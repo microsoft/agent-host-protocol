@@ -40,3 +40,11 @@ For desktop (Electron) deployments, the renderer connects directly to the agent 
 ## Custom Transports
 
 Implementations MAY define custom transports as long as they meet the requirements above. Any mechanism that delivers complete, ordered, bidirectional messages is acceptable.
+
+## Keep-Alive
+
+AHP does not define a protocol-level heartbeat. For WebSocket transports, implementations SHOULD use WebSocket protocol-level ping/pong frames to detect dead connections. The ping interval and timeout are implementation-specific.
+
+## Authentication
+
+Authentication is a transport-layer concern and is outside the scope of the AHP wire protocol. For WebSocket transports, implementations SHOULD authenticate during the WebSocket handshake (e.g. via query parameters, headers, or the HTTP upgrade request) before the AHP `initialize` request is sent.

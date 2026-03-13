@@ -31,9 +31,9 @@ AHP uses [JSON-RPC 2.0](https://www.jsonrpc.org/specification) as its message fr
 
 | Direction | Type | Examples |
 |---|---|---|
-| Client → Server (notification) | Fire-and-forget | `initialize`, `reconnect`, `unsubscribe`, `dispatchAction` |
-| Client → Server (request) | Expects a response | `subscribe`, `createSession`, `disposeSession`, `listSessions`, `fetchTurns`, `fetchContent` |
-| Server → Client (notification) | Pushed | `serverHello`, `reconnectResponse`, `action`, `notification` |
+| Client → Server (notification) | Fire-and-forget | `unsubscribe`, `dispatchAction` |
+| Client → Server (request) | Expects a response | `initialize`, `reconnect`, `subscribe`, `createSession`, `disposeSession`, `listSessions`, `fetchTurns`, `fetchContent` |
+| Server → Client (notification) | Pushed | `action`, `notification` |
 | Server → Client (response) | Correlated by `id` | Success result or JSON-RPC error |
 
 ### Requests
@@ -77,4 +77,6 @@ The specification is organized into the following sections:
 - **[State Types](/reference/state-types)** — Complete state type definitions.
 - **[Actions](/reference/actions)** — Complete action type definitions.
 - **[Commands](/reference/commands)** — Available RPC commands.
+- **[Messages](/reference/messages)** — Complete list of JSON-RPC methods.
 - **[Notifications](/reference/notifications)** — Ephemeral event broadcasts.
+- **[Error Codes](/reference/error-codes)** — Application-specific error codes.

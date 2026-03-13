@@ -11,7 +11,7 @@ interface IActionEnvelope {
   readonly action: IStateAction;
   readonly serverSeq: number;
   readonly origin: { clientId: string; clientSeq: number } | undefined;
-  readonly rejected?: true;
+  readonly rejectionReason?: string;
 }
 ```
 

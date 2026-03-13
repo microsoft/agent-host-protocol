@@ -101,7 +101,7 @@ function capabilitiesForVersion(version: number): ProtocolCapabilities {
 
 A newer client connecting to an older server:
 
-1. During handshake, the client learns the server's protocol version from `serverHello`.
+1. During handshake, the client learns the server's protocol version from the `initialize` response.
 2. The client derives `ProtocolCapabilities` from the server version.
 3. Command factories check capabilities before dispatching; if unsupported, the client degrades gracefully.
 4. The server only sends action types known to the client's declared version (via `isActionKnownToVersion`).

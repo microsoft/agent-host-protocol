@@ -9,13 +9,13 @@ ActionEnvelope {
   action: Action
   serverSeq: number                                     // monotonic, assigned by server
   origin: { clientId: string, clientSeq: number } | undefined  // undefined = server-originated
-  rejected?: true
+  rejectionReason?: string                              // present when the server rejected the action
 }
 ```
 
 - `serverSeq` — Monotonically increasing sequence number assigned by the server, used for ordering and replay.
 - `origin` — Identifies who produced this action. `undefined` means the server itself (e.g. from an agent backend). Otherwise identifies the client that dispatched it.
-- `rejected` — Set to `true` when the server rejected the action. The client should revert its optimistic prediction.
+- `rejectionReason` — When present, indicates the server rejected the action. The client should revert its optimistic prediction. Contains a human-readable explanation (e.g. `"no active turn to cancel"`, `"unknown permission request ID"`).
 
 ## Root Actions
 
@@ -55,6 +55,10 @@ When a client dispatches an action, the server applies it to the state and also 
 |---|---|---|
 | `session/toolStart` | No | Tool execution began |
 | `session/toolComplete` | No | Tool execution finished |
+
+::: tip FUTURE WORK
+A `session/toolUpdate` action for streaming incremental tool output (e.g. terminal output during a shell command) is planned for a future protocol version.
+:::
 
 ### Permissions
 

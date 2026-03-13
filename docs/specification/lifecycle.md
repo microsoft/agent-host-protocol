@@ -4,18 +4,21 @@ The lifecycle defines how AHP connections are established, sessions are created 
 
 ## Connection Handshake
 
-The client initiates the connection with an `initialize` notification. The server responds with a `serverHello` notification:
+The client initiates the connection with an `initialize` **request**. The server responds with the protocol version and initial state snapshots:
 
 ```
 1. Client → Server:  initialize(protocolVersion, clientId, initialSubscriptions?)
-2. Server → Client:  serverHello(protocolVersion, serverSeq, snapshots[])
+2. Server → Client:  { protocolVersion, serverSeq, snapshots[] }
 ```
 
 ### Initialize (Client → Server)
 
+`initialize` is a JSON-RPC **request** — the server MUST respond with a result or error.
+
 ```json
 {
   "jsonrpc": "2.0",
+  "id": 1,
   "method": "initialize",
   "params": {
     "protocolVersion": 1,
@@ -27,13 +30,13 @@ The client initiates the connection with an `initialize` notification. The serve
 
 `initialSubscriptions` allows the client to subscribe to root state (and any previously-open sessions) in the same round-trip as the handshake.
 
-### ServerHello (Server → Client)
+### Initialize Response (Server → Client)
 
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "serverHello",
-  "params": {
+  "id": 1,
+  "result": {
     "protocolVersion": 1,
     "serverSeq": 42,
     "snapshots": [
@@ -48,6 +51,8 @@ The client initiates the connection with an `initialize` notification. The serve
 ```
 
 The `protocolVersion` in the response tells the client what version the server speaks. The client derives `ProtocolCapabilities` from this and gates feature usage accordingly.
+
+If the server cannot accept the connection (e.g. unsupported protocol version), it MUST return a JSON-RPC error. See [Error Codes](/reference/error-codes) for defined codes.
 
 ## Session Creation
 
@@ -75,6 +80,21 @@ Once a session reaches `lifecycle: 'ready'`, the session is active:
 
 All actions MUST be scoped to the session URI and reference a valid turn ID when applicable.
 
+## Server Validation of Client Actions
+
+When the server receives a client-dispatched action, it MUST validate it before applying. Invalid actions MUST be echoed back with a `rejectionReason`. The following validation rules apply:
+
+| Action | Condition | Server Behavior |
+|---|---|---|
+| Any action referencing a non-existent session | Session URI not found | Server MUST silently ignore the action (no echo) |
+| `session/permissionResolved` | `requestId` not in `pendingPermissions` | Server MUST reject the action |
+| `session/turnCancelled` | No active turn | Server MUST reject the action |
+| `session/modelChanged` | A turn is currently active | Server MUST defer the model change until the active turn completes, then apply it for the next turn |
+
+::: tip FUTURE WORK
+`session/turnStarted` dispatched while a turn is already active will eventually support queuing and steering. See the protocol roadmap for details.
+:::
+
 ## Session Disposal
 
 ```jsonc
@@ -91,11 +111,12 @@ The server disposes the session and broadcasts a `notify/sessionRemoved` notific
 
 ## Reconnection
 
-If the transport connection drops, the client reconnects and sends:
+If the transport connection drops, the client reconnects and sends a `reconnect` **request**:
 
 ```json
 {
   "jsonrpc": "2.0",
+  "id": 2,
   "method": "reconnect",
   "params": {
     "clientId": "client-abc",
@@ -105,9 +126,39 @@ If the transport connection drops, the client reconnects and sends:
 }
 ```
 
-The server replays actions since `lastSeenServerSeq` from a bounded replay buffer. If the gap exceeds the buffer, the server sends fresh snapshots via a `reconnectResponse` notification.
+The server MUST include all replayed data in the response before returning. If the server can replay from the requested sequence, it returns the missed action envelopes:
 
-Notifications are **not** replayed — the client SHOULD re-fetch the session list via `listSessions()`.
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "type": "replay",
+    "actions": [
+      { "action": { "type": "session/delta", ... }, "serverSeq": 43 },
+      { "action": { "type": "session/delta", ... }, "serverSeq": 44 }
+    ]
+  }
+}
+```
+
+If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "result": {
+    "type": "snapshot",
+    "snapshots": [
+      { "resource": "agenthost:/root", "state": { ... }, "fromSeq": 50 },
+      { "resource": "copilot:/<uuid>", "state": { ... }, "fromSeq": 50 }
+    ]
+  }
+}
+```
+
+Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via `listSessions()`.
 
 ## Unexpected Disconnection
 

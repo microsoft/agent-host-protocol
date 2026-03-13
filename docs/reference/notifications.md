@@ -76,27 +76,7 @@ Clients use notifications to maintain a local session list cache:
 
 ## Server Notifications
 
-In addition to protocol notifications, the server sends these notifications during connection lifecycle:
-
-### `serverHello`
-
-Sent in response to the client's `initialize` message.
-
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "serverHello",
-  "params": {
-    "protocolVersion": 1,
-    "serverSeq": 42,
-    "snapshots": [{ "resource": "...", "state": { ... }, "fromSeq": 42 }]
-  }
-}
-```
-
-### `reconnectResponse`
-
-Sent in response to a `reconnect` message when the server cannot replay from the requested sequence number and must send fresh snapshots instead.
+In addition to protocol notifications, the server pushes action envelopes to subscribed clients:
 
 ### `action`
 

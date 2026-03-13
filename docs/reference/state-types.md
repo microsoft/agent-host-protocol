@@ -85,8 +85,8 @@ An in-progress turn — the assistant is actively streaming.
 | `userMessage` | `IUserMessage` | The user's input |
 | `streamingText` | `string` | Accumulated streaming response text |
 | `responseParts` | `IResponsePart[]` | Structured response content so far |
-| `toolCalls` | `Map<string, IToolCallState>` | Active tool invocations by tool call ID |
-| `pendingPermissions` | `Map<string, IPermissionRequest>` | Pending permission requests by request ID |
+| `toolCalls` | `Record<string, IToolCallState>` | Active tool invocations keyed by tool call ID |
+| `pendingPermissions` | `Record<string, IPermissionRequest>` | Pending permission requests keyed by request ID |
 | `reasoning` | `string` | Accumulated reasoning/thinking text |
 | `usage` | `IUsageInfo \| undefined` | Token usage info |
 
@@ -132,6 +132,10 @@ A reference to large content stored outside the state tree.
 ### `IToolCallState`
 
 Full lifecycle state of a tool invocation within an active turn.
+
+::: tip FUTURE WORK
+Fields like `toolName` in `IToolCallState` and `serverName`/`toolName`/`rawRequest` in `IPermissionRequest` carry agent-specific identifiers on the wire despite the agent-agnostic design principle. These exist for debugging and logging purposes. A future version may move these to a separate diagnostic channel or namespace them more clearly.
+:::
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -205,3 +209,13 @@ Full lifecycle state of a tool invocation within an active turn.
 | `errorType` | `string` | Yes | Error type identifier |
 | `message` | `string` | Yes | Human-readable error message |
 | `stack` | `string` | No | Stack trace |
+
+### `ISnapshot`
+
+A point-in-time snapshot of a subscribed resource's state, returned by `initialize`, `reconnect`, and `subscribe`.
+
+| Field | Type | Description |
+|---|---|---|
+| `resource` | `URI` | The subscribed resource URI (e.g. `agenthost:/root` or `copilot:/<uuid>`) |
+| `state` | `IRootState \| ISessionState` | The current state of the resource |
+| `fromSeq` | `number` | The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`. |

@@ -78,11 +78,12 @@ The server broadcasts action envelopes as JSON-RPC notifications to subscribed c
 
 ## Initial Subscriptions
 
-During the connection handshake, clients MAY include `initialSubscriptions` in the `initialize` message to subscribe to URIs in the same round-trip:
+During the connection handshake, clients MAY include `initialSubscriptions` in the `initialize` request to subscribe to URIs in the same round-trip:
 
 ```json
 {
   "jsonrpc": "2.0",
+  "id": 1,
   "method": "initialize",
   "params": {
     "protocolVersion": 1,
@@ -92,7 +93,7 @@ During the connection handshake, clients MAY include `initialSubscriptions` in t
 }
 ```
 
-The server includes snapshots for each in the `serverHello` response.
+The server includes snapshots for each in the `initialize` response.
 
 ## Protocol Notifications
 

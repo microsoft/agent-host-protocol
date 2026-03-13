@@ -97,8 +97,8 @@ ActiveTurn {
   userMessage: UserMessage
   streamingText: string
   responseParts: ResponsePart[]
-  toolCalls: Map<toolCallId, ToolCallState>
-  pendingPermissions: Map<requestId, PermissionRequest>
+  toolCalls: Record<toolCallId, ToolCallState>
+  pendingPermissions: Record<requestId, PermissionRequest>
   reasoning: string
   usage: UsageInfo | undefined
 }

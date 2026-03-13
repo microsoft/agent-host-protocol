@@ -26,8 +26,8 @@ When the client receives an `ActionEnvelope` from the server:
 2. **Foreign action** (different origin or server-originated):
    - Apply to `confirmedState`, rebase remaining `pendingActions`.
 
-3. **Rejected action** (server echoed with `rejected: true`):
-   - Remove from pending (optimistic effect reverted).
+3. **Rejected action** (server echoed with `rejectionReason` present):
+   - Remove from pending (optimistic effect reverted). The `rejectionReason` MAY be surfaced to the user.
 
 4. Recompute `optimisticState` from `confirmedState` + remaining `pendingActions`.
 
@@ -64,9 +64,10 @@ The rare true conflict (two clients abort the same turn) is resolved by **server
 If the transport connection drops:
 
 ```jsonc
-// Client → Server
+// Client → Server (request)
 {
   "jsonrpc": "2.0",
+  "id": 2,
   "method": "reconnect",
   "params": {
     "clientId": "client-1",
@@ -76,7 +77,9 @@ If the transport connection drops:
 }
 ```
 
-The server replays actions since `lastSeenServerSeq` from a bounded replay buffer. If the gap exceeds the buffer, the server sends fresh snapshots via a `reconnectResponse` notification. Notifications (like `sessionAdded`/`sessionRemoved`) are **not** replayed — the client should re-fetch the session list.
+The server MUST include all replayed data in the response. If the gap is within the replay buffer, the response contains missed action envelopes. If the gap exceeds the buffer, the response contains fresh snapshots instead. In both cases, the client resets `confirmedState` accordingly and clears `pendingActions`.
+
+Protocol notifications (like `sessionAdded`/`sessionRemoved`) are **not** replayed — the client should re-fetch the session list.
 
 ## Next Steps
 
