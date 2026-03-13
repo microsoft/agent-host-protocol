@@ -1,0 +1,20 @@
+{
+  "name": "@ahp/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server providing WebSocket connectivity to an Agent Host Protocol server",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

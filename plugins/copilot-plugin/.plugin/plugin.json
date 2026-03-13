@@ -1,0 +1,8 @@
+{
+  "name": "ahp-client",
+  "version": "0.1.0",
+  "description": "Connect to and interact with an Agent Host Protocol server over WebSocket.",
+  "author": "Microsoft",
+  "repository": "https://github.com/microsoft/agent-host-protocol",
+  "license": "MIT"
+}

@@ -13,8 +13,8 @@
     "url": "git+https://github.com/microsoft/agent-host-protocol.git"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Microsoft Corporation",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/microsoft/agent-host-protocol/issues"

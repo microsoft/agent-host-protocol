@@ -1,0 +1,15 @@
+{
+  "name": "agent-host-protocol",
+  "owner": {
+    "name": "Microsoft"
+  },
+  "metadata": {
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "ahp-client",
+      "source": "./copilot-plugin/"
+    }
+  ]
+}

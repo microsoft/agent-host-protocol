@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ahp-websocket": {
+      "command": "npx",
+      "args": ["tsx", "${PLUGIN_ROOT}/mcp-server/src/index.ts"]
+    }
+  }
+}
