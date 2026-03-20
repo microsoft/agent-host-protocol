@@ -4,5 +4,11 @@
       "extensions": ["ts"],
       "parameters": ["--import", "tsx"]
     }
-  ]
+  ],
+  "git.branchProtection": [
+    "main",
+    "release/*"
+  ],
+  "git.branchProtectionPrompt": "alwaysCommitToNewBranch",
+  "git.branchRandomName.enable": true,
 }

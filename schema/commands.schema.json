@@ -171,7 +171,7 @@
           "description": "Model ID to use"
         },
         "workingDirectory": {
-          "type": "string",
+          "$ref": "#/$defs/URI",
           "description": "Working directory for the session"
         }
       },

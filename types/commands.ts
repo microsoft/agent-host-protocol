@@ -171,7 +171,7 @@ export interface ICreateSessionParams {
   /** Model ID to use */
   model?: string;
   /** Working directory for the session */
-  workingDirectory?: string;
+  workingDirectory?: URI;
 }
 
 // ─── disposeSession ──────────────────────────────────────────────────────────
