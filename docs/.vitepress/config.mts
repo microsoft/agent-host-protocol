@@ -41,6 +41,7 @@ export default withMermaid(defineConfig({
           text: 'Design',
           items: [
             { text: 'Design Decisions', link: '/guide/design' },
+            { text: 'AHP and ACP', link: '/guide/ahp-and-acp' },
           ],
         },
       ],
