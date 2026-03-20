@@ -279,6 +279,10 @@
         "model": {
           "type": "string",
           "description": "Currently selected model"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "The working directory URI for this session"
         }
       },
       "required": [

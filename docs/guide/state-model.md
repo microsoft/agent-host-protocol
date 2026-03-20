@@ -66,6 +66,7 @@ SessionSummary {
   createdAt: number
   modifiedAt: number
   model?: string
+  workingDirectory?: URI
 }
 ```
 

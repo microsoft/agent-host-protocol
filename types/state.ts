@@ -236,6 +236,8 @@ export interface ISessionSummary {
   modifiedAt: number;
   /** Currently selected model */
   model?: string;
+  /** The working directory URI for this session */
+  workingDirectory?: URI;
 }
 
 // ─── Turn Types ──────────────────────────────────────────────────────────────
