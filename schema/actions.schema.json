@@ -910,6 +910,10 @@
           "$ref": "#/$defs/ISessionActiveClient",
           "description": "The client currently providing tools and interactive capabilities to this session"
         },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "The working directory URI for this session"
+        },
         "turns": {
           "type": "array",
           "items": {

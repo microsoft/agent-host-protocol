@@ -1,5 +1,5 @@
 ---
-description: Rules for describing how types
+description: Rules for iterating on protocol types
 applyTo: 'types/**/*.ts'
 ---
 
@@ -37,3 +37,4 @@ applyTo: 'types/**/*.ts'
 - After making a change, always add compatibility checks to the resulting file (current tip: `types/version/v1.ts`) so that any future incompatible changes will be caught by the compiler. See [Versioning](../../docs/specification/versioning.md) for details.
 - For actions or commands that could be implemented by returning an array `T[]` directly, still prefer to wrap it in `{ items: T[] }` for forward compatibility. This allows adding additional fields later without breaking the shape.
 - After making your changes, check to make sure the documentation in `docs` is up to date. For significant new flows or features, consider adding new documentation for it. Note that Mermaid diagrams are allowed.
+- Whenever you change or add an action, you must review the reducers in `types/reducers.ts` to see if that needs to be propagated into the state. If it does, add the appropriate logic and unit tests for it.
