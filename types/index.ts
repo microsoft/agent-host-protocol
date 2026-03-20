@@ -37,6 +37,7 @@ export type {
   IToolResultTextContent,
   IToolResultBinaryContent,
   IToolResultContent,
+  IToolResultFileEditContent,
   ISessionActiveClient,
   IPermissionRequest,
   IUsageInfo,

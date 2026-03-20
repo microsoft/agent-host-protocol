@@ -827,6 +827,40 @@
         "contentType"
       ]
     },
+    "IToolResultFileEditContent": {
+      "type": "object",
+      "description": "Describes a file modification performed by a tool.\n\nClients can use the `beforeURI`/`afterURI` pair to render a diff view.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.FileEdit"
+        },
+        "beforeURI": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the file content before the edit"
+        },
+        "afterURI": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the file content after the edit"
+        },
+        "diff": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "number"
+            },
+            "removed": {
+              "type": "number"
+            }
+          },
+          "description": "Optional diff display metadata"
+        }
+      },
+      "required": [
+        "type",
+        "beforeURI",
+        "afterURI"
+      ]
+    },
     "IPermissionRequest": {
       "type": "object",
       "properties": {
@@ -1007,10 +1041,13 @@
           "$ref": "#/$defs/IToolResultBinaryContent"
         },
         {
+          "$ref": "#/$defs/IToolResultFileEditContent"
+        },
+        {
           "$ref": "#/$defs/IContentRef"
         }
       ],
-      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus `IContentRef`\nfor lazy-loading large results (an AHP extension)."
+      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`IContentRef` for lazy-loading large results and `IToolResultFileEditContent`\nfor file edit diffs (AHP extensions)."
     }
   }
 }

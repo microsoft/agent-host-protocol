@@ -225,6 +225,10 @@
         "uri": {
           "type": "string",
           "description": "Content URI from a `ContentRef`"
+        },
+        "encoding": {
+          "$ref": "#/$defs/ContentEncoding",
+          "description": "Preferred encoding for the returned data (default: server-chosen)"
         }
       },
       "required": [
@@ -233,7 +237,7 @@
     },
     "IFetchContentResult": {
       "type": "object",
-      "description": "Result of the `fetchContent` command.",
+      "description": "Result of the `fetchContent` command.\n\nThe server SHOULD honor the `encoding` requested in the params. If the\nserver cannot provide the requested encoding, it MUST fall back to either\n`base64` or `utf-8`.",
       "properties": {
         "data": {
           "type": "string",
@@ -243,9 +247,9 @@
           "$ref": "#/$defs/ContentEncoding",
           "description": "How `data` is encoded"
         },
-        "mimeType": {
+        "contentType": {
           "type": "string",
-          "description": "MIME type of the content"
+          "description": "Content type (e.g. `\"image/png\"`, `\"text/plain\"`)"
         }
       },
       "required": [
@@ -1235,6 +1239,40 @@
         "type",
         "data",
         "contentType"
+      ]
+    },
+    "IToolResultFileEditContent": {
+      "type": "object",
+      "description": "Describes a file modification performed by a tool.\n\nClients can use the `beforeURI`/`afterURI` pair to render a diff view.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.FileEdit"
+        },
+        "beforeURI": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the file content before the edit"
+        },
+        "afterURI": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the file content after the edit"
+        },
+        "diff": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "number"
+            },
+            "removed": {
+              "type": "number"
+            }
+          },
+          "description": "Optional diff display metadata"
+        }
+      },
+      "required": [
+        "type",
+        "beforeURI",
+        "afterURI"
       ]
     },
     "IPermissionRequest": {

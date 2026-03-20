@@ -144,8 +144,9 @@ function splitUnionType(typeText: string): string[] {
 }
 
 function inlineObjectToSchema(text: string): JsonSchema {
-  // Parse { key: type; key?: type } style
-  const inner = text.slice(1, -1).trim();
+  // Parse { key: type; key?: type } style, stripping any JSDoc/block comments
+  const cleaned = text.replace(/\/\*[\s\S]*?\*\//g, '');
+  const inner = cleaned.slice(cleaned.indexOf('{') + 1, cleaned.lastIndexOf('}')).trim();
   const schema: JsonSchema = { type: 'object', properties: {}, required: [] };
   const fields = inner.split(';').map(f => f.trim()).filter(Boolean);
 

@@ -174,8 +174,8 @@ stateDiagram-v2
 | `streaming` | `partialInput?` | LM is streaming tool call parameters. `partialInput` accumulates via `toolCallDelta`. |
 | `pending-confirmation` | `invocationMessage`, `toolInput?` | Parameters complete, waiting for client to confirm execution. |
 | `running` | `confirmed` | Tool is executing. `confirmed` records how it was approved. |
-| `pending-result-confirmation` | `success`, `pastTenseMessage`, `toolOutput?` | Execution finished, waiting for client to approve the result. |
-| `completed` | `success`, `pastTenseMessage`, `toolOutput?` | Terminal state. Tool finished. |
+| `pending-result-confirmation` | `success`, `pastTenseMessage`, `content?` | Execution finished, waiting for client to approve the result. |
+| `completed` | `success`, `pastTenseMessage`, `content?` | Terminal state. Tool finished. |
 | `cancelled` | `reason`, `reasonMessage?`, `userSuggestion?` | Terminal state. `reason` is `'denied'`, `'skipped'`, or `'result-denied'`. |
 
 When a turn completes, only terminal-state tool calls (`completed` or `cancelled`) are preserved in the finalized `Turn.toolCalls` array.
