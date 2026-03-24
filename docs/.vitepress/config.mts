@@ -4,7 +4,8 @@ import { withMermaid } from 'vitepress-plugin-mermaid'
 export default withMermaid(defineConfig({
   title: 'Agent Host Protocol',
   description: 'Documentation for the Agent Host Protocol — a synchronized, multi-client state protocol for AI agent sessions',
-  base: '/agent-host-protocol/',
+  // todo: reenable when GH pages is public
+  // base: '/agent-host-protocol/',
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/agent-host-protocol/logo.svg' }],
