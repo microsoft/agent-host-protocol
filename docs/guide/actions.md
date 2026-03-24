@@ -43,8 +43,8 @@ When a client dispatches an action, the server applies it to the state and also 
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `session/turnStarted` | **Yes** | User sent a message; server starts processing |
-| `session/delta` | No | Streaming text chunk from assistant |
-| `session/responsePart` | No | Structured content appended |
+| `session/delta` | No | Streaming text chunk appended to a response part by `partId` |
+| `session/responsePart` | No | New response part created (markdown, reasoning, content ref) |
 | `session/turnComplete` | No | Turn finished (assistant idle) |
 | `session/turnCancelled` | **Yes** | Turn was aborted; server stops processing |
 | `session/error` | No | Error during turn processing |
@@ -58,22 +58,13 @@ When a client dispatches an action, the server applies it to the state and also 
 
 ::: tip FUTURE WORK
 A `session/toolUpdate` action for streaming incremental tool output (e.g. terminal output during a shell command) is planned for a future protocol version.
-:::
-
-### Permissions
-
-| Type | Client-dispatchable? | When |
-|---|---|---|
-| `session/permissionRequest` | No | Permission needed from user |
-| `session/permissionResolved` | **Yes** | Permission granted or denied |
-
-### Metadata & Informational
+:::\n\n### Metadata & Informational
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `session/titleChanged` | No | Session title updated |
 | `session/usage` | No | Token usage report |
-| `session/reasoning` | No | Reasoning/thinking text |
+| `session/reasoning` | No | Reasoning/thinking text appended to a reasoning part by `partId` |
 | `session/modelChanged` | **Yes** | Model changed for this session |
 
 ## Client-Dispatched Actions
@@ -97,7 +88,7 @@ The client applies the action **optimistically** to its local state before sendi
 | Action | Server-side effect |
 |---|---|
 | `session/turnStarted` | Begins agent processing for the new turn |
-| `session/permissionResolved` | Unblocks the pending tool execution |
+| `session/toolCallConfirmed` | Approves or denies a pending tool call; unblocks or cancels tool execution |
 | `session/turnCancelled` | Aborts the in-progress turn |
 | `session/modelChanged` | Changes the model for subsequent turns |
 

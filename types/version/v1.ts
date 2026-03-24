@@ -24,6 +24,8 @@ import type {
   IMessageAttachment,
   IMarkdownResponsePart,
   IContentRef,
+  IToolCallResponsePart,
+  IReasoningResponsePart,
   IToolCallResult,
   IToolCallStreamingState,
   IToolCallPendingConfirmationState,
@@ -37,7 +39,6 @@ import type {
   IToolResultTextContent,
   IToolResultBinaryContent,
   IToolResultFileEditContent,
-  IPermissionRequest,
   IUsageInfo,
   IErrorInfo,
   ISnapshot,
@@ -105,6 +106,8 @@ type V1_IUserMessage = IUserMessage;
 type V1_IMessageAttachment = IMessageAttachment;
 type V1_IMarkdownResponsePart = IMarkdownResponsePart;
 type V1_IContentRef = IContentRef;
+type V1_IToolCallResponsePart = IToolCallResponsePart;
+type V1_IReasoningResponsePart = IReasoningResponsePart;
 type V1_IToolCallResult = IToolCallResult;
 type V1_IToolCallStreamingState = IToolCallStreamingState;
 type V1_IToolCallPendingConfirmationState = IToolCallPendingConfirmationState;
@@ -118,7 +121,6 @@ type V1_IToolAnnotations = IToolAnnotations;
 type V1_IToolResultTextContent = IToolResultTextContent;
 type V1_IToolResultBinaryContent = IToolResultBinaryContent;
 type V1_IToolResultFileEditContent = IToolResultFileEditContent;
-type V1_IPermissionRequest = IPermissionRequest;
 type V1_IUsageInfo = IUsageInfo;
 type V1_IErrorInfo = IErrorInfo;
 type V1_ISnapshot = ISnapshot;
@@ -171,6 +173,10 @@ type _CheckMarkdownResponsePart = AssertCompatible<V1_IMarkdownResponsePart, IMa
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckContentRef = AssertCompatible<V1_IContentRef, IContentRef>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckToolCallResponsePart = AssertCompatible<V1_IToolCallResponsePart, IToolCallResponsePart>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckReasoningResponsePart = AssertCompatible<V1_IReasoningResponsePart, IReasoningResponsePart>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckToolCallResult = AssertCompatible<V1_IToolCallResult, IToolCallResult>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckToolCallStreamingState = AssertCompatible<V1_IToolCallStreamingState, IToolCallStreamingState>;
@@ -186,8 +192,6 @@ type _CheckToolCallCompletedState = AssertCompatible<V1_IToolCallCompletedState,
 type _CheckToolCallCancelledState = AssertCompatible<V1_IToolCallCancelledState, IToolCallCancelledState>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckToolCallState = AssertCompatible<V1_IToolCallState, IToolCallState>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckPermissionRequest = AssertCompatible<V1_IPermissionRequest, IPermissionRequest>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckUsageInfo = AssertCompatible<V1_IUsageInfo, IUsageInfo>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

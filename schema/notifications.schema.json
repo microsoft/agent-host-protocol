@@ -375,30 +375,12 @@
           "$ref": "#/$defs/IUserMessage",
           "description": "The user's input"
         },
-        "responseText": {
-          "type": "string",
-          "description": "Final response text (captured from streaming)"
-        },
         "responseParts": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/IResponsePart"
           },
-          "description": "Structured response content"
-        },
-        "toolCalls": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "$ref": "#/$defs/IToolCallCompletedState"
-              },
-              {
-                "$ref": "#/$defs/IToolCallCancelledState"
-              }
-            ]
-          },
-          "description": "Tool invocations in terminal states (completed or cancelled)"
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
         },
         "usage": {
           "$ref": "#/$defs/IUsageInfo",
@@ -416,9 +398,7 @@
       "required": [
         "id",
         "userMessage",
-        "responseText",
         "responseParts",
-        "toolCalls",
         "usage",
         "state"
       ]
@@ -435,34 +415,12 @@
           "$ref": "#/$defs/IUserMessage",
           "description": "The user's input"
         },
-        "streamingText": {
-          "type": "string",
-          "description": "Accumulated streaming response text"
-        },
         "responseParts": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/IResponsePart"
           },
-          "description": "Structured response content so far"
-        },
-        "toolCalls": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/IToolCallState"
-          },
-          "description": "Active tool invocations keyed by tool call ID"
-        },
-        "pendingPermissions": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/IPermissionRequest"
-          },
-          "description": "Pending permission requests keyed by request ID"
-        },
-        "reasoning": {
-          "type": "string",
-          "description": "Accumulated reasoning/thinking text"
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nTool call parts include `pendingPermissions` when permissions are awaiting user approval."
         },
         "usage": {
           "$ref": "#/$defs/IUsageInfo",
@@ -472,11 +430,7 @@
       "required": [
         "id",
         "userMessage",
-        "streamingText",
         "responseParts",
-        "toolCalls",
-        "pendingPermissions",
-        "reasoning",
         "usage"
       ]
     },
@@ -527,6 +481,10 @@
           "$ref": "#/$defs/ResponsePartKind.Markdown",
           "description": "Discriminant"
         },
+        "id": {
+          "type": "string",
+          "description": "Part identifier, used by `session/delta` to target this part for content appends"
+        },
         "content": {
           "type": "string",
           "description": "Markdown content"
@@ -534,6 +492,7 @@
       },
       "required": [
         "kind",
+        "id",
         "content"
       ]
     },
@@ -561,6 +520,47 @@
       "required": [
         "kind",
         "uri"
+      ]
+    },
+    "IToolCallResponsePart": {
+      "type": "object",
+      "description": "A tool call represented as a response part.\n\nTool calls are part of the response stream, interleaved with text and\nreasoning. The `toolCall.toolCallId` serves as the part identifier for\nactions that target this part.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.ToolCall",
+          "description": "Discriminant"
+        },
+        "toolCall": {
+          "$ref": "#/$defs/IToolCallState",
+          "description": "Full tool call lifecycle state"
+        }
+      },
+      "required": [
+        "kind",
+        "toolCall"
+      ]
+    },
+    "IReasoningResponsePart": {
+      "type": "object",
+      "description": "Reasoning/thinking content from the model.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.Reasoning",
+          "description": "Discriminant"
+        },
+        "id": {
+          "type": "string",
+          "description": "Part identifier, used by `session/reasoning` to target this part for content appends"
+        },
+        "content": {
+          "type": "string",
+          "description": "Accumulated reasoning text"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "content"
       ]
     },
     "IToolCallBase": {
@@ -679,10 +679,14 @@
     },
     "IToolCallPendingConfirmationState": {
       "type": "object",
-      "description": "Parameters are complete, waiting for client to confirm execution.",
+      "description": "Parameters are complete, or a running tool requires re-confirmation\n(e.g. a mid-execution permission check).",
       "properties": {
         "status": {
           "$ref": "#/$defs/ToolCallStatus.PendingConfirmation"
+        },
+        "confirmationTitle": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Short title for the confirmation prompt (e.g. `\"Run in terminal\"`, `\"Write file\"`)"
         }
       },
       "required": [
@@ -928,51 +932,6 @@
         "type",
         "beforeURI",
         "afterURI"
-      ]
-    },
-    "IPermissionRequest": {
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": "string",
-          "description": "Unique request identifier"
-        },
-        "permissionKind": {
-          "$ref": "#/$defs/PermissionKind",
-          "description": "Type of permission"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Associated tool call"
-        },
-        "path": {
-          "type": "string",
-          "description": "File/directory path"
-        },
-        "fullCommandText": {
-          "type": "string",
-          "description": "Full command to execute"
-        },
-        "intention": {
-          "type": "string",
-          "description": "What the tool intends to do"
-        },
-        "serverName": {
-          "type": "string",
-          "description": "MCP server name"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Tool requesting permission"
-        },
-        "rawRequest": {
-          "type": "string",
-          "description": "Raw request data"
-        }
-      },
-      "required": [
-        "requestId",
-        "permissionKind"
       ]
     },
     "IUsageInfo": {

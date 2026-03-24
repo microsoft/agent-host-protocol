@@ -455,12 +455,6 @@ function generateStateTypesPage(project: Project): string {
     lines.push(renderInterfaceTable(iface) + '\n');
   }
 
-  // Permission Types
-  lines.push('## Permission Types\n');
-  const permReq = getInterface(project, 'IPermissionRequest');
-  lines.push(renderHeading('IPermissionRequest', permReq));
-  lines.push(renderInterfaceTable(permReq) + '\n');
-
   // Common Types
   lines.push('## Common Types\n');
 
@@ -501,13 +495,11 @@ const ACTION_ORDER: ActionMeta[] = [
   { interfaceName: 'ISessionResponsePartAction', typeValue: 'session/responsePart', description: 'Structured content appended to the response.', clientDispatchable: false, version: 1 },
   { interfaceName: 'ISessionToolCallStartAction', typeValue: 'session/toolCallStart', description: 'A tool call begins — parameters are streaming from the LM.', clientDispatchable: false, version: 1 },
   { interfaceName: 'ISessionToolCallDeltaAction', typeValue: 'session/toolCallDelta', description: 'Streaming partial parameters for a tool call.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionToolCallReadyAction', typeValue: 'session/toolCallReady', description: 'Tool call parameters are complete.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'ISessionToolCallReadyAction', typeValue: 'session/toolCallReady', description: 'Tool call parameters are complete, or a running tool requires re-confirmation.', clientDispatchable: false, version: 1 },
   { interfaceName: 'ISessionToolCallApprovedAction', typeValue: 'session/toolCallConfirmed (approved)', description: 'Client approves a pending tool call.', clientDispatchable: true, version: 1 },
   { interfaceName: 'ISessionToolCallDeniedAction', typeValue: 'session/toolCallConfirmed (denied)', description: 'Client denies a pending tool call.', clientDispatchable: true, version: 1 },
   { interfaceName: 'ISessionToolCallCompleteAction', typeValue: 'session/toolCallComplete', description: 'Tool execution finished.', clientDispatchable: false, version: 1 },
   { interfaceName: 'ISessionToolCallResultConfirmedAction', typeValue: 'session/toolCallResultConfirmed', description: 'Client approves or denies a tool result.', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionPermissionRequestAction', typeValue: 'session/permissionRequest', description: 'Permission needed from the user to proceed.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionPermissionResolvedAction', typeValue: 'session/permissionResolved', description: 'Permission granted or denied.', clientDispatchable: true, version: 1 },
   { interfaceName: 'ISessionTurnCompleteAction', typeValue: 'session/turnComplete', description: 'Turn finished — the assistant is idle.', clientDispatchable: false, version: 1 },
   { interfaceName: 'ISessionTurnCancelledAction', typeValue: 'session/turnCancelled', description: 'Turn was aborted; server stops processing.', clientDispatchable: true, version: 1 },
   { interfaceName: 'ISessionErrorAction', typeValue: 'session/error', description: 'Error during turn processing.', clientDispatchable: false, version: 1 },

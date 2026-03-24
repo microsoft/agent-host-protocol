@@ -17,7 +17,6 @@ import type {
   IToolDefinition,
   ISessionActiveClient,
   IUsageInfo,
-  IPermissionRequest,
 } from './state.js';
 
 import { ToolCallConfirmationReason, ToolCallCancellationReason } from './state.js';
@@ -43,8 +42,6 @@ export const enum ActionType {
   SessionToolCallConfirmed = 'session/toolCallConfirmed',
   SessionToolCallComplete = 'session/toolCallComplete',
   SessionToolCallResultConfirmed = 'session/toolCallResultConfirmed',
-  SessionPermissionRequest = 'session/permissionRequest',
-  SessionPermissionResolved = 'session/permissionResolved',
   SessionTurnComplete = 'session/turnComplete',
   SessionTurnCancelled = 'session/turnCancelled',
   SessionError = 'session/error',
@@ -173,7 +170,10 @@ export interface ISessionTurnStartedAction {
 }
 
 /**
- * Streaming text chunk from the assistant.
+ * Streaming text chunk from the assistant, appended to a specific response part.
+ *
+ * The server MUST first emit a `session/responsePart` to create the target
+ * part (markdown or reasoning), then use this action to append text to it.
  *
  * @category Session Actions
  * @version 1
@@ -184,6 +184,8 @@ export interface ISessionDeltaAction {
   session: URI;
   /** Turn identifier */
   turnId: string;
+  /** Identifier of the response part to append to */
+  partId: string;
   /** Text chunk */
   content: string;
 }
@@ -242,8 +244,15 @@ export interface ISessionToolCallDeltaAction extends IToolCallActionBase {
 }
 
 /**
- * Tool call parameters are complete. Transitions to `pending-confirmation`
+ * Tool call parameters are complete, or a running tool requires re-confirmation.
+ *
+ * When dispatched for a `streaming` tool call, transitions to `pending-confirmation`
  * or directly to `running` if `confirmed` is set.
+ *
+ * When dispatched for a `running` tool call (e.g. mid-execution permission needed),
+ * transitions back to `pending-confirmation`. The `invocationMessage` and `_meta`
+ * SHOULD be updated to describe the specific confirmation needed. Clients use the
+ * standard `session/toolCallConfirmed` flow to approve or deny.
  *
  * For client-provided tools, the server typically sets `confirmed` to
  * `'not-needed'` so the tool transitions directly to `running`, where the
@@ -254,10 +263,12 @@ export interface ISessionToolCallDeltaAction extends IToolCallActionBase {
  */
 export interface ISessionToolCallReadyAction extends IToolCallActionBase {
   type: ActionType.SessionToolCallReady;
-  /** Message describing what the tool will do */
+  /** Message describing what the tool will do or what confirmation is needed */
   invocationMessage: StringOrMarkdown;
   /** Raw tool input */
   toolInput?: string;
+  /** Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`) */
+  confirmationTitle?: StringOrMarkdown;
   /** If set, the tool was auto-confirmed and transitions directly to `running` */
   confirmed?: ToolCallConfirmationReason;
 }
@@ -350,41 +361,6 @@ export interface ISessionToolCallResultConfirmedAction extends IToolCallActionBa
 }
 
 /**
- * Permission needed from the user to proceed.
- *
- * @category Session Actions
- * @version 1
- */
-export interface ISessionPermissionRequestAction {
-  type: ActionType.SessionPermissionRequest;
-  /** Session URI */
-  session: URI;
-  /** Turn identifier */
-  turnId: string;
-  /** Permission request details */
-  request: IPermissionRequest;
-}
-
-/**
- * Permission granted or denied.
- *
- * @category Session Actions
- * @version 1
- * @clientDispatchable
- */
-export interface ISessionPermissionResolvedAction {
-  type: ActionType.SessionPermissionResolved;
-  /** Session URI */
-  session: URI;
-  /** Turn identifier */
-  turnId: string;
-  /** Permission request ID */
-  requestId: string;
-  /** Whether permission was granted */
-  approved: boolean;
-}
-
-/**
  * Turn finished — the assistant is idle.
  *
  * @category Session Actions
@@ -460,7 +436,10 @@ export interface ISessionUsageAction {
 }
 
 /**
- * Reasoning/thinking text from the model.
+ * Reasoning/thinking text from the model, appended to a specific reasoning response part.
+ *
+ * The server MUST first emit a `session/responsePart` to create the target
+ * reasoning part, then use this action to append text to it.
  *
  * @category Session Actions
  * @version 1
@@ -471,6 +450,8 @@ export interface ISessionReasoningAction {
   session: URI;
   /** Turn identifier */
   turnId: string;
+  /** Identifier of the reasoning response part to append to */
+  partId: string;
   /** Reasoning text chunk */
   content: string;
 }
@@ -564,8 +545,6 @@ export type IStateAction =
   | ISessionToolCallConfirmedAction
   | ISessionToolCallCompleteAction
   | ISessionToolCallResultConfirmedAction
-  | ISessionPermissionRequestAction
-  | ISessionPermissionResolvedAction
   | ISessionTurnCompleteAction
   | ISessionTurnCancelledAction
   | ISessionErrorAction

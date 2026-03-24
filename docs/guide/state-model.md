@@ -80,9 +80,7 @@ A turn represents one request/response cycle between user and agent.
 Turn {
   id: string
   userMessage: UserMessage
-  responseText: string              // captured from streamingText on completion
-  responseParts: ResponsePart[]
-  toolCalls: CompletedToolCall[]
+  responseParts: ResponsePart[]     // all content in stream order
   usage: UsageInfo | undefined
   state: 'complete' | 'cancelled' | 'error'
   error?: ErrorInfo
@@ -97,11 +95,7 @@ An in-progress turn where the assistant is actively streaming:
 ActiveTurn {
   id: string
   userMessage: UserMessage
-  streamingText: string
-  responseParts: ResponsePart[]
-  toolCalls: Record<toolCallId, ToolCallState>
-  pendingPermissions: Record<requestId, PermissionRequest>
-  reasoning: string
+  responseParts: ResponsePart[]     // all content in stream order
   usage: UsageInfo | undefined
 }
 ```
@@ -123,13 +117,27 @@ MessageAttachment {
 
 ## Response Parts
 
-Response content comes in two forms:
+All response content — text, tool calls, reasoning, and content references — lives in a single `responseParts` array in stream order. This mirrors how LLM APIs (e.g. OpenAI) represent responses as a unified list of typed items.
 
 ```typescript
 // Inline markdown content
 MarkdownResponsePart {
   kind: 'markdown'
+  id: string               // targeted by session/delta for text appends
   content: string
+}
+
+// Reasoning/thinking content from the model
+ReasoningResponsePart {
+  kind: 'reasoning'
+  id: string               // targeted by session/reasoning for text appends
+  content: string
+}
+
+// Tool call (see Tool Call Lifecycle below)
+ToolCallResponsePart {
+  kind: 'toolCall'
+  toolCall: ToolCallState   // full lifecycle state
 }
 
 // Reference to large content stored outside the state tree
@@ -141,7 +149,11 @@ ContentRef {
 }
 ```
 
+Text content uses a **create-then-append** pattern: the server first emits a `session/responsePart` action to create a new markdown (or reasoning) part with an `id`, then streams text into it via `session/delta` (or `session/reasoning`) actions targeting that `partId`. This pattern is extensible to future streaming content types.
+
 Clients fetch `ContentRef` content separately via the `fetchContent(uri)` command. This keeps the state tree small and serializable.
+
+Consumers can derive display text by concatenating all `markdown` parts, find tool calls by filtering for `toolCall` parts, and access reasoning by filtering for `reasoning` parts.
 
 ## Tool Call Lifecycle
 
@@ -157,6 +169,7 @@ stateDiagram-v2
   pending_confirmation --> running : toolCallConfirmed (approved)
   pending_confirmation --> cancelled : toolCallConfirmed (denied/skipped)
 
+  running --> pending_confirmation : toolCallReady (re‑confirmation)
   running --> completed : toolCallComplete
   running --> pending_result_confirmation : toolCallComplete (requiresResultConfirmation)
 
@@ -172,31 +185,17 @@ stateDiagram-v2
 | Status | Key Fields | Description |
 |---|---|---|
 | `streaming` | `partialInput?` | LM is streaming tool call parameters. `partialInput` accumulates via `toolCallDelta`. |
-| `pending-confirmation` | `invocationMessage`, `toolInput?` | Parameters complete, waiting for client to confirm execution. |
+| `pending-confirmation` | `invocationMessage`, `toolInput?` | Parameters complete or mid-execution confirmation needed. Uses `_meta` for context (e.g. permission kind, command text). |
 | `running` | `confirmed` | Tool is executing. `confirmed` records how it was approved. |
 | `pending-result-confirmation` | `success`, `pastTenseMessage`, `content?` | Execution finished, waiting for client to approve the result. |
 | `completed` | `success`, `pastTenseMessage`, `content?` | Terminal state. Tool finished. |
 | `cancelled` | `reason`, `reasonMessage?`, `userSuggestion?` | Terminal state. `reason` is `'denied'`, `'skipped'`, or `'result-denied'`. |
 
-When a turn completes, only terminal-state tool calls (`completed` or `cancelled`) are preserved in the finalized `Turn.toolCalls` array.
+### Mid-execution Re-confirmation
 
-## Permission Requests
+When a running tool needs additional user approval (e.g. a shell permission), the server dispatches `session/toolCallReady` again without `confirmed`. This transitions the tool call from `running` back to `pending-confirmation`, updating `invocationMessage` and `_meta` with context about what needs approval. The client uses the standard `session/toolCallConfirmed` flow to approve or deny.
 
-Tools that require user approval generate permission requests:
-
-```typescript
-PermissionRequest {
-  requestId: string
-  permissionKind: 'shell' | 'write' | 'mcp' | 'read' | 'url'
-  toolCallId?: string
-  path?: string
-  fullCommandText?: string
-  intention?: string
-  serverName?: string
-  toolName?: string
-  rawRequest?: string
-}
-```
+When a turn completes, non-terminal tool calls in `responseParts` are force-cancelled with reason `'skipped'`.
 
 ## Usage Info
 

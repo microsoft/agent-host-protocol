@@ -98,7 +98,7 @@ When the server receives a client-dispatched action, it MUST validate it before 
 | Action | Condition | Server Behavior |
 |---|---|---|
 | Any action referencing a non-existent session | Session URI not found | Server MUST silently ignore the action (no echo) |
-| `session/permissionResolved` | `requestId` not in `pendingPermissions` | Server MUST reject the action |
+| `session/toolCallConfirmed` | Tool call not in `pending-confirmation` state | Server MUST reject the action |
 | `session/turnCancelled` | No active turn | Server MUST reject the action |
 | `session/modelChanged` | A turn is currently active | Server MUST defer the model change until the active turn completes, then apply it for the next turn |
 

@@ -720,30 +720,12 @@
           "$ref": "#/$defs/IUserMessage",
           "description": "The user's input"
         },
-        "responseText": {
-          "type": "string",
-          "description": "Final response text (captured from streaming)"
-        },
         "responseParts": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/IResponsePart"
           },
-          "description": "Structured response content"
-        },
-        "toolCalls": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "$ref": "#/$defs/IToolCallCompletedState"
-              },
-              {
-                "$ref": "#/$defs/IToolCallCancelledState"
-              }
-            ]
-          },
-          "description": "Tool invocations in terminal states (completed or cancelled)"
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
         },
         "usage": {
           "$ref": "#/$defs/IUsageInfo",
@@ -761,9 +743,7 @@
       "required": [
         "id",
         "userMessage",
-        "responseText",
         "responseParts",
-        "toolCalls",
         "usage",
         "state"
       ]
@@ -780,34 +760,12 @@
           "$ref": "#/$defs/IUserMessage",
           "description": "The user's input"
         },
-        "streamingText": {
-          "type": "string",
-          "description": "Accumulated streaming response text"
-        },
         "responseParts": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/IResponsePart"
           },
-          "description": "Structured response content so far"
-        },
-        "toolCalls": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/IToolCallState"
-          },
-          "description": "Active tool invocations keyed by tool call ID"
-        },
-        "pendingPermissions": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/IPermissionRequest"
-          },
-          "description": "Pending permission requests keyed by request ID"
-        },
-        "reasoning": {
-          "type": "string",
-          "description": "Accumulated reasoning/thinking text"
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nTool call parts include `pendingPermissions` when permissions are awaiting user approval."
         },
         "usage": {
           "$ref": "#/$defs/IUsageInfo",
@@ -817,11 +775,7 @@
       "required": [
         "id",
         "userMessage",
-        "streamingText",
         "responseParts",
-        "toolCalls",
-        "pendingPermissions",
-        "reasoning",
         "usage"
       ]
     },
@@ -872,6 +826,10 @@
           "$ref": "#/$defs/ResponsePartKind.Markdown",
           "description": "Discriminant"
         },
+        "id": {
+          "type": "string",
+          "description": "Part identifier, used by `session/delta` to target this part for content appends"
+        },
         "content": {
           "type": "string",
           "description": "Markdown content"
@@ -879,6 +837,7 @@
       },
       "required": [
         "kind",
+        "id",
         "content"
       ]
     },
@@ -906,6 +865,47 @@
       "required": [
         "kind",
         "uri"
+      ]
+    },
+    "IToolCallResponsePart": {
+      "type": "object",
+      "description": "A tool call represented as a response part.\n\nTool calls are part of the response stream, interleaved with text and\nreasoning. The `toolCall.toolCallId` serves as the part identifier for\nactions that target this part.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.ToolCall",
+          "description": "Discriminant"
+        },
+        "toolCall": {
+          "$ref": "#/$defs/IToolCallState",
+          "description": "Full tool call lifecycle state"
+        }
+      },
+      "required": [
+        "kind",
+        "toolCall"
+      ]
+    },
+    "IReasoningResponsePart": {
+      "type": "object",
+      "description": "Reasoning/thinking content from the model.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.Reasoning",
+          "description": "Discriminant"
+        },
+        "id": {
+          "type": "string",
+          "description": "Part identifier, used by `session/reasoning` to target this part for content appends"
+        },
+        "content": {
+          "type": "string",
+          "description": "Accumulated reasoning text"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "content"
       ]
     },
     "IToolCallBase": {
@@ -1024,10 +1024,14 @@
     },
     "IToolCallPendingConfirmationState": {
       "type": "object",
-      "description": "Parameters are complete, waiting for client to confirm execution.",
+      "description": "Parameters are complete, or a running tool requires re-confirmation\n(e.g. a mid-execution permission check).",
       "properties": {
         "status": {
           "$ref": "#/$defs/ToolCallStatus.PendingConfirmation"
+        },
+        "confirmationTitle": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Short title for the confirmation prompt (e.g. `\"Run in terminal\"`, `\"Write file\"`)"
         }
       },
       "required": [
@@ -1275,51 +1279,6 @@
         "afterURI"
       ]
     },
-    "IPermissionRequest": {
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": "string",
-          "description": "Unique request identifier"
-        },
-        "permissionKind": {
-          "$ref": "#/$defs/PermissionKind",
-          "description": "Type of permission"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Associated tool call"
-        },
-        "path": {
-          "type": "string",
-          "description": "File/directory path"
-        },
-        "fullCommandText": {
-          "type": "string",
-          "description": "Full command to execute"
-        },
-        "intention": {
-          "type": "string",
-          "description": "What the tool intends to do"
-        },
-        "serverName": {
-          "type": "string",
-          "description": "MCP server name"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Tool requesting permission"
-        },
-        "rawRequest": {
-          "type": "string",
-          "description": "Raw request data"
-        }
-      },
-      "required": [
-        "requestId",
-        "permissionKind"
-      ]
-    },
     "IUsageInfo": {
       "type": "object",
       "properties": {
@@ -1564,7 +1523,7 @@
     },
     "ISessionDeltaAction": {
       "type": "object",
-      "description": "Streaming text chunk from the assistant.",
+      "description": "Streaming text chunk from the assistant, appended to a specific response part.\n\nThe server MUST first emit a `session/responsePart` to create the target\npart (markdown or reasoning), then use this action to append text to it.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.SessionDelta"
@@ -1577,6 +1536,10 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "partId": {
+          "type": "string",
+          "description": "Identifier of the response part to append to"
+        },
         "content": {
           "type": "string",
           "description": "Text chunk"
@@ -1586,6 +1549,7 @@
         "type",
         "session",
         "turnId",
+        "partId",
         "content"
       ]
     },
@@ -1665,18 +1629,22 @@
     },
     "ISessionToolCallReadyAction": {
       "type": "object",
-      "description": "Tool call parameters are complete. Transitions to `pending-confirmation`\nor directly to `running` if `confirmed` is set.\n\nFor client-provided tools, the server typically sets `confirmed` to\n`'not-needed'` so the tool transitions directly to `running`, where the\nowning client can begin execution immediately.",
+      "description": "Tool call parameters are complete, or a running tool requires re-confirmation.\n\nWhen dispatched for a `streaming` tool call, transitions to `pending-confirmation`\nor directly to `running` if `confirmed` is set.\n\nWhen dispatched for a `running` tool call (e.g. mid-execution permission needed),\ntransitions back to `pending-confirmation`. The `invocationMessage` and `_meta`\nSHOULD be updated to describe the specific confirmation needed. Clients use the\nstandard `session/toolCallConfirmed` flow to approve or deny.\n\nFor client-provided tools, the server typically sets `confirmed` to\n`'not-needed'` so the tool transitions directly to `running`, where the\nowning client can begin execution immediately.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.SessionToolCallReady"
         },
         "invocationMessage": {
           "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Message describing what the tool will do"
+          "description": "Message describing what the tool will do or what confirmation is needed"
         },
         "toolInput": {
           "type": "string",
           "description": "Raw tool input"
+        },
+        "confirmationTitle": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Short title for the confirmation prompt (e.g. `\"Run in terminal\"`, `\"Write file\"`)"
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -1780,65 +1748,6 @@
       },
       "required": [
         "type",
-        "approved"
-      ]
-    },
-    "ISessionPermissionRequestAction": {
-      "type": "object",
-      "description": "Permission needed from the user to proceed.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionPermissionRequest"
-        },
-        "session": {
-          "$ref": "#/$defs/URI",
-          "description": "Session URI"
-        },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "request": {
-          "$ref": "#/$defs/IPermissionRequest",
-          "description": "Permission request details"
-        }
-      },
-      "required": [
-        "type",
-        "session",
-        "turnId",
-        "request"
-      ]
-    },
-    "ISessionPermissionResolvedAction": {
-      "type": "object",
-      "description": "Permission granted or denied.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionPermissionResolved"
-        },
-        "session": {
-          "$ref": "#/$defs/URI",
-          "description": "Session URI"
-        },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "requestId": {
-          "type": "string",
-          "description": "Permission request ID"
-        },
-        "approved": {
-          "type": "boolean",
-          "description": "Whether permission was granted"
-        }
-      },
-      "required": [
-        "type",
-        "session",
-        "turnId",
-        "requestId",
         "approved"
       ]
     },
@@ -1964,7 +1873,7 @@
     },
     "ISessionReasoningAction": {
       "type": "object",
-      "description": "Reasoning/thinking text from the model.",
+      "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `session/responsePart` to create the target\nreasoning part, then use this action to append text to it.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.SessionReasoning"
@@ -1977,6 +1886,10 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "partId": {
+          "type": "string",
+          "description": "Identifier of the reasoning response part to append to"
+        },
         "content": {
           "type": "string",
           "description": "Reasoning text chunk"
@@ -1986,6 +1899,7 @@
         "type",
         "session",
         "turnId",
+        "partId",
         "content"
       ]
     },

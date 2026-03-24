@@ -23,6 +23,8 @@ export type {
   IMessageAttachment,
   IMarkdownResponsePart,
   IContentRef,
+  IToolCallResponsePart,
+  IReasoningResponsePart,
   IResponsePart,
   IToolCallResult,
   IToolCallStreamingState,
@@ -39,7 +41,6 @@ export type {
   IToolResultContent,
   IToolResultFileEditContent,
   ISessionActiveClient,
-  IPermissionRequest,
   IUsageInfo,
   IErrorInfo,
   ISnapshot,
@@ -56,7 +57,6 @@ export {
   ToolCallConfirmationReason,
   ToolCallCancellationReason,
   ToolResultContentType,
-  PermissionKind,
 } from './state.js';
 
 // Action types
@@ -78,8 +78,6 @@ export type {
   ISessionToolCallConfirmedAction,
   ISessionToolCallCompleteAction,
   ISessionToolCallResultConfirmedAction,
-  ISessionPermissionRequestAction,
-  ISessionPermissionResolvedAction,
   ISessionTurnCompleteAction,
   ISessionTurnCancelledAction,
   ISessionErrorAction,

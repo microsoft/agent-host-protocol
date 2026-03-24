@@ -274,12 +274,13 @@ export interface ITurn {
   id: string;
   /** The user's input */
   userMessage: IUserMessage;
-  /** Final response text (captured from streaming) */
-  responseText: string;
-  /** Structured response content */
+  /**
+   * All response content in stream order: text, tool calls, reasoning, and content refs.
+   *
+   * Consumers should derive display text by concatenating markdown parts,
+   * and find tool calls by filtering for `ToolCall` parts.
+   */
   responseParts: IResponsePart[];
-  /** Tool invocations in terminal states (completed or cancelled) */
-  toolCalls: (IToolCallCompletedState | IToolCallCancelledState)[];
   /** Token usage info */
   usage: IUsageInfo | undefined;
   /** How the turn ended */
@@ -298,16 +299,12 @@ export interface IActiveTurn {
   id: string;
   /** The user's input */
   userMessage: IUserMessage;
-  /** Accumulated streaming response text */
-  streamingText: string;
-  /** Structured response content so far */
+  /**
+   * All response content in stream order: text, tool calls, reasoning, and content refs.
+   *
+   * Tool call parts include `pendingPermissions` when permissions are awaiting user approval.
+   */
   responseParts: IResponsePart[];
-  /** Active tool invocations keyed by tool call ID */
-  toolCalls: Record<string, IToolCallState>;
-  /** Pending permission requests keyed by request ID */
-  pendingPermissions: Record<string, IPermissionRequest>;
-  /** Accumulated reasoning/thinking text */
-  reasoning: string;
   /** Token usage info */
   usage: IUsageInfo | undefined;
 }
@@ -344,6 +341,8 @@ export interface IMessageAttachment {
 export const enum ResponsePartKind {
   Markdown = 'markdown',
   ContentRef = 'contentRef',
+  ToolCall = 'toolCall',
+  Reasoning = 'reasoning',
 }
 
 /**
@@ -352,6 +351,8 @@ export const enum ResponsePartKind {
 export interface IMarkdownResponsePart {
   /** Discriminant */
   kind: ResponsePartKind.Markdown;
+  /** Part identifier, used by `session/delta` to target this part for content appends */
+  id: string;
   /** Markdown content */
   content: string;
 }
@@ -373,9 +374,39 @@ export interface IContentRef {
 }
 
 /**
+ * A tool call represented as a response part.
+ *
+ * Tool calls are part of the response stream, interleaved with text and
+ * reasoning. The `toolCall.toolCallId` serves as the part identifier for
+ * actions that target this part.
+ *
  * @category Response Parts
  */
-export type IResponsePart = IMarkdownResponsePart | IContentRef;
+export interface IToolCallResponsePart {
+  /** Discriminant */
+  kind: ResponsePartKind.ToolCall;
+  /** Full tool call lifecycle state */
+  toolCall: IToolCallState;
+}
+
+/**
+ * Reasoning/thinking content from the model.
+ *
+ * @category Response Parts
+ */
+export interface IReasoningResponsePart {
+  /** Discriminant */
+  kind: ResponsePartKind.Reasoning;
+  /** Part identifier, used by `session/reasoning` to target this part for content appends */
+  id: string;
+  /** Accumulated reasoning text */
+  content: string;
+}
+
+/**
+ * @category Response Parts
+ */
+export type IResponsePart = IMarkdownResponsePart | IContentRef | IToolCallResponsePart | IReasoningResponsePart;
 
 // ─── Tool Call Types ─────────────────────────────────────────────────────────
 
@@ -507,12 +538,15 @@ export interface IToolCallStreamingState extends IToolCallBase {
 }
 
 /**
- * Parameters are complete, waiting for client to confirm execution.
+ * Parameters are complete, or a running tool requires re-confirmation
+ * (e.g. a mid-execution permission check).
  *
  * @category Tool Call Types
  */
 export interface IToolCallPendingConfirmationState extends IToolCallBase, IToolCallParameterFields {
   status: ToolCallStatus.PendingConfirmation;
+  /** Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`) */
+  confirmationTitle?: StringOrMarkdown;
 }
 
 /**
@@ -725,50 +759,6 @@ export type IToolResultContent =
   | IToolResultBinaryContent
   | IToolResultFileEditContent
   | IContentRef;
-
-// ─── Permission Types ────────────────────────────────────────────────────────
-
-/**
- * Type of permission requested.
- *
- * @category Permission Types
- */
-export const enum PermissionKind {
-  Shell = 'shell',
-  Write = 'write',
-  Mcp = 'mcp',
-  Read = 'read',
-  Url = 'url',
-}
-
-/**
- * @category Permission Types
- * @remarks
- * Fields like `serverName`, `toolName`, and `rawRequest` carry agent-specific
- * identifiers on the wire despite the agent-agnostic design principle. These exist
- * for debugging and logging purposes.
- * @todo @connor4312, split this up into well-separated union types
- */
-export interface IPermissionRequest {
-  /** Unique request identifier */
-  requestId: string;
-  /** Type of permission */
-  permissionKind: PermissionKind;
-  /** Associated tool call */
-  toolCallId?: string;
-  /** File/directory path */
-  path?: string;
-  /** Full command to execute */
-  fullCommandText?: string;
-  /** What the tool intends to do */
-  intention?: string;
-  /** MCP server name */
-  serverName?: string;
-  /** Tool requesting permission */
-  toolName?: string;
-  /** Raw request data */
-  rawRequest?: string;
-}
 
 // ─── Common Types ────────────────────────────────────────────────────────────
 

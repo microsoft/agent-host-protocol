@@ -17,7 +17,7 @@ import {
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { IRootState, ISessionState } from './state.js';
+import type { IRootState, ISessionState, IToolCallResponsePart } from './state.js';
 import {
   SessionLifecycle,
   SessionStatus,
@@ -26,7 +26,6 @@ import {
   ToolCallConfirmationReason,
   ToolCallCancellationReason,
   ResponsePartKind,
-  PermissionKind,
 } from './state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
@@ -78,11 +77,7 @@ function makeSessionStateWithActiveTurn(overrides?: Partial<ISessionState>): ISe
     activeTurn: {
       id: T,
       userMessage: { text: 'Hello' },
-      streamingText: '',
       responseParts: [],
-      toolCalls: {},
-      pendingPermissions: {},
-      reasoning: '',
       usage: undefined,
     },
     ...overrides,
@@ -95,6 +90,46 @@ function startToolCall(state: ISessionState, toolCallId = TC): ISessionState {
     type: ActionType.SessionToolCallStart,
     session: S, turnId: T, toolCallId,
     toolName: 'bash', displayName: 'Run Command',
+  });
+}
+
+/** Gets tool call response parts from responseParts. */
+function getToolCallParts(state: ISessionState): IToolCallResponsePart[] {
+  const parts = state.activeTurn?.responseParts ?? [];
+  return parts.filter((p): p is IToolCallResponsePart => p.kind === ResponsePartKind.ToolCall);
+}
+
+/** Gets a tool call part by toolCallId. */
+function getToolCallPart(state: ISessionState, toolCallId = TC): IToolCallResponsePart | undefined {
+  return getToolCallParts(state).find(p => p.toolCall.toolCallId === toolCallId);
+}
+
+/** Gets markdown text from responseParts by concatenating all markdown parts. */
+function getMarkdownText(state: ISessionState): string {
+  const parts = state.activeTurn?.responseParts ?? [];
+  return parts
+    .filter(p => p.kind === ResponsePartKind.Markdown)
+    .map(p => (p as { content: string }).content)
+    .join('');
+}
+
+/** Creates a markdown response part and returns updated state. */
+function createMarkdownPart(state: ISessionState, partId: string, turnId = T): ISessionState {
+  return sessionReducer(state, {
+    type: ActionType.SessionResponsePart,
+    session: S,
+    turnId,
+    part: { kind: ResponsePartKind.Markdown, id: partId, content: '' },
+  });
+}
+
+/** Creates a reasoning response part and returns updated state. */
+function createReasoningPart(state: ISessionState, partId: string, turnId = T): ISessionState {
+  return sessionReducer(state, {
+    type: ActionType.SessionResponsePart,
+    session: S,
+    turnId,
+    part: { kind: ResponsePartKind.Reasoning, id: partId, content: '' },
   });
 }
 
@@ -222,48 +257,48 @@ describe('sessionReducer — turn lifecycle', () => {
     assert.ok(next.activeTurn);
     assert.equal(next.activeTurn!.id, T);
     assert.equal(next.activeTurn!.userMessage.text, 'Hello');
-    assert.equal(next.activeTurn!.streamingText, '');
     assert.deepStrictEqual(next.activeTurn!.responseParts, []);
-    assert.deepStrictEqual(next.activeTurn!.toolCalls, {});
-    assert.deepStrictEqual(next.activeTurn!.pendingPermissions, {});
   });
 
   it('handles session/delta', () => {
-    const state = makeSessionStateWithActiveTurn();
-    let next = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: T, content: 'Hello ' });
-    next = sessionReducer(next, { type: ActionType.SessionDelta, session: S, turnId: T, content: 'world' });
-    assert.equal(next.activeTurn!.streamingText, 'Hello world');
+    let state = createMarkdownPart(makeSessionStateWithActiveTurn(), 'md-1');
+    state = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: T, partId: 'md-1', content: 'Hello ' });
+    state = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: T, partId: 'md-1', content: 'world' });
+    assert.equal(getMarkdownText(state), 'Hello world');
   });
 
   it('ignores session/delta with wrong turnId', () => {
-    const state = makeSessionStateWithActiveTurn();
-    const next = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: 'wrong-turn', content: 'orphan' });
+    let state = createMarkdownPart(makeSessionStateWithActiveTurn(), 'md-1');
+    const next = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: 'wrong-turn', partId: 'md-1', content: 'orphan' });
     assert.equal(next, state);
   });
 
   it('ignores session/delta without activeTurn', () => {
     const state = makeSessionState();
-    const next = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: T, content: 'orphan' });
+    const next = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: T, partId: 'md-1', content: 'orphan' });
     assert.equal(next, state);
   });
 
   it('handles session/responsePart', () => {
     const state = makeSessionStateWithActiveTurn();
-    const part = { kind: ResponsePartKind.Markdown as const, content: '# Title' };
+    const part = { kind: ResponsePartKind.Markdown as const, id: 'md-1', content: '# Title' };
     const next = sessionReducer(state, { type: ActionType.SessionResponsePart, session: S, turnId: T, part });
     assert.equal(next.activeTurn!.responseParts.length, 1);
     assert.deepStrictEqual(next.activeTurn!.responseParts[0], part);
   });
 
   it('handles session/turnComplete — finalizes turn', () => {
-    const state = makeSessionStateWithActiveTurn();
-    let s = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: T, content: 'Response text' });
+    let s = createMarkdownPart(makeSessionStateWithActiveTurn(), 'md-1');
+    s = sessionReducer(s, { type: ActionType.SessionDelta, session: S, turnId: T, partId: 'md-1', content: 'Response text' });
     s = sessionReducer(s, { type: ActionType.SessionTurnComplete, session: S, turnId: T });
 
     assert.equal(s.activeTurn, undefined);
     assert.equal(s.turns.length, 1);
     assert.equal(s.turns[0].id, T);
-    assert.equal(s.turns[0].responseText, 'Response text');
+    // responseText is derived from markdown parts
+    const markdownParts = s.turns[0].responseParts.filter(p => p.kind === ResponsePartKind.Markdown);
+    assert.equal(markdownParts.length, 1);
+    assert.equal((markdownParts[0] as { content: string }).content, 'Response text');
     assert.equal(s.turns[0].state, TurnState.Complete);
     assert.equal(s.summary.status, SessionStatus.Idle);
   });
@@ -291,10 +326,12 @@ describe('sessionReducer — turn lifecycle', () => {
   it('force-cancels in-progress tool calls on turn completion with skipped reason', () => {
     let state = startToolCall(makeSessionStateWithActiveTurn());
     const next = sessionReducer(state, { type: ActionType.SessionTurnComplete, session: S, turnId: T });
-    assert.equal(next.turns[0].toolCalls.length, 1);
-    assert.equal(next.turns[0].toolCalls[0].status, ToolCallStatus.Cancelled);
-    if (next.turns[0].toolCalls[0].status === ToolCallStatus.Cancelled) {
-      assert.equal(next.turns[0].toolCalls[0].reason, ToolCallCancellationReason.Skipped);
+    const toolCallParts = next.turns[0].responseParts.filter(p => p.kind === ResponsePartKind.ToolCall);
+    assert.equal(toolCallParts.length, 1);
+    const tc = (toolCallParts[0] as IToolCallResponsePart).toolCall;
+    assert.equal(tc.status, ToolCallStatus.Cancelled);
+    if (tc.status === ToolCallStatus.Cancelled) {
+      assert.equal(tc.reason, ToolCallCancellationReason.Skipped);
     }
   });
 
@@ -311,14 +348,14 @@ describe('sessionReducer — turn lifecycle', () => {
 describe('sessionReducer — tool calls', () => {
   it('handles full tool call lifecycle: start → delta → ready → confirmed → complete', () => {
     let state = startToolCall(makeSessionStateWithActiveTurn());
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.Streaming);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.Streaming);
 
     // Delta
     state = sessionReducer(state, {
       type: ActionType.SessionToolCallDelta, session: S, turnId: T, toolCallId: TC,
       content: 'ls -la', invocationMessage: 'Listing files',
     });
-    const streaming = state.activeTurn!.toolCalls[TC];
+    const streaming = getToolCallPart(state)!.toolCall;
     assert.equal(streaming.status, ToolCallStatus.Streaming);
     if (streaming.status === ToolCallStatus.Streaming) {
       assert.equal(streaming.partialInput, 'ls -la');
@@ -330,28 +367,26 @@ describe('sessionReducer — tool calls', () => {
       type: ActionType.SessionToolCallReady, session: S, turnId: T, toolCallId: TC,
       invocationMessage: 'Run: ls -la', toolInput: 'ls -la',
     });
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.PendingConfirmation);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.PendingConfirmation);
 
     // Confirmed (approved)
     state = sessionReducer(state, {
       type: ActionType.SessionToolCallConfirmed, session: S, turnId: T, toolCallId: TC,
       approved: true, confirmed: ToolCallConfirmationReason.UserAction,
     });
-    //@ts-ignore
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.Running);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.Running);
 
     // Complete
     state = sessionReducer(state, {
       type: ActionType.SessionToolCallComplete, session: S, turnId: T, toolCallId: TC,
       result: { success: true, pastTenseMessage: 'Ran command' },
     });
-    //@ts-ignore
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.Completed);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.Completed);
   });
 
   it('handles tool call ready with auto-confirm → running', () => {
     let state = readyToolCallAutoConfirm(startToolCall(makeSessionStateWithActiveTurn()));
-    const tc = state.activeTurn!.toolCalls[TC];
+    const tc = getToolCallPart(state)!.toolCall;
     assert.equal(tc.status, ToolCallStatus.Running);
     if (tc.status === ToolCallStatus.Running) {
       assert.equal(tc.confirmed, ToolCallConfirmationReason.NotNeeded);
@@ -368,7 +403,7 @@ describe('sessionReducer — tool calls', () => {
       type: ActionType.SessionToolCallConfirmed, session: S, turnId: T, toolCallId: TC,
       approved: false, reason: ToolCallCancellationReason.Denied,
     });
-    const tc = state.activeTurn!.toolCalls[TC];
+    const tc = getToolCallPart(state)!.toolCall;
     assert.equal(tc.status, ToolCallStatus.Cancelled);
     if (tc.status === ToolCallStatus.Cancelled) {
       assert.equal(tc.reason, ToolCallCancellationReason.Denied);
@@ -381,13 +416,13 @@ describe('sessionReducer — tool calls', () => {
       type: ActionType.SessionToolCallComplete, session: S, turnId: T, toolCallId: TC,
       result: { success: true, pastTenseMessage: 'Done' }, requiresResultConfirmation: true,
     });
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.PendingResultConfirmation);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.PendingResultConfirmation);
 
     state = sessionReducer(state, {
       type: ActionType.SessionToolCallResultConfirmed, session: S, turnId: T, toolCallId: TC,
       approved: true,
     });
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.Completed);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.Completed);
   });
 
   it('handles tool call result denied → cancelled with result-denied reason', () => {
@@ -400,7 +435,7 @@ describe('sessionReducer — tool calls', () => {
       type: ActionType.SessionToolCallResultConfirmed, session: S, turnId: T, toolCallId: TC,
       approved: false,
     });
-    const tc = state.activeTurn!.toolCalls[TC];
+    const tc = getToolCallPart(state)!.toolCall;
     assert.equal(tc.status, ToolCallStatus.Cancelled);
     if (tc.status === ToolCallStatus.Cancelled) {
       assert.equal(tc.reason, ToolCallCancellationReason.ResultDenied);
@@ -413,12 +448,12 @@ describe('sessionReducer — tool calls', () => {
       type: ActionType.SessionToolCallReady, session: S, turnId: T, toolCallId: TC,
       invocationMessage: 'Run',
     });
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.PendingConfirmation);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.PendingConfirmation);
     state = sessionReducer(state, {
       type: ActionType.SessionToolCallComplete, session: S, turnId: T, toolCallId: TC,
       result: { success: true, pastTenseMessage: 'Done' },
     });
-    const tc = state.activeTurn!.toolCalls[TC];
+    const tc = getToolCallPart(state)!.toolCall;
     assert.equal(tc.status, ToolCallStatus.Completed);
     if (tc.status === ToolCallStatus.Completed) {
       //@ts-ignore
@@ -436,58 +471,71 @@ describe('sessionReducer — tool calls', () => {
   });
 });
 
-// ─── Session Reducer: Permissions ────────────────────────────────────────────
+// ─── Session Reducer: Running → Re-confirmation ─────────────────────────────
 
-describe('sessionReducer — permissions', () => {
-  it('handles session/permissionRequest and session/permissionResolved', () => {
-    let state = makeSessionStateWithActiveTurn();
-    const request = { requestId: 'perm-1', permissionKind: PermissionKind.Shell, fullCommandText: 'rm -rf /tmp/test' };
+describe('sessionReducer — running tool re-confirmation', () => {
+  it('toolCallReady transitions running tool call back to pending-confirmation', () => {
+    let state = readyToolCallAutoConfirm(startToolCall(makeSessionStateWithActiveTurn()));
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.Running);
 
-    state = sessionReducer(state, { type: ActionType.SessionPermissionRequest, session: S, turnId: T, request });
-    assert.ok(state.activeTurn!.pendingPermissions['perm-1']);
-    assert.equal(state.activeTurn!.pendingPermissions['perm-1'].requestId, 'perm-1');
+    // Server re-sends toolCallReady without confirmed, e.g. for a permission check
+    state = sessionReducer(state, {
+      type: ActionType.SessionToolCallReady, session: S, turnId: T, toolCallId: TC,
+      invocationMessage: 'Run: rm -rf /tmp/test',
+      _meta: { permissionKind: 'shell', fullCommandText: 'rm -rf /tmp/test' },
+    });
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.PendingConfirmation);
 
-    state = sessionReducer(state, { type: ActionType.SessionPermissionResolved, session: S, turnId: T, requestId: 'perm-1', approved: true });
-    assert.equal(state.activeTurn!.pendingPermissions['perm-1'], undefined);
+    // Verify updated invocation message
+    const tc = getToolCallPart(state)!.toolCall;
+    if (tc.status === ToolCallStatus.PendingConfirmation) {
+      assert.equal(tc.invocationMessage, 'Run: rm -rf /tmp/test');
+    }
   });
 
-  it('permissionRequest transitions associated tool call to pending-confirmation', () => {
+  it('toolCallReady re-confirmation approved transitions back to running', () => {
     let state = readyToolCallAutoConfirm(startToolCall(makeSessionStateWithActiveTurn()));
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.Running);
+    state = sessionReducer(state, {
+      type: ActionType.SessionToolCallReady, session: S, turnId: T, toolCallId: TC,
+      invocationMessage: 'Permission needed',
+    });
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.PendingConfirmation);
 
     state = sessionReducer(state, {
-      type: ActionType.SessionPermissionRequest, session: S, turnId: T,
-      request: { requestId: 'perm-1', permissionKind: PermissionKind.Shell, toolCallId: TC },
+      type: ActionType.SessionToolCallConfirmed, session: S, turnId: T, toolCallId: TC,
+      approved: true, confirmed: ToolCallConfirmationReason.UserAction,
     });
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.PendingConfirmation);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.Running);
   });
 
-  it('permissionResolved (approved) transitions associated tool call back to running', () => {
+  it('toolCallReady re-confirmation denied transitions to cancelled', () => {
     let state = readyToolCallAutoConfirm(startToolCall(makeSessionStateWithActiveTurn()));
     state = sessionReducer(state, {
-      type: ActionType.SessionPermissionRequest, session: S, turnId: T,
-      request: { requestId: 'perm-1', permissionKind: PermissionKind.Shell, toolCallId: TC },
+      type: ActionType.SessionToolCallReady, session: S, turnId: T, toolCallId: TC,
+      invocationMessage: 'Permission needed',
     });
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.PendingConfirmation);
-
     state = sessionReducer(state, {
-      type: ActionType.SessionPermissionResolved, session: S, turnId: T,
-      requestId: 'perm-1', approved: true,
+      type: ActionType.SessionToolCallConfirmed, session: S, turnId: T, toolCallId: TC,
+      approved: false, reason: ToolCallCancellationReason.Denied,
     });
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.Running);
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.Cancelled);
   });
 
-  it('permissionResolved (denied) transitions associated tool call to cancelled', () => {
-    let state = readyToolCallAutoConfirm(startToolCall(makeSessionStateWithActiveTurn()));
+  it('toolCallReady ignores non-streaming/non-running tool calls', () => {
+    let state = startToolCall(makeSessionStateWithActiveTurn());
+    // Move to pending-confirmation first
     state = sessionReducer(state, {
-      type: ActionType.SessionPermissionRequest, session: S, turnId: T,
-      request: { requestId: 'perm-1', permissionKind: PermissionKind.Shell, toolCallId: TC },
+      type: ActionType.SessionToolCallReady, session: S, turnId: T, toolCallId: TC,
+      invocationMessage: 'Run',
     });
-    state = sessionReducer(state, {
-      type: ActionType.SessionPermissionResolved, session: S, turnId: T,
-      requestId: 'perm-1', approved: false,
+    assert.equal(getToolCallPart(state)!.toolCall.status, ToolCallStatus.PendingConfirmation);
+
+    // Sending toolCallReady again while already pending-confirmation should be ignored
+    const next = sessionReducer(state, {
+      type: ActionType.SessionToolCallReady, session: S, turnId: T, toolCallId: TC,
+      invocationMessage: 'Run again',
     });
-    assert.equal(state.activeTurn!.toolCalls[TC].status, ToolCallStatus.Cancelled);
+    assert.equal(next, state);
   });
 });
 
@@ -509,10 +557,12 @@ describe('sessionReducer — metadata', () => {
   });
 
   it('handles session/reasoning', () => {
-    const state = makeSessionStateWithActiveTurn();
-    let next = sessionReducer(state, { type: ActionType.SessionReasoning, session: S, turnId: T, content: 'Thinking about ' });
-    next = sessionReducer(next, { type: ActionType.SessionReasoning, session: S, turnId: T, content: 'the answer' });
-    assert.equal(next.activeTurn!.reasoning, 'Thinking about the answer');
+    let state = createReasoningPart(makeSessionStateWithActiveTurn(), 'r-1');
+    state = sessionReducer(state, { type: ActionType.SessionReasoning, session: S, turnId: T, partId: 'r-1', content: 'Thinking about ' });
+    state = sessionReducer(state, { type: ActionType.SessionReasoning, session: S, turnId: T, partId: 'r-1', content: 'the answer' });
+    const reasoningParts = state.activeTurn!.responseParts.filter(p => p.kind === ResponsePartKind.Reasoning);
+    assert.equal(reasoningParts.length, 1);
+    assert.equal((reasoningParts[0] as { content: string }).content, 'Thinking about the answer');
   });
 
   it('handles session/modelChanged and bumps modifiedAt', () => {
@@ -573,7 +623,7 @@ describe('isClientDispatchable', () => {
 // ─── Full Turn Flow Integration Test ─────────────────────────────────────────
 
 describe('sessionReducer — full turn flow', () => {
-  it('processes a complete turn with tool calls and permissions', () => {
+  it('processes a complete turn with tool calls and re-confirmation', () => {
     let state = makeSessionState({ lifecycle: SessionLifecycle.Ready });
 
     // Turn started
@@ -584,12 +634,16 @@ describe('sessionReducer — full turn flow', () => {
       userMessage: { text: 'Fix the bug' },
     });
 
-    // Streaming delta
+    // Create markdown part, then stream delta into it
     state = sessionReducer(state, {
-      type: ActionType.SessionDelta, session: 's', turnId: 't1', content: 'I will ',
+      type: ActionType.SessionResponsePart, session: 's', turnId: 't1',
+      part: { kind: ResponsePartKind.Markdown, id: 'md-1', content: '' },
     });
     state = sessionReducer(state, {
-      type: ActionType.SessionDelta, session: 's', turnId: 't1', content: 'fix it.',
+      type: ActionType.SessionDelta, session: 's', turnId: 't1', partId: 'md-1', content: 'I will ',
+    });
+    state = sessionReducer(state, {
+      type: ActionType.SessionDelta, session: 's', turnId: 't1', partId: 'md-1', content: 'fix it.',
     });
 
     // Tool call lifecycle
@@ -609,15 +663,33 @@ describe('sessionReducer — full turn flow', () => {
       result: { success: true, pastTenseMessage: 'Edited main.ts' },
     });
 
-    // Permission
+    // Tool call with mid-execution re-confirmation (e.g. permission check)
     state = sessionReducer(state, {
-      type: ActionType.SessionPermissionRequest,
-      session: 's', turnId: 't1',
-      request: { requestId: 'p1', permissionKind: PermissionKind.Write, path: '/tmp/out' },
+      type: ActionType.SessionToolCallStart,
+      session: 's', turnId: 't1', toolCallId: 'tc2',
+      toolName: 'write', displayName: 'Write File',
     });
     state = sessionReducer(state, {
-      type: ActionType.SessionPermissionResolved,
-      session: 's', turnId: 't1', requestId: 'p1', approved: true,
+      type: ActionType.SessionToolCallReady,
+      session: 's', turnId: 't1', toolCallId: 'tc2',
+      invocationMessage: 'Write /tmp/out', confirmed: ToolCallConfirmationReason.NotNeeded,
+    });
+    // Running tool needs re-confirmation (e.g. permission)
+    state = sessionReducer(state, {
+      type: ActionType.SessionToolCallReady,
+      session: 's', turnId: 't1', toolCallId: 'tc2',
+      invocationMessage: 'Write to /tmp/out',
+      _meta: { permissionKind: 'write', path: '/tmp/out' },
+    });
+    state = sessionReducer(state, {
+      type: ActionType.SessionToolCallConfirmed,
+      session: 's', turnId: 't1', toolCallId: 'tc2',
+      approved: true, confirmed: ToolCallConfirmationReason.UserAction,
+    });
+    state = sessionReducer(state, {
+      type: ActionType.SessionToolCallComplete,
+      session: 's', turnId: 't1', toolCallId: 'tc2',
+      result: { success: true, pastTenseMessage: 'Wrote file' },
     });
 
     // Usage + reasoning
@@ -627,15 +699,20 @@ describe('sessionReducer — full turn flow', () => {
       usage: { inputTokens: 200, outputTokens: 100 },
     });
     state = sessionReducer(state, {
+      type: ActionType.SessionResponsePart,
+      session: 's', turnId: 't1',
+      part: { kind: ResponsePartKind.Reasoning, id: 'r-1', content: '' },
+    });
+    state = sessionReducer(state, {
       type: ActionType.SessionReasoning,
-      session: 's', turnId: 't1', content: 'The bug was in line 42',
+      session: 's', turnId: 't1', partId: 'r-1', content: 'The bug was in line 42',
     });
 
-    // Response part
+    // Another markdown response part
     state = sessionReducer(state, {
       type: ActionType.SessionResponsePart,
       session: 's', turnId: 't1',
-      part: { kind: ResponsePartKind.Markdown, content: '## Fix applied' },
+      part: { kind: ResponsePartKind.Markdown, id: 'md-2', content: '## Fix applied' },
     });
 
     // Turn complete
@@ -648,11 +725,22 @@ describe('sessionReducer — full turn flow', () => {
     assert.equal(state.turns.length, 1);
     const turn = state.turns[0];
     assert.equal(turn.id, 't1');
-    assert.equal(turn.responseText, 'I will fix it.');
     assert.equal(turn.state, TurnState.Complete);
-    assert.equal(turn.toolCalls.length, 1);
-    assert.equal(turn.toolCalls[0].status, ToolCallStatus.Completed);
-    assert.equal(turn.responseParts.length, 1);
+
+    // Check response parts ordering and content
+    const markdownParts = turn.responseParts.filter(p => p.kind === ResponsePartKind.Markdown);
+    assert.equal(markdownParts.length, 2);
+    assert.equal((markdownParts[0] as { content: string }).content, 'I will fix it.');
+
+    const toolCallParts = turn.responseParts.filter(p => p.kind === ResponsePartKind.ToolCall) as IToolCallResponsePart[];
+    assert.equal(toolCallParts.length, 2);
+    assert.equal(toolCallParts[0].toolCall.status, ToolCallStatus.Completed);
+    assert.equal(toolCallParts[1].toolCall.status, ToolCallStatus.Completed);
+
+    const reasoningParts = turn.responseParts.filter(p => p.kind === ResponsePartKind.Reasoning);
+    assert.equal(reasoningParts.length, 1);
+    assert.equal((reasoningParts[0] as { content: string }).content, 'The bug was in line 42');
+
     assert.deepStrictEqual(turn.usage, { inputTokens: 200, outputTokens: 100 });
     assert.equal(state.summary.status, SessionStatus.Idle);
   });
