@@ -42,6 +42,7 @@ import type {
   IUsageInfo,
   IErrorInfo,
   ISnapshot,
+  IPendingMessage,
 } from '../state.js';
 
 import type {
@@ -54,6 +55,9 @@ import type {
   ISessionServerToolsChangedAction,
   ISessionActiveClientChangedAction,
   ISessionActiveClientToolsChangedAction,
+  ISessionPendingMessageSetAction,
+  ISessionPendingMessageRemovedAction,
+  ISessionQueuedMessagesReorderedAction,
 } from '../actions.js';
 
 import type {
@@ -124,6 +128,7 @@ type V1_IToolResultFileEditContent = IToolResultFileEditContent;
 type V1_IUsageInfo = IUsageInfo;
 type V1_IErrorInfo = IErrorInfo;
 type V1_ISnapshot = ISnapshot;
+type V1_IPendingMessage = IPendingMessage;
 type V1_IStateAction = IStateAction;
 type V1_IActionEnvelope = IActionEnvelope;
 type V1_IActionOrigin = IActionOrigin;
@@ -133,6 +138,9 @@ type V1_ISessionToolCallDeniedAction = ISessionToolCallDeniedAction;
 type V1_ISessionServerToolsChangedAction = ISessionServerToolsChangedAction;
 type V1_ISessionActiveClientChangedAction = ISessionActiveClientChangedAction;
 type V1_ISessionActiveClientToolsChangedAction = ISessionActiveClientToolsChangedAction;
+type V1_ISessionPendingMessageSetAction = ISessionPendingMessageSetAction;
+type V1_ISessionPendingMessageRemovedAction = ISessionPendingMessageRemovedAction;
+type V1_ISessionQueuedMessagesReorderedAction = ISessionQueuedMessagesReorderedAction;
 type V1_IProtocolNotification = IProtocolNotification;
 type V1_IAuthRequiredNotification = IAuthRequiredNotification;
 type V1_IListSessionsResult = IListSessionsResult;
@@ -228,6 +236,14 @@ type _CheckServerToolsChangedAction = AssertCompatible<V1_ISessionServerToolsCha
 type _CheckActiveClientChangedAction = AssertCompatible<V1_ISessionActiveClientChangedAction, ISessionActiveClientChangedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckActiveClientToolsChangedAction = AssertCompatible<V1_ISessionActiveClientToolsChangedAction, ISessionActiveClientToolsChangedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckPendingMessage = AssertCompatible<V1_IPendingMessage, IPendingMessage>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckPendingMessageSetAction = AssertCompatible<V1_ISessionPendingMessageSetAction, ISessionPendingMessageSetAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckPendingMessageRemovedAction = AssertCompatible<V1_ISessionPendingMessageRemovedAction, ISessionPendingMessageRemovedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckQueuedMessagesReorderedAction = AssertCompatible<V1_ISessionQueuedMessagesReorderedAction, ISessionQueuedMessagesReorderedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckProtocolNotification = AssertCompatible<V1_IProtocolNotification, IProtocolNotification>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

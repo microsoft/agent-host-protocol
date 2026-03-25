@@ -153,6 +153,36 @@ export interface ISessionModelInfo {
   policyState?: PolicyState;
 }
 
+// ─── Pending Message Types ───────────────────────────────────────────────────
+
+/**
+ * Discriminant for pending message kinds.
+ *
+ * @category Pending Message Types
+ */
+export const enum PendingMessageKind {
+  /** Injected into the current turn at a convenient point */
+  Steering = 'steering',
+  /** Sent automatically as a new turn after the current turn finishes */
+  Queued = 'queued',
+}
+
+/**
+ * A message queued for future delivery to the agent.
+ *
+ * Steering messages are injected into the current turn mid-flight.
+ * Queued messages are automatically started as new turns after the
+ * current turn naturally finishes.
+ *
+ * @category Pending Message Types
+ */
+export interface IPendingMessage {
+  /** Unique identifier for this pending message */
+  id: string;
+  /** The message content */
+  userMessage: IUserMessage;
+}
+
 // ─── Session State ───────────────────────────────────────────────────────────
 
 /**
@@ -199,6 +229,10 @@ export interface ISessionState {
   turns: ITurn[];
   /** Currently in-progress turn */
   activeTurn?: IActiveTurn;
+  /** Message to inject into the current turn at a convenient point */
+  steeringMessage?: IPendingMessage;
+  /** Messages to send automatically as new turns after the current turn finishes */
+  queuedMessages?: IPendingMessage[];
 }
 
 /**

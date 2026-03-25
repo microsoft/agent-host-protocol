@@ -175,6 +175,24 @@
         "name"
       ]
     },
+    "IPendingMessage": {
+      "type": "object",
+      "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this pending message"
+        },
+        "userMessage": {
+          "$ref": "#/$defs/IUserMessage",
+          "description": "The message content"
+        }
+      },
+      "required": [
+        "id",
+        "userMessage"
+      ]
+    },
     "ISessionState": {
       "type": "object",
       "description": "Full state for a single session, loaded when a client subscribes to the session's URI.",
@@ -216,6 +234,17 @@
         "activeTurn": {
           "$ref": "#/$defs/IActiveTurn",
           "description": "Currently in-progress turn"
+        },
+        "steeringMessage": {
+          "$ref": "#/$defs/IPendingMessage",
+          "description": "Message to inject into the current turn at a convenient point"
+        },
+        "queuedMessages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IPendingMessage"
+          },
+          "description": "Messages to send automatically as new turns after the current turn finishes"
         }
       },
       "required": [

@@ -219,6 +219,62 @@ The session list can be arbitrarily large and is **not** part of the state tree.
 
 Notifications are ephemeral — not processed by reducers, not stored in state, not replayed on reconnect. On reconnect, clients re-fetch the list.
 
+## Pending Messages
+
+Sessions maintain two optional arrays of **pending messages** — instructions queued for future delivery to the agent:
+
+```typescript
+SessionState {
+  // ...existing fields...
+  steeringMessage?: PendingMessage      // inject into current turn
+  queuedMessages?: PendingMessage[]     // start as new turns
+}
+
+PendingMessage {
+  id: string
+  userMessage: UserMessage
+}
+```
+
+### Steering Message
+
+The steering message is injected into the **current turn** at a convenient point. Clients set a steering message to guide the agent mid-flight — for example, telling it to focus on a specific file or change approach. Only one steering message exists at a time; adding a new one replaces any existing one.
+
+- When the session has an active turn, the server consumes the steering message at its discretion, dispatching `session/pendingMessageRemoved` when it does.
+- When set while idle, the steering message is silently stored until a turn starts.
+
+### Queued Messages
+
+Queued messages are automatically started as **new turns** after the current turn finishes. The server processes them FIFO (by arrival order).
+
+- When a turn completes and queued messages exist, the server removes the first queued message and starts a new turn from it.
+- When a queued message is added while the session is idle, the server SHOULD immediately consume it and start a turn.
+- The resulting `session/turnStarted` action includes a `queuedMessageId` field linking back to the source queued message.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Client->>Server: pendingMessageSet (kind: queued, id: q-1)
+    Note over Server: Turn in progress, message stored
+
+    Client->>Server: pendingMessageSet (kind: queued, id: q-2)
+
+    Server->>Client: turnComplete (current turn)
+    Server->>Client: pendingMessageRemoved (kind: queued, id: q-1)
+    Server->>Client: turnStarted (queuedMessageId: q-1)
+    Note over Server: Auto-started from queue
+
+    Server->>Client: turnComplete
+    Server->>Client: pendingMessageRemoved (kind: queued, id: q-2)
+    Server->>Client: turnStarted (queuedMessageId: q-2)
+```
+
+### Management
+
+Clients can **set** or **remove** both steering and queued messages at any time using the `session/pendingMessageSet` (upsert) and `session/pendingMessageRemoved` actions with a `kind` discriminant (`'steering'` or `'queued'`).
+
 ## Next Steps
 
 - [Actions](/guide/actions) — How state is mutated.

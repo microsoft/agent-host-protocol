@@ -26,6 +26,7 @@ import {
   ToolCallConfirmationReason,
   ToolCallCancellationReason,
   ResponsePartKind,
+  PendingMessageKind,
 } from './state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
@@ -743,5 +744,264 @@ describe('sessionReducer — full turn flow', () => {
 
     assert.deepStrictEqual(turn.usage, { inputTokens: 200, outputTokens: 100 });
     assert.equal(state.summary.status, SessionStatus.Idle);
+  });
+});
+
+// ─── Pending Message Tests ───────────────────────────────────────────────────
+
+describe('sessionReducer — pending messages', () => {
+  describe('steering message', () => {
+    it('sets a steering message', () => {
+      const state = makeSessionState();
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageSet,
+        session: S, kind: PendingMessageKind.Steering, id: 'sm-1',
+        userMessage: { text: 'Focus on tests' },
+      });
+      assert.deepStrictEqual(result.steeringMessage, {
+        id: 'sm-1', userMessage: { text: 'Focus on tests' },
+      });
+    });
+
+    it('replaces existing steering message', () => {
+      const state = makeSessionState({
+        steeringMessage: { id: 'sm-1', userMessage: { text: 'Old' } },
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageSet,
+        session: S, kind: PendingMessageKind.Steering, id: 'sm-2',
+        userMessage: { text: 'New' },
+      });
+      assert.equal(result.steeringMessage!.id, 'sm-2');
+      assert.equal(result.steeringMessage!.userMessage.text, 'New');
+    });
+
+    it('updates steering message content via set with same ID', () => {
+      const state = makeSessionState({
+        steeringMessage: { id: 'sm-1', userMessage: { text: 'Original' } },
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageSet,
+        session: S, kind: PendingMessageKind.Steering, id: 'sm-1',
+        userMessage: { text: 'Updated' },
+      });
+      assert.equal(result.steeringMessage!.id, 'sm-1');
+      assert.equal(result.steeringMessage!.userMessage.text, 'Updated');
+    });
+
+    it('removes steering message', () => {
+      const state = makeSessionState({
+        steeringMessage: { id: 'sm-1', userMessage: { text: 'Steer' } },
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageRemoved,
+        session: S, kind: PendingMessageKind.Steering, id: 'sm-1',
+      });
+      assert.strictEqual(result.steeringMessage, undefined);
+    });
+
+    it('remove is no-op for mismatched ID', () => {
+      const state = makeSessionState({
+        steeringMessage: { id: 'sm-1', userMessage: { text: 'Hello' } },
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageRemoved,
+        session: S, kind: PendingMessageKind.Steering, id: 'sm-unknown',
+      });
+      assert.strictEqual(result, state);
+    });
+
+    it('remove is no-op when no steering message exists', () => {
+      const state = makeSessionState();
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageRemoved,
+        session: S, kind: PendingMessageKind.Steering, id: 'sm-1',
+      });
+      assert.strictEqual(result, state);
+    });
+  });
+
+  describe('queued messages', () => {
+    it('sets a new queued message', () => {
+      const state = makeSessionState();
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageSet,
+        session: S, kind: PendingMessageKind.Queued, id: 'pm-1',
+        userMessage: { text: 'Do something' },
+      });
+      assert.deepStrictEqual(result.queuedMessages, [
+        { id: 'pm-1', userMessage: { text: 'Do something' } },
+      ]);
+    });
+
+    it('appends when ID is new', () => {
+      const state = makeSessionState({
+        queuedMessages: [{ id: 'pm-1', userMessage: { text: 'First' } }],
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageSet,
+        session: S, kind: PendingMessageKind.Queued, id: 'pm-2',
+        userMessage: { text: 'Second' },
+      });
+      assert.equal(result.queuedMessages!.length, 2);
+      assert.equal(result.queuedMessages![1].id, 'pm-2');
+    });
+
+    it('updates in place when ID already exists', () => {
+      const state = makeSessionState({
+        queuedMessages: [
+          { id: 'pm-1', userMessage: { text: 'First' } },
+          { id: 'pm-2', userMessage: { text: 'Second' } },
+        ],
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageSet,
+        session: S, kind: PendingMessageKind.Queued, id: 'pm-1',
+        userMessage: { text: 'Updated first' },
+      });
+      assert.equal(result.queuedMessages!.length, 2);
+      assert.equal(result.queuedMessages![0].userMessage.text, 'Updated first');
+      assert.equal(result.queuedMessages![1].id, 'pm-2');
+    });
+
+    it('removes a queued message', () => {
+      const state = makeSessionState({
+        queuedMessages: [
+          { id: 'pm-1', userMessage: { text: 'First' } },
+          { id: 'pm-2', userMessage: { text: 'Second' } },
+        ],
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageRemoved,
+        session: S, kind: PendingMessageKind.Queued, id: 'pm-1',
+      });
+      assert.equal(result.queuedMessages!.length, 1);
+      assert.equal(result.queuedMessages![0].id, 'pm-2');
+    });
+
+    it('removes last queued message and sets array to undefined', () => {
+      const state = makeSessionState({
+        queuedMessages: [{ id: 'pm-1', userMessage: { text: 'Only one' } }],
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageRemoved,
+        session: S, kind: PendingMessageKind.Queued, id: 'pm-1',
+      });
+      assert.strictEqual(result.queuedMessages, undefined);
+    });
+
+    it('remove is no-op for unknown ID', () => {
+      const state = makeSessionState({
+        queuedMessages: [{ id: 'pm-1', userMessage: { text: 'Hello' } }],
+      });
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageRemoved,
+        session: S, kind: PendingMessageKind.Queued, id: 'pm-unknown',
+      });
+      assert.strictEqual(result, state);
+    });
+
+    it('remove is no-op when array is empty', () => {
+      const state = makeSessionState();
+      const result = sessionReducer(state, {
+        type: ActionType.SessionPendingMessageRemoved,
+        session: S, kind: PendingMessageKind.Queued, id: 'pm-1',
+      });
+      assert.strictEqual(result, state);
+    });
+  });
+
+  it('steering message and queued messages are independent', () => {
+    let state = makeSessionState();
+    state = sessionReducer(state, {
+      type: ActionType.SessionPendingMessageSet,
+      session: S, kind: PendingMessageKind.Steering, id: 's-1',
+      userMessage: { text: 'Steer' },
+    });
+    state = sessionReducer(state, {
+      type: ActionType.SessionPendingMessageSet,
+      session: S, kind: PendingMessageKind.Queued, id: 'q-1',
+      userMessage: { text: 'Queue' },
+    });
+    assert.equal(state.steeringMessage!.userMessage.text, 'Steer');
+    assert.equal(state.queuedMessages!.length, 1);
+    assert.equal(state.queuedMessages![0].userMessage.text, 'Queue');
+  });
+});
+
+// ─── Queued Messages Reorder Tests ───────────────────────────────────────────
+
+describe('sessionReducer — queuedMessagesReordered', () => {
+  it('reorders queued messages', () => {
+    const state = makeSessionState({
+      queuedMessages: [
+        { id: 'a', userMessage: { text: 'A' } },
+        { id: 'b', userMessage: { text: 'B' } },
+        { id: 'c', userMessage: { text: 'C' } },
+      ],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionQueuedMessagesReordered,
+      session: S, order: ['c', 'a', 'b'],
+    });
+    assert.equal(result.queuedMessages!.length, 3);
+    assert.equal(result.queuedMessages![0].id, 'c');
+    assert.equal(result.queuedMessages![1].id, 'a');
+    assert.equal(result.queuedMessages![2].id, 'b');
+  });
+
+  it('keeps messages not in order at the end in original order', () => {
+    const state = makeSessionState({
+      queuedMessages: [
+        { id: 'a', userMessage: { text: 'A' } },
+        { id: 'b', userMessage: { text: 'B' } },
+        { id: 'c', userMessage: { text: 'C' } },
+      ],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionQueuedMessagesReordered,
+      session: S, order: ['c'],
+    });
+    assert.equal(result.queuedMessages!.length, 3);
+    assert.equal(result.queuedMessages![0].id, 'c');
+    assert.equal(result.queuedMessages![1].id, 'a');
+    assert.equal(result.queuedMessages![2].id, 'b');
+  });
+
+  it('ignores unknown IDs in order array', () => {
+    const state = makeSessionState({
+      queuedMessages: [
+        { id: 'a', userMessage: { text: 'A' } },
+        { id: 'b', userMessage: { text: 'B' } },
+      ],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionQueuedMessagesReordered,
+      session: S, order: ['unknown', 'b', 'a', 'also-unknown'],
+    });
+    assert.equal(result.queuedMessages!.length, 2);
+    assert.equal(result.queuedMessages![0].id, 'b');
+    assert.equal(result.queuedMessages![1].id, 'a');
+  });
+
+  it('empty order preserves all messages in original order', () => {
+    const state = makeSessionState({
+      queuedMessages: [{ id: 'a', userMessage: { text: 'A' } }],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionQueuedMessagesReordered,
+      session: S, order: [],
+    });
+    assert.equal(result.queuedMessages!.length, 1);
+    assert.equal(result.queuedMessages![0].id, 'a');
+  });
+
+  it('is no-op when no queued messages exist', () => {
+    const state = makeSessionState();
+    const result = sessionReducer(state, {
+      type: ActionType.SessionQueuedMessagesReordered,
+      session: S, order: ['a', 'b'],
+    });
+    assert.strictEqual(result, state);
   });
 });

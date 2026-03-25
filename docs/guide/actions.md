@@ -67,6 +67,16 @@ A `session/toolUpdate` action for streaming incremental tool output (e.g. termin
 | `session/reasoning` | No | Reasoning/thinking text appended to a reasoning part by `partId` |
 | `session/modelChanged` | **Yes** | Model changed for this session |
 
+### Pending Messages
+
+| Type | Client-dispatchable? | When |
+|---|---|---|
+| `session/pendingMessageSet` | **Yes** | A steering or queued message was set (upsert) |
+| `session/pendingMessageRemoved` | **Yes** | A pending message was cancelled (by client) or consumed (by server) |
+| `session/queuedMessagesReordered` | **Yes** | Queued messages were reordered |
+
+The `pendingMessageSet` and `pendingMessageRemoved` actions carry a `kind` discriminant (`'steering'` or `'queued'`). See the [State Model — Pending Messages](/guide/state-model#pending-messages) for semantics.
+
 ## Client-Dispatched Actions
 
 Clients interact with the server by dispatching actions as fire-and-forget notifications:
@@ -91,6 +101,9 @@ The client applies the action **optimistically** to its local state before sendi
 | `session/toolCallConfirmed` | Approves or denies a pending tool call; unblocks or cancels tool execution |
 | `session/turnCancelled` | Aborts the in-progress turn |
 | `session/modelChanged` | Changes the model for subsequent turns |
+| `session/pendingMessageSet` | Stores a steering or queued message (upsert); if queued and idle, auto-starts a turn |
+| `session/pendingMessageRemoved` | Cancels a pending message before it is consumed |
+| `session/queuedMessagesReordered` | Reorders queued messages; unknown IDs ignored, unmentioned messages kept at end |
 
 ## Reducers
 

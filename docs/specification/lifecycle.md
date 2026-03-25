@@ -101,10 +101,29 @@ When the server receives a client-dispatched action, it MUST validate it before 
 | `session/toolCallConfirmed` | Tool call not in `pending-confirmation` state | Server MUST reject the action |
 | `session/turnCancelled` | No active turn | Server MUST reject the action |
 | `session/modelChanged` | A turn is currently active | Server MUST defer the model change until the active turn completes, then apply it for the next turn |
+| `session/pendingMessageRemoved` | No pending message with matching `id` and `kind` | Server SHOULD reject the action |
 
-::: tip FUTURE WORK
-`session/turnStarted` dispatched while a turn is already active will eventually support queuing and steering. See the protocol roadmap for details.
-:::
+## Pending Message Consumption
+
+The server consumes pending messages according to their kind:
+
+### Queued Messages
+
+When a turn completes and `queuedMessages` is non-empty, the server SHOULD:
+
+1. Dispatch `session/pendingMessageRemoved` with `kind: 'queued'` for the first queued message.
+2. Dispatch `session/turnStarted` with the queued message's `userMessage` and `queuedMessageId` set to the message's `id`.
+
+When a queued message is added while the session is idle (no active turn), the server SHOULD immediately consume it using the same two-step sequence.
+
+### Steering Messages
+
+When a turn is active and `steeringMessages` is non-empty, the server MAY consume steering messages at its discretion. To consume a steering message, the server:
+
+1. Dispatches `session/pendingMessageRemoved` with `kind: 'steering'`.
+2. Injects the message content into the model context (the injection mechanism is opaque to the protocol).
+
+Steering messages added while idle are silently stored and consumed when a turn becomes active.
 
 ## Session Disposal
 

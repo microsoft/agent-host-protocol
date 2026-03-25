@@ -26,6 +26,9 @@ import type {
   ISessionServerToolsChangedAction,
   ISessionActiveClientChangedAction,
   ISessionActiveClientToolsChangedAction,
+  ISessionPendingMessageSetAction,
+  ISessionPendingMessageRemovedAction,
+  ISessionQueuedMessagesReorderedAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -61,6 +64,9 @@ export type ISessionAction =
   | ISessionServerToolsChangedAction
   | ISessionActiveClientChangedAction
   | ISessionActiveClientToolsChangedAction
+  | ISessionPendingMessageSetAction
+  | ISessionPendingMessageRemovedAction
+  | ISessionQueuedMessagesReorderedAction
 ;
 
 /** Union of session actions that clients may dispatch. */
@@ -73,6 +79,9 @@ export type IClientSessionAction =
   | ISessionModelChangedAction
   | ISessionActiveClientChangedAction
   | ISessionActiveClientToolsChangedAction
+  | ISessionPendingMessageSetAction
+  | ISessionPendingMessageRemovedAction
+  | ISessionQueuedMessagesReorderedAction
 ;
 
 /** Union of session actions that only the server may produce. */
@@ -122,4 +131,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in IStateAction['type']]: boo
   [ActionType.SessionServerToolsChanged]: false,
   [ActionType.SessionActiveClientChanged]: true,
   [ActionType.SessionActiveClientToolsChanged]: true,
+  [ActionType.SessionPendingMessageSet]: true,
+  [ActionType.SessionPendingMessageRemoved]: true,
+  [ActionType.SessionQueuedMessagesReordered]: true,
 };

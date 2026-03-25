@@ -5,8 +5,8 @@
  */
 
 import { ActionType } from './actions.js';
-import type { IRootState, ISessionState, IToolCallState, IResponsePart, IToolCallResponsePart, ITurn } from './state.js';
-import { SessionLifecycle, SessionStatus, TurnState, ToolCallStatus, ToolCallConfirmationReason, ToolCallCancellationReason, ResponsePartKind } from './state.js';
+import type { IRootState, ISessionState, IToolCallState, IResponsePart, IToolCallResponsePart, ITurn, IPendingMessage } from './state.js';
+import { SessionLifecycle, SessionStatus, TurnState, ToolCallStatus, ToolCallConfirmationReason, ToolCallCancellationReason, ResponsePartKind, PendingMessageKind } from './state.js';
 import type { IRootAction, ISessionAction, IClientSessionAction } from './action-origin.generated.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 
@@ -451,6 +451,65 @@ export function sessionReducer(state: ISessionState, action: ISessionAction, log
         ...state,
         activeClient: { ...state.activeClient, tools: action.tools },
       };
+
+    // ── Pending Messages ──────────────────────────────────────────────────
+
+    case ActionType.SessionPendingMessageSet: {
+      const entry: IPendingMessage = { id: action.id, userMessage: action.userMessage };
+      if (action.kind === PendingMessageKind.Steering) {
+        return { ...state, steeringMessage: entry };
+      }
+      const existing = state.queuedMessages ?? [];
+      const idx = existing.findIndex(m => m.id === action.id);
+      if (idx >= 0) {
+        const updated = [...existing];
+        updated[idx] = entry;
+        return { ...state, queuedMessages: updated };
+      }
+      return { ...state, queuedMessages: [...existing, entry] };
+    }
+
+    case ActionType.SessionPendingMessageRemoved: {
+      if (action.kind === PendingMessageKind.Steering) {
+        if (!state.steeringMessage || state.steeringMessage.id !== action.id) {
+          return state;
+        }
+        return { ...state, steeringMessage: undefined };
+      }
+      const existing = state.queuedMessages;
+      if (!existing) {
+        return state;
+      }
+      const filtered = existing.filter(m => m.id !== action.id);
+      return filtered.length === existing.length
+        ? state
+        : { ...state, queuedMessages: filtered.length > 0 ? filtered : undefined };
+    }
+
+    case ActionType.SessionQueuedMessagesReordered: {
+      const existing = state.queuedMessages;
+      if (!existing) {
+        return state;
+      }
+      const byId = new Map(existing.map(m => [m.id, m]));
+      const ordered = new Set<string>();
+      const reordered = action.order
+        .filter(id => {
+          if (byId.has(id) && !ordered.has(id)) {
+            ordered.add(id);
+            return true;
+          }
+          return false;
+        })
+        .map(id => byId.get(id)!);
+      // Append any messages not mentioned in order, preserving original order
+      for (const m of existing) {
+        if (!ordered.has(m.id)) {
+          reordered.push(m);
+        }
+      }
+      return { ...state, queuedMessages: reordered };
+    }
 
     default:
       softAssertNever(action, log);

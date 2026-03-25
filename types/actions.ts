@@ -19,7 +19,7 @@ import type {
   IUsageInfo,
 } from './state.js';
 
-import { ToolCallConfirmationReason, ToolCallCancellationReason } from './state.js';
+import { ToolCallConfirmationReason, ToolCallCancellationReason, PendingMessageKind } from './state.js';
 
 // ─── Action Type Enum ────────────────────────────────────────────────────────
 
@@ -52,6 +52,9 @@ export const enum ActionType {
   SessionServerToolsChanged = 'session/serverToolsChanged',
   SessionActiveClientChanged = 'session/activeClientChanged',
   SessionActiveClientToolsChanged = 'session/activeClientToolsChanged',
+  SessionPendingMessageSet = 'session/pendingMessageSet',
+  SessionPendingMessageRemoved = 'session/pendingMessageRemoved',
+  SessionQueuedMessagesReordered = 'session/queuedMessagesReordered',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -167,6 +170,8 @@ export interface ISessionTurnStartedAction {
   turnId: string;
   /** User's message */
   userMessage: IUserMessage;
+  /** If this turn was auto-started from a queued message, the ID of that message */
+  queuedMessageId?: string;
 }
 
 /**
@@ -526,6 +531,75 @@ export interface ISessionActiveClientToolsChangedAction {
   tools: IToolDefinition[];
 }
 
+// ─── Pending Message Actions ─────────────────────────────────────────────────
+
+/**
+ * A pending message was set (upsert semantics: creates or replaces).
+ *
+ * For steering messages, this always replaces the single steering message.
+ * For queued messages, if a message with the given `id` already exists it is
+ * updated in place; otherwise it is appended to the queue. If the session is
+ * idle when a queued message is set, the server SHOULD immediately consume it
+ * and start a new turn.
+ *
+ * @category Session Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ISessionPendingMessageSetAction {
+  type: ActionType.SessionPendingMessageSet;
+  /** Session URI */
+  session: URI;
+  /** Whether this is a steering or queued message */
+  kind: PendingMessageKind;
+  /** Unique identifier for this pending message */
+  id: string;
+  /** The message content */
+  userMessage: IUserMessage;
+}
+
+/**
+ * A pending message was removed (steering or queued).
+ *
+ * Dispatched by clients to cancel a pending message, or by the server when
+ * it consumes a message (e.g. starting a turn from a queued message or
+ * injecting a steering message into the current turn).
+ *
+ * @category Session Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ISessionPendingMessageRemovedAction {
+  type: ActionType.SessionPendingMessageRemoved;
+  /** Session URI */
+  session: URI;
+  /** Whether this is a steering or queued message */
+  kind: PendingMessageKind;
+  /** Identifier of the pending message to remove */
+  id: string;
+}
+
+/**
+ * Reorder the queued messages.
+ *
+ * The `order` array contains the IDs of queued messages in their new
+ * desired order. IDs not present in the current queue are ignored.
+ * Queued messages whose IDs are absent from `order` are appended at
+ * the end in their original relative order (so a client with a stale
+ * view of the queue never silently drops messages).
+ *
+ * @category Session Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ISessionQueuedMessagesReorderedAction {
+  type: ActionType.SessionQueuedMessagesReordered;
+  /** Session URI */
+  session: URI;
+  /** Queued message IDs in the desired order */
+  order: string[];
+}
+
 // ─── Discriminated Union ─────────────────────────────────────────────────────
 
 /**
@@ -554,4 +628,7 @@ export type IStateAction =
   | ISessionModelChangedAction
   | ISessionServerToolsChangedAction
   | ISessionActiveClientChangedAction
-  | ISessionActiveClientToolsChangedAction;
+  | ISessionActiveClientToolsChangedAction
+  | ISessionPendingMessageSetAction
+  | ISessionPendingMessageRemovedAction
+  | ISessionQueuedMessagesReorderedAction;

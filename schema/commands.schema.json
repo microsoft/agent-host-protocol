@@ -589,6 +589,24 @@
         "name"
       ]
     },
+    "IPendingMessage": {
+      "type": "object",
+      "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this pending message"
+        },
+        "userMessage": {
+          "$ref": "#/$defs/IUserMessage",
+          "description": "The message content"
+        }
+      },
+      "required": [
+        "id",
+        "userMessage"
+      ]
+    },
     "ISessionState": {
       "type": "object",
       "description": "Full state for a single session, loaded when a client subscribes to the session's URI.",
@@ -630,6 +648,17 @@
         "activeTurn": {
           "$ref": "#/$defs/IActiveTurn",
           "description": "Currently in-progress turn"
+        },
+        "steeringMessage": {
+          "$ref": "#/$defs/IPendingMessage",
+          "description": "Message to inject into the current turn at a convenient point"
+        },
+        "queuedMessages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IPendingMessage"
+          },
+          "description": "Messages to send automatically as new turns after the current turn finishes"
         }
       },
       "required": [
@@ -1512,6 +1541,10 @@
         "userMessage": {
           "$ref": "#/$defs/IUserMessage",
           "description": "User's message"
+        },
+        "queuedMessageId": {
+          "type": "string",
+          "description": "If this turn was auto-started from a queued message, the ID of that message"
         }
       },
       "required": [
@@ -2000,6 +2033,90 @@
         "type",
         "session",
         "tools"
+      ]
+    },
+    "ISessionPendingMessageSetAction": {
+      "type": "object",
+      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the session is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionPendingMessageSet"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "kind": {
+          "$ref": "#/$defs/PendingMessageKind",
+          "description": "Whether this is a steering or queued message"
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this pending message"
+        },
+        "userMessage": {
+          "$ref": "#/$defs/IUserMessage",
+          "description": "The message content"
+        }
+      },
+      "required": [
+        "type",
+        "session",
+        "kind",
+        "id",
+        "userMessage"
+      ]
+    },
+    "ISessionPendingMessageRemovedAction": {
+      "type": "object",
+      "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionPendingMessageRemoved"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "kind": {
+          "$ref": "#/$defs/PendingMessageKind",
+          "description": "Whether this is a steering or queued message"
+        },
+        "id": {
+          "type": "string",
+          "description": "Identifier of the pending message to remove"
+        }
+      },
+      "required": [
+        "type",
+        "session",
+        "kind",
+        "id"
+      ]
+    },
+    "ISessionQueuedMessagesReorderedAction": {
+      "type": "object",
+      "description": "Reorder the queued messages.\n\nThe `order` array contains the IDs of queued messages in their new\ndesired order. IDs not present in the current queue are ignored.\nQueued messages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the queue never silently drops messages).",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionQueuedMessagesReordered"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Queued message IDs in the desired order"
+        }
+      },
+      "required": [
+        "type",
+        "session",
+        "order"
       ]
     }
   }

@@ -41,6 +41,7 @@ export type {
   IToolResultContent,
   IToolResultFileEditContent,
   ISessionActiveClient,
+  IPendingMessage,
   IUsageInfo,
   IErrorInfo,
   ISnapshot,
@@ -57,6 +58,7 @@ export {
   ToolCallConfirmationReason,
   ToolCallCancellationReason,
   ToolResultContentType,
+  PendingMessageKind,
 } from './state.js';
 
 // Action types
@@ -88,6 +90,9 @@ export type {
   ISessionServerToolsChangedAction,
   ISessionActiveClientChangedAction,
   ISessionActiveClientToolsChangedAction,
+  ISessionPendingMessageSetAction,
+  ISessionPendingMessageRemovedAction,
+  ISessionQueuedMessagesReorderedAction,
   IStateAction,
 } from './actions.js';
 
