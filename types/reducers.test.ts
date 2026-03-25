@@ -261,6 +261,60 @@ describe('sessionReducer — turn lifecycle', () => {
     assert.deepStrictEqual(next.activeTurn!.responseParts, []);
   });
 
+  it('turnStarted with queuedMessageId removes from queuedMessages', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      queuedMessages: [
+        { id: 'q-1', userMessage: { text: 'First' } },
+        { id: 'q-2', userMessage: { text: 'Second' } },
+      ],
+    });
+    const next = sessionReducer(state, {
+      type: ActionType.SessionTurnStarted, session: S, turnId: T,
+      userMessage: { text: 'First' }, queuedMessageId: 'q-1',
+    });
+    assert.equal(next.queuedMessages!.length, 1);
+    assert.equal(next.queuedMessages![0].id, 'q-2');
+  });
+
+  it('turnStarted with queuedMessageId removes last queued message and sets undefined', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      queuedMessages: [{ id: 'q-1', userMessage: { text: 'Only' } }],
+    });
+    const next = sessionReducer(state, {
+      type: ActionType.SessionTurnStarted, session: S, turnId: T,
+      userMessage: { text: 'Only' }, queuedMessageId: 'q-1',
+    });
+    assert.strictEqual(next.queuedMessages, undefined);
+  });
+
+  it('turnStarted with queuedMessageId removes matching steering message', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      steeringMessage: { id: 's-1', userMessage: { text: 'Steer' } },
+    });
+    const next = sessionReducer(state, {
+      type: ActionType.SessionTurnStarted, session: S, turnId: T,
+      userMessage: { text: 'Steer' }, queuedMessageId: 's-1',
+    });
+    assert.strictEqual(next.steeringMessage, undefined);
+  });
+
+  it('turnStarted without queuedMessageId does not touch pending messages', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      steeringMessage: { id: 's-1', userMessage: { text: 'Steer' } },
+      queuedMessages: [{ id: 'q-1', userMessage: { text: 'Queued' } }],
+    });
+    const next = sessionReducer(state, {
+      type: ActionType.SessionTurnStarted, session: S, turnId: T,
+      userMessage: { text: 'Hello' },
+    });
+    assert.deepStrictEqual(next.steeringMessage, state.steeringMessage);
+    assert.deepStrictEqual(next.queuedMessages, state.queuedMessages);
+  });
+
   it('handles session/delta', () => {
     let state = createMarkdownPart(makeSessionStateWithActiveTurn(), 'md-1');
     state = sessionReducer(state, { type: ActionType.SessionDelta, session: S, turnId: T, partId: 'md-1', content: 'Hello ' });

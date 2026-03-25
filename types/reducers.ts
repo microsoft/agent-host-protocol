@@ -215,8 +215,8 @@ export function sessionReducer(state: ISessionState, action: ISessionAction, log
 
     // ── Turn Lifecycle ────────────────────────────────────────────────────
 
-    case ActionType.SessionTurnStarted:
-      return {
+    case ActionType.SessionTurnStarted: {
+      let next: ISessionState = {
         ...state,
         summary: { ...state.summary, status: SessionStatus.InProgress, modifiedAt: Date.now() },
         activeTurn: {
@@ -226,6 +226,20 @@ export function sessionReducer(state: ISessionState, action: ISessionAction, log
           usage: undefined,
         },
       };
+
+      // If this turn was auto-started from a pending message, remove it
+      if (action.queuedMessageId) {
+        if (next.steeringMessage?.id === action.queuedMessageId) {
+          next = { ...next, steeringMessage: undefined };
+        }
+        if (next.queuedMessages) {
+          const filtered = next.queuedMessages.filter(m => m.id !== action.queuedMessageId);
+          next = { ...next, queuedMessages: filtered.length > 0 ? filtered : undefined };
+        }
+      }
+
+      return next;
+    }
 
     case ActionType.SessionDelta:
       return updateResponsePart(state, action.turnId, action.partId, part => {
