@@ -131,6 +131,8 @@ export type {
   IListSessionsResult,
   IFetchContentParams,
   IFetchContentResult,
+  IWriteFileParams,
+  IWriteFileResult,
   IBrowseDirectoryParams,
   IDirectoryEntry,
   IBrowseDirectoryResult,

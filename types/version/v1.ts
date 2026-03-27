@@ -74,6 +74,8 @@ import type {
   IListSessionsResult,
   IAuthenticateParams,
   IAuthenticateResult,
+  IWriteFileParams,
+  IWriteFileResult,
 } from '../commands.js';
 
 import type {
@@ -156,6 +158,8 @@ type V1_IAuthRequiredNotification = IAuthRequiredNotification;
 type V1_IListSessionsResult = IListSessionsResult;
 type V1_IAuthenticateParams = IAuthenticateParams;
 type V1_IAuthenticateResult = IAuthenticateResult;
+type V1_IWriteFileParams = IWriteFileParams;
+type V1_IWriteFileResult = IWriteFileResult;
 type V1_ICommandMap = ICommandMap;
 type V1_IClientNotificationMap = IClientNotificationMap;
 type V1_IServerNotificationMap = IServerNotificationMap;
@@ -272,6 +276,10 @@ type _CheckListSessionsResult = AssertCompatible<V1_IListSessionsResult, IListSe
 type _CheckAuthenticateParams = AssertCompatible<V1_IAuthenticateParams, IAuthenticateParams>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckAuthenticateResult = AssertCompatible<V1_IAuthenticateResult, IAuthenticateResult>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckWriteFileParams = AssertCompatible<V1_IWriteFileParams, IWriteFileParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckWriteFileResult = AssertCompatible<V1_IWriteFileResult, IWriteFileResult>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckProtectedResourceMetadata = AssertCompatible<V1_IProtectedResourceMetadata, IProtectedResourceMetadata>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

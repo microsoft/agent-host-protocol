@@ -20,6 +20,8 @@ import type {
   IListSessionsResult,
   IFetchContentParams,
   IFetchContentResult,
+  IWriteFileParams,
+  IWriteFileResult,
   IBrowseDirectoryParams,
   IBrowseDirectoryResult,
   IFetchTurnsParams,
@@ -86,6 +88,7 @@ export interface ICommandMap {
   'disposeSession': { params: IDisposeSessionParams; result: null };
   'listSessions': { params: IListSessionsParams; result: IListSessionsResult };
   'fetchContent': { params: IFetchContentParams; result: IFetchContentResult };
+  'writeFile': { params: IWriteFileParams; result: IWriteFileResult };
   'browseDirectory': { params: IBrowseDirectoryParams; result: IBrowseDirectoryResult };
   'fetchTurns': { params: IFetchTurnsParams; result: IFetchTurnsResult };
   'authenticate': { params: IAuthenticateParams; result: IAuthenticateResult };

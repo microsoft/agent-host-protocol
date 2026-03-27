@@ -257,6 +257,42 @@
         "encoding"
       ]
     },
+    "IWriteFileParams": {
+      "type": "object",
+      "description": "Writes content to a file on the server's filesystem.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nIf the file does not exist, it is created. If the file already exists, it is\noverwritten unless `createOnly` is set.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Target file URI on the server filesystem"
+        },
+        "data": {
+          "type": "string",
+          "description": "Content encoded as a string"
+        },
+        "encoding": {
+          "$ref": "#/$defs/ContentEncoding",
+          "description": "How `data` is encoded"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content type (e.g. `\"text/plain\"`, `\"image/png\"`)"
+        },
+        "createOnly": {
+          "type": "boolean",
+          "description": "If `true`, the server MUST fail if the file already exists instead of\noverwriting it. Useful for safe creation of new files."
+        }
+      },
+      "required": [
+        "uri",
+        "data",
+        "encoding"
+      ]
+    },
+    "IWriteFileResult": {
+      "type": "object",
+      "description": "Result of the `writeFile` command.\n\nAn empty object on success.",
+      "properties": {}
+    },
     "IBrowseDirectoryParams": {
       "type": "object",
       "description": "Lists the contents of a directory on the server. Used by clients to\npresent directory pickers or file browsers.",
@@ -1383,6 +1419,10 @@
             "$ref": "#/$defs/Icon"
           },
           "description": "Icons for the plugin"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Opaque version token for this customization.\n\nClients SHOULD include a nonce with every customization they provide.\nConsumers can compare nonces to detect whether a customization has\nchanged since it was last seen, avoiding redundant reloads or copies."
         }
       },
       "required": [

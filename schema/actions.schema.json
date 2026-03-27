@@ -1772,6 +1772,10 @@
             "$ref": "#/$defs/Icon"
           },
           "description": "Icons for the plugin"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Opaque version token for this customization.\n\nClients SHOULD include a nonce with every customization they provide.\nConsumers can compare nonces to detect whether a customization has\nchanged since it was last seen, avoiding redundant reloads or copies."
         }
       },
       "required": [
