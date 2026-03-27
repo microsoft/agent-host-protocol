@@ -36,6 +36,7 @@ CustomizationRef {
   displayName: string  // human-readable name
   description?: string // what the plugin provides
   icons?: Icon[]       // icons for UI display
+  nonce?: string       // opaque version token for change detection
 }
 ```
 

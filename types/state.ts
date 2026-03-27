@@ -873,6 +873,14 @@ export interface ICustomizationRef {
   description?: string;
   /** Icons for the plugin */
   icons?: Icon[];
+  /**
+   * Opaque version token for this customization.
+   *
+   * Clients SHOULD include a nonce with every customization they provide.
+   * Consumers can compare nonces to detect whether a customization has
+   * changed since it was last seen, avoiding redundant reloads or copies.
+   */
+  nonce?: string;
 }
 
 /**
