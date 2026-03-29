@@ -482,7 +482,7 @@
     },
     "ISessionTitleChangedAction": {
       "type": "object",
-      "description": "Session title updated (typically auto-generated from conversation).",
+      "description": "Session title updated. Fired by the server when the title is auto-generated\nfrom conversation, or dispatched by a client to rename a session.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.SessionTitleChanged"
