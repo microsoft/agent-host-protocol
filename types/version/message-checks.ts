@@ -30,6 +30,7 @@ type _ExpectedCommands =
   | 'disposeSession'
   | 'listSessions'
   | 'fetchContent'
+  | 'writeFile'
   | 'browseDirectory'
   | 'fetchTurns'
   | 'authenticate';
