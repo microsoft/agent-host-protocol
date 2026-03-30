@@ -62,7 +62,7 @@ A `session/toolUpdate` action for streaming incremental tool output (e.g. termin
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
-| `session/titleChanged` | No | Session title updated |
+| `session/titleChanged` | **Yes** | Session title updated (auto-generated or client rename) |
 | `session/usage` | No | Token usage report |
 | `session/reasoning` | No | Reasoning/thinking text appended to a reasoning part by `partId` |
 | `session/modelChanged` | **Yes** | Model changed for this session |
@@ -109,6 +109,7 @@ The client applies the action **optimistically** to its local state before sendi
 | `session/turnStarted` | Begins agent processing for the new turn |
 | `session/toolCallConfirmed` | Approves or denies a pending tool call; unblocks or cancels tool execution |
 | `session/turnCancelled` | Aborts the in-progress turn |
+| `session/titleChanged` | Updates the session title (rename) |
 | `session/modelChanged` | Changes the model for subsequent turns |
 | `session/pendingMessageSet` | Stores a steering or queued message (upsert); if queued and idle, auto-starts a turn |
 | `session/pendingMessageRemoved` | Cancels a pending message before it is consumed |

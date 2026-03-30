@@ -503,7 +503,7 @@ const ACTION_ORDER: ActionMeta[] = [
   { interfaceName: 'ISessionTurnCompleteAction', typeValue: 'session/turnComplete', description: 'Turn finished — the assistant is idle.', clientDispatchable: false, version: 1 },
   { interfaceName: 'ISessionTurnCancelledAction', typeValue: 'session/turnCancelled', description: 'Turn was aborted; server stops processing.', clientDispatchable: true, version: 1 },
   { interfaceName: 'ISessionErrorAction', typeValue: 'session/error', description: 'Error during turn processing.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionTitleChangedAction', typeValue: 'session/titleChanged', description: 'Session title updated (typically auto-generated from conversation).', clientDispatchable: false, version: 1 },
+  { interfaceName: 'ISessionTitleChangedAction', typeValue: 'session/titleChanged', description: 'Session title updated (auto-generated from conversation, or dispatched by a client to rename).', clientDispatchable: true, version: 1 },
   { interfaceName: 'ISessionUsageAction', typeValue: 'session/usage', description: 'Token usage report for a turn.', clientDispatchable: false, version: 1 },
   { interfaceName: 'ISessionReasoningAction', typeValue: 'session/reasoning', description: 'Reasoning/thinking text from the model.', clientDispatchable: false, version: 1 },
   { interfaceName: 'ISessionModelChangedAction', typeValue: 'session/modelChanged', description: 'Model changed for this session.', clientDispatchable: true, version: 1 },
