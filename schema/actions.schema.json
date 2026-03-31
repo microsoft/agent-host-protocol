@@ -712,6 +712,27 @@
         "enabled"
       ]
     },
+    "ISessionTruncatedAction": {
+      "type": "object",
+      "description": "Truncates a session's history. If `turnId` is provided, all turns after that\nturn are removed and the specified turn is kept. If `turnId` is omitted, all\nturns are removed.\n\nIf there is an active turn it is silently dropped and the session status\nreturns to `idle`.\n\nCommon use-case: truncate old data then dispatch a new\n`session/turnStarted` with an edited message.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionTruncated"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Keep turns up to and including this turn. Omit to clear all turns."
+        }
+      },
+      "required": [
+        "type",
+        "session"
+      ]
+    },
     "ISessionPendingMessageSetAction": {
       "type": "object",
       "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the session is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.",
@@ -2047,6 +2068,9 @@
         },
         {
           "$ref": "#/$defs/ISessionCustomizationToggledAction"
+        },
+        {
+          "$ref": "#/$defs/ISessionTruncatedAction"
         }
       ]
     }

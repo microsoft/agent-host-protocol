@@ -93,6 +93,7 @@ export type {
   ISessionPendingMessageSetAction,
   ISessionPendingMessageRemovedAction,
   ISessionQueuedMessagesReorderedAction,
+  ISessionTruncatedAction,
   IStateAction,
 } from './actions.js';
 
@@ -126,6 +127,7 @@ export type {
   ISubscribeParams,
   ISubscribeResult,
   ICreateSessionParams,
+  ISessionForkSource,
   IDisposeSessionParams,
   IListSessionsParams,
   IListSessionsResult,

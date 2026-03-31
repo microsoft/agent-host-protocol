@@ -154,9 +154,26 @@
         "snapshot"
       ]
     },
-    "ICreateSessionParams": {
+    "ISessionForkSource": {
       "type": "object",
       "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `notify/sessionAdded` notification to all\nclients.",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the existing session to fork from"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn ID in the source session; content up to and including this turn's response is copied"
+        }
+      },
+      "required": [
+        "session",
+        "turnId"
+      ]
+    },
+    "ICreateSessionParams": {
+      "type": "object",
       "properties": {
         "session": {
           "$ref": "#/$defs/URI",
@@ -173,6 +190,10 @@
         "workingDirectory": {
           "$ref": "#/$defs/URI",
           "description": "Working directory for the session"
+        },
+        "fork": {
+          "$ref": "#/$defs/ISessionForkSource",
+          "description": "Fork from an existing session. The new session is populated with content\nfrom the source session up to and including the specified turn's response."
         }
       },
       "required": [
@@ -2233,6 +2254,27 @@
         "session",
         "uri",
         "enabled"
+      ]
+    },
+    "ISessionTruncatedAction": {
+      "type": "object",
+      "description": "Truncates a session's history. If `turnId` is provided, all turns after that\nturn are removed and the specified turn is kept. If `turnId` is omitted, all\nturns are removed.\n\nIf there is an active turn it is silently dropped and the session status\nreturns to `idle`.\n\nCommon use-case: truncate old data then dispatch a new\n`session/turnStarted` with an edited message.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionTruncated"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Keep turns up to and including this turn. Omit to clear all turns."
+        }
+      },
+      "required": [
+        "type",
+        "session"
       ]
     },
     "ISessionPendingMessageSetAction": {

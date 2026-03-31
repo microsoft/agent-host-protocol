@@ -277,6 +277,51 @@ sequenceDiagram
 
 Clients can **set** or **remove** both steering and queued messages at any time using the `session/pendingMessageSet` (upsert) and `session/pendingMessageRemoved` actions with a `kind` discriminant (`'steering'` or `'queued'`).
 
+## Session Truncation
+
+The `session/truncated` action removes turn history from a session. It is **client-dispatchable** — either side can truncate. If the session has an active turn it is silently dropped and the session status returns to `idle`.
+
+- **With `turnId`** — keeps all turns up to and including the specified turn; removes everything after it.
+- **Without `turnId`** — removes all turns (empties the session).
+
+A common pattern is to truncate and then immediately start a new turn with an edited message:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+
+    Note over Client: User edits message from turn t-2
+
+    Client->>Server: dispatchAction (session/truncated, turnId: t-1)
+    Note over Server: Drops turns after t-1, drops active turn
+
+    Server->>Client: action (session/truncated)
+
+    Client->>Server: dispatchAction (session/turnStarted, edited message)
+    Server->>Client: action (session/turnStarted)
+    Note over Server: New turn begins with edited message
+```
+
+If the `turnId` is not found in the completed turns array, the action is a no-op.
+
+## Session Forking
+
+A new session can be created as a **fork** of an existing session by providing the optional `fork` field in `createSession`. The server populates the new session with content from the source session up to and including the response of the specified turn.
+
+```typescript
+createSession({
+  session: 'copilot:/<new-uuid>',
+  provider: 'copilot',
+  fork: {
+    session: 'copilot:/<source-uuid>',
+    turnId: 't-3',     // copy turns through t-3
+  },
+})
+```
+
+The forked session is an independent copy — subsequent changes to either session do not affect the other. The server broadcasts `notify/sessionAdded` for the new session as usual.
+
 ## Next Steps
 
 - [Actions](/guide/actions) — How state is mutated.

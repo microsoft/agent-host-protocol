@@ -31,6 +31,7 @@ import type {
   ISessionQueuedMessagesReorderedAction,
   ISessionCustomizationsChangedAction,
   ISessionCustomizationToggledAction,
+  ISessionTruncatedAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -71,6 +72,7 @@ export type ISessionAction =
   | ISessionQueuedMessagesReorderedAction
   | ISessionCustomizationsChangedAction
   | ISessionCustomizationToggledAction
+  | ISessionTruncatedAction
 ;
 
 /** Union of session actions that clients may dispatch. */
@@ -88,6 +90,7 @@ export type IClientSessionAction =
   | ISessionPendingMessageRemovedAction
   | ISessionQueuedMessagesReorderedAction
   | ISessionCustomizationToggledAction
+  | ISessionTruncatedAction
 ;
 
 /** Union of session actions that only the server may produce. */
@@ -142,4 +145,5 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in IStateAction['type']]: boo
   [ActionType.SessionQueuedMessagesReordered]: true,
   [ActionType.SessionCustomizationsChanged]: false,
   [ActionType.SessionCustomizationToggled]: true,
+  [ActionType.SessionTruncated]: true,
 };

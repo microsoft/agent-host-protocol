@@ -58,6 +58,7 @@ export const enum ActionType {
   SessionQueuedMessagesReordered = 'session/queuedMessagesReordered',
   SessionCustomizationsChanged = 'session/customizationsChanged',
   SessionCustomizationToggled = 'session/customizationToggled',
+  SessionTruncated = 'session/truncated',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -575,6 +576,31 @@ export interface ISessionCustomizationToggledAction {
   enabled: boolean;
 }
 
+// ─── Truncation ──────────────────────────────────────────────────────────────
+
+/**
+ * Truncates a session's history. If `turnId` is provided, all turns after that
+ * turn are removed and the specified turn is kept. If `turnId` is omitted, all
+ * turns are removed.
+ *
+ * If there is an active turn it is silently dropped and the session status
+ * returns to `idle`.
+ *
+ * Common use-case: truncate old data then dispatch a new
+ * `session/turnStarted` with an edited message.
+ *
+ * @category Session Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ISessionTruncatedAction {
+  type: ActionType.SessionTruncated;
+  /** Session URI */
+  session: URI;
+  /** Keep turns up to and including this turn. Omit to clear all turns. */
+  turnId?: string;
+}
+
 // ─── Pending Message Actions ─────────────────────────────────────────────────
 
 /**
@@ -677,4 +703,5 @@ export type IStateAction =
   | ISessionPendingMessageRemovedAction
   | ISessionQueuedMessagesReorderedAction
   | ISessionCustomizationsChangedAction
-  | ISessionCustomizationToggledAction;
+  | ISessionCustomizationToggledAction
+  | ISessionTruncatedAction;

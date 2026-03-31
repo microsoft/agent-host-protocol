@@ -1138,3 +1138,123 @@ describe('sessionReducer — customizations', () => {
     });
   });
 });
+
+// ─── Truncation Tests ────────────────────────────────────────────────────────
+
+describe('sessionReducer — session/truncated', () => {
+  const turn1 = { id: 't1', userMessage: { text: 'First' }, responseParts: [], usage: undefined, state: TurnState.Complete as const };
+  const turn2 = { id: 't2', userMessage: { text: 'Second' }, responseParts: [], usage: undefined, state: TurnState.Complete as const };
+  const turn3 = { id: 't3', userMessage: { text: 'Third' }, responseParts: [], usage: undefined, state: TurnState.Complete as const };
+
+  it('truncates turns after turnId, keeping the specified turn', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      turns: [turn1, turn2, turn3],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionTruncated,
+      session: S,
+      turnId: 't2',
+    });
+    assert.equal(result.turns.length, 2);
+    assert.equal(result.turns[0].id, 't1');
+    assert.equal(result.turns[1].id, 't2');
+    assert.equal(result.summary.status, SessionStatus.Idle);
+  });
+
+  it('keeps all turns when turnId is the last turn', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      turns: [turn1, turn2],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionTruncated,
+      session: S,
+      turnId: 't2',
+    });
+    assert.equal(result.turns.length, 2);
+  });
+
+  it('keeps only the first turn when turnId is the first turn', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      turns: [turn1, turn2, turn3],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionTruncated,
+      session: S,
+      turnId: 't1',
+    });
+    assert.equal(result.turns.length, 1);
+    assert.equal(result.turns[0].id, 't1');
+  });
+
+  it('clears all turns when turnId is omitted', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      turns: [turn1, turn2, turn3],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionTruncated,
+      session: S,
+    });
+    assert.equal(result.turns.length, 0);
+    assert.equal(result.summary.status, SessionStatus.Idle);
+  });
+
+  it('drops the active turn and sets status to idle', () => {
+    const state = makeSessionStateWithActiveTurn({
+      turns: [turn1, turn2],
+    });
+    assert.ok(state.activeTurn);
+    assert.equal(state.summary.status, SessionStatus.InProgress);
+
+    const result = sessionReducer(state, {
+      type: ActionType.SessionTruncated,
+      session: S,
+      turnId: 't1',
+    });
+    assert.equal(result.activeTurn, undefined);
+    assert.equal(result.turns.length, 1);
+    assert.equal(result.turns[0].id, 't1');
+    assert.equal(result.summary.status, SessionStatus.Idle);
+  });
+
+  it('drops active turn even when clearing all turns', () => {
+    const state = makeSessionStateWithActiveTurn();
+    const result = sessionReducer(state, {
+      type: ActionType.SessionTruncated,
+      session: S,
+    });
+    assert.equal(result.activeTurn, undefined);
+    assert.equal(result.turns.length, 0);
+    assert.equal(result.summary.status, SessionStatus.Idle);
+  });
+
+  it('is no-op for unknown turnId', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      turns: [turn1, turn2],
+    });
+    const result = sessionReducer(state, {
+      type: ActionType.SessionTruncated,
+      session: S,
+      turnId: 'unknown',
+    });
+    assert.strictEqual(result, state);
+  });
+
+  it('does not mutate the original state', () => {
+    const state = makeSessionState({
+      lifecycle: SessionLifecycle.Ready,
+      turns: [turn1, turn2, turn3],
+    });
+    const original = { ...state, turns: [...state.turns] };
+    sessionReducer(state, {
+      type: ActionType.SessionTruncated,
+      session: S,
+      turnId: 't1',
+    });
+    assert.deepStrictEqual(state.turns, original.turns);
+  });
+});
