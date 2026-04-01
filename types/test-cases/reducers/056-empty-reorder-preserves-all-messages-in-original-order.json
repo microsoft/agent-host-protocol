@@ -1,0 +1,51 @@
+{
+  "description": "empty reorder preserves all messages in original order",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "a",
+        "userMessage": {
+          "text": "A"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/queuedMessagesReordered",
+      "session": "copilot:/test-session",
+      "order": []
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "a",
+        "userMessage": {
+          "text": "A"
+        }
+      }
+    ]
+  }
+}

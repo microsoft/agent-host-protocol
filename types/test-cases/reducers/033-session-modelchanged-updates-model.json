@@ -1,0 +1,36 @@
+{
+  "description": "session/modelChanged updates model",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/modelChanged",
+      "session": "copilot:/test-session",
+      "model": "gpt-4"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 9999,
+      "model": "gpt-4"
+    },
+    "lifecycle": "creating",
+    "turns": []
+  }
+}

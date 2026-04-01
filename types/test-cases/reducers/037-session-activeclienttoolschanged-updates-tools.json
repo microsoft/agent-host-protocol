@@ -1,0 +1,53 @@
+{
+  "description": "session/activeClientToolsChanged updates tools",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "activeClient": {
+      "clientId": "vscode-1",
+      "tools": []
+    }
+  },
+  "actions": [
+    {
+      "type": "session/activeClientToolsChanged",
+      "session": "copilot:/test-session",
+      "tools": [
+        {
+          "name": "openFile",
+          "description": "Open a file"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "activeClient": {
+      "clientId": "vscode-1",
+      "tools": [
+        {
+          "name": "openFile",
+          "description": "Open a file"
+        }
+      ]
+    }
+  }
+}

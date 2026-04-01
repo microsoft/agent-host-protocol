@@ -1,0 +1,83 @@
+{
+  "description": "session/truncated keeps turns up to turnId",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "ready",
+    "turns": [
+      {
+        "id": "t1",
+        "userMessage": {
+          "text": "First"
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t2",
+        "userMessage": {
+          "text": "Second"
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t3",
+        "userMessage": {
+          "text": "Third"
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/truncated",
+      "session": "copilot:/test-session",
+      "turnId": "t2"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 9999
+    },
+    "lifecycle": "ready",
+    "turns": [
+      {
+        "id": "t1",
+        "userMessage": {
+          "text": "First"
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t2",
+        "userMessage": {
+          "text": "Second"
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "activeTurn": null
+  }
+}

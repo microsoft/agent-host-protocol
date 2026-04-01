@@ -1,0 +1,36 @@
+{
+  "description": "remove steering message is no-op when none exists",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageRemoved",
+      "session": "copilot:/test-session",
+      "kind": "steering",
+      "id": "sm-1"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  }
+}

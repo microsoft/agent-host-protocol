@@ -1,0 +1,100 @@
+{
+  "description": "tool call result confirmation → pending → approved",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "session/toolCallStart",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "toolName": "bash",
+      "displayName": "Run Command"
+    },
+    {
+      "type": "session/toolCallReady",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "invocationMessage": "Run",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "session/toolCallComplete",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "result": {
+        "success": true,
+        "pastTenseMessage": "Done"
+      },
+      "requiresResultConfirmation": true
+    },
+    {
+      "type": "session/toolCallResultConfirmed",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "approved": true
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "completed",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "toolClientId": null,
+            "_meta": null,
+            "invocationMessage": "Run",
+            "toolInput": null,
+            "confirmed": "not-needed",
+            "success": true,
+            "pastTenseMessage": "Done",
+            "content": null,
+            "structuredContent": null,
+            "error": null
+          }
+        }
+      ],
+      "usage": null
+    }
+  }
+}

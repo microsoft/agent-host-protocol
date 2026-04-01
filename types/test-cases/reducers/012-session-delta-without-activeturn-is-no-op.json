@@ -1,0 +1,37 @@
+{
+  "description": "session/delta without activeTurn is no-op",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/delta",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "partId": "md-1",
+      "content": "orphan"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "description": "toolCallReady ignores non-streaming/non-running tool calls",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "pending-confirmation",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "toolClientId": null,
+            "_meta": null,
+            "invocationMessage": "Run",
+            "toolInput": null,
+            "confirmationTitle": null
+          }
+        }
+      ],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "session/toolCallReady",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "invocationMessage": "Run again"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "pending-confirmation",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "toolClientId": null,
+            "_meta": null,
+            "invocationMessage": "Run",
+            "toolInput": null,
+            "confirmationTitle": null
+          }
+        }
+      ],
+      "usage": null
+    }
+  }
+}

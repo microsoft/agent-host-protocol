@@ -1,0 +1,47 @@
+{
+  "description": "set a new queued message",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageSet",
+      "session": "copilot:/test-session",
+      "kind": "queued",
+      "id": "pm-1",
+      "userMessage": {
+        "text": "Do something"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "pm-1",
+        "userMessage": {
+          "text": "Do something"
+        }
+      }
+    ]
+  }
+}

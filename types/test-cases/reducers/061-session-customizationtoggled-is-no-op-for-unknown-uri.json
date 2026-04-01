@@ -1,0 +1,54 @@
+{
+  "description": "session/customizationToggled is no-op for unknown URI",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": true
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/customizationToggled",
+      "session": "copilot:/test-session",
+      "uri": "https://plugins.example/unknown",
+      "enabled": false
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "description": "session/error finalizes turn with error",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "session/error",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "error": {
+        "errorType": "runtime",
+        "message": "Something broke"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "error",
+      "createdAt": 1000,
+      "modifiedAt": 9999
+    },
+    "lifecycle": "ready",
+    "turns": [
+      {
+        "id": "turn-1",
+        "userMessage": {
+          "text": "Hello"
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "Something broke"
+        }
+      }
+    ],
+    "activeTurn": null
+  }
+}

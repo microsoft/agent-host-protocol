@@ -1,0 +1,17 @@
+{
+  "description": "root/activeSessionsChanged",
+  "reducer": "root",
+  "initial": {
+    "agents": []
+  },
+  "actions": [
+    {
+      "type": "root/activeSessionsChanged",
+      "activeSessions": 5
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "activeSessions": 5
+  }
+}

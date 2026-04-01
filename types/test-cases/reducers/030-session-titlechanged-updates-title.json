@@ -1,0 +1,35 @@
+{
+  "description": "session/titleChanged updates title",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/titleChanged",
+      "session": "copilot:/test-session",
+      "title": "New Title"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "New Title",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 9999
+    },
+    "lifecycle": "creating",
+    "turns": []
+  }
+}

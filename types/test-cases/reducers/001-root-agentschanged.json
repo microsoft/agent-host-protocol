@@ -1,0 +1,30 @@
+{
+  "description": "root/agentsChanged",
+  "reducer": "root",
+  "initial": {
+    "agents": []
+  },
+  "actions": [
+    {
+      "type": "root/agentsChanged",
+      "agents": [
+        {
+          "provider": "copilot",
+          "displayName": "Copilot",
+          "description": "AI",
+          "models": []
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "agents": [
+      {
+        "provider": "copilot",
+        "displayName": "Copilot",
+        "description": "AI",
+        "models": []
+      }
+    ]
+  }
+}

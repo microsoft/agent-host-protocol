@@ -1,0 +1,77 @@
+{
+  "description": "tool call ready with auto-confirm transitions to running",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "session/toolCallStart",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "toolName": "bash",
+      "displayName": "Run Command"
+    },
+    {
+      "type": "session/toolCallReady",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "invocationMessage": "Run",
+      "confirmed": "not-needed"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "toolClientId": null,
+            "_meta": null,
+            "invocationMessage": "Run",
+            "toolInput": null,
+            "confirmed": "not-needed"
+          }
+        }
+      ],
+      "usage": null
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "description": "update steering message content via set with same ID",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "steeringMessage": {
+      "id": "sm-1",
+      "userMessage": {
+        "text": "Original"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageSet",
+      "session": "copilot:/test-session",
+      "kind": "steering",
+      "id": "sm-1",
+      "userMessage": {
+        "text": "Updated"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "steeringMessage": {
+      "id": "sm-1",
+      "userMessage": {
+        "text": "Updated"
+      }
+    }
+  }
+}

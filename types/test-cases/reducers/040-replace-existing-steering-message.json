@@ -1,0 +1,51 @@
+{
+  "description": "replace existing steering message",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "steeringMessage": {
+      "id": "sm-1",
+      "userMessage": {
+        "text": "Old"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageSet",
+      "session": "copilot:/test-session",
+      "kind": "steering",
+      "id": "sm-2",
+      "userMessage": {
+        "text": "New"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "steeringMessage": {
+      "id": "sm-2",
+      "userMessage": {
+        "text": "New"
+      }
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "description": "update queued message in place when ID already exists",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "pm-1",
+        "userMessage": {
+          "text": "First"
+        }
+      },
+      {
+        "id": "pm-2",
+        "userMessage": {
+          "text": "Second"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageSet",
+      "session": "copilot:/test-session",
+      "kind": "queued",
+      "id": "pm-1",
+      "userMessage": {
+        "text": "Updated first"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "pm-1",
+        "userMessage": {
+          "text": "Updated first"
+        }
+      },
+      {
+        "id": "pm-2",
+        "userMessage": {
+          "text": "Second"
+        }
+      }
+    ]
+  }
+}

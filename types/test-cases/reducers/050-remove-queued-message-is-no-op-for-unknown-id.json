@@ -1,0 +1,52 @@
+{
+  "description": "remove queued message is no-op for unknown ID",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "pm-1",
+        "userMessage": {
+          "text": "Hello"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageRemoved",
+      "session": "copilot:/test-session",
+      "kind": "queued",
+      "id": "pm-unknown"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "pm-1",
+        "userMessage": {
+          "text": "Hello"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,237 @@
+{
+  "description": "full turn flow with tool calls and re-confirmation",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "ready",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/turnStarted",
+      "session": "s",
+      "turnId": "t1",
+      "userMessage": {
+        "text": "Fix the bug"
+      }
+    },
+    {
+      "type": "session/responsePart",
+      "session": "s",
+      "turnId": "t1",
+      "part": {
+        "kind": "markdown",
+        "id": "md-1",
+        "content": ""
+      }
+    },
+    {
+      "type": "session/delta",
+      "session": "s",
+      "turnId": "t1",
+      "partId": "md-1",
+      "content": "I will "
+    },
+    {
+      "type": "session/delta",
+      "session": "s",
+      "turnId": "t1",
+      "partId": "md-1",
+      "content": "fix it."
+    },
+    {
+      "type": "session/toolCallStart",
+      "session": "s",
+      "turnId": "t1",
+      "toolCallId": "tc1",
+      "toolName": "edit",
+      "displayName": "Edit File"
+    },
+    {
+      "type": "session/toolCallReady",
+      "session": "s",
+      "turnId": "t1",
+      "toolCallId": "tc1",
+      "invocationMessage": "Edit main.ts",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "session/toolCallComplete",
+      "session": "s",
+      "turnId": "t1",
+      "toolCallId": "tc1",
+      "result": {
+        "success": true,
+        "pastTenseMessage": "Edited main.ts"
+      }
+    },
+    {
+      "type": "session/toolCallStart",
+      "session": "s",
+      "turnId": "t1",
+      "toolCallId": "tc2",
+      "toolName": "write",
+      "displayName": "Write File"
+    },
+    {
+      "type": "session/toolCallReady",
+      "session": "s",
+      "turnId": "t1",
+      "toolCallId": "tc2",
+      "invocationMessage": "Write /tmp/out",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "session/toolCallReady",
+      "session": "s",
+      "turnId": "t1",
+      "toolCallId": "tc2",
+      "invocationMessage": "Write to /tmp/out",
+      "_meta": {
+        "permissionKind": "write",
+        "path": "/tmp/out"
+      }
+    },
+    {
+      "type": "session/toolCallConfirmed",
+      "session": "s",
+      "turnId": "t1",
+      "toolCallId": "tc2",
+      "approved": true,
+      "confirmed": "user-action"
+    },
+    {
+      "type": "session/toolCallComplete",
+      "session": "s",
+      "turnId": "t1",
+      "toolCallId": "tc2",
+      "result": {
+        "success": true,
+        "pastTenseMessage": "Wrote file"
+      }
+    },
+    {
+      "type": "session/usage",
+      "session": "s",
+      "turnId": "t1",
+      "usage": {
+        "inputTokens": 200,
+        "outputTokens": 100
+      }
+    },
+    {
+      "type": "session/responsePart",
+      "session": "s",
+      "turnId": "t1",
+      "part": {
+        "kind": "reasoning",
+        "id": "r-1",
+        "content": ""
+      }
+    },
+    {
+      "type": "session/reasoning",
+      "session": "s",
+      "turnId": "t1",
+      "partId": "r-1",
+      "content": "The bug was in line 42"
+    },
+    {
+      "type": "session/responsePart",
+      "session": "s",
+      "turnId": "t1",
+      "part": {
+        "kind": "markdown",
+        "id": "md-2",
+        "content": "## Fix applied"
+      }
+    },
+    {
+      "type": "session/turnComplete",
+      "session": "s",
+      "turnId": "t1"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 9999
+    },
+    "lifecycle": "ready",
+    "turns": [
+      {
+        "id": "t1",
+        "userMessage": {
+          "text": "Fix the bug"
+        },
+        "responseParts": [
+          {
+            "kind": "markdown",
+            "id": "md-1",
+            "content": "I will fix it."
+          },
+          {
+            "kind": "toolCall",
+            "toolCall": {
+              "status": "completed",
+              "toolCallId": "tc1",
+              "toolName": "edit",
+              "displayName": "Edit File",
+              "toolClientId": null,
+              "_meta": null,
+              "invocationMessage": "Edit main.ts",
+              "toolInput": null,
+              "confirmed": "not-needed",
+              "success": true,
+              "pastTenseMessage": "Edited main.ts"
+            }
+          },
+          {
+            "kind": "toolCall",
+            "toolCall": {
+              "status": "completed",
+              "toolCallId": "tc2",
+              "toolName": "write",
+              "displayName": "Write File",
+              "toolClientId": null,
+              "_meta": null,
+              "invocationMessage": "Write to /tmp/out",
+              "toolInput": null,
+              "confirmed": "user-action",
+              "success": true,
+              "pastTenseMessage": "Wrote file"
+            }
+          },
+          {
+            "kind": "reasoning",
+            "id": "r-1",
+            "content": "The bug was in line 42"
+          },
+          {
+            "kind": "markdown",
+            "id": "md-2",
+            "content": "## Fix applied"
+          }
+        ],
+        "usage": {
+          "inputTokens": 200,
+          "outputTokens": 100
+        },
+        "state": "complete",
+        "error": null
+      }
+    ],
+    "activeTurn": null
+  }
+}

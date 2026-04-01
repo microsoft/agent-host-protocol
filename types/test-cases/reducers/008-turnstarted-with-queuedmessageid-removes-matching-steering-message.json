@@ -1,0 +1,54 @@
+{
+  "description": "turnStarted with queuedMessageId removes matching steering message",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "steeringMessage": {
+      "id": "s-1",
+      "userMessage": {
+        "text": "Steer"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "session/turnStarted",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "userMessage": {
+        "text": "Steer"
+      },
+      "queuedMessageId": "s-1"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 9999
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "steeringMessage": null,
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Steer"
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  }
+}

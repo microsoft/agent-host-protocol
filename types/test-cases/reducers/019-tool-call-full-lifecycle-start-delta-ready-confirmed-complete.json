@@ -1,0 +1,105 @@
+{
+  "description": "tool call full lifecycle: start → delta → ready → confirmed → complete",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "session/toolCallStart",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "toolName": "bash",
+      "displayName": "Run Command"
+    },
+    {
+      "type": "session/toolCallDelta",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "content": "ls -la",
+      "invocationMessage": "Listing files"
+    },
+    {
+      "type": "session/toolCallReady",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "invocationMessage": "Run: ls -la",
+      "toolInput": "ls -la"
+    },
+    {
+      "type": "session/toolCallConfirmed",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "approved": true,
+      "confirmed": "user-action"
+    },
+    {
+      "type": "session/toolCallComplete",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "result": {
+        "success": true,
+        "pastTenseMessage": "Ran command"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Hello"
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "completed",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "toolClientId": null,
+            "_meta": null,
+            "invocationMessage": "Run: ls -la",
+            "toolInput": "ls -la",
+            "confirmed": "user-action",
+            "success": true,
+            "pastTenseMessage": "Ran command"
+          }
+        }
+      ],
+      "usage": null
+    }
+  }
+}

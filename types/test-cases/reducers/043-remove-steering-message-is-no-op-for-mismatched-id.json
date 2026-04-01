@@ -1,0 +1,48 @@
+{
+  "description": "remove steering message is no-op for mismatched ID",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "steeringMessage": {
+      "id": "sm-1",
+      "userMessage": {
+        "text": "Hello"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageRemoved",
+      "session": "copilot:/test-session",
+      "kind": "steering",
+      "id": "sm-unknown"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "steeringMessage": {
+      "id": "sm-1",
+      "userMessage": {
+        "text": "Hello"
+      }
+    }
+  }
+}

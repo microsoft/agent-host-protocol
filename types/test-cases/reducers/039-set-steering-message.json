@@ -1,0 +1,45 @@
+{
+  "description": "set steering message",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageSet",
+      "session": "copilot:/test-session",
+      "kind": "steering",
+      "id": "sm-1",
+      "userMessage": {
+        "text": "Focus on tests"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "steeringMessage": {
+      "id": "sm-1",
+      "userMessage": {
+        "text": "Focus on tests"
+      }
+    }
+  }
+}

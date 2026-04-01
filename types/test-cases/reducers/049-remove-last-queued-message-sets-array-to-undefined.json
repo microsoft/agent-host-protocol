@@ -1,0 +1,45 @@
+{
+  "description": "remove last queued message sets array to undefined",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "pm-1",
+        "userMessage": {
+          "text": "Only one"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/pendingMessageRemoved",
+      "session": "copilot:/test-session",
+      "kind": "queued",
+      "id": "pm-1"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "queuedMessages": null
+  }
+}

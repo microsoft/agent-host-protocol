@@ -1,0 +1,42 @@
+{
+  "description": "session/creationFailed",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/creationFailed",
+      "session": "copilot:/test-session",
+      "error": {
+        "errorType": "init",
+        "message": "Failed to start"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creationFailed",
+    "turns": [],
+    "creationError": {
+      "errorType": "init",
+      "message": "Failed to start"
+    }
+  }
+}

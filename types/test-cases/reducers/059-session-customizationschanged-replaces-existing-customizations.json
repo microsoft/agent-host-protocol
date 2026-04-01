@@ -1,0 +1,61 @@
+{
+  "description": "session/customizationsChanged replaces existing customizations",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": true
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/customizationsChanged",
+      "session": "copilot:/test-session",
+      "customizations": [
+        {
+          "customization": {
+            "uri": "https://plugins.example/b",
+            "displayName": "Plugin B"
+          },
+          "enabled": false
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/b",
+          "displayName": "Plugin B"
+        },
+        "enabled": false
+      }
+    ]
+  }
+}

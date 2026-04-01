@@ -1,0 +1,56 @@
+{
+  "description": "turnStarted with queuedMessageId removes last queued message",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "idle",
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "q-1",
+        "userMessage": {
+          "text": "Only"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/turnStarted",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "userMessage": {
+        "text": "Only"
+      },
+      "queuedMessageId": "q-1"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 9999
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "queuedMessages": null,
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": {
+        "text": "Only"
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  }
+}
