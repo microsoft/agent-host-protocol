@@ -1,0 +1,21 @@
+{
+  "description": "terminal/cwdChanged updates cwd",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "cwd": "file:///home/user",
+    "content": ""
+  },
+  "actions": [
+    {
+      "type": "terminal/cwdChanged",
+      "terminal": "agenthost:/terminal/1",
+      "cwd": "file:///home/user/project"
+    }
+  ],
+  "expected": {
+    "title": "bash",
+    "cwd": "file:///home/user/project",
+    "content": ""
+  }
+}

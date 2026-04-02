@@ -18,6 +18,8 @@ import type {
   ISessionActiveClient,
   IUsageInfo,
   ISessionCustomization,
+  ITerminalInfo,
+  ITerminalClaim,
 } from './state.js';
 
 import { ToolCallConfirmationReason, ToolCallCancellationReason, PendingMessageKind } from './state.js';
@@ -59,6 +61,15 @@ export const enum ActionType {
   SessionCustomizationsChanged = 'session/customizationsChanged',
   SessionCustomizationToggled = 'session/customizationToggled',
   SessionTruncated = 'session/truncated',
+  RootTerminalsChanged = 'root/terminalsChanged',
+  TerminalData = 'terminal/data',
+  TerminalInput = 'terminal/input',
+  TerminalResized = 'terminal/resized',
+  TerminalClaimed = 'terminal/claimed',
+  TerminalTitleChanged = 'terminal/titleChanged',
+  TerminalCwdChanged = 'terminal/cwdChanged',
+  TerminalExited = 'terminal/exited',
+  TerminalCleared = 'terminal/cleared',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -129,6 +140,21 @@ export interface IRootActiveSessionsChangedAction {
   type: ActionType.RootActiveSessionsChanged;
   /** Current count of active sessions */
   activeSessions: number;
+}
+
+/**
+ * Fired when the list of known terminals changes.
+ *
+ * Full-replacement semantics: the `terminals` array replaces the previous
+ * `terminals` entirely.
+ *
+ * @category Root Actions
+ * @version 1
+ */
+export interface IRootTerminalsChangedAction {
+  type: ActionType.RootTerminalsChanged;
+  /** Updated terminal list (full replacement) */
+  terminals: ITerminalInfo[];
 }
 
 // ─── Session Actions ─────────────────────────────────────────────────────────
@@ -670,6 +696,142 @@ export interface ISessionQueuedMessagesReorderedAction {
   order: string[];
 }
 
+// ─── Terminal Actions ────────────────────────────────────────────────────────
+
+/**
+ * Terminal output data (pty → client direction). Also dispatchable by clients
+ * to provide terminal content in remoting scenarios.
+ *
+ * Both directions append `data` to the terminal's `content` in the reducer.
+ *
+ * @category Terminal Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ITerminalDataAction {
+  type: ActionType.TerminalData;
+  /** Terminal URI */
+  terminal: URI;
+  /** Output data (may contain ANSI escape sequences) */
+  data: string;
+}
+
+/**
+ * Keyboard input sent to the terminal process (client → pty direction).
+ *
+ * This is a side-effect-only action: the server forwards the data to the
+ * terminal's pty. The reducer treats this as a no-op since `terminal/data`
+ * actions will reflect any resulting output.
+ *
+ * @category Terminal Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ITerminalInputAction {
+  type: ActionType.TerminalInput;
+  /** Terminal URI */
+  terminal: URI;
+  /** Input data to send to the pty */
+  data: string;
+}
+
+/**
+ * Terminal dimensions changed.
+ *
+ * Dispatchable by clients to request a resize, or by the server to inform
+ * clients of the actual terminal dimensions.
+ *
+ * @category Terminal Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ITerminalResizedAction {
+  type: ActionType.TerminalResized;
+  /** Terminal URI */
+  terminal: URI;
+  /** Terminal width in columns */
+  cols: number;
+  /** Terminal height in rows */
+  rows: number;
+}
+
+/**
+ * Terminal claim changed. A client or session claims or releases the terminal.
+ *
+ * Dispatch with `claim: null` to release. The server SHOULD reject if another
+ * entity already holds the claim.
+ *
+ * @category Terminal Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ITerminalClaimedAction {
+  type: ActionType.TerminalClaimed;
+  /** Terminal URI */
+  terminal: URI;
+  /** The new claim, or `null` to release */
+  claim: ITerminalClaim | null;
+}
+
+/**
+ * Terminal title changed.
+ *
+ * Fired by the server when the terminal process updates its title (e.g. via
+ * escape sequences), or dispatched by a client to rename a terminal.
+ *
+ * @category Terminal Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ITerminalTitleChangedAction {
+  type: ActionType.TerminalTitleChanged;
+  /** Terminal URI */
+  terminal: URI;
+  /** New terminal title */
+  title: string;
+}
+
+/**
+ * Terminal working directory changed.
+ *
+ * @category Terminal Actions
+ * @version 1
+ */
+export interface ITerminalCwdChangedAction {
+  type: ActionType.TerminalCwdChanged;
+  /** Terminal URI */
+  terminal: URI;
+  /** New working directory */
+  cwd: URI;
+}
+
+/**
+ * Terminal process exited.
+ *
+ * @category Terminal Actions
+ * @version 1
+ */
+export interface ITerminalExitedAction {
+  type: ActionType.TerminalExited;
+  /** Terminal URI */
+  terminal: URI;
+  /** Process exit code. `undefined` if the process was killed without an exit code. */
+  exitCode?: number;
+}
+
+/**
+ * Terminal scrollback buffer cleared.
+ *
+ * @category Terminal Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ITerminalClearedAction {
+  type: ActionType.TerminalCleared;
+  /** Terminal URI */
+  terminal: URI;
+}
+
 // ─── Discriminated Union ─────────────────────────────────────────────────────
 
 /**
@@ -678,6 +840,7 @@ export interface ISessionQueuedMessagesReorderedAction {
 export type IStateAction =
   | IRootAgentsChangedAction
   | IRootActiveSessionsChangedAction
+  | IRootTerminalsChangedAction
   | ISessionReadyAction
   | ISessionCreationFailedAction
   | ISessionTurnStartedAction
@@ -704,4 +867,12 @@ export type IStateAction =
   | ISessionQueuedMessagesReorderedAction
   | ISessionCustomizationsChangedAction
   | ISessionCustomizationToggledAction
-  | ISessionTruncatedAction;
+  | ISessionTruncatedAction
+  | ITerminalDataAction
+  | ITerminalInputAction
+  | ITerminalResizedAction
+  | ITerminalClaimedAction
+  | ITerminalTitleChangedAction
+  | ITerminalCwdChangedAction
+  | ITerminalExitedAction
+  | ITerminalClearedAction;

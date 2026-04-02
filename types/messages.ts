@@ -16,6 +16,7 @@ import type {
   ISubscribeResult,
   ICreateSessionParams,
   IDisposeSessionParams,
+  ICreateTerminalParams,
   IListSessionsParams,
   IListSessionsResult,
   IResourceReadParams,
@@ -92,6 +93,7 @@ export interface ICommandMap {
   'subscribe': { params: ISubscribeParams; result: ISubscribeResult };
   'createSession': { params: ICreateSessionParams; result: null };
   'disposeSession': { params: IDisposeSessionParams; result: null };
+  'createTerminal': { params: ICreateTerminalParams; result: null };
   'listSessions': { params: IListSessionsParams; result: IListSessionsResult };
   'resourceRead': { params: IResourceReadParams; result: IResourceReadResult };
   'resourceWrite': { params: IResourceWriteParams; result: IResourceWriteResult };

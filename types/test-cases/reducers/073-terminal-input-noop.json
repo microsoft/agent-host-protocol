@@ -1,0 +1,19 @@
+{
+  "description": "terminal/input is a no-op in the reducer",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "content": "$ "
+  },
+  "actions": [
+    {
+      "type": "terminal/input",
+      "terminal": "agenthost:/terminal/1",
+      "data": "ls -la\r"
+    }
+  ],
+  "expected": {
+    "title": "bash",
+    "content": "$ "
+  }
+}

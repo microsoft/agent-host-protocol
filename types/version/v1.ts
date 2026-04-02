@@ -47,6 +47,11 @@ import type {
   Icon,
   ICustomizationRef,
   ISessionCustomization,
+  ITerminalInfo,
+  ITerminalClientClaim,
+  ITerminalSessionClaim,
+  ITerminalClaim,
+  ITerminalState,
 } from '../state.js';
 
 import type {
@@ -65,6 +70,15 @@ import type {
   ISessionCustomizationsChangedAction,
   ISessionCustomizationToggledAction,
   ISessionTruncatedAction,
+  IRootTerminalsChangedAction,
+  ITerminalDataAction,
+  ITerminalInputAction,
+  ITerminalResizedAction,
+  ITerminalClaimedAction,
+  ITerminalTitleChangedAction,
+  ITerminalCwdChangedAction,
+  ITerminalExitedAction,
+  ITerminalClearedAction,
 } from '../actions.js';
 
 import type {
@@ -89,6 +103,7 @@ import type {
   IResourceDeleteResult,
   IResourceMoveParams,
   IResourceMoveResult,
+  ICreateTerminalParams,
 } from '../commands.js';
 
 import type {
@@ -168,6 +183,21 @@ type V1_ISessionQueuedMessagesReorderedAction = ISessionQueuedMessagesReorderedA
 type V1_ISessionCustomizationsChangedAction = ISessionCustomizationsChangedAction;
 type V1_ISessionCustomizationToggledAction = ISessionCustomizationToggledAction;
 type V1_ISessionTruncatedAction = ISessionTruncatedAction;
+type V1_IRootTerminalsChangedAction = IRootTerminalsChangedAction;
+type V1_ITerminalDataAction = ITerminalDataAction;
+type V1_ITerminalInputAction = ITerminalInputAction;
+type V1_ITerminalResizedAction = ITerminalResizedAction;
+type V1_ITerminalClaimedAction = ITerminalClaimedAction;
+type V1_ITerminalTitleChangedAction = ITerminalTitleChangedAction;
+type V1_ITerminalCwdChangedAction = ITerminalCwdChangedAction;
+type V1_ITerminalExitedAction = ITerminalExitedAction;
+type V1_ITerminalClearedAction = ITerminalClearedAction;
+type V1_ITerminalInfo = ITerminalInfo;
+type V1_ITerminalClientClaim = ITerminalClientClaim;
+type V1_ITerminalSessionClaim = ITerminalSessionClaim;
+type V1_ITerminalClaim = ITerminalClaim;
+type V1_ITerminalState = ITerminalState;
+type V1_ICreateTerminalParams = ICreateTerminalParams;
 type V1_ISessionForkSource = ISessionForkSource;
 type V1_IProtocolNotification = IProtocolNotification;
 type V1_IAuthRequiredNotification = IAuthRequiredNotification;
@@ -344,3 +374,33 @@ type _CheckClientNotificationMap = AssertCompatible<V1_IClientNotificationMap, I
 type _CheckServerNotificationMap = AssertCompatible<V1_IServerNotificationMap, IServerNotificationMap>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckNotificationMethodParams = AssertCompatible<V1_INotificationMethodParams, INotificationMethodParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalsChangedAction = AssertCompatible<V1_IRootTerminalsChangedAction, IRootTerminalsChangedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalDataAction = AssertCompatible<V1_ITerminalDataAction, ITerminalDataAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalInputAction = AssertCompatible<V1_ITerminalInputAction, ITerminalInputAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalResizedAction = AssertCompatible<V1_ITerminalResizedAction, ITerminalResizedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalClaimedAction = AssertCompatible<V1_ITerminalClaimedAction, ITerminalClaimedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalTitleChangedAction = AssertCompatible<V1_ITerminalTitleChangedAction, ITerminalTitleChangedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalCwdChangedAction = AssertCompatible<V1_ITerminalCwdChangedAction, ITerminalCwdChangedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalExitedAction = AssertCompatible<V1_ITerminalExitedAction, ITerminalExitedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalClearedAction = AssertCompatible<V1_ITerminalClearedAction, ITerminalClearedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalInfo = AssertCompatible<V1_ITerminalInfo, ITerminalInfo>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalClientClaim = AssertCompatible<V1_ITerminalClientClaim, ITerminalClientClaim>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalSessionClaim = AssertCompatible<V1_ITerminalSessionClaim, ITerminalSessionClaim>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalClaim = AssertCompatible<V1_ITerminalClaim, ITerminalClaim>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckTerminalState = AssertCompatible<V1_ITerminalState, ITerminalState>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckCreateTerminalParams = AssertCompatible<V1_ICreateTerminalParams, ICreateTerminalParams>;

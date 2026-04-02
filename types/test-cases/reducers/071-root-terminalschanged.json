@@ -1,0 +1,35 @@
+{
+  "description": "root/terminalsChanged",
+  "reducer": "root",
+  "initial": {
+    "agents": []
+  },
+  "actions": [
+    {
+      "type": "root/terminalsChanged",
+      "terminals": [
+        {
+          "resource": "agenthost:/terminal/1",
+          "title": "bash"
+        },
+        {
+          "resource": "agenthost:/terminal/2",
+          "title": "zsh"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "agents": [],
+    "terminals": [
+      {
+        "resource": "agenthost:/terminal/1",
+        "title": "bash"
+      },
+      {
+        "resource": "agenthost:/terminal/2",
+        "title": "zsh"
+      }
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "description": "full terminal lifecycle: cwd, data, resize, claim, exit",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "content": ""
+  },
+  "actions": [
+    {
+      "type": "terminal/cwdChanged",
+      "terminal": "agenthost:/terminal/1",
+      "cwd": "file:///home/user"
+    },
+    {
+      "type": "terminal/resized",
+      "terminal": "agenthost:/terminal/1",
+      "cols": 80,
+      "rows": 24
+    },
+    {
+      "type": "terminal/claimed",
+      "terminal": "agenthost:/terminal/1",
+      "claim": {
+        "kind": "session",
+        "session": "copilot:/s1",
+        "turnId": "t1",
+        "toolCallId": "tc1"
+      }
+    },
+    {
+      "type": "terminal/data",
+      "terminal": "agenthost:/terminal/1",
+      "data": "$ npm test\r\nAll tests passed\r\n"
+    },
+    {
+      "type": "terminal/claimed",
+      "terminal": "agenthost:/terminal/1",
+      "claim": null
+    },
+    {
+      "type": "terminal/exited",
+      "terminal": "agenthost:/terminal/1",
+      "exitCode": 0
+    }
+  ],
+  "expected": {
+    "title": "bash",
+    "cwd": "file:///home/user",
+    "cols": 80,
+    "rows": 24,
+    "content": "$ npm test\r\nAll tests passed\r\n",
+    "claim": null,
+    "exitCode": 0
+  }
+}

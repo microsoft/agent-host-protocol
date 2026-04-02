@@ -130,6 +130,13 @@
         "activeSessions": {
           "type": "number",
           "description": "Number of active (non-disposed) sessions on the server"
+        },
+        "terminals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ITerminalInfo"
+          },
+          "description": "Known terminals on the server. Subscribe to individual terminal URIs for full state."
         }
       },
       "required": [
@@ -1048,6 +1055,106 @@
         "enabled"
       ]
     },
+    "ITerminalInfo": {
+      "type": "object",
+      "description": "Lightweight terminal metadata exposed on the root state.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Terminal URI (subscribable for full terminal state)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable terminal title"
+        }
+      },
+      "required": [
+        "resource",
+        "title"
+      ]
+    },
+    "ITerminalClientClaim": {
+      "type": "object",
+      "description": "A terminal claimed by a connected client.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/TerminalClaimKind.Client",
+          "description": "Discriminant"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "The `clientId` of the claiming client"
+        }
+      },
+      "required": [
+        "kind",
+        "clientId"
+      ]
+    },
+    "ITerminalSessionClaim": {
+      "type": "object",
+      "description": "A terminal claimed by a session, optionally scoped to a specific turn or tool call.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/TerminalClaimKind.Session",
+          "description": "Discriminant"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI that claimed the terminal"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Optional turn identifier within the session"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Optional tool call identifier within the turn"
+        }
+      },
+      "required": [
+        "kind",
+        "session"
+      ]
+    },
+    "ITerminalState": {
+      "type": "object",
+      "description": "Full state for a single terminal, loaded when a client subscribes to the terminal's URI.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Human-readable terminal title"
+        },
+        "cwd": {
+          "$ref": "#/$defs/URI",
+          "description": "Current working directory of the terminal process"
+        },
+        "cols": {
+          "type": "number",
+          "description": "Terminal width in columns"
+        },
+        "rows": {
+          "type": "number",
+          "description": "Terminal height in rows"
+        },
+        "content": {
+          "type": "string",
+          "description": "Accumulated terminal output. May contain ANSI escape sequences.\nThe scrollback length is implementation-defined."
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Process exit code, set when the terminal process exits"
+        },
+        "claim": {
+          "$ref": "#/$defs/ITerminalClaim",
+          "description": "Who currently holds this terminal, if anyone"
+        }
+      },
+      "required": [
+        "title",
+        "content"
+      ]
+    },
     "IUsageInfo": {
       "type": "object",
       "properties": {
@@ -1105,6 +1212,9 @@
             },
             {
               "$ref": "#/$defs/ISessionState"
+            },
+            {
+              "$ref": "#/$defs/ITerminalState"
             }
           ],
           "description": "The current state of the resource"
@@ -1196,6 +1306,17 @@
         }
       ],
       "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`IToolResultResourceContent` for lazy-loading large results and\n`IToolResultFileEditContent` for file edit diffs (AHP extensions)."
+    },
+    "ITerminalClaim": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ITerminalClientClaim"
+        },
+        {
+          "$ref": "#/$defs/ITerminalSessionClaim"
+        }
+      ],
+      "description": "Describes who currently holds a terminal. A terminal may be claimed by\neither a connected client or a session (e.g. during a tool call)."
     }
   }
 }

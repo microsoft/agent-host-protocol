@@ -1,0 +1,24 @@
+{
+  "description": "terminal/data appends to content",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "content": "$ "
+  },
+  "actions": [
+    {
+      "type": "terminal/data",
+      "terminal": "agenthost:/terminal/1",
+      "data": "hello"
+    },
+    {
+      "type": "terminal/data",
+      "terminal": "agenthost:/terminal/1",
+      "data": " world\r\n"
+    }
+  ],
+  "expected": {
+    "title": "bash",
+    "content": "$ hello world\r\n"
+  }
+}

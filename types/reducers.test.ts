@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import {
   rootReducer,
   sessionReducer,
+  terminalReducer,
   isClientDispatchable,
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
@@ -30,6 +31,7 @@ import {
   SessionStatus,
   TurnState,
 } from './state.js';
+import type { ITerminalState } from './state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
 
@@ -41,10 +43,10 @@ function readSource(file: string): string {
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session';
-  initial: IRootState | ISessionState;
+  reducer: 'root' | 'session' | 'terminal';
+  initial: IRootState | ISessionState | ITerminalState;
   actions: unknown[];
-  expected: IRootState | ISessionState;
+  expected: IRootState | ISessionState | ITerminalState;
 }
 
 /**
@@ -98,6 +100,8 @@ describe('reducer fixtures', () => {
       for (const action of fixture.actions) {
         if (fixture.reducer === 'root') {
           state = rootReducer(state as IRootState, action as any);
+        } else if (fixture.reducer === 'terminal') {
+          state = terminalReducer(state as ITerminalState, action as any);
         } else {
           state = sessionReducer(state as ISessionState, action as any);
         }

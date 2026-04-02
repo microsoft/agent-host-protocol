@@ -5,6 +5,7 @@ import type {
   IStateAction,
   IRootAgentsChangedAction,
   IRootActiveSessionsChangedAction,
+  IRootTerminalsChangedAction,
   ISessionReadyAction,
   ISessionCreationFailedAction,
   ISessionTurnStartedAction,
@@ -32,16 +33,25 @@ import type {
   ISessionCustomizationsChangedAction,
   ISessionCustomizationToggledAction,
   ISessionTruncatedAction,
+  ITerminalDataAction,
+  ITerminalInputAction,
+  ITerminalResizedAction,
+  ITerminalClaimedAction,
+  ITerminalTitleChangedAction,
+  ITerminalCwdChangedAction,
+  ITerminalExitedAction,
+  ITerminalClearedAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
 
-// ─── Root vs Session Action Unions ───────────────────────────────────────────
+// ─── Root vs Session vs Terminal Action Unions ───────────────────────────────
 
 /** Union of all root-scoped actions. */
 export type IRootAction =
   | IRootAgentsChangedAction
   | IRootActiveSessionsChangedAction
+  | IRootTerminalsChangedAction
 ;
 
 /** Union of all session-scoped actions. */
@@ -110,6 +120,34 @@ export type IServerSessionAction =
   | ISessionCustomizationsChangedAction
 ;
 
+/** Union of all terminal-scoped actions. */
+export type ITerminalAction =
+  | ITerminalDataAction
+  | ITerminalInputAction
+  | ITerminalResizedAction
+  | ITerminalClaimedAction
+  | ITerminalTitleChangedAction
+  | ITerminalCwdChangedAction
+  | ITerminalExitedAction
+  | ITerminalClearedAction
+;
+
+/** Union of terminal actions that clients may dispatch. */
+export type IClientTerminalAction =
+  | ITerminalDataAction
+  | ITerminalInputAction
+  | ITerminalResizedAction
+  | ITerminalClaimedAction
+  | ITerminalTitleChangedAction
+  | ITerminalClearedAction
+;
+
+/** Union of terminal actions that only the server may produce. */
+export type IServerTerminalAction =
+  | ITerminalCwdChangedAction
+  | ITerminalExitedAction
+;
+
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
 
 /**
@@ -119,6 +157,7 @@ export type IServerSessionAction =
 export const IS_CLIENT_DISPATCHABLE: { readonly [K in IStateAction['type']]: boolean } = {
   [ActionType.RootAgentsChanged]: false,
   [ActionType.RootActiveSessionsChanged]: false,
+  [ActionType.RootTerminalsChanged]: false,
   [ActionType.SessionReady]: false,
   [ActionType.SessionCreationFailed]: false,
   [ActionType.SessionTurnStarted]: true,
@@ -146,4 +185,12 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in IStateAction['type']]: boo
   [ActionType.SessionCustomizationsChanged]: false,
   [ActionType.SessionCustomizationToggled]: true,
   [ActionType.SessionTruncated]: true,
+  [ActionType.TerminalData]: true,
+  [ActionType.TerminalInput]: true,
+  [ActionType.TerminalResized]: true,
+  [ActionType.TerminalClaimed]: true,
+  [ActionType.TerminalTitleChanged]: true,
+  [ActionType.TerminalCwdChanged]: false,
+  [ActionType.TerminalExited]: false,
+  [ActionType.TerminalCleared]: true,
 };

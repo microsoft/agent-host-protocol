@@ -1,13 +1,13 @@
 /**
- * Reducer Functions — Pure state reducers for AHP root and session state.
+ * Reducer Functions — Pure state reducers for AHP root, session, and terminal state.
  *
  * @module reducers
  */
 
 import { ActionType } from './actions.js';
-import type { IRootState, ISessionState, IToolCallState, IResponsePart, IToolCallResponsePart, ITurn, IPendingMessage } from './state.js';
+import type { IRootState, ISessionState, ITerminalState, IToolCallState, IResponsePart, IToolCallResponsePart, ITurn, IPendingMessage } from './state.js';
 import { SessionLifecycle, SessionStatus, TurnState, ToolCallStatus, ToolCallConfirmationReason, ToolCallCancellationReason, ResponsePartKind, PendingMessageKind } from './state.js';
-import type { IRootAction, ISessionAction, IClientSessionAction } from './action-origin.generated.js';
+import type { IRootAction, ISessionAction, IClientSessionAction, ITerminalAction, IClientTerminalAction } from './action-origin.generated.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -183,6 +183,9 @@ export function rootReducer(state: IRootState, action: IRootAction, log?: (msg: 
 
     case ActionType.RootActiveSessionsChanged:
       return { ...state, activeSessions: action.activeSessions };
+
+    case ActionType.RootTerminalsChanged:
+      return { ...state, terminals: action.terminals };
 
     default:
       softAssertNever(action, log);
@@ -571,14 +574,53 @@ export function sessionReducer(state: ISessionState, action: ISessionAction, log
   }
 }
 
+// ─── Terminal Reducer ────────────────────────────────────────────────────────
+
+/**
+ * Pure reducer for terminal state. Handles all {@link ITerminalAction} variants.
+ */
+export function terminalReducer(state: ITerminalState, action: ITerminalAction, log?: (msg: string) => void): ITerminalState {
+  switch (action.type) {
+    case ActionType.TerminalData:
+      return { ...state, content: state.content + action.data };
+
+    case ActionType.TerminalInput:
+      // Side-effect-only: the server forwards to the pty.
+      // No state change in the reducer.
+      return state;
+
+    case ActionType.TerminalResized:
+      return { ...state, cols: action.cols, rows: action.rows };
+
+    case ActionType.TerminalClaimed:
+      return { ...state, claim: action.claim ?? undefined };
+
+    case ActionType.TerminalTitleChanged:
+      return { ...state, title: action.title };
+
+    case ActionType.TerminalCwdChanged:
+      return { ...state, cwd: action.cwd };
+
+    case ActionType.TerminalExited:
+      return { ...state, exitCode: action.exitCode };
+
+    case ActionType.TerminalCleared:
+      return { ...state, content: '' };
+
+    default:
+      softAssertNever(action, log);
+      return state;
+  }
+}
+
 // ─── Dispatch Validation ─────────────────────────────────────────────────────
 
 /**
- * Type guard that checks whether an action may be dispatched by a client.
+ * Type guard that checks whether a session action may be dispatched by a client.
  *
  * Servers SHOULD call this to validate incoming `dispatchAction` requests
  * and reject any action the client is not allowed to originate.
  */
-export function isClientDispatchable(action: ISessionAction): action is IClientSessionAction {
+export function isClientDispatchable(action: ISessionAction | ITerminalAction): action is IClientSessionAction | IClientTerminalAction {
   return IS_CLIENT_DISPATCHABLE[action.type];
 }

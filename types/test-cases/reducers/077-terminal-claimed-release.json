@@ -1,0 +1,24 @@
+{
+  "description": "terminal/claimed with null releases claim",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "content": "",
+    "claim": {
+      "kind": "client",
+      "clientId": "vscode-1"
+    }
+  },
+  "actions": [
+    {
+      "type": "terminal/claimed",
+      "terminal": "agenthost:/terminal/1",
+      "claim": null
+    }
+  ],
+  "expected": {
+    "title": "bash",
+    "content": "",
+    "claim": null
+  }
+}

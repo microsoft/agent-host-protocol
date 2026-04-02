@@ -1,0 +1,22 @@
+{
+  "description": "terminal/exited sets exitCode",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "cwd": "file:///home/user",
+    "content": "$ exit\r\n"
+  },
+  "actions": [
+    {
+      "type": "terminal/exited",
+      "terminal": "agenthost:/terminal/1",
+      "exitCode": 0
+    }
+  ],
+  "expected": {
+    "title": "bash",
+    "cwd": "file:///home/user",
+    "content": "$ exit\r\n",
+    "exitCode": 0
+  }
+}

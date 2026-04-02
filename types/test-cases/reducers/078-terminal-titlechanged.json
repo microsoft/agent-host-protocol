@@ -1,0 +1,19 @@
+{
+  "description": "terminal/titleChanged updates title",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "content": ""
+  },
+  "actions": [
+    {
+      "type": "terminal/titleChanged",
+      "terminal": "agenthost:/terminal/1",
+      "title": "vim ~/project/main.ts"
+    }
+  ],
+  "expected": {
+    "title": "vim ~/project/main.ts",
+    "content": ""
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "description": "terminal/claimed sets client claim",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "content": ""
+  },
+  "actions": [
+    {
+      "type": "terminal/claimed",
+      "terminal": "agenthost:/terminal/1",
+      "claim": {
+        "kind": "client",
+        "clientId": "vscode-1"
+      }
+    }
+  ],
+  "expected": {
+    "title": "bash",
+    "content": "",
+    "claim": {
+      "kind": "client",
+      "clientId": "vscode-1"
+    }
+  }
+}

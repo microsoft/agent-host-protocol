@@ -1,0 +1,30 @@
+{
+  "description": "terminal/claimed sets session claim with tool call",
+  "reducer": "terminal",
+  "initial": {
+    "title": "bash",
+    "content": ""
+  },
+  "actions": [
+    {
+      "type": "terminal/claimed",
+      "terminal": "agenthost:/terminal/1",
+      "claim": {
+        "kind": "session",
+        "session": "copilot:/session-1",
+        "turnId": "turn-1",
+        "toolCallId": "tc-1"
+      }
+    }
+  ],
+  "expected": {
+    "title": "bash",
+    "content": "",
+    "claim": {
+      "kind": "session",
+      "session": "copilot:/session-1",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1"
+    }
+  }
+}

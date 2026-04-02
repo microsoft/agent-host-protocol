@@ -151,6 +151,8 @@ export interface IRootState {
   agents: IAgentInfo[];
   /** Number of active (non-disposed) sessions on the server */
   activeSessions?: number;
+  /** Known terminals on the server. Subscribe to individual terminal URIs for full state. */
+  terminals?: ITerminalInfo[];
 }
 
 /**
@@ -949,6 +951,91 @@ export interface ISessionCustomization {
   statusMessage?: string;
 }
 
+// ─── Terminal Types ──────────────────────────────────────────────────────────
+
+/**
+ * Lightweight terminal metadata exposed on the root state.
+ *
+ * @category Terminal Types
+ */
+export interface ITerminalInfo {
+  /** Terminal URI (subscribable for full terminal state) */
+  resource: URI;
+  /** Human-readable terminal title */
+  title: string;
+}
+
+/**
+ * Discriminant for terminal claim kinds.
+ *
+ * @category Terminal Types
+ */
+export const enum TerminalClaimKind {
+  Client = 'client',
+  Session = 'session',
+}
+
+/**
+ * A terminal claimed by a connected client.
+ *
+ * @category Terminal Types
+ */
+export interface ITerminalClientClaim {
+  /** Discriminant */
+  kind: TerminalClaimKind.Client;
+  /** The `clientId` of the claiming client */
+  clientId: string;
+}
+
+/**
+ * A terminal claimed by a session, optionally scoped to a specific turn or tool call.
+ *
+ * @category Terminal Types
+ */
+export interface ITerminalSessionClaim {
+  /** Discriminant */
+  kind: TerminalClaimKind.Session;
+  /** Session URI that claimed the terminal */
+  session: URI;
+  /** Optional turn identifier within the session */
+  turnId?: string;
+  /** Optional tool call identifier within the turn */
+  toolCallId?: string;
+}
+
+/**
+ * Describes who currently holds a terminal. A terminal may be claimed by
+ * either a connected client or a session (e.g. during a tool call).
+ *
+ * @category Terminal Types
+ */
+export type ITerminalClaim = ITerminalClientClaim | ITerminalSessionClaim;
+
+/**
+ * Full state for a single terminal, loaded when a client subscribes to the terminal's URI.
+ *
+ * @category Terminal Types
+ */
+export interface ITerminalState {
+  /** Human-readable terminal title */
+  title: string;
+  /** Current working directory of the terminal process */
+  cwd?: URI;
+  /** Terminal width in columns */
+  cols?: number;
+  /** Terminal height in rows */
+  rows?: number;
+  /**
+   * Accumulated terminal output. May contain ANSI escape sequences.
+   * The scrollback length is implementation-defined.
+   */
+  content: string;
+  /** Process exit code, set when the terminal process exits */
+  exitCode?: number;
+  /** Who currently holds this terminal, if anyone */
+  claim?: ITerminalClaim;
+}
+
 // ─── Common Types ────────────────────────────────────────────────────────────
 
 /**
@@ -987,7 +1074,7 @@ export interface ISnapshot {
   /** The subscribed resource URI (e.g. `agenthost:/root` or `copilot:/<uuid>`) */
   resource: URI;
   /** The current state of the resource */
-  state: IRootState | ISessionState;
+  state: IRootState | ISessionState | ITerminalState;
   /** The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`. */
   fromSeq: number;
 }

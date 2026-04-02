@@ -211,6 +211,34 @@ export interface IDisposeSessionParams {
   session: URI;
 }
 
+// ─── createTerminal ──────────────────────────────────────────────────────────
+
+/**
+ * Creates a new terminal on the server.
+ *
+ * After creation, the client should subscribe to the terminal URI to receive
+ * state updates. The server dispatches `root/terminalsChanged` to update the
+ * root terminal list.
+ *
+ * @category Commands
+ * @method createTerminal
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ */
+export interface ICreateTerminalParams {
+  /** Terminal URI (client-chosen) */
+  terminal: URI;
+  /** Human-readable terminal name */
+  name?: string;
+  /** Initial working directory URI */
+  cwd?: URI;
+  /** Initial terminal width in columns */
+  cols?: number;
+  /** Initial terminal height in rows */
+  rows?: number;
+}
+
 // ─── listSessions ────────────────────────────────────────────────────────────
 
 /**

@@ -16,6 +16,8 @@ const GENERATED_HEADER = `// Generated from types/actions.ts — do not edit
 // Run \`npm run generate\` to regenerate.
 `;
 
+type ActionScope = 'root' | 'session' | 'terminal';
+
 interface ActionInfo {
   /** The interface name (e.g. 'IRootAgentsChangedAction') */
   name: string;
@@ -23,8 +25,8 @@ interface ActionInfo {
   actionType: string;
   /** The ActionType enum member name (e.g. 'ActionType.RootAgentsChanged') */
   enumRef: string;
-  /** Whether this is a root action (@category Root Actions) */
-  isRoot: boolean;
+  /** Which scope this action belongs to */
+  scope: ActionScope;
   /** Whether the action is @clientDispatchable */
   isClientDispatchable: boolean;
 }
@@ -111,7 +113,9 @@ export function generateActionOrigin(project: Project, outDir: string): void {
     }
 
     const category = getJsDocTag(node as any, 'category') || '';
-    const isRoot = category === 'Root Actions';
+    const scope: ActionScope = category === 'Root Actions' ? 'root'
+      : category === 'Terminal Actions' ? 'terminal'
+      : 'session';
     const isClientDispatchable = hasJsDocTag(node as any, 'clientDispatchable');
 
     // Resolve the action type discriminant
@@ -150,16 +154,19 @@ export function generateActionOrigin(project: Project, outDir: string): void {
       name,
       actionType: resolved.actionType,
       enumRef: resolved.enumRef,
-      isRoot,
+      scope,
       isClientDispatchable,
     });
   }
 
   // Generate output
-  const rootActions = actions.filter(a => a.isRoot);
-  const sessionActions = actions.filter(a => !a.isRoot);
-  const clientActions = sessionActions.filter(a => a.isClientDispatchable);
-  const serverActions = sessionActions.filter(a => !a.isClientDispatchable);
+  const rootActions = actions.filter(a => a.scope === 'root');
+  const sessionActions = actions.filter(a => a.scope === 'session');
+  const terminalActions = actions.filter(a => a.scope === 'terminal');
+  const clientSessionActions = sessionActions.filter(a => a.isClientDispatchable);
+  const serverSessionActions = sessionActions.filter(a => !a.isClientDispatchable);
+  const clientTerminalActions = terminalActions.filter(a => a.isClientDispatchable);
+  const serverTerminalActions = terminalActions.filter(a => !a.isClientDispatchable);
 
   const lines: string[] = [GENERATED_HEADER];
 
@@ -175,13 +182,12 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   lines.push(``);
 
   // IRootAction
-  lines.push(`// ─── Root vs Session Action Unions ───────────────────────────────────────────`);
+  lines.push(`// ─── Root vs Session vs Terminal Action Unions ───────────────────────────────`);
   lines.push(``);
   lines.push(`/** Union of all root-scoped actions. */`);
   lines.push(`export type IRootAction =`);
   for (let i = 0; i < rootActions.length; i++) {
-    const sep = i === 0 ? '  |' : '  |';
-    lines.push(`${sep} ${rootActions[i].name}`);
+    lines.push(`  | ${rootActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
@@ -198,8 +204,8 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   // IClientSessionAction
   lines.push(`/** Union of session actions that clients may dispatch. */`);
   lines.push(`export type IClientSessionAction =`);
-  for (let i = 0; i < clientActions.length; i++) {
-    lines.push(`  | ${clientActions[i].name}`);
+  for (let i = 0; i < clientSessionActions.length; i++) {
+    lines.push(`  | ${clientSessionActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
@@ -207,11 +213,39 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   // IServerSessionAction
   lines.push(`/** Union of session actions that only the server may produce. */`);
   lines.push(`export type IServerSessionAction =`);
-  for (let i = 0; i < serverActions.length; i++) {
-    lines.push(`  | ${serverActions[i].name}`);
+  for (let i = 0; i < serverSessionActions.length; i++) {
+    lines.push(`  | ${serverSessionActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
+
+  // ITerminalAction
+  lines.push(`/** Union of all terminal-scoped actions. */`);
+  lines.push(`export type ITerminalAction =`);
+  for (let i = 0; i < terminalActions.length; i++) {
+    lines.push(`  | ${terminalActions[i].name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  // IClientTerminalAction
+  lines.push(`/** Union of terminal actions that clients may dispatch. */`);
+  lines.push(`export type IClientTerminalAction =`);
+  for (let i = 0; i < clientTerminalActions.length; i++) {
+    lines.push(`  | ${clientTerminalActions[i].name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  // IServerTerminalAction
+  lines.push(`/** Union of terminal actions that only the server may produce. */`);
+  lines.push(`export type IServerTerminalAction =`);
+  for (let i = 0; i < serverTerminalActions.length; i++) {
+    lines.push(`  | ${serverTerminalActions[i].name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
 
   // IS_CLIENT_DISPATCHABLE map
   lines.push(`// ─── Client-Dispatchable Map ─────────────────────────────────────────────────`);
