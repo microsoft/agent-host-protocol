@@ -1135,11 +1135,20 @@
         "title": {
           "type": "string",
           "description": "Human-readable terminal title"
+        },
+        "claim": {
+          "$ref": "#/$defs/ITerminalClaim",
+          "description": "Who currently holds this terminal"
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Process exit code, if the terminal process has exited"
         }
       },
       "required": [
         "resource",
-        "title"
+        "title",
+        "claim"
       ]
     },
     "ITerminalClientClaim": {
@@ -1216,12 +1225,13 @@
         },
         "claim": {
           "$ref": "#/$defs/ITerminalClaim",
-          "description": "Who currently holds this terminal, if anyone"
+          "description": "Who currently holds this terminal"
         }
       },
       "required": [
         "title",
-        "content"
+        "content",
+        "claim"
       ]
     },
     "IUsageInfo": {

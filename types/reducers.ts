@@ -593,7 +593,7 @@ export function terminalReducer(state: ITerminalState, action: ITerminalAction, 
       return { ...state, cols: action.cols, rows: action.rows };
 
     case ActionType.TerminalClaimed:
-      return { ...state, claim: action.claim ?? undefined };
+      return { ...state, claim: action.claim };
 
     case ActionType.TerminalTitleChanged:
       return { ...state, title: action.title };

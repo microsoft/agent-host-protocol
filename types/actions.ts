@@ -699,14 +699,19 @@ export interface ISessionQueuedMessagesReorderedAction {
 // ─── Terminal Actions ────────────────────────────────────────────────────────
 
 /**
- * Terminal output data (pty → client direction). Also dispatchable by clients
- * to provide terminal content in remoting scenarios.
+ * Terminal output data (pty → client direction).
  *
- * Both directions append `data` to the terminal's `content` in the reducer.
+ * Appends `data` to the terminal's `content` in the reducer.
+ *
+ * `terminal/data` and `terminal/input` are intentionally separate actions
+ * because standard write-ahead reconciliation is not safe for terminal I/O.
+ * A pty is a stateful, mutable process — optimistically applying input or
+ * predicting output would produce incorrect state. Instead, `terminal/input`
+ * is a side-effect-only action (client → server → pty), and `terminal/data`
+ * is server-authoritative output (pty → server → client).
  *
  * @category Terminal Actions
  * @version 1
- * @clientDispatchable
  */
 export interface ITerminalDataAction {
   type: ActionType.TerminalData;
@@ -722,6 +727,8 @@ export interface ITerminalDataAction {
  * This is a side-effect-only action: the server forwards the data to the
  * terminal's pty. The reducer treats this as a no-op since `terminal/data`
  * actions will reflect any resulting output.
+ *
+ * See `terminal/data` for why these two actions are kept separate.
  *
  * @category Terminal Actions
  * @version 1
@@ -756,10 +763,10 @@ export interface ITerminalResizedAction {
 }
 
 /**
- * Terminal claim changed. A client or session claims or releases the terminal.
+ * Terminal claim changed. A client or session transfers ownership of the terminal.
  *
- * Dispatch with `claim: null` to release. The server SHOULD reject if another
- * entity already holds the claim.
+ * The server SHOULD reject if the dispatching client does not currently hold
+ * the claim.
  *
  * @category Terminal Actions
  * @version 1
@@ -769,8 +776,8 @@ export interface ITerminalClaimedAction {
   type: ActionType.TerminalClaimed;
   /** Terminal URI */
   terminal: URI;
-  /** The new claim, or `null` to release */
-  claim: ITerminalClaim | null;
+  /** The new claim */
+  claim: ITerminalClaim;
 }
 
 /**

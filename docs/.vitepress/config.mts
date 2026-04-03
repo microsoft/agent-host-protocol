@@ -35,6 +35,7 @@ export default withMermaid(defineConfig({
           items: [
             { text: 'State Model', link: '/guide/state-model' },
             { text: 'Actions', link: '/guide/actions' },
+            { text: 'Terminals', link: '/guide/terminals' },
             { text: 'Customizations', link: '/guide/customizations' },
             { text: 'Write-Ahead Reconciliation', link: '/guide/reconciliation' },
           ],

@@ -4,7 +4,8 @@
   "initial": {
     "title": "bash",
     "cwd": "file:///home/user",
-    "content": ""
+    "content": "",
+    "claim": { "kind": "client", "clientId": "c1" }
   },
   "actions": [
     {
@@ -16,6 +17,7 @@
   "expected": {
     "title": "bash",
     "cwd": "file:///home/user/project",
-    "content": ""
+    "content": "",
+    "claim": { "kind": "client", "clientId": "c1" }
   }
 }

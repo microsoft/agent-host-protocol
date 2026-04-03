@@ -963,6 +963,10 @@ export interface ITerminalInfo {
   resource: URI;
   /** Human-readable terminal title */
   title: string;
+  /** Who currently holds this terminal */
+  claim: ITerminalClaim;
+  /** Process exit code, if the terminal process has exited */
+  exitCode?: number;
 }
 
 /**
@@ -1032,8 +1036,8 @@ export interface ITerminalState {
   content: string;
   /** Process exit code, set when the terminal process exits */
   exitCode?: number;
-  /** Who currently holds this terminal, if anyone */
-  claim?: ITerminalClaim;
+  /** Who currently holds this terminal */
+  claim: ITerminalClaim;
 }
 
 // ─── Common Types ────────────────────────────────────────────────────────────

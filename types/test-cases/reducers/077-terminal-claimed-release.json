@@ -1,24 +1,32 @@
 {
-  "description": "terminal/claimed with null releases claim",
+  "description": "terminal/claimed narrows session claim (detach from tool call)",
   "reducer": "terminal",
   "initial": {
     "title": "bash",
     "content": "",
     "claim": {
-      "kind": "client",
-      "clientId": "vscode-1"
+      "kind": "session",
+      "session": "copilot:/s1",
+      "turnId": "t1",
+      "toolCallId": "tc1"
     }
   },
   "actions": [
     {
       "type": "terminal/claimed",
       "terminal": "agenthost:/terminal/1",
-      "claim": null
+      "claim": {
+        "kind": "session",
+        "session": "copilot:/s1"
+      }
     }
   ],
   "expected": {
     "title": "bash",
     "content": "",
-    "claim": null
+    "claim": {
+      "kind": "session",
+      "session": "copilot:/s1"
+    }
   }
 }

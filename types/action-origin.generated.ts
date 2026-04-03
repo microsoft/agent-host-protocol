@@ -134,7 +134,6 @@ export type ITerminalAction =
 
 /** Union of terminal actions that clients may dispatch. */
 export type IClientTerminalAction =
-  | ITerminalDataAction
   | ITerminalInputAction
   | ITerminalResizedAction
   | ITerminalClaimedAction
@@ -144,6 +143,7 @@ export type IClientTerminalAction =
 
 /** Union of terminal actions that only the server may produce. */
 export type IServerTerminalAction =
+  | ITerminalDataAction
   | ITerminalCwdChangedAction
   | ITerminalExitedAction
 ;
@@ -185,7 +185,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in IStateAction['type']]: boo
   [ActionType.SessionCustomizationsChanged]: false,
   [ActionType.SessionCustomizationToggled]: true,
   [ActionType.SessionTruncated]: true,
-  [ActionType.TerminalData]: true,
+  [ActionType.TerminalData]: false,
   [ActionType.TerminalInput]: true,
   [ActionType.TerminalResized]: true,
   [ActionType.TerminalClaimed]: true,

@@ -839,7 +839,7 @@
     },
     "ITerminalDataAction": {
       "type": "object",
-      "description": "Terminal output data (pty → client direction). Also dispatchable by clients\nto provide terminal content in remoting scenarios.\n\nBoth directions append `data` to the terminal's `content` in the reducer.",
+      "description": "Terminal output data (pty → client direction).\n\nAppends `data` to the terminal's `content` in the reducer.\n\n`terminal/data` and `terminal/input` are intentionally separate actions\nbecause standard write-ahead reconciliation is not safe for terminal I/O.\nA pty is a stateful, mutable process — optimistically applying input or\npredicting output would produce incorrect state. Instead, `terminal/input`\nis a side-effect-only action (client → server → pty), and `terminal/data`\nis server-authoritative output (pty → server → client).",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.TerminalData"
@@ -861,7 +861,7 @@
     },
     "ITerminalInputAction": {
       "type": "object",
-      "description": "Keyboard input sent to the terminal process (client → pty direction).\n\nThis is a side-effect-only action: the server forwards the data to the\nterminal's pty. The reducer treats this as a no-op since `terminal/data`\nactions will reflect any resulting output.",
+      "description": "Keyboard input sent to the terminal process (client → pty direction).\n\nThis is a side-effect-only action: the server forwards the data to the\nterminal's pty. The reducer treats this as a no-op since `terminal/data`\nactions will reflect any resulting output.\n\nSee `terminal/data` for why these two actions are kept separate.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.TerminalInput"
@@ -910,7 +910,7 @@
     },
     "ITerminalClaimedAction": {
       "type": "object",
-      "description": "Terminal claim changed. A client or session claims or releases the terminal.\n\nDispatch with `claim: null` to release. The server SHOULD reject if another\nentity already holds the claim.",
+      "description": "Terminal claim changed. A client or session transfers ownership of the terminal.\n\nThe server SHOULD reject if the dispatching client does not currently hold\nthe claim.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.TerminalClaimed"
@@ -920,13 +920,8 @@
           "description": "Terminal URI"
         },
         "claim": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/ITerminalClaim"
-            },
-            {}
-          ],
-          "description": "The new claim, or `null` to release"
+          "$ref": "#/$defs/ITerminalClaim",
+          "description": "The new claim"
         }
       },
       "required": [
@@ -2090,11 +2085,20 @@
         "title": {
           "type": "string",
           "description": "Human-readable terminal title"
+        },
+        "claim": {
+          "$ref": "#/$defs/ITerminalClaim",
+          "description": "Who currently holds this terminal"
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Process exit code, if the terminal process has exited"
         }
       },
       "required": [
         "resource",
-        "title"
+        "title",
+        "claim"
       ]
     },
     "ITerminalClientClaim": {
@@ -2171,12 +2175,13 @@
         },
         "claim": {
           "$ref": "#/$defs/ITerminalClaim",
-          "description": "Who currently holds this terminal, if anyone"
+          "description": "Who currently holds this terminal"
         }
       },
       "required": [
         "title",
-        "content"
+        "content",
+        "claim"
       ]
     },
     "IUsageInfo": {

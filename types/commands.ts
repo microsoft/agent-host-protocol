@@ -6,7 +6,7 @@
  * They return a result or a JSON-RPC error.
  */
 
-import type { URI, ISnapshot, ISessionSummary, ITurn } from './state.js';
+import type { URI, ISnapshot, ISessionSummary, ITurn, ITerminalClaim } from './state.js';
 import type { IActionEnvelope, IStateAction } from './actions.js';
 
 // ─── initialize ──────────────────────────────────────────────────────────────
@@ -229,6 +229,8 @@ export interface IDisposeSessionParams {
 export interface ICreateTerminalParams {
   /** Terminal URI (client-chosen) */
   terminal: URI;
+  /** Initial owner of the terminal */
+  claim: ITerminalClaim;
   /** Human-readable terminal name */
   name?: string;
   /** Initial working directory URI */
@@ -237,6 +239,25 @@ export interface ICreateTerminalParams {
   cols?: number;
   /** Initial terminal height in rows */
   rows?: number;
+}
+
+// ─── disposeTerminal ─────────────────────────────────────────────────────────
+
+/**
+ * Disposes a terminal and kills its process if still running.
+ *
+ * The server dispatches `root/terminalsChanged` to remove the terminal from
+ * the root terminal list.
+ *
+ * @category Commands
+ * @method disposeTerminal
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ */
+export interface IDisposeTerminalParams {
+  /** Terminal URI to dispose */
+  terminal: URI;
 }
 
 // ─── listSessions ────────────────────────────────────────────────────────────

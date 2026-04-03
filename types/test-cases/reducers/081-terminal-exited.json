@@ -4,7 +4,8 @@
   "initial": {
     "title": "bash",
     "cwd": "file:///home/user",
-    "content": "$ exit\r\n"
+    "content": "$ exit\r\n",
+    "claim": { "kind": "client", "clientId": "c1" }
   },
   "actions": [
     {
@@ -17,6 +18,7 @@
     "title": "bash",
     "cwd": "file:///home/user",
     "content": "$ exit\r\n",
+    "claim": { "kind": "client", "clientId": "c1" },
     "exitCode": 0
   }
 }

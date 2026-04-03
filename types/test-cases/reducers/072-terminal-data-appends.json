@@ -3,7 +3,8 @@
   "reducer": "terminal",
   "initial": {
     "title": "bash",
-    "content": "$ "
+    "content": "$ ",
+    "claim": { "kind": "client", "clientId": "c1" }
   },
   "actions": [
     {
@@ -19,6 +20,7 @@
   ],
   "expected": {
     "title": "bash",
-    "content": "$ hello world\r\n"
+    "content": "$ hello world\r\n",
+    "claim": { "kind": "client", "clientId": "c1" }
   }
 }

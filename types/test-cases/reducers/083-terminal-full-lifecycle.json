@@ -1,9 +1,10 @@
 {
-  "description": "full terminal lifecycle: cwd, data, resize, claim, exit",
+  "description": "full terminal lifecycle: cwd, data, resize, claim transfer, exit",
   "reducer": "terminal",
   "initial": {
     "title": "bash",
-    "content": ""
+    "content": "",
+    "claim": { "kind": "client", "clientId": "c1" }
   },
   "actions": [
     {
@@ -35,7 +36,10 @@
     {
       "type": "terminal/claimed",
       "terminal": "agenthost:/terminal/1",
-      "claim": null
+      "claim": {
+        "kind": "session",
+        "session": "copilot:/s1"
+      }
     },
     {
       "type": "terminal/exited",
@@ -49,7 +53,10 @@
     "cols": 80,
     "rows": 24,
     "content": "$ npm test\r\nAll tests passed\r\n",
-    "claim": null,
+    "claim": {
+      "kind": "session",
+      "session": "copilot:/s1"
+    },
     "exitCode": 0
   }
 }

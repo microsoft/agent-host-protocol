@@ -1,9 +1,10 @@
 {
-  "description": "terminal/claimed sets client claim",
+  "description": "terminal/claimed transfers to client claim",
   "reducer": "terminal",
   "initial": {
     "title": "bash",
-    "content": ""
+    "content": "",
+    "claim": { "kind": "session", "session": "copilot:/s1" }
   },
   "actions": [
     {

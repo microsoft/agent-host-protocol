@@ -150,6 +150,7 @@ export type {
   ISessionForkSource,
   IDisposeSessionParams,
   ICreateTerminalParams,
+  IDisposeTerminalParams,
   IListSessionsParams,
   IListSessionsResult,
   IResourceReadParams,

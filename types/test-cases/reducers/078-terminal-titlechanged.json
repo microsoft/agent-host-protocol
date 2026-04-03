@@ -3,7 +3,8 @@
   "reducer": "terminal",
   "initial": {
     "title": "bash",
-    "content": ""
+    "content": "",
+    "claim": { "kind": "client", "clientId": "c1" }
   },
   "actions": [
     {
@@ -14,6 +15,7 @@
   ],
   "expected": {
     "title": "vim ~/project/main.ts",
-    "content": ""
+    "content": "",
+    "claim": { "kind": "client", "clientId": "c1" }
   }
 }

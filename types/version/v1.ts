@@ -104,6 +104,7 @@ import type {
   IResourceMoveParams,
   IResourceMoveResult,
   ICreateTerminalParams,
+  IDisposeTerminalParams,
 } from '../commands.js';
 
 import type {
@@ -198,6 +199,7 @@ type V1_ITerminalSessionClaim = ITerminalSessionClaim;
 type V1_ITerminalClaim = ITerminalClaim;
 type V1_ITerminalState = ITerminalState;
 type V1_ICreateTerminalParams = ICreateTerminalParams;
+type V1_IDisposeTerminalParams = IDisposeTerminalParams;
 type V1_ISessionForkSource = ISessionForkSource;
 type V1_IProtocolNotification = IProtocolNotification;
 type V1_IAuthRequiredNotification = IAuthRequiredNotification;
@@ -404,3 +406,5 @@ type _CheckTerminalClaim = AssertCompatible<V1_ITerminalClaim, ITerminalClaim>;
 type _CheckTerminalState = AssertCompatible<V1_ITerminalState, ITerminalState>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckCreateTerminalParams = AssertCompatible<V1_ICreateTerminalParams, ICreateTerminalParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckDisposeTerminalParams = AssertCompatible<V1_IDisposeTerminalParams, IDisposeTerminalParams>;

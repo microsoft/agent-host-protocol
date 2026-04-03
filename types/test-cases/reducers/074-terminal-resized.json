@@ -5,7 +5,8 @@
     "title": "bash",
     "cols": 80,
     "rows": 24,
-    "content": ""
+    "content": "",
+    "claim": { "kind": "client", "clientId": "c1" }
   },
   "actions": [
     {
@@ -19,6 +20,7 @@
     "title": "bash",
     "cols": 120,
     "rows": 40,
-    "content": ""
+    "content": "",
+    "claim": { "kind": "client", "clientId": "c1" }
   }
 }
