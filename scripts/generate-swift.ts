@@ -384,7 +384,7 @@ const STATE_STRUCTS = [
   'ISessionModelInfo', 'IPendingMessage', 'ISessionState', 'ISessionActiveClient',
   'ISessionSummary', 'ITurn', 'IActiveTurn', 'IUserMessage',
   'IMessageAttachment', 'IMarkdownResponsePart', 'IContentRef',
-  'IToolCallResponsePart', 'IReasoningResponsePart',
+  'IResourceReponsePart', 'IToolCallResponsePart', 'IReasoningResponsePart',
   'IToolCallResult', 'IToolCallStreamingState',
   'IToolCallPendingConfirmationState', 'IToolCallRunningState',
   'IToolCallPendingResultConfirmationState', 'IToolCallCompletedState',
@@ -399,7 +399,7 @@ const RESPONSE_PART_UNION: UnionConfig = {
   discriminantField: 'kind',
   variants: [
     { caseName: 'markdown', structName: 'MarkdownResponsePart', discriminantValue: 'markdown' },
-    { caseName: 'contentRef', structName: 'ContentRef', discriminantValue: 'contentRef' },
+    { caseName: 'contentRef', structName: 'ResourceReponsePart', discriminantValue: 'contentRef' },
     { caseName: 'toolCall', structName: 'ToolCallResponsePart', discriminantValue: 'toolCall' },
     { caseName: 'reasoning', structName: 'ReasoningResponsePart', discriminantValue: 'reasoning' },
   ],
@@ -598,6 +598,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/queuedMessagesReordered', caseName: 'sessionQueuedMessagesReordered', tsInterface: 'ISessionQueuedMessagesReorderedAction' },
   { type: 'session/customizationsChanged', caseName: 'sessionCustomizationsChanged', tsInterface: 'ISessionCustomizationsChangedAction' },
   { type: 'session/customizationToggled', caseName: 'sessionCustomizationToggled', tsInterface: 'ISessionCustomizationToggledAction' },
+  { type: 'session/truncated', caseName: 'sessionTruncated', tsInterface: 'ISessionTruncatedAction' },
 ];
 
 /** Merged struct for the approved/denied tool call confirmed action */
@@ -742,7 +743,7 @@ const COMMAND_STRUCTS = [
   'IInitializeParams', 'IInitializeResult',
   'IReconnectParams', 'IReconnectReplayResult', 'IReconnectSnapshotResult',
   'ISubscribeParams', 'ISubscribeResult',
-  'ICreateSessionParams', 'IDisposeSessionParams',
+  'ISessionForkSource', 'ICreateSessionParams', 'IDisposeSessionParams',
   'IListSessionsParams', 'IListSessionsResult',
   'IResourceReadParams', 'IResourceReadResult',
   'IResourceWriteParams', 'IResourceWriteResult',
@@ -1160,9 +1161,77 @@ let package = Package(
 `;
 }
 
+// ─── Exhaustiveness Check ─────────────────────────────────────────────────────
+
+/**
+ * Verifies that every type imported in types/version/v1.ts from the protocol
+ * source modules (state, actions, commands, notifications) is covered by one
+ * of the generator lists or a known special-cased code path.
+ *
+ * This catches the class of bug where a new type is added to the TypeScript
+ * protocol and to v1.ts but the Swift generator lists are not updated.
+ */
+function checkExhaustiveness(project: Project): void {
+  const v1 = project.getSourceFiles().find(f => f.getBaseName() === 'v1.ts');
+  if (!v1) throw new Error('Could not find types/version/v1.ts in the project');
+
+  // Collect all interface/type names imported from protocol source modules.
+  // We skip messages.ts because its types (ICommandMap etc.) are generated
+  // as literal Swift strings in generateMessagesFile(), not as struct lists.
+  const protocolModules = new Set(['state', 'actions', 'commands', 'notifications', 'errors']);
+  const imported = new Set<string>();
+  for (const decl of v1.getImportDeclarations()) {
+    const mod = decl.getModuleSpecifierValue().replace(/^\.\.\//, '').replace(/\.js$/, '');
+    if (!protocolModules.has(mod)) continue;
+    for (const named of decl.getNamedImports()) {
+      imported.add(named.getName());
+    }
+  }
+
+  // Types covered by the explicit generator lists.
+  const coveredByLists = new Set<string>([
+    ...STATE_STRUCTS,
+    ...STATE_ENUMS,
+    ...COMMAND_STRUCTS,
+    ...COMMAND_ENUMS,
+    ...NOTIFICATION_STRUCTS,
+    ...NOTIFICATION_ENUMS,
+    ...ACTION_VARIANTS
+      .filter(v => v.tsInterface !== '_merged_')
+      .map(v => v.tsInterface),
+  ]);
+
+  // Types that ARE generated but via explicit non-list code paths.
+  const knownSpecial = new Set<string>([
+    'StringOrMarkdown',              // generateStringOrMarkdown()
+    'IToolCallState',                // TOOL_CALL_STATE_UNION discriminated union
+    'IStateAction',                  // StateAction enum in generateActionsFile()
+    'IActionEnvelope',               // generateStructFromInterface() call in generateActionsFile()
+    'IActionOrigin',                 // generateStructFromInterface() call in generateActionsFile()
+    'ISessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
+    'ISessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction
+    'IProtocolNotification',         // PROTOCOL_NOTIFICATION_UNION discriminated union
+  ]);
+
+  const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));
+  if (missing.length > 0) {
+    throw new Error(
+      `generate-swift.ts exhaustiveness check failed.\n` +
+      `The following types are declared in types/version/v1.ts but are not covered by the Swift generator:\n` +
+      missing.map(n => `  - ${n}`).join('\n') + '\n\n' +
+      `Add them to the appropriate list in scripts/generate-swift.ts:\n` +
+      `  STATE_STRUCTS / STATE_ENUMS, COMMAND_STRUCTS / COMMAND_ENUMS,\n` +
+      `  NOTIFICATION_STRUCTS / NOTIFICATION_ENUMS, ACTION_VARIANTS,\n` +
+      `  or knownSpecial if they are generated via a non-list code path.`
+    );
+  }
+}
+
 // ─── Main Entry Point ────────────────────────────────────────────────────────
 
 export function generateSwiftPackage(project: Project, outputDir: string): void {
+  checkExhaustiveness(project);
+
   const generatedDir = path.join(outputDir, 'Sources', 'AgentHostProtocol', 'Generated');
   fs.mkdirSync(generatedDir, { recursive: true });
 
