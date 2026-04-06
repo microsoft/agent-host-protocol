@@ -917,6 +917,27 @@
         "tools"
       ]
     },
+    "ISessionFileDiff": {
+      "type": "object",
+      "description": "A summary of changes to a single file within a session.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the affected file"
+        },
+        "added": {
+          "type": "number",
+          "description": "Number of items added (e.g., lines for text files, cells for notebooks)"
+        },
+        "removed": {
+          "type": "number",
+          "description": "Number of items removed (e.g., lines for text files, cells for notebooks)"
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
     "ISessionSummary": {
       "type": "object",
       "properties": {
@@ -951,6 +972,13 @@
         "workingDirectory": {
           "$ref": "#/$defs/URI",
           "description": "The working directory URI for this session"
+        },
+        "diffs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ISessionFileDiff"
+          },
+          "description": "Files changed during this session with diff statistics"
         }
       },
       "required": [
@@ -1592,11 +1620,16 @@
         "resource": {
           "$ref": "#/$defs/URI",
           "description": "Terminal URI (subscribable for full terminal state)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title for the terminal content"
         }
       },
       "required": [
         "type",
-        "resource"
+        "resource",
+        "title"
       ]
     },
     "ICustomizationRef": {

@@ -315,6 +315,20 @@ export interface ISessionActiveClient {
 }
 
 /**
+ * A summary of changes to a single file within a session.
+ *
+ * @category Session State
+ */
+export interface ISessionFileDiff {
+  /** URI of the affected file */
+  uri: URI;
+  /** Number of items added (e.g., lines for text files, cells for notebooks) */
+  added?: number;
+  /** Number of items removed (e.g., lines for text files, cells for notebooks) */
+  removed?: number;
+}
+
+/**
  * @category Session State
  */
 export interface ISessionSummary {
@@ -334,6 +348,8 @@ export interface ISessionSummary {
   model?: string;
   /** The working directory URI for this session */
   workingDirectory?: URI;
+  /** Files changed during this session with diff statistics */
+  diffs?: ISessionFileDiff[];
 }
 
 // ─── Turn Types ──────────────────────────────────────────────────────────────

@@ -376,7 +376,7 @@ const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'TurnState', 'AttachmentType', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason',
-  'ToolResultContentType', 'CustomizationStatus',
+  'ToolResultContentType', 'CustomizationStatus', 'TerminalClaimKind',
 ];
 
 const STATE_STRUCTS = [
@@ -390,8 +390,11 @@ const STATE_STRUCTS = [
   'IToolCallPendingResultConfirmationState', 'IToolCallCompletedState',
   'IToolCallCancelledState', 'IToolDefinition', 'IToolAnnotations',
   'IToolResultTextContent', 'IToolResultEmbeddedResourceContent',
-  'IToolResultResourceContent', 'IToolResultFileEditContent', 'ICustomizationRef',
-  'ISessionCustomization', 'IUsageInfo', 'IErrorInfo', 'ISnapshot',
+  'IToolResultResourceContent', 'IToolResultFileEditContent',
+  'IToolResultTerminalContent', 'ICustomizationRef',
+  'ISessionCustomization', 'ISessionFileDiff', 'ITerminalInfo',
+  'ITerminalClientClaim', 'ITerminalSessionClaim', 'ITerminalState',
+  'IUsageInfo', 'IErrorInfo', 'ISnapshot',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -418,12 +421,22 @@ const TOOL_CALL_STATE_UNION: UnionConfig = {
   ],
 };
 
+const TERMINAL_CLAIM_UNION: UnionConfig = {
+  name: 'TerminalClaim',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'client', structName: 'TerminalClientClaim', discriminantValue: 'client' },
+    { caseName: 'session', structName: 'TerminalSessionClaim', discriminantValue: 'session' },
+  ],
+};
+
 function generateToolResultContentUnion(): string {
   return `public enum ToolResultContent: Codable, Sendable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
     case resource(ToolResultResourceContent)
     case fileEdit(ToolResultFileEditContent)
+    case terminal(ToolResultTerminalContent)
 
     private enum Keys: String, CodingKey {
         case type
@@ -441,6 +454,8 @@ function generateToolResultContentUnion(): string {
                 self = .resource(try ToolResultResourceContent(from: decoder))
             case "fileEdit":
                 self = .fileEdit(try ToolResultFileEditContent(from: decoder))
+            case "terminal":
+                self = .terminal(try ToolResultTerminalContent(from: decoder))
             default:
                 throw DecodingError.dataCorruptedError(
                     forKey: .type, in: container,
@@ -461,6 +476,7 @@ function generateToolResultContentUnion(): string {
         case .embeddedResource(let v): try v.encode(to: encoder)
         case .resource(let v): try v.encode(to: encoder)
         case .fileEdit(let v): try v.encode(to: encoder)
+        case .terminal(let v): try v.encode(to: encoder)
         }
     }
 }`;
@@ -558,6 +574,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_CALL_STATE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(TERMINAL_CLAIM_UNION));
+  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -599,6 +617,16 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/customizationsChanged', caseName: 'sessionCustomizationsChanged', tsInterface: 'ISessionCustomizationsChangedAction' },
   { type: 'session/customizationToggled', caseName: 'sessionCustomizationToggled', tsInterface: 'ISessionCustomizationToggledAction' },
   { type: 'session/truncated', caseName: 'sessionTruncated', tsInterface: 'ISessionTruncatedAction' },
+  { type: 'session/toolCallContentChanged', caseName: 'sessionToolCallContentChanged', tsInterface: 'ISessionToolCallContentChangedAction' },
+  { type: 'root/terminalsChanged', caseName: 'rootTerminalsChanged', tsInterface: 'IRootTerminalsChangedAction' },
+  { type: 'terminal/data', caseName: 'terminalData', tsInterface: 'ITerminalDataAction' },
+  { type: 'terminal/input', caseName: 'terminalInput', tsInterface: 'ITerminalInputAction' },
+  { type: 'terminal/resized', caseName: 'terminalResized', tsInterface: 'ITerminalResizedAction' },
+  { type: 'terminal/claimed', caseName: 'terminalClaimed', tsInterface: 'ITerminalClaimedAction' },
+  { type: 'terminal/titleChanged', caseName: 'terminalTitleChanged', tsInterface: 'ITerminalTitleChangedAction' },
+  { type: 'terminal/cwdChanged', caseName: 'terminalCwdChanged', tsInterface: 'ITerminalCwdChangedAction' },
+  { type: 'terminal/exited', caseName: 'terminalExited', tsInterface: 'ITerminalExitedAction' },
+  { type: 'terminal/cleared', caseName: 'terminalCleared', tsInterface: 'ITerminalClearedAction' },
 ];
 
 /** Merged struct for the approved/denied tool call confirmed action */
@@ -754,6 +782,7 @@ const COMMAND_STRUCTS = [
   'IFetchTurnsParams', 'IFetchTurnsResult',
   'IUnsubscribeParams', 'IDispatchActionParams',
   'IAuthenticateParams', 'IAuthenticateResult',
+  'ICreateTerminalParams', 'IDisposeTerminalParams',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1211,6 +1240,7 @@ function checkExhaustiveness(project: Project): void {
     'ISessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'ISessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction
     'IProtocolNotification',         // PROTOCOL_NOTIFICATION_UNION discriminated union
+    'ITerminalClaim',                // TERMINAL_CLAIM_UNION discriminated union
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

@@ -17,6 +17,7 @@ export type {
   ISessionModelInfo,
   ISessionState,
   ISessionSummary,
+  ISessionFileDiff,
   ITurn,
   IActiveTurn,
   IUserMessage,
