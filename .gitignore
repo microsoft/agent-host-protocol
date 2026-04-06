@@ -21,3 +21,5 @@ DerivedData
 **/*.xcuserstate
 **/*.xcsettings
 **/.swiftpm/xcode/xcuserdata/
+
+coverage

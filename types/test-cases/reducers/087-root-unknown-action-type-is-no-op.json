@@ -1,0 +1,15 @@
+{
+  "description": "root unknown action type is no-op",
+  "reducer": "root",
+  "initial": {
+    "agents": []
+  },
+  "actions": [
+    {
+      "type": "root/nonExistentAction"
+    }
+  ],
+  "expected": {
+    "agents": []
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "description": "delta skips response parts without id field",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": { "text": "Hello" },
+      "responseParts": [
+        {
+          "kind": "unknownFuturePart"
+        },
+        {
+          "kind": "markdown",
+          "id": "md-1",
+          "content": "old"
+        }
+      ],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "session/delta",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "partId": "md-1",
+      "content": " new"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": { "text": "Hello" },
+      "responseParts": [
+        {
+          "kind": "unknownFuturePart"
+        },
+        {
+          "kind": "markdown",
+          "id": "md-1",
+          "content": "old new"
+        }
+      ],
+      "usage": null
+    }
+  }
+}

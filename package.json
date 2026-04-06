@@ -14,7 +14,7 @@
     "docs:preview": "vitepress preview docs",
     "typecheck": "tsc --noEmit -p types/tsconfig.json",
     "lint": "eslint",
-    "test": "npm run typecheck && npm run lint && tsx --test types/*.test.ts"
+    "test": "npm run typecheck && npm run lint && c8 --include types/reducers.ts --check-coverage --branches 100 tsx --test types/*.test.ts"
   },
   "repository": {
     "type": "git",
@@ -32,6 +32,7 @@
     "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
+    "c8": "^11.0.0",
     "eslint": "^10.1.0",
     "mermaid": "^11.13.0",
     "ts-morph": "^24.0.0",
