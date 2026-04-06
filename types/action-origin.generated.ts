@@ -17,6 +17,7 @@ import type {
   ISessionToolCallConfirmedAction,
   ISessionToolCallCompleteAction,
   ISessionToolCallResultConfirmedAction,
+  ISessionToolCallContentChangedAction,
   ISessionTurnCompleteAction,
   ISessionTurnCancelledAction,
   ISessionErrorAction,
@@ -67,6 +68,7 @@ export type ISessionAction =
   | ISessionToolCallConfirmedAction
   | ISessionToolCallCompleteAction
   | ISessionToolCallResultConfirmedAction
+  | ISessionToolCallContentChangedAction
   | ISessionTurnCompleteAction
   | ISessionTurnCancelledAction
   | ISessionErrorAction
@@ -112,6 +114,7 @@ export type IServerSessionAction =
   | ISessionToolCallStartAction
   | ISessionToolCallDeltaAction
   | ISessionToolCallReadyAction
+  | ISessionToolCallContentChangedAction
   | ISessionTurnCompleteAction
   | ISessionErrorAction
   | ISessionUsageAction
@@ -169,6 +172,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in IStateAction['type']]: boo
   [ActionType.SessionToolCallConfirmed]: true,
   [ActionType.SessionToolCallComplete]: true,
   [ActionType.SessionToolCallResultConfirmed]: true,
+  [ActionType.SessionToolCallContentChanged]: false,
   [ActionType.SessionTurnComplete]: false,
   [ActionType.SessionTurnCancelled]: true,
   [ActionType.SessionError]: false,

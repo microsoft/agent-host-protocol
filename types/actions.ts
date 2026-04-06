@@ -14,6 +14,7 @@ import type {
   IUserMessage,
   IResponsePart,
   IToolCallResult,
+  IToolResultContent,
   IToolDefinition,
   ISessionActiveClient,
   IUsageInfo,
@@ -45,6 +46,7 @@ export const enum ActionType {
   SessionToolCallConfirmed = 'session/toolCallConfirmed',
   SessionToolCallComplete = 'session/toolCallComplete',
   SessionToolCallResultConfirmed = 'session/toolCallResultConfirmed',
+  SessionToolCallContentChanged = 'session/toolCallContentChanged',
   SessionTurnComplete = 'session/turnComplete',
   SessionTurnCancelled = 'session/turnCancelled',
   SessionError = 'session/error',
@@ -393,6 +395,22 @@ export interface ISessionToolCallResultConfirmedAction extends IToolCallActionBa
   type: ActionType.SessionToolCallResultConfirmed;
   /** Whether the result was approved */
   approved: boolean;
+}
+
+/**
+ * Partial content produced while a tool is still executing.
+ *
+ * Replaces the `content` array on the running tool call state. Clients can
+ * use this to display live feedback (e.g. a terminal reference) before the
+ * tool completes.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface ISessionToolCallContentChangedAction extends IToolCallActionBase {
+  type: ActionType.SessionToolCallContentChanged;
+  /** The current partial content for the running tool call */
+  content: IToolResultContent[];
 }
 
 /**
@@ -859,6 +877,7 @@ export type IStateAction =
   | ISessionToolCallConfirmedAction
   | ISessionToolCallCompleteAction
   | ISessionToolCallResultConfirmedAction
+  | ISessionToolCallContentChangedAction
   | ISessionTurnCompleteAction
   | ISessionTurnCancelledAction
   | ISessionErrorAction

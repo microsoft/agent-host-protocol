@@ -1,0 +1,81 @@
+{
+  "description": "toolCallContentChanged is no-op for non-running tool call",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": { "text": "Hello" },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "completed",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "invocationMessage": "Ran command",
+            "toolInput": "ls -la",
+            "confirmed": "user-action",
+            "success": true,
+            "pastTenseMessage": "Ran command"
+          }
+        }
+      ],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "session/toolCallContentChanged",
+      "session": "copilot:/test-session",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "content": [
+        { "type": "terminal", "resource": "agenthost:/terminal/1" }
+      ]
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": "in-progress",
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "userMessage": { "text": "Hello" },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "completed",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "invocationMessage": "Ran command",
+            "toolInput": "ls -la",
+            "confirmed": "user-action",
+            "success": true,
+            "pastTenseMessage": "Ran command"
+          }
+        }
+      ],
+      "usage": null
+    }
+  }
+}

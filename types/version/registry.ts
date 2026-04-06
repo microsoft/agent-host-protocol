@@ -37,6 +37,7 @@ export const ACTION_INTRODUCED_IN: { readonly [K in IStateAction['type']]: numbe
   [ActionType.SessionToolCallConfirmed]: 1,
   [ActionType.SessionToolCallComplete]: 1,
   [ActionType.SessionToolCallResultConfirmed]: 1,
+  [ActionType.SessionToolCallContentChanged]: 1,
   [ActionType.SessionTurnComplete]: 1,
   [ActionType.SessionTurnCancelled]: 1,
   [ActionType.SessionError]: 1,

@@ -429,6 +429,26 @@
         "approved"
       ]
     },
+    "ISessionToolCallContentChangedAction": {
+      "type": "object",
+      "description": "Partial content produced while a tool is still executing.\n\nReplaces the `content` array on the running tool call state. Clients can\nuse this to display live feedback (e.g. a terminal reference) before the\ntool completes.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionToolCallContentChanged"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IToolResultContent"
+          },
+          "description": "The current partial content for the running tool call"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ]
+    },
     "ISessionTurnCompleteAction": {
       "type": "object",
       "description": "Turn finished — the assistant is idle.",
@@ -1750,6 +1770,13 @@
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
           "description": "How the tool was confirmed for execution"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IToolResultContent"
+          },
+          "description": "Partial content produced while the tool is still executing.\n\nFor example, a terminal content block lets clients subscribe to live\noutput before the tool completes."
         }
       },
       "required": [
@@ -2013,6 +2040,23 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "IToolResultTerminalContent": {
+      "type": "object",
+      "description": "A reference to a terminal whose output is relevant to this tool result.\n\nClients can subscribe to the terminal's URI to stream its output in real\ntime, providing live feedback while a tool is executing.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Terminal"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Terminal URI (subscribable for full terminal state)"
+        }
+      },
+      "required": [
+        "type",
+        "resource"
       ]
     },
     "ICustomizationRef": {
@@ -2332,9 +2376,12 @@
         },
         {
           "$ref": "#/$defs/IToolResultFileEditContent"
+        },
+        {
+          "$ref": "#/$defs/IToolResultTerminalContent"
         }
       ],
-      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`IToolResultResourceContent` for lazy-loading large results and\n`IToolResultFileEditContent` for file edit diffs (AHP extensions)."
+      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`IToolResultResourceContent` for lazy-loading large results,\n`IToolResultFileEditContent` for file edit diffs, and\n`IToolResultTerminalContent` for live terminal output (AHP extensions)."
     },
     "ITerminalClaim": {
       "oneOf": [
@@ -2394,6 +2441,9 @@
         },
         {
           "$ref": "#/$defs/ISessionToolCallResultConfirmedAction"
+        },
+        {
+          "$ref": "#/$defs/ISessionToolCallContentChangedAction"
         },
         {
           "$ref": "#/$defs/ISessionTurnCompleteAction"

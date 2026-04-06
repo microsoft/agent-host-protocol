@@ -420,6 +420,17 @@ export function sessionReducer(state: ISessionState, action: ISessionAction, log
         };
       });
 
+    case ActionType.SessionToolCallContentChanged:
+      return updateToolCallInParts(state, action.turnId, action.toolCallId, tc => {
+        if (tc.status !== ToolCallStatus.Running) {
+          return tc;
+        }
+        return {
+          ...tc,
+          content: action.content,
+        };
+      });
+
     // ── Metadata ──────────────────────────────────────────────────────────
 
     case ActionType.SessionTitleChanged:

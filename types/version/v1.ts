@@ -40,6 +40,7 @@ import type {
   IToolResultEmbeddedResourceContent,
   IToolResultResourceContent,
   IToolResultFileEditContent,
+  IToolResultTerminalContent,
   IUsageInfo,
   IErrorInfo,
   ISnapshot,
@@ -71,6 +72,7 @@ import type {
   ISessionCustomizationToggledAction,
   ISessionTruncatedAction,
   IRootTerminalsChangedAction,
+  ISessionToolCallContentChangedAction,
   ITerminalDataAction,
   ITerminalInputAction,
   ITerminalResizedAction,
@@ -162,6 +164,7 @@ type V1_IToolResultTextContent = IToolResultTextContent;
 type V1_IToolResultEmbeddedResourceContent = IToolResultEmbeddedResourceContent;
 type V1_IToolResultResourceContent = IToolResultResourceContent;
 type V1_IToolResultFileEditContent = IToolResultFileEditContent;
+type V1_IToolResultTerminalContent = IToolResultTerminalContent;
 type V1_IUsageInfo = IUsageInfo;
 type V1_IErrorInfo = IErrorInfo;
 type V1_ISnapshot = ISnapshot;
@@ -184,6 +187,7 @@ type V1_ISessionQueuedMessagesReorderedAction = ISessionQueuedMessagesReorderedA
 type V1_ISessionCustomizationsChangedAction = ISessionCustomizationsChangedAction;
 type V1_ISessionCustomizationToggledAction = ISessionCustomizationToggledAction;
 type V1_ISessionTruncatedAction = ISessionTruncatedAction;
+type V1_ISessionToolCallContentChangedAction = ISessionToolCallContentChangedAction;
 type V1_IRootTerminalsChangedAction = IRootTerminalsChangedAction;
 type V1_ITerminalDataAction = ITerminalDataAction;
 type V1_ITerminalInputAction = ITerminalInputAction;
@@ -305,6 +309,8 @@ type _CheckToolResultResourceContent = AssertCompatible<V1_IToolResultResourceCo
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckToolResultFileEditContent = AssertCompatible<V1_IToolResultFileEditContent, IToolResultFileEditContent>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckToolResultTerminalContent = AssertCompatible<V1_IToolResultTerminalContent, IToolResultTerminalContent>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckServerToolsChangedAction = AssertCompatible<V1_ISessionServerToolsChangedAction, ISessionServerToolsChangedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckActiveClientChangedAction = AssertCompatible<V1_ISessionActiveClientChangedAction, ISessionActiveClientChangedAction>;
@@ -330,6 +336,8 @@ type _CheckCustomizationsChangedAction = AssertCompatible<V1_ISessionCustomizati
 type _CheckCustomizationToggledAction = AssertCompatible<V1_ISessionCustomizationToggledAction, ISessionCustomizationToggledAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckTruncatedAction = AssertCompatible<V1_ISessionTruncatedAction, ISessionTruncatedAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckToolCallContentChangedAction = AssertCompatible<V1_ISessionToolCallContentChangedAction, ISessionToolCallContentChangedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckSessionForkSource = AssertCompatible<V1_ISessionForkSource, ISessionForkSource>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

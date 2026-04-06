@@ -28,6 +28,8 @@ type _ExpectedCommands =
   | 'subscribe'
   | 'createSession'
   | 'disposeSession'
+  | 'createTerminal'
+  | 'disposeTerminal'
   | 'listSessions'
   | 'resourceRead'
   | 'resourceWrite'

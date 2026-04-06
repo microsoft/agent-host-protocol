@@ -660,6 +660,13 @@ export interface IToolCallRunningState extends IToolCallBase, IToolCallParameter
   status: ToolCallStatus.Running;
   /** How the tool was confirmed for execution */
   confirmed: ToolCallConfirmationReason;
+  /**
+   * Partial content produced while the tool is still executing.
+   *
+   * For example, a terminal content block lets clients subscribe to live
+   * output before the tool completes.
+   */
+  content?: IToolResultContent[];
 }
 
 /**
@@ -796,6 +803,7 @@ export const enum ToolResultContentType {
   EmbeddedResource = 'embeddedResource',
   Resource = 'resource',
   FileEdit = 'fileEdit',
+  Terminal = 'terminal',
 }
 
 /**
@@ -871,11 +879,26 @@ export interface IToolResultFileEditContent {
 }
 
 /**
+ * A reference to a terminal whose output is relevant to this tool result.
+ *
+ * Clients can subscribe to the terminal's URI to stream its output in real
+ * time, providing live feedback while a tool is executing.
+ *
+ * @category Tool Result Content
+ */
+export interface IToolResultTerminalContent {
+  type: ToolResultContentType.Terminal;
+  /** Terminal URI (subscribable for full terminal state) */
+  resource: URI;
+}
+
+/**
  * Content block in a tool result.
  *
  * Mirrors the content blocks in MCP `CallToolResult.content`, plus
- * `IToolResultResourceContent` for lazy-loading large results and
- * `IToolResultFileEditContent` for file edit diffs (AHP extensions).
+ * `IToolResultResourceContent` for lazy-loading large results,
+ * `IToolResultFileEditContent` for file edit diffs, and
+ * `IToolResultTerminalContent` for live terminal output (AHP extensions).
  *
  * @category Tool Result Content
  */
@@ -883,7 +906,8 @@ export type IToolResultContent =
   | IToolResultTextContent
   | IToolResultEmbeddedResourceContent
   | IToolResultResourceContent
-  | IToolResultFileEditContent;
+  | IToolResultFileEditContent
+  | IToolResultTerminalContent;
 
 // ─── Customization Types ─────────────────────────────────────────────────────
 
