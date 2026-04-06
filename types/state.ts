@@ -890,6 +890,8 @@ export interface IToolResultTerminalContent {
   type: ToolResultContentType.Terminal;
   /** Terminal URI (subscribable for full terminal state) */
   resource: URI;
+  /** Display title for the terminal content */
+  title: string;
 }
 
 /**
