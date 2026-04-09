@@ -95,6 +95,9 @@ public struct AHPRootReducer: Reducer {
         case .rootActiveSessionsChanged(let a):
             state.activeSessions = a.activeSessions
 
+        case .rootTerminalsChanged(let a):
+            state.terminals = a.terminals
+
         default:
             break
         }
@@ -135,6 +138,7 @@ public struct AHPSessionReducer: Reducer {
         case .sessionTurnStarted(let a):
             state.summary.status = .inProgress
             state.summary.modifiedAt = currentTimestamp()
+            state.summary.isRead = false
             state.activeTurn = ActiveTurn(
                 id: a.turnId,
                 userMessage: a.userMessage,
@@ -213,7 +217,7 @@ public struct AHPSessionReducer: Reducer {
                         toolName: base.toolName,
                         displayName: base.displayName,
                         toolClientId: base.toolClientId,
-                        meta: a.meta ?? base.meta,
+                        meta: base.meta,
                         invocationMessage: a.invocationMessage,
                         toolInput: a.toolInput,
                         status: .running,
@@ -225,7 +229,7 @@ public struct AHPSessionReducer: Reducer {
                         toolName: base.toolName,
                         displayName: base.displayName,
                         toolClientId: base.toolClientId,
-                        meta: a.meta ?? base.meta,
+                        meta: base.meta,
                         invocationMessage: a.invocationMessage,
                         toolInput: a.toolInput,
                         status: .pendingConfirmation,
@@ -398,6 +402,41 @@ public struct AHPSessionReducer: Reducer {
         case .sessionCustomizationToggled(let a):
             guard let idx = state.customizations?.firstIndex(where: { $0.customization.uri == a.uri }) else { return }
             state.customizations?[idx].enabled = a.enabled
+
+        // ── Truncation ───────────────────────────────────────────────────────
+
+        case .sessionTruncated(let a):
+            if let turnId = a.turnId {
+                guard let idx = state.turns.firstIndex(where: { $0.id == turnId }) else { return }
+                state.turns = Array(state.turns.prefix(idx + 1))
+            } else {
+                state.turns = []
+            }
+            state.activeTurn = nil
+            state.summary.status = .idle
+            state.summary.modifiedAt = currentTimestamp()
+
+        // ── Read / Done ──────────────────────────────────────────────────────
+
+        case .sessionIsReadChanged(let a):
+            state.summary.isRead = a.isRead
+
+        case .sessionIsDoneChanged(let a):
+            state.summary.isDone = a.isDone
+
+        // ── Diffs ─────────────────────────────────────────────────────────────
+
+        case .sessionDiffsChanged(let a):
+            state.summary.diffs = a.diffs
+
+        // ── Tool Call Content ────────────────────────────────────────────────
+
+        case .sessionToolCallContentChanged(let a):
+            Self.updateToolCallInPlace(state: &state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
+                guard case .running(var r) = tc else { return }
+                r.content = a.content
+                tc = .running(r)
+            }
 
         // ── Pending Messages ──────────────────────────────────────────────────
 
@@ -584,5 +623,5 @@ extension Reducer {
 // MARK: - Timestamp Helper
 
 private func currentTimestamp() -> Int {
-    Int(Date().timeIntervalSince1970 * 1000)
+    currentTimestampProvider()
 }

@@ -80,7 +80,7 @@ function mapType(tsType: string): string {
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
 
   // Known unions
-  if (tsType === 'IRootState | ISessionState') return 'SnapshotState';
+  if (tsType === 'IRootState | ISessionState' || tsType === 'IRootState | ISessionState | ITerminalState') return 'SnapshotState';
 
   // T | null → T?
   const nullMatch = tsType.match(/^(.+?)\s*\|\s*null$/);
@@ -519,15 +519,18 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot — either root state or session state.
+  return `/// The state payload of a snapshot — root state, session state, or terminal state.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
+    case terminal(TerminalState)
 
     public init(from decoder: Decoder) throws {
         // SessionState has required \`summary\` field, try it first
         if let session = try? SessionState(from: decoder) {
             self = .session(session)
+        } else if let terminal = try? TerminalState(from: decoder) {
+            self = .terminal(terminal)
         } else {
             self = .root(try RootState(from: decoder))
         }
@@ -537,6 +540,7 @@ public enum SnapshotState: Codable, Sendable {
         switch self {
         case .root(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
+        case .terminal(let state): try state.encode(to: encoder)
         }
     }
 }`;
@@ -623,8 +627,6 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/customizationsChanged', caseName: 'sessionCustomizationsChanged', tsInterface: 'ISessionCustomizationsChangedAction' },
   { type: 'session/customizationToggled', caseName: 'sessionCustomizationToggled', tsInterface: 'ISessionCustomizationToggledAction' },
   { type: 'session/truncated', caseName: 'sessionTruncated', tsInterface: 'ISessionTruncatedAction' },
-  { type: 'session/isReadChanged', caseName: 'sessionIsReadChanged', tsInterface: 'ISessionIsReadChangedAction' },
-  { type: 'session/isDoneChanged', caseName: 'sessionIsDoneChanged', tsInterface: 'ISessionIsDoneChangedAction' },
   { type: 'session/diffsChanged', caseName: 'sessionDiffsChanged', tsInterface: 'ISessionDiffsChangedAction' },
   { type: 'session/toolCallContentChanged', caseName: 'sessionToolCallContentChanged', tsInterface: 'ISessionToolCallContentChangedAction' },
   { type: 'root/terminalsChanged', caseName: 'rootTerminalsChanged', tsInterface: 'IRootTerminalsChangedAction' },
@@ -740,6 +742,8 @@ function generateActionsFile(project: Project): string {
       : swiftTypeName(v.tsInterface).replace(/^Session/, 'Session').replace(/Action$/, 'Action');
     lines.push(`    case ${v.caseName}(${swiftTypeName(v.tsInterface === '_merged_' ? 'SessionToolCallConfirmedAction' : v.tsInterface)})`);
   }
+  lines.push('    /// Unknown or future action type; reducers treat this as a no-op.');
+  lines.push('    case unknown(type: String)');
   lines.push('');
   lines.push('    private enum TypeKey: String, CodingKey { case type }');
   lines.push('');
@@ -755,7 +759,7 @@ function generateActionsFile(project: Project): string {
     lines.push(`            self = .${v.caseName}(try ${structName}(from: decoder))`);
   }
   lines.push('        default:');
-  lines.push('            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown action type: \\(type)")');
+  lines.push('            self = .unknown(type: type)');
   lines.push('        }');
   lines.push('    }');
   lines.push('');
@@ -764,6 +768,7 @@ function generateActionsFile(project: Project): string {
   for (const v of ACTION_VARIANTS) {
     lines.push(`        case .${v.caseName}(let v): try v.encode(to: encoder)`);
   }
+  lines.push('        case .unknown: break');
   lines.push('        }');
   lines.push('    }');
   lines.push('}');

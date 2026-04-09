@@ -3,6 +3,13 @@
 
 import Foundation
 
+// MARK: - Timestamp Provider
+
+/// Injectable timestamp provider for testing. Returns epoch milliseconds.
+public var currentTimestampProvider: () -> Int = {
+    Int(Date().timeIntervalSince1970 * 1000)
+}
+
 // MARK: - Root Reducer
 
 /// Pure reducer for root state.
@@ -16,6 +23,11 @@ public func rootReducer(state: RootState, action: StateAction) -> RootState {
     case .rootActiveSessionsChanged(let a):
         var next = state
         next.activeSessions = a.activeSessions
+        return next
+
+    case .rootTerminalsChanged(let a):
+        var next = state
+        next.terminals = a.terminals
         return next
 
     default:
@@ -49,6 +61,7 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         var next = state
         next.summary.status = .inProgress
         next.summary.modifiedAt = currentTimestamp()
+        next.summary.isRead = false
         next.activeTurn = ActiveTurn(
             id: a.turnId,
             userMessage: a.userMessage,
@@ -138,7 +151,7 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
                     toolName: base.toolName,
                     displayName: base.displayName,
                     toolClientId: base.toolClientId,
-                    meta: a.meta ?? base.meta,
+                    meta: base.meta,
                     invocationMessage: a.invocationMessage,
                     toolInput: a.toolInput,
                     status: .running,
@@ -150,7 +163,7 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
                 toolName: base.toolName,
                 displayName: base.displayName,
                 toolClientId: base.toolClientId,
-                meta: a.meta ?? base.meta,
+                meta: base.meta,
                 invocationMessage: a.invocationMessage,
                 toolInput: a.toolInput,
                 status: .pendingConfirmation,
@@ -344,6 +357,53 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         next.customizations = list
         return next
 
+    // ── Truncation ───────────────────────────────────────────────────────
+
+    case .sessionTruncated(let a):
+        let turns: [Turn]
+        if let turnId = a.turnId {
+            guard let idx = state.turns.firstIndex(where: { $0.id == turnId }) else {
+                return state
+            }
+            turns = Array(state.turns.prefix(idx + 1))
+        } else {
+            turns = []
+        }
+        var next = state
+        next.turns = turns
+        next.activeTurn = nil
+        next.summary.status = .idle
+        next.summary.modifiedAt = currentTimestamp()
+        return next
+
+    // ── Read / Done ──────────────────────────────────────────────────────
+
+    case .sessionIsReadChanged(let a):
+        var next = state
+        next.summary.isRead = a.isRead
+        return next
+
+    case .sessionIsDoneChanged(let a):
+        var next = state
+        next.summary.isDone = a.isDone
+        return next
+
+    // ── Diffs ─────────────────────────────────────────────────────────────
+
+    case .sessionDiffsChanged(let a):
+        var next = state
+        next.summary.diffs = a.diffs
+        return next
+
+    // ── Tool Call Content ────────────────────────────────────────────────
+
+    case .sessionToolCallContentChanged(let a):
+        return updateToolCall(state: state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
+            guard case .running(var r) = tc else { return tc }
+            r.content = a.content
+            return .running(r)
+        }
+
     // ── Pending Messages ──────────────────────────────────────────────────
 
     case .sessionPendingMessageSet(let a):
@@ -414,6 +474,8 @@ public let clientDispatchableActions: Set<String> = [
     "session/pendingMessageRemoved",
     "session/queuedMessagesReordered",
     "session/customizationToggled",
+    "session/isReadChanged",
+    "session/isDoneChanged",
 ]
 
 /// Checks whether an action may be dispatched by a client.
@@ -424,7 +486,8 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .sessionModelChanged, .sessionActiveClientChanged,
          .sessionActiveClientToolsChanged, .sessionPendingMessageSet,
          .sessionPendingMessageRemoved, .sessionQueuedMessagesReordered,
-         .sessionCustomizationToggled:
+         .sessionCustomizationToggled, .sessionIsReadChanged,
+         .sessionIsDoneChanged:
         return true
     default:
         return false
@@ -434,7 +497,7 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
 // MARK: - Helpers
 
 private func currentTimestamp() -> Int {
-    Int(Date().timeIntervalSince1970 * 1000)
+    currentTimestampProvider()
 }
 
 // ToolCallBaseFields and toolCallBase() are now shared via
