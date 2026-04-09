@@ -58,6 +58,19 @@ function needsCodingKey(tsPropName: string): boolean {
 /** Known inline object types mapped to named Swift structs */
 const INLINE_TYPE_OVERRIDES: Record<string, string> = {};
 
+/**
+ * Synthetic Swift structs required for `Partial<T>` references encountered
+ * during type mapping. Swift has no structural `Partial`, so we emit a
+ * sibling struct with every property forced optional. Populated by
+ * `mapType`, consumed by the file generators that reference them.
+ */
+const requiredPartialStructs = new Set<string>();
+
+/** Swift name for `Partial<ISessionSummary>` → `PartialSessionSummary`. */
+function partialSwiftName(tsInterfaceName: string): string {
+  return `Partial${swiftTypeName(tsInterfaceName)}`;
+}
+
 /** Map a TypeScript type string to a Swift type string */
 function mapType(tsType: string, propName?: string, containerName?: string): string {
   tsType = tsType.replace(/import\([^)]+\)\./g, '').trim();
@@ -107,6 +120,14 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   // Record<string, T>
   const recordMatch = tsType.match(/^Record<string,\s*(.+)>$/);
   if (recordMatch) return `[String: ${mapType(recordMatch[1])}]`;
+
+  // Partial<T> — Swift has no structural Partial; emit/ reuse a sibling
+  // struct with every property optional. Tracked for later emission.
+  const partialMatch = tsType.match(/^Partial<(\w+)>$/);
+  if (partialMatch) {
+    requiredPartialStructs.add(partialMatch[1]);
+    return partialSwiftName(partialMatch[1]);
+  }
 
   // Enum member union: EnumName.A | EnumName.B | ...
   const enumUnionMatch = tsType.match(/^(\w+)\.\w+(\s*\|\s*\1\.\w+)*$/);
@@ -376,6 +397,25 @@ function generateStructFromInterface(
   const name = swiftNameOverride ?? swiftTypeName(tsInterfaceName);
   const props = extractProps(iface, project);
   return generateSwiftStruct(name, props);
+}
+
+/**
+ * Emit a Swift counterpart for `Partial<T>`: same properties as `T` but with
+ * every field forced optional. The synthetic struct is referenced by
+ * `mapType` via `partialSwiftName`.
+ */
+function generatePartialStructFromInterface(
+  project: Project,
+  tsInterfaceName: string,
+): string {
+  const iface = findInterface(project, tsInterfaceName);
+  if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
+  const props = extractProps(iface, project).map(p => ({
+    ...p,
+    optional: true,
+    type: p.type.endsWith('?') ? p.type : `${p.type}?`,
+  }));
+  return generateSwiftStruct(partialSwiftName(tsInterfaceName), props);
 }
 
 // ─── State File Generator ────────────────────────────────────────────────────
@@ -911,7 +951,7 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason', 'NotificationType'];
 
 const NOTIFICATION_STRUCTS = [
-  'ISessionAddedNotification', 'ISessionRemovedNotification', 'IAuthRequiredNotification',
+  'ISessionAddedNotification', 'ISessionRemovedNotification', 'ISessionSummaryChangedNotification', 'IAuthRequiredNotification',
 ];
 
 const PROTOCOL_NOTIFICATION_UNION: UnionConfig = {
@@ -920,6 +960,7 @@ const PROTOCOL_NOTIFICATION_UNION: UnionConfig = {
   variants: [
     { caseName: 'sessionAdded', structName: 'SessionAddedNotification', discriminantValue: 'notify/sessionAdded' },
     { caseName: 'sessionRemoved', structName: 'SessionRemovedNotification', discriminantValue: 'notify/sessionRemoved' },
+    { caseName: 'sessionSummaryChanged', structName: 'SessionSummaryChangedNotification', discriminantValue: 'notify/sessionSummaryChanged' },
     { caseName: 'authRequired', structName: 'AuthRequiredNotification', discriminantValue: 'notify/authRequired' },
   ],
 };
@@ -937,6 +978,11 @@ function generateNotificationsFile(project: Project): string {
     }
   }
 
+  // Snapshot partials requested before notifications (typically empty) so we
+  // can emit exactly the partials introduced by notification structs in this
+  // file, keeping them co-located with their sole consumer.
+  const priorPartials = new Set(requiredPartialStructs);
+
   lines.push('// MARK: - Notification Types\n');
   for (const ifaceName of NOTIFICATION_STRUCTS) {
     try {
@@ -945,6 +991,20 @@ function generateNotificationsFile(project: Project): string {
     } catch (e) {
       lines.push(`// TODO: Could not generate ${ifaceName}: ${e}`);
       lines.push('');
+    }
+  }
+
+  const newPartials = [...requiredPartialStructs].filter(n => !priorPartials.has(n));
+  if (newPartials.length > 0) {
+    lines.push('// MARK: - Partial Summary Types\n');
+    for (const tsName of newPartials) {
+      try {
+        lines.push(generatePartialStructFromInterface(project, tsName));
+        lines.push('');
+      } catch (e) {
+        lines.push(`// TODO: Could not generate Partial<${tsName}>: ${e}`);
+        lines.push('');
+      }
     }
   }
 

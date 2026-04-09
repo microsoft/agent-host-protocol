@@ -111,6 +111,7 @@ import type {
 import type {
   IProtocolNotification,
   IAuthRequiredNotification,
+  ISessionSummaryChangedNotification,
 } from '../notifications.js';
 
 import type {
@@ -257,6 +258,7 @@ type V1_IDisposeTerminalParams = IDisposeTerminalParams;
 type V1_ISessionForkSource = ISessionForkSource;
 type V1_IProtocolNotification = IProtocolNotification;
 type V1_IAuthRequiredNotification = IAuthRequiredNotification;
+type V1_ISessionSummaryChangedNotification = ISessionSummaryChangedNotification;
 type V1_IListSessionsResult = IListSessionsResult;
 type V1_IAuthenticateParams = IAuthenticateParams;
 type V1_IAuthenticateResult = IAuthenticateResult;
@@ -442,6 +444,8 @@ type _CheckToolCallContentChangedAction = AssertCompatible<V1_ISessionToolCallCo
 type _CheckSessionForkSource = AssertCompatible<V1_ISessionForkSource, ISessionForkSource>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckProtocolNotification = AssertCompatible<V1_IProtocolNotification, IProtocolNotification>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckSessionSummaryChangedNotification = AssertCompatible<V1_ISessionSummaryChangedNotification, ISessionSummaryChangedNotification>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckListSessionsResult = AssertCompatible<V1_IListSessionsResult, IListSessionsResult>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

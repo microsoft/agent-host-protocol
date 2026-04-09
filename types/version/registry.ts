@@ -88,6 +88,7 @@ export function isActionKnownToVersion(action: IStateAction, clientVersion: numb
 export const NOTIFICATION_INTRODUCED_IN: { readonly [K in IProtocolNotification['type']]: number } = {
   [NotificationType.SessionAdded]: 1,
   [NotificationType.SessionRemoved]: 1,
+  [NotificationType.SessionSummaryChanged]: 1,
   [NotificationType.AuthRequired]: 1,
 };
 

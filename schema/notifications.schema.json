@@ -39,6 +39,77 @@
         "session"
       ]
     },
+    "ISessionSummaryChangedNotification": {
+      "type": "object",
+      "description": "Broadcast to all connected clients when an existing session's summary\nchanges (title, status, `modifiedAt`, model, working directory, read/done\nstate, or diff statistics).\n\nThis notification lets clients that maintain a cached session list — for\nexample, the result of a previous `listSessions()` call — stay in sync with\nin-flight sessions without having to subscribe to every session URI\nindividually. It is complementary to, not a replacement for,\n`notify/sessionAdded` and `notify/sessionRemoved`: those signal lifecycle\n(creation/disposal), while this signals summary-level mutations on an\nalready-known session.\n\nSemantics:\n\n- Only fields present in `changes` have new values; omitted fields are\n  unchanged on the client's cached summary.\n- Identity fields (`resource`, `provider`, `createdAt`) never change and\n  are not carried.\n- Like all protocol notifications, this is ephemeral: it is **not**\n  replayed on reconnect. On reconnect, clients should re-fetch the full\n  catalog via `listSessions()` as usual.\n- The server SHOULD emit this notification whenever any mutable field on\n  {@link ISessionSummary | `ISessionSummary`} changes for a session the\n  server has surfaced via `listSessions()` or `notify/sessionAdded`.\n  Servers MAY coalesce or debounce updates for noisy fields (for example,\n  `modifiedAt` bumps while a turn is streaming, or rapidly changing\n  `diffs`) at their discretion.\n- Clients that have no cached entry for `session` MAY ignore the\n  notification; it is not a substitute for `notify/sessionAdded`.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/NotificationType.SessionSummaryChanged"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the session whose summary changed"
+        },
+        "changes": {
+          "type": "object",
+          "properties": {
+            "resource": {
+              "$ref": "#/$defs/URI",
+              "description": "Session URI"
+            },
+            "provider": {
+              "type": "string",
+              "description": "Agent provider ID"
+            },
+            "title": {
+              "type": "string",
+              "description": "Session title"
+            },
+            "status": {
+              "$ref": "#/$defs/SessionStatus",
+              "description": "Current session status"
+            },
+            "createdAt": {
+              "type": "number",
+              "description": "Creation timestamp"
+            },
+            "modifiedAt": {
+              "type": "number",
+              "description": "Last modification timestamp"
+            },
+            "model": {
+              "type": "string",
+              "description": "Currently selected model"
+            },
+            "workingDirectory": {
+              "$ref": "#/$defs/URI",
+              "description": "The working directory URI for this session"
+            },
+            "isRead": {
+              "type": "boolean",
+              "description": "Whether the client has viewed this session since its last modification"
+            },
+            "isDone": {
+              "type": "boolean",
+              "description": "Whether the session has been marked as done by the client"
+            },
+            "diffs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ISessionFileDiff"
+              },
+              "description": "Files changed during this session with diff statistics"
+            }
+          },
+          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`, `createdAt`) never change and\nMUST be omitted by senders; receivers SHOULD ignore them if present."
+        }
+      },
+      "required": [
+        "type",
+        "session",
+        "changes"
+      ]
+    },
     "IAuthRequiredNotification": {
       "type": "object",
       "description": "Sent by the server when a protected resource requires (re-)authentication.\n\nThis notification is sent when a previously valid token expires or is\nrevoked, or when the server discovers a new authentication requirement.\nClients should obtain a fresh token and push it via the `authenticate`\ncommand.",
@@ -68,6 +139,9 @@
         },
         {
           "$ref": "#/$defs/ISessionRemovedNotification"
+        },
+        {
+          "$ref": "#/$defs/ISessionSummaryChangedNotification"
         },
         {
           "$ref": "#/$defs/IAuthRequiredNotification"

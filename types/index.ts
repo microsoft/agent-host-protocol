@@ -211,6 +211,7 @@ export { ReconnectResultType, ContentEncoding } from './commands.js';
 export type {
   ISessionAddedNotification,
   ISessionRemovedNotification,
+  ISessionSummaryChangedNotification,
   IAuthRequiredNotification,
   IProtocolNotification,
 } from './notifications.js';

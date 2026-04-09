@@ -256,7 +256,9 @@ UsageInfo {
 The session list can be arbitrarily large and is **not** part of the state tree. Instead:
 
 - Clients fetch the list imperatively via `listSessions()` RPC.
-- The server sends lightweight **notifications** (`sessionAdded`, `sessionRemoved`) so connected clients can update a local cache without re-fetching.
+- The server sends lightweight **notifications** to keep connected clients' caches in sync without re-fetching:
+  - `notify/sessionAdded` and `notify/sessionRemoved` signal lifecycle (creation and disposal).
+  - `notify/sessionSummaryChanged` streams partial updates to an existing session's summary (title, status, `modifiedAt`, model, working directory, `isRead`, `isDone`, `diffs`) so clients that are displaying a session list can stay in sync without subscribing to every session URI individually. Only fields present in `changes` carry new values; omitted fields are unchanged. The server SHOULD emit this notification whenever any mutable summary field changes, and MAY coalesce or debounce noisy updates (for example, rapid `modifiedAt` bumps while a turn is streaming) at its discretion.
 
 Notifications are ephemeral — not processed by reducers, not stored in state, not replayed on reconnect. On reconnect, clients re-fetch the list.
 

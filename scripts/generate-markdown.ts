@@ -736,11 +736,22 @@ function generateNotificationsPage(project: Project): string {
     lines.push(example + '\n');
   }
 
+  const sessionSummaryChanged = getInterface(project, 'ISessionSummaryChangedNotification');
+  lines.push(`### \`notify/sessionSummaryChanged\` ${sourceLink(sessionSummaryChanged)}\n`);
+  lines.push(getJsDocDescription(sessionSummaryChanged) + '\n');
+  lines.push(renderInterfaceTable(sessionSummaryChanged) + '\n');
+
+  const sessionSummaryChangedExamples = getJsDocExamples(sessionSummaryChanged);
+  for (const example of sessionSummaryChangedExamples) {
+    lines.push('**Example:**\n');
+    lines.push(example + '\n');
+  }
+
   // Usage Pattern
   lines.push('## Usage Pattern\n');
   lines.push('Clients use notifications to maintain a local session list cache:\n');
   lines.push('1. On connect, fetch the full session list via `listSessions()`.');
-  lines.push('2. Listen for `notify/sessionAdded` and `notify/sessionRemoved` to keep the cache updated.');
+  lines.push('2. Listen for `notify/sessionAdded` and `notify/sessionRemoved` to track lifecycle, and `notify/sessionSummaryChanged` to patch cached summaries in place.');
   lines.push('3. On reconnect, **re-fetch** the full list — notifications are not replayed.\n');
 
   // Version Introduction
@@ -748,7 +759,8 @@ function generateNotificationsPage(project: Project): string {
   lines.push('| Notification Type | Version |');
   lines.push('|---|---|');
   lines.push('| `notify/sessionAdded` | 1 |');
-  lines.push('| `notify/sessionRemoved` | 1 |\n');
+  lines.push('| `notify/sessionRemoved` | 1 |');
+  lines.push('| `notify/sessionSummaryChanged` | 1 |\n');
 
   // Server Notifications (action delivery)
   lines.push('## Server Notifications\n');

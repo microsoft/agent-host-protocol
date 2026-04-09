@@ -109,4 +109,20 @@ In addition to action envelopes, the server broadcasts **protocol notifications*
 }
 ```
 
+For partial updates to an existing session's summary (title, status, `modifiedAt`, etc.), the server broadcasts `notify/sessionSummaryChanged` with only the fields that changed:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "notification",
+  "params": {
+    "notification": {
+      "type": "notify/sessionSummaryChanged",
+      "session": "copilot:/<uuid>",
+      "changes": { "title": "Refactor auth middleware", "status": 8 }
+    }
+  }
+}
+```
+
 Protocol notifications go to all connected clients regardless of subscriptions. They are not stored in state and are not replayed on reconnection.

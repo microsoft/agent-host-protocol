@@ -144,6 +144,32 @@ Steering messages added while idle are silently stored and consumed when a turn 
 
 The server disposes the session and broadcasts a `notify/sessionRemoved` notification to all clients.
 
+## Session Summary Updates
+
+While a session is alive, its [summary](/guide/state-model#session-summary) may change in response to agent activity or client actions (for example, the title is auto-generated, the status transitions from `Idle` to `InProgress`, `modifiedAt` advances, or `diffs` accumulate). The server SHOULD broadcast a `notify/sessionSummaryChanged` notification to all connected clients whenever any mutable field of `ISessionSummary` changes, carrying only the changed fields:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "notification",
+  "params": {
+    "notification": {
+      "type": "notify/sessionSummaryChanged",
+      "session": "copilot:/<uuid>",
+      "changes": {
+        "title": "Refactor auth middleware",
+        "status": 8,
+        "modifiedAt": 1710000123456
+      }
+    }
+  }
+}
+```
+
+This lets clients that maintain a cached session list (for example, from a previous `listSessions()` call) patch their entries in place without subscribing to every session URI. Identity fields (`resource`, `provider`, `createdAt`) never change and are not carried.
+
+Servers MAY coalesce or debounce this notification for noisy fields — for example, rapid `modifiedAt` bumps while a turn is streaming, or frequent `diffs` updates during an edit burst — at their discretion. Like all protocol notifications, `notify/sessionSummaryChanged` is ephemeral and is **not** replayed on reconnect; clients should re-fetch via `listSessions()` when they reconnect.
+
 ## Reconnection
 
 If the transport connection drops, the client reconnects and sends a `reconnect` **request**:

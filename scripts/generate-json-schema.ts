@@ -130,6 +130,20 @@ function typeTextToSchema(typeText: string, project: Project): JsonSchema {
     return typeTextToSchema(undefinedMatch[1], project);
   }
 
+  // Partial<X> — inline every property of X as optional (no `required`).
+  // Keeps the generated schema self-describing without introducing synthetic
+  // $defs entries that have no counterpart in the TS source.
+  const partialMatch = cleaned.match(/^Partial<(\w+)>$/);
+  if (partialMatch) {
+    const iface = findInterface(project, partialMatch[1]);
+    if (iface) {
+      const inner = interfaceToSchema(iface, project);
+      delete inner.required;
+      delete inner.description;
+      return inner;
+    }
+  }
+
   // Union types (not string literals): A | B
   if (cleaned.includes(' | ') && !cleaned.startsWith("'")) {
     const parts = splitUnionType(cleaned);
