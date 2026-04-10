@@ -201,7 +201,7 @@ describe('reducer immutability', () => {
     const turn2 = { id: 't2', userMessage: { text: 'Second' }, responseParts: [], usage: undefined, state: TurnState.Complete };
     const turn3 = { id: 't3', userMessage: { text: 'Third' }, responseParts: [], usage: undefined, state: TurnState.Complete };
     const state: ISessionState = {
-      summary: { resource: 'x', provider: 'copilot', title: 'T', status: SessionStatus.Idle, createdAt: 1000, modifiedAt: 1000 },
+      summary: { resource: 'x', provider: 'copilot', title: 'T', status: SessionStatus.Idle, createdAt: 1000, modifiedAt: 1000, project: { uri: 'file:///test-project', displayName: 'Test Project' } },
       lifecycle: SessionLifecycle.Ready,
       turns: [turn1, turn2, turn3],
     };

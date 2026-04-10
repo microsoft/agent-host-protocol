@@ -18,6 +18,7 @@ import type {
   ISessionState,
   ISessionSummary,
   ISessionFileDiff,
+  IProjectInfo,
   ISessionActiveClient,
   ITurn,
   IActiveTurn,
@@ -168,6 +169,7 @@ type V1_ISessionModelInfo = ISessionModelInfo;
 type V1_ISessionState = ISessionState;
 type V1_ISessionSummary = ISessionSummary;
 type V1_ISessionFileDiff = ISessionFileDiff;
+type V1_IProjectInfo = IProjectInfo;
 type V1_ISessionActiveClient = ISessionActiveClient;
 type V1_ITurn = ITurn;
 type V1_IActiveTurn = IActiveTurn;
@@ -298,6 +300,8 @@ type _CheckSessionState = AssertCompatible<V1_ISessionState, ISessionState>;
 type _CheckSessionSummary = AssertCompatible<V1_ISessionSummary, ISessionSummary>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckSessionFileDiff = AssertCompatible<V1_ISessionFileDiff, ISessionFileDiff>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckProjectInfo = AssertCompatible<V1_IProjectInfo, IProjectInfo>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckTurn = AssertCompatible<V1_ITurn, ITurn>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

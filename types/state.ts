@@ -336,6 +336,18 @@ export interface ISessionFileDiff {
 }
 
 /**
+ * Server-owned project metadata for a session.
+ *
+ * @category Session State
+ */
+export interface IProjectInfo {
+  /** Project URI */
+  uri: URI;
+  /** Human-readable project name */
+  displayName: string;
+}
+
+/**
  * @category Session State
  */
 export interface ISessionSummary {
@@ -351,6 +363,8 @@ export interface ISessionSummary {
   createdAt: number;
   /** Last modification timestamp */
   modifiedAt: number;
+  /** Server-owned project for this session */
+  project?: IProjectInfo;
   /** Currently selected model */
   model?: string;
   /** The working directory URI for this session */

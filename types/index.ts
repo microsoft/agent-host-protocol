@@ -14,6 +14,7 @@ export type {
   IRootState,
   IAgentInfo,
   IProtectedResourceMetadata,
+  IProjectInfo,
   ISessionModelInfo,
   ISessionState,
   ISessionSummary,

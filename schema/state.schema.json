@@ -366,6 +366,24 @@
         "uri"
       ]
     },
+    "IProjectInfo": {
+      "type": "object",
+      "description": "Server-owned project metadata for a session.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Project URI"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable project name"
+        }
+      },
+      "required": [
+        "uri",
+        "displayName"
+      ]
+    },
     "ISessionSummary": {
       "type": "object",
       "properties": {
@@ -392,6 +410,10 @@
         "modifiedAt": {
           "type": "number",
           "description": "Last modification timestamp"
+        },
+        "project": {
+          "$ref": "#/$defs/IProjectInfo",
+          "description": "Server-owned project for this session"
         },
         "model": {
           "type": "string",
