@@ -1857,7 +1857,7 @@
     },
     "IToolDefinition": {
       "type": "object",
-      "description": "Describes a tool available in a session, provided by either the server or the active client.\n\nThis type mirrors the MCP `Tool` type from the Model Context Protocol specification\n(2025-11-25 draft) and will continue to track it.",
+      "description": "Describes a tool available in a session, provided by either the server or the active client.",
       "properties": {
         "name": {
           "type": "string",

@@ -571,7 +571,7 @@
     },
     "ISessionToolCallContentChangedAction": {
       "type": "object",
-      "description": "Partial content produced while a tool is still executing.\n\nReplaces the `content` array on the running tool call state. Clients can\nuse this to display live feedback (e.g. a terminal reference) before the\ntool completes.",
+      "description": "Partial content produced while a tool is still executing.\n\nReplaces the `content` array on the running tool call state. Clients can\nuse this to display live feedback (e.g. a terminal reference) before the\ntool completes.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action to stream intermediate content while\nexecuting. The server SHOULD reject this action if the dispatching client does\nnot match `toolClientId`.",
       "properties": {
         "session": {
           "$ref": "#/$defs/URI",
@@ -3090,7 +3090,7 @@
     },
     "IToolDefinition": {
       "type": "object",
-      "description": "Describes a tool available in a session, provided by either the server or the active client.\n\nThis type mirrors the MCP `Tool` type from the Model Context Protocol specification\n(2025-11-25 draft) and will continue to track it.",
+      "description": "Describes a tool available in a session, provided by either the server or the active client.",
       "properties": {
         "name": {
           "type": "string",

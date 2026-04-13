@@ -1063,9 +1063,6 @@ export type IToolCallState =
 /**
  * Describes a tool available in a session, provided by either the server or the active client.
  *
- * This type mirrors the MCP `Tool` type from the Model Context Protocol specification
- * (2025-11-25 draft) and will continue to track it.
- *
  * @category Tool Definition Types
  */
 export interface IToolDefinition {
