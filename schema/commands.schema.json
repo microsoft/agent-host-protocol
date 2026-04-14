@@ -593,7 +593,7 @@
     },
     "IResolveSessionConfigParams": {
       "type": "object",
-      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). When `ready` is `true`, the\nclient may call `createSession` with the accumulated config.",
+      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). The returned `values` contain\nserver-resolved defaults to pass to `createSession`.",
       "properties": {
         "provider": {
           "type": "string",
@@ -616,10 +616,6 @@
       "type": "object",
       "description": "Result of the `resolveSessionConfig` command.",
       "properties": {
-        "ready": {
-          "type": "boolean",
-          "description": "True when all required configuration is satisfied and `createSession` can be called"
-        },
         "schema": {
           "$ref": "#/$defs/ISessionConfigSchema",
           "description": "JSON Schema describing available configuration properties given the current context"
@@ -633,7 +629,6 @@
         }
       },
       "required": [
-        "ready",
         "schema",
         "values"
       ]
