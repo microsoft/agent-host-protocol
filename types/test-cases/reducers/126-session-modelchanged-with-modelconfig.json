@@ -1,5 +1,5 @@
 {
-  "description": "session/modelChanged updates model",
+  "description": "session/modelChanged with model config updates both model and config",
   "reducer": "session",
   "initial": {
     "summary": {
@@ -8,16 +8,22 @@
       "title": "Test Session",
       "status": 1,
       "createdAt": 1000,
-      "modifiedAt": 1000
+      "modifiedAt": 1000,
+      "model": { "id": "gpt-4o" }
     },
-    "lifecycle": "creating",
+    "lifecycle": "ready",
     "turns": []
   },
   "actions": [
     {
       "type": "session/modelChanged",
       "session": "copilot:/test-session",
-      "model": { "id": "gpt-4" }
+      "model": {
+        "id": "o3",
+        "config": {
+          "thinkingLevel": "high"
+        }
+      }
     }
   ],
   "expected": {
@@ -28,9 +34,14 @@
       "status": 1,
       "createdAt": 1000,
       "modifiedAt": 9999,
-      "model": { "id": "gpt-4" }
+      "model": {
+        "id": "o3",
+        "config": {
+          "thinkingLevel": "high"
+        }
+      }
     },
-    "lifecycle": "creating",
+    "lifecycle": "ready",
     "turns": []
   }
 }

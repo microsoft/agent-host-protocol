@@ -6,10 +6,10 @@
  * They return a result or a JSON-RPC error.
  */
 
-import type { URI, ISnapshot, ISessionConfigSchema, ISessionSummary, ITurn, ITerminalClaim } from './state.js';
+import type { URI, ISnapshot, ISessionConfigSchema, ISessionSummary, IModelSelection, ITurn, ITerminalClaim } from './state.js';
 import type { IActionEnvelope, IStateAction } from './actions.js';
 
-export type { ISessionConfigPropertySchema, ISessionConfigSchema } from './state.js';
+export type { IConfigPropertySchema, IConfigSchema, ISessionConfigPropertySchema, ISessionConfigSchema } from './state.js';
 
 // ─── initialize ──────────────────────────────────────────────────────────────
 
@@ -184,8 +184,8 @@ export interface ICreateSessionParams {
   session: URI;
   /** Agent provider ID */
   provider?: string;
-  /** Model ID to use */
-  model?: string;
+  /** Model selection (ID and optional model-specific configuration) */
+  model?: IModelSelection;
   /** Working directory for the session */
   workingDirectory?: URI;
   /**

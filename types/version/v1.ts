@@ -13,12 +13,15 @@ import type {
   IRootState,
   IAgentInfo,
   ISessionModelInfo,
+  IModelSelection,
   IProtectedResourceMetadata,
   StringOrMarkdown,
   ISessionState,
   ISessionSummary,
   ISessionFileDiff,
   ISessionConfigState,
+  IConfigPropertySchema,
+  IConfigSchema,
   IProjectInfo,
   ISessionActiveClient,
   ITurn,
@@ -181,6 +184,7 @@ type V1_StringOrMarkdown = StringOrMarkdown;
 type V1_IAgentInfo = IAgentInfo;
 type V1_IProtectedResourceMetadata = IProtectedResourceMetadata;
 type V1_ISessionModelInfo = ISessionModelInfo;
+type V1_IModelSelection = IModelSelection;
 type V1_ISessionState = ISessionState;
 type V1_ISessionSummary = ISessionSummary;
 type V1_ISessionFileDiff = ISessionFileDiff;
@@ -301,6 +305,8 @@ type V1_IResourceMoveParams = IResourceMoveParams;
 type V1_IResourceMoveResult = IResourceMoveResult;
 type V1_IResolveSessionConfigParams = IResolveSessionConfigParams;
 type V1_IResolveSessionConfigResult = IResolveSessionConfigResult;
+type V1_IConfigPropertySchema = IConfigPropertySchema;
+type V1_IConfigSchema = IConfigSchema;
 type V1_ISessionConfigPropertySchema = ISessionConfigPropertySchema;
 type V1_ISessionConfigSchema = ISessionConfigSchema;
 type V1_ISessionConfigCompletionsParams = ISessionConfigCompletionsParams;
@@ -324,6 +330,8 @@ type _CheckStringOrMarkdown = AssertCompatible<V1_StringOrMarkdown, StringOrMark
 type _CheckAgentInfo = AssertCompatible<V1_IAgentInfo, IAgentInfo>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckSessionModelInfo = AssertCompatible<V1_ISessionModelInfo, ISessionModelInfo>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckModelSelection = AssertCompatible<V1_IModelSelection, IModelSelection>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckSessionState = AssertCompatible<V1_ISessionState, ISessionState>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -574,6 +582,10 @@ type _CheckDisposeTerminalParams = AssertCompatible<V1_IDisposeTerminalParams, I
 type _CheckResolveSessionConfigParams = AssertCompatible<V1_IResolveSessionConfigParams, IResolveSessionConfigParams>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckResolveSessionConfigResult = AssertCompatible<V1_IResolveSessionConfigResult, IResolveSessionConfigResult>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckConfigPropertySchema = AssertCompatible<V1_IConfigPropertySchema, IConfigPropertySchema>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckConfigSchema = AssertCompatible<V1_IConfigSchema, IConfigSchema>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckSessionConfigPropertySchema = AssertCompatible<V1_ISessionConfigPropertySchema, ISessionConfigPropertySchema>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

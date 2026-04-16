@@ -11,6 +11,7 @@ import type {
   StringOrMarkdown,
   IAgentInfo,
   IErrorInfo,
+  IModelSelection,
   IUserMessage,
   IResponsePart,
   IToolCallResult,
@@ -542,8 +543,8 @@ export interface ISessionModelChangedAction {
   type: ActionType.SessionModelChanged;
   /** Session URI */
   session: URI;
-  /** New model ID */
-  model: string;
+  /** New model selection */
+  model: IModelSelection;
 }
 
 /**

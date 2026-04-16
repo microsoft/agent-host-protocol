@@ -184,8 +184,8 @@
           "description": "Agent provider ID"
         },
         "model": {
-          "type": "string",
-          "description": "Model ID to use"
+          "$ref": "#/$defs/IModelSelection",
+          "description": "Model selection (ID and optional model-specific configuration)"
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
@@ -911,12 +911,36 @@
         "policyState": {
           "$ref": "#/$defs/PolicyState",
           "description": "Policy configuration state"
+        },
+        "configSchema": {
+          "$ref": "#/$defs/IConfigSchema",
+          "description": "Configuration schema describing model-specific options (e.g. thinking\nlevel). Clients present this as a form and pass the resolved values in\n{@link IModelSelection.config} when creating or changing sessions."
         }
       },
       "required": [
         "id",
         "provider",
         "name"
+      ]
+    },
+    "IModelSelection": {
+      "type": "object",
+      "description": "A model selection: the chosen model ID together with any model-specific\nconfiguration values whose keys correspond to the model's\n{@link ISessionModelInfo.configSchema}.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Model identifier"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Model-specific configuration values"
+        }
+      },
+      "required": [
+        "id"
       ]
     },
     "IPendingMessage": {
@@ -1118,7 +1142,7 @@
           "description": "Server-owned project for this session"
         },
         "model": {
-          "type": "string",
+          "$ref": "#/$defs/IModelSelection",
           "description": "Currently selected model"
         },
         "workingDirectory": {
@@ -1150,9 +1174,9 @@
         "modifiedAt"
       ]
     },
-    "ISessionConfigPropertySchema": {
+    "IConfigPropertySchema": {
       "type": "object",
-      "description": "A JSON Schema-compatible string enum property descriptor with display extensions.\n\nStandard JSON Schema fields (`type`, `title`, `description`, `default`,\n`enum`) allow validators to process the schema. Display extensions\n(`enumLabels`, `enumDescriptions`) are parallel arrays that provide UI metadata for each `enum` value.",
+      "description": "A JSON Schema-compatible string enum property descriptor with display extensions.\n\nStandard JSON Schema fields (`type`, `title`, `description`, `default`,\n`enum`) allow validators to process the schema. Display extensions\n(`enumLabels`, `enumDescriptions`) are parallel arrays that provide UI\nmetadata for each `enum` value.\n\nThis is the generic base type. See {@link ISessionConfigPropertySchema} for\nsession-specific extensions.",
       "properties": {
         "type": {
           "type": "string",
@@ -1194,13 +1218,99 @@
           },
           "description": "Display extension: description per enum value (parallel array)"
         },
-        "enumDynamic": {
+        "readOnly": {
           "type": "boolean",
-          "description": "Display extension: when `true`, the full set of allowed values is too large\nto enumerate statically. The client SHOULD use `sessionConfigCompletions`\nto fetch matching values based on user input. Any values in `enum` are\nseed/recent values for initial display."
+          "description": "JSON Schema: when `true`, the property is displayed but cannot be modified by the user"
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "enum"
+      ]
+    },
+    "IConfigSchema": {
+      "type": "object",
+      "description": "A JSON Schema object describing available configuration properties.\n\nThis is the generic base type. See {@link ISessionConfigSchema} for\nsession-specific usage.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "object"
+          ],
+          "description": "JSON Schema: always `'object'`"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/IConfigPropertySchema"
+          },
+          "description": "JSON Schema: property descriptors keyed by property id"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: list of required property ids"
+        }
+      },
+      "required": [
+        "type",
+        "properties"
+      ]
+    },
+    "ISessionConfigPropertySchema": {
+      "type": "object",
+      "description": "A session configuration property descriptor.\n\nExtends the generic {@link IConfigPropertySchema} with session-specific\ndisplay extensions.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "string"
+          ],
+          "description": "JSON Schema: property type. Only string enum properties are currently supported."
+        },
+        "title": {
+          "type": "string",
+          "description": "JSON Schema: human-readable label for the property"
+        },
+        "description": {
+          "type": "string",
+          "description": "JSON Schema: description / tooltip"
+        },
+        "default": {
+          "type": "string",
+          "description": "JSON Schema: default value"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: allowed values"
+        },
+        "enumLabels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Display extension: human-readable label per enum value (parallel array)"
+        },
+        "enumDescriptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Display extension: description per enum value (parallel array)"
         },
         "readOnly": {
           "type": "boolean",
           "description": "JSON Schema: when `true`, the property is displayed but cannot be modified by the user"
+        },
+        "enumDynamic": {
+          "type": "boolean",
+          "description": "Display extension: when `true`, the full set of allowed values is too large\nto enumerate statically. The client SHOULD use `sessionConfigCompletions`\nto fetch matching values based on user input. Any values in `enum` are\nseed/recent values for initial display."
         },
         "sessionMutable": {
           "type": "boolean",
@@ -3757,8 +3867,8 @@
           "description": "Session URI"
         },
         "model": {
-          "type": "string",
-          "description": "New model ID"
+          "$ref": "#/$defs/IModelSelection",
+          "description": "New model selection"
         }
       },
       "required": [

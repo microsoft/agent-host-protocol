@@ -30,6 +30,7 @@ ModelInfo {
   maxContextWindow?: number
   supportsVision?: boolean
   policyState?: 'enabled' | 'disabled' | 'unconfigured'
+  configSchema?: ConfigSchema   // model-specific options (e.g. thinking level)
 }
 ```
 
@@ -69,10 +70,15 @@ SessionSummary {
   createdAt: number
   modifiedAt: number
   project?: ProjectInfo
-  model?: string
+  model?: ModelSelection
   workingDirectory?: URI
   isRead?: boolean
   isDone?: boolean
+}
+
+ModelSelection {
+  id: string                             // model ID
+  config?: Record<string, string>        // model-specific config values
 }
 
 ProjectInfo {
