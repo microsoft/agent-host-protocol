@@ -37,6 +37,20 @@ function toCamelCase(name: string): string {
   return name[0].toLowerCase() + name.slice(1);
 }
 
+const SWIFT_RESERVED_KEYWORDS = new Set([
+  'associatedtype', 'class', 'deinit', 'enum', 'extension', 'fileprivate',
+  'func', 'import', 'init', 'inout', 'internal', 'let', 'open', 'operator',
+  'private', 'precedencegroup', 'protocol', 'public', 'rethrows', 'static',
+  'struct', 'subscript', 'typealias', 'var', 'break', 'case', 'catch',
+  'continue', 'default', 'defer', 'do', 'else', 'fallthrough', 'for', 'guard',
+  'if', 'in', 'repeat', 'return', 'throw', 'switch', 'where', 'while', 'as',
+  'Any', 'false', 'is', 'nil', 'self', 'Self', 'super', 'throws', 'true', 'try',
+]);
+
+function swiftIdentifier(name: string): string {
+  return SWIFT_RESERVED_KEYWORDS.has(name) ? `\`${name}\`` : name;
+}
+
 /** Convert _meta → meta, otherwise keep as-is */
 function swiftPropName(tsPropName: string): string {
   if (tsPropName.startsWith('_')) return tsPropName.substring(1);
@@ -227,7 +241,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): SwiftProp[
           : tsName;
 
       return {
-        name: sName,
+        name: swiftIdentifier(sName),
         wireName: tsName,
         type: finalType,
         optional: isOptional,
@@ -253,7 +267,7 @@ function generateSwiftEnum(enumDecl: EnumDeclaration): string {
   lines.push(`public enum ${name}: ${rawType}, Codable, Sendable {`);
 
   for (const member of enumDecl.getMembers()) {
-    const memberName = toCamelCase(member.getName());
+    const memberName = swiftIdentifier(toCamelCase(member.getName()));
     const value = member.getValue();
     const memberDoc = member.getJsDocs()[0]?.getDescription().trim();
     if (memberDoc) {
@@ -431,7 +445,8 @@ const STATE_ENUMS = [
 
 const STATE_STRUCTS = [
   'Icon', 'IProtectedResourceMetadata', 'IRootState', 'IAgentInfo',
-  'ISessionModelInfo', 'IPendingMessage', 'ISessionState', 'ISessionActiveClient',
+  'ISessionModelInfo', 'IModelSelection', 'IConfigPropertySchema', 'IConfigSchema',
+  'IPendingMessage', 'ISessionState', 'ISessionActiveClient',
   'ISessionSummary', 'IProjectInfo', 'ISessionConfigState', 'ITurn', 'IActiveTurn', 'IUserMessage',
   'ISessionInputOption',
   'ISessionInputTextAnswerValue', 'ISessionInputNumberAnswerValue',
