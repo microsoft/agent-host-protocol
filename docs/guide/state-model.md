@@ -32,7 +32,26 @@ ModelInfo {
   policyState?: 'enabled' | 'disabled' | 'unconfigured'
   configSchema?: ConfigSchema   // model-specific options (e.g. thinking level)
 }
+
+ConfigSchema {
+  type: 'object'
+  properties: Record<string, ConfigPropertySchema>
+  required?: string[]
+}
+
+ConfigPropertySchema {
+  type: 'string'
+  title: string
+  description?: string
+  default?: string
+  enum: string[]                 // allowed values
+  enumLabels?: string[]          // display labels (parallel array)
+  enumDescriptions?: string[]    // descriptions (parallel array)
+  readOnly?: boolean
+}
 ```
+
+When a model has a `configSchema`, clients present it as a form and pass the resolved values in a `ModelSelection` (see [Session Summary](#session-summary)).
 
 Root state is mutated only by server-originated actions (e.g. `root/agentsChanged`).
 
