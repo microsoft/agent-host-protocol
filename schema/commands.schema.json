@@ -201,6 +201,10 @@
             "type": "string"
           },
           "description": "Agent-specific configuration values collected via `resolveSessionConfig`.\nKeys and values correspond to the schema returned by the server."
+        },
+        "activeClient": {
+          "$ref": "#/$defs/ISessionActiveClient",
+          "description": "Eagerly claim the active client role for the new session.\n\nWhen provided, the server initializes the session with this client as the\nactive client, equivalent to dispatching a `session/activeClientChanged`\naction immediately after creation. The `clientId` MUST match the\n`clientId` the creating client supplied in `initialize`."
         }
       },
       "required": [

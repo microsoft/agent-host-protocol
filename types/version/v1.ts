@@ -144,6 +144,7 @@ import type {
   IResourceMoveParams,
   IResourceMoveResult,
   ICreateTerminalParams,
+  ICreateSessionParams,
   IDisposeTerminalParams,
   IResolveSessionConfigParams,
   IResolveSessionConfigResult,
@@ -283,6 +284,7 @@ type V1_ITerminalContentPart = ITerminalContentPart;
 type V1_ITerminalUnclassifiedPart = ITerminalUnclassifiedPart;
 type V1_ITerminalCommandPart = ITerminalCommandPart;
 type V1_ICreateTerminalParams = ICreateTerminalParams;
+type V1_ICreateSessionParams = ICreateSessionParams;
 type V1_IDisposeTerminalParams = IDisposeTerminalParams;
 type V1_ISessionForkSource = ISessionForkSource;
 type V1_IProtocolNotification = IProtocolNotification;
@@ -576,6 +578,8 @@ type _CheckTerminalUnclassifiedPart = AssertCompatible<V1_ITerminalUnclassifiedP
 type _CheckTerminalCommandPart = AssertCompatible<V1_ITerminalCommandPart, ITerminalCommandPart>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckCreateTerminalParams = AssertCompatible<V1_ICreateTerminalParams, ICreateTerminalParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckCreateSessionParams = AssertCompatible<V1_ICreateSessionParams, ICreateSessionParams>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckDisposeTerminalParams = AssertCompatible<V1_IDisposeTerminalParams, IDisposeTerminalParams>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
