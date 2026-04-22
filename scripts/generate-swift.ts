@@ -17,21 +17,6 @@ import path from 'path';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
 
-// ─── Name Mapping ────────────────────────────────────────────────────────────
-
-/** Strips the I prefix from interface names: RootState → RootState */
-function swiftTypeName(tsName: string): string {
-  if (
-    tsName.length > 1 &&
-    tsName[0] === 'I' &&
-    tsName[1] === tsName[1].toUpperCase() &&
-    tsName[1] !== tsName[1].toLowerCase()
-  ) {
-    return tsName.substring(1);
-  }
-  return tsName;
-}
-
 /** PascalCase → camelCase */
 function toCamelCase(name: string): string {
   return name[0].toLowerCase() + name.slice(1);
@@ -82,7 +67,7 @@ const requiredPartialStructs = new Set<string>();
 
 /** Swift name for `Partial<SessionSummary>` → `PartialSessionSummary`. */
 function partialSwiftName(tsInterfaceName: string): string {
-  return `Partial${swiftTypeName(tsInterfaceName)}`;
+  return `Partial${tsInterfaceName}`;
 }
 
 /** Map a TypeScript type string to a Swift type string */
@@ -145,11 +130,11 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
 
   // Enum member union: EnumName.A | EnumName.B | ...
   const enumUnionMatch = tsType.match(/^(\w+)\.\w+(\s*\|\s*\1\.\w+)*$/);
-  if (enumUnionMatch) return swiftTypeName(enumUnionMatch[1]);
+  if (enumUnionMatch) return enumUnionMatch[1];
 
   // Single enum member: EnumName.Value
   const enumMemberMatch = tsType.match(/^(\w+)\.(\w+)$/);
-  if (enumMemberMatch) return swiftTypeName(enumMemberMatch[1]);
+  if (enumMemberMatch) return enumMemberMatch[1];
 
   // String literal: 'value'
   if (tsType.startsWith("'") && tsType.endsWith("'")) return 'String';
@@ -160,8 +145,8 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   // Inline object type → AnyCodable fallback
   if (tsType.startsWith('{')) return 'AnyCodable';
 
-  // Named type — strip I prefix
-  return swiftTypeName(tsType);
+  // Named type
+  return tsType;
 }
 
 // ─── Property Extraction ─────────────────────────────────────────────────────
@@ -408,7 +393,7 @@ function generateStructFromInterface(
 ): string {
   const iface = findInterface(project, tsInterfaceName);
   if (!iface) throw new Error(`Interface ${tsInterfaceName} not found`);
-  const name = swiftNameOverride ?? swiftTypeName(tsInterfaceName);
+  const name = swiftNameOverride ?? tsInterfaceName;
   const props = extractProps(iface, project);
   return generateSwiftStruct(name, props);
 }
@@ -872,10 +857,7 @@ function generateActionsFile(project: Project): string {
   lines.push('/// Discriminated union of all state actions.');
   lines.push('public enum StateAction: Codable, Sendable {');
   for (const v of ACTION_VARIANTS) {
-    const structName = v.tsInterface === '_merged_'
-      ? 'SessionToolCallConfirmedAction'
-      : swiftTypeName(v.tsInterface).replace(/^Session/, 'Session').replace(/Action$/, 'Action');
-    lines.push(`    case ${v.caseName}(${swiftTypeName(v.tsInterface === '_merged_' ? 'SessionToolCallConfirmedAction' : v.tsInterface)})`);
+    lines.push(`    case ${v.caseName}(${v.tsInterface === '_merged_' ? 'SessionToolCallConfirmedAction' : v.tsInterface})`);
   }
   lines.push('    /// Unknown or future action type; reducers treat this as a no-op.');
   lines.push('    case unknown(type: String)');
@@ -889,7 +871,7 @@ function generateActionsFile(project: Project): string {
   for (const v of ACTION_VARIANTS) {
     const structName = v.tsInterface === '_merged_'
       ? 'SessionToolCallConfirmedAction'
-      : swiftTypeName(v.tsInterface);
+      : v.tsInterface;
     lines.push(`        case ${JSON.stringify(v.type)}:`);
     lines.push(`            self = .${v.caseName}(try ${structName}(from: decoder))`);
   }
