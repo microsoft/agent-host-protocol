@@ -1975,14 +1975,18 @@
     },
     "IConfigPropertySchema": {
       "type": "object",
-      "description": "A JSON Schema-compatible string enum property descriptor with display extensions.\n\nStandard JSON Schema fields (`type`, `title`, `description`, `default`,\n`enum`) allow validators to process the schema. Display extensions\n(`enumLabels`, `enumDescriptions`) are parallel arrays that provide UI\nmetadata for each `enum` value.\n\nThis is the generic base type. See {@link ISessionConfigPropertySchema} for\nsession-specific extensions.",
+      "description": "A JSON Schema-compatible property descriptor with display extensions.\n\nStandard JSON Schema fields (`type`, `title`, `description`, `default`,\n`enum`) allow validators to process the schema. Display extensions\n(`enumLabels`, `enumDescriptions`) are parallel arrays that provide UI\nmetadata for each `enum` value.\n\nThis is the generic base type. See {@link ISessionConfigPropertySchema} for\nsession-specific extensions.",
       "properties": {
         "type": {
           "type": "string",
           "enum": [
-            "string"
+            "string",
+            "number",
+            "boolean",
+            "array",
+            "object"
           ],
-          "description": "JSON Schema: property type. Only string enum properties are currently supported."
+          "description": "JSON Schema: property type"
         },
         "title": {
           "type": "string",
@@ -1993,7 +1997,6 @@
           "description": "JSON Schema: description / tooltip"
         },
         "default": {
-          "type": "string",
           "description": "JSON Schema: default value"
         },
         "enum": {
@@ -2001,7 +2004,7 @@
           "items": {
             "type": "string"
           },
-          "description": "JSON Schema: allowed values"
+          "description": "JSON Schema: allowed values (typically used with `string` type)"
         },
         "enumLabels": {
           "type": "array",
@@ -2020,12 +2023,29 @@
         "readOnly": {
           "type": "boolean",
           "description": "JSON Schema: when `true`, the property is displayed but cannot be modified by the user"
+        },
+        "items": {
+          "$ref": "#/$defs/IConfigPropertySchema",
+          "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/IConfigPropertySchema"
+          },
+          "description": "JSON Schema: property descriptors for object properties (used when `type` is `'object'`)"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: list of required property ids (used when `type` is `'object'`)"
         }
       },
       "required": [
         "type",
-        "title",
-        "enum"
+        "title"
       ]
     },
     "IConfigSchema": {
@@ -2085,9 +2105,13 @@
         "type": {
           "type": "string",
           "enum": [
-            "string"
+            "string",
+            "number",
+            "boolean",
+            "array",
+            "object"
           ],
-          "description": "JSON Schema: property type. Only string enum properties are currently supported."
+          "description": "JSON Schema: property type"
         },
         "title": {
           "type": "string",
@@ -2098,7 +2122,6 @@
           "description": "JSON Schema: description / tooltip"
         },
         "default": {
-          "type": "string",
           "description": "JSON Schema: default value"
         },
         "enum": {
@@ -2106,7 +2129,7 @@
           "items": {
             "type": "string"
           },
-          "description": "JSON Schema: allowed values"
+          "description": "JSON Schema: allowed values (typically used with `string` type)"
         },
         "enumLabels": {
           "type": "array",
@@ -2126,6 +2149,24 @@
           "type": "boolean",
           "description": "JSON Schema: when `true`, the property is displayed but cannot be modified by the user"
         },
+        "items": {
+          "$ref": "#/$defs/IConfigPropertySchema",
+          "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/IConfigPropertySchema"
+          },
+          "description": "JSON Schema: property descriptors for object properties (used when `type` is `'object'`)"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: list of required property ids (used when `type` is `'object'`)"
+        },
         "enumDynamic": {
           "type": "boolean",
           "description": "Display extension: when `true`, the full set of allowed values is too large\nto enumerate statically. The client SHOULD use `sessionConfigCompletions`\nto fetch matching values based on user input. Any values in `enum` are\nseed/recent values for initial display."
@@ -2137,8 +2178,7 @@
       },
       "required": [
         "type",
-        "title",
-        "enum"
+        "title"
       ]
     },
     "ISessionConfigSchema": {

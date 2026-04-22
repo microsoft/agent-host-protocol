@@ -388,7 +388,7 @@ export interface ISessionSummary {
 // ─── Config Schema Types ─────────────────────────────────────────────────────
 
 /**
- * A JSON Schema-compatible string enum property descriptor with display extensions.
+ * A JSON Schema-compatible property descriptor with display extensions.
  *
  * Standard JSON Schema fields (`type`, `title`, `description`, `default`,
  * `enum`) allow validators to process the schema. Display extensions
@@ -401,22 +401,28 @@ export interface ISessionSummary {
  * @category Config Schema Types
  */
 export interface IConfigPropertySchema {
-  /** JSON Schema: property type. Only string enum properties are currently supported. */
-  type: 'string';
+  /** JSON Schema: property type */
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
   /** JSON Schema: human-readable label for the property */
   title: string;
   /** JSON Schema: description / tooltip */
   description?: string;
   /** JSON Schema: default value */
-  default?: string;
-  /** JSON Schema: allowed values */
-  enum: string[];
+  default?: unknown;
+  /** JSON Schema: allowed values (typically used with `string` type) */
+  enum?: string[];
   /** Display extension: human-readable label per enum value (parallel array) */
   enumLabels?: string[];
   /** Display extension: description per enum value (parallel array) */
   enumDescriptions?: string[];
   /** JSON Schema: when `true`, the property is displayed but cannot be modified by the user */
   readOnly?: boolean;
+  /** JSON Schema: schema for array items (used when `type` is `'array'`) */
+  items?: IConfigPropertySchema;
+  /** JSON Schema: property descriptors for object properties (used when `type` is `'object'`) */
+  properties?: Record<string, IConfigPropertySchema>;
+  /** JSON Schema: list of required property ids (used when `type` is `'object'`) */
+  required?: string[];
 }
 
 /**
