@@ -4,7 +4,7 @@ AHP uses [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0 Pr
 
 ## Overview
 
-Each agent declares the **protected resources** it requires authentication for via the `protectedResources` field on [`AgentInfo`](/reference/state-types#iagentinfo) in root state. Clients discover these requirements by subscribing to `agenthost:/root`, obtain tokens from the declared authorization servers using standard OAuth 2.0 flows, and push them to the server via the [`authenticate`](/reference/commands#authenticate) command.
+Each agent declares the **protected resources** it requires authentication for via the `protectedResources` field on [`AgentInfo`](/reference/state-types#agentinfo) in root state. Clients discover these requirements by subscribing to `agenthost:/root`, obtain tokens from the declared authorization servers using standard OAuth 2.0 flows, and push them to the server via the [`authenticate`](/reference/commands#authenticate) command.
 
 ```mermaid
 sequenceDiagram
@@ -26,7 +26,7 @@ sequenceDiagram
 
 ## Discovery
 
-Authentication requirements are declared **per-agent** on [`AgentInfo.protectedResources`](/reference/state-types#iagentinfo). Each entry is an [`ProtectedResourceMetadata`](/reference/state-types#iprotectedresourcemetadata) object following the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) shape:
+Authentication requirements are declared **per-agent** on [`AgentInfo.protectedResources`](/reference/state-types#agentinfo). Each entry is an [`ProtectedResourceMetadata`](/reference/state-types#protectedresourcemetadata) object following the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) shape:
 
 ```json
 {

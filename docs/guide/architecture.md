@@ -26,7 +26,7 @@ The Agent Host Protocol server runs as either an Electron **utility process** (d
 |    +-- Agent B (e.g. MockAgent for testing)                   |
 |                                                               |
 |  agentEventMapper                                             |
-|    +-- AgentProgressEvent → SessionAction mapping           |
+|    +-- IAgentProgressEvent → SessionAction mapping           |
 +---------------------------------------------------------------+
 ```
 
@@ -34,9 +34,9 @@ The Agent Host Protocol server runs as either an Electron **utility process** (d
 
 The system has two distinct protocol layers:
 
-### Layer 1: Agent Interface (Internal)
+### Layer 1: IAgent Interface (Internal)
 
-The `Agent` interface is what each agent backend implements. It fires raw progress events and exposes methods for session management:
+The `IAgent` interface is what each agent backend implements. It fires raw progress events and exposes methods for session management:
 
 | Method | Description |
 |---|---|
@@ -55,7 +55,7 @@ This layer is **agent-specific**. Different backends can have different event sh
 
 The server maps raw agent events to state actions via an event mapper, dispatches them through `SessionStateManager`, and broadcasts to subscribed clients. **This layer is agent-agnostic.**
 
-Clients never see agent-specific tool names or event formats. They consume generic, display-ready state types (`ToolCallState`, `CompletedToolCall`) that carry fields like `displayName`, `invocationMessage`, and `toolKind`.
+Clients never see agent-specific tool names or event formats. They consume generic, display-ready state types (`ToolCallState`, `ICompletedToolCall`) that carry fields like `displayName`, `invocationMessage`, and `toolKind`.
 
 ## Agent-Agnostic Design
 
@@ -66,7 +66,7 @@ All agent-specific logic — translating tool names into display strings, extrac
 Client-side rendering components are completely generic. They receive all provider-specific details via configuration:
 
 ```typescript
-interface AgentHostSessionHandlerConfig {
+interface IAgentHostSessionHandlerConfig {
   readonly provider: AgentProvider;    // e.g. 'copilot'
   readonly agentId: string;
   readonly sessionType: string;
@@ -75,7 +75,7 @@ interface AgentHostSessionHandlerConfig {
 }
 ```
 
-Adding a new agent provider means adding a new `Agent` implementation on the server. No client-side changes are needed.
+Adding a new agent provider means adding a new `IAgent` implementation on the server. No client-side changes are needed.
 
 ## Session URIs
 

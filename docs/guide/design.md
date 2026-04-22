@@ -8,17 +8,17 @@ Core design principles and decisions for the Agent Host Protocol.
 
 There are two protocol layers:
 
-1. **`Agent` interface** — The internal interface that each agent backend implements. It fires raw progress events. This layer is agent-specific.
+1. **`IAgent` interface** — The internal interface that each agent backend implements. It fires raw progress events. This layer is agent-specific.
 
 2. **Sessions state protocol** — The client-facing protocol. The server maps raw events into state actions via an event mapper. **This layer is agent-agnostic.**
 
 All agent-specific logic — translating tool names like `bash`/`view`/`grep` into display strings, extracting command lines from tool parameters, determining rendering hints like `toolKind: 'terminal'` — lives in the server-side agent implementation. These display-ready fields are carried on the state actions that clients receive.
 
-Clients never see agent-specific tool names. They consume `ToolCallState` and `CompletedToolCall` from the session state tree, which carry generic display-ready fields (`displayName`, `invocationMessage`, `toolKind`, etc.).
+Clients never see agent-specific tool names. They consume `ToolCallState` and `ICompletedToolCall` from the session state tree, which carry generic display-ready fields (`displayName`, `invocationMessage`, `toolKind`, etc.).
 
 ## Provider-Agnostic Rendering
 
-Client-side rendering components are **completely generic**. They receive all provider-specific details via configuration. A single contribution point discovers agents via `listAgents()` and dynamically registers each one. Adding a new provider means adding a new `Agent` implementation in the server process. No changes needed to client-side code.
+Client-side rendering components are **completely generic**. They receive all provider-specific details via configuration. A single contribution point discovers agents via `listAgents()` and dynamically registers each one. Adding a new provider means adding a new `IAgent` implementation in the server process. No changes needed to client-side code.
 
 ## State-Based Rendering
 
