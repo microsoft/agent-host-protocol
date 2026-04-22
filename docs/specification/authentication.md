@@ -121,7 +121,7 @@ The RFC 9728 `resource` field is already a unique identifier for the protected r
 
 When a command fails because the client has not authenticated for a required protected resource, the server SHOULD return error code `-32007` (`AuthRequired`). This error MAY be returned from **any** command — not just `authenticate`.
 
-The `data` field of the JSON-RPC error SHOULD contain an `ProtectedResourceMetadata[]` array describing the resources that require authentication. This allows clients to handle authentication programmatically:
+The `data` field of the JSON-RPC error SHOULD contain a `ProtectedResourceMetadata[]` array describing the resources that require authentication. This allows clients to handle authentication programmatically:
 
 ```jsonc
 // Client → Server

@@ -14,7 +14,7 @@ There are two protocol layers:
 
 All agent-specific logic — translating tool names like `bash`/`view`/`grep` into display strings, extracting command lines from tool parameters, determining rendering hints like `toolKind: 'terminal'` — lives in the server-side agent implementation. These display-ready fields are carried on the state actions that clients receive.
 
-Clients never see agent-specific tool names. They consume `ToolCallState` and `ICompletedToolCall` from the session state tree, which carry generic display-ready fields (`displayName`, `invocationMessage`, `toolKind`, etc.).
+Clients never see agent-specific tool names. They consume `ToolCallState` values from the session state tree, including the completed `ToolCallCompletedState` variant, which carry generic display-ready fields (`displayName`, `invocationMessage`, `toolKind`, etc.).
 
 ## Provider-Agnostic Rendering
 

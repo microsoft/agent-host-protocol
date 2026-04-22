@@ -576,7 +576,7 @@
     },
     "AuthenticateParams": {
       "type": "object",
-      "description": "Pushes a Bearer token for a protected resource. The `resource` field MUST\nmatch an `ProtectedResourceMetadata.resource` value declared by an agent\nin `AgentInfo.protectedResources`.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command.",
+      "description": "Pushes a Bearer token for a protected resource. The `resource` field MUST\nmatch a `ProtectedResourceMetadata.resource` value declared by an agent\nin `AgentInfo.protectedResources`.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command.",
       "properties": {
         "resource": {
           "type": "string",

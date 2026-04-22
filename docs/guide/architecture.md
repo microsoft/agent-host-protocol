@@ -55,7 +55,7 @@ This layer is **agent-specific**. Different backends can have different event sh
 
 The server maps raw agent events to state actions via an event mapper, dispatches them through `SessionStateManager`, and broadcasts to subscribed clients. **This layer is agent-agnostic.**
 
-Clients never see agent-specific tool names or event formats. They consume generic, display-ready state types (`ToolCallState`, `ICompletedToolCall`) that carry fields like `displayName`, `invocationMessage`, and `toolKind`.
+Clients never see agent-specific tool names or event formats. They consume generic, display-ready `ToolCallState` values, including the `ToolCallCompletedState` variant, which carry fields like `displayName`, `invocationMessage`, and `toolKind`.
 
 ## Agent-Agnostic Design
 

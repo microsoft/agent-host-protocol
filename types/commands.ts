@@ -663,7 +663,7 @@ export interface ResourceMoveResult {
 
 /**
  * Pushes a Bearer token for a protected resource. The `resource` field MUST
- * match an `ProtectedResourceMetadata.resource` value declared by an agent
+ * match a `ProtectedResourceMetadata.resource` value declared by an agent
  * in `AgentInfo.protectedResources`.
  *
  * Tokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)
