@@ -55,7 +55,7 @@ type AssertCompatible<Frozen, Current extends Frozen> =
 The registry maintains a runtime map with a TypeScript index signature that forces an entry for every action type in the union:
 
 ```typescript
-const ACTION_INTRODUCED_IN: { readonly [K in IStateAction['type']]: number } = {
+const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: number } = {
   'root/agentsChanged': 1,
   'session/turnStarted': 1,
   'session/delta': 1,
@@ -68,7 +68,7 @@ Adding a new action to the union without adding it to this map is a compile erro
 The server uses this for one-line filtering:
 
 ```typescript
-function isActionKnownToVersion(action: IStateAction, clientVersion: number): boolean {
+function isActionKnownToVersion(action: StateAction, clientVersion: number): boolean {
   return ACTION_INTRODUCED_IN[action.type] <= clientVersion;
 }
 ```

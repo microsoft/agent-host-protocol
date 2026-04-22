@@ -191,7 +191,7 @@ Both actions use **full-replacement semantics** — the entire `tools` array is 
 
 ### Tool Name Uniqueness
 
-Server tools and client tools share a flat namespace (`IToolDefinition.name`). Agent host implementations SHOULD ensure names are unique across both sets — for example by prefixing client tool names.
+Server tools and client tools share a flat namespace (`ToolDefinition.name`). Agent host implementations SHOULD ensure names are unique across both sets — for example by prefixing client tool names.
 
 ### Executing a Client Tool Call
 
@@ -300,4 +300,4 @@ sequenceDiagram
 
 - [State Model](/guide/state-model) — The state tree that customizations and tools live in, including the tool call lifecycle state machine.
 - [Actions](/guide/actions) — How state is mutated by actions.
-- [State Types Reference](/reference/state-types) — `ISessionActiveClient`, `IToolDefinition`, `IToolCallState`, `ICustomizationRef`, and more.
+- [State Types Reference](/reference/state-types) — `SessionActiveClient`, `ToolDefinition`, `ToolCallState`, `CustomizationRef`, and more.

@@ -25,13 +25,13 @@ import {
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { IRootState, ISessionState } from './state.js';
+import type { RootState, SessionState } from './state.js';
 import {
   SessionLifecycle,
   SessionStatus,
   TurnState,
 } from './state.js';
-import type { ITerminalState } from './state.js';
+import type { TerminalState } from './state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)));
 
@@ -44,9 +44,9 @@ function readSource(file: string): string {
 interface Fixture {
   description: string;
   reducer: 'root' | 'session' | 'terminal';
-  initial: IRootState | ISessionState | ITerminalState;
+  initial: RootState | SessionState | TerminalState;
   actions: unknown[];
-  expected: IRootState | ISessionState | ITerminalState;
+  expected: RootState | SessionState | TerminalState;
 }
 
 /**
@@ -99,11 +99,11 @@ describe('reducer fixtures', () => {
       let state = fixture.initial;
       for (const action of fixture.actions) {
         if (fixture.reducer === 'root') {
-          state = rootReducer(state as IRootState, action as any);
+          state = rootReducer(state as RootState, action as any);
         } else if (fixture.reducer === 'terminal') {
-          state = terminalReducer(state as ITerminalState, action as any);
+          state = terminalReducer(state as TerminalState, action as any);
         } else {
-          state = sessionReducer(state as ISessionState, action as any);
+          state = sessionReducer(state as SessionState, action as any);
         }
       }
       assert.deepStrictEqual(state, fixture.expected);
@@ -190,7 +190,7 @@ describe('isClientDispatchable', () => {
 
 describe('reducer immutability', () => {
   it('rootReducer does not mutate original state', () => {
-    const state: IRootState = { agents: [] };
+    const state: RootState = { agents: [] };
     const agents = [{ provider: 'x', displayName: 'X', description: 'x', models: [] }];
     rootReducer(state, { type: ActionType.RootAgentsChanged, agents });
     assert.deepStrictEqual(state.agents, []);
@@ -200,7 +200,7 @@ describe('reducer immutability', () => {
     const turn1 = { id: 't1', userMessage: { text: 'First' }, responseParts: [], usage: undefined, state: TurnState.Complete };
     const turn2 = { id: 't2', userMessage: { text: 'Second' }, responseParts: [], usage: undefined, state: TurnState.Complete };
     const turn3 = { id: 't3', userMessage: { text: 'Third' }, responseParts: [], usage: undefined, state: TurnState.Complete };
-    const state: ISessionState = {
+    const state: SessionState = {
       summary: { resource: 'x', provider: 'copilot', title: 'T', status: SessionStatus.Idle, createdAt: 1000, modifiedAt: 1000, project: { uri: 'file:///test-project', displayName: 'Test Project' } },
       lifecycle: SessionLifecycle.Ready,
       turns: [turn1, turn2, turn3],

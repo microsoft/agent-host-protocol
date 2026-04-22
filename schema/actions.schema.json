@@ -5,7 +5,7 @@
   "title": "AHP Action Types",
   "description": "All action types in the Agent Host Protocol.",
   "$defs": {
-    "IActionOrigin": {
+    "ActionOrigin": {
       "type": "object",
       "description": "Identifies the client that originally dispatched an action.",
       "properties": {
@@ -21,18 +21,18 @@
         "clientSeq"
       ]
     },
-    "IActionEnvelope": {
+    "ActionEnvelope": {
       "type": "object",
       "description": "Every action is wrapped in an `ActionEnvelope`.",
       "properties": {
         "action": {
-          "$ref": "#/$defs/IStateAction"
+          "$ref": "#/$defs/StateAction"
         },
         "serverSeq": {
           "type": "number"
         },
         "origin": {
-          "$ref": "#/$defs/IActionOrigin"
+          "$ref": "#/$defs/ActionOrigin"
         },
         "rejectionReason": {
           "type": "string"
@@ -44,7 +44,7 @@
         "origin"
       ]
     },
-    "IToolCallActionBase": {
+    "ToolCallActionBase": {
       "type": "object",
       "description": "Base interface for all tool-call-scoped actions, carrying the common\nsession, turn, and tool call identifiers.",
       "properties": {
@@ -72,7 +72,7 @@
         "toolCallId"
       ]
     },
-    "IRootAgentsChangedAction": {
+    "RootAgentsChangedAction": {
       "type": "object",
       "description": "Fired when available agent backends or their models change.",
       "properties": {
@@ -82,7 +82,7 @@
         "agents": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IAgentInfo"
+            "$ref": "#/$defs/AgentInfo"
           },
           "description": "Updated agent list"
         }
@@ -92,7 +92,7 @@
         "agents"
       ]
     },
-    "IRootActiveSessionsChangedAction": {
+    "RootActiveSessionsChangedAction": {
       "type": "object",
       "description": "Fired when the number of active sessions changes.",
       "properties": {
@@ -109,7 +109,7 @@
         "activeSessions"
       ]
     },
-    "IRootTerminalsChangedAction": {
+    "RootTerminalsChangedAction": {
       "type": "object",
       "description": "Fired when the list of known terminals changes.\n\nFull-replacement semantics: the `terminals` array replaces the previous\n`terminals` entirely.",
       "properties": {
@@ -119,7 +119,7 @@
         "terminals": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ITerminalInfo"
+            "$ref": "#/$defs/TerminalInfo"
           },
           "description": "Updated terminal list (full replacement)"
         }
@@ -129,7 +129,7 @@
         "terminals"
       ]
     },
-    "IRootConfigChangedAction": {
+    "RootConfigChangedAction": {
       "type": "object",
       "description": "Fired when agent-host configuration values change.\n\nBy default, the reducer merges the new values into `state.config.values`.\nSet `replace` to `true` to replace all values instead of merging.",
       "properties": {
@@ -151,7 +151,7 @@
         "config"
       ]
     },
-    "ISessionReadyAction": {
+    "SessionReadyAction": {
       "type": "object",
       "description": "Session backend initialized successfully.",
       "properties": {
@@ -168,7 +168,7 @@
         "session"
       ]
     },
-    "ISessionCreationFailedAction": {
+    "SessionCreationFailedAction": {
       "type": "object",
       "description": "Session backend failed to initialize.",
       "properties": {
@@ -180,7 +180,7 @@
           "description": "Session URI"
         },
         "error": {
-          "$ref": "#/$defs/IErrorInfo",
+          "$ref": "#/$defs/ErrorInfo",
           "description": "Error details"
         }
       },
@@ -190,7 +190,7 @@
         "error"
       ]
     },
-    "ISessionTurnStartedAction": {
+    "SessionTurnStartedAction": {
       "type": "object",
       "description": "User sent a message; server starts agent processing.",
       "properties": {
@@ -206,7 +206,7 @@
           "description": "Turn identifier"
         },
         "userMessage": {
-          "$ref": "#/$defs/IUserMessage",
+          "$ref": "#/$defs/UserMessage",
           "description": "User's message"
         },
         "queuedMessageId": {
@@ -221,7 +221,7 @@
         "userMessage"
       ]
     },
-    "ISessionDeltaAction": {
+    "SessionDeltaAction": {
       "type": "object",
       "description": "Streaming text chunk from the assistant, appended to a specific response part.\n\nThe server MUST first emit a `session/responsePart` to create the target\npart (markdown or reasoning), then use this action to append text to it.",
       "properties": {
@@ -253,7 +253,7 @@
         "content"
       ]
     },
-    "ISessionResponsePartAction": {
+    "SessionResponsePartAction": {
       "type": "object",
       "description": "Structured content appended to the response.",
       "properties": {
@@ -269,7 +269,7 @@
           "description": "Turn identifier"
         },
         "part": {
-          "$ref": "#/$defs/IResponsePart",
+          "$ref": "#/$defs/ResponsePart",
           "description": "Response part (markdown or content ref)"
         }
       },
@@ -280,7 +280,7 @@
         "part"
       ]
     },
-    "ISessionToolCallStartAction": {
+    "SessionToolCallStartAction": {
       "type": "object",
       "description": "A tool call begins — parameters are streaming from the LM.\n\nFor client-provided tools, the server sets `toolClientId` to identify the\nowning client. That client is responsible for executing the tool once it\nreaches the `running` state and dispatching `session/toolCallComplete`.",
       "properties": {
@@ -326,7 +326,7 @@
         "displayName"
       ]
     },
-    "ISessionToolCallDeltaAction": {
+    "SessionToolCallDeltaAction": {
       "type": "object",
       "description": "Streaming partial parameters for a tool call.",
       "properties": {
@@ -367,7 +367,7 @@
         "content"
       ]
     },
-    "ISessionToolCallReadyAction": {
+    "SessionToolCallReadyAction": {
       "type": "object",
       "description": "Tool call parameters are complete, or a running tool requires re-confirmation.\n\nWhen dispatched for a `streaming` tool call, transitions to `pending-confirmation`\nor directly to `running` if `confirmed` is set.\n\nWhen dispatched for a `running` tool call (e.g. mid-execution permission needed),\ntransitions back to `pending-confirmation`. The `invocationMessage` and `_meta`\nSHOULD be updated to describe the specific confirmation needed. Clients use the\nstandard `session/toolCallConfirmed` flow to approve or deny.\n\nFor client-provided tools, the server typically sets `confirmed` to\n`'not-needed'` so the tool transitions directly to `running`, where the\nowning client can begin execution immediately.",
       "properties": {
@@ -426,7 +426,7 @@
         "options": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IConfirmationOption"
+            "$ref": "#/$defs/ConfirmationOption"
           },
           "description": "Options the server offers for this confirmation. When present, the client\nSHOULD render these instead of a plain approve/deny UI. Each option\nbelongs to a {@link ConfirmationOptionGroup} so the client can still\ncategorise the choices."
         }
@@ -439,7 +439,7 @@
         "invocationMessage"
       ]
     },
-    "ISessionToolCallApprovedAction": {
+    "SessionToolCallApprovedAction": {
       "type": "object",
       "description": "Client approves a pending tool call. The tool transitions to `running`.",
       "properties": {
@@ -488,7 +488,7 @@
         "confirmed"
       ]
     },
-    "ISessionToolCallDeniedAction": {
+    "SessionToolCallDeniedAction": {
       "type": "object",
       "description": "Client denies a pending tool call. The tool transitions to `cancelled`.\n\nFor client-provided tools, the owning client MUST dispatch this if it does\nnot recognize the tool or cannot execute it.",
       "properties": {
@@ -527,7 +527,7 @@
           "description": "Why the tool was cancelled"
         },
         "userSuggestion": {
-          "$ref": "#/$defs/IUserMessage",
+          "$ref": "#/$defs/UserMessage",
           "description": "What the user suggested doing instead"
         },
         "reasonMessage": {
@@ -548,7 +548,7 @@
         "reason"
       ]
     },
-    "ISessionToolCallCompleteAction": {
+    "SessionToolCallCompleteAction": {
       "type": "object",
       "description": "Tool execution finished. Transitions to `completed` or `pending-result-confirmation`\nif `requiresResultConfirmation` is `true`.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action with the execution result. The server\nSHOULD reject this action if the dispatching client does not match `toolClientId`.\n\nServers waiting on a client tool call MAY time out after a reasonable duration\nif the implementing client disconnects or becomes unresponsive, and dispatch\nthis action with `result.success = false` and an appropriate error.",
       "properties": {
@@ -573,7 +573,7 @@
           "$ref": "#/$defs/ActionType.SessionToolCallComplete"
         },
         "result": {
-          "$ref": "#/$defs/IToolCallResult",
+          "$ref": "#/$defs/ToolCallResult",
           "description": "Execution result"
         },
         "requiresResultConfirmation": {
@@ -589,7 +589,7 @@
         "result"
       ]
     },
-    "ISessionToolCallResultConfirmedAction": {
+    "SessionToolCallResultConfirmedAction": {
       "type": "object",
       "description": "Client approves or denies a tool's result.\n\nIf `approved` is `false`, the tool transitions to `cancelled` with reason `result-denied`.",
       "properties": {
@@ -626,7 +626,7 @@
         "approved"
       ]
     },
-    "ISessionToolCallContentChangedAction": {
+    "SessionToolCallContentChangedAction": {
       "type": "object",
       "description": "Partial content produced while a tool is still executing.\n\nReplaces the `content` array on the running tool call state. Clients can\nuse this to display live feedback (e.g. a terminal reference) before the\ntool completes.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action to stream intermediate content while\nexecuting. The server SHOULD reject this action if the dispatching client does\nnot match `toolClientId`.",
       "properties": {
@@ -653,7 +653,7 @@
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolResultContent"
+            "$ref": "#/$defs/ToolResultContent"
           },
           "description": "The current partial content for the running tool call"
         }
@@ -666,7 +666,7 @@
         "content"
       ]
     },
-    "ISessionTurnCompleteAction": {
+    "SessionTurnCompleteAction": {
       "type": "object",
       "description": "Turn finished — the assistant is idle.",
       "properties": {
@@ -688,7 +688,7 @@
         "turnId"
       ]
     },
-    "ISessionTurnCancelledAction": {
+    "SessionTurnCancelledAction": {
       "type": "object",
       "description": "Turn was aborted; server stops processing.",
       "properties": {
@@ -710,7 +710,7 @@
         "turnId"
       ]
     },
-    "ISessionErrorAction": {
+    "SessionErrorAction": {
       "type": "object",
       "description": "Error during turn processing.",
       "properties": {
@@ -726,7 +726,7 @@
           "description": "Turn identifier"
         },
         "error": {
-          "$ref": "#/$defs/IErrorInfo",
+          "$ref": "#/$defs/ErrorInfo",
           "description": "Error details"
         }
       },
@@ -737,7 +737,7 @@
         "error"
       ]
     },
-    "ISessionTitleChangedAction": {
+    "SessionTitleChangedAction": {
       "type": "object",
       "description": "Session title updated. Fired by the server when the title is auto-generated\nfrom conversation, or dispatched by a client to rename a session.",
       "properties": {
@@ -759,7 +759,7 @@
         "title"
       ]
     },
-    "ISessionUsageAction": {
+    "SessionUsageAction": {
       "type": "object",
       "description": "Token usage report for a turn.",
       "properties": {
@@ -775,7 +775,7 @@
           "description": "Turn identifier"
         },
         "usage": {
-          "$ref": "#/$defs/IUsageInfo",
+          "$ref": "#/$defs/UsageInfo",
           "description": "Token usage data"
         }
       },
@@ -786,7 +786,7 @@
         "usage"
       ]
     },
-    "ISessionReasoningAction": {
+    "SessionReasoningAction": {
       "type": "object",
       "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `session/responsePart` to create the target\nreasoning part, then use this action to append text to it.",
       "properties": {
@@ -818,7 +818,7 @@
         "content"
       ]
     },
-    "ISessionModelChangedAction": {
+    "SessionModelChangedAction": {
       "type": "object",
       "description": "Model changed for this session.",
       "properties": {
@@ -830,7 +830,7 @@
           "description": "Session URI"
         },
         "model": {
-          "$ref": "#/$defs/IModelSelection",
+          "$ref": "#/$defs/ModelSelection",
           "description": "New model selection"
         }
       },
@@ -840,7 +840,7 @@
         "model"
       ]
     },
-    "ISessionIsReadChangedAction": {
+    "SessionIsReadChangedAction": {
       "type": "object",
       "description": "The read state of the session changed.\n\nDispatched by a client to mark a session as read (e.g. after viewing it)\nor unread (e.g. after new activity since the client last looked at it).",
       "properties": {
@@ -862,7 +862,7 @@
         "isRead"
       ]
     },
-    "ISessionIsDoneChangedAction": {
+    "SessionIsDoneChangedAction": {
       "type": "object",
       "description": "The done state of the session changed.\n\nDispatched by a client to mark a session as done (e.g. the task is\ncomplete) or to reopen it.",
       "properties": {
@@ -884,7 +884,7 @@
         "isDone"
       ]
     },
-    "ISessionDiffsChangedAction": {
+    "SessionDiffsChangedAction": {
       "type": "object",
       "description": "The file diffs for the session changed.\n\nFull-replacement semantics: the `diffs` array replaces the previous\n`summary.diffs` entirely.",
       "properties": {
@@ -898,7 +898,7 @@
         "diffs": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IFileEdit"
+            "$ref": "#/$defs/FileEdit"
           },
           "description": "Updated file diffs for the session"
         }
@@ -909,7 +909,7 @@
         "diffs"
       ]
     },
-    "ISessionServerToolsChangedAction": {
+    "SessionServerToolsChangedAction": {
       "type": "object",
       "description": "Server tools for this session have changed.\n\nFull-replacement semantics: the `tools` array replaces the previous `serverTools` entirely.",
       "properties": {
@@ -923,7 +923,7 @@
         "tools": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolDefinition"
+            "$ref": "#/$defs/ToolDefinition"
           },
           "description": "Updated server tools list (full replacement)"
         }
@@ -934,9 +934,9 @@
         "tools"
       ]
     },
-    "ISessionActiveClientChangedAction": {
+    "SessionActiveClientChangedAction": {
       "type": "object",
-      "description": "The active client for this session has changed.\n\nA client dispatches this action with its own `ISessionActiveClient` to claim\nthe active role, or with `null` to release it. The server SHOULD reject if\nanother client is already active. The server SHOULD automatically dispatch\nthis action with `activeClient: null` when the active client disconnects.",
+      "description": "The active client for this session has changed.\n\nA client dispatches this action with its own `SessionActiveClient` to claim\nthe active role, or with `null` to release it. The server SHOULD reject if\nanother client is already active. The server SHOULD automatically dispatch\nthis action with `activeClient: null` when the active client disconnects.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.SessionActiveClientChanged"
@@ -948,7 +948,7 @@
         "activeClient": {
           "oneOf": [
             {
-              "$ref": "#/$defs/ISessionActiveClient"
+              "$ref": "#/$defs/SessionActiveClient"
             },
             {}
           ],
@@ -961,7 +961,7 @@
         "activeClient"
       ]
     },
-    "ISessionActiveClientToolsChangedAction": {
+    "SessionActiveClientToolsChangedAction": {
       "type": "object",
       "description": "The active client's tool list has changed.\n\nFull-replacement semantics: the `tools` array replaces the active client's\nprevious tools entirely. The server SHOULD reject if the dispatching client\nis not the current active client.",
       "properties": {
@@ -975,7 +975,7 @@
         "tools": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolDefinition"
+            "$ref": "#/$defs/ToolDefinition"
           },
           "description": "Updated client tools list (full replacement)"
         }
@@ -986,7 +986,7 @@
         "tools"
       ]
     },
-    "ISessionCustomizationsChangedAction": {
+    "SessionCustomizationsChangedAction": {
       "type": "object",
       "description": "The session's customizations have changed.\n\nFull-replacement semantics: the `customizations` array replaces the\nprevious `customizations` entirely.",
       "properties": {
@@ -1000,7 +1000,7 @@
         "customizations": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ISessionCustomization"
+            "$ref": "#/$defs/SessionCustomization"
           },
           "description": "Updated customization list (full replacement)"
         }
@@ -1011,7 +1011,7 @@
         "customizations"
       ]
     },
-    "ISessionCustomizationToggledAction": {
+    "SessionCustomizationToggledAction": {
       "type": "object",
       "description": "A client toggled a customization on or off.\n\nThe server locates the customization by `uri` in the session's\ncustomization list and sets its `enabled` flag.",
       "properties": {
@@ -1038,7 +1038,7 @@
         "enabled"
       ]
     },
-    "ISessionConfigChangedAction": {
+    "SessionConfigChangedAction": {
       "type": "object",
       "description": "Client changed a mutable config value mid-session.\n\nOnly properties with `sessionMutable: true` in the config schema may be\nchanged. The server validates and broadcasts the action; the reducer merges\nthe new values into `state.config.values`.",
       "properties": {
@@ -1065,7 +1065,7 @@
         "config"
       ]
     },
-    "ISessionTruncatedAction": {
+    "SessionTruncatedAction": {
       "type": "object",
       "description": "Truncates a session's history. If `turnId` is provided, all turns after that\nturn are removed and the specified turn is kept. If `turnId` is omitted, all\nturns are removed.\n\nIf there is an active turn it is silently dropped and the session status\nreturns to `idle`.\n\nCommon use-case: truncate old data then dispatch a new\n`session/turnStarted` with an edited message.",
       "properties": {
@@ -1086,7 +1086,7 @@
         "session"
       ]
     },
-    "ISessionPendingMessageSetAction": {
+    "SessionPendingMessageSetAction": {
       "type": "object",
       "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the session is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.",
       "properties": {
@@ -1106,7 +1106,7 @@
           "description": "Unique identifier for this pending message"
         },
         "userMessage": {
-          "$ref": "#/$defs/IUserMessage",
+          "$ref": "#/$defs/UserMessage",
           "description": "The message content"
         }
       },
@@ -1118,7 +1118,7 @@
         "userMessage"
       ]
     },
-    "ISessionPendingMessageRemovedAction": {
+    "SessionPendingMessageRemovedAction": {
       "type": "object",
       "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).",
       "properties": {
@@ -1145,7 +1145,7 @@
         "id"
       ]
     },
-    "ISessionQueuedMessagesReorderedAction": {
+    "SessionQueuedMessagesReorderedAction": {
       "type": "object",
       "description": "Reorder the queued messages.\n\nThe `order` array contains the IDs of queued messages in their new\ndesired order. IDs not present in the current queue are ignored.\nQueued messages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the queue never silently drops messages).",
       "properties": {
@@ -1170,7 +1170,7 @@
         "order"
       ]
     },
-    "ISessionInputRequestedAction": {
+    "SessionInputRequestedAction": {
       "type": "object",
       "description": "A session requested input from the user.\n\nFull-request upsert semantics: the `request` replaces any existing request\nwith the same `id`, or is appended if it is new. Answer drafts are preserved\nunless `request.answers` is provided.",
       "properties": {
@@ -1182,7 +1182,7 @@
           "description": "Session URI"
         },
         "request": {
-          "$ref": "#/$defs/ISessionInputRequest",
+          "$ref": "#/$defs/SessionInputRequest",
           "description": "Input request to create or replace"
         }
       },
@@ -1192,7 +1192,7 @@
         "request"
       ]
     },
-    "ISessionInputAnswerChangedAction": {
+    "SessionInputAnswerChangedAction": {
       "type": "object",
       "description": "A client updated, submitted, skipped, or removed a single in-progress answer.\n\nDispatching with `answer: undefined` removes that question's answer draft.",
       "properties": {
@@ -1212,7 +1212,7 @@
           "description": "Question identifier within the input request"
         },
         "answer": {
-          "$ref": "#/$defs/ISessionInputAnswer",
+          "$ref": "#/$defs/SessionInputAnswer",
           "description": "Updated answer, or `undefined` to clear an answer draft"
         }
       },
@@ -1223,7 +1223,7 @@
         "questionId"
       ]
     },
-    "ISessionInputCompletedAction": {
+    "SessionInputCompletedAction": {
       "type": "object",
       "description": "A client accepted, declined, or cancelled a session input request.\n\nIf accepted, the server uses `answers` (when provided) plus the request's\nsynced answer state to resume the blocked operation.",
       "properties": {
@@ -1245,7 +1245,7 @@
         "answers": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/ISessionInputAnswer"
+            "$ref": "#/$defs/SessionInputAnswer"
           },
           "description": "Optional final answer replacement, keyed by question ID"
         }
@@ -1257,7 +1257,7 @@
         "response"
       ]
     },
-    "ITerminalDataAction": {
+    "TerminalDataAction": {
       "type": "object",
       "description": "Terminal output data (pty → client direction).\n\nAppends `data` to the terminal's `content` in the reducer.\n\n`terminal/data` and `terminal/input` are intentionally separate actions\nbecause standard write-ahead reconciliation is not safe for terminal I/O.\nA pty is a stateful, mutable process — optimistically applying input or\npredicting output would produce incorrect state. Instead, `terminal/input`\nis a side-effect-only action (client → server → pty), and `terminal/data`\nis server-authoritative output (pty → server → client).",
       "properties": {
@@ -1279,7 +1279,7 @@
         "data"
       ]
     },
-    "ITerminalInputAction": {
+    "TerminalInputAction": {
       "type": "object",
       "description": "Keyboard input sent to the terminal process (client → pty direction).\n\nThis is a side-effect-only action: the server forwards the data to the\nterminal's pty. The reducer treats this as a no-op since `terminal/data`\nactions will reflect any resulting output.\n\nSee `terminal/data` for why these two actions are kept separate.",
       "properties": {
@@ -1301,7 +1301,7 @@
         "data"
       ]
     },
-    "ITerminalResizedAction": {
+    "TerminalResizedAction": {
       "type": "object",
       "description": "Terminal dimensions changed.\n\nDispatchable by clients to request a resize, or by the server to inform\nclients of the actual terminal dimensions.",
       "properties": {
@@ -1328,7 +1328,7 @@
         "rows"
       ]
     },
-    "ITerminalClaimedAction": {
+    "TerminalClaimedAction": {
       "type": "object",
       "description": "Terminal claim changed. A client or session transfers ownership of the terminal.\n\nThe server SHOULD reject if the dispatching client does not currently hold\nthe claim.",
       "properties": {
@@ -1340,7 +1340,7 @@
           "description": "Terminal URI"
         },
         "claim": {
-          "$ref": "#/$defs/ITerminalClaim",
+          "$ref": "#/$defs/TerminalClaim",
           "description": "The new claim"
         }
       },
@@ -1350,7 +1350,7 @@
         "claim"
       ]
     },
-    "ITerminalTitleChangedAction": {
+    "TerminalTitleChangedAction": {
       "type": "object",
       "description": "Terminal title changed.\n\nFired by the server when the terminal process updates its title (e.g. via\nescape sequences), or dispatched by a client to rename a terminal.",
       "properties": {
@@ -1372,7 +1372,7 @@
         "title"
       ]
     },
-    "ITerminalCwdChangedAction": {
+    "TerminalCwdChangedAction": {
       "type": "object",
       "description": "Terminal working directory changed.",
       "properties": {
@@ -1394,7 +1394,7 @@
         "cwd"
       ]
     },
-    "ITerminalExitedAction": {
+    "TerminalExitedAction": {
       "type": "object",
       "description": "Terminal process exited.",
       "properties": {
@@ -1415,7 +1415,7 @@
         "terminal"
       ]
     },
-    "ITerminalClearedAction": {
+    "TerminalClearedAction": {
       "type": "object",
       "description": "Terminal scrollback buffer cleared.",
       "properties": {
@@ -1432,7 +1432,7 @@
         "terminal"
       ]
     },
-    "ITerminalCommandDetectionAvailableAction": {
+    "TerminalCommandDetectionAvailableAction": {
       "type": "object",
       "description": "Shell integration has loaded and the terminal now supports command\ndetection. The server dispatches this when shell integration becomes\navailable (which may happen asynchronously after the terminal is created).\n\nClients MUST NOT assume command detection is available until this action\n(or `terminal/commandExecuted`) has been received.",
       "properties": {
@@ -1449,7 +1449,7 @@
         "terminal"
       ]
     },
-    "ITerminalCommandExecutedAction": {
+    "TerminalCommandExecutedAction": {
       "type": "object",
       "description": "A command has been submitted to the shell and is now executing.\nAll subsequent `terminal/data` actions (until the matching\n`terminal/commandFinished`) constitute this command's output.",
       "properties": {
@@ -1481,7 +1481,7 @@
         "timestamp"
       ]
     },
-    "ITerminalCommandFinishedAction": {
+    "TerminalCommandFinishedAction": {
       "type": "object",
       "description": "A command has finished executing.\n\nThe sequence of `terminal/data` actions between the preceding\n`terminal/commandExecuted` (same `commandId`) and this action constitutes\nthe complete output of the command.",
       "properties": {
@@ -1511,14 +1511,14 @@
         "commandId"
       ]
     },
-    "ISessionToolCallConfirmedAction": {
+    "SessionToolCallConfirmedAction": {
       "oneOf": [
         {},
         {
-          "$ref": "#/$defs/ISessionToolCallApprovedAction"
+          "$ref": "#/$defs/SessionToolCallApprovedAction"
         },
         {
-          "$ref": "#/$defs/ISessionToolCallDeniedAction"
+          "$ref": "#/$defs/SessionToolCallDeniedAction"
         }
       ],
       "description": "Client confirms or denies a pending tool call."
@@ -1555,7 +1555,7 @@
         "src"
       ]
     },
-    "IProtectedResourceMetadata": {
+    "ProtectedResourceMetadata": {
       "type": "object",
       "description": "Describes a protected resource's authentication requirements using\n[RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0\nProtected Resource Metadata) semantics.\n\nField names use snake_case to match the RFC 9728 JSON format.",
       "properties": {
@@ -1634,14 +1634,14 @@
         "resource"
       ]
     },
-    "IRootState": {
+    "RootState": {
       "type": "object",
       "description": "Global state shared with every client subscribed to `agenthost:/root`.",
       "properties": {
         "agents": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IAgentInfo"
+            "$ref": "#/$defs/AgentInfo"
           },
           "description": "Available agent backends and their models"
         },
@@ -1652,12 +1652,12 @@
         "terminals": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ITerminalInfo"
+            "$ref": "#/$defs/TerminalInfo"
           },
           "description": "Known terminals on the server. Subscribe to individual terminal URIs for full state."
         },
         "config": {
-          "$ref": "#/$defs/IRootConfigState",
+          "$ref": "#/$defs/RootConfigState",
           "description": "Agent host configuration schema and current values"
         }
       },
@@ -1665,7 +1665,7 @@
         "agents"
       ]
     },
-    "IAgentInfo": {
+    "AgentInfo": {
       "type": "object",
       "properties": {
         "provider": {
@@ -1683,21 +1683,21 @@
         "models": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ISessionModelInfo"
+            "$ref": "#/$defs/SessionModelInfo"
           },
           "description": "Available models for this agent"
         },
         "protectedResources": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IProtectedResourceMetadata"
+            "$ref": "#/$defs/ProtectedResourceMetadata"
           },
           "description": "Protected resources this agent requires authentication for.\n\nEach entry describes an OAuth 2.0 protected resource using\n[RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) semantics.\nClients should obtain tokens from the declared `authorization_servers`\nand push them via the `authenticate` command before creating sessions\nwith this agent."
         },
         "customizations": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ICustomizationRef"
+            "$ref": "#/$defs/CustomizationRef"
           },
           "description": "Customizations (Open Plugins) associated with this agent.\n\nEach entry is a reference to an [Open Plugins](https://open-plugins.com/)\nplugin that the agent host can activate for sessions using this agent."
         }
@@ -1709,7 +1709,7 @@
         "models"
       ]
     },
-    "ISessionModelInfo": {
+    "SessionModelInfo": {
       "type": "object",
       "properties": {
         "id": {
@@ -1737,8 +1737,8 @@
           "description": "Policy configuration state"
         },
         "configSchema": {
-          "$ref": "#/$defs/IConfigSchema",
-          "description": "Configuration schema describing model-specific options (e.g. thinking\nlevel). Clients present this as a form and pass the resolved values in\n{@link IModelSelection.config} when creating or changing sessions."
+          "$ref": "#/$defs/ConfigSchema",
+          "description": "Configuration schema describing model-specific options (e.g. thinking\nlevel). Clients present this as a form and pass the resolved values in\n{@link ModelSelection.config} when creating or changing sessions."
         }
       },
       "required": [
@@ -1747,9 +1747,9 @@
         "name"
       ]
     },
-    "IModelSelection": {
+    "ModelSelection": {
       "type": "object",
-      "description": "A model selection: the chosen model ID together with any model-specific\nconfiguration values whose keys correspond to the model's\n{@link ISessionModelInfo.configSchema}.",
+      "description": "A model selection: the chosen model ID together with any model-specific\nconfiguration values whose keys correspond to the model's\n{@link SessionModelInfo.configSchema}.",
       "properties": {
         "id": {
           "type": "string",
@@ -1767,7 +1767,7 @@
         "id"
       ]
     },
-    "IPendingMessage": {
+    "PendingMessage": {
       "type": "object",
       "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
       "properties": {
@@ -1776,7 +1776,7 @@
           "description": "Unique identifier for this pending message"
         },
         "userMessage": {
-          "$ref": "#/$defs/IUserMessage",
+          "$ref": "#/$defs/UserMessage",
           "description": "The message content"
         }
       },
@@ -1785,12 +1785,12 @@
         "userMessage"
       ]
     },
-    "ISessionState": {
+    "SessionState": {
       "type": "object",
       "description": "Full state for a single session, loaded when a client subscribes to the session's URI.",
       "properties": {
         "summary": {
-          "$ref": "#/$defs/ISessionSummary",
+          "$ref": "#/$defs/SessionSummary",
           "description": "Lightweight session metadata"
         },
         "lifecycle": {
@@ -1798,59 +1798,59 @@
           "description": "Session initialization state"
         },
         "creationError": {
-          "$ref": "#/$defs/IErrorInfo",
+          "$ref": "#/$defs/ErrorInfo",
           "description": "Error details if creation failed"
         },
         "serverTools": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolDefinition"
+            "$ref": "#/$defs/ToolDefinition"
           },
           "description": "Tools provided by the server (agent host) for this session"
         },
         "activeClient": {
-          "$ref": "#/$defs/ISessionActiveClient",
+          "$ref": "#/$defs/SessionActiveClient",
           "description": "The client currently providing tools and interactive capabilities to this session"
         },
         "turns": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ITurn"
+            "$ref": "#/$defs/Turn"
           },
           "description": "Completed turns"
         },
         "activeTurn": {
-          "$ref": "#/$defs/IActiveTurn",
+          "$ref": "#/$defs/ActiveTurn",
           "description": "Currently in-progress turn"
         },
         "steeringMessage": {
-          "$ref": "#/$defs/IPendingMessage",
+          "$ref": "#/$defs/PendingMessage",
           "description": "Message to inject into the current turn at a convenient point"
         },
         "queuedMessages": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IPendingMessage"
+            "$ref": "#/$defs/PendingMessage"
           },
           "description": "Messages to send automatically as new turns after the current turn finishes"
         },
         "inputRequests": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ISessionInputRequest"
+            "$ref": "#/$defs/SessionInputRequest"
           },
           "description": "Requests for user input that are currently blocking or informing session progress"
         },
         "config": {
-          "$ref": "#/$defs/ISessionConfigState",
+          "$ref": "#/$defs/SessionConfigState",
           "description": "Session configuration schema and current values"
         },
         "customizations": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ISessionCustomization"
+            "$ref": "#/$defs/SessionCustomization"
           },
-          "description": "Server-provided customizations active in this session.\n\nClient-provided customizations are available on\n{@link ISessionActiveClient.customizations | activeClient.customizations}."
+          "description": "Server-provided customizations active in this session.\n\nClient-provided customizations are available on\n{@link SessionActiveClient.customizations | activeClient.customizations}."
         }
       },
       "required": [
@@ -1859,7 +1859,7 @@
         "turns"
       ]
     },
-    "ISessionActiveClient": {
+    "SessionActiveClient": {
       "type": "object",
       "description": "The client currently providing tools and interactive capabilities to a session.\n\nOnly one client may be active per session at a time. The server SHOULD\nautomatically unset the active client if that client disconnects.",
       "properties": {
@@ -1874,14 +1874,14 @@
         "tools": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolDefinition"
+            "$ref": "#/$defs/ToolDefinition"
           },
           "description": "Tools this client provides to the session"
         },
         "customizations": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ICustomizationRef"
+            "$ref": "#/$defs/CustomizationRef"
           },
           "description": "Customizations this client contributes to the session"
         }
@@ -1891,7 +1891,7 @@
         "tools"
       ]
     },
-    "IProjectInfo": {
+    "ProjectInfo": {
       "type": "object",
       "description": "Server-owned project metadata for a session.",
       "properties": {
@@ -1909,7 +1909,7 @@
         "displayName"
       ]
     },
-    "ISessionSummary": {
+    "SessionSummary": {
       "type": "object",
       "properties": {
         "resource": {
@@ -1937,11 +1937,11 @@
           "description": "Last modification timestamp"
         },
         "project": {
-          "$ref": "#/$defs/IProjectInfo",
+          "$ref": "#/$defs/ProjectInfo",
           "description": "Server-owned project for this session"
         },
         "model": {
-          "$ref": "#/$defs/IModelSelection",
+          "$ref": "#/$defs/ModelSelection",
           "description": "Currently selected model"
         },
         "workingDirectory": {
@@ -1959,7 +1959,7 @@
         "diffs": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IFileEdit"
+            "$ref": "#/$defs/FileEdit"
           },
           "description": "Files changed during this session with diff statistics"
         }
@@ -1973,9 +1973,9 @@
         "modifiedAt"
       ]
     },
-    "IConfigPropertySchema": {
+    "ConfigPropertySchema": {
       "type": "object",
-      "description": "A JSON Schema-compatible property descriptor with display extensions.\n\nStandard JSON Schema fields (`type`, `title`, `description`, `default`,\n`enum`) allow validators to process the schema. Display extensions\n(`enumLabels`, `enumDescriptions`) are parallel arrays that provide UI\nmetadata for each `enum` value.\n\nThis is the generic base type. See {@link ISessionConfigPropertySchema} for\nsession-specific extensions.",
+      "description": "A JSON Schema-compatible property descriptor with display extensions.\n\nStandard JSON Schema fields (`type`, `title`, `description`, `default`,\n`enum`) allow validators to process the schema. Display extensions\n(`enumLabels`, `enumDescriptions`) are parallel arrays that provide UI\nmetadata for each `enum` value.\n\nThis is the generic base type. See {@link SessionConfigPropertySchema} for\nsession-specific extensions.",
       "properties": {
         "type": {
           "type": "string",
@@ -2025,13 +2025,13 @@
           "description": "JSON Schema: when `true`, the property is displayed but cannot be modified by the user"
         },
         "items": {
-          "$ref": "#/$defs/IConfigPropertySchema",
+          "$ref": "#/$defs/ConfigPropertySchema",
           "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
         },
         "properties": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/IConfigPropertySchema"
+            "$ref": "#/$defs/ConfigPropertySchema"
           },
           "description": "JSON Schema: property descriptors for object properties (used when `type` is `'object'`)"
         },
@@ -2048,9 +2048,9 @@
         "title"
       ]
     },
-    "IConfigSchema": {
+    "ConfigSchema": {
       "type": "object",
-      "description": "A JSON Schema object describing available configuration properties.\n\nThis is the generic base type. See {@link ISessionConfigSchema} for\nsession-specific usage.",
+      "description": "A JSON Schema object describing available configuration properties.\n\nThis is the generic base type. See {@link SessionConfigSchema} for\nsession-specific usage.",
       "properties": {
         "type": {
           "type": "string",
@@ -2062,7 +2062,7 @@
         "properties": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/IConfigPropertySchema"
+            "$ref": "#/$defs/ConfigPropertySchema"
           },
           "description": "JSON Schema: property descriptors keyed by property id"
         },
@@ -2079,12 +2079,12 @@
         "properties"
       ]
     },
-    "IRootConfigState": {
+    "RootConfigState": {
       "type": "object",
       "description": "Live agent-host configuration metadata.\n\nThe schema describes the available configuration properties and the values\ncontain the current value for each resolved property.",
       "properties": {
         "schema": {
-          "$ref": "#/$defs/IConfigSchema",
+          "$ref": "#/$defs/ConfigSchema",
           "description": "JSON Schema describing available configuration properties"
         },
         "values": {
@@ -2098,9 +2098,9 @@
         "values"
       ]
     },
-    "ISessionConfigPropertySchema": {
+    "SessionConfigPropertySchema": {
       "type": "object",
-      "description": "A session configuration property descriptor.\n\nExtends the generic {@link IConfigPropertySchema} with session-specific\ndisplay extensions.",
+      "description": "A session configuration property descriptor.\n\nExtends the generic {@link ConfigPropertySchema} with session-specific\ndisplay extensions.",
       "properties": {
         "type": {
           "type": "string",
@@ -2150,13 +2150,13 @@
           "description": "JSON Schema: when `true`, the property is displayed but cannot be modified by the user"
         },
         "items": {
-          "$ref": "#/$defs/IConfigPropertySchema",
+          "$ref": "#/$defs/ConfigPropertySchema",
           "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
         },
         "properties": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/IConfigPropertySchema"
+            "$ref": "#/$defs/ConfigPropertySchema"
           },
           "description": "JSON Schema: property descriptors for object properties (used when `type` is `'object'`)"
         },
@@ -2181,7 +2181,7 @@
         "title"
       ]
     },
-    "ISessionConfigSchema": {
+    "SessionConfigSchema": {
       "type": "object",
       "description": "A JSON Schema object describing available session configuration metadata.",
       "properties": {
@@ -2195,7 +2195,7 @@
         "properties": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/ISessionConfigPropertySchema"
+            "$ref": "#/$defs/SessionConfigPropertySchema"
           },
           "description": "JSON Schema: property descriptors keyed by property id"
         },
@@ -2212,12 +2212,12 @@
         "properties"
       ]
     },
-    "ISessionConfigState": {
+    "SessionConfigState": {
       "type": "object",
       "description": "Live session configuration metadata.\n\nThe schema describes the available configuration properties and the values\ncontain the current value for each resolved property.",
       "properties": {
         "schema": {
-          "$ref": "#/$defs/ISessionConfigSchema",
+          "$ref": "#/$defs/SessionConfigSchema",
           "description": "JSON Schema describing available configuration properties"
         },
         "values": {
@@ -2231,7 +2231,7 @@
         "values"
       ]
     },
-    "ISessionInputOption": {
+    "SessionInputOption": {
       "type": "object",
       "description": "A choice in a select-style question.",
       "properties": {
@@ -2257,7 +2257,7 @@
         "label"
       ]
     },
-    "ISessionInputQuestionBase": {
+    "SessionInputQuestionBase": {
       "type": "object",
       "properties": {
         "id": {
@@ -2282,7 +2282,7 @@
         "message"
       ]
     },
-    "ISessionInputTextQuestion": {
+    "SessionInputTextQuestion": {
       "type": "object",
       "description": "Text question within a session input request.",
       "properties": {
@@ -2328,7 +2328,7 @@
         "kind"
       ]
     },
-    "ISessionInputNumberQuestion": {
+    "SessionInputNumberQuestion": {
       "type": "object",
       "description": "Numeric question within a session input request.",
       "properties": {
@@ -2377,7 +2377,7 @@
         "kind"
       ]
     },
-    "ISessionInputBooleanQuestion": {
+    "SessionInputBooleanQuestion": {
       "type": "object",
       "description": "Boolean question within a session input request.",
       "properties": {
@@ -2411,7 +2411,7 @@
         "kind"
       ]
     },
-    "ISessionInputSingleSelectQuestion": {
+    "SessionInputSingleSelectQuestion": {
       "type": "object",
       "description": "Single-select question within a session input request.",
       "properties": {
@@ -2437,7 +2437,7 @@
         "options": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ISessionInputOption"
+            "$ref": "#/$defs/SessionInputOption"
           },
           "description": "Options the user may select from"
         },
@@ -2453,7 +2453,7 @@
         "options"
       ]
     },
-    "ISessionInputMultiSelectQuestion": {
+    "SessionInputMultiSelectQuestion": {
       "type": "object",
       "description": "Multi-select question within a session input request.",
       "properties": {
@@ -2479,7 +2479,7 @@
         "options": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ISessionInputOption"
+            "$ref": "#/$defs/SessionInputOption"
           },
           "description": "Options the user may select from"
         },
@@ -2503,7 +2503,7 @@
         "options"
       ]
     },
-    "ISessionInputRequest": {
+    "SessionInputRequest": {
       "type": "object",
       "description": "A live request for user input.\n\nThe server creates or replaces requests with `session/inputRequested`.\nClients sync drafts with `session/inputAnswerChanged` and complete requests\nwith `session/inputCompleted`.",
       "properties": {
@@ -2522,14 +2522,14 @@
         "questions": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ISessionInputQuestion"
+            "$ref": "#/$defs/SessionInputQuestion"
           },
           "description": "Ordered questions to ask the user"
         },
         "answers": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/ISessionInputAnswer"
+            "$ref": "#/$defs/SessionInputAnswer"
           },
           "description": "Current draft or submitted answers, keyed by question ID"
         }
@@ -2539,7 +2539,7 @@
         "message"
       ]
     },
-    "ISessionInputTextAnswerValue": {
+    "SessionInputTextAnswerValue": {
       "type": "object",
       "description": "Value captured for one answer.",
       "properties": {
@@ -2555,7 +2555,7 @@
         "value"
       ]
     },
-    "ISessionInputNumberAnswerValue": {
+    "SessionInputNumberAnswerValue": {
       "type": "object",
       "properties": {
         "kind": {
@@ -2570,7 +2570,7 @@
         "value"
       ]
     },
-    "ISessionInputBooleanAnswerValue": {
+    "SessionInputBooleanAnswerValue": {
       "type": "object",
       "properties": {
         "kind": {
@@ -2585,7 +2585,7 @@
         "value"
       ]
     },
-    "ISessionInputSelectedAnswerValue": {
+    "SessionInputSelectedAnswerValue": {
       "type": "object",
       "properties": {
         "kind": {
@@ -2607,7 +2607,7 @@
         "value"
       ]
     },
-    "ISessionInputSelectedManyAnswerValue": {
+    "SessionInputSelectedManyAnswerValue": {
       "type": "object",
       "properties": {
         "kind": {
@@ -2632,7 +2632,7 @@
         "value"
       ]
     },
-    "ISessionInputAnswered": {
+    "SessionInputAnswered": {
       "type": "object",
       "properties": {
         "state": {
@@ -2647,7 +2647,7 @@
           "description": "Answer state"
         },
         "value": {
-          "$ref": "#/$defs/ISessionInputAnswerValue",
+          "$ref": "#/$defs/SessionInputAnswerValue",
           "description": "Answer value"
         }
       },
@@ -2656,7 +2656,7 @@
         "value"
       ]
     },
-    "ISessionInputSkipped": {
+    "SessionInputSkipped": {
       "type": "object",
       "properties": {
         "state": {
@@ -2675,7 +2675,7 @@
         "state"
       ]
     },
-    "ITurn": {
+    "Turn": {
       "type": "object",
       "description": "A completed request/response cycle.",
       "properties": {
@@ -2684,18 +2684,18 @@
           "description": "Turn identifier"
         },
         "userMessage": {
-          "$ref": "#/$defs/IUserMessage",
+          "$ref": "#/$defs/UserMessage",
           "description": "The user's input"
         },
         "responseParts": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IResponsePart"
+            "$ref": "#/$defs/ResponsePart"
           },
           "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
         },
         "usage": {
-          "$ref": "#/$defs/IUsageInfo",
+          "$ref": "#/$defs/UsageInfo",
           "description": "Token usage info"
         },
         "state": {
@@ -2703,7 +2703,7 @@
           "description": "How the turn ended"
         },
         "error": {
-          "$ref": "#/$defs/IErrorInfo",
+          "$ref": "#/$defs/ErrorInfo",
           "description": "Error details if state is `'error'`"
         }
       },
@@ -2715,7 +2715,7 @@
         "state"
       ]
     },
-    "IActiveTurn": {
+    "ActiveTurn": {
       "type": "object",
       "description": "An in-progress turn — the assistant is actively streaming.",
       "properties": {
@@ -2724,18 +2724,18 @@
           "description": "Turn identifier"
         },
         "userMessage": {
-          "$ref": "#/$defs/IUserMessage",
+          "$ref": "#/$defs/UserMessage",
           "description": "The user's input"
         },
         "responseParts": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IResponsePart"
+            "$ref": "#/$defs/ResponsePart"
           },
           "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nTool call parts include `pendingPermissions` when permissions are awaiting user approval."
         },
         "usage": {
-          "$ref": "#/$defs/IUsageInfo",
+          "$ref": "#/$defs/UsageInfo",
           "description": "Token usage info"
         }
       },
@@ -2746,7 +2746,7 @@
         "usage"
       ]
     },
-    "IUserMessage": {
+    "UserMessage": {
       "type": "object",
       "properties": {
         "text": {
@@ -2756,7 +2756,7 @@
         "attachments": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IMessageAttachment"
+            "$ref": "#/$defs/MessageAttachment"
           },
           "description": "File/selection attachments"
         }
@@ -2765,7 +2765,7 @@
         "text"
       ]
     },
-    "IMessageAttachment": {
+    "MessageAttachment": {
       "type": "object",
       "properties": {
         "type": {
@@ -2786,7 +2786,7 @@
         "path"
       ]
     },
-    "IMarkdownResponsePart": {
+    "MarkdownResponsePart": {
       "type": "object",
       "properties": {
         "kind": {
@@ -2808,7 +2808,7 @@
         "content"
       ]
     },
-    "IContentRef": {
+    "ContentRef": {
       "type": "object",
       "description": "A reference to large content stored outside the state tree.",
       "properties": {
@@ -2829,7 +2829,7 @@
         "uri"
       ]
     },
-    "IResourceReponsePart": {
+    "ResourceReponsePart": {
       "type": "object",
       "description": "A content part that's a reference to large content stored outside the state tree.",
       "properties": {
@@ -2855,7 +2855,7 @@
         "kind"
       ]
     },
-    "IToolCallResponsePart": {
+    "ToolCallResponsePart": {
       "type": "object",
       "description": "A tool call represented as a response part.\n\nTool calls are part of the response stream, interleaved with text and\nreasoning. The `toolCall.toolCallId` serves as the part identifier for\nactions that target this part.",
       "properties": {
@@ -2864,7 +2864,7 @@
           "description": "Discriminant"
         },
         "toolCall": {
-          "$ref": "#/$defs/IToolCallState",
+          "$ref": "#/$defs/ToolCallState",
           "description": "Full tool call lifecycle state"
         }
       },
@@ -2873,7 +2873,7 @@
         "toolCall"
       ]
     },
-    "IReasoningResponsePart": {
+    "ReasoningResponsePart": {
       "type": "object",
       "description": "Reasoning/thinking content from the model.",
       "properties": {
@@ -2896,7 +2896,7 @@
         "content"
       ]
     },
-    "IConfirmationOption": {
+    "ConfirmationOption": {
       "type": "object",
       "description": "A confirmation option that the server offers for a tool call awaiting\napproval. Allows richer choices beyond simple approve/deny — for example,\n\"Approve in this Session\" or \"Deny with reason.\"",
       "properties": {
@@ -2923,7 +2923,7 @@
         "kind"
       ]
     },
-    "IToolCallBase": {
+    "ToolCallBase": {
       "type": "object",
       "description": "Metadata common to all tool call states.",
       "properties": {
@@ -2955,7 +2955,7 @@
         "displayName"
       ]
     },
-    "IToolCallParameterFields": {
+    "ToolCallParameterFields": {
       "type": "object",
       "description": "Properties available once tool call parameters are fully received.",
       "properties": {
@@ -2972,7 +2972,7 @@
         "invocationMessage"
       ]
     },
-    "IToolCallResult": {
+    "ToolCallResult": {
       "type": "object",
       "description": "Tool execution result details, available after execution completes.",
       "properties": {
@@ -2987,7 +2987,7 @@
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolResultContent"
+            "$ref": "#/$defs/ToolResultContent"
           },
           "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
         },
@@ -3017,7 +3017,7 @@
         "pastTenseMessage"
       ]
     },
-    "IToolCallStreamingState": {
+    "ToolCallStreamingState": {
       "type": "object",
       "description": "LM is streaming the tool call parameters.",
       "properties": {
@@ -3061,7 +3061,7 @@
         "status"
       ]
     },
-    "IToolCallPendingConfirmationState": {
+    "ToolCallPendingConfirmationState": {
       "type": "object",
       "description": "Parameters are complete, or a running tool requires re-confirmation\n(e.g. a mid-execution permission check).",
       "properties": {
@@ -3120,7 +3120,7 @@
         "options": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IConfirmationOption"
+            "$ref": "#/$defs/ConfirmationOption"
           },
           "description": "Options the server offers for this confirmation. When present, the client\nSHOULD render these instead of a plain approve/deny UI. Each option\nbelongs to a {@link ConfirmationOptionGroup} so the client can still\ncategorise the choices."
         }
@@ -3133,7 +3133,7 @@
         "status"
       ]
     },
-    "IToolCallRunningState": {
+    "ToolCallRunningState": {
       "type": "object",
       "description": "Tool is actively executing.",
       "properties": {
@@ -3174,13 +3174,13 @@
           "description": "How the tool was confirmed for execution"
         },
         "selectedOption": {
-          "$ref": "#/$defs/IConfirmationOption",
+          "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
         },
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolResultContent"
+            "$ref": "#/$defs/ToolResultContent"
           },
           "description": "Partial content produced while the tool is still executing.\n\nFor example, a terminal content block lets clients subscribe to live\noutput before the tool completes."
         }
@@ -3194,7 +3194,7 @@
         "confirmed"
       ]
     },
-    "IToolCallPendingResultConfirmationState": {
+    "ToolCallPendingResultConfirmationState": {
       "type": "object",
       "description": "Tool finished executing, waiting for client to approve the result.",
       "properties": {
@@ -3238,7 +3238,7 @@
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolResultContent"
+            "$ref": "#/$defs/ToolResultContent"
           },
           "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
         },
@@ -3270,7 +3270,7 @@
           "description": "How the tool was confirmed for execution"
         },
         "selectedOption": {
-          "$ref": "#/$defs/IConfirmationOption",
+          "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
         }
       },
@@ -3285,7 +3285,7 @@
         "confirmed"
       ]
     },
-    "IToolCallCompletedState": {
+    "ToolCallCompletedState": {
       "type": "object",
       "description": "Tool completed successfully or with an error.",
       "properties": {
@@ -3329,7 +3329,7 @@
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/IToolResultContent"
+            "$ref": "#/$defs/ToolResultContent"
           },
           "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
         },
@@ -3361,7 +3361,7 @@
           "description": "How the tool was confirmed for execution"
         },
         "selectedOption": {
-          "$ref": "#/$defs/IConfirmationOption",
+          "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
         }
       },
@@ -3376,7 +3376,7 @@
         "confirmed"
       ]
     },
-    "IToolCallCancelledState": {
+    "ToolCallCancelledState": {
       "type": "object",
       "description": "Tool call was cancelled before execution.",
       "properties": {
@@ -3421,11 +3421,11 @@
           "description": "Optional message explaining the cancellation"
         },
         "userSuggestion": {
-          "$ref": "#/$defs/IUserMessage",
+          "$ref": "#/$defs/UserMessage",
           "description": "What the user suggested doing instead"
         },
         "selectedOption": {
-          "$ref": "#/$defs/IConfirmationOption",
+          "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
         }
       },
@@ -3438,7 +3438,7 @@
         "reason"
       ]
     },
-    "IToolDefinition": {
+    "ToolDefinition": {
       "type": "object",
       "description": "Describes a tool available in a session, provided by either the server or the active client.",
       "properties": {
@@ -3491,7 +3491,7 @@
           "description": "JSON Schema defining the structure of the tool's output.\n\nMirrors MCP `Tool.outputSchema`."
         },
         "annotations": {
-          "$ref": "#/$defs/IToolAnnotations",
+          "$ref": "#/$defs/ToolAnnotations",
           "description": "Behavioral hints about the tool. All properties are advisory."
         },
         "_meta": {
@@ -3504,7 +3504,7 @@
         "name"
       ]
     },
-    "IToolAnnotations": {
+    "ToolAnnotations": {
       "type": "object",
       "description": "Behavioral hints about a tool. All properties are advisory and not\nguaranteed to faithfully describe tool behavior.\n\nMirrors MCP `ToolAnnotations` from the Model Context Protocol specification.",
       "properties": {
@@ -3530,7 +3530,7 @@
         }
       }
     },
-    "IToolResultTextContent": {
+    "ToolResultTextContent": {
       "type": "object",
       "description": "Text content in a tool result.\n\nMirrors MCP `TextContent`.",
       "properties": {
@@ -3547,7 +3547,7 @@
         "text"
       ]
     },
-    "IToolResultEmbeddedResourceContent": {
+    "ToolResultEmbeddedResourceContent": {
       "type": "object",
       "description": "Base64-encoded binary content embedded in a tool result.\n\nMirrors MCP `EmbeddedResource` for inline binary data.",
       "properties": {
@@ -3569,9 +3569,9 @@
         "contentType"
       ]
     },
-    "IToolResultResourceContent": {
+    "ToolResultResourceContent": {
       "type": "object",
-      "description": "A reference to a resource stored outside the tool result.\n\nWraps {@link IContentRef} for lazy-loading large results.",
+      "description": "A reference to a resource stored outside the tool result.\n\nWraps {@link ContentRef} for lazy-loading large results.",
       "properties": {
         "uri": {
           "$ref": "#/$defs/URI",
@@ -3594,7 +3594,7 @@
         "type"
       ]
     },
-    "IFileEdit": {
+    "FileEdit": {
       "type": "object",
       "description": "Describes a file modification with before/after state and diff metadata.\n\nSupports creates (only `after`), deletes (only `before`), renames/moves\n(different `uri` in `before` and `after`), and edits (same `uri`, different content).",
       "properties": {
@@ -3644,7 +3644,7 @@
         }
       }
     },
-    "IToolResultFileEditContent": {
+    "ToolResultFileEditContent": {
       "type": "object",
       "description": "Describes a file modification performed by a tool.",
       "properties": {
@@ -3700,7 +3700,7 @@
         "type"
       ]
     },
-    "IToolResultTerminalContent": {
+    "ToolResultTerminalContent": {
       "type": "object",
       "description": "A reference to a terminal whose output is relevant to this tool result.\n\nClients can subscribe to the terminal's URI to stream its output in real\ntime, providing live feedback while a tool is executing.",
       "properties": {
@@ -3722,7 +3722,7 @@
         "title"
       ]
     },
-    "IToolResultSubagentContent": {
+    "ToolResultSubagentContent": {
       "type": "object",
       "description": "A reference to a subagent session spawned by a tool.\n\nClients can subscribe to the subagent's session URI to stream its\nprogress in real time, including inner tool calls and responses.",
       "properties": {
@@ -3752,7 +3752,7 @@
         "title"
       ]
     },
-    "ICustomizationRef": {
+    "CustomizationRef": {
       "type": "object",
       "description": "A reference to an [Open Plugins](https://open-plugins.com/) plugin.\n\nThis is intentionally thin — AHP specifies plugin identity and metadata\nbut not implementation details, which are defined by the Open Plugins spec.",
       "properties": {
@@ -3785,12 +3785,12 @@
         "displayName"
       ]
     },
-    "ISessionCustomization": {
+    "SessionCustomization": {
       "type": "object",
       "description": "A customization active in a session.\n\nEntries without a `clientId` are server-provided; entries with a `clientId`\noriginate from that client.",
       "properties": {
         "customization": {
-          "$ref": "#/$defs/ICustomizationRef",
+          "$ref": "#/$defs/CustomizationRef",
           "description": "The plugin this customization refers to"
         },
         "enabled": {
@@ -3811,7 +3811,7 @@
         "enabled"
       ]
     },
-    "ITerminalInfo": {
+    "TerminalInfo": {
       "type": "object",
       "description": "Lightweight terminal metadata exposed on the root state.",
       "properties": {
@@ -3824,7 +3824,7 @@
           "description": "Human-readable terminal title"
         },
         "claim": {
-          "$ref": "#/$defs/ITerminalClaim",
+          "$ref": "#/$defs/TerminalClaim",
           "description": "Who currently holds this terminal"
         },
         "exitCode": {
@@ -3838,7 +3838,7 @@
         "claim"
       ]
     },
-    "ITerminalClientClaim": {
+    "TerminalClientClaim": {
       "type": "object",
       "description": "A terminal claimed by a connected client.",
       "properties": {
@@ -3856,7 +3856,7 @@
         "clientId"
       ]
     },
-    "ITerminalSessionClaim": {
+    "TerminalSessionClaim": {
       "type": "object",
       "description": "A terminal claimed by a session, optionally scoped to a specific turn or tool call.",
       "properties": {
@@ -3882,7 +3882,7 @@
         "session"
       ]
     },
-    "ITerminalState": {
+    "TerminalState": {
       "type": "object",
       "description": "Full state for a single terminal, loaded when a client subscribes to the terminal's URI.",
       "properties": {
@@ -3905,7 +3905,7 @@
         "content": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/ITerminalContentPart"
+            "$ref": "#/$defs/TerminalContentPart"
           },
           "description": "Typed content parts, replacing the flat `content: string`.\n\nNaive consumers that only need the raw VT stream can reconstruct it with:\n  `content.map(p => p.type === 'command' ? p.output : p.value).join('')`\n\nConsumers that need command boundaries can filter by part type."
         },
@@ -3914,7 +3914,7 @@
           "description": "Process exit code, set when the terminal process exits"
         },
         "claim": {
-          "$ref": "#/$defs/ITerminalClaim",
+          "$ref": "#/$defs/TerminalClaim",
           "description": "Who currently holds this terminal"
         },
         "supportsCommandDetection": {
@@ -3928,7 +3928,7 @@
         "claim"
       ]
     },
-    "ITerminalUnclassifiedPart": {
+    "TerminalUnclassifiedPart": {
       "type": "object",
       "description": "Unstructured terminal output — content before, between, or after commands,\nor from terminals that do not support command detection.",
       "properties": {
@@ -3948,7 +3948,7 @@
         "value"
       ]
     },
-    "ITerminalCommandPart": {
+    "TerminalCommandPart": {
       "type": "object",
       "description": "A single command: its command line and the output it produced.\n\nWhile `isComplete` is false the command is still executing; `output` grows\nas `terminal/data` actions arrive. At `terminal/commandFinished` the part\nis mutated in-place with `isComplete: true` and the completion metadata.",
       "properties": {
@@ -3996,7 +3996,7 @@
         "isComplete"
       ]
     },
-    "IUsageInfo": {
+    "UsageInfo": {
       "type": "object",
       "properties": {
         "inputTokens": {
@@ -4017,7 +4017,7 @@
         }
       }
     },
-    "IErrorInfo": {
+    "ErrorInfo": {
       "type": "object",
       "properties": {
         "errorType": {
@@ -4038,7 +4038,7 @@
         "message"
       ]
     },
-    "ISnapshot": {
+    "Snapshot": {
       "type": "object",
       "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`.",
       "properties": {
@@ -4049,13 +4049,13 @@
         "state": {
           "oneOf": [
             {
-              "$ref": "#/$defs/IRootState"
+              "$ref": "#/$defs/RootState"
             },
             {
-              "$ref": "#/$defs/ISessionState"
+              "$ref": "#/$defs/SessionState"
             },
             {
-              "$ref": "#/$defs/ITerminalState"
+              "$ref": "#/$defs/TerminalState"
             }
           ],
           "description": "The current state of the resource"
@@ -4090,298 +4090,298 @@
       ],
       "description": "A string that may optionally be rendered as Markdown.\n\n- A plain `string` is rendered as-is (no Markdown processing).\n- An object with `{ markdown: string }` is rendered with Markdown formatting."
     },
-    "ISessionInputQuestion": {
+    "SessionInputQuestion": {
       "oneOf": [
         {
-          "$ref": "#/$defs/ISessionInputTextQuestion"
+          "$ref": "#/$defs/SessionInputTextQuestion"
         },
         {
-          "$ref": "#/$defs/ISessionInputNumberQuestion"
+          "$ref": "#/$defs/SessionInputNumberQuestion"
         },
         {
-          "$ref": "#/$defs/ISessionInputBooleanQuestion"
+          "$ref": "#/$defs/SessionInputBooleanQuestion"
         },
         {
-          "$ref": "#/$defs/ISessionInputSingleSelectQuestion"
+          "$ref": "#/$defs/SessionInputSingleSelectQuestion"
         },
         {
-          "$ref": "#/$defs/ISessionInputMultiSelectQuestion"
+          "$ref": "#/$defs/SessionInputMultiSelectQuestion"
         }
       ],
       "description": "One question within a session input request."
     },
-    "ISessionInputAnswerValue": {
+    "SessionInputAnswerValue": {
       "oneOf": [
         {
-          "$ref": "#/$defs/ISessionInputTextAnswerValue"
+          "$ref": "#/$defs/SessionInputTextAnswerValue"
         },
         {
-          "$ref": "#/$defs/ISessionInputNumberAnswerValue"
+          "$ref": "#/$defs/SessionInputNumberAnswerValue"
         },
         {
-          "$ref": "#/$defs/ISessionInputBooleanAnswerValue"
+          "$ref": "#/$defs/SessionInputBooleanAnswerValue"
         },
         {
-          "$ref": "#/$defs/ISessionInputSelectedAnswerValue"
+          "$ref": "#/$defs/SessionInputSelectedAnswerValue"
         },
         {
-          "$ref": "#/$defs/ISessionInputSelectedManyAnswerValue"
+          "$ref": "#/$defs/SessionInputSelectedManyAnswerValue"
         }
       ]
     },
-    "ISessionInputAnswer": {
+    "SessionInputAnswer": {
       "oneOf": [
         {
-          "$ref": "#/$defs/ISessionInputAnswered"
+          "$ref": "#/$defs/SessionInputAnswered"
         },
         {
-          "$ref": "#/$defs/ISessionInputSkipped"
+          "$ref": "#/$defs/SessionInputSkipped"
         }
       ],
       "description": "Draft, submitted, or skipped answer for one question."
     },
-    "IResponsePart": {
+    "ResponsePart": {
       "oneOf": [
         {
-          "$ref": "#/$defs/IMarkdownResponsePart"
+          "$ref": "#/$defs/MarkdownResponsePart"
         },
         {
-          "$ref": "#/$defs/IResourceReponsePart"
+          "$ref": "#/$defs/ResourceReponsePart"
         },
         {
-          "$ref": "#/$defs/IToolCallResponsePart"
+          "$ref": "#/$defs/ToolCallResponsePart"
         },
         {
-          "$ref": "#/$defs/IReasoningResponsePart"
+          "$ref": "#/$defs/ReasoningResponsePart"
         }
       ]
     },
-    "IToolCallState": {
+    "ToolCallState": {
       "oneOf": [
         {},
         {
-          "$ref": "#/$defs/IToolCallStreamingState"
+          "$ref": "#/$defs/ToolCallStreamingState"
         },
         {
-          "$ref": "#/$defs/IToolCallPendingConfirmationState"
+          "$ref": "#/$defs/ToolCallPendingConfirmationState"
         },
         {
-          "$ref": "#/$defs/IToolCallRunningState"
+          "$ref": "#/$defs/ToolCallRunningState"
         },
         {
-          "$ref": "#/$defs/IToolCallPendingResultConfirmationState"
+          "$ref": "#/$defs/ToolCallPendingResultConfirmationState"
         },
         {
-          "$ref": "#/$defs/IToolCallCompletedState"
+          "$ref": "#/$defs/ToolCallCompletedState"
         },
         {
-          "$ref": "#/$defs/IToolCallCancelledState"
+          "$ref": "#/$defs/ToolCallCancelledState"
         }
       ],
       "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
     },
-    "IToolResultContent": {
+    "ToolResultContent": {
       "oneOf": [
         {},
         {
-          "$ref": "#/$defs/IToolResultTextContent"
+          "$ref": "#/$defs/ToolResultTextContent"
         },
         {
-          "$ref": "#/$defs/IToolResultEmbeddedResourceContent"
+          "$ref": "#/$defs/ToolResultEmbeddedResourceContent"
         },
         {
-          "$ref": "#/$defs/IToolResultResourceContent"
+          "$ref": "#/$defs/ToolResultResourceContent"
         },
         {
-          "$ref": "#/$defs/IToolResultFileEditContent"
+          "$ref": "#/$defs/ToolResultFileEditContent"
         },
         {
-          "$ref": "#/$defs/IToolResultTerminalContent"
+          "$ref": "#/$defs/ToolResultTerminalContent"
         },
         {
-          "$ref": "#/$defs/IToolResultSubagentContent"
+          "$ref": "#/$defs/ToolResultSubagentContent"
         }
       ],
-      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`IToolResultResourceContent` for lazy-loading large results,\n`IToolResultFileEditContent` for file edit diffs,\n`IToolResultTerminalContent` for live terminal output, and\n`IToolResultSubagentContent` for subagent sessions (AHP extensions)."
+      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`ToolResultResourceContent` for lazy-loading large results,\n`ToolResultFileEditContent` for file edit diffs,\n`ToolResultTerminalContent` for live terminal output, and\n`ToolResultSubagentContent` for subagent sessions (AHP extensions)."
     },
-    "ITerminalClaim": {
+    "TerminalClaim": {
       "oneOf": [
         {
-          "$ref": "#/$defs/ITerminalClientClaim"
+          "$ref": "#/$defs/TerminalClientClaim"
         },
         {
-          "$ref": "#/$defs/ITerminalSessionClaim"
+          "$ref": "#/$defs/TerminalSessionClaim"
         }
       ],
       "description": "Describes who currently holds a terminal. A terminal may be claimed by\neither a connected client or a session (e.g. during a tool call)."
     },
-    "ITerminalContentPart": {
+    "TerminalContentPart": {
       "oneOf": [
         {},
         {
-          "$ref": "#/$defs/ITerminalUnclassifiedPart"
+          "$ref": "#/$defs/TerminalUnclassifiedPart"
         },
         {
-          "$ref": "#/$defs/ITerminalCommandPart"
+          "$ref": "#/$defs/TerminalCommandPart"
         }
       ],
       "description": "A content part within terminal output."
     },
-    "IStateAction": {
+    "StateAction": {
       "description": "Discriminated union of all state actions.",
       "oneOf": [
         {
           "$ref": "#/$defs/"
         },
         {
-          "$ref": "#/$defs/IRootAgentsChangedAction"
+          "$ref": "#/$defs/RootAgentsChangedAction"
         },
         {
-          "$ref": "#/$defs/IRootActiveSessionsChangedAction"
+          "$ref": "#/$defs/RootActiveSessionsChangedAction"
         },
         {
-          "$ref": "#/$defs/IRootTerminalsChangedAction"
+          "$ref": "#/$defs/RootTerminalsChangedAction"
         },
         {
-          "$ref": "#/$defs/IRootConfigChangedAction"
+          "$ref": "#/$defs/RootConfigChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionReadyAction"
+          "$ref": "#/$defs/SessionReadyAction"
         },
         {
-          "$ref": "#/$defs/ISessionCreationFailedAction"
+          "$ref": "#/$defs/SessionCreationFailedAction"
         },
         {
-          "$ref": "#/$defs/ISessionTurnStartedAction"
+          "$ref": "#/$defs/SessionTurnStartedAction"
         },
         {
-          "$ref": "#/$defs/ISessionDeltaAction"
+          "$ref": "#/$defs/SessionDeltaAction"
         },
         {
-          "$ref": "#/$defs/ISessionResponsePartAction"
+          "$ref": "#/$defs/SessionResponsePartAction"
         },
         {
-          "$ref": "#/$defs/ISessionToolCallStartAction"
+          "$ref": "#/$defs/SessionToolCallStartAction"
         },
         {
-          "$ref": "#/$defs/ISessionToolCallDeltaAction"
+          "$ref": "#/$defs/SessionToolCallDeltaAction"
         },
         {
-          "$ref": "#/$defs/ISessionToolCallReadyAction"
+          "$ref": "#/$defs/SessionToolCallReadyAction"
         },
         {
-          "$ref": "#/$defs/ISessionToolCallConfirmedAction"
+          "$ref": "#/$defs/SessionToolCallConfirmedAction"
         },
         {
-          "$ref": "#/$defs/ISessionToolCallCompleteAction"
+          "$ref": "#/$defs/SessionToolCallCompleteAction"
         },
         {
-          "$ref": "#/$defs/ISessionToolCallResultConfirmedAction"
+          "$ref": "#/$defs/SessionToolCallResultConfirmedAction"
         },
         {
-          "$ref": "#/$defs/ISessionToolCallContentChangedAction"
+          "$ref": "#/$defs/SessionToolCallContentChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionTurnCompleteAction"
+          "$ref": "#/$defs/SessionTurnCompleteAction"
         },
         {
-          "$ref": "#/$defs/ISessionTurnCancelledAction"
+          "$ref": "#/$defs/SessionTurnCancelledAction"
         },
         {
-          "$ref": "#/$defs/ISessionErrorAction"
+          "$ref": "#/$defs/SessionErrorAction"
         },
         {
-          "$ref": "#/$defs/ISessionTitleChangedAction"
+          "$ref": "#/$defs/SessionTitleChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionUsageAction"
+          "$ref": "#/$defs/SessionUsageAction"
         },
         {
-          "$ref": "#/$defs/ISessionReasoningAction"
+          "$ref": "#/$defs/SessionReasoningAction"
         },
         {
-          "$ref": "#/$defs/ISessionModelChangedAction"
+          "$ref": "#/$defs/SessionModelChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionServerToolsChangedAction"
+          "$ref": "#/$defs/SessionServerToolsChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionActiveClientChangedAction"
+          "$ref": "#/$defs/SessionActiveClientChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionActiveClientToolsChangedAction"
+          "$ref": "#/$defs/SessionActiveClientToolsChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionPendingMessageSetAction"
+          "$ref": "#/$defs/SessionPendingMessageSetAction"
         },
         {
-          "$ref": "#/$defs/ISessionPendingMessageRemovedAction"
+          "$ref": "#/$defs/SessionPendingMessageRemovedAction"
         },
         {
-          "$ref": "#/$defs/ISessionQueuedMessagesReorderedAction"
+          "$ref": "#/$defs/SessionQueuedMessagesReorderedAction"
         },
         {
-          "$ref": "#/$defs/ISessionInputRequestedAction"
+          "$ref": "#/$defs/SessionInputRequestedAction"
         },
         {
-          "$ref": "#/$defs/ISessionInputAnswerChangedAction"
+          "$ref": "#/$defs/SessionInputAnswerChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionInputCompletedAction"
+          "$ref": "#/$defs/SessionInputCompletedAction"
         },
         {
-          "$ref": "#/$defs/ISessionCustomizationsChangedAction"
+          "$ref": "#/$defs/SessionCustomizationsChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionCustomizationToggledAction"
+          "$ref": "#/$defs/SessionCustomizationToggledAction"
         },
         {
-          "$ref": "#/$defs/ISessionTruncatedAction"
+          "$ref": "#/$defs/SessionTruncatedAction"
         },
         {
-          "$ref": "#/$defs/ISessionIsReadChangedAction"
+          "$ref": "#/$defs/SessionIsReadChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionIsDoneChangedAction"
+          "$ref": "#/$defs/SessionIsDoneChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionDiffsChangedAction"
+          "$ref": "#/$defs/SessionDiffsChangedAction"
         },
         {
-          "$ref": "#/$defs/ISessionConfigChangedAction"
+          "$ref": "#/$defs/SessionConfigChangedAction"
         },
         {
-          "$ref": "#/$defs/ITerminalDataAction"
+          "$ref": "#/$defs/TerminalDataAction"
         },
         {
-          "$ref": "#/$defs/ITerminalInputAction"
+          "$ref": "#/$defs/TerminalInputAction"
         },
         {
-          "$ref": "#/$defs/ITerminalResizedAction"
+          "$ref": "#/$defs/TerminalResizedAction"
         },
         {
-          "$ref": "#/$defs/ITerminalClaimedAction"
+          "$ref": "#/$defs/TerminalClaimedAction"
         },
         {
-          "$ref": "#/$defs/ITerminalTitleChangedAction"
+          "$ref": "#/$defs/TerminalTitleChangedAction"
         },
         {
-          "$ref": "#/$defs/ITerminalCwdChangedAction"
+          "$ref": "#/$defs/TerminalCwdChangedAction"
         },
         {
-          "$ref": "#/$defs/ITerminalExitedAction"
+          "$ref": "#/$defs/TerminalExitedAction"
         },
         {
-          "$ref": "#/$defs/ITerminalClearedAction"
+          "$ref": "#/$defs/TerminalClearedAction"
         },
         {
-          "$ref": "#/$defs/ITerminalCommandDetectionAvailableAction"
+          "$ref": "#/$defs/TerminalCommandDetectionAvailableAction"
         },
         {
-          "$ref": "#/$defs/ITerminalCommandExecutedAction"
+          "$ref": "#/$defs/TerminalCommandExecutedAction"
         },
         {
-          "$ref": "#/$defs/ITerminalCommandFinishedAction"
+          "$ref": "#/$defs/TerminalCommandFinishedAction"
         }
       ]
     }

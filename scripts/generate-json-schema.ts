@@ -318,7 +318,7 @@ function generateStateSchema(project: Project): JsonSchema {
   if (sf) {
     for (const ta of sf.getTypeAliases()) {
       const name = ta.getName();
-      // Skip simple alias like URI = string, and indexed access types like IToolCallState['status']
+      // Skip simple alias like URI = string, and indexed access types like ToolCallState['status']
       const typeText = ta.getTypeNode()?.getText() || '';
       if (typeText === 'string' || typeText.includes('[')) continue;
       schema.$defs![name] = typeTextToSchema(typeText, project);
@@ -346,12 +346,12 @@ function generateActionsSchema(project: Project): JsonSchema {
     schema.$defs![name] = interfaceToSchema(iface, project);
   }
 
-  // Add action type aliases (e.g. ISessionToolCallConfirmedAction union)
+  // Add action type aliases (e.g. SessionToolCallConfirmedAction union)
   const actionSf = project.getSourceFiles().find(f => f.getBaseName() === 'actions.ts');
   if (actionSf) {
     for (const ta of actionSf.getTypeAliases()) {
       const name = ta.getName();
-      if (name === 'IStateAction') continue; // handled below
+      if (name === 'StateAction') continue; // handled below
       const typeText = ta.getTypeNode()?.getText() || '';
       schema.$defs![name] = typeTextToSchema(typeText, project);
       const desc = ta.getJsDocs()[0]?.getDescription()?.trim();
@@ -382,12 +382,12 @@ function generateActionsSchema(project: Project): JsonSchema {
     }
   }
 
-  // IStateAction as oneOf — derive members from the IStateAction type alias itself
-  const stateActionAlias = actionSf?.getTypeAlias('IStateAction');
+  // StateAction as oneOf — derive members from the StateAction type alias itself
+  const stateActionAlias = actionSf?.getTypeAlias('StateAction');
   const stateActionMembers = stateActionAlias
     ? splitUnionType(stateActionAlias.getTypeNode()?.getText() || '').map(s => s.trim())
     : [];
-  schema.$defs!['IStateAction'] = {
+  schema.$defs!['StateAction'] = {
     description: 'Discriminated union of all state actions.',
     oneOf: stateActionMembers.map(name => ({ $ref: `#/$defs/${name}` })),
   };
@@ -438,9 +438,9 @@ function generateNotificationsSchema(project: Project): JsonSchema {
     schema.$defs![name] = interfaceToSchema(iface, project);
   }
 
-  // Add IProtocolNotification discriminated union
+  // Add ProtocolNotification discriminated union
   const notifNames = Array.from(notifIfaces.keys());
-  schema.$defs!['IProtocolNotification'] = {
+  schema.$defs!['ProtocolNotification'] = {
     description: 'Discriminated union of all protocol notifications.',
     oneOf: notifNames.map(name => ({ $ref: `#/$defs/${name}` })),
   };

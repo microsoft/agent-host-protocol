@@ -8,49 +8,49 @@
  */
 
 import type {
-  IInitializeParams,
-  IInitializeResult,
-  IReconnectParams,
-  IReconnectResult,
-  ISubscribeParams,
-  ISubscribeResult,
-  ICreateSessionParams,
-  IDisposeSessionParams,
-  ICreateTerminalParams,
-  IDisposeTerminalParams,
-  IListSessionsParams,
-  IListSessionsResult,
-  IResourceReadParams,
-  IResourceReadResult,
-  IResourceWriteParams,
-  IResourceWriteResult,
-  IResourceListParams,
-  IResourceListResult,
-  IResourceCopyParams,
-  IResourceCopyResult,
-  IResourceDeleteParams,
-  IResourceDeleteResult,
-  IResourceMoveParams,
-  IResourceMoveResult,
-  IFetchTurnsParams,
-  IFetchTurnsResult,
-  IUnsubscribeParams,
-  IDispatchActionParams,
-  IAuthenticateParams,
-  IAuthenticateResult,
-  IResolveSessionConfigParams,
-  IResolveSessionConfigResult,
-  ISessionConfigCompletionsParams,
-  ISessionConfigCompletionsResult,
+  InitializeParams,
+  InitializeResult,
+  ReconnectParams,
+  ReconnectResult,
+  SubscribeParams,
+  SubscribeResult,
+  CreateSessionParams,
+  DisposeSessionParams,
+  CreateTerminalParams,
+  DisposeTerminalParams,
+  ListSessionsParams,
+  ListSessionsResult,
+  ResourceReadParams,
+  ResourceReadResult,
+  ResourceWriteParams,
+  ResourceWriteResult,
+  ResourceListParams,
+  ResourceListResult,
+  ResourceCopyParams,
+  ResourceCopyResult,
+  ResourceDeleteParams,
+  ResourceDeleteResult,
+  ResourceMoveParams,
+  ResourceMoveResult,
+  FetchTurnsParams,
+  FetchTurnsResult,
+  UnsubscribeParams,
+  DispatchActionParams,
+  AuthenticateParams,
+  AuthenticateResult,
+  ResolveSessionConfigParams,
+  ResolveSessionConfigResult,
+  SessionConfigCompletionsParams,
+  SessionConfigCompletionsResult,
 } from './commands.js';
 
-import type { IActionEnvelope } from './actions.js';
-import type { IProtocolNotification } from './notifications.js';
+import type { ActionEnvelope } from './actions.js';
+import type { ProtocolNotification } from './notifications.js';
 
 // ─── JSON-RPC Base Types ─────────────────────────────────────────────────────
 
 /** A JSON-RPC request: has both `method` and `id`. */
-export interface IJsonRpcRequest {
+export interface JsonRpcRequest {
   readonly jsonrpc: '2.0';
   readonly id: number;
   readonly method: string;
@@ -58,14 +58,14 @@ export interface IJsonRpcRequest {
 }
 
 /** A JSON-RPC success response. */
-export interface IJsonRpcSuccessResponse {
+export interface JsonRpcSuccessResponse {
   readonly jsonrpc: '2.0';
   readonly id: number;
   readonly result: unknown;
 }
 
 /** A JSON-RPC error response. */
-export interface IJsonRpcErrorResponse {
+export interface JsonRpcErrorResponse {
   readonly jsonrpc: '2.0';
   readonly id: number;
   readonly error: {
@@ -76,10 +76,10 @@ export interface IJsonRpcErrorResponse {
 }
 
 /** A JSON-RPC response (success or error). */
-export type IJsonRpcResponse = IJsonRpcSuccessResponse | IJsonRpcErrorResponse;
+export type JsonRpcResponse = JsonRpcSuccessResponse | JsonRpcErrorResponse;
 
 /** A JSON-RPC notification: has `method` but no `id`. */
-export interface IJsonRpcNotification {
+export interface JsonRpcNotification {
   readonly jsonrpc: '2.0';
   readonly method: string;
   readonly params?: unknown;
@@ -92,32 +92,32 @@ export interface IJsonRpcNotification {
  *
  * @category Commands
  */
-export interface ICommandMap {
-  'initialize': { params: IInitializeParams; result: IInitializeResult };
-  'reconnect': { params: IReconnectParams; result: IReconnectResult };
-  'subscribe': { params: ISubscribeParams; result: ISubscribeResult };
-  'createSession': { params: ICreateSessionParams; result: null };
-  'disposeSession': { params: IDisposeSessionParams; result: null };
-  'createTerminal': { params: ICreateTerminalParams; result: null };
-  'disposeTerminal': { params: IDisposeTerminalParams; result: null };
-  'listSessions': { params: IListSessionsParams; result: IListSessionsResult };
-  'resourceRead': { params: IResourceReadParams; result: IResourceReadResult };
-  'resourceWrite': { params: IResourceWriteParams; result: IResourceWriteResult };
-  'resourceList': { params: IResourceListParams; result: IResourceListResult };
-  'resourceCopy': { params: IResourceCopyParams; result: IResourceCopyResult };
-  'resourceDelete': { params: IResourceDeleteParams; result: IResourceDeleteResult };
-  'resourceMove': { params: IResourceMoveParams; result: IResourceMoveResult };
-  'fetchTurns': { params: IFetchTurnsParams; result: IFetchTurnsResult };
-  'authenticate': { params: IAuthenticateParams; result: IAuthenticateResult };
-  'resolveSessionConfig': { params: IResolveSessionConfigParams; result: IResolveSessionConfigResult };
-  'sessionConfigCompletions': { params: ISessionConfigCompletionsParams; result: ISessionConfigCompletionsResult };
+export interface CommandMap {
+  'initialize': { params: InitializeParams; result: InitializeResult };
+  'reconnect': { params: ReconnectParams; result: ReconnectResult };
+  'subscribe': { params: SubscribeParams; result: SubscribeResult };
+  'createSession': { params: CreateSessionParams; result: null };
+  'disposeSession': { params: DisposeSessionParams; result: null };
+  'createTerminal': { params: CreateTerminalParams; result: null };
+  'disposeTerminal': { params: DisposeTerminalParams; result: null };
+  'listSessions': { params: ListSessionsParams; result: ListSessionsResult };
+  'resourceRead': { params: ResourceReadParams; result: ResourceReadResult };
+  'resourceWrite': { params: ResourceWriteParams; result: ResourceWriteResult };
+  'resourceList': { params: ResourceListParams; result: ResourceListResult };
+  'resourceCopy': { params: ResourceCopyParams; result: ResourceCopyResult };
+  'resourceDelete': { params: ResourceDeleteParams; result: ResourceDeleteResult };
+  'resourceMove': { params: ResourceMoveParams; result: ResourceMoveResult };
+  'fetchTurns': { params: FetchTurnsParams; result: FetchTurnsResult };
+  'authenticate': { params: AuthenticateParams; result: AuthenticateResult };
+  'resolveSessionConfig': { params: ResolveSessionConfigParams; result: ResolveSessionConfigResult };
+  'sessionConfigCompletions': { params: SessionConfigCompletionsParams; result: SessionConfigCompletionsResult };
 }
 
 // ─── Notification Maps ───────────────────────────────────────────────────────
 
 /** Params for the server → client `notification` method. */
-export interface INotificationMethodParams {
-  notification: IProtocolNotification;
+export interface NotificationMethodParams {
+  notification: ProtocolNotification;
 }
 
 /**
@@ -125,9 +125,9 @@ export interface INotificationMethodParams {
  *
  * @category Notifications
  */
-export interface IClientNotificationMap {
-  'unsubscribe': { params: IUnsubscribeParams };
-  'dispatchAction': { params: IDispatchActionParams };
+export interface ClientNotificationMap {
+  'unsubscribe': { params: UnsubscribeParams };
+  'dispatchAction': { params: DispatchActionParams };
 }
 
 /**
@@ -135,13 +135,13 @@ export interface IClientNotificationMap {
  *
  * @category Notifications
  */
-export interface IServerNotificationMap {
-  'action': { params: IActionEnvelope };
-  'notification': { params: INotificationMethodParams };
+export interface ServerNotificationMap {
+  'action': { params: ActionEnvelope };
+  'notification': { params: NotificationMethodParams };
 }
 
 /** Combined notification map for all directions. */
-export type INotificationMap = IClientNotificationMap & IServerNotificationMap;
+export type NotificationMap = ClientNotificationMap & ServerNotificationMap;
 
 // ─── Typed Requests ──────────────────────────────────────────────────────────
 
@@ -151,19 +151,19 @@ export type INotificationMap = IClientNotificationMap & IServerNotificationMap;
  * When used as a union (default generic), narrowing on `method` gives typed `params`:
  *
  * ```ts
- * function handle(req: IAhpRequest) {
+ * function handle(req: AhpRequest) {
  *   if (req.method === 'fetchTurns') {
  *     req.params.session; // typed as URI
  *   }
  * }
  * ```
  */
-export type IAhpRequest<M extends keyof ICommandMap = keyof ICommandMap> =
+export type AhpRequest<M extends keyof CommandMap = keyof CommandMap> =
   M extends unknown ? {
     readonly jsonrpc: '2.0';
     readonly id: number;
     readonly method: M;
-    readonly params: ICommandMap[M]['params'];
+    readonly params: CommandMap[M]['params'];
   } : never;
 
 // ─── Typed Responses ─────────────────────────────────────────────────────────
@@ -175,21 +175,21 @@ export type IAhpRequest<M extends keyof ICommandMap = keyof ICommandMap> =
  * generic parameter when you know the method from the associated request:
  *
  * ```ts
- * const result: IAhpSuccessResponse<'fetchTurns'> = ...;
- * result.result.turns; // typed as ITurn[]
+ * const result: AhpSuccessResponse<'fetchTurns'> = ...;
+ * result.result.turns; // typed as Turn[]
  * ```
  */
-export type IAhpSuccessResponse<M extends keyof ICommandMap = keyof ICommandMap> =
+export type AhpSuccessResponse<M extends keyof CommandMap = keyof CommandMap> =
   M extends unknown ? {
     readonly jsonrpc: '2.0';
     readonly id: number;
-    readonly result: ICommandMap[M]['result'];
+    readonly result: CommandMap[M]['result'];
   } : never;
 
 /** Typed JSON-RPC response (success with known result type, or error). */
-export type IAhpResponse<M extends keyof ICommandMap = keyof ICommandMap> =
-  | IAhpSuccessResponse<M>
-  | IJsonRpcErrorResponse;
+export type AhpResponse<M extends keyof CommandMap = keyof CommandMap> =
+  | AhpSuccessResponse<M>
+  | JsonRpcErrorResponse;
 
 // ─── Typed Notifications ─────────────────────────────────────────────────────
 
@@ -199,34 +199,34 @@ export type IAhpResponse<M extends keyof ICommandMap = keyof ICommandMap> =
  * When used as a union (default generic), narrowing on `method` gives typed `params`:
  *
  * ```ts
- * function handle(notif: IAhpNotification) {
+ * function handle(notif: AhpNotification) {
  *   if (notif.method === 'action') {
  *     notif.params.serverSeq; // typed as number
  *   }
  * }
  * ```
  */
-export type IAhpNotification<M extends keyof INotificationMap = keyof INotificationMap> =
+export type AhpNotification<M extends keyof NotificationMap = keyof NotificationMap> =
   M extends unknown ? {
     readonly jsonrpc: '2.0';
     readonly method: M;
-    readonly params: INotificationMap[M]['params'];
+    readonly params: NotificationMap[M]['params'];
   } : never;
 
 /** A client → server notification. */
-export type IAhpClientNotification<M extends keyof IClientNotificationMap = keyof IClientNotificationMap> =
+export type AhpClientNotification<M extends keyof ClientNotificationMap = keyof ClientNotificationMap> =
   M extends unknown ? {
     readonly jsonrpc: '2.0';
     readonly method: M;
-    readonly params: IClientNotificationMap[M]['params'];
+    readonly params: ClientNotificationMap[M]['params'];
   } : never;
 
 /** A server → client notification. */
-export type IAhpServerNotification<M extends keyof IServerNotificationMap = keyof IServerNotificationMap> =
+export type AhpServerNotification<M extends keyof ServerNotificationMap = keyof ServerNotificationMap> =
   M extends unknown ? {
     readonly jsonrpc: '2.0';
     readonly method: M;
-    readonly params: IServerNotificationMap[M]['params'];
+    readonly params: ServerNotificationMap[M]['params'];
   } : never;
 
 // ─── Protocol Message Union ──────────────────────────────────────────────────
@@ -235,16 +235,16 @@ export type IAhpServerNotification<M extends keyof IServerNotificationMap = keyo
  * Discriminated union of all AHP protocol messages.
  *
  * Narrow using standard JSON-RPC structure:
- * - Has `method` + `id` → request ({@link IAhpRequest})
- * - Has `method`, no `id` → notification ({@link IAhpNotification})
- * - Has `result` or `error` + `id` → response ({@link IAhpResponse})
+ * - Has `method` + `id` → request ({@link AhpRequest})
+ * - Has `method`, no `id` → notification ({@link AhpNotification})
+ * - Has `result` or `error` + `id` → response ({@link AhpResponse})
  *
  * Then narrow on `method` for fully typed params:
  *
  * ```ts
- * function dispatch(msg: IProtocolMessage) {
+ * function dispatch(msg: ProtocolMessage) {
  *   if ('method' in msg && 'id' in msg) {
- *     // msg is IAhpRequest
+ *     // msg is AhpRequest
  *     if (msg.method === 'fetchTurns') {
  *       msg.params.session; // URI
  *     }
@@ -252,8 +252,8 @@ export type IAhpServerNotification<M extends keyof IServerNotificationMap = keyo
  * }
  * ```
  */
-export type IProtocolMessage =
-  | IAhpRequest
-  | IAhpSuccessResponse
-  | IJsonRpcErrorResponse
-  | IAhpNotification;
+export type ProtocolMessage =
+  | AhpRequest
+  | AhpSuccessResponse
+  | JsonRpcErrorResponse
+  | AhpNotification;

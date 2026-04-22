@@ -10,9 +10,9 @@
  */
 
 import type {
-  ICommandMap,
-  IClientNotificationMap,
-  IServerNotificationMap,
+  CommandMap,
+  ClientNotificationMap,
+  ServerNotificationMap,
 } from '../messages.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -55,8 +55,8 @@ type _ExpectedServerNotifications =
 // ─── Assertions ──────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckCommandMapKeys = _Exact<keyof ICommandMap, _ExpectedCommands>;
+type _CheckCommandMapKeys = _Exact<keyof CommandMap, _ExpectedCommands>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckClientNotificationMapKeys = _Exact<keyof IClientNotificationMap, _ExpectedClientNotifications>;
+type _CheckClientNotificationMapKeys = _Exact<keyof ClientNotificationMap, _ExpectedClientNotifications>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckServerNotificationMapKeys = _Exact<keyof IServerNotificationMap, _ExpectedServerNotifications>;
+type _CheckServerNotificationMapKeys = _Exact<keyof ServerNotificationMap, _ExpectedServerNotifications>;

@@ -4,7 +4,7 @@ AHP uses [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0 Pr
 
 ## Overview
 
-Each agent declares the **protected resources** it requires authentication for via the `protectedResources` field on [`IAgentInfo`](/reference/state-types#iagentinfo) in root state. Clients discover these requirements by subscribing to `agenthost:/root`, obtain tokens from the declared authorization servers using standard OAuth 2.0 flows, and push them to the server via the [`authenticate`](/reference/commands#authenticate) command.
+Each agent declares the **protected resources** it requires authentication for via the `protectedResources` field on [`AgentInfo`](/reference/state-types#iagentinfo) in root state. Clients discover these requirements by subscribing to `agenthost:/root`, obtain tokens from the declared authorization servers using standard OAuth 2.0 flows, and push them to the server via the [`authenticate`](/reference/commands#authenticate) command.
 
 ```mermaid
 sequenceDiagram
@@ -26,7 +26,7 @@ sequenceDiagram
 
 ## Discovery
 
-Authentication requirements are declared **per-agent** on [`IAgentInfo.protectedResources`](/reference/state-types#iagentinfo). Each entry is an [`IProtectedResourceMetadata`](/reference/state-types#iprotectedresourcemetadata) object following the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) shape:
+Authentication requirements are declared **per-agent** on [`AgentInfo.protectedResources`](/reference/state-types#iagentinfo). Each entry is an [`ProtectedResourceMetadata`](/reference/state-types#iprotectedresourcemetadata) object following the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) shape:
 
 ```json
 {
@@ -121,7 +121,7 @@ The RFC 9728 `resource` field is already a unique identifier for the protected r
 
 When a command fails because the client has not authenticated for a required protected resource, the server SHOULD return error code `-32007` (`AuthRequired`). This error MAY be returned from **any** command — not just `authenticate`.
 
-The `data` field of the JSON-RPC error SHOULD contain an `IProtectedResourceMetadata[]` array describing the resources that require authentication. This allows clients to handle authentication programmatically:
+The `data` field of the JSON-RPC error SHOULD contain an `ProtectedResourceMetadata[]` array describing the resources that require authentication. This allows clients to handle authentication programmatically:
 
 ```jsonc
 // Client → Server

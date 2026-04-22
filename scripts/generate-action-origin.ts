@@ -19,7 +19,7 @@ const GENERATED_HEADER = `// Generated from types/actions.ts — do not edit
 type ActionScope = 'root' | 'session' | 'terminal';
 
 interface ActionInfo {
-  /** The interface name (e.g. 'IRootAgentsChangedAction') */
+  /** The interface name (e.g. 'RootAgentsChangedAction') */
   name: string;
   /** The ActionType enum value string (e.g. 'root/agentsChanged') */
   actionType: string;
@@ -90,11 +90,11 @@ export function generateActionOrigin(project: Project, outDir: string): void {
     }
   }
 
-  // Find the IStateAction union to know which types are in scope
-  const stateActionAlias = actionsFile.getTypeAliasOrThrow('IStateAction');
+  // Find the StateAction union to know which types are in scope
+  const stateActionAlias = actionsFile.getTypeAliasOrThrow('StateAction');
   const unionText = stateActionAlias.getTypeNodeOrThrow().getText();
 
-  // Extract interface names from the union (e.g. "IRootAgentsChangedAction")
+  // Extract interface names from the union (e.g. "RootAgentsChangedAction")
   const unionMembers = new Set(
     unionText.split('|').map(s => s.trim()).filter(s => s.length > 0),
   );
@@ -103,7 +103,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const actions: ActionInfo[] = [];
 
   for (const name of unionMembers) {
-    // Could be an interface or a type alias (ISessionToolCallConfirmedAction is a type alias)
+    // Could be an interface or a type alias (SessionToolCallConfirmedAction is a type alias)
     const iface = actionsFile.getInterface(name);
     const typeAlias = actionsFile.getTypeAlias(name);
     const node = iface || typeAlias;
@@ -124,7 +124,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
     if (iface) {
       resolved = resolveActionType(iface, enumValues);
     } else if (typeAlias) {
-      // For type aliases (unions like ISessionToolCallConfirmedAction),
+      // For type aliases (unions like SessionToolCallConfirmedAction),
       // look at the first union member to find the type discriminant
       const aliasType = typeAlias.getType();
       const unionTypes = aliasType.getUnionTypes();
@@ -172,7 +172,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
 
   // Imports
   lines.push(`import type {`);
-  lines.push(`  IStateAction,`);
+  lines.push(`  StateAction,`);
   for (const a of actions) {
     lines.push(`  ${a.name},`);
   }
@@ -181,65 +181,65 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   lines.push(`import { ActionType } from './actions.js';`);
   lines.push(``);
 
-  // IRootAction
+  // RootAction
   lines.push(`// ─── Root vs Session vs Terminal Action Unions ───────────────────────────────`);
   lines.push(``);
   lines.push(`/** Union of all root-scoped actions. */`);
-  lines.push(`export type IRootAction =`);
+  lines.push(`export type RootAction =`);
   for (let i = 0; i < rootActions.length; i++) {
     lines.push(`  | ${rootActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
 
-  // ISessionAction
+  // SessionAction
   lines.push(`/** Union of all session-scoped actions. */`);
-  lines.push(`export type ISessionAction =`);
+  lines.push(`export type SessionAction =`);
   for (let i = 0; i < sessionActions.length; i++) {
     lines.push(`  | ${sessionActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
 
-  // IClientSessionAction
+  // ClientSessionAction
   lines.push(`/** Union of session actions that clients may dispatch. */`);
-  lines.push(`export type IClientSessionAction =`);
+  lines.push(`export type ClientSessionAction =`);
   for (let i = 0; i < clientSessionActions.length; i++) {
     lines.push(`  | ${clientSessionActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
 
-  // IServerSessionAction
+  // ServerSessionAction
   lines.push(`/** Union of session actions that only the server may produce. */`);
-  lines.push(`export type IServerSessionAction =`);
+  lines.push(`export type ServerSessionAction =`);
   for (let i = 0; i < serverSessionActions.length; i++) {
     lines.push(`  | ${serverSessionActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
 
-  // ITerminalAction
+  // TerminalAction
   lines.push(`/** Union of all terminal-scoped actions. */`);
-  lines.push(`export type ITerminalAction =`);
+  lines.push(`export type TerminalAction =`);
   for (let i = 0; i < terminalActions.length; i++) {
     lines.push(`  | ${terminalActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
 
-  // IClientTerminalAction
+  // ClientTerminalAction
   lines.push(`/** Union of terminal actions that clients may dispatch. */`);
-  lines.push(`export type IClientTerminalAction =`);
+  lines.push(`export type ClientTerminalAction =`);
   for (let i = 0; i < clientTerminalActions.length; i++) {
     lines.push(`  | ${clientTerminalActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);
 
-  // IServerTerminalAction
+  // ServerTerminalAction
   lines.push(`/** Union of terminal actions that only the server may produce. */`);
-  lines.push(`export type IServerTerminalAction =`);
+  lines.push(`export type ServerTerminalAction =`);
   for (let i = 0; i < serverTerminalActions.length; i++) {
     lines.push(`  | ${serverTerminalActions[i].name}`);
   }
@@ -252,9 +252,9 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   lines.push(``);
   lines.push(`/**`);
   lines.push(` * Exhaustive map indicating which action types may be dispatched by clients.`);
-  lines.push(` * Adding a new action to IStateAction without adding it here is a compile error.`);
+  lines.push(` * Adding a new action to StateAction without adding it here is a compile error.`);
   lines.push(` */`);
-  lines.push(`export const IS_CLIENT_DISPATCHABLE: { readonly [K in IStateAction['type']]: boolean } = {`);
+  lines.push(`export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: boolean } = {`);
   for (const a of actions) {
     lines.push(`  [${a.enumRef}]: ${a.isClientDispatchable},`);
   }

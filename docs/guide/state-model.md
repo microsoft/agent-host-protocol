@@ -253,7 +253,7 @@ When a turn completes, non-terminal tool calls in `responseParts` are force-canc
 
 ### Confirmation Options
 
-By default, clients render a binary approve/deny UI for `pending-confirmation` tool calls. The server can provide richer choices via `options` — an array of `IConfirmationOption` objects, each with:
+By default, clients render a binary approve/deny UI for `pending-confirmation` tool calls. The server can provide richer choices via `options` — an array of `ConfirmationOption` objects, each with:
 
 | Field | Type | Description |
 |---|---|---|
@@ -262,7 +262,7 @@ By default, clients render a binary approve/deny UI for `pending-confirmation` t
 | `kind` | `'approve' \| 'deny'` | Classifies the option so the server and client know whether it represents approval or denial. |
 | `group` | `number?` | Logical group number. Clients SHOULD display options in the order they are defined and MAY use differing group numbers to insert dividers between logical clusters. |
 
-For example, a server might offer `"Approve"`, `"Approve in this Session"`, `"Deny"`, and `"Deny with reason"`. When the user picks an option, the client dispatches `session/toolCallConfirmed` with `selectedOptionId` set to the chosen option's `id`. The reducer resolves the full `IConfirmationOption` object and stores it as `selectedOption` on the resulting `running` or `cancelled` state, and it carries through to `completed`.
+For example, a server might offer `"Approve"`, `"Approve in this Session"`, `"Deny"`, and `"Deny with reason"`. When the user picks an option, the client dispatches `session/toolCallConfirmed` with `selectedOptionId` set to the chosen option's `id`. The reducer resolves the full `ConfirmationOption` object and stores it as `selectedOption` on the resulting `running` or `cancelled` state, and it carries through to `completed`.
 
 ## Session Input Requests
 

@@ -19,7 +19,7 @@ const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport
 
 // ─── Name Mapping ────────────────────────────────────────────────────────────
 
-/** Strips the I prefix from interface names: IRootState → RootState */
+/** Strips the I prefix from interface names: RootState → RootState */
 function swiftTypeName(tsName: string): string {
   if (
     tsName.length > 1 &&
@@ -80,7 +80,7 @@ const INLINE_TYPE_OVERRIDES: Record<string, string> = {};
  */
 const requiredPartialStructs = new Set<string>();
 
-/** Swift name for `Partial<ISessionSummary>` → `PartialSessionSummary`. */
+/** Swift name for `Partial<SessionSummary>` → `PartialSessionSummary`. */
 function partialSwiftName(tsInterfaceName: string): string {
   return `Partial${swiftTypeName(tsInterfaceName)}`;
 }
@@ -98,8 +98,8 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   if (tsType === 'string') return 'String';
   if (tsType === 'number') {
     const isInputDouble =
-      (containerName === 'ISessionInputNumberAnswerValue' && propName === 'value') ||
-      (containerName === 'ISessionInputNumberQuestion' && (propName === 'defaultValue' || propName === 'min' || propName === 'max')) ||
+      (containerName === 'SessionInputNumberAnswerValue' && propName === 'value') ||
+      (containerName === 'SessionInputNumberQuestion' && (propName === 'defaultValue' || propName === 'min' || propName === 'max')) ||
       propName === 'numberValue';
     return isInputDouble ? 'Double' : 'Int';
   }
@@ -113,7 +113,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
 
   // Known unions
-  if (tsType === 'IRootState | ISessionState' || tsType === 'IRootState | ISessionState | ITerminalState') return 'SnapshotState';
+  if (tsType === 'RootState | SessionState' || tsType === 'RootState | SessionState | TerminalState') return 'SnapshotState';
 
   // T | null → T?
   const nullMatch = tsType.match(/^(.+?)\s*\|\s*null$/);
@@ -444,32 +444,32 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS = [
-  'Icon', 'IProtectedResourceMetadata', 'IRootState', 'IRootConfigState', 'IAgentInfo',
-  'ISessionModelInfo', 'IModelSelection', 'IConfigPropertySchema', 'IConfigSchema',
-  'IPendingMessage', 'ISessionState', 'ISessionActiveClient',
-  'ISessionSummary', 'IProjectInfo', 'ISessionConfigState', 'ITurn', 'IActiveTurn', 'IUserMessage',
-  'ISessionInputOption',
-  'ISessionInputTextAnswerValue', 'ISessionInputNumberAnswerValue',
-  'ISessionInputBooleanAnswerValue', 'ISessionInputSelectedAnswerValue',
-  'ISessionInputSelectedManyAnswerValue', 'ISessionInputAnswered',
-  'ISessionInputSkipped',
-  'ISessionInputTextQuestion',
-  'ISessionInputNumberQuestion', 'ISessionInputBooleanQuestion',
-  'ISessionInputSingleSelectQuestion', 'ISessionInputMultiSelectQuestion',
-  'ISessionInputRequest',
-  'IMessageAttachment', 'IMarkdownResponsePart', 'IContentRef',
-  'IResourceReponsePart', 'IToolCallResponsePart', 'IReasoningResponsePart',
-  'IToolCallResult', 'IToolCallStreamingState',
-  'IToolCallPendingConfirmationState', 'IToolCallRunningState',
-  'IToolCallPendingResultConfirmationState', 'IToolCallCompletedState',
-  'IToolCallCancelledState', 'IConfirmationOption', 'IToolDefinition', 'IToolAnnotations',
-  'IToolResultTextContent', 'IToolResultEmbeddedResourceContent',
-  'IToolResultResourceContent', 'IToolResultFileEditContent',
-  'IToolResultTerminalContent', 'IToolResultSubagentContent', 'ICustomizationRef',
-  'ISessionCustomization', 'IFileEdit', 'ITerminalInfo',
-  'ITerminalClientClaim', 'ITerminalSessionClaim', 'ITerminalState',
-  'ITerminalUnclassifiedPart', 'ITerminalCommandPart',
-  'IUsageInfo', 'IErrorInfo', 'ISnapshot',
+  'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
+  'SessionModelInfo', 'ModelSelection', 'ConfigPropertySchema', 'ConfigSchema',
+  'PendingMessage', 'SessionState', 'SessionActiveClient',
+  'SessionSummary', 'ProjectInfo', 'SessionConfigState', 'Turn', 'ActiveTurn', 'UserMessage',
+  'SessionInputOption',
+  'SessionInputTextAnswerValue', 'SessionInputNumberAnswerValue',
+  'SessionInputBooleanAnswerValue', 'SessionInputSelectedAnswerValue',
+  'SessionInputSelectedManyAnswerValue', 'SessionInputAnswered',
+  'SessionInputSkipped',
+  'SessionInputTextQuestion',
+  'SessionInputNumberQuestion', 'SessionInputBooleanQuestion',
+  'SessionInputSingleSelectQuestion', 'SessionInputMultiSelectQuestion',
+  'SessionInputRequest',
+  'MessageAttachment', 'MarkdownResponsePart', 'ContentRef',
+  'ResourceReponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
+  'ToolCallResult', 'ToolCallStreamingState',
+  'ToolCallPendingConfirmationState', 'ToolCallRunningState',
+  'ToolCallPendingResultConfirmationState', 'ToolCallCompletedState',
+  'ToolCallCancelledState', 'ConfirmationOption', 'ToolDefinition', 'ToolAnnotations',
+  'ToolResultTextContent', 'ToolResultEmbeddedResourceContent',
+  'ToolResultResourceContent', 'ToolResultFileEditContent',
+  'ToolResultTerminalContent', 'ToolResultSubagentContent', 'CustomizationRef',
+  'SessionCustomization', 'FileEdit', 'TerminalInfo',
+  'TerminalClientClaim', 'TerminalSessionClaim', 'TerminalState',
+  'TerminalUnclassifiedPart', 'TerminalCommandPart',
+  'UsageInfo', 'ErrorInfo', 'Snapshot',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -723,56 +723,56 @@ function generateStateFile(project: Project): string {
 
 /** Action type discriminant values mapped to struct names */
 const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[] = [
-  { type: 'root/agentsChanged', caseName: 'rootAgentsChanged', tsInterface: 'IRootAgentsChangedAction' },
-  { type: 'root/activeSessionsChanged', caseName: 'rootActiveSessionsChanged', tsInterface: 'IRootActiveSessionsChangedAction' },
-  { type: 'session/ready', caseName: 'sessionReady', tsInterface: 'ISessionReadyAction' },
-  { type: 'session/creationFailed', caseName: 'sessionCreationFailed', tsInterface: 'ISessionCreationFailedAction' },
-  { type: 'session/turnStarted', caseName: 'sessionTurnStarted', tsInterface: 'ISessionTurnStartedAction' },
-  { type: 'session/delta', caseName: 'sessionDelta', tsInterface: 'ISessionDeltaAction' },
-  { type: 'session/responsePart', caseName: 'sessionResponsePart', tsInterface: 'ISessionResponsePartAction' },
-  { type: 'session/toolCallStart', caseName: 'sessionToolCallStart', tsInterface: 'ISessionToolCallStartAction' },
-  { type: 'session/toolCallDelta', caseName: 'sessionToolCallDelta', tsInterface: 'ISessionToolCallDeltaAction' },
-  { type: 'session/toolCallReady', caseName: 'sessionToolCallReady', tsInterface: 'ISessionToolCallReadyAction' },
+  { type: 'root/agentsChanged', caseName: 'rootAgentsChanged', tsInterface: 'RootAgentsChangedAction' },
+  { type: 'root/activeSessionsChanged', caseName: 'rootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
+  { type: 'session/ready', caseName: 'sessionReady', tsInterface: 'SessionReadyAction' },
+  { type: 'session/creationFailed', caseName: 'sessionCreationFailed', tsInterface: 'SessionCreationFailedAction' },
+  { type: 'session/turnStarted', caseName: 'sessionTurnStarted', tsInterface: 'SessionTurnStartedAction' },
+  { type: 'session/delta', caseName: 'sessionDelta', tsInterface: 'SessionDeltaAction' },
+  { type: 'session/responsePart', caseName: 'sessionResponsePart', tsInterface: 'SessionResponsePartAction' },
+  { type: 'session/toolCallStart', caseName: 'sessionToolCallStart', tsInterface: 'SessionToolCallStartAction' },
+  { type: 'session/toolCallDelta', caseName: 'sessionToolCallDelta', tsInterface: 'SessionToolCallDeltaAction' },
+  { type: 'session/toolCallReady', caseName: 'sessionToolCallReady', tsInterface: 'SessionToolCallReadyAction' },
   { type: 'session/toolCallConfirmed', caseName: 'sessionToolCallConfirmed', tsInterface: '_merged_' },
-  { type: 'session/toolCallComplete', caseName: 'sessionToolCallComplete', tsInterface: 'ISessionToolCallCompleteAction' },
-  { type: 'session/toolCallResultConfirmed', caseName: 'sessionToolCallResultConfirmed', tsInterface: 'ISessionToolCallResultConfirmedAction' },
-  { type: 'session/turnComplete', caseName: 'sessionTurnComplete', tsInterface: 'ISessionTurnCompleteAction' },
-  { type: 'session/turnCancelled', caseName: 'sessionTurnCancelled', tsInterface: 'ISessionTurnCancelledAction' },
-  { type: 'session/error', caseName: 'sessionError', tsInterface: 'ISessionErrorAction' },
-  { type: 'session/titleChanged', caseName: 'sessionTitleChanged', tsInterface: 'ISessionTitleChangedAction' },
-  { type: 'session/usage', caseName: 'sessionUsage', tsInterface: 'ISessionUsageAction' },
-  { type: 'session/reasoning', caseName: 'sessionReasoning', tsInterface: 'ISessionReasoningAction' },
-  { type: 'session/modelChanged', caseName: 'sessionModelChanged', tsInterface: 'ISessionModelChangedAction' },
-  { type: 'session/isReadChanged', caseName: 'sessionIsReadChanged', tsInterface: 'ISessionIsReadChangedAction' },
-  { type: 'session/isDoneChanged', caseName: 'sessionIsDoneChanged', tsInterface: 'ISessionIsDoneChangedAction' },
-  { type: 'session/serverToolsChanged', caseName: 'sessionServerToolsChanged', tsInterface: 'ISessionServerToolsChangedAction' },
-  { type: 'session/activeClientChanged', caseName: 'sessionActiveClientChanged', tsInterface: 'ISessionActiveClientChangedAction' },
-  { type: 'session/activeClientToolsChanged', caseName: 'sessionActiveClientToolsChanged', tsInterface: 'ISessionActiveClientToolsChangedAction' },
-  { type: 'session/pendingMessageSet', caseName: 'sessionPendingMessageSet', tsInterface: 'ISessionPendingMessageSetAction' },
-  { type: 'session/pendingMessageRemoved', caseName: 'sessionPendingMessageRemoved', tsInterface: 'ISessionPendingMessageRemovedAction' },
-  { type: 'session/queuedMessagesReordered', caseName: 'sessionQueuedMessagesReordered', tsInterface: 'ISessionQueuedMessagesReorderedAction' },
-  { type: 'session/inputRequested', caseName: 'sessionInputRequested', tsInterface: 'ISessionInputRequestedAction' },
-  { type: 'session/inputAnswerChanged', caseName: 'sessionInputAnswerChanged', tsInterface: 'ISessionInputAnswerChangedAction' },
-  { type: 'session/inputCompleted', caseName: 'sessionInputCompleted', tsInterface: 'ISessionInputCompletedAction' },
-  { type: 'session/customizationsChanged', caseName: 'sessionCustomizationsChanged', tsInterface: 'ISessionCustomizationsChangedAction' },
-  { type: 'session/customizationToggled', caseName: 'sessionCustomizationToggled', tsInterface: 'ISessionCustomizationToggledAction' },
-  { type: 'session/truncated', caseName: 'sessionTruncated', tsInterface: 'ISessionTruncatedAction' },
-  { type: 'session/diffsChanged', caseName: 'sessionDiffsChanged', tsInterface: 'ISessionDiffsChangedAction' },
-  { type: 'session/configChanged', caseName: 'sessionConfigChanged', tsInterface: 'ISessionConfigChangedAction' },
-  { type: 'session/toolCallContentChanged', caseName: 'sessionToolCallContentChanged', tsInterface: 'ISessionToolCallContentChangedAction' },
-  { type: 'root/terminalsChanged', caseName: 'rootTerminalsChanged', tsInterface: 'IRootTerminalsChangedAction' },
-  { type: 'root/configChanged', caseName: 'rootConfigChanged', tsInterface: 'IRootConfigChangedAction' },
-  { type: 'terminal/data', caseName: 'terminalData', tsInterface: 'ITerminalDataAction' },
-  { type: 'terminal/input', caseName: 'terminalInput', tsInterface: 'ITerminalInputAction' },
-  { type: 'terminal/resized', caseName: 'terminalResized', tsInterface: 'ITerminalResizedAction' },
-  { type: 'terminal/claimed', caseName: 'terminalClaimed', tsInterface: 'ITerminalClaimedAction' },
-  { type: 'terminal/titleChanged', caseName: 'terminalTitleChanged', tsInterface: 'ITerminalTitleChangedAction' },
-  { type: 'terminal/cwdChanged', caseName: 'terminalCwdChanged', tsInterface: 'ITerminalCwdChangedAction' },
-  { type: 'terminal/exited', caseName: 'terminalExited', tsInterface: 'ITerminalExitedAction' },
-  { type: 'terminal/cleared', caseName: 'terminalCleared', tsInterface: 'ITerminalClearedAction' },
-  { type: 'terminal/commandDetectionAvailable', caseName: 'terminalCommandDetectionAvailable', tsInterface: 'ITerminalCommandDetectionAvailableAction' },
-  { type: 'terminal/commandExecuted', caseName: 'terminalCommandExecuted', tsInterface: 'ITerminalCommandExecutedAction' },
-  { type: 'terminal/commandFinished', caseName: 'terminalCommandFinished', tsInterface: 'ITerminalCommandFinishedAction' },
+  { type: 'session/toolCallComplete', caseName: 'sessionToolCallComplete', tsInterface: 'SessionToolCallCompleteAction' },
+  { type: 'session/toolCallResultConfirmed', caseName: 'sessionToolCallResultConfirmed', tsInterface: 'SessionToolCallResultConfirmedAction' },
+  { type: 'session/turnComplete', caseName: 'sessionTurnComplete', tsInterface: 'SessionTurnCompleteAction' },
+  { type: 'session/turnCancelled', caseName: 'sessionTurnCancelled', tsInterface: 'SessionTurnCancelledAction' },
+  { type: 'session/error', caseName: 'sessionError', tsInterface: 'SessionErrorAction' },
+  { type: 'session/titleChanged', caseName: 'sessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
+  { type: 'session/usage', caseName: 'sessionUsage', tsInterface: 'SessionUsageAction' },
+  { type: 'session/reasoning', caseName: 'sessionReasoning', tsInterface: 'SessionReasoningAction' },
+  { type: 'session/modelChanged', caseName: 'sessionModelChanged', tsInterface: 'SessionModelChangedAction' },
+  { type: 'session/isReadChanged', caseName: 'sessionIsReadChanged', tsInterface: 'SessionIsReadChangedAction' },
+  { type: 'session/isDoneChanged', caseName: 'sessionIsDoneChanged', tsInterface: 'SessionIsDoneChangedAction' },
+  { type: 'session/serverToolsChanged', caseName: 'sessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
+  { type: 'session/activeClientChanged', caseName: 'sessionActiveClientChanged', tsInterface: 'SessionActiveClientChangedAction' },
+  { type: 'session/activeClientToolsChanged', caseName: 'sessionActiveClientToolsChanged', tsInterface: 'SessionActiveClientToolsChangedAction' },
+  { type: 'session/pendingMessageSet', caseName: 'sessionPendingMessageSet', tsInterface: 'SessionPendingMessageSetAction' },
+  { type: 'session/pendingMessageRemoved', caseName: 'sessionPendingMessageRemoved', tsInterface: 'SessionPendingMessageRemovedAction' },
+  { type: 'session/queuedMessagesReordered', caseName: 'sessionQueuedMessagesReordered', tsInterface: 'SessionQueuedMessagesReorderedAction' },
+  { type: 'session/inputRequested', caseName: 'sessionInputRequested', tsInterface: 'SessionInputRequestedAction' },
+  { type: 'session/inputAnswerChanged', caseName: 'sessionInputAnswerChanged', tsInterface: 'SessionInputAnswerChangedAction' },
+  { type: 'session/inputCompleted', caseName: 'sessionInputCompleted', tsInterface: 'SessionInputCompletedAction' },
+  { type: 'session/customizationsChanged', caseName: 'sessionCustomizationsChanged', tsInterface: 'SessionCustomizationsChangedAction' },
+  { type: 'session/customizationToggled', caseName: 'sessionCustomizationToggled', tsInterface: 'SessionCustomizationToggledAction' },
+  { type: 'session/truncated', caseName: 'sessionTruncated', tsInterface: 'SessionTruncatedAction' },
+  { type: 'session/diffsChanged', caseName: 'sessionDiffsChanged', tsInterface: 'SessionDiffsChangedAction' },
+  { type: 'session/configChanged', caseName: 'sessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
+  { type: 'session/toolCallContentChanged', caseName: 'sessionToolCallContentChanged', tsInterface: 'SessionToolCallContentChangedAction' },
+  { type: 'root/terminalsChanged', caseName: 'rootTerminalsChanged', tsInterface: 'RootTerminalsChangedAction' },
+  { type: 'root/configChanged', caseName: 'rootConfigChanged', tsInterface: 'RootConfigChangedAction' },
+  { type: 'terminal/data', caseName: 'terminalData', tsInterface: 'TerminalDataAction' },
+  { type: 'terminal/input', caseName: 'terminalInput', tsInterface: 'TerminalInputAction' },
+  { type: 'terminal/resized', caseName: 'terminalResized', tsInterface: 'TerminalResizedAction' },
+  { type: 'terminal/claimed', caseName: 'terminalClaimed', tsInterface: 'TerminalClaimedAction' },
+  { type: 'terminal/titleChanged', caseName: 'terminalTitleChanged', tsInterface: 'TerminalTitleChangedAction' },
+  { type: 'terminal/cwdChanged', caseName: 'terminalCwdChanged', tsInterface: 'TerminalCwdChangedAction' },
+  { type: 'terminal/exited', caseName: 'terminalExited', tsInterface: 'TerminalExitedAction' },
+  { type: 'terminal/cleared', caseName: 'terminalCleared', tsInterface: 'TerminalClearedAction' },
+  { type: 'terminal/commandDetectionAvailable', caseName: 'terminalCommandDetectionAvailable', tsInterface: 'TerminalCommandDetectionAvailableAction' },
+  { type: 'terminal/commandExecuted', caseName: 'terminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
+  { type: 'terminal/commandFinished', caseName: 'terminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
 ];
 
 /** Merged struct for the approved/denied tool call confirmed action */
@@ -845,9 +845,9 @@ function generateActionsFile(project: Project): string {
 
   // ActionEnvelope and ActionOrigin
   lines.push('// MARK: - Action Infrastructure\n');
-  lines.push(generateStructFromInterface(project, 'IActionOrigin'));
+  lines.push(generateStructFromInterface(project, 'ActionOrigin'));
   lines.push('');
-  lines.push(generateStructFromInterface(project, 'IActionEnvelope'));
+  lines.push(generateStructFromInterface(project, 'ActionEnvelope'));
   lines.push('');
 
   // Individual action structs
@@ -917,25 +917,25 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ContentEncoding'];
 
 const COMMAND_STRUCTS = [
-  'IInitializeParams', 'IInitializeResult',
-  'IReconnectParams', 'IReconnectReplayResult', 'IReconnectSnapshotResult',
-  'ISubscribeParams', 'ISubscribeResult',
-  'ISessionForkSource', 'ICreateSessionParams', 'IDisposeSessionParams',
-  'IListSessionsParams', 'IListSessionsResult',
-  'IResourceReadParams', 'IResourceReadResult',
-  'IResourceWriteParams', 'IResourceWriteResult',
-  'IResourceListParams', 'IResourceListResult', 'IDirectoryEntry',
-  'IResourceCopyParams', 'IResourceCopyResult',
-  'IResourceDeleteParams', 'IResourceDeleteResult',
-  'IResourceMoveParams', 'IResourceMoveResult',
-  'IFetchTurnsParams', 'IFetchTurnsResult',
-  'IUnsubscribeParams', 'IDispatchActionParams',
-  'IAuthenticateParams', 'IAuthenticateResult',
-  'ICreateTerminalParams', 'IDisposeTerminalParams',
-  'IResolveSessionConfigParams', 'IResolveSessionConfigResult',
-  'ISessionConfigPropertySchema', 'ISessionConfigSchema',
-  'ISessionConfigCompletionsParams', 'ISessionConfigCompletionsResult',
-  'ISessionConfigValueItem',
+  'InitializeParams', 'InitializeResult',
+  'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
+  'SubscribeParams', 'SubscribeResult',
+  'SessionForkSource', 'CreateSessionParams', 'DisposeSessionParams',
+  'ListSessionsParams', 'ListSessionsResult',
+  'ResourceReadParams', 'ResourceReadResult',
+  'ResourceWriteParams', 'ResourceWriteResult',
+  'ResourceListParams', 'ResourceListResult', 'DirectoryEntry',
+  'ResourceCopyParams', 'ResourceCopyResult',
+  'ResourceDeleteParams', 'ResourceDeleteResult',
+  'ResourceMoveParams', 'ResourceMoveResult',
+  'FetchTurnsParams', 'FetchTurnsResult',
+  'UnsubscribeParams', 'DispatchActionParams',
+  'AuthenticateParams', 'AuthenticateResult',
+  'CreateTerminalParams', 'DisposeTerminalParams',
+  'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
+  'SessionConfigPropertySchema', 'SessionConfigSchema',
+  'SessionConfigCompletionsParams', 'SessionConfigCompletionsResult',
+  'SessionConfigValueItem',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -987,7 +987,7 @@ function generateCommandsFile(project: Project): string {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason', 'NotificationType'];
 
 const NOTIFICATION_STRUCTS = [
-  'ISessionAddedNotification', 'ISessionRemovedNotification', 'ISessionSummaryChangedNotification', 'IAuthRequiredNotification',
+  'SessionAddedNotification', 'SessionRemovedNotification', 'SessionSummaryChangedNotification', 'AuthRequiredNotification',
 ];
 
 const PROTOCOL_NOTIFICATION_UNION: UnionConfig = {
@@ -1378,7 +1378,7 @@ function checkExhaustiveness(project: Project): void {
   if (!v1) throw new Error('Could not find types/version/v1.ts in the project');
 
   // Collect all interface/type names imported from protocol source modules.
-  // We skip messages.ts because its types (ICommandMap etc.) are generated
+  // We skip messages.ts because its types (CommandMap etc.) are generated
   // as literal Swift strings in generateMessagesFile(), not as struct lists.
   const protocolModules = new Set(['state', 'actions', 'commands', 'notifications', 'errors']);
   const imported = new Set<string>();
@@ -1406,18 +1406,18 @@ function checkExhaustiveness(project: Project): void {
   // Types that ARE generated but via explicit non-list code paths.
   const knownSpecial = new Set<string>([
     'StringOrMarkdown',              // generateStringOrMarkdown()
-    'IToolCallState',                // TOOL_CALL_STATE_UNION discriminated union
-    'IStateAction',                  // StateAction enum in generateActionsFile()
-    'IActionEnvelope',               // generateStructFromInterface() call in generateActionsFile()
-    'IActionOrigin',                 // generateStructFromInterface() call in generateActionsFile()
-    'ISessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
-    'ISessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction
-    'IProtocolNotification',         // PROTOCOL_NOTIFICATION_UNION discriminated union
-    'ITerminalClaim',                // TERMINAL_CLAIM_UNION discriminated union
-    'ITerminalContentPart',           // TERMINAL_CONTENT_PART_UNION discriminated union
-    'ISessionInputQuestion',         // SESSION_INPUT_QUESTION_UNION discriminated union
-    'ISessionInputAnswerValue',      // SESSION_INPUT_ANSWER_VALUE_UNION discriminated union
-    'ISessionInputAnswer',           // SESSION_INPUT_ANSWER_UNION discriminated union
+    'ToolCallState',                // TOOL_CALL_STATE_UNION discriminated union
+    'StateAction',                  // StateAction enum in generateActionsFile()
+    'ActionEnvelope',               // generateStructFromInterface() call in generateActionsFile()
+    'ActionOrigin',                 // generateStructFromInterface() call in generateActionsFile()
+    'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
+    'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction
+    'ProtocolNotification',         // PROTOCOL_NOTIFICATION_UNION discriminated union
+    'TerminalClaim',                // TERMINAL_CLAIM_UNION discriminated union
+    'TerminalContentPart',           // TERMINAL_CONTENT_PART_UNION discriminated union
+    'SessionInputQuestion',         // SESSION_INPUT_QUESTION_UNION discriminated union
+    'SessionInputAnswerValue',      // SESSION_INPUT_ANSWER_VALUE_UNION discriminated union
+    'SessionInputAnswer',           // SESSION_INPUT_ANSWER_UNION discriminated union
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

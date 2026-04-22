@@ -242,7 +242,7 @@ function getTypeAlias(project: Project, name: string): TypeAliasDeclaration | un
 /**
  * Renders a type alias as a proper ### heading with its definition.
  * String-literal unions: ### `ToolCallStatus` \n `'running' | 'pending-permission' | ...`
- * Interface unions: ### `IResponsePart` \n `IMarkdownResponsePart | IContentRef` (with cross-links)
+ * Interface unions: ### `ResponsePart` \n `MarkdownResponsePart | ContentRef` (with cross-links)
  */
 function renderTypeAlias(project: Project, name: string): string {
   const ta = getTypeAlias(project, name);
@@ -366,62 +366,62 @@ function generateStateTypesPage(project: Project): string {
 
   // Root State
   lines.push('## Root State\n');
-  const rootState = getInterface(project, 'IRootState');
-  lines.push(renderHeading('IRootState', rootState));
+  const rootState = getInterface(project, 'RootState');
+  lines.push(renderHeading('RootState', rootState));
   lines.push(getJsDocDescription(rootState) + '\n');
   lines.push(renderInterfaceTable(rootState) + '\n');
 
-  const agentInfo = getInterface(project, 'IAgentInfo');
-  lines.push(renderHeading('IAgentInfo', agentInfo));
+  const agentInfo = getInterface(project, 'AgentInfo');
+  lines.push(renderHeading('AgentInfo', agentInfo));
   lines.push(renderInterfaceTable(agentInfo) + '\n');
 
-  const modelInfo = getInterface(project, 'ISessionModelInfo');
-  lines.push(renderHeading('ISessionModelInfo', modelInfo));
+  const modelInfo = getInterface(project, 'SessionModelInfo');
+  lines.push(renderHeading('SessionModelInfo', modelInfo));
   lines.push(renderInterfaceTable(modelInfo) + '\n');
 
   // Session State
   lines.push('## Session State\n');
-  const sessionState = getInterface(project, 'ISessionState');
-  lines.push(renderHeading('ISessionState', sessionState));
+  const sessionState = getInterface(project, 'SessionState');
+  lines.push(renderHeading('SessionState', sessionState));
   lines.push(getJsDocDescription(sessionState) + '\n');
   lines.push(renderInterfaceTable(sessionState) + '\n');
 
-  const sessionSummary = getInterface(project, 'ISessionSummary');
-  lines.push(renderHeading('ISessionSummary', sessionSummary));
+  const sessionSummary = getInterface(project, 'SessionSummary');
+  lines.push(renderHeading('SessionSummary', sessionSummary));
   lines.push(renderInterfaceTable(sessionSummary) + '\n');
 
   // Turn Types
   lines.push('## Turn Types\n');
-  const turn = getInterface(project, 'ITurn');
-  lines.push(renderHeading('ITurn', turn));
+  const turn = getInterface(project, 'Turn');
+  lines.push(renderHeading('Turn', turn));
   lines.push(getJsDocDescription(turn) + '\n');
   lines.push(renderInterfaceTable(turn) + '\n');
 
-  const activeTurn = getInterface(project, 'IActiveTurn');
-  lines.push(renderHeading('IActiveTurn', activeTurn));
+  const activeTurn = getInterface(project, 'ActiveTurn');
+  lines.push(renderHeading('ActiveTurn', activeTurn));
   lines.push(getJsDocDescription(activeTurn) + '\n');
   lines.push(renderInterfaceTable(activeTurn) + '\n');
 
-  const userMessage = getInterface(project, 'IUserMessage');
-  lines.push(renderHeading('IUserMessage', userMessage));
+  const userMessage = getInterface(project, 'UserMessage');
+  lines.push(renderHeading('UserMessage', userMessage));
   lines.push(renderInterfaceTable(userMessage) + '\n');
 
-  const messageAttachment = getInterface(project, 'IMessageAttachment');
-  lines.push(renderHeading('IMessageAttachment', messageAttachment));
+  const messageAttachment = getInterface(project, 'MessageAttachment');
+  lines.push(renderHeading('MessageAttachment', messageAttachment));
   lines.push(renderInterfaceTable(messageAttachment) + '\n');
 
   // Response Parts
   lines.push('## Response Parts\n');
-  const mdPart = getInterface(project, 'IMarkdownResponsePart');
-  lines.push(renderHeading('IMarkdownResponsePart', mdPart));
+  const mdPart = getInterface(project, 'MarkdownResponsePart');
+  lines.push(renderHeading('MarkdownResponsePart', mdPart));
   lines.push(renderInterfaceTable(mdPart) + '\n');
 
-  const contentRef = getInterface(project, 'IContentRef');
-  lines.push(renderHeading('IContentRef', contentRef));
+  const contentRef = getInterface(project, 'ContentRef');
+  lines.push(renderHeading('ContentRef', contentRef));
   lines.push(getJsDocDescription(contentRef) + '\n');
   lines.push(renderInterfaceTable(contentRef) + '\n');
 
-  // Render IResponsePart type alias automatically
+  // Render ResponsePart type alias automatically
   const responseParts = getTypeAliasesByCategory(project, 'state.ts', 'Response Parts');
   for (const ta of responseParts) {
     lines.push(renderTypeAlias(project, ta.getName()) + '\n');
@@ -430,7 +430,7 @@ function generateStateTypesPage(project: Project): string {
   // Tool Call Types
   lines.push('## Tool Call Types\n');
 
-  // Render type aliases in the Tool Call Types category (IToolCallState union, ToolCallStatus, etc.)
+  // Render type aliases in the Tool Call Types category (ToolCallState union, ToolCallStatus, etc.)
   const toolCallAliases = getTypeAliasesByCategory(project, 'state.ts', 'Tool Call Types');
   for (const ta of toolCallAliases) {
     const rendered = renderTypeAlias(project, ta.getName());
@@ -439,14 +439,14 @@ function generateStateTypesPage(project: Project): string {
 
   // Render each tool call state interface
   const toolCallInterfaces = [
-    'IToolCallResult',
-    'IToolCallStreamingState',
-    'IToolCallPendingConfirmationState',
-    'IToolCallRunningState',
-    'IToolCallPendingResultConfirmationState',
-    'IToolCallCompletedState',
-    'IToolCallCancelledState',
-    'IToolResultSubagentContent',
+    'ToolCallResult',
+    'ToolCallStreamingState',
+    'ToolCallPendingConfirmationState',
+    'ToolCallRunningState',
+    'ToolCallPendingResultConfirmationState',
+    'ToolCallCompletedState',
+    'ToolCallCancelledState',
+    'ToolResultSubagentContent',
   ];
   for (const name of toolCallInterfaces) {
     const iface = getInterface(project, name);
@@ -459,16 +459,16 @@ function generateStateTypesPage(project: Project): string {
   // Common Types
   lines.push('## Common Types\n');
 
-  const usageInfo = getInterface(project, 'IUsageInfo');
-  lines.push(renderHeading('IUsageInfo', usageInfo));
+  const usageInfo = getInterface(project, 'UsageInfo');
+  lines.push(renderHeading('UsageInfo', usageInfo));
   lines.push(renderInterfaceTable(usageInfo) + '\n');
 
-  const errorInfo = getInterface(project, 'IErrorInfo');
-  lines.push(renderHeading('IErrorInfo', errorInfo));
+  const errorInfo = getInterface(project, 'ErrorInfo');
+  lines.push(renderHeading('ErrorInfo', errorInfo));
   lines.push(renderInterfaceTable(errorInfo) + '\n');
 
-  const snapshot = getInterface(project, 'ISnapshot');
-  lines.push(renderHeading('ISnapshot', snapshot));
+  const snapshot = getInterface(project, 'Snapshot');
+  lines.push(renderHeading('Snapshot', snapshot));
   lines.push(getJsDocDescription(snapshot) + '\n');
   lines.push(renderInterfaceTable(snapshot) + '\n');
 
@@ -487,29 +487,29 @@ interface ActionMeta {
 
 const ACTION_ORDER: ActionMeta[] = [
   // Root
-  { interfaceName: 'IRootAgentsChangedAction', typeValue: 'root/agentsChanged', description: 'Fired when available agent backends or their models change.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'RootAgentsChangedAction', typeValue: 'root/agentsChanged', description: 'Fired when available agent backends or their models change.', clientDispatchable: false, version: 1 },
   // Session
-  { interfaceName: 'ISessionReadyAction', typeValue: 'session/ready', description: 'Session backend initialized successfully.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionCreationFailedAction', typeValue: 'session/creationFailed', description: 'Session backend failed to initialize.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionTurnStartedAction', typeValue: 'session/turnStarted', description: 'User sent a message; server starts agent processing.', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionDeltaAction', typeValue: 'session/delta', description: 'Streaming text chunk from the assistant.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionResponsePartAction', typeValue: 'session/responsePart', description: 'Structured content appended to the response.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionToolCallStartAction', typeValue: 'session/toolCallStart', description: 'A tool call begins — parameters are streaming from the LM.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionToolCallDeltaAction', typeValue: 'session/toolCallDelta', description: 'Streaming partial parameters for a tool call.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionToolCallReadyAction', typeValue: 'session/toolCallReady', description: 'Tool call parameters are complete, or a running tool requires re-confirmation.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionToolCallApprovedAction', typeValue: 'session/toolCallConfirmed (approved)', description: 'Client approves a pending tool call.', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionToolCallDeniedAction', typeValue: 'session/toolCallConfirmed (denied)', description: 'Client denies a pending tool call.', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionToolCallCompleteAction', typeValue: 'session/toolCallComplete', description: 'Tool execution finished.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionToolCallResultConfirmedAction', typeValue: 'session/toolCallResultConfirmed', description: 'Client approves or denies a tool result.', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionTurnCompleteAction', typeValue: 'session/turnComplete', description: 'Turn finished — the assistant is idle.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionTurnCancelledAction', typeValue: 'session/turnCancelled', description: 'Turn was aborted; server stops processing.', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionErrorAction', typeValue: 'session/error', description: 'Error during turn processing.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionTitleChangedAction', typeValue: 'session/titleChanged', description: 'Session title updated (auto-generated from conversation, or dispatched by a client to rename).', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionUsageAction', typeValue: 'session/usage', description: 'Token usage report for a turn.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionReasoningAction', typeValue: 'session/reasoning', description: 'Reasoning/thinking text from the model.', clientDispatchable: false, version: 1 },
-  { interfaceName: 'ISessionModelChangedAction', typeValue: 'session/modelChanged', description: 'Model changed for this session.', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionIsReadChangedAction', typeValue: 'session/isReadChanged', description: 'Read state changed for this session.', clientDispatchable: true, version: 1 },
-  { interfaceName: 'ISessionIsDoneChangedAction', typeValue: 'session/isDoneChanged', description: 'Done state changed for this session.', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionReadyAction', typeValue: 'session/ready', description: 'Session backend initialized successfully.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionCreationFailedAction', typeValue: 'session/creationFailed', description: 'Session backend failed to initialize.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionTurnStartedAction', typeValue: 'session/turnStarted', description: 'User sent a message; server starts agent processing.', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionDeltaAction', typeValue: 'session/delta', description: 'Streaming text chunk from the assistant.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionResponsePartAction', typeValue: 'session/responsePart', description: 'Structured content appended to the response.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionToolCallStartAction', typeValue: 'session/toolCallStart', description: 'A tool call begins — parameters are streaming from the LM.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionToolCallDeltaAction', typeValue: 'session/toolCallDelta', description: 'Streaming partial parameters for a tool call.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionToolCallReadyAction', typeValue: 'session/toolCallReady', description: 'Tool call parameters are complete, or a running tool requires re-confirmation.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionToolCallApprovedAction', typeValue: 'session/toolCallConfirmed (approved)', description: 'Client approves a pending tool call.', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionToolCallDeniedAction', typeValue: 'session/toolCallConfirmed (denied)', description: 'Client denies a pending tool call.', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionToolCallCompleteAction', typeValue: 'session/toolCallComplete', description: 'Tool execution finished.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionToolCallResultConfirmedAction', typeValue: 'session/toolCallResultConfirmed', description: 'Client approves or denies a tool result.', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionTurnCompleteAction', typeValue: 'session/turnComplete', description: 'Turn finished — the assistant is idle.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionTurnCancelledAction', typeValue: 'session/turnCancelled', description: 'Turn was aborted; server stops processing.', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionErrorAction', typeValue: 'session/error', description: 'Error during turn processing.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionTitleChangedAction', typeValue: 'session/titleChanged', description: 'Session title updated (auto-generated from conversation, or dispatched by a client to rename).', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionUsageAction', typeValue: 'session/usage', description: 'Token usage report for a turn.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionReasoningAction', typeValue: 'session/reasoning', description: 'Reasoning/thinking text from the model.', clientDispatchable: false, version: 1 },
+  { interfaceName: 'SessionModelChangedAction', typeValue: 'session/modelChanged', description: 'Model changed for this session.', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionIsReadChangedAction', typeValue: 'session/isReadChanged', description: 'Read state changed for this session.', clientDispatchable: true, version: 1 },
+  { interfaceName: 'SessionIsDoneChangedAction', typeValue: 'session/isDoneChanged', description: 'Done state changed for this session.', clientDispatchable: true, version: 1 },
 ];
 
 function generateActionsPage(project: Project): string {
@@ -525,8 +525,8 @@ function generateActionsPage(project: Project): string {
   lines.push('## Action Envelope\n');
   lines.push('Every action is wrapped in an `ActionEnvelope`:\n');
   lines.push('```typescript');
-  lines.push('interface IActionEnvelope {');
-  lines.push('  readonly action: IStateAction;');
+  lines.push('interface ActionEnvelope {');
+  lines.push('  readonly action: StateAction;');
   lines.push('  readonly serverSeq: number;');
   lines.push('  readonly origin: { clientId: string; clientSeq: number } | undefined;');
   lines.push('  readonly rejectionReason?: string;');
@@ -555,10 +555,10 @@ function generateActionsPage(project: Project): string {
 
     lines.push(renderInterfaceTable(iface) + '\n');
 
-    // Special case: toolCallComplete has a nested IToolCallResult
+    // Special case: toolCallComplete has a nested ToolCallResult
     if (meta.typeValue === 'session/toolCallComplete') {
-      const resultIface = getInterface(project, 'IToolCallResult');
-      lines.push(renderHeading('IToolCallResult', resultIface, 4));
+      const resultIface = getInterface(project, 'ToolCallResult');
+      lines.push(renderHeading('ToolCallResult', resultIface, 4));
       lines.push(renderInterfaceTable(resultIface) + '\n');
     }
   }
@@ -586,18 +586,18 @@ interface CommandMeta {
 }
 
 const COMMAND_ORDER: CommandMeta[] = [
-  { method: 'initialize', paramsInterface: 'IInitializeParams', resultInterface: 'IInitializeResult' },
-  { method: 'reconnect', paramsInterface: 'IReconnectParams' },
-  { method: 'createSession', paramsInterface: 'ICreateSessionParams', resultText: '`null` on success.' },
-  { method: 'disposeSession', paramsInterface: 'IDisposeSessionParams', resultText: '`null` on success.' },
-  { method: 'listSessions', paramsInterface: 'IListSessionsParams', resultInterface: 'IListSessionsResult' },
-  { method: 'resourceRead', paramsInterface: 'IResourceReadParams', resultInterface: 'IResourceReadResult' },
-  { method: 'resourceWrite', paramsInterface: 'IResourceWriteParams', resultInterface: 'IResourceWriteResult' },
-  { method: 'resourceList', paramsInterface: 'IResourceListParams', resultInterface: 'IResourceListResult' },
-  { method: 'resourceCopy', paramsInterface: 'IResourceCopyParams', resultInterface: 'IResourceCopyResult' },
-  { method: 'resourceDelete', paramsInterface: 'IResourceDeleteParams', resultInterface: 'IResourceDeleteResult' },
-  { method: 'resourceMove', paramsInterface: 'IResourceMoveParams', resultInterface: 'IResourceMoveResult' },
-  { method: 'fetchTurns', paramsInterface: 'IFetchTurnsParams', resultInterface: 'IFetchTurnsResult' },
+  { method: 'initialize', paramsInterface: 'InitializeParams', resultInterface: 'InitializeResult' },
+  { method: 'reconnect', paramsInterface: 'ReconnectParams' },
+  { method: 'createSession', paramsInterface: 'CreateSessionParams', resultText: '`null` on success.' },
+  { method: 'disposeSession', paramsInterface: 'DisposeSessionParams', resultText: '`null` on success.' },
+  { method: 'listSessions', paramsInterface: 'ListSessionsParams', resultInterface: 'ListSessionsResult' },
+  { method: 'resourceRead', paramsInterface: 'ResourceReadParams', resultInterface: 'ResourceReadResult' },
+  { method: 'resourceWrite', paramsInterface: 'ResourceWriteParams', resultInterface: 'ResourceWriteResult' },
+  { method: 'resourceList', paramsInterface: 'ResourceListParams', resultInterface: 'ResourceListResult' },
+  { method: 'resourceCopy', paramsInterface: 'ResourceCopyParams', resultInterface: 'ResourceCopyResult' },
+  { method: 'resourceDelete', paramsInterface: 'ResourceDeleteParams', resultInterface: 'ResourceDeleteResult' },
+  { method: 'resourceMove', paramsInterface: 'ResourceMoveParams', resultInterface: 'ResourceMoveResult' },
+  { method: 'fetchTurns', paramsInterface: 'FetchTurnsParams', resultInterface: 'FetchTurnsResult' },
 ];
 
 function generateCommandsPage(project: Project): string {
@@ -627,8 +627,8 @@ function generateCommandsPage(project: Project): string {
 
     // Reconnect has two result types
     if (cmd.method === 'reconnect') {
-      const replayResult = getInterface(project, 'IReconnectReplayResult');
-      const snapshotResult = getInterface(project, 'IReconnectSnapshotResult');
+      const replayResult = getInterface(project, 'ReconnectReplayResult');
+      const snapshotResult = getInterface(project, 'ReconnectSnapshotResult');
 
       lines.push('**Result (replay):** When the server can replay from the requested sequence:\n');
       lines.push(renderInterfaceTable(replayResult) + '\n');
@@ -714,7 +714,7 @@ function generateNotificationsPage(project: Project): string {
   // Protocol Notifications
   lines.push('## Protocol Notifications\n');
 
-  const sessionAdded = getInterface(project, 'ISessionAddedNotification');
+  const sessionAdded = getInterface(project, 'SessionAddedNotification');
   lines.push(`### \`notify/sessionAdded\` ${sourceLink(sessionAdded)}\n`);
   lines.push(getJsDocDescription(sessionAdded) + '\n');
   lines.push(renderInterfaceTable(sessionAdded) + '\n');
@@ -725,7 +725,7 @@ function generateNotificationsPage(project: Project): string {
     lines.push(example + '\n');
   }
 
-  const sessionRemoved = getInterface(project, 'ISessionRemovedNotification');
+  const sessionRemoved = getInterface(project, 'SessionRemovedNotification');
   lines.push(`### \`notify/sessionRemoved\` ${sourceLink(sessionRemoved)}\n`);
   lines.push(getJsDocDescription(sessionRemoved) + '\n');
   lines.push(renderInterfaceTable(sessionRemoved) + '\n');
@@ -736,7 +736,7 @@ function generateNotificationsPage(project: Project): string {
     lines.push(example + '\n');
   }
 
-  const sessionSummaryChanged = getInterface(project, 'ISessionSummaryChangedNotification');
+  const sessionSummaryChanged = getInterface(project, 'SessionSummaryChangedNotification');
   lines.push(`### \`notify/sessionSummaryChanged\` ${sourceLink(sessionSummaryChanged)}\n`);
   lines.push(getJsDocDescription(sessionSummaryChanged) + '\n');
   lines.push(renderInterfaceTable(sessionSummaryChanged) + '\n');

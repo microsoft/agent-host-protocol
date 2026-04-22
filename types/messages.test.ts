@@ -92,39 +92,39 @@ const allMethods = parseCommandMethods(commandsSrc);
 const requests = allMethods.filter(m => m.messageType === 'Request').map(m => m.method);
 const clientNotifications = [...new Set(allMethods.filter(m => m.messageType === 'Notification').map(m => m.method))];
 
-describe('ICommandMap', () => {
-  const mapKeys = parseMapKeys(messagesSrc, 'ICommandMap');
+describe('CommandMap', () => {
+  const mapKeys = parseMapKeys(messagesSrc, 'CommandMap');
 
   it('contains every @messageType Request method from commands.ts', () => {
     const missing = requests.filter(m => !mapKeys.includes(m));
-    assert.deepStrictEqual(missing, [], `Missing from ICommandMap: ${missing.join(', ')}`);
+    assert.deepStrictEqual(missing, [], `Missing from CommandMap: ${missing.join(', ')}`);
   });
 
   it('contains no extra methods beyond commands.ts', () => {
     const extra = mapKeys.filter(m => !requests.includes(m));
-    assert.deepStrictEqual(extra, [], `Extra in ICommandMap: ${extra.join(', ')}`);
+    assert.deepStrictEqual(extra, [], `Extra in CommandMap: ${extra.join(', ')}`);
   });
 });
 
-describe('IClientNotificationMap', () => {
-  const mapKeys = parseMapKeys(messagesSrc, 'IClientNotificationMap');
+describe('ClientNotificationMap', () => {
+  const mapKeys = parseMapKeys(messagesSrc, 'ClientNotificationMap');
 
   it('contains every @messageType Notification method from commands.ts', () => {
     const missing = clientNotifications.filter(m => !mapKeys.includes(m));
-    assert.deepStrictEqual(missing, [], `Missing from IClientNotificationMap: ${missing.join(', ')}`);
+    assert.deepStrictEqual(missing, [], `Missing from ClientNotificationMap: ${missing.join(', ')}`);
   });
 
   it('contains no extra methods beyond commands.ts', () => {
     const extra = mapKeys.filter(m => !clientNotifications.includes(m));
-    assert.deepStrictEqual(extra, [], `Extra in IClientNotificationMap: ${extra.join(', ')}`);
+    assert.deepStrictEqual(extra, [], `Extra in ClientNotificationMap: ${extra.join(', ')}`);
   });
 });
 
-describe('_ExpectedCommands matches ICommandMap', () => {
+describe('_ExpectedCommands matches CommandMap', () => {
   const expectedCommands = parseExpectedUnion(messageChecksSrc, '_ExpectedCommands');
-  const mapKeys = parseMapKeys(messagesSrc, 'ICommandMap');
+  const mapKeys = parseMapKeys(messagesSrc, 'CommandMap');
 
-  it('_ExpectedCommands lists exactly the ICommandMap keys', () => {
+  it('_ExpectedCommands lists exactly the CommandMap keys', () => {
     assert.deepStrictEqual(expectedCommands.sort(), mapKeys.sort());
   });
 
@@ -133,11 +133,11 @@ describe('_ExpectedCommands matches ICommandMap', () => {
   });
 });
 
-describe('_ExpectedClientNotifications matches IClientNotificationMap', () => {
+describe('_ExpectedClientNotifications matches ClientNotificationMap', () => {
   const expected = parseExpectedUnion(messageChecksSrc, '_ExpectedClientNotifications');
-  const mapKeys = parseMapKeys(messagesSrc, 'IClientNotificationMap');
+  const mapKeys = parseMapKeys(messagesSrc, 'ClientNotificationMap');
 
-  it('_ExpectedClientNotifications lists exactly the IClientNotificationMap keys', () => {
+  it('_ExpectedClientNotifications lists exactly the ClientNotificationMap keys', () => {
     assert.deepStrictEqual(expected.sort(), mapKeys.sort());
   });
 
@@ -146,11 +146,11 @@ describe('_ExpectedClientNotifications matches IClientNotificationMap', () => {
   });
 });
 
-describe('_ExpectedServerNotifications matches IServerNotificationMap', () => {
+describe('_ExpectedServerNotifications matches ServerNotificationMap', () => {
   const expected = parseExpectedUnion(messageChecksSrc, '_ExpectedServerNotifications');
-  const mapKeys = parseMapKeys(messagesSrc, 'IServerNotificationMap');
+  const mapKeys = parseMapKeys(messagesSrc, 'ServerNotificationMap');
 
-  it('_ExpectedServerNotifications lists exactly the IServerNotificationMap keys', () => {
+  it('_ExpectedServerNotifications lists exactly the ServerNotificationMap keys', () => {
     assert.deepStrictEqual(expected.sort(), mapKeys.sort());
   });
 });
@@ -158,8 +158,8 @@ describe('_ExpectedServerNotifications matches IServerNotificationMap', () => {
 describe('command params/result naming conventions', () => {
   for (const method of requests) {
     const pascal = method[0].toUpperCase() + method.slice(1);
-    const paramsName = `I${pascal}Params`;
-    const resultName = `I${pascal}Result`;
+    const paramsName = `${pascal}Params`;
+    const resultName = `${pascal}Result`;
 
     it(`${method}: ${paramsName} is exported from commands.ts`, () => {
       assert.ok(
@@ -169,10 +169,10 @@ describe('command params/result naming conventions', () => {
     });
 
     it(`${method}: result is ${resultName} or null`, () => {
-      // Check that ICommandMap entry references the right result type (or null)
+      // Check that CommandMap entry references the right result type (or null)
       const entryRe = new RegExp(`'${method}'\\s*:\\s*\\{[^}]*result:\\s*(\\S+)`);
       const match = messagesSrc.match(entryRe);
-      assert.ok(match, `Could not find ICommandMap entry for ${method}`);
+      assert.ok(match, `Could not find CommandMap entry for ${method}`);
       const resultType = match[1].replace(/[;\s}]+$/, '');
       assert.ok(
         resultType === resultName || resultType === 'null',

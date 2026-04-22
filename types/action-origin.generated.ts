@@ -2,57 +2,57 @@
 // Run `npm run generate` to regenerate.
 
 import type {
-  IStateAction,
-  IRootAgentsChangedAction,
-  IRootActiveSessionsChangedAction,
-  IRootTerminalsChangedAction,
-  IRootConfigChangedAction,
-  ISessionReadyAction,
-  ISessionCreationFailedAction,
-  ISessionTurnStartedAction,
-  ISessionDeltaAction,
-  ISessionResponsePartAction,
-  ISessionToolCallStartAction,
-  ISessionToolCallDeltaAction,
-  ISessionToolCallReadyAction,
-  ISessionToolCallConfirmedAction,
-  ISessionToolCallCompleteAction,
-  ISessionToolCallResultConfirmedAction,
-  ISessionToolCallContentChangedAction,
-  ISessionTurnCompleteAction,
-  ISessionTurnCancelledAction,
-  ISessionErrorAction,
-  ISessionTitleChangedAction,
-  ISessionUsageAction,
-  ISessionReasoningAction,
-  ISessionModelChangedAction,
-  ISessionServerToolsChangedAction,
-  ISessionActiveClientChangedAction,
-  ISessionActiveClientToolsChangedAction,
-  ISessionPendingMessageSetAction,
-  ISessionPendingMessageRemovedAction,
-  ISessionQueuedMessagesReorderedAction,
-  ISessionInputRequestedAction,
-  ISessionInputAnswerChangedAction,
-  ISessionInputCompletedAction,
-  ISessionCustomizationsChangedAction,
-  ISessionCustomizationToggledAction,
-  ISessionTruncatedAction,
-  ISessionIsReadChangedAction,
-  ISessionIsDoneChangedAction,
-  ISessionDiffsChangedAction,
-  ISessionConfigChangedAction,
-  ITerminalDataAction,
-  ITerminalInputAction,
-  ITerminalResizedAction,
-  ITerminalClaimedAction,
-  ITerminalTitleChangedAction,
-  ITerminalCwdChangedAction,
-  ITerminalExitedAction,
-  ITerminalClearedAction,
-  ITerminalCommandDetectionAvailableAction,
-  ITerminalCommandExecutedAction,
-  ITerminalCommandFinishedAction,
+  StateAction,
+  RootAgentsChangedAction,
+  RootActiveSessionsChangedAction,
+  RootTerminalsChangedAction,
+  RootConfigChangedAction,
+  SessionReadyAction,
+  SessionCreationFailedAction,
+  SessionTurnStartedAction,
+  SessionDeltaAction,
+  SessionResponsePartAction,
+  SessionToolCallStartAction,
+  SessionToolCallDeltaAction,
+  SessionToolCallReadyAction,
+  SessionToolCallConfirmedAction,
+  SessionToolCallCompleteAction,
+  SessionToolCallResultConfirmedAction,
+  SessionToolCallContentChangedAction,
+  SessionTurnCompleteAction,
+  SessionTurnCancelledAction,
+  SessionErrorAction,
+  SessionTitleChangedAction,
+  SessionUsageAction,
+  SessionReasoningAction,
+  SessionModelChangedAction,
+  SessionServerToolsChangedAction,
+  SessionActiveClientChangedAction,
+  SessionActiveClientToolsChangedAction,
+  SessionPendingMessageSetAction,
+  SessionPendingMessageRemovedAction,
+  SessionQueuedMessagesReorderedAction,
+  SessionInputRequestedAction,
+  SessionInputAnswerChangedAction,
+  SessionInputCompletedAction,
+  SessionCustomizationsChangedAction,
+  SessionCustomizationToggledAction,
+  SessionTruncatedAction,
+  SessionIsReadChangedAction,
+  SessionIsDoneChangedAction,
+  SessionDiffsChangedAction,
+  SessionConfigChangedAction,
+  TerminalDataAction,
+  TerminalInputAction,
+  TerminalResizedAction,
+  TerminalClaimedAction,
+  TerminalTitleChangedAction,
+  TerminalCwdChangedAction,
+  TerminalExitedAction,
+  TerminalClearedAction,
+  TerminalCommandDetectionAvailableAction,
+  TerminalCommandExecutedAction,
+  TerminalCommandFinishedAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -60,136 +60,136 @@ import { ActionType } from './actions.js';
 // ─── Root vs Session vs Terminal Action Unions ───────────────────────────────
 
 /** Union of all root-scoped actions. */
-export type IRootAction =
-  | IRootAgentsChangedAction
-  | IRootActiveSessionsChangedAction
-  | IRootTerminalsChangedAction
-  | IRootConfigChangedAction
+export type RootAction =
+  | RootAgentsChangedAction
+  | RootActiveSessionsChangedAction
+  | RootTerminalsChangedAction
+  | RootConfigChangedAction
 ;
 
 /** Union of all session-scoped actions. */
-export type ISessionAction =
-  | ISessionReadyAction
-  | ISessionCreationFailedAction
-  | ISessionTurnStartedAction
-  | ISessionDeltaAction
-  | ISessionResponsePartAction
-  | ISessionToolCallStartAction
-  | ISessionToolCallDeltaAction
-  | ISessionToolCallReadyAction
-  | ISessionToolCallConfirmedAction
-  | ISessionToolCallCompleteAction
-  | ISessionToolCallResultConfirmedAction
-  | ISessionToolCallContentChangedAction
-  | ISessionTurnCompleteAction
-  | ISessionTurnCancelledAction
-  | ISessionErrorAction
-  | ISessionTitleChangedAction
-  | ISessionUsageAction
-  | ISessionReasoningAction
-  | ISessionModelChangedAction
-  | ISessionServerToolsChangedAction
-  | ISessionActiveClientChangedAction
-  | ISessionActiveClientToolsChangedAction
-  | ISessionPendingMessageSetAction
-  | ISessionPendingMessageRemovedAction
-  | ISessionQueuedMessagesReorderedAction
-  | ISessionInputRequestedAction
-  | ISessionInputAnswerChangedAction
-  | ISessionInputCompletedAction
-  | ISessionCustomizationsChangedAction
-  | ISessionCustomizationToggledAction
-  | ISessionTruncatedAction
-  | ISessionIsReadChangedAction
-  | ISessionIsDoneChangedAction
-  | ISessionDiffsChangedAction
-  | ISessionConfigChangedAction
+export type SessionAction =
+  | SessionReadyAction
+  | SessionCreationFailedAction
+  | SessionTurnStartedAction
+  | SessionDeltaAction
+  | SessionResponsePartAction
+  | SessionToolCallStartAction
+  | SessionToolCallDeltaAction
+  | SessionToolCallReadyAction
+  | SessionToolCallConfirmedAction
+  | SessionToolCallCompleteAction
+  | SessionToolCallResultConfirmedAction
+  | SessionToolCallContentChangedAction
+  | SessionTurnCompleteAction
+  | SessionTurnCancelledAction
+  | SessionErrorAction
+  | SessionTitleChangedAction
+  | SessionUsageAction
+  | SessionReasoningAction
+  | SessionModelChangedAction
+  | SessionServerToolsChangedAction
+  | SessionActiveClientChangedAction
+  | SessionActiveClientToolsChangedAction
+  | SessionPendingMessageSetAction
+  | SessionPendingMessageRemovedAction
+  | SessionQueuedMessagesReorderedAction
+  | SessionInputRequestedAction
+  | SessionInputAnswerChangedAction
+  | SessionInputCompletedAction
+  | SessionCustomizationsChangedAction
+  | SessionCustomizationToggledAction
+  | SessionTruncatedAction
+  | SessionIsReadChangedAction
+  | SessionIsDoneChangedAction
+  | SessionDiffsChangedAction
+  | SessionConfigChangedAction
 ;
 
 /** Union of session actions that clients may dispatch. */
-export type IClientSessionAction =
-  | ISessionTurnStartedAction
-  | ISessionToolCallConfirmedAction
-  | ISessionToolCallCompleteAction
-  | ISessionToolCallResultConfirmedAction
-  | ISessionToolCallContentChangedAction
-  | ISessionTurnCancelledAction
-  | ISessionTitleChangedAction
-  | ISessionModelChangedAction
-  | ISessionActiveClientChangedAction
-  | ISessionActiveClientToolsChangedAction
-  | ISessionPendingMessageSetAction
-  | ISessionPendingMessageRemovedAction
-  | ISessionQueuedMessagesReorderedAction
-  | ISessionInputAnswerChangedAction
-  | ISessionInputCompletedAction
-  | ISessionCustomizationToggledAction
-  | ISessionTruncatedAction
-  | ISessionIsReadChangedAction
-  | ISessionIsDoneChangedAction
-  | ISessionConfigChangedAction
+export type ClientSessionAction =
+  | SessionTurnStartedAction
+  | SessionToolCallConfirmedAction
+  | SessionToolCallCompleteAction
+  | SessionToolCallResultConfirmedAction
+  | SessionToolCallContentChangedAction
+  | SessionTurnCancelledAction
+  | SessionTitleChangedAction
+  | SessionModelChangedAction
+  | SessionActiveClientChangedAction
+  | SessionActiveClientToolsChangedAction
+  | SessionPendingMessageSetAction
+  | SessionPendingMessageRemovedAction
+  | SessionQueuedMessagesReorderedAction
+  | SessionInputAnswerChangedAction
+  | SessionInputCompletedAction
+  | SessionCustomizationToggledAction
+  | SessionTruncatedAction
+  | SessionIsReadChangedAction
+  | SessionIsDoneChangedAction
+  | SessionConfigChangedAction
 ;
 
 /** Union of session actions that only the server may produce. */
-export type IServerSessionAction =
-  | ISessionReadyAction
-  | ISessionCreationFailedAction
-  | ISessionDeltaAction
-  | ISessionResponsePartAction
-  | ISessionToolCallStartAction
-  | ISessionToolCallDeltaAction
-  | ISessionToolCallReadyAction
-  | ISessionTurnCompleteAction
-  | ISessionErrorAction
-  | ISessionUsageAction
-  | ISessionReasoningAction
-  | ISessionServerToolsChangedAction
-  | ISessionInputRequestedAction
-  | ISessionCustomizationsChangedAction
-  | ISessionDiffsChangedAction
+export type ServerSessionAction =
+  | SessionReadyAction
+  | SessionCreationFailedAction
+  | SessionDeltaAction
+  | SessionResponsePartAction
+  | SessionToolCallStartAction
+  | SessionToolCallDeltaAction
+  | SessionToolCallReadyAction
+  | SessionTurnCompleteAction
+  | SessionErrorAction
+  | SessionUsageAction
+  | SessionReasoningAction
+  | SessionServerToolsChangedAction
+  | SessionInputRequestedAction
+  | SessionCustomizationsChangedAction
+  | SessionDiffsChangedAction
 ;
 
 /** Union of all terminal-scoped actions. */
-export type ITerminalAction =
-  | ITerminalDataAction
-  | ITerminalInputAction
-  | ITerminalResizedAction
-  | ITerminalClaimedAction
-  | ITerminalTitleChangedAction
-  | ITerminalCwdChangedAction
-  | ITerminalExitedAction
-  | ITerminalClearedAction
-  | ITerminalCommandDetectionAvailableAction
-  | ITerminalCommandExecutedAction
-  | ITerminalCommandFinishedAction
+export type TerminalAction =
+  | TerminalDataAction
+  | TerminalInputAction
+  | TerminalResizedAction
+  | TerminalClaimedAction
+  | TerminalTitleChangedAction
+  | TerminalCwdChangedAction
+  | TerminalExitedAction
+  | TerminalClearedAction
+  | TerminalCommandDetectionAvailableAction
+  | TerminalCommandExecutedAction
+  | TerminalCommandFinishedAction
 ;
 
 /** Union of terminal actions that clients may dispatch. */
-export type IClientTerminalAction =
-  | ITerminalInputAction
-  | ITerminalResizedAction
-  | ITerminalClaimedAction
-  | ITerminalTitleChangedAction
-  | ITerminalClearedAction
+export type ClientTerminalAction =
+  | TerminalInputAction
+  | TerminalResizedAction
+  | TerminalClaimedAction
+  | TerminalTitleChangedAction
+  | TerminalClearedAction
 ;
 
 /** Union of terminal actions that only the server may produce. */
-export type IServerTerminalAction =
-  | ITerminalDataAction
-  | ITerminalCwdChangedAction
-  | ITerminalExitedAction
-  | ITerminalCommandDetectionAvailableAction
-  | ITerminalCommandExecutedAction
-  | ITerminalCommandFinishedAction
+export type ServerTerminalAction =
+  | TerminalDataAction
+  | TerminalCwdChangedAction
+  | TerminalExitedAction
+  | TerminalCommandDetectionAvailableAction
+  | TerminalCommandExecutedAction
+  | TerminalCommandFinishedAction
 ;
 
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
 
 /**
  * Exhaustive map indicating which action types may be dispatched by clients.
- * Adding a new action to IStateAction without adding it here is a compile error.
+ * Adding a new action to StateAction without adding it here is a compile error.
  */
-export const IS_CLIENT_DISPATCHABLE: { readonly [K in IStateAction['type']]: boolean } = {
+export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: boolean } = {
   [ActionType.RootAgentsChanged]: false,
   [ActionType.RootActiveSessionsChanged]: false,
   [ActionType.RootTerminalsChanged]: false,
