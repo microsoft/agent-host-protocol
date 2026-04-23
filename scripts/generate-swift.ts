@@ -92,6 +92,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   // Type aliases
   if (tsType === 'URI') return 'String';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
+  if (tsType === 'SessionMeta') return '[String: AnyCodable]';
 
   // Known unions
   if (tsType === 'RootState | SessionState' || tsType === 'RootState | SessionState | TerminalState') return 'SnapshotState';

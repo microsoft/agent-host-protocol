@@ -554,6 +554,12 @@ pub struct SessionState {
     /// {@link SessionActiveClient.customizations | activeClient.customizations}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customizations: Option<Vec<SessionCustomization>>,
+    /// Side-channel metadata. Keys are well-known or producer-defined;
+    /// consumers MUST ignore unknown keys. Lives on session state (rather
+    /// than {@link SessionSummary}) because it is only meaningful to clients
+    /// that have opened the session.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
 }
 
 /// The client currently providing tools and interactive capabilities to a session.

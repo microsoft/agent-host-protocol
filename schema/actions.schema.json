@@ -1087,6 +1087,28 @@
         "config"
       ]
     },
+    "SessionMetaChangedAction": {
+      "type": "object",
+      "description": "The session's `_meta` side-channel changed. Replaces `state._meta`\nentirely (full-replacement semantics). Producers SHOULD merge any\nkeys they wish to preserve into the new value before dispatching.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionMetaChanged"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "meta": {
+          "$ref": "#/$defs/SessionMeta",
+          "description": "New `_meta` payload, or `undefined` to clear it"
+        }
+      },
+      "required": [
+        "type",
+        "session",
+        "meta"
+      ]
+    },
     "SessionTruncatedAction": {
       "type": "object",
       "description": "Truncates a session's history. If `turnId` is provided, all turns after that\nturn are removed and the specified turn is kept. If `turnId` is omitted, all\nturns are removed.\n\nIf there is an active turn it is silently dropped and the session status\nreturns to `idle`.\n\nCommon use-case: truncate old data then dispatch a new\n`session/turnStarted` with an edited message.",
@@ -1873,6 +1895,10 @@
             "$ref": "#/$defs/SessionCustomization"
           },
           "description": "Server-provided customizations active in this session.\n\nClient-provided customizations are available on\n{@link SessionActiveClient.customizations | activeClient.customizations}."
+        },
+        "_meta": {
+          "$ref": "#/$defs/SessionMeta",
+          "description": "Side-channel metadata. Keys are well-known or producer-defined;\nconsumers MUST ignore unknown keys. Lives on session state (rather\nthan {@link SessionSummary}) because it is only meaningful to clients\nthat have opened the session."
         }
       },
       "required": [
@@ -1880,6 +1906,11 @@
         "lifecycle",
         "turns"
       ]
+    },
+    "SessionMeta": {
+      "type": "object",
+      "description": "Well-known property bag attached to a session. Allows extensions and\nclients to carry side-channel data without growing the core protocol on\nevery addition. Keys SHOULD be namespaced (e.g. `git`, `vscode.foo`) to\navoid collisions; all values MUST be JSON-serializable.",
+      "properties": {}
     },
     "SessionActiveClient": {
       "type": "object",
@@ -4374,6 +4405,9 @@
         },
         {
           "$ref": "#/$defs/SessionConfigChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionMetaChangedAction"
         },
         {
           "$ref": "#/$defs/TerminalDataAction"

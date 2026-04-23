@@ -94,6 +94,8 @@ pub enum ActionType {
     SessionDiffsChanged,
     #[serde(rename = "session/configChanged")]
     SessionConfigChanged,
+    #[serde(rename = "session/metaChanged")]
+    SessionMetaChanged,
     #[serde(rename = "root/terminalsChanged")]
     RootTerminalsChanged,
     #[serde(rename = "root/configChanged")]

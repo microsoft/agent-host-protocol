@@ -43,6 +43,7 @@ import type {
   SessionActivityChangedAction,
   SessionDiffsChangedAction,
   SessionConfigChangedAction,
+  SessionMetaChangedAction,
   TerminalDataAction,
   TerminalInputAction,
   TerminalResizedAction,
@@ -106,6 +107,7 @@ export type SessionAction =
   | SessionActivityChangedAction
   | SessionDiffsChangedAction
   | SessionConfigChangedAction
+  | SessionMetaChangedAction
 ;
 
 /** Union of session actions that clients may dispatch. */
@@ -150,6 +152,7 @@ export type ServerSessionAction =
   | SessionCustomizationsChangedAction
   | SessionActivityChangedAction
   | SessionDiffsChangedAction
+  | SessionMetaChangedAction
 ;
 
 /** Union of all terminal-scoped actions. */
@@ -233,6 +236,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionActivityChanged]: false,
   [ActionType.SessionDiffsChanged]: false,
   [ActionType.SessionConfigChanged]: true,
+  [ActionType.SessionMetaChanged]: false,
   [ActionType.TerminalData]: false,
   [ActionType.TerminalInput]: true,
   [ActionType.TerminalResized]: true,

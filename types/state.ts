@@ -330,6 +330,25 @@ export interface SessionState {
    * {@link SessionActiveClient.customizations | activeClient.customizations}.
    */
   customizations?: SessionCustomization[];
+  /**
+   * Side-channel metadata. Keys are well-known or producer-defined;
+   * consumers MUST ignore unknown keys. Lives on session state (rather
+   * than {@link SessionSummary}) because it is only meaningful to clients
+   * that have opened the session.
+   */
+  _meta?: SessionMeta;
+}
+
+/**
+ * Well-known property bag attached to a session. Allows extensions and
+ * clients to carry side-channel data without growing the core protocol on
+ * every addition. Keys SHOULD be namespaced (e.g. `git`, `vscode.foo`) to
+ * avoid collisions; all values MUST be JSON-serializable.
+ *
+ * @category Session State
+ */
+export interface SessionMeta {
+  readonly [key: string]: unknown;
 }
 
 /**

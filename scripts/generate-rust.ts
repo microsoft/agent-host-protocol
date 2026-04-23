@@ -138,6 +138,8 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   // SessionStatus is a bitfield — represent as raw u32 rather than enum.
   if (tsType === 'SessionStatus') return 'u32';
 
+  if (tsType === 'SessionMeta') return 'JsonObject';
+
   if (tsType === 'IRootState | ISessionState' || tsType === 'IRootState | ISessionState | ITerminalState'
     || tsType === 'RootState | SessionState' || tsType === 'RootState | SessionState | TerminalState') {
     return 'SnapshotState';
