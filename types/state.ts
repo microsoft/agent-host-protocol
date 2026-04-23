@@ -1410,6 +1410,34 @@ export type ToolResultContent =
 // ─── Customization Types ─────────────────────────────────────────────────────
 
 /**
+ * Scope discriminator for a customization configured on the agent host.
+ *
+ * @category Customization Types
+ */
+export const enum CustomizationScopeKind {
+  /** Applies to every session on this agent host. */
+  Host = 'host',
+  /** Applies only to sessions rooted in a specific workspace. */
+  Workspace = 'workspace',
+}
+
+/**
+ * Scope metadata for an agent-host customization.
+ *
+ * @category Customization Types
+ */
+export interface CustomizationScope {
+  /** Whether the customization is host-wide or workspace-specific. */
+  kind: CustomizationScopeKind;
+  /**
+   * Workspace root URI this customization applies to.
+   *
+   * Required when {@link kind} is {@link CustomizationScopeKind.Workspace}.
+   */
+  workspace?: URI;
+}
+
+/**
  * A reference to an [Open Plugins](https://open-plugins.com/) plugin.
  *
  * This is intentionally thin — AHP specifies plugin identity and metadata
@@ -1434,6 +1462,8 @@ export interface CustomizationRef {
    * changed since it was last seen, avoiding redundant reloads or copies.
    */
   nonce?: string;
+  /** Optional scope metadata when the customization is configured by the host. */
+  scope?: CustomizationScope;
 }
 
 /**
@@ -1453,16 +1483,27 @@ export const enum CustomizationStatus {
 }
 
 /**
- * A customization active in a session.
+ * Origin of a customization active in a session.
  *
- * Entries without a `clientId` are server-provided; entries with a `clientId`
- * originate from that client.
+ * @category Customization Types
+ */
+export const enum SessionCustomizationSource {
+  /** Customization was configured by the connected client. */
+  Client = 'client',
+  /** Customization was configured on the agent host itself. */
+  Host = 'host',
+}
+
+/**
+ * A customization active in a session.
  *
  * @category Customization Types
  */
 export interface SessionCustomization {
   /** The plugin this customization refers to */
   customization: CustomizationRef;
+  /** Where this customization originated. */
+  source?: SessionCustomizationSource;
   /** Whether this customization is currently enabled */
   enabled: boolean;
   /**

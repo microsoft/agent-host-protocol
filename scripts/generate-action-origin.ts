@@ -163,6 +163,8 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const rootActions = actions.filter(a => a.scope === 'root');
   const sessionActions = actions.filter(a => a.scope === 'session');
   const terminalActions = actions.filter(a => a.scope === 'terminal');
+  const clientRootActions = rootActions.filter(a => a.isClientDispatchable);
+  const serverRootActions = rootActions.filter(a => !a.isClientDispatchable);
   const clientSessionActions = sessionActions.filter(a => a.isClientDispatchable);
   const serverSessionActions = sessionActions.filter(a => !a.isClientDispatchable);
   const clientTerminalActions = terminalActions.filter(a => a.isClientDispatchable);
@@ -188,6 +190,24 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   lines.push(`export type RootAction =`);
   for (let i = 0; i < rootActions.length; i++) {
     lines.push(`  | ${rootActions[i].name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  // ClientRootAction
+  lines.push(`/** Union of root actions that clients may dispatch. */`);
+  lines.push(`export type ClientRootAction =`);
+  for (let i = 0; i < clientRootActions.length; i++) {
+    lines.push(`  | ${clientRootActions[i].name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  // ServerRootAction
+  lines.push(`/** Union of root actions that only the server may produce. */`);
+  lines.push(`export type ServerRootAction =`);
+  for (let i = 0; i < serverRootActions.length; i++) {
+    lines.push(`  | ${serverRootActions[i].name}`);
   }
   lines.push(`;`);
   lines.push(``);

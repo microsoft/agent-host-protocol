@@ -67,7 +67,7 @@ SessionState {
   turns: Turn[]
   activeTurn: ActiveTurn | undefined
   inputRequests?: SessionInputRequest[]
-  customizations?: SessionCustomization[]  // server-provided plugins
+  customizations?: SessionCustomization[]  // active session plugins
 }
 ```
 

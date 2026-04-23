@@ -49,6 +49,7 @@ Server-provided customizations are exposed in `SessionState.customizations` as `
 ```typescript
 SessionCustomization {
   customization: CustomizationRef
+  source?: 'host' | 'client'
   enabled: boolean
   status?: 'loading' | 'loaded' | 'degraded' | 'error'
   statusMessage?: string
@@ -83,6 +84,8 @@ stateDiagram-v2
 
 The server updates `SessionState.customizations` via the `session/customizationsChanged` action whenever loading status changes. This action uses full-replacement semantics — the entire array is replaced.
 
+The optional `source` field distinguishes host-managed entries (`'host'`) from active-client entries (`'client'`). This lets servers preserve host-scoped plugins while replacing the client-scoped subset when the active client changes.
+
 ## Client Customizations
 
 The active client contributes customizations by including them in `SessionActiveClient.customizations` when claiming the active role (via `session/activeClientChanged`) or updating tools (via `session/activeClientToolsChanged`).
@@ -103,6 +106,19 @@ sequenceDiagram
 ```
 
 When the active client disconnects or is replaced, its customizations are no longer available. The server SHOULD update `SessionState.customizations` accordingly.
+
+## Session-Scoped Host Configuration
+
+The protocol intentionally treats plugin resolution as implementation-defined. For remote/browser clients, a useful pattern is to let the host resolve plugins from session configuration or workspace/server files, then publish the effective set through `SessionState.customizations`.
+
+For example, a host might:
+
+1. read a workspace file such as `.vscode/agent-host.json`
+2. expose the effective plugin list through `resolveSessionConfig`
+3. load those plugins when creating or resuming the session
+4. publish them as host-scoped `SessionCustomization` entries (`source: 'host'`)
+
+This keeps plugin configuration usable from thin clients without extending AHP with plugin-install semantics.
 
 ## Toggling Customizations
 
