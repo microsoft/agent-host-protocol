@@ -27,7 +27,6 @@ import type {
   TerminalClaim,
   SessionInputResponseKind,
   ConfirmationOption,
-  SessionMeta,
 } from './state.js';
 
 import { ToolCallConfirmationReason, ToolCallCancellationReason, PendingMessageKind } from './state.js';
@@ -787,7 +786,7 @@ export interface SessionMetaChangedAction {
   /** Session URI */
   session: URI;
   /** New `_meta` payload, or `undefined` to clear it */
-  meta: SessionMeta | undefined;
+  _meta: Record<string, unknown> | undefined;
 }
 
 // ─── Truncation ──────────────────────────────────────────────────────────────

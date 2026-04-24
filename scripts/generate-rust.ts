@@ -138,8 +138,6 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   // SessionStatus is a bitfield — represent as raw u32 rather than enum.
   if (tsType === 'SessionStatus') return 'u32';
 
-  if (tsType === 'SessionMeta') return 'JsonObject';
-
   if (tsType === 'IRootState | ISessionState' || tsType === 'IRootState | ISessionState | ITerminalState'
     || tsType === 'RootState | SessionState' || tsType === 'RootState | SessionState | TerminalState') {
     return 'SnapshotState';
@@ -813,6 +811,7 @@ const ACTION_VARIANTS: {
   { type: 'session/truncated', variantName: 'SessionTruncated', tsInterface: 'SessionTruncatedAction' },
   { type: 'session/diffsChanged', variantName: 'SessionDiffsChanged', tsInterface: 'SessionDiffsChangedAction' },
   { type: 'session/configChanged', variantName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
+  { type: 'session/metaChanged', variantName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
   { type: 'session/toolCallContentChanged', variantName: 'SessionToolCallContentChanged', tsInterface: 'SessionToolCallContentChangedAction' },
   { type: 'root/terminalsChanged', variantName: 'RootTerminalsChanged', tsInterface: 'RootTerminalsChangedAction' },
   { type: 'terminal/data', variantName: 'TerminalData', tsInterface: 'TerminalDataAction' },

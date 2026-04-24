@@ -783,6 +783,19 @@ pub struct SessionConfigChangedAction {
     pub replace: Option<bool>,
 }
 
+/// The session's `_meta` side-channel changed. Replaces `state._meta`
+/// entirely (full-replacement semantics). Producers SHOULD merge any
+/// keys they wish to preserve into the new value before dispatching.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMetaChangedAction {
+    /// Session URI
+    pub session: Uri,
+    /// New `_meta` payload, or `undefined` to clear it
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
 /// Partial content produced while a tool is still executing.
 /// 
 /// Replaces the `content` array on the running tool call state. Clients can
@@ -1064,6 +1077,8 @@ pub enum StateAction {
     SessionDiffsChanged(SessionDiffsChangedAction),
     #[serde(rename = "session/configChanged")]
     SessionConfigChanged(SessionConfigChangedAction),
+    #[serde(rename = "session/metaChanged")]
+    SessionMetaChanged(SessionMetaChangedAction),
     #[serde(rename = "session/toolCallContentChanged")]
     SessionToolCallContentChanged(SessionToolCallContentChangedAction),
     #[serde(rename = "root/terminalsChanged")]

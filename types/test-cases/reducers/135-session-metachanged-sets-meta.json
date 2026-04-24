@@ -18,7 +18,7 @@
     {
       "type": "session/metaChanged",
       "session": "copilot:/test-session",
-      "meta": { "git": { "branch": "feature" }, "vscode.foo": 42 }
+      "_meta": { "git": { "branch": "feature" }, "vscode.foo": 42 }
     }
   ],
   "expected": {

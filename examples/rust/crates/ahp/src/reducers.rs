@@ -523,6 +523,10 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             touch_modified(state);
             ReduceOutcome::Applied
         }
+        StateAction::SessionMetaChanged(a) => {
+            state.meta = a.meta.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::SessionServerToolsChanged(a) => {
             state.server_tools = Some(a.tools.clone());
             ReduceOutcome::Applied
