@@ -1057,6 +1057,7 @@ mod tests {
             input_requests: None,
             config: None,
             customizations: None,
+            meta: None,
         }
     }
 
