@@ -6,12 +6,12 @@ docs/.vitepress/cache
 # Generated files (npm run generate)
 docs/reference/
 docs/public/schema/
-examples/swift/AgentHostProtocol/Sources/AgentHostProtocol/Generated/
-examples/swift/AgentHostProtocol/.build/
-examples/swift/AgentHostProtocol/.swiftpm/
-examples/swift/AHPApp/.build/
-examples/swift/AHPClient/.build/
-examples/swift/AHPClient/AHPClient/Config/Signing.local.xcconfig
+clients/swift/AgentHostProtocol/Sources/AgentHostProtocol/Generated/
+clients/swift/AgentHostProtocol/.build/
+clients/swift/AgentHostProtocol/.swiftpm/
+clients/swift/AHPApp/.build/
+clients/swift/AHPClient/.build/
+clients/swift/AHPClient/AHPClient/Config/Signing.local.xcconfig
 
 # Xcode / Swift
 DerivedData
@@ -24,4 +24,4 @@ DerivedData
 
 coverage
 
-examples/rust/target
+clients/rust/target

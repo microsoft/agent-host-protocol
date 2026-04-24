@@ -12,12 +12,12 @@
   "git.branchProtectionPrompt": "alwaysCommitToNewBranch",
   "git.branchRandomName.enable": true,
   "files.readonlyInclude": {
-    "examples/rust/crates/ahp-types/src/*.rs": true,
+    "clients/rust/crates/ahp-types/src/*.rs": true,
   },
   "files.readonlyExclude": {
-    "examples/rust/crates/ahp-types/src/common.rs": true,
+    "clients/rust/crates/ahp-types/src/common.rs": true,
   },
 	"rust-analyzer.linkedProjects": [
-		"examples/rust/Cargo.toml"
+		"clients/rust/Cargo.toml"
 	],
 }

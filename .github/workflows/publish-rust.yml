@@ -1,0 +1,92 @@
+name: Publish Rust Crates
+
+on:
+  push:
+    tags:
+      - "rust/v*"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: clients/rust
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  # Run the full test suite and lints before publishing anything
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: clients/rust
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Verify publishable (dry run)
+        run: |
+          cargo publish --dry-run -p ahp-types
+          cargo publish --dry-run -p ahp
+          cargo publish --dry-run -p ahp-ws
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: crates-io
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify tag matches workspace version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#rust/v}"
+          CARGO_VERSION=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "ahp-types") | .version')
+
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match Cargo workspace version ($CARGO_VERSION)"
+            exit 1
+          fi
+
+          echo "Publishing version $CARGO_VERSION"
+
+      # Publish in dependency order with a pause between each to allow
+      # crates.io index propagation before dependents are published.
+      - name: Publish ahp-types
+        run: cargo publish -p ahp-types
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for index propagation
+        run: sleep 30
+
+      - name: Publish ahp
+        run: cargo publish -p ahp
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for index propagation
+        run: sleep 30
+
+      - name: Publish ahp-ws
+        run: cargo publish -p ahp-ws
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

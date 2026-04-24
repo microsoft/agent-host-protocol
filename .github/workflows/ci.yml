@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: examples/rust
+        working-directory: clients/rust
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +37,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: examples/rust
+          workspaces: clients/rust
 
       - run: cargo clippy --workspace -- -D warnings
 

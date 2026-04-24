@@ -19,8 +19,8 @@ const TYPES_DIR = path.join(ROOT, 'types');
 const DOCS_DIR = path.join(ROOT, 'docs', 'reference');
 const SCHEMA_DIR = path.join(ROOT, 'schema');
 const SCHEMA_PUBLIC_DIR = path.join(ROOT, 'docs', 'public', 'schema');
-const SWIFT_DIR = path.join(ROOT, 'examples', 'swift', 'AgentHostProtocol');
-const RUST_DIR = path.join(ROOT, 'examples', 'rust');
+const SWIFT_DIR = path.join(ROOT, 'clients', 'swift', 'AgentHostProtocol');
+const RUST_DIR = path.join(ROOT, 'clients', 'rust');
 
 const args = process.argv.slice(2);
 const docsOnly = args.includes('--docs');

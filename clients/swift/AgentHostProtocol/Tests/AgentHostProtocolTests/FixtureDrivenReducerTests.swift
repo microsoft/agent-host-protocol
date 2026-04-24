@@ -42,7 +42,7 @@ final class FixtureDrivenReducerTests: XCTestCase {
 
     private static let fixtureDir: URL = {
         // Navigate from this source file to the fixtures directory:
-        // examples/swift/AgentHostProtocol/Tests/AgentHostProtocolTests/FixtureDrivenReducerTests.swift
+        // clients/swift/AgentHostProtocol/Tests/AgentHostProtocolTests/FixtureDrivenReducerTests.swift
         // → repo root → types/test-cases/reducers/
         let thisFile = URL(fileURLWithPath: #filePath)
         let repoRoot = thisFile
@@ -51,7 +51,7 @@ final class FixtureDrivenReducerTests: XCTestCase {
             .deletingLastPathComponent() // remove Tests/
             .deletingLastPathComponent() // remove AgentHostProtocol/
             .deletingLastPathComponent() // remove swift/
-            .deletingLastPathComponent() // remove examples/
+            .deletingLastPathComponent() // remove clients/
         return repoRoot.appendingPathComponent("types/test-cases/reducers")
     }()
 

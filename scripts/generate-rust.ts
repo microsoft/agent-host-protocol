@@ -2,7 +2,7 @@
  * Rust Crate Generator — Generates Rust type definitions for the `ahp-types`
  * crate from the TypeScript source of truth parsed via ts-morph.
  *
- * Output: examples/rust/crates/ahp-types/src/{state,actions,commands,
+ * Output: clients/rust/crates/ahp-types/src/{state,actions,commands,
  * notifications,errors,messages,version}.rs
  *
  * Mirrors the structure of `generate-swift.ts`. The generated files are
