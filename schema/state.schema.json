@@ -5,9 +5,6 @@
   "title": "AHP State Types",
   "description": "All state types in the Agent Host Protocol.",
   "$defs": {
-    "URI": {
-      "type": "string"
-    },
     "Icon": {
       "type": "object",
       "description": "An optionally-sized icon that can be displayed in a user interface.",
@@ -2716,6 +2713,9 @@
         }
       ],
       "description": "A content part within terminal output."
+    },
+    "URI": {
+      "type": "string"
     }
   }
 }

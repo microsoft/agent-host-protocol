@@ -5,9 +5,6 @@
   "title": "AHP Command Types",
   "description": "All command parameter and result types in the Agent Host Protocol.",
   "$defs": {
-    "URI": {
-      "type": "string"
-    },
     "InitializeParams": {
       "type": "object",
       "description": "Establishes a new connection and negotiates the protocol version.\nThis MUST be the first message sent by the client.",
@@ -4809,6 +4806,9 @@
         "terminal",
         "commandId"
       ]
+    },
+    "URI": {
+      "type": "string"
     }
   }
 }

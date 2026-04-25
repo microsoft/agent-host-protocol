@@ -5,9 +5,6 @@
   "title": "AHP Action Types",
   "description": "All action types in the Agent Host Protocol.",
   "$defs": {
-    "URI": {
-      "type": "string"
-    },
     "ActionOrigin": {
       "type": "object",
       "description": "Identifies the client that originally dispatched an action.",
@@ -4443,6 +4440,9 @@
           "$ref": "#/$defs/TerminalCommandFinishedAction"
         }
       ]
+    },
+    "URI": {
+      "type": "string"
     }
   }
 }

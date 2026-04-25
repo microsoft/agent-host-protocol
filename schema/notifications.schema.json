@@ -5,9 +5,6 @@
   "title": "AHP Notification Types",
   "description": "All notification types in the Agent Host Protocol.",
   "$defs": {
-    "URI": {
-      "type": "string"
-    },
     "SessionAddedNotification": {
       "type": "object",
       "description": "Broadcast to all connected clients when a new session is created.",
@@ -2703,6 +2700,9 @@
         "state",
         "fromSeq"
       ]
+    },
+    "URI": {
+      "type": "string"
     }
   }
 }

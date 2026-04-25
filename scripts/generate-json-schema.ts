@@ -277,7 +277,6 @@ function buildSchemaWithDefs(
     description,
     $defs: {},
   };
-  addUriDefinition(schema);
 
   // Collect all interfaces from the primary file and additional files
   const allInterfaces = new Map<string, InterfaceDeclaration>();
@@ -300,6 +299,7 @@ function buildSchemaWithDefs(
     schema.oneOf = rootInterfaces.map(name => ({ $ref: `#/$defs/${name}` }));
   }
 
+  addUriDefinition(schema);
   return schema;
 }
 
@@ -312,7 +312,6 @@ function generateStateSchema(project: Project): JsonSchema {
     description: 'All state types in the Agent Host Protocol.',
     $defs: {},
   };
-  addUriDefinition(schema);
 
   const ifaces = collectInterfacesFromFile(project, 'state.ts');
   for (const [name, iface] of ifaces) {
@@ -333,6 +332,7 @@ function generateStateSchema(project: Project): JsonSchema {
     }
   }
 
+  addUriDefinition(schema);
   return schema;
 }
 
@@ -345,7 +345,6 @@ function generateActionsSchema(project: Project): JsonSchema {
     description: 'All action types in the Agent Host Protocol.',
     $defs: {},
   };
-  addUriDefinition(schema);
 
   // Add action interfaces
   const actionIfaces = collectInterfacesFromFile(project, 'actions.ts');
@@ -399,6 +398,7 @@ function generateActionsSchema(project: Project): JsonSchema {
     oneOf: stateActionMembers.map(name => ({ $ref: `#/$defs/${name}` })),
   };
 
+  addUriDefinition(schema);
   return schema;
 }
 
@@ -411,7 +411,6 @@ function generateCommandsSchema(project: Project): JsonSchema {
     description: 'All command parameter and result types in the Agent Host Protocol.',
     $defs: {},
   };
-  addUriDefinition(schema);
 
   const cmdIfaces = collectInterfacesFromFile(project, 'commands.ts');
   for (const [name, iface] of cmdIfaces) {
@@ -428,6 +427,7 @@ function generateCommandsSchema(project: Project): JsonSchema {
     }
   }
 
+  addUriDefinition(schema);
   return schema;
 }
 
@@ -440,7 +440,6 @@ function generateNotificationsSchema(project: Project): JsonSchema {
     description: 'All notification types in the Agent Host Protocol.',
     $defs: {},
   };
-  addUriDefinition(schema);
 
   const notifIfaces = collectInterfacesFromFile(project, 'notifications.ts');
   for (const [name, iface] of notifIfaces) {
@@ -462,6 +461,7 @@ function generateNotificationsSchema(project: Project): JsonSchema {
     }
   }
 
+  addUriDefinition(schema);
   return schema;
 }
 
