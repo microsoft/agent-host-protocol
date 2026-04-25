@@ -4806,9 +4806,6 @@
         "terminal",
         "commandId"
       ]
-    },
-    "URI": {
-      "type": "string"
     }
   }
 }

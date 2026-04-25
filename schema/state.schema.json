@@ -2713,9 +2713,6 @@
         }
       ],
       "description": "A content part within terminal output."
-    },
-    "URI": {
-      "type": "string"
     }
   }
 }

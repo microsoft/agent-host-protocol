@@ -258,10 +258,6 @@ function collectInterfacesFromFile(
   return map;
 }
 
-function addUriDefinition(schema: JsonSchema): void {
-  schema.$defs!['URI'] = { type: 'string' };
-}
-
 function buildSchemaWithDefs(
   project: Project,
   title: string,
@@ -331,7 +327,6 @@ function generateStateSchema(project: Project): JsonSchema {
     }
   }
 
-  addUriDefinition(schema);
   return schema;
 }
 
@@ -397,7 +392,6 @@ function generateActionsSchema(project: Project): JsonSchema {
     oneOf: stateActionMembers.map(name => ({ $ref: `#/$defs/${name}` })),
   };
 
-  addUriDefinition(schema);
   return schema;
 }
 
@@ -426,7 +420,6 @@ function generateCommandsSchema(project: Project): JsonSchema {
     }
   }
 
-  addUriDefinition(schema);
   return schema;
 }
 
@@ -460,7 +453,6 @@ function generateNotificationsSchema(project: Project): JsonSchema {
     }
   }
 
-  addUriDefinition(schema);
   return schema;
 }
 

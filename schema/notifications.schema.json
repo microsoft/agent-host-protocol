@@ -2700,9 +2700,6 @@
         "state",
         "fromSeq"
       ]
-    },
-    "URI": {
-      "type": "string"
     }
   }
 }
