@@ -374,9 +374,9 @@ private struct InputBarPreviewWrapper: View {
             UserBubble(
                 text: "Please review these files",
                 attachments: [
-                    MessageAttachment(type: .file, uri: "file:///workspace/src/auth/login.swift", displayName: "login.swift"),
-                    MessageAttachment(type: .directory, uri: "file:///workspace/src/models/", displayName: "models"),
-                    MessageAttachment(type: .selection, uri: "file:///workspace/src/app.swift", displayName: "app.swift (selection)")
+                    MessageAttachment(type: .file, uri: "src/auth/login.swift", displayName: "login.swift"),
+                    MessageAttachment(type: .directory, uri: "src/models/", displayName: "models"),
+                    MessageAttachment(type: .selection, uri: "src/app.swift", displayName: "app.swift (selection)")
                 ]
             )
 
@@ -397,7 +397,7 @@ private struct InputBarPreviewWrapper: View {
                 </userRequest>
                 """,
                 attachments: [
-                    MessageAttachment(type: .file, uri: "file:///workspace/AGENTS.md", displayName: "AGENTS.md")
+                    MessageAttachment(type: .file, uri: "AGENTS.md", displayName: "AGENTS.md")
                 ]
             )
 

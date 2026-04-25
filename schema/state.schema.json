@@ -5,13 +5,15 @@
   "title": "AHP State Types",
   "description": "All state types in the Agent Host Protocol.",
   "$defs": {
+    "URI": {
+      "type": "string"
+    },
     "Icon": {
       "type": "object",
       "description": "An optionally-sized icon that can be displayed in a user interface.",
       "properties": {
         "src": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a\n`data:` URI with Base64-encoded image data.\n\nConsumers SHOULD take steps to ensure URLs serving icons are from the\nsame domain as the client/server or a trusted domain.\n\nConsumers SHOULD take appropriate precautions when consuming SVGs as they can contain\nexecutable JavaScript."
         },
         "contentType": {
@@ -384,8 +386,7 @@
       "description": "Server-owned project metadata for a session.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Project URI"
         },
         "displayName": {
@@ -402,8 +403,7 @@
       "type": "object",
       "properties": {
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "provider": {
@@ -439,8 +439,7 @@
           "description": "Currently selected model"
         },
         "workingDirectory": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "The working directory URI for this session"
         },
         "diffs": {
@@ -1003,8 +1002,7 @@
           "description": "Display message for the request as a whole"
         },
         "url": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "URL the user should review or open, for URL-style elicitations"
         },
         "questions": {
@@ -1261,8 +1259,7 @@
           "description": "Attachment type"
         },
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "File/directory URI"
         },
         "displayName": {
@@ -1302,8 +1299,7 @@
       "description": "A reference to large content stored outside the state tree.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Content URI"
         },
         "sizeHint": {
@@ -1324,8 +1320,7 @@
       "description": "A content part that's a reference to large content stored outside the state tree.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Content URI"
         },
         "sizeHint": {
@@ -2065,8 +2060,7 @@
       "description": "A reference to a resource stored outside the tool result.\n\nWraps {@link ContentRef} for lazy-loading large results.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Content URI"
         },
         "sizeHint": {
@@ -2200,8 +2194,7 @@
           "$ref": "#/$defs/ToolResultContentType.Terminal"
         },
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI (subscribable for full terminal state)"
         },
         "title": {
@@ -2223,8 +2216,7 @@
           "$ref": "#/$defs/ToolResultContentType.Subagent"
         },
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Subagent session URI (subscribable for full session state)"
         },
         "title": {
@@ -2251,8 +2243,7 @@
       "description": "A reference to an [Open Plugins](https://open-plugins.com/) plugin.\n\nThis is intentionally thin — AHP specifies plugin identity and metadata\nbut not implementation details, which are defined by the Open Plugins spec.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Plugin URI (e.g. an HTTPS URL or marketplace identifier)"
         },
         "displayName": {
@@ -2315,8 +2306,7 @@
       "description": "Lightweight terminal metadata exposed on the root state.",
       "properties": {
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI (subscribable for full terminal state)"
         },
         "title": {
@@ -2365,8 +2355,7 @@
           "description": "Discriminant"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI that claimed the terminal"
         },
         "turnId": {
@@ -2392,8 +2381,7 @@
           "description": "Human-readable terminal title"
         },
         "cwd": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Current working directory of the terminal process"
         },
         "cols": {
@@ -2545,8 +2533,7 @@
       "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`.",
       "properties": {
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "The subscribed resource URI (e.g. `agenthost:/root` or `copilot:/<uuid>`)"
         },
         "state": {

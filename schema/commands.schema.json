@@ -5,6 +5,9 @@
   "title": "AHP Command Types",
   "description": "All command parameter and result types in the Agent Host Protocol.",
   "$defs": {
+    "URI": {
+      "type": "string"
+    },
     "InitializeParams": {
       "type": "object",
       "description": "Establishes a new connection and negotiates the protocol version.\nThis MUST be the first message sent by the client.",
@@ -20,8 +23,7 @@
         "initialSubscriptions": {
           "type": "array",
           "items": {
-            "type": "string",
-            "format": "uri"
+            "$ref": "#/$defs/URI"
           },
           "description": "URIs to subscribe to during handshake"
         },
@@ -55,8 +57,7 @@
           "description": "Snapshots for each `initialSubscriptions` URI"
         },
         "defaultDirectory": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Suggested default directory for remote filesystem browsing"
         }
       },
@@ -81,8 +82,7 @@
         "subscriptions": {
           "type": "array",
           "items": {
-            "type": "string",
-            "format": "uri"
+            "$ref": "#/$defs/URI"
           },
           "description": "URIs the client was subscribed to"
         }
@@ -140,8 +140,7 @@
       "description": "Subscribe to a URI-identified state resource.",
       "properties": {
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "URI to subscribe to"
         }
       },
@@ -167,8 +166,7 @@
       "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `notify/sessionAdded` notification to all\nclients.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "URI of the existing session to fork from"
         },
         "turnId": {
@@ -185,8 +183,7 @@
       "type": "object",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI (client-chosen, e.g. `copilot:/<uuid>`)"
         },
         "provider": {
@@ -198,8 +195,7 @@
           "description": "Model selection (ID and optional model-specific configuration)"
         },
         "workingDirectory": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Working directory for the session"
         },
         "fork": {
@@ -225,8 +221,7 @@
       "description": "Disposes a session and cleans up server-side resources.\n\nThe server broadcasts a `notify/sessionRemoved` notification to all clients.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI to dispose"
         }
       },
@@ -239,8 +234,7 @@
       "description": "Creates a new terminal on the server.\n\nAfter creation, the client should subscribe to the terminal URI to receive\nstate updates. The server dispatches `root/terminalsChanged` to update the\nroot terminal list.",
       "properties": {
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI (client-chosen)"
         },
         "claim": {
@@ -252,8 +246,7 @@
           "description": "Human-readable terminal name"
         },
         "cwd": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Initial working directory URI"
         },
         "cols": {
@@ -275,8 +268,7 @@
       "description": "Disposes a terminal and kills its process if still running.\n\nThe server dispatches `root/terminalsChanged` to remove the terminal from\nthe root terminal list.",
       "properties": {
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI to dispose"
         }
       },
@@ -354,8 +346,7 @@
       "description": "Writes content to a file on the server's filesystem.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nIf the file does not exist, it is created. If the file already exists, it is\noverwritten unless `createOnly` is set.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Target file URI on the server filesystem"
         },
         "data": {
@@ -391,8 +382,7 @@
       "description": "Lists directory entries at a file URI on the server's filesystem.\n\nThis is intended for remote folder pickers and similar UI that needs to let\nusers navigate the server's local filesystem.\n\nThe server MUST return success only if the target exists and is a directory.\nIf the target does not exist, is not a directory, or cannot be accessed, the\nserver MUST return a JSON-RPC error.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Directory URI on the server filesystem"
         }
       },
@@ -443,8 +433,7 @@
       "description": "Fetches historical turns for a session. Used for lazy loading of conversation\nhistory.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "before": {
@@ -486,8 +475,7 @@
       "description": "Stop receiving updates for a URI.",
       "properties": {
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "URI to unsubscribe from"
         }
       },
@@ -518,13 +506,11 @@
       "description": "Copies a resource from one URI to another on the server's filesystem.\n\nIf the destination already exists, it is overwritten unless `failIfExists`\nis set.",
       "properties": {
         "source": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Source URI to copy from"
         },
         "destination": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Destination URI to copy to"
         },
         "failIfExists": {
@@ -547,8 +533,7 @@
       "description": "Deletes a resource at a URI on the server's filesystem.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "URI of the resource to delete"
         },
         "recursive": {
@@ -570,13 +555,11 @@
       "description": "Moves (renames) a resource from one URI to another on the server's filesystem.\n\nIf the destination already exists, it is overwritten unless `failIfExists`\nis set.",
       "properties": {
         "source": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Source URI to move from"
         },
         "destination": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Destination URI to move to"
         },
         "failIfExists": {
@@ -626,8 +609,7 @@
           "description": "Agent provider ID"
         },
         "workingDirectory": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Working directory for the session"
         },
         "config": {
@@ -687,8 +669,7 @@
           "description": "Agent provider ID"
         },
         "workingDirectory": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Working directory for the session"
         },
         "config": {
@@ -730,8 +711,7 @@
       "description": "An optionally-sized icon that can be displayed in a user interface.",
       "properties": {
         "src": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a\n`data:` URI with Base64-encoded image data.\n\nConsumers SHOULD take steps to ensure URLs serving icons are from the\nsame domain as the client/server or a trusted domain.\n\nConsumers SHOULD take appropriate precautions when consuming SVGs as they can contain\nexecutable JavaScript."
         },
         "contentType": {
@@ -1104,8 +1084,7 @@
       "description": "Server-owned project metadata for a session.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Project URI"
         },
         "displayName": {
@@ -1122,8 +1101,7 @@
       "type": "object",
       "properties": {
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "provider": {
@@ -1159,8 +1137,7 @@
           "description": "Currently selected model"
         },
         "workingDirectory": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "The working directory URI for this session"
         },
         "diffs": {
@@ -1723,8 +1700,7 @@
           "description": "Display message for the request as a whole"
         },
         "url": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "URL the user should review or open, for URL-style elicitations"
         },
         "questions": {
@@ -1981,8 +1957,7 @@
           "description": "Attachment type"
         },
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "File/directory URI"
         },
         "displayName": {
@@ -2022,8 +1997,7 @@
       "description": "A reference to large content stored outside the state tree.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Content URI"
         },
         "sizeHint": {
@@ -2044,8 +2018,7 @@
       "description": "A content part that's a reference to large content stored outside the state tree.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Content URI"
         },
         "sizeHint": {
@@ -2785,8 +2758,7 @@
       "description": "A reference to a resource stored outside the tool result.\n\nWraps {@link ContentRef} for lazy-loading large results.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Content URI"
         },
         "sizeHint": {
@@ -2920,8 +2892,7 @@
           "$ref": "#/$defs/ToolResultContentType.Terminal"
         },
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI (subscribable for full terminal state)"
         },
         "title": {
@@ -2943,8 +2914,7 @@
           "$ref": "#/$defs/ToolResultContentType.Subagent"
         },
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Subagent session URI (subscribable for full session state)"
         },
         "title": {
@@ -2971,8 +2941,7 @@
       "description": "A reference to an [Open Plugins](https://open-plugins.com/) plugin.\n\nThis is intentionally thin — AHP specifies plugin identity and metadata\nbut not implementation details, which are defined by the Open Plugins spec.",
       "properties": {
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Plugin URI (e.g. an HTTPS URL or marketplace identifier)"
         },
         "displayName": {
@@ -3035,8 +3004,7 @@
       "description": "Lightweight terminal metadata exposed on the root state.",
       "properties": {
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI (subscribable for full terminal state)"
         },
         "title": {
@@ -3085,8 +3053,7 @@
           "description": "Discriminant"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI that claimed the terminal"
         },
         "turnId": {
@@ -3112,8 +3079,7 @@
           "description": "Human-readable terminal title"
         },
         "cwd": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Current working directory of the terminal process"
         },
         "cols": {
@@ -3265,8 +3231,7 @@
       "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`.",
       "properties": {
         "resource": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "The subscribed resource URI (e.g. `agenthost:/root` or `copilot:/<uuid>`)"
         },
         "state": {
@@ -3338,8 +3303,7 @@
       "description": "Base interface for all tool-call-scoped actions, carrying the common\nsession, turn, and tool call identifiers.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3449,8 +3413,7 @@
           "$ref": "#/$defs/ActionType.SessionReady"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         }
       },
@@ -3467,8 +3430,7 @@
           "$ref": "#/$defs/ActionType.SessionCreationFailed"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "error": {
@@ -3490,8 +3452,7 @@
           "$ref": "#/$defs/ActionType.SessionTurnStarted"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3522,8 +3483,7 @@
           "$ref": "#/$defs/ActionType.SessionDelta"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3555,8 +3515,7 @@
           "$ref": "#/$defs/ActionType.SessionResponsePart"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3580,8 +3539,7 @@
       "description": "A tool call begins — parameters are streaming from the LM.\n\nFor client-provided tools, the server sets `toolClientId` to identify the\nowning client. That client is responsible for executing the tool once it\nreaches the `running` state and dispatching `session/toolCallComplete`.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3627,8 +3585,7 @@
       "description": "Streaming partial parameters for a tool call.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3669,8 +3626,7 @@
       "description": "Tool call parameters are complete, or a running tool requires re-confirmation.\n\nWhen dispatched for a `streaming` tool call, transitions to `pending-confirmation`\nor directly to `running` if `confirmed` is set.\n\nWhen dispatched for a `running` tool call (e.g. mid-execution permission needed),\ntransitions back to `pending-confirmation`. The `invocationMessage` and `_meta`\nSHOULD be updated to describe the specific confirmation needed. Clients use the\nstandard `session/toolCallConfirmed` flow to approve or deny.\n\nFor client-provided tools, the server typically sets `confirmed` to\n`'not-needed'` so the tool transitions directly to `running`, where the\nowning client can begin execution immediately.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3742,8 +3698,7 @@
       "description": "Client approves a pending tool call. The tool transitions to `running`.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3792,8 +3747,7 @@
       "description": "Client denies a pending tool call. The tool transitions to `cancelled`.\n\nFor client-provided tools, the owning client MUST dispatch this if it does\nnot recognize the tool or cannot execute it.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3853,8 +3807,7 @@
       "description": "Tool execution finished. Transitions to `completed` or `pending-result-confirmation`\nif `requiresResultConfirmation` is `true`.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action with the execution result. The server\nSHOULD reject this action if the dispatching client does not match `toolClientId`.\n\nServers waiting on a client tool call MAY time out after a reasonable duration\nif the implementing client disconnects or becomes unresponsive, and dispatch\nthis action with `result.success = false` and an appropriate error.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3895,8 +3848,7 @@
       "description": "Client approves or denies a tool's result.\n\nIf `approved` is `false`, the tool transitions to `cancelled` with reason `result-denied`.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3933,8 +3885,7 @@
       "description": "Partial content produced while a tool is still executing.\n\nReplaces the `content` array on the running tool call state. Clients can\nuse this to display live feedback (e.g. a terminal reference) before the\ntool completes.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action to stream intermediate content while\nexecuting. The server SHOULD reject this action if the dispatching client does\nnot match `toolClientId`.",
       "properties": {
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -3977,8 +3928,7 @@
           "$ref": "#/$defs/ActionType.SessionTurnComplete"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -4000,8 +3950,7 @@
           "$ref": "#/$defs/ActionType.SessionTurnCancelled"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -4023,8 +3972,7 @@
           "$ref": "#/$defs/ActionType.SessionError"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -4051,8 +3999,7 @@
           "$ref": "#/$defs/ActionType.SessionTitleChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "title": {
@@ -4074,8 +4021,7 @@
           "$ref": "#/$defs/ActionType.SessionUsage"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -4102,8 +4048,7 @@
           "$ref": "#/$defs/ActionType.SessionReasoning"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -4135,8 +4080,7 @@
           "$ref": "#/$defs/ActionType.SessionModelChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "model": {
@@ -4158,8 +4102,7 @@
           "$ref": "#/$defs/ActionType.SessionIsReadChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "isRead": {
@@ -4181,8 +4124,7 @@
           "$ref": "#/$defs/ActionType.SessionIsArchivedChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "isArchived": {
@@ -4204,8 +4146,7 @@
           "$ref": "#/$defs/ActionType.SessionActivityChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "activity": {
@@ -4227,8 +4168,7 @@
           "$ref": "#/$defs/ActionType.SessionDiffsChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "diffs": {
@@ -4253,8 +4193,7 @@
           "$ref": "#/$defs/ActionType.SessionServerToolsChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "tools": {
@@ -4279,8 +4218,7 @@
           "$ref": "#/$defs/ActionType.SessionActiveClientChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "activeClient": {
@@ -4307,8 +4245,7 @@
           "$ref": "#/$defs/ActionType.SessionActiveClientToolsChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "tools": {
@@ -4333,8 +4270,7 @@
           "$ref": "#/$defs/ActionType.SessionCustomizationsChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "customizations": {
@@ -4359,13 +4295,11 @@
           "$ref": "#/$defs/ActionType.SessionCustomizationToggled"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "uri": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "The URI of the customization to toggle"
         },
         "enabled": {
@@ -4388,8 +4322,7 @@
           "$ref": "#/$defs/ActionType.SessionConfigChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "config": {
@@ -4416,8 +4349,7 @@
           "$ref": "#/$defs/ActionType.SessionMetaChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "_meta": {
@@ -4440,8 +4372,7 @@
           "$ref": "#/$defs/ActionType.SessionTruncated"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "turnId": {
@@ -4462,8 +4393,7 @@
           "$ref": "#/$defs/ActionType.SessionPendingMessageSet"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "kind": {
@@ -4495,8 +4425,7 @@
           "$ref": "#/$defs/ActionType.SessionPendingMessageRemoved"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "kind": {
@@ -4523,8 +4452,7 @@
           "$ref": "#/$defs/ActionType.SessionQueuedMessagesReordered"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "order": {
@@ -4549,8 +4477,7 @@
           "$ref": "#/$defs/ActionType.SessionInputRequested"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "request": {
@@ -4572,8 +4499,7 @@
           "$ref": "#/$defs/ActionType.SessionInputAnswerChanged"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "requestId": {
@@ -4604,8 +4530,7 @@
           "$ref": "#/$defs/ActionType.SessionInputCompleted"
         },
         "session": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Session URI"
         },
         "requestId": {
@@ -4639,8 +4564,7 @@
           "$ref": "#/$defs/ActionType.TerminalData"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "data": {
@@ -4662,8 +4586,7 @@
           "$ref": "#/$defs/ActionType.TerminalInput"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "data": {
@@ -4685,8 +4608,7 @@
           "$ref": "#/$defs/ActionType.TerminalResized"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "cols": {
@@ -4713,8 +4635,7 @@
           "$ref": "#/$defs/ActionType.TerminalClaimed"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "claim": {
@@ -4736,8 +4657,7 @@
           "$ref": "#/$defs/ActionType.TerminalTitleChanged"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "title": {
@@ -4759,13 +4679,11 @@
           "$ref": "#/$defs/ActionType.TerminalCwdChanged"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "cwd": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "New working directory"
         }
       },
@@ -4783,8 +4701,7 @@
           "$ref": "#/$defs/ActionType.TerminalExited"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "exitCode": {
@@ -4805,8 +4722,7 @@
           "$ref": "#/$defs/ActionType.TerminalCleared"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         }
       },
@@ -4823,8 +4739,7 @@
           "$ref": "#/$defs/ActionType.TerminalCommandDetectionAvailable"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         }
       },
@@ -4841,8 +4756,7 @@
           "$ref": "#/$defs/ActionType.TerminalCommandExecuted"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "commandId": {
@@ -4874,8 +4788,7 @@
           "$ref": "#/$defs/ActionType.TerminalCommandFinished"
         },
         "terminal": {
-          "type": "string",
-          "format": "uri",
+          "$ref": "#/$defs/URI",
           "description": "Terminal URI"
         },
         "commandId": {
