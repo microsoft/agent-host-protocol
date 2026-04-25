@@ -965,8 +965,8 @@ pub struct SessionInputRequest {
 pub struct MessageAttachment {
     /// Attachment type
     pub r#type: AttachmentType,
-    /// File/directory path
-    pub path: String,
+    /// File/directory URI
+    pub uri: Uri,
     /// Display name
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,

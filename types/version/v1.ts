@@ -27,7 +27,6 @@ import type {
   Turn,
   ActiveTurn,
   UserMessage,
-  MessageAttachment,
   MarkdownResponsePart,
   ContentRef,
   ToolCallResponsePart,
@@ -83,6 +82,7 @@ import type {
   SessionInputRequest,
   ConfirmationOption,
   ConfirmationOptionKind,
+  AttachmentType,
 } from '../state.js';
 
 import type {
@@ -202,7 +202,11 @@ type V1_ISessionActiveClient = SessionActiveClient;
 type V1_ITurn = Turn;
 type V1_IActiveTurn = ActiveTurn;
 type V1_IUserMessage = UserMessage;
-type V1_IMessageAttachment = MessageAttachment;
+interface V1_IMessageAttachment {
+  type: AttachmentType;
+  uri: string;
+  displayName?: string;
+}
 type V1_IMarkdownResponsePart = MarkdownResponsePart;
 type V1_IContentRef = ContentRef;
 type V1_IToolCallResponsePart = ToolCallResponsePart;
@@ -332,6 +336,7 @@ type V1_ICommandMap = CommandMap;
 type V1_IClientNotificationMap = ClientNotificationMap;
 type V1_IServerNotificationMap = ServerNotificationMap;
 type V1_INotificationMethodParams = NotificationMethodParams;
+type CurrentMessageAttachment = NonNullable<UserMessage['attachments']>[number];
 
 // ─── Compatibility Assertions ────────────────────────────────────────────────
 
@@ -365,7 +370,7 @@ type _CheckActiveTurn = AssertCompatible<V1_IActiveTurn, ActiveTurn>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckUserMessage = AssertCompatible<V1_IUserMessage, UserMessage>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckMessageAttachment = AssertCompatible<V1_IMessageAttachment, MessageAttachment>;
+type _CheckMessageAttachment = AssertCompatible<V1_IMessageAttachment, CurrentMessageAttachment>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckMarkdownResponsePart = AssertCompatible<V1_IMarkdownResponsePart, MarkdownResponsePart>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

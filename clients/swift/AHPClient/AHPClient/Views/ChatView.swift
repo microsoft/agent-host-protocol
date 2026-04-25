@@ -416,7 +416,7 @@ private struct InputBarPreviewWrapper: View {
                 </userRequest>
                 """,
                 attachments: [
-                    MessageAttachment(type: .file, path: "src/auth.swift", displayName: "auth.swift")
+                    MessageAttachment(type: .file, uri: "src/auth.swift", displayName: "auth.swift")
                 ]
             )
             ReasoningPartView(part: ReasoningResponsePart(

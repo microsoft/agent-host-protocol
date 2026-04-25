@@ -844,8 +844,8 @@ export interface UserMessage {
 export interface MessageAttachment {
   /** Attachment type */
   type: AttachmentType;
-  /** File/directory path */
-  path: string;
+  /** File/directory URI */
+  uri: URI;
   /** Display name */
   displayName?: string;
 }

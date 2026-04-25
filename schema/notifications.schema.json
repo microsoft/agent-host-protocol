@@ -1398,9 +1398,9 @@
           "$ref": "#/$defs/AttachmentType",
           "description": "Attachment type"
         },
-        "path": {
-          "type": "string",
-          "description": "File/directory path"
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "File/directory URI"
         },
         "displayName": {
           "type": "string",
@@ -1409,7 +1409,7 @@
       },
       "required": [
         "type",
-        "path"
+        "uri"
       ]
     },
     "MarkdownResponsePart": {
