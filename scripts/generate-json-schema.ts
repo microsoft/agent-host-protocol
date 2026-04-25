@@ -299,7 +299,6 @@ function buildSchemaWithDefs(
     schema.oneOf = rootInterfaces.map(name => ({ $ref: `#/$defs/${name}` }));
   }
 
-  addUriDefinition(schema);
   return schema;
 }
 

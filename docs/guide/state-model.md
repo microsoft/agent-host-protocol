@@ -163,7 +163,7 @@ UserMessage {
 
 MessageAttachment {
   type: 'file' | 'directory' | 'selection'
-  uri: URI
+  path: string
   displayName?: string
 }
 ```
