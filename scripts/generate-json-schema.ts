@@ -30,6 +30,7 @@ interface JsonSchema {
   items?: JsonSchema;
   enum?: Array<string | number | boolean>;
   const?: string | number | boolean;
+  format?: string;
   oneOf?: JsonSchema[];
   anyOf?: JsonSchema[];
   $ref?: string;
@@ -104,6 +105,7 @@ function typeTextToSchema(typeText: string, project: Project): JsonSchema {
 
   // Simple types
   if (cleaned === 'string') return { type: 'string' };
+  if (cleaned === 'URI') return { type: 'string', format: 'uri' };
   if (cleaned === 'number') return { type: 'number' };
   if (cleaned === 'boolean') return { type: 'boolean' };
   if (cleaned === 'unknown') return {};

@@ -82,7 +82,6 @@ import type {
   SessionInputRequest,
   ConfirmationOption,
   ConfirmationOptionKind,
-  AttachmentType,
 } from '../state.js';
 
 import type {
@@ -202,8 +201,9 @@ type V1_ISessionActiveClient = SessionActiveClient;
 type V1_ITurn = Turn;
 type V1_IActiveTurn = ActiveTurn;
 type V1_IUserMessage = UserMessage;
+type V1_AttachmentType = 'file' | 'directory' | 'selection';
 interface V1_IMessageAttachment {
-  type: AttachmentType;
+  type: V1_AttachmentType;
   uri: string;
   displayName?: string;
 }
