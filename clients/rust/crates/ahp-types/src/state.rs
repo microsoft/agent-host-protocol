@@ -948,7 +948,8 @@ pub struct SessionInputRequest {
     /// Stable request identifier
     pub id: String,
     /// Display message for the request as a whole
-    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
     /// URL the user should review or open, for URL-style elicitations
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<Uri>,

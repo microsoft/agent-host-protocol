@@ -664,7 +664,7 @@ export interface SessionInputRequest {
   /** Stable request identifier */
   id: string;
   /** Display message for the request as a whole */
-  message: string;
+  message?: string;
   /** URL the user should review or open, for URL-style elicitations */
   url?: URI;
   /** Ordered questions to ask the user */

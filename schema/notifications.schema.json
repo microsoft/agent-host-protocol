@@ -1161,8 +1161,7 @@
         }
       },
       "required": [
-        "id",
-        "message"
+        "id"
       ]
     },
     "SessionInputTextAnswerValue": {
