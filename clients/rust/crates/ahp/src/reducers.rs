@@ -6,6 +6,44 @@
 //! the matching scope; unrelated actions short-circuit as
 //! [`ReduceOutcome::OutOfScope`] so a client holding all three state
 //! trees can blindly fan every action out.
+//!
+//! All three reducers are pure functions over `(state, action)` — no
+//! I/O, no allocation beyond what the action itself carries — which
+//! makes them safe to run inside a UI render loop or a snapshot
+//! reconciler.
+//!
+//! # Example
+//!
+//! ```
+//! use ahp::reducers::{apply_action_to_root, ReduceOutcome};
+//! use ahp_types::actions::{
+//!     RootActiveSessionsChangedAction, SessionTitleChangedAction, StateAction,
+//! };
+//! use ahp_types::state::RootState;
+//!
+//! let mut root = RootState {
+//!     agents: vec![],
+//!     active_sessions: None,
+//!     terminals: None,
+//!     config: None,
+//! };
+//!
+//! // A root-scoped action mutates `RootState`.
+//! let action = StateAction::RootActiveSessionsChanged(
+//!     RootActiveSessionsChangedAction { active_sessions: 5 },
+//! );
+//! assert_eq!(apply_action_to_root(&mut root, &action), ReduceOutcome::Applied);
+//! assert_eq!(root.active_sessions, Some(5));
+//!
+//! // A session-scoped action is reported as out-of-scope at the root.
+//! let session_action = StateAction::SessionTitleChanged(
+//!     SessionTitleChangedAction { session: "copilot:/s1".into(), title: "Hi".into() },
+//! );
+//! assert_eq!(
+//!     apply_action_to_root(&mut root, &session_action),
+//!     ReduceOutcome::OutOfScope,
+//! );
+//! ```
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};

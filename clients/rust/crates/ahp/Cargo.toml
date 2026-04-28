@@ -7,6 +7,14 @@ license.workspace = true
 repository.workspace = true
 description = "Agent Host Protocol SDK — transport-agnostic client, reducers, and JSON-RPC plumbing."
 readme = "README.md"
+homepage = "https://microsoft.github.io/agent-host-protocol/"
+documentation = "https://docs.rs/ahp"
+keywords = ["ahp", "agent", "protocol", "json-rpc", "tokio"]
+categories = ["api-bindings", "asynchronous", "network-programming"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 ahp-types = { workspace = true }
@@ -25,3 +33,7 @@ tracing-subscriber = "0.3"
 [[example]]
 name = "connect_ws"
 path = "examples/connect_ws.rs"
+
+[[example]]
+name = "reducers_demo"
+path = "examples/reducers_demo.rs"

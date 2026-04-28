@@ -1,4 +1,16 @@
 //! Error types used across the SDK.
+//!
+//! Two error families are exposed:
+//!
+//! - [`TransportError`] — failures of an underlying [`crate::Transport`]
+//!   implementation (closed connection, framing/IO errors).
+//! - [`ClientError`] — failures of the higher-level [`crate::Client`]
+//!   API: transport errors, JSON-RPC error responses, deserialization
+//!   problems, shutdown, cancellation, missing subscriptions, and
+//!   sequence gaps that require resubscribing.
+//!
+//! `ClientError` implements `From<TransportError>` and
+//! `From<serde_json::Error>` so client code can use `?` freely.
 
 use ahp_types::messages::JsonRpcError;
 use thiserror::Error;

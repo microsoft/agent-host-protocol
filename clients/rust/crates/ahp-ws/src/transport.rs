@@ -23,15 +23,33 @@ type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 /// A [`Transport`] backed by a `tokio-tungstenite` WebSocket stream.
 ///
-/// Connect with [`WebSocketTransport::connect`] for the common case, or
-/// pass an existing [`WebSocketStream`] to [`WebSocketTransport::from_stream`]
-/// when you need custom connection options.
+/// Use [`WebSocketTransport::connect`] for the common case, or
+/// [`WebSocketTransport::from_stream`] when you need custom connection
+/// options (custom TLS configuration, additional headers, etc.).
+///
+/// # Example
+///
+/// ```no_run
+/// use ahp::{Client, ClientConfig};
+/// use ahp_ws::WebSocketTransport;
+///
+/// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+/// let transport = WebSocketTransport::connect("ws://localhost:12345").await?;
+/// let client = Client::connect(transport, ClientConfig::default()).await?;
+/// client.initialize("demo".into(), 1, vec![]).await?;
+/// # Ok(()) }
+/// ```
 pub struct WebSocketTransport {
     inner: WsStream,
 }
 
 impl WebSocketTransport {
     /// Open a new WebSocket connection to `url`.
+    ///
+    /// Both `ws://` and `wss://` schemes are accepted; TLS is handled
+    /// transparently via `native-tls`. The URL is parsed eagerly so
+    /// malformed URLs surface as
+    /// [`WebSocketTransportError::InvalidUrl`] before any network I/O.
     pub async fn connect(url: &str) -> Result<Self, WebSocketTransportError> {
         let _parsed = Url::parse(url)?; // validate early
         let (stream, _resp) = connect_async(url).await?;
@@ -39,6 +57,10 @@ impl WebSocketTransport {
     }
 
     /// Wrap an already-connected WebSocket stream.
+    ///
+    /// Use this when you need to drive the `tokio-tungstenite`
+    /// handshake yourself — for custom TLS configuration, request
+    /// headers, or to reuse an existing socket.
     pub fn from_stream(inner: WsStream) -> Self {
         Self { inner }
     }

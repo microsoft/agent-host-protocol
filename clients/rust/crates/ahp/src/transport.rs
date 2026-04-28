@@ -4,6 +4,37 @@
 //! WebSocket, raw TCP, Unix socket, stdio, an in-memory pair for tests —
 //! can back a [`Transport`] implementation. The client consumes typed
 //! [`TransportMessage`]s; framing and TLS are the transport's concern.
+//!
+//! # Implementing a transport
+//!
+//! Three async methods are required: [`Transport::send`],
+//! [`Transport::recv`], and (optionally) [`Transport::close`]. The
+//! crate uses the `impl Future` form of async-fn-in-trait, so no
+//! dynamic dispatch box is required.
+//!
+//! ```
+//! use ahp::{Transport, TransportError, TransportMessage};
+//! use std::future::Future;
+//! use tokio::sync::mpsc;
+//!
+//! /// One half of an in-memory transport pair — handy for tests.
+//! pub struct MemTransport {
+//!     tx: mpsc::Sender<TransportMessage>,
+//!     rx: mpsc::Receiver<TransportMessage>,
+//! }
+//!
+//! impl Transport for MemTransport {
+//!     async fn send(&mut self, msg: TransportMessage) -> Result<(), TransportError> {
+//!         self.tx.send(msg).await.map_err(|_| TransportError::Closed)
+//!     }
+//!     async fn recv(&mut self) -> Result<Option<TransportMessage>, TransportError> {
+//!         Ok(self.rx.recv().await)
+//!     }
+//! }
+//! ```
+//!
+//! For ready-made transports, see the [`ahp-ws`](https://docs.rs/ahp-ws)
+//! crate (WebSocket via `tokio-tungstenite`).
 
 use std::future::Future;
 

@@ -7,6 +7,14 @@ license.workspace = true
 repository.workspace = true
 description = "Wire protocol types for the Agent Host Protocol (AHP)."
 readme = "README.md"
+homepage = "https://microsoft.github.io/agent-host-protocol/"
+documentation = "https://docs.rs/ahp-types"
+keywords = ["ahp", "agent", "protocol", "json-rpc", "serde"]
+categories = ["api-bindings", "encoding", "data-structures"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 serde = { workspace = true }

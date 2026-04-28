@@ -7,6 +7,14 @@ license.workspace = true
 repository.workspace = true
 description = "WebSocket transport adapter for the Agent Host Protocol SDK."
 readme = "README.md"
+homepage = "https://microsoft.github.io/agent-host-protocol/"
+documentation = "https://docs.rs/ahp-ws"
+keywords = ["ahp", "agent", "websocket", "transport", "tokio"]
+categories = ["api-bindings", "asynchronous", "network-programming::websocket"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 ahp = { workspace = true }
