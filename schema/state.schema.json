@@ -2269,7 +2269,7 @@
     },
     "SessionCustomization": {
       "type": "object",
-      "description": "A customization active in a session.\n\nEntries without a `clientId` are server-provided; entries with a `clientId`\noriginate from that client.",
+      "description": "A customization active in a session.",
       "properties": {
         "customization": {
           "$ref": "#/$defs/CustomizationRef",

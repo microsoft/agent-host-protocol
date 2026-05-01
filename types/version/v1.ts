@@ -160,6 +160,10 @@ import type {
   SessionConfigValueItem,
   InitializeParams,
   InitializeResult,
+  ReconnectParams,
+  ReconnectResult,
+  ReconnectReplayResult,
+  ReconnectSnapshotResult,
 } from '../commands.js';
 
 import type {
@@ -328,6 +332,10 @@ type V1_ISessionConfigCompletionsResult = SessionConfigCompletionsResult;
 type V1_ISessionConfigValueItem = SessionConfigValueItem;
 type V1_IInitializeParams = InitializeParams;
 type V1_IInitializeResult = InitializeResult;
+type V1_IReconnectParams = ReconnectParams;
+type V1_IReconnectResult = ReconnectResult;
+type V1_IReconnectReplayResult = ReconnectReplayResult;
+type V1_IReconnectSnapshotResult = ReconnectSnapshotResult;
 type V1_ICommandMap = CommandMap;
 type V1_IClientNotificationMap = ClientNotificationMap;
 type V1_IServerNotificationMap = ServerNotificationMap;
@@ -628,3 +636,11 @@ type _CheckConfirmationOptionKind = AssertCompatible<V1_ConfirmationOptionKind, 
 type _CheckInitializeParams = AssertCompatible<V1_IInitializeParams, InitializeParams>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckInitializeResult = AssertCompatible<V1_IInitializeResult, InitializeResult>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckReconnectParams = AssertCompatible<V1_IReconnectParams, ReconnectParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckReconnectResult = AssertCompatible<V1_IReconnectResult, ReconnectResult>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckReconnectReplayResult = AssertCompatible<V1_IReconnectReplayResult, ReconnectReplayResult>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckReconnectSnapshotResult = AssertCompatible<V1_IReconnectSnapshotResult, ReconnectSnapshotResult>;

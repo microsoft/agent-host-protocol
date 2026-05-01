@@ -66,7 +66,8 @@ struct ReconnectResultTests {
         )
         let result = ReconnectResult.replay(ReconnectReplayResult(
             type: .replay,
-            actions: [action1, action2]
+            actions: [action1, action2],
+            missing: []
         ))
 
         store.applyReconnectResult(result)
@@ -84,7 +85,7 @@ struct ReconnectResultTests {
             fromSeq: 50
         ))
 
-        let result = ReconnectResult.replay(ReconnectReplayResult(type: .replay, actions: []))
+        let result = ReconnectResult.replay(ReconnectReplayResult(type: .replay, actions: [], missing: []))
         store.applyReconnectResult(result)
 
         #expect(store.rootState.agents[0].provider == "stable")

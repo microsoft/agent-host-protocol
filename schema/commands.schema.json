@@ -104,11 +104,19 @@
             "$ref": "#/$defs/ActionEnvelope"
           },
           "description": "Missed action envelopes since `lastSeenServerSeq`"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "URIs from `ReconnectParams.subscriptions` that the server cannot resume.\nThis includes resources that no longer exist (e.g. disposed sessions or\nterminals) as well as resources the client is no longer permitted to\nobserve. Clients SHOULD drop these from their local subscription set."
         }
       },
       "required": [
         "type",
-        "actions"
+        "actions",
+        "missing"
       ]
     },
     "ReconnectSnapshotResult": {
@@ -2967,7 +2975,7 @@
     },
     "SessionCustomization": {
       "type": "object",
-      "description": "A customization active in a session.\n\nEntries without a `clientId` are server-provided; entries with a `clientId`\noriginate from that client.",
+      "description": "A customization active in a session.",
       "properties": {
         "customization": {
           "$ref": "#/$defs/CustomizationRef",

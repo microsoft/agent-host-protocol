@@ -201,10 +201,13 @@ The server MUST include all replayed data in the response before returning. If t
     "actions": [
       { "action": { "type": "session/delta", ... }, "serverSeq": 43 },
       { "action": { "type": "session/delta", ... }, "serverSeq": 44 }
-    ]
+    ],
+    "missing": ["copilot:/<disposed-uuid>"]
   }
 }
 ```
+
+The `missing` array lists subscriptions from the request that the server cannot resume — for example, sessions or terminals that have been disposed, or resources the client is no longer permitted to observe. Clients SHOULD drop these from their local subscription set.
 
 If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
 

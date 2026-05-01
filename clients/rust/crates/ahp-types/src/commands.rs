@@ -99,6 +99,11 @@ pub struct ReconnectParams {
 pub struct ReconnectReplayResult {
     /// Missed action envelopes since `lastSeenServerSeq`
     pub actions: Vec<ActionEnvelope>,
+    /// URIs from `ReconnectParams.subscriptions` that the server cannot resume.
+    /// This includes resources that no longer exist (e.g. disposed sessions or
+    /// terminals) as well as resources the client is no longer permitted to
+    /// observe. Clients SHOULD drop these from their local subscription set.
+    pub missing: Vec<Uri>,
 }
 
 /// Reconnect result when the gap exceeds the replay buffer.

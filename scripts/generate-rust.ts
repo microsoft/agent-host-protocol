@@ -1292,6 +1292,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputQuestion',
     'SessionInputAnswerValue',
     'SessionInputAnswer',
+    'ReconnectResult',
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

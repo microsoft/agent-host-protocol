@@ -1461,6 +1461,7 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputQuestion',         // SESSION_INPUT_QUESTION_UNION discriminated union
     'SessionInputAnswerValue',      // SESSION_INPUT_ANSWER_VALUE_UNION discriminated union
     'SessionInputAnswer',           // SESSION_INPUT_ANSWER_UNION discriminated union
+    'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));
