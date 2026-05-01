@@ -13,12 +13,14 @@ struct InputRequestView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
-            HStack(spacing: 8) {
-                Image(systemName: "questionmark.bubble")
-                    .foregroundStyle(.blue)
-                Text(request.message)
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if let message = request.message, !message.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "questionmark.bubble")
+                        .foregroundStyle(.blue)
+                    Text(message)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
 
             // URL elicitation

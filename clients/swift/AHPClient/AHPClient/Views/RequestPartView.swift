@@ -21,8 +21,8 @@ struct UserBubble: View {
         if let attachments, !attachments.isEmpty {
             for (i, a) in attachments.enumerated() {
                 let icon = attachmentIcon(a.type)
-                let label = a.displayName ?? a.path
-                result.append(ContextPill(id: "attachment-\(i)", label: label, icon: icon, content: a.path))
+                let label = a.displayName ?? a.uri
+                result.append(ContextPill(id: "attachment-\(i)", label: label, icon: icon, content: a.uri))
             }
         }
         return result
@@ -374,9 +374,9 @@ private struct InputBarPreviewWrapper: View {
             UserBubble(
                 text: "Please review these files",
                 attachments: [
-                    MessageAttachment(type: .file, path: "src/auth/login.swift", displayName: "login.swift"),
-                    MessageAttachment(type: .directory, path: "src/models/", displayName: "models"),
-                    MessageAttachment(type: .selection, path: "src/app.swift", displayName: "app.swift (selection)")
+                    MessageAttachment(type: .file, uri: "src/auth/login.swift", displayName: "login.swift"),
+                    MessageAttachment(type: .directory, uri: "src/models/", displayName: "models"),
+                    MessageAttachment(type: .selection, uri: "src/app.swift", displayName: "app.swift (selection)")
                 ]
             )
 
@@ -397,7 +397,7 @@ private struct InputBarPreviewWrapper: View {
                 </userRequest>
                 """,
                 attachments: [
-                    MessageAttachment(type: .file, path: "AGENTS.md", displayName: "AGENTS.md")
+                    MessageAttachment(type: .file, uri: "AGENTS.md", displayName: "AGENTS.md")
                 ]
             )
 
