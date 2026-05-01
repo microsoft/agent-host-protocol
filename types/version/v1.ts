@@ -148,6 +148,8 @@ import type {
   ResourceDeleteResult,
   ResourceMoveParams,
   ResourceMoveResult,
+  ResourceRequestParams,
+  ResourceRequestResult,
   CreateTerminalParams,
   CreateSessionParams,
   DisposeTerminalParams,
@@ -168,10 +170,18 @@ import type {
 
 import type {
   CommandMap,
+  ServerCommandMap,
   ClientNotificationMap,
   ServerNotificationMap,
   NotificationMethodParams,
 } from '../messages.js';
+
+import type {
+  AhpError,
+  AhpErrorDetailsMap,
+  AuthRequiredErrorData,
+  PermissionDeniedErrorData,
+} from '../errors.js';
 
 // ─── Bidirectional Assignability Check ───────────────────────────────────────
 
@@ -321,6 +331,8 @@ type V1_IResourceDeleteParams = ResourceDeleteParams;
 type V1_IResourceDeleteResult = ResourceDeleteResult;
 type V1_IResourceMoveParams = ResourceMoveParams;
 type V1_IResourceMoveResult = ResourceMoveResult;
+type V1_IResourceRequestParams = ResourceRequestParams;
+type V1_IResourceRequestResult = ResourceRequestResult;
 type V1_IResolveSessionConfigParams = ResolveSessionConfigParams;
 type V1_IResolveSessionConfigResult = ResolveSessionConfigResult;
 type V1_IConfigPropertySchema = ConfigPropertySchema;
@@ -337,9 +349,14 @@ type V1_IReconnectResult = ReconnectResult;
 type V1_IReconnectReplayResult = ReconnectReplayResult;
 type V1_IReconnectSnapshotResult = ReconnectSnapshotResult;
 type V1_ICommandMap = CommandMap;
+type V1_IServerCommandMap = ServerCommandMap;
 type V1_IClientNotificationMap = ClientNotificationMap;
 type V1_IServerNotificationMap = ServerNotificationMap;
 type V1_INotificationMethodParams = NotificationMethodParams;
+type V1_IAhpError = AhpError;
+type V1_IAhpErrorDetailsMap = AhpErrorDetailsMap;
+type V1_IAuthRequiredErrorData = AuthRequiredErrorData;
+type V1_IPermissionDeniedErrorData = PermissionDeniedErrorData;
 
 // ─── Compatibility Assertions ────────────────────────────────────────────────
 
@@ -551,17 +568,31 @@ type _CheckResourceMoveParams = AssertCompatible<V1_IResourceMoveParams, Resourc
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckResourceMoveResult = AssertCompatible<V1_IResourceMoveResult, ResourceMoveResult>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckResourceRequestParams = AssertCompatible<V1_IResourceRequestParams, ResourceRequestParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckResourceRequestResult = AssertCompatible<V1_IResourceRequestResult, ResourceRequestResult>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckProtectedResourceMetadata = AssertCompatible<V1_IProtectedResourceMetadata, ProtectedResourceMetadata>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckAuthRequiredNotification = AssertCompatible<V1_IAuthRequiredNotification, AuthRequiredNotification>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckCommandMap = AssertCompatible<V1_ICommandMap, CommandMap>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckServerCommandMap = AssertCompatible<V1_IServerCommandMap, ServerCommandMap>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckClientNotificationMap = AssertCompatible<V1_IClientNotificationMap, ClientNotificationMap>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckServerNotificationMap = AssertCompatible<V1_IServerNotificationMap, ServerNotificationMap>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckNotificationMethodParams = AssertCompatible<V1_INotificationMethodParams, NotificationMethodParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckAhpError = AssertCompatible<V1_IAhpError, AhpError>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckAhpErrorDetailsMap = AssertCompatible<V1_IAhpErrorDetailsMap, AhpErrorDetailsMap>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckAuthRequiredErrorData = AssertCompatible<V1_IAuthRequiredErrorData, AuthRequiredErrorData>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckPermissionDeniedErrorData = AssertCompatible<V1_IPermissionDeniedErrorData, PermissionDeniedErrorData>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckTerminalsChangedAction = AssertCompatible<V1_IRootTerminalsChangedAction, RootTerminalsChangedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

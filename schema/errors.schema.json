@@ -25,7 +25,3337 @@
         -32003,
         -32004,
         -32005,
-        -32006
+        -32006,
+        -32007,
+        -32008,
+        -32009,
+        -32010
+      ]
+    },
+    "AuthRequiredErrorData": {
+      "type": "object",
+      "description": "Details carried in the `data` field of an `AuthRequired` (-32007) error.\n\nWraps the protected resource list in `{ resources: [...] }` rather than\nreturning a bare array, so additional fields can be added in future\nversions without breaking the wire shape.",
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProtectedResourceMetadata"
+          },
+          "description": "Protected resources that require authentication."
+        }
+      },
+      "required": [
+        "resources"
+      ]
+    },
+    "PermissionDeniedErrorData": {
+      "type": "object",
+      "description": "Details carried in the `data` field of a `PermissionDenied` (-32009) error.\n\nThe receiver MAY advertise a `resourceRequest` payload describing the\naccess that, if granted, would unlock the operation. The caller MAY then\nissue `resourceRequest` with that payload to negotiate access.",
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/ResourceRequestParams",
+          "description": "The resource access that, if granted via `resourceRequest`, would unlock\nthe operation. Omitted when no specific access grant would resolve the\ndenial (for example, when the resource is fundamentally inaccessible)."
+        }
+      }
+    },
+    "AhpErrorDetailsMap": {
+      "type": "object",
+      "description": "Maps each AHP error code that carries structured `data` to the type of\nthat data.\n\nError codes not present in this map either have no `data` payload or\ncarry an unspecified payload that callers SHOULD treat as `unknown`.",
+      "properties": {
+        "[AhpErrorCodes.AuthRequired]": {
+          "$ref": "#/$defs/AuthRequiredErrorData"
+        },
+        "[AhpErrorCodes.PermissionDenied]": {
+          "$ref": "#/$defs/PermissionDeniedErrorData"
+        }
+      },
+      "required": [
+        "[AhpErrorCodes.AuthRequired]",
+        "[AhpErrorCodes.PermissionDenied]"
+      ]
+    },
+    "Icon": {
+      "type": "object",
+      "description": "An optionally-sized icon that can be displayed in a user interface.",
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/URI",
+          "description": "A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a\n`data:` URI with Base64-encoded image data.\n\nConsumers SHOULD take steps to ensure URLs serving icons are from the\nsame domain as the client/server or a trusted domain.\n\nConsumers SHOULD take appropriate precautions when consuming SVGs as they can contain\nexecutable JavaScript."
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Optional MIME type override if the source MIME type is missing or generic.\nFor example: `\"image/png\"`, `\"image/jpeg\"`, or `\"image/svg+xml\"`."
+        },
+        "sizes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional array of strings that specify sizes at which the icon can be used.\nEach string should be in WxH format (e.g., `\"48x48\"`, `\"96x96\"`) or `\"any\"` for scalable formats like SVG.\n\nIf not provided, the client should assume that the icon can be used at any size."
+        },
+        "theme": {
+          "type": "string",
+          "enum": [
+            "light",
+            "dark"
+          ],
+          "description": "Optional specifier for the theme this icon is designed for. `\"light\"` indicates\nthe icon is designed to be used with a light background, and `\"dark\"` indicates\nthe icon is designed to be used with a dark background.\n\nIf not provided, the client should assume the icon can be used with any theme."
+        }
+      },
+      "required": [
+        "src"
+      ]
+    },
+    "ProtectedResourceMetadata": {
+      "type": "object",
+      "description": "Describes a protected resource's authentication requirements using\n[RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0\nProtected Resource Metadata) semantics.\n\nField names use snake_case to match the RFC 9728 JSON format.",
+      "properties": {
+        "resource": {
+          "type": "string",
+          "description": "REQUIRED. The protected resource's resource identifier, a URL using the\n`https` scheme with no fragment component (e.g. `\"https://api.github.com\"`)."
+        },
+        "resource_name": {
+          "type": "string",
+          "description": "OPTIONAL. Human-readable name of the protected resource."
+        },
+        "authorization_servers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "OPTIONAL. JSON array of OAuth authorization server identifier URLs."
+        },
+        "jwks_uri": {
+          "type": "string",
+          "description": "OPTIONAL. URL of the protected resource's JWK Set document."
+        },
+        "scopes_supported": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "RECOMMENDED. JSON array of OAuth 2.0 scope values used in authorization requests."
+        },
+        "bearer_methods_supported": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "OPTIONAL. JSON array of Bearer Token presentation methods supported."
+        },
+        "resource_signing_alg_values_supported": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "OPTIONAL. JSON array of JWS signing algorithms supported."
+        },
+        "resource_encryption_alg_values_supported": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "OPTIONAL. JSON array of JWE encryption algorithms (alg) supported."
+        },
+        "resource_encryption_enc_values_supported": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "OPTIONAL. JSON array of JWE encryption algorithms (enc) supported."
+        },
+        "resource_documentation": {
+          "type": "string",
+          "description": "OPTIONAL. URL of human-readable documentation for the resource."
+        },
+        "resource_policy_uri": {
+          "type": "string",
+          "description": "OPTIONAL. URL of the resource's data-usage policy."
+        },
+        "resource_tos_uri": {
+          "type": "string",
+          "description": "OPTIONAL. URL of the resource's terms of service."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "AHP extension. Whether authentication is required for this resource.\n\n- `true` (default) — the agent cannot be used without a valid token.\n  The server SHOULD return `AuthRequired` (`-32007`) if the client\n  attempts to use the agent without authenticating.\n- `false` — the agent works without authentication but MAY offer\n  enhanced capabilities when a token is provided.\n\nClients SHOULD treat an absent field the same as `true`."
+        }
+      },
+      "required": [
+        "resource"
+      ]
+    },
+    "RootState": {
+      "type": "object",
+      "description": "Global state shared with every client subscribed to `agenthost:/root`.",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AgentInfo"
+          },
+          "description": "Available agent backends and their models"
+        },
+        "activeSessions": {
+          "type": "number",
+          "description": "Number of active (non-disposed) sessions on the server"
+        },
+        "terminals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TerminalInfo"
+          },
+          "description": "Known terminals on the server. Subscribe to individual terminal URIs for full state."
+        },
+        "config": {
+          "$ref": "#/$defs/RootConfigState",
+          "description": "Agent host configuration schema and current values"
+        }
+      },
+      "required": [
+        "agents"
+      ]
+    },
+    "AgentInfo": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID (e.g. `'copilot'`)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description string"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionModelInfo"
+          },
+          "description": "Available models for this agent"
+        },
+        "protectedResources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProtectedResourceMetadata"
+          },
+          "description": "Protected resources this agent requires authentication for.\n\nEach entry describes an OAuth 2.0 protected resource using\n[RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) semantics.\nClients should obtain tokens from the declared `authorization_servers`\nand push them via the `authenticate` command before creating sessions\nwith this agent."
+        },
+        "customizations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationRef"
+          },
+          "description": "Customizations (Open Plugins) associated with this agent.\n\nEach entry is a reference to an [Open Plugins](https://open-plugins.com/)\nplugin that the agent host can activate for sessions using this agent."
+        }
+      },
+      "required": [
+        "provider",
+        "displayName",
+        "description",
+        "models"
+      ]
+    },
+    "SessionModelInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Model identifier"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Provider this model belongs to"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable model name"
+        },
+        "maxContextWindow": {
+          "type": "number",
+          "description": "Maximum context window size"
+        },
+        "supportsVision": {
+          "type": "boolean",
+          "description": "Whether the model supports vision"
+        },
+        "policyState": {
+          "$ref": "#/$defs/PolicyState",
+          "description": "Policy configuration state"
+        },
+        "configSchema": {
+          "$ref": "#/$defs/ConfigSchema",
+          "description": "Configuration schema describing model-specific options (e.g. thinking\nlevel). Clients present this as a form and pass the resolved values in\n{@link ModelSelection.config} when creating or changing sessions."
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "name"
+      ]
+    },
+    "ModelSelection": {
+      "type": "object",
+      "description": "A model selection: the chosen model ID together with any model-specific\nconfiguration values whose keys correspond to the model's\n{@link SessionModelInfo.configSchema}.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Model identifier"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Model-specific configuration values"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "PendingMessage": {
+      "type": "object",
+      "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this pending message"
+        },
+        "userMessage": {
+          "$ref": "#/$defs/UserMessage",
+          "description": "The message content"
+        }
+      },
+      "required": [
+        "id",
+        "userMessage"
+      ]
+    },
+    "SessionState": {
+      "type": "object",
+      "description": "Full state for a single session, loaded when a client subscribes to the session's URI.",
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/SessionSummary",
+          "description": "Lightweight session metadata"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/SessionLifecycle",
+          "description": "Session initialization state"
+        },
+        "creationError": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Error details if creation failed"
+        },
+        "serverTools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolDefinition"
+          },
+          "description": "Tools provided by the server (agent host) for this session"
+        },
+        "activeClient": {
+          "$ref": "#/$defs/SessionActiveClient",
+          "description": "The client currently providing tools and interactive capabilities to this session"
+        },
+        "turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Turn"
+          },
+          "description": "Completed turns"
+        },
+        "activeTurn": {
+          "$ref": "#/$defs/ActiveTurn",
+          "description": "Currently in-progress turn"
+        },
+        "steeringMessage": {
+          "$ref": "#/$defs/PendingMessage",
+          "description": "Message to inject into the current turn at a convenient point"
+        },
+        "queuedMessages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PendingMessage"
+          },
+          "description": "Messages to send automatically as new turns after the current turn finishes"
+        },
+        "inputRequests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionInputRequest"
+          },
+          "description": "Requests for user input that are currently blocking or informing session progress"
+        },
+        "config": {
+          "$ref": "#/$defs/SessionConfigState",
+          "description": "Session configuration schema and current values"
+        },
+        "customizations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionCustomization"
+          },
+          "description": "Server-provided customizations active in this session.\n\nClient-provided customizations are available on\n{@link SessionActiveClient.customizations | activeClient.customizations}."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this session.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `git` key may provide extra git metadata about the session's\nworkingDirectory."
+        }
+      },
+      "required": [
+        "summary",
+        "lifecycle",
+        "turns"
+      ]
+    },
+    "SessionActiveClient": {
+      "type": "object",
+      "description": "The client currently providing tools and interactive capabilities to a session.\n\nOnly one client may be active per session at a time. The server SHOULD\nautomatically unset the active client if that client disconnects.",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "Client identifier (matches `clientId` from `initialize`)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable client name (e.g. `\"VS Code\"`)"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolDefinition"
+          },
+          "description": "Tools this client provides to the session"
+        },
+        "customizations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationRef"
+          },
+          "description": "Customizations this client contributes to the session"
+        }
+      },
+      "required": [
+        "clientId",
+        "tools"
+      ]
+    },
+    "ProjectInfo": {
+      "type": "object",
+      "description": "Server-owned project metadata for a session.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Project URI"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable project name"
+        }
+      },
+      "required": [
+        "uri",
+        "displayName"
+      ]
+    },
+    "SessionSummary": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Session title"
+        },
+        "status": {
+          "$ref": "#/$defs/SessionStatus",
+          "description": "Current session status"
+        },
+        "activity": {
+          "type": "string",
+          "description": "Human-readable description of what the session is currently doing"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp"
+        },
+        "modifiedAt": {
+          "type": "number",
+          "description": "Last modification timestamp"
+        },
+        "project": {
+          "$ref": "#/$defs/ProjectInfo",
+          "description": "Server-owned project for this session"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelSelection",
+          "description": "Currently selected model"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "The working directory URI for this session"
+        },
+        "diffs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FileEdit"
+          },
+          "description": "Files changed during this session with diff statistics"
+        }
+      },
+      "required": [
+        "resource",
+        "provider",
+        "title",
+        "status",
+        "createdAt",
+        "modifiedAt"
+      ]
+    },
+    "ConfigPropertySchema": {
+      "type": "object",
+      "description": "A JSON Schema-compatible property descriptor with display extensions.\n\nStandard JSON Schema fields (`type`, `title`, `description`, `default`,\n`enum`) allow validators to process the schema. Display extensions\n(`enumLabels`, `enumDescriptions`) are parallel arrays that provide UI\nmetadata for each `enum` value.\n\nThis is the generic base type. See {@link SessionConfigPropertySchema} for\nsession-specific extensions.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "array",
+            "object"
+          ],
+          "description": "JSON Schema: property type"
+        },
+        "title": {
+          "type": "string",
+          "description": "JSON Schema: human-readable label for the property"
+        },
+        "description": {
+          "type": "string",
+          "description": "JSON Schema: description / tooltip"
+        },
+        "default": {
+          "description": "JSON Schema: default value"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: allowed values (typically used with `string` type)"
+        },
+        "enumLabels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Display extension: human-readable label per enum value (parallel array)"
+        },
+        "enumDescriptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Display extension: description per enum value (parallel array)"
+        },
+        "readOnly": {
+          "type": "boolean",
+          "description": "JSON Schema: when `true`, the property is displayed but cannot be modified by the user"
+        },
+        "items": {
+          "$ref": "#/$defs/ConfigPropertySchema",
+          "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ConfigPropertySchema"
+          },
+          "description": "JSON Schema: property descriptors for object properties (used when `type` is `'object'`)"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: list of required property ids (used when `type` is `'object'`)"
+        }
+      },
+      "required": [
+        "type",
+        "title"
+      ]
+    },
+    "ConfigSchema": {
+      "type": "object",
+      "description": "A JSON Schema object describing available configuration properties.\n\nThis is the generic base type. See {@link SessionConfigSchema} for\nsession-specific usage.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "object"
+          ],
+          "description": "JSON Schema: always `'object'`"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ConfigPropertySchema"
+          },
+          "description": "JSON Schema: property descriptors keyed by property id"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: list of required property ids"
+        }
+      },
+      "required": [
+        "type",
+        "properties"
+      ]
+    },
+    "RootConfigState": {
+      "type": "object",
+      "description": "Live agent-host configuration metadata.\n\nThe schema describes the available configuration properties and the values\ncontain the current value for each resolved property.",
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ConfigSchema",
+          "description": "JSON Schema describing available configuration properties"
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Current configuration values"
+        }
+      },
+      "required": [
+        "schema",
+        "values"
+      ]
+    },
+    "SessionConfigPropertySchema": {
+      "type": "object",
+      "description": "A session configuration property descriptor.\n\nExtends the generic {@link ConfigPropertySchema} with session-specific\ndisplay extensions.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "array",
+            "object"
+          ],
+          "description": "JSON Schema: property type"
+        },
+        "title": {
+          "type": "string",
+          "description": "JSON Schema: human-readable label for the property"
+        },
+        "description": {
+          "type": "string",
+          "description": "JSON Schema: description / tooltip"
+        },
+        "default": {
+          "description": "JSON Schema: default value"
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: allowed values (typically used with `string` type)"
+        },
+        "enumLabels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Display extension: human-readable label per enum value (parallel array)"
+        },
+        "enumDescriptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Display extension: description per enum value (parallel array)"
+        },
+        "readOnly": {
+          "type": "boolean",
+          "description": "JSON Schema: when `true`, the property is displayed but cannot be modified by the user"
+        },
+        "items": {
+          "$ref": "#/$defs/ConfigPropertySchema",
+          "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ConfigPropertySchema"
+          },
+          "description": "JSON Schema: property descriptors for object properties (used when `type` is `'object'`)"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: list of required property ids (used when `type` is `'object'`)"
+        },
+        "enumDynamic": {
+          "type": "boolean",
+          "description": "Display extension: when `true`, the full set of allowed values is too large\nto enumerate statically. The client SHOULD use `sessionConfigCompletions`\nto fetch matching values based on user input. Any values in `enum` are\nseed/recent values for initial display."
+        },
+        "sessionMutable": {
+          "type": "boolean",
+          "description": "When `true`, the user may change this property after session creation"
+        }
+      },
+      "required": [
+        "type",
+        "title"
+      ]
+    },
+    "SessionConfigSchema": {
+      "type": "object",
+      "description": "A JSON Schema object describing available session configuration metadata.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "object"
+          ],
+          "description": "JSON Schema: always `'object'`"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/SessionConfigPropertySchema"
+          },
+          "description": "JSON Schema: property descriptors keyed by property id"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "JSON Schema: list of required property ids"
+        }
+      },
+      "required": [
+        "type",
+        "properties"
+      ]
+    },
+    "SessionConfigState": {
+      "type": "object",
+      "description": "Live session configuration metadata.\n\nThe schema describes the available configuration properties and the values\ncontain the current value for each resolved property.",
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/SessionConfigSchema",
+          "description": "JSON Schema describing available configuration properties"
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Current configuration values"
+        }
+      },
+      "required": [
+        "schema",
+        "values"
+      ]
+    },
+    "SessionInputOption": {
+      "type": "object",
+      "description": "A choice in a select-style question.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable option identifier; for MCP enum values this is the enum string"
+        },
+        "label": {
+          "type": "string",
+          "description": "Display label"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional secondary text"
+        },
+        "recommended": {
+          "type": "boolean",
+          "description": "Whether this option is the recommended/default choice"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
+    "SessionInputQuestionBase": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        }
+      },
+      "required": [
+        "id",
+        "message"
+      ]
+    },
+    "SessionInputTextQuestion": {
+      "type": "object",
+      "description": "Text question within a session input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "$ref": "#/$defs/SessionInputQuestionKind.Text"
+        },
+        "format": {
+          "type": "string",
+          "description": "Format hint for text questions, such as `email`, `uri`, `date`, or `date-time`"
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum string length"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum string length"
+        },
+        "defaultValue": {
+          "type": "string",
+          "description": "Default text"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind"
+      ]
+    },
+    "SessionInputNumberQuestion": {
+      "type": "object",
+      "description": "Numeric question within a session input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SessionInputQuestionKind.Number"
+            },
+            {
+              "$ref": "#/$defs/SessionInputQuestionKind.Integer"
+            }
+          ]
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value"
+        },
+        "defaultValue": {
+          "type": "number",
+          "description": "Default numeric value"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind"
+      ]
+    },
+    "SessionInputBooleanQuestion": {
+      "type": "object",
+      "description": "Boolean question within a session input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "$ref": "#/$defs/SessionInputQuestionKind.Boolean"
+        },
+        "defaultValue": {
+          "type": "boolean",
+          "description": "Default boolean value"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind"
+      ]
+    },
+    "SessionInputSingleSelectQuestion": {
+      "type": "object",
+      "description": "Single-select question within a session input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "$ref": "#/$defs/SessionInputQuestionKind.SingleSelect"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionInputOption"
+          },
+          "description": "Options the user may select from"
+        },
+        "allowFreeformInput": {
+          "type": "boolean",
+          "description": "Whether the user may enter text instead of selecting an option"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind",
+        "options"
+      ]
+    },
+    "SessionInputMultiSelectQuestion": {
+      "type": "object",
+      "description": "Multi-select question within a session input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "$ref": "#/$defs/SessionInputQuestionKind.MultiSelect"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionInputOption"
+          },
+          "description": "Options the user may select from"
+        },
+        "allowFreeformInput": {
+          "type": "boolean",
+          "description": "Whether the user may enter text in addition to selecting options"
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum selected item count"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum selected item count"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind",
+        "options"
+      ]
+    },
+    "SessionInputRequest": {
+      "type": "object",
+      "description": "A live request for user input.\n\nThe server creates or replaces requests with `session/inputRequested`.\nClients sync drafts with `session/inputAnswerChanged` and complete requests\nwith `session/inputCompleted`.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable request identifier"
+        },
+        "message": {
+          "type": "string",
+          "description": "Display message for the request as a whole"
+        },
+        "url": {
+          "$ref": "#/$defs/URI",
+          "description": "URL the user should review or open, for URL-style elicitations"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionInputQuestion"
+          },
+          "description": "Ordered questions to ask the user"
+        },
+        "answers": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/SessionInputAnswer"
+          },
+          "description": "Current draft or submitted answers, keyed by question ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "SessionInputTextAnswerValue": {
+      "type": "object",
+      "description": "Value captured for one answer.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SessionInputAnswerValueKind.Text"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "SessionInputNumberAnswerValue": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SessionInputAnswerValueKind.Number"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "SessionInputBooleanAnswerValue": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SessionInputAnswerValueKind.Boolean"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "SessionInputSelectedAnswerValue": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SessionInputAnswerValueKind.Selected"
+        },
+        "value": {
+          "type": "string"
+        },
+        "freeformValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Free-form text entered instead of selecting an option"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "SessionInputSelectedManyAnswerValue": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SessionInputAnswerValueKind.SelectedMany"
+        },
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "freeformValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Free-form text entered in addition to selected options"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "SessionInputAnswered": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SessionInputAnswerState.Draft"
+            },
+            {
+              "$ref": "#/$defs/SessionInputAnswerState.Submitted"
+            }
+          ],
+          "description": "Answer state"
+        },
+        "value": {
+          "$ref": "#/$defs/SessionInputAnswerValue",
+          "description": "Answer value"
+        }
+      },
+      "required": [
+        "state",
+        "value"
+      ]
+    },
+    "SessionInputSkipped": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/SessionInputAnswerState.Skipped",
+          "description": "Answer state"
+        },
+        "freeformValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Free-form reason or value captured while skipping, if any"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "Turn": {
+      "type": "object",
+      "description": "A completed request/response cycle.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "userMessage": {
+          "$ref": "#/$defs/UserMessage",
+          "description": "The user's input"
+        },
+        "responseParts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResponsePart"
+          },
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState",
+          "description": "How the turn ended"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Error details if state is `'error'`"
+        }
+      },
+      "required": [
+        "id",
+        "userMessage",
+        "responseParts",
+        "usage",
+        "state"
+      ]
+    },
+    "ActiveTurn": {
+      "type": "object",
+      "description": "An in-progress turn — the assistant is actively streaming.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "userMessage": {
+          "$ref": "#/$defs/UserMessage",
+          "description": "The user's input"
+        },
+        "responseParts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResponsePart"
+          },
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nTool call parts include `pendingPermissions` when permissions are awaiting user approval."
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        }
+      },
+      "required": [
+        "id",
+        "userMessage",
+        "responseParts",
+        "usage"
+      ]
+    },
+    "UserMessage": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Message text"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MessageAttachment"
+          },
+          "description": "File/selection attachments"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "MessageAttachment": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/AttachmentType",
+          "description": "Attachment type"
+        },
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "File/directory URI"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name"
+        }
+      },
+      "required": [
+        "type",
+        "uri"
+      ]
+    },
+    "MarkdownResponsePart": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.Markdown",
+          "description": "Discriminant"
+        },
+        "id": {
+          "type": "string",
+          "description": "Part identifier, used by `session/delta` to target this part for content appends"
+        },
+        "content": {
+          "type": "string",
+          "description": "Markdown content"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "content"
+      ]
+    },
+    "ContentRef": {
+      "type": "object",
+      "description": "A reference to large content stored outside the state tree.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
+    "ResourceReponsePart": {
+      "type": "object",
+      "description": "A content part that's a reference to large content stored outside the state tree.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        },
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.ContentRef",
+          "description": "Discriminant"
+        }
+      },
+      "required": [
+        "uri",
+        "kind"
+      ]
+    },
+    "ToolCallResponsePart": {
+      "type": "object",
+      "description": "A tool call represented as a response part.\n\nTool calls are part of the response stream, interleaved with text and\nreasoning. The `toolCall.toolCallId` serves as the part identifier for\nactions that target this part.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.ToolCall",
+          "description": "Discriminant"
+        },
+        "toolCall": {
+          "$ref": "#/$defs/ToolCallState",
+          "description": "Full tool call lifecycle state"
+        }
+      },
+      "required": [
+        "kind",
+        "toolCall"
+      ]
+    },
+    "ReasoningResponsePart": {
+      "type": "object",
+      "description": "Reasoning/thinking content from the model.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.Reasoning",
+          "description": "Discriminant"
+        },
+        "id": {
+          "type": "string",
+          "description": "Part identifier, used by `session/reasoning` to target this part for content appends"
+        },
+        "content": {
+          "type": "string",
+          "description": "Accumulated reasoning text"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "content"
+      ]
+    },
+    "ConfirmationOption": {
+      "type": "object",
+      "description": "A confirmation option that the server offers for a tool call awaiting\napproval. Allows richer choices beyond simple approve/deny — for example,\n\"Approve in this Session\" or \"Deny with reason.\"",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the option, returned in the confirmed action"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label displayed to the user"
+        },
+        "kind": {
+          "$ref": "#/$defs/ConfirmationOptionKind",
+          "description": "Whether this option represents an approval or denial"
+        },
+        "group": {
+          "type": "number",
+          "description": "Logical group number for visual categorisation.\n\nClients SHOULD display options in the order they are defined and MAY\nuse differing group numbers to insert dividers between logical clusters\nof options."
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "kind"
+      ]
+    },
+    "ToolCallBase": {
+      "type": "object",
+      "description": "Metadata common to all tool call states.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "toolClientId": {
+          "type": "string",
+          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `session/toolCallComplete` with the result."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName"
+      ]
+    },
+    "ToolCallParameterFields": {
+      "type": "object",
+      "description": "Properties available once tool call parameters are fully received.",
+      "properties": {
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        }
+      },
+      "required": [
+        "invocationMessage"
+      ]
+    },
+    "ToolCallResult": {
+      "type": "object",
+      "description": "Tool execution result details, available after execution completes.",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the tool succeeded"
+        },
+        "pastTenseMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Past-tense description of what the tool did"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
+        },
+        "structuredContent": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message"
+          ],
+          "description": "Error details if the tool failed"
+        }
+      },
+      "required": [
+        "success",
+        "pastTenseMessage"
+      ]
+    },
+    "ToolCallStreamingState": {
+      "type": "object",
+      "description": "LM is streaming the tool call parameters.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "toolClientId": {
+          "type": "string",
+          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `session/toolCallComplete` with the result."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.Streaming"
+        },
+        "partialInput": {
+          "type": "string",
+          "description": "Partial parameters accumulated so far"
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Progress message shown while parameters are streaming"
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "status"
+      ]
+    },
+    "ToolCallPendingConfirmationState": {
+      "type": "object",
+      "description": "Parameters are complete, or a running tool requires re-confirmation\n(e.g. a mid-execution permission check).",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "toolClientId": {
+          "type": "string",
+          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `session/toolCallComplete` with the result."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.PendingConfirmation"
+        },
+        "confirmationTitle": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Short title for the confirmation prompt (e.g. `\"Run in terminal\"`, `\"Write file\"`)"
+        },
+        "edits": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "description": "File edits that this tool call will perform, for preview before confirmation"
+        },
+        "editable": {
+          "type": "boolean",
+          "description": "Whether the agent host allows the client to edit the tool's input parameters before confirming"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConfirmationOption"
+          },
+          "description": "Options the server offers for this confirmation. When present, the client\nSHOULD render these instead of a plain approve/deny UI. Each option\nbelongs to a {@link ConfirmationOptionGroup} so the client can still\ncategorise the choices."
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "status"
+      ]
+    },
+    "ToolCallRunningState": {
+      "type": "object",
+      "description": "Tool is actively executing.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "toolClientId": {
+          "type": "string",
+          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `session/toolCallComplete` with the result."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.Running"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/ToolCallConfirmationReason",
+          "description": "How the tool was confirmed for execution"
+        },
+        "selectedOption": {
+          "$ref": "#/$defs/ConfirmationOption",
+          "description": "The confirmation option the user selected, if confirmation options were provided"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "Partial content produced while the tool is still executing.\n\nFor example, a terminal content block lets clients subscribe to live\noutput before the tool completes."
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "status",
+        "confirmed"
+      ]
+    },
+    "ToolCallPendingResultConfirmationState": {
+      "type": "object",
+      "description": "Tool finished executing, waiting for client to approve the result.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "toolClientId": {
+          "type": "string",
+          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `session/toolCallComplete` with the result."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the tool succeeded"
+        },
+        "pastTenseMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Past-tense description of what the tool did"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
+        },
+        "structuredContent": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message"
+          ],
+          "description": "Error details if the tool failed"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.PendingResultConfirmation"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/ToolCallConfirmationReason",
+          "description": "How the tool was confirmed for execution"
+        },
+        "selectedOption": {
+          "$ref": "#/$defs/ConfirmationOption",
+          "description": "The confirmation option the user selected, if confirmation options were provided"
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "success",
+        "pastTenseMessage",
+        "status",
+        "confirmed"
+      ]
+    },
+    "ToolCallCompletedState": {
+      "type": "object",
+      "description": "Tool completed successfully or with an error.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "toolClientId": {
+          "type": "string",
+          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `session/toolCallComplete` with the result."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the tool succeeded"
+        },
+        "pastTenseMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Past-tense description of what the tool did"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
+        },
+        "structuredContent": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message"
+          ],
+          "description": "Error details if the tool failed"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.Completed"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/ToolCallConfirmationReason",
+          "description": "How the tool was confirmed for execution"
+        },
+        "selectedOption": {
+          "$ref": "#/$defs/ConfirmationOption",
+          "description": "The confirmation option the user selected, if confirmation options were provided"
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "success",
+        "pastTenseMessage",
+        "status",
+        "confirmed"
+      ]
+    },
+    "ToolCallCancelledState": {
+      "type": "object",
+      "description": "Tool call was cancelled before execution.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "toolClientId": {
+          "type": "string",
+          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `session/toolCallComplete` with the result."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.Cancelled"
+        },
+        "reason": {
+          "$ref": "#/$defs/ToolCallCancellationReason",
+          "description": "Why the tool was cancelled"
+        },
+        "reasonMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Optional message explaining the cancellation"
+        },
+        "userSuggestion": {
+          "$ref": "#/$defs/UserMessage",
+          "description": "What the user suggested doing instead"
+        },
+        "selectedOption": {
+          "$ref": "#/$defs/ConfirmationOption",
+          "description": "The confirmation option the user selected, if confirmation options were provided"
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "status",
+        "reason"
+      ]
+    },
+    "ToolDefinition": {
+      "type": "object",
+      "description": "Describes a tool available in a session, provided by either the server or the active client.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique tool identifier"
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable display name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what the tool does"
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "properties": {
+              "type": "string"
+            },
+            "required": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "JSON Schema defining the expected input parameters.\n\nOptional because client-provided tools may not have formal schemas.\nMirrors MCP `Tool.inputSchema`."
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "properties": {
+              "type": "string"
+            },
+            "required": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "JSON Schema defining the structure of the tool's output.\n\nMirrors MCP `Tool.outputSchema`."
+        },
+        "annotations": {
+          "$ref": "#/$defs/ToolAnnotations",
+          "description": "Behavioral hints about the tool. All properties are advisory."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata.\n\nMirrors the MCP `_meta` convention."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "ToolAnnotations": {
+      "type": "object",
+      "description": "Behavioral hints about a tool. All properties are advisory and not\nguaranteed to faithfully describe tool behavior.\n\nMirrors MCP `ToolAnnotations` from the Model Context Protocol specification.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Alternate human-readable title"
+        },
+        "readOnlyHint": {
+          "type": "boolean",
+          "description": "Tool does not modify its environment (default: false)"
+        },
+        "destructiveHint": {
+          "type": "boolean",
+          "description": "Tool may perform destructive updates (default: true)"
+        },
+        "idempotentHint": {
+          "type": "boolean",
+          "description": "Repeated calls with the same arguments have no additional effect (default: false)"
+        },
+        "openWorldHint": {
+          "type": "boolean",
+          "description": "Tool may interact with external entities (default: true)"
+        }
+      }
+    },
+    "ToolResultTextContent": {
+      "type": "object",
+      "description": "Text content in a tool result.\n\nMirrors MCP `TextContent`.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Text"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text content"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ]
+    },
+    "ToolResultEmbeddedResourceContent": {
+      "type": "object",
+      "description": "Base64-encoded binary content embedded in a tool result.\n\nMirrors MCP `EmbeddedResource` for inline binary data.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.EmbeddedResource"
+        },
+        "data": {
+          "type": "string",
+          "description": "Base64-encoded data"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content type (e.g. `\"image/png\"`, `\"application/pdf\"`)"
+        }
+      },
+      "required": [
+        "type",
+        "data",
+        "contentType"
+      ]
+    },
+    "ToolResultResourceContent": {
+      "type": "object",
+      "description": "A reference to a resource stored outside the tool result.\n\nWraps {@link ContentRef} for lazy-loading large results.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        },
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Resource"
+        }
+      },
+      "required": [
+        "uri",
+        "type"
+      ]
+    },
+    "FileEdit": {
+      "type": "object",
+      "description": "Describes a file modification with before/after state and diff metadata.\n\nSupports creates (only `after`), deletes (only `before`), renames/moves\n(different `uri` in `before` and `after`), and edits (same `uri`, different content).",
+      "properties": {
+        "before": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "uri",
+            "content"
+          ],
+          "description": "The file state before the edit. Absent for file creations or for in-place file edits."
+        },
+        "after": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "uri",
+            "content"
+          ],
+          "description": "The file state after the edit. Absent for file deletions."
+        },
+        "diff": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "number"
+            },
+            "removed": {
+              "type": "number"
+            }
+          },
+          "description": "Optional diff display metadata"
+        }
+      }
+    },
+    "ToolResultFileEditContent": {
+      "type": "object",
+      "description": "Describes a file modification performed by a tool.",
+      "properties": {
+        "before": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "uri",
+            "content"
+          ],
+          "description": "The file state before the edit. Absent for file creations or for in-place file edits."
+        },
+        "after": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "uri",
+            "content"
+          ],
+          "description": "The file state after the edit. Absent for file deletions."
+        },
+        "diff": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "number"
+            },
+            "removed": {
+              "type": "number"
+            }
+          },
+          "description": "Optional diff display metadata"
+        },
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.FileEdit"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "ToolResultTerminalContent": {
+      "type": "object",
+      "description": "A reference to a terminal whose output is relevant to this tool result.\n\nClients can subscribe to the terminal's URI to stream its output in real\ntime, providing live feedback while a tool is executing.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Terminal"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Terminal URI (subscribable for full terminal state)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title for the terminal content"
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "title"
+      ]
+    },
+    "ToolResultSubagentContent": {
+      "type": "object",
+      "description": "A reference to a subagent session spawned by a tool.\n\nClients can subscribe to the subagent's session URI to stream its\nprogress in real time, including inner tool calls and responses.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Subagent"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Subagent session URI (subscribable for full session state)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title for the subagent"
+        },
+        "agentName": {
+          "type": "string",
+          "description": "Internal agent name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the subagent's task"
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "title"
+      ]
+    },
+    "CustomizationRef": {
+      "type": "object",
+      "description": "A reference to an [Open Plugins](https://open-plugins.com/) plugin.\n\nThis is intentionally thin — AHP specifies plugin identity and metadata\nbut not implementation details, which are defined by the Open Plugins spec.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Plugin URI (e.g. an HTTPS URL or marketplace identifier)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what the plugin provides"
+        },
+        "icons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Icon"
+          },
+          "description": "Icons for the plugin"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Opaque version token for this customization.\n\nClients SHOULD include a nonce with every customization they provide.\nConsumers can compare nonces to detect whether a customization has\nchanged since it was last seen, avoiding redundant reloads or copies."
+        }
+      },
+      "required": [
+        "uri",
+        "displayName"
+      ]
+    },
+    "SessionCustomization": {
+      "type": "object",
+      "description": "A customization active in a session.",
+      "properties": {
+        "customization": {
+          "$ref": "#/$defs/CustomizationRef",
+          "description": "The plugin this customization refers to"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this customization is currently enabled"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "The `clientId` of the client that contributed this customization.\nAbsent for server-provided customizations."
+        },
+        "status": {
+          "$ref": "#/$defs/CustomizationStatus",
+          "description": "Server-reported loading status"
+        },
+        "statusMessage": {
+          "type": "string",
+          "description": "Human-readable status detail (e.g. error message or degradation warning)."
+        }
+      },
+      "required": [
+        "customization",
+        "enabled"
+      ]
+    },
+    "TerminalInfo": {
+      "type": "object",
+      "description": "Lightweight terminal metadata exposed on the root state.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Terminal URI (subscribable for full terminal state)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable terminal title"
+        },
+        "claim": {
+          "$ref": "#/$defs/TerminalClaim",
+          "description": "Who currently holds this terminal"
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Process exit code, if the terminal process has exited"
+        }
+      },
+      "required": [
+        "resource",
+        "title",
+        "claim"
+      ]
+    },
+    "TerminalClientClaim": {
+      "type": "object",
+      "description": "A terminal claimed by a connected client.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/TerminalClaimKind.Client",
+          "description": "Discriminant"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "The `clientId` of the claiming client"
+        }
+      },
+      "required": [
+        "kind",
+        "clientId"
+      ]
+    },
+    "TerminalSessionClaim": {
+      "type": "object",
+      "description": "A terminal claimed by a session, optionally scoped to a specific turn or tool call.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/TerminalClaimKind.Session",
+          "description": "Discriminant"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI that claimed the terminal"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Optional turn identifier within the session"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Optional tool call identifier within the turn"
+        }
+      },
+      "required": [
+        "kind",
+        "session"
+      ]
+    },
+    "TerminalState": {
+      "type": "object",
+      "description": "Full state for a single terminal, loaded when a client subscribes to the terminal's URI.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Human-readable terminal title"
+        },
+        "cwd": {
+          "$ref": "#/$defs/URI",
+          "description": "Current working directory of the terminal process"
+        },
+        "cols": {
+          "type": "number",
+          "description": "Terminal width in columns"
+        },
+        "rows": {
+          "type": "number",
+          "description": "Terminal height in rows"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TerminalContentPart"
+          },
+          "description": "Typed content parts, replacing the flat `content: string`.\n\nNaive consumers that only need the raw VT stream can reconstruct it with:\n  `content.map(p => p.type === 'command' ? p.output : p.value).join('')`\n\nConsumers that need command boundaries can filter by part type."
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Process exit code, set when the terminal process exits"
+        },
+        "claim": {
+          "$ref": "#/$defs/TerminalClaim",
+          "description": "Who currently holds this terminal"
+        },
+        "supportsCommandDetection": {
+          "type": "boolean",
+          "description": "Whether this terminal emits `terminal/commandExecuted` and\n`terminal/commandFinished` actions and populates `command`-typed parts.\n\nClients MUST check this flag before relying on command detection.\nDo NOT use the presence of a `command` part as a feature flag — parts\nare absent in the normal idle state."
+        }
+      },
+      "required": [
+        "title",
+        "content",
+        "claim"
+      ]
+    },
+    "TerminalUnclassifiedPart": {
+      "type": "object",
+      "description": "Unstructured terminal output — content before, between, or after commands,\nor from terminals that do not support command detection.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "unclassified"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "description": "Accumulated VT output. Appended to by `terminal/data` when no command is executing."
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ]
+    },
+    "TerminalCommandPart": {
+      "type": "object",
+      "description": "A single command: its command line and the output it produced.\n\nWhile `isComplete` is false the command is still executing; `output` grows\nas `terminal/data` actions arrive. At `terminal/commandFinished` the part\nis mutated in-place with `isComplete: true` and the completion metadata.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "command"
+          ]
+        },
+        "commandId": {
+          "type": "string",
+          "description": "Stable id matching the `commandId` on the corresponding\n`terminal/commandExecuted` and `terminal/commandFinished` actions."
+        },
+        "commandLine": {
+          "type": "string",
+          "description": "The command line submitted to the shell."
+        },
+        "output": {
+          "type": "string",
+          "description": "Accumulated VT output. Appended to by `terminal/data` while `isComplete`\nis false. Shell integration escape sequences are stripped by the server."
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Unix timestamp (ms) when execution started, as reported by the server."
+        },
+        "isComplete": {
+          "type": "boolean",
+          "description": "Whether the command has finished."
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Shell exit code. Set at completion. `undefined` if unknown."
+        },
+        "durationMs": {
+          "type": "number",
+          "description": "Wall-clock duration in milliseconds. Set at completion."
+        }
+      },
+      "required": [
+        "type",
+        "commandId",
+        "commandLine",
+        "output",
+        "timestamp",
+        "isComplete"
+      ]
+    },
+    "UsageInfo": {
+      "type": "object",
+      "properties": {
+        "inputTokens": {
+          "type": "number",
+          "description": "Input tokens consumed"
+        },
+        "outputTokens": {
+          "type": "number",
+          "description": "Output tokens generated"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model used"
+        },
+        "cacheReadTokens": {
+          "type": "number",
+          "description": "Tokens read from cache"
+        }
+      }
+    },
+    "ErrorInfo": {
+      "type": "object",
+      "properties": {
+        "errorType": {
+          "type": "string",
+          "description": "Error type identifier"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message"
+        },
+        "stack": {
+          "type": "string",
+          "description": "Stack trace"
+        }
+      },
+      "required": [
+        "errorType",
+        "message"
+      ]
+    },
+    "Snapshot": {
+      "type": "object",
+      "description": "A point-in-time snapshot of a subscribed resource's state, returned by\n`initialize`, `reconnect`, and `subscribe`.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The subscribed resource URI (e.g. `agenthost:/root` or `copilot:/<uuid>`)"
+        },
+        "state": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RootState"
+            },
+            {
+              "$ref": "#/$defs/SessionState"
+            },
+            {
+              "$ref": "#/$defs/TerminalState"
+            }
+          ],
+          "description": "The current state of the resource"
+        },
+        "fromSeq": {
+          "type": "number",
+          "description": "The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`."
+        }
+      },
+      "required": [
+        "resource",
+        "state",
+        "fromSeq"
+      ]
+    },
+    "InitializeParams": {
+      "type": "object",
+      "description": "Establishes a new connection and negotiates the protocol version.\nThis MUST be the first message sent by the client.",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "description": "Protocol version the client speaks"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Unique client identifier"
+        },
+        "initialSubscriptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "URIs to subscribe to during handshake"
+        },
+        "locale": {
+          "type": "string",
+          "description": "IETF BCP 47 language tag indicating the client's preferred locale\n(e.g. `\"en-US\"`, `\"ja\"`). The server SHOULD use this to localise\nuser-facing strings such as confirmation option labels."
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "clientId"
+      ]
+    },
+    "InitializeResult": {
+      "type": "object",
+      "description": "Result of the `initialize` command.\n\nIf the server does not support the client's protocol version, it MUST return\nerror code `-32005` (`UnsupportedProtocolVersion`).",
+      "properties": {
+        "protocolVersion": {
+          "type": "number",
+          "description": "Protocol version the server speaks"
+        },
+        "serverSeq": {
+          "type": "number",
+          "description": "Current server sequence number"
+        },
+        "snapshots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Snapshot"
+          },
+          "description": "Snapshots for each `initialSubscriptions` URI"
+        },
+        "defaultDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "Suggested default directory for remote filesystem browsing"
+        }
+      },
+      "required": [
+        "protocolVersion",
+        "serverSeq",
+        "snapshots"
+      ]
+    },
+    "ReconnectParams": {
+      "type": "object",
+      "description": "Re-establishes a dropped connection. The server replays missed actions or\nprovides fresh snapshots.",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "Client identifier from the original connection"
+        },
+        "lastSeenServerSeq": {
+          "type": "number",
+          "description": "Last `serverSeq` the client received"
+        },
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "URIs the client was subscribed to"
+        }
+      },
+      "required": [
+        "clientId",
+        "lastSeenServerSeq",
+        "subscriptions"
+      ]
+    },
+    "ReconnectReplayResult": {
+      "type": "object",
+      "description": "Reconnect result when the server can replay from the requested sequence.\n\nThe server MUST include all replayed data in the response.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ReconnectResultType.Replay",
+          "description": "Discriminant"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ActionEnvelope"
+          },
+          "description": "Missed action envelopes since `lastSeenServerSeq`"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "URIs from `ReconnectParams.subscriptions` that the server cannot resume.\nThis includes resources that no longer exist (e.g. disposed sessions or\nterminals) as well as resources the client is no longer permitted to\nobserve. Clients SHOULD drop these from their local subscription set."
+        }
+      },
+      "required": [
+        "type",
+        "actions",
+        "missing"
+      ]
+    },
+    "ReconnectSnapshotResult": {
+      "type": "object",
+      "description": "Reconnect result when the gap exceeds the replay buffer.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ReconnectResultType.Snapshot",
+          "description": "Discriminant"
+        },
+        "snapshots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Snapshot"
+          },
+          "description": "Fresh snapshots for each subscription"
+        }
+      },
+      "required": [
+        "type",
+        "snapshots"
+      ]
+    },
+    "SubscribeParams": {
+      "type": "object",
+      "description": "Subscribe to a URI-identified state resource.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "URI to subscribe to"
+        }
+      },
+      "required": [
+        "resource"
+      ]
+    },
+    "SubscribeResult": {
+      "type": "object",
+      "description": "Result of the `subscribe` command.",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/Snapshot",
+          "description": "Snapshot of the subscribed resource"
+        }
+      },
+      "required": [
+        "snapshot"
+      ]
+    },
+    "SessionForkSource": {
+      "type": "object",
+      "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `notify/sessionAdded` notification to all\nclients.",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the existing session to fork from"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn ID in the source session; content up to and including this turn's response is copied"
+        }
+      },
+      "required": [
+        "session",
+        "turnId"
+      ]
+    },
+    "CreateSessionParams": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI (client-chosen, e.g. `copilot:/<uuid>`)"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelSelection",
+          "description": "Model selection (ID and optional model-specific configuration)"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "Working directory for the session"
+        },
+        "fork": {
+          "$ref": "#/$defs/SessionForkSource",
+          "description": "Fork from an existing session. The new session is populated with content\nfrom the source session up to and including the specified turn's response."
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Agent-specific configuration values collected via `resolveSessionConfig`.\nKeys and values correspond to the schema returned by the server."
+        },
+        "activeClient": {
+          "$ref": "#/$defs/SessionActiveClient",
+          "description": "Eagerly claim the active client role for the new session.\n\nWhen provided, the server initializes the session with this client as the\nactive client, equivalent to dispatching a `session/activeClientChanged`\naction immediately after creation. The `clientId` MUST match the\n`clientId` the creating client supplied in `initialize`."
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "DisposeSessionParams": {
+      "type": "object",
+      "description": "Disposes a session and cleans up server-side resources.\n\nThe server broadcasts a `notify/sessionRemoved` notification to all clients.",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI to dispose"
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "CreateTerminalParams": {
+      "type": "object",
+      "description": "Creates a new terminal on the server.\n\nAfter creation, the client should subscribe to the terminal URI to receive\nstate updates. The server dispatches `root/terminalsChanged` to update the\nroot terminal list.",
+      "properties": {
+        "terminal": {
+          "$ref": "#/$defs/URI",
+          "description": "Terminal URI (client-chosen)"
+        },
+        "claim": {
+          "$ref": "#/$defs/TerminalClaim",
+          "description": "Initial owner of the terminal"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable terminal name"
+        },
+        "cwd": {
+          "$ref": "#/$defs/URI",
+          "description": "Initial working directory URI"
+        },
+        "cols": {
+          "type": "number",
+          "description": "Initial terminal width in columns"
+        },
+        "rows": {
+          "type": "number",
+          "description": "Initial terminal height in rows"
+        }
+      },
+      "required": [
+        "terminal",
+        "claim"
+      ]
+    },
+    "DisposeTerminalParams": {
+      "type": "object",
+      "description": "Disposes a terminal and kills its process if still running.\n\nThe server dispatches `root/terminalsChanged` to remove the terminal from\nthe root terminal list.",
+      "properties": {
+        "terminal": {
+          "$ref": "#/$defs/URI",
+          "description": "Terminal URI to dispose"
+        }
+      },
+      "required": [
+        "terminal"
+      ]
+    },
+    "ListSessionsParams": {
+      "type": "object",
+      "description": "Returns a list of session summaries. Used to populate session lists and sidebars.\n\nThe session list is **not** part of the state tree because it can be arbitrarily\nlarge. Clients fetch it imperatively and maintain a local cache updated by\n`notify/sessionAdded` and `notify/sessionRemoved` notifications.",
+      "properties": {
+        "filter": {
+          "type": "object",
+          "description": "Optional filter criteria"
+        }
+      }
+    },
+    "ListSessionsResult": {
+      "type": "object",
+      "description": "Result of the `listSessions` command.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionSummary"
+          },
+          "description": "The list of session summaries."
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "ResourceReadParams": {
+      "type": "object",
+      "description": "Reads the content of a resource by URI.\n\nContent references keep the state tree small by storing large data (images,\nlong tool outputs) by reference rather than inline.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.",
+      "properties": {
+        "uri": {
+          "type": "string",
+          "description": "Content URI from a `ContentRef`"
+        },
+        "encoding": {
+          "$ref": "#/$defs/ContentEncoding",
+          "description": "Preferred encoding for the returned data (default: server-chosen)"
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
+    "ResourceReadResult": {
+      "type": "object",
+      "description": "Result of the `resourceRead` command.\n\nThe server SHOULD honor the `encoding` requested in the params. If the\nserver cannot provide the requested encoding, it MUST fall back to either\n`base64` or `utf-8`.",
+      "properties": {
+        "data": {
+          "type": "string",
+          "description": "Content encoded as a string"
+        },
+        "encoding": {
+          "$ref": "#/$defs/ContentEncoding",
+          "description": "How `data` is encoded"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content type (e.g. `\"image/png\"`, `\"text/plain\"`)"
+        }
+      },
+      "required": [
+        "data",
+        "encoding"
+      ]
+    },
+    "ResourceWriteParams": {
+      "type": "object",
+      "description": "Writes content to a file on the server's filesystem.\n\nBinary content (images, etc.) MUST use `base64` encoding. Text content MAY\nuse `utf-8` encoding.\n\nIf the file does not exist, it is created. If the file already exists, it is\noverwritten unless `createOnly` is set.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Target file URI on the server filesystem"
+        },
+        "data": {
+          "type": "string",
+          "description": "Content encoded as a string"
+        },
+        "encoding": {
+          "$ref": "#/$defs/ContentEncoding",
+          "description": "How `data` is encoded"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content type (e.g. `\"text/plain\"`, `\"image/png\"`)"
+        },
+        "createOnly": {
+          "type": "boolean",
+          "description": "If `true`, the server MUST fail if the file already exists instead of\noverwriting it. Useful for safe creation of new files."
+        }
+      },
+      "required": [
+        "uri",
+        "data",
+        "encoding"
+      ]
+    },
+    "ResourceWriteResult": {
+      "type": "object",
+      "description": "Result of the `resourceWrite` command.\n\nAn empty object on success.",
+      "properties": {}
+    },
+    "ResourceListParams": {
+      "type": "object",
+      "description": "Lists directory entries at a file URI on the server's filesystem.\n\nThis is intended for remote folder pickers and similar UI that needs to let\nusers navigate the server's local filesystem.\n\nThe server MUST return success only if the target exists and is a directory.\nIf the target does not exist, is not a directory, or cannot be accessed, the\nserver MUST return a JSON-RPC error.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Directory URI on the server filesystem"
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
+    "DirectoryEntry": {
+      "type": "object",
+      "description": "Directory entry returned by `resourceList`.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Base name of the entry"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "file",
+            "directory"
+          ],
+          "description": "Whether the entry is a file or directory"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ]
+    },
+    "ResourceListResult": {
+      "type": "object",
+      "description": "Result of the `resourceList` command.",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DirectoryEntry"
+          },
+          "description": "Entries directly contained in the requested directory"
+        }
+      },
+      "required": [
+        "entries"
+      ]
+    },
+    "FetchTurnsParams": {
+      "type": "object",
+      "description": "Fetches historical turns for a session. Used for lazy loading of conversation\nhistory.",
+      "properties": {
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "before": {
+          "type": "string",
+          "description": "Turn ID to fetch before (exclusive). Omit to fetch from the most recent turn."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum number of turns to return. Server MAY impose its own upper bound."
+        }
+      },
+      "required": [
+        "session"
+      ]
+    },
+    "FetchTurnsResult": {
+      "type": "object",
+      "description": "Result of the `fetchTurns` command.",
+      "properties": {
+        "turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Turn"
+          },
+          "description": "The requested turns, ordered oldest-first"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more turns exist before the returned range"
+        }
+      },
+      "required": [
+        "turns",
+        "hasMore"
+      ]
+    },
+    "UnsubscribeParams": {
+      "type": "object",
+      "description": "Stop receiving updates for a URI.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "URI to unsubscribe from"
+        }
+      },
+      "required": [
+        "resource"
+      ]
+    },
+    "DispatchActionParams": {
+      "type": "object",
+      "description": "Fire-and-forget action dispatch (write-ahead). The client applies actions\noptimistically to local state.",
+      "properties": {
+        "clientSeq": {
+          "type": "number",
+          "description": "Client sequence number"
+        },
+        "action": {
+          "$ref": "#/$defs/StateAction",
+          "description": "The action to dispatch"
+        }
+      },
+      "required": [
+        "clientSeq",
+        "action"
+      ]
+    },
+    "ResourceCopyParams": {
+      "type": "object",
+      "description": "Copies a resource from one URI to another on the server's filesystem.\n\nIf the destination already exists, it is overwritten unless `failIfExists`\nis set.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/URI",
+          "description": "Source URI to copy from"
+        },
+        "destination": {
+          "$ref": "#/$defs/URI",
+          "description": "Destination URI to copy to"
+        },
+        "failIfExists": {
+          "type": "boolean",
+          "description": "If `true`, the server MUST fail if the destination already exists instead\nof overwriting it."
+        }
+      },
+      "required": [
+        "source",
+        "destination"
+      ]
+    },
+    "ResourceCopyResult": {
+      "type": "object",
+      "description": "Result of the `resourceCopy` command.\n\nAn empty object on success.",
+      "properties": {}
+    },
+    "ResourceDeleteParams": {
+      "type": "object",
+      "description": "Deletes a resource at a URI on the server's filesystem.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the resource to delete"
+        },
+        "recursive": {
+          "type": "boolean",
+          "description": "If `true` and the target is a directory, delete it and all its contents\nrecursively. If `false` (default), deleting a non-empty directory MUST fail."
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
+    "ResourceDeleteResult": {
+      "type": "object",
+      "description": "Result of the `resourceDelete` command.\n\nAn empty object on success.",
+      "properties": {}
+    },
+    "ResourceRequestParams": {
+      "type": "object",
+      "description": "Requests permission to access a resource on the receiver's filesystem.\n\n`resourceRequest` is symmetrical and MAY be sent in either direction: a\nclient asks the server to grant access to a server-side resource, or a\nserver asks the client to grant access to a client-side resource. The\nreceiver decides whether to allow, deny, or prompt the user for the\nrequested access.\n\nIf the receiver denies access, it MUST respond with `PermissionDenied`\n(-32009). The error data MAY include a `ResourceRequestParams` value\ndescribing the access the caller would need to be granted for the\noperation to succeed; see `PermissionDeniedErrorData` in\n`types/errors.ts`.\n\nAfter a successful `resourceRequest`, the caller MAY use the corresponding\n`resource*` commands (e.g. `resourceRead`, `resourceWrite`) to perform the\noperation. Receivers MAY rescind access at any time by returning\n`PermissionDenied` on subsequent operations.\n\nEither `read`, `write`, or both SHOULD be set to `true`. A request with\nneither flag set is treated as `read: true` by receivers.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Resource URI being requested. Typically a `file:` URI on the receiver's\nfilesystem, but any URI scheme that the receiver mediates access to is\nallowed."
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether the caller needs read access to the resource."
+        },
+        "write": {
+          "type": "boolean",
+          "description": "Whether the caller needs write access to the resource."
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
+    "ResourceRequestResult": {
+      "type": "object",
+      "description": "Result of the `resourceRequest` command.\n\nAn empty object on success.",
+      "properties": {}
+    },
+    "ResourceMoveParams": {
+      "type": "object",
+      "description": "Moves (renames) a resource from one URI to another on the server's filesystem.\n\nIf the destination already exists, it is overwritten unless `failIfExists`\nis set.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/URI",
+          "description": "Source URI to move from"
+        },
+        "destination": {
+          "$ref": "#/$defs/URI",
+          "description": "Destination URI to move to"
+        },
+        "failIfExists": {
+          "type": "boolean",
+          "description": "If `true`, the server MUST fail if the destination already exists instead\nof overwriting it."
+        }
+      },
+      "required": [
+        "source",
+        "destination"
+      ]
+    },
+    "ResourceMoveResult": {
+      "type": "object",
+      "description": "Result of the `resourceMove` command.\n\nAn empty object on success.",
+      "properties": {}
+    },
+    "AuthenticateParams": {
+      "type": "object",
+      "description": "Pushes a Bearer token for a protected resource. The `resource` field MUST\nmatch a `ProtectedResourceMetadata.resource` value declared by an agent\nin `AgentInfo.protectedResources`.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command.",
+      "properties": {
+        "resource": {
+          "type": "string",
+          "description": "The protected resource identifier. MUST match a `resource` value from\n`ProtectedResourceMetadata` declared in `AgentInfo.protectedResources`."
+        },
+        "token": {
+          "type": "string",
+          "description": "Bearer token obtained from the resource's authorization server"
+        }
+      },
+      "required": [
+        "resource",
+        "token"
+      ]
+    },
+    "AuthenticateResult": {
+      "type": "object",
+      "description": "Result of the `authenticate` command.\n\nAn empty object on success. If the token is invalid or the resource is\nunrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`\n`-32007` or `InvalidParams` `-32602`).",
+      "properties": {}
+    },
+    "ResolveSessionConfigParams": {
+      "type": "object",
+      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). The returned `values` contain\nserver-resolved defaults to pass to `createSession`.",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "Working directory for the session"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Current user-filled configuration values"
+        }
+      }
+    },
+    "ResolveSessionConfigResult": {
+      "type": "object",
+      "description": "Result of the `resolveSessionConfig` command.",
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/SessionConfigSchema",
+          "description": "JSON Schema describing available configuration properties given the current context"
+        },
+        "values": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Current configuration values (echoed back with server-resolved defaults applied)"
+        }
+      },
+      "required": [
+        "schema",
+        "values"
+      ]
+    },
+    "SessionConfigValueItem": {
+      "type": "object",
+      "description": "A single value item returned by `sessionConfigCompletions`.",
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "The value to store in config"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable display label"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional secondary description"
+        }
+      },
+      "required": [
+        "value",
+        "label"
+      ]
+    },
+    "SessionConfigCompletionsParams": {
+      "type": "object",
+      "description": "Queries the server for allowed values of a dynamic session config property.\n\nUsed when a property in the schema returned by `resolveSessionConfig` has\n`enumDynamic: true`. The client sends a search query and receives matching\nvalues with display metadata.",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "Working directory for the session"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Current user-filled configuration values (provides context for the query)"
+        },
+        "property": {
+          "type": "string",
+          "description": "Property id from the schema to query values for"
+        },
+        "query": {
+          "type": "string",
+          "description": "Search filter text (empty or omitted returns default/recent values)"
+        }
+      },
+      "required": [
+        "property"
+      ]
+    },
+    "SessionConfigCompletionsResult": {
+      "type": "object",
+      "description": "Result of the `sessionConfigCompletions` command.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionConfigValueItem"
+          },
+          "description": "Matching value items"
+        }
+      },
+      "required": [
+        "items"
       ]
     }
   }
