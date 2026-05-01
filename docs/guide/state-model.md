@@ -161,12 +161,53 @@ UserMessage {
   attachments?: MessageAttachment[]
 }
 
-MessageAttachment {
-  type: 'file' | 'directory' | 'selection'
-  path: string
-  displayName?: string
+// Discriminated union — see types/state.ts for full definitions.
+type MessageAttachment =
+  | SimpleMessageAttachment            // type: 'simple'
+  | MessageEmbeddedResourceAttachment  // type: 'embeddedResource'
+  | MessageResourceAttachment          // type: 'resource'
+
+// Common fields shared by all variants:
+MessageAttachmentBase {
+  label: string                  // human-readable label, e.g. filename
+  rangeStart?: number            // half-open [rangeStart, rangeEnd) range
+  rangeEnd?: number              //   in `text` that references this attachment
+  displayKind?: 'image' | 'document' | 'symbol' | 'directory' | 'selection' | string
+  _meta?: Record<string, unknown>
 }
 ```
+
+Attachments MAY be referenced inline by `text` via the optional `rangeStart`/`rangeEnd` fields, which point at a half-open span of UTF-16 code units in the message text. Attachments without a range are still associated with the message but are not anchored to a specific span.
+
+Use `SimpleMessageAttachment` for opaque attachments whose model representation is supplied by the producer, `MessageEmbeddedResourceAttachment` for small inline base64 payloads (e.g. a pasted image), and `MessageResourceAttachment` to reference a resource by URI (the content is fetched via `resourceRead` when needed).
+
+Attachments produced by the [`completions`](#user-message-completions) command MAY include a `_meta` blob; clients MUST preserve every property of `_meta` when echoing the attachment back in the user message.
+
+### User-Message Completions
+
+To support `@`-mention pickers and similar inline-completion experiences, the client can call the `completions` command while the user is composing a message:
+
+```typescript
+CompletionsParams {
+  kind: 'userMessage'      // CompletionItemKind.UserMessage
+  session: URI
+  text: string             // full text typed so far
+  offset: number           // cursor offset (UTF-16 code units)
+}
+
+CompletionsResult {
+  items: CompletionItem[]
+}
+
+CompletionItem {
+  insertText: string
+  rangeStart?: number      // range in `text` to replace; insertion at cursor if omitted
+  rangeEnd?: number
+  attachment: MessageAttachment
+}
+```
+
+Servers advertise the characters that should auto-trigger this request via `InitializeResult.completionTriggerCharacters` (e.g. `['@', '#']`). Clients MAY also issue `completions` calls in response to explicit user actions (such as a keyboard shortcut). When the user accepts an item, the client replaces `[rangeStart, rangeEnd)` in the input with `insertText` and associates the item's `attachment` with the resulting `UserMessage`.
 
 ## Response Parts
 

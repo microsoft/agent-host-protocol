@@ -133,15 +133,18 @@ pub enum TurnState {
     Error,
 }
 
-/// Type of a message attachment.
+/// Discriminant for {@link MessageAttachment} variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum AttachmentType {
-    #[serde(rename = "file")]
-    File,
-    #[serde(rename = "directory")]
-    Directory,
-    #[serde(rename = "selection")]
-    Selection,
+pub enum MessageAttachmentKind {
+    /// A simple, opaque attachment whose representation is described by the producer.
+    #[serde(rename = "simple")]
+    Simple,
+    /// An attachment whose data is embedded inline as a base64 string.
+    #[serde(rename = "embeddedResource")]
+    EmbeddedResource,
+    /// An attachment that references a resource by URI.
+    #[serde(rename = "resource")]
+    Resource,
 }
 
 /// Discriminant for response part types.
@@ -779,6 +782,12 @@ pub struct ActiveTurn {
     pub usage: Option<UsageInfo>,
 }
 
+/// A user message and its associated attachments.
+///
+/// Attachments MAY be referenced inside {@link UserMessage.text} via their
+/// {@link MessageAttachmentBase.rangeStart}/{@link MessageAttachmentBase.rangeEnd}
+/// fields. Attachments without a range are still associated with the message
+/// but do not correspond to a specific span in the text.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserMessage {
@@ -1001,16 +1010,155 @@ pub struct SessionInputRequest {
     pub answers: Option<std::collections::HashMap<String, SessionInputAnswer>>,
 }
 
+/// A simple, opaque attachment whose model representation is described by
+/// the producer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MessageAttachment {
-    /// Attachment type
-    pub r#type: AttachmentType,
-    /// File/directory URI
-    pub uri: Uri,
-    /// Display name
+pub struct SimpleMessageAttachment {
+    /// A human-readable label for the attachment (e.g. the filename of a file
+    /// attachment). Used for display in UI.
+    pub label: String,
+    /// If defined, the start of the range in {@link UserMessage.text} that
+    /// references this attachment. The range is the half-open interval
+    /// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+    /// units.
+    ///
+    /// When present, `rangeEnd` MUST also be present and MUST be greater than or
+    /// equal to `rangeStart`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
+    pub range_start: Option<i64>,
+    /// The end of the range in {@link UserMessage.text} that references this
+    /// attachment. See {@link rangeStart}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range_end: Option<i64>,
+    /// Advisory display hint for clients rendering this attachment. Recognized
+    /// values include:
+    ///
+    /// - `'image'`: the attachment is an image
+    /// - `'document'`: the attachment is a textual document
+    /// - `'symbol'`: the attachment is a code symbol (e.g. a function or class)
+    /// - `'directory'`: the attachment is a folder
+    /// - `'selection'`: the attachment is a selection within a document
+    ///
+    /// Implementations MAY provide additional values; clients SHOULD fall back
+    /// to a reasonable default when an unknown value is encountered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_kind: Option<String>,
+    /// Additional implementation-defined metadata for the attachment.
+    ///
+    /// If the attachment was produced by the `completions` command, the client
+    /// MUST preserve every property of `_meta` originally returned by the agent
+    /// host when sending the user message containing the accepted completion.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Representation of the attachment as it should be shown to the model.
+    ///
+    /// If the attachment was produced by the client, this property MUST be
+    /// defined so the agent host can correctly interpret the attachment. This
+    /// property MAY be omitted when the attachment originated from a
+    /// `completions` response.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_representation: Option<String>,
+}
+
+/// An attachment whose data is embedded inline as a base64 string.
+///
+/// Use this for small binary payloads (e.g. a pasted image) that should be
+/// delivered with the user message itself rather than fetched separately.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageEmbeddedResourceAttachment {
+    /// A human-readable label for the attachment (e.g. the filename of a file
+    /// attachment). Used for display in UI.
+    pub label: String,
+    /// If defined, the start of the range in {@link UserMessage.text} that
+    /// references this attachment. The range is the half-open interval
+    /// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+    /// units.
+    ///
+    /// When present, `rangeEnd` MUST also be present and MUST be greater than or
+    /// equal to `rangeStart`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range_start: Option<i64>,
+    /// The end of the range in {@link UserMessage.text} that references this
+    /// attachment. See {@link rangeStart}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range_end: Option<i64>,
+    /// Advisory display hint for clients rendering this attachment. Recognized
+    /// values include:
+    ///
+    /// - `'image'`: the attachment is an image
+    /// - `'document'`: the attachment is a textual document
+    /// - `'symbol'`: the attachment is a code symbol (e.g. a function or class)
+    /// - `'directory'`: the attachment is a folder
+    /// - `'selection'`: the attachment is a selection within a document
+    ///
+    /// Implementations MAY provide additional values; clients SHOULD fall back
+    /// to a reasonable default when an unknown value is encountered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_kind: Option<String>,
+    /// Additional implementation-defined metadata for the attachment.
+    ///
+    /// If the attachment was produced by the `completions` command, the client
+    /// MUST preserve every property of `_meta` originally returned by the agent
+    /// host when sending the user message containing the accepted completion.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Base64-encoded binary data
+    pub data: String,
+    /// Content MIME type (e.g. `"image/png"`, `"application/pdf"`)
+    pub content_type: String,
+}
+
+/// An attachment that references a resource by URI. The content is not
+/// delivered inline; consumers can fetch it via `resourceRead` when needed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageResourceAttachment {
+    /// A human-readable label for the attachment (e.g. the filename of a file
+    /// attachment). Used for display in UI.
+    pub label: String,
+    /// If defined, the start of the range in {@link UserMessage.text} that
+    /// references this attachment. The range is the half-open interval
+    /// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+    /// units.
+    ///
+    /// When present, `rangeEnd` MUST also be present and MUST be greater than or
+    /// equal to `rangeStart`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range_start: Option<i64>,
+    /// The end of the range in {@link UserMessage.text} that references this
+    /// attachment. See {@link rangeStart}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range_end: Option<i64>,
+    /// Advisory display hint for clients rendering this attachment. Recognized
+    /// values include:
+    ///
+    /// - `'image'`: the attachment is an image
+    /// - `'document'`: the attachment is a textual document
+    /// - `'symbol'`: the attachment is a code symbol (e.g. a function or class)
+    /// - `'directory'`: the attachment is a folder
+    /// - `'selection'`: the attachment is a selection within a document
+    ///
+    /// Implementations MAY provide additional values; clients SHOULD fall back
+    /// to a reasonable default when an unknown value is encountered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_kind: Option<String>,
+    /// Additional implementation-defined metadata for the attachment.
+    ///
+    /// If the attachment was produced by the `completions` command, the client
+    /// MUST preserve every property of `_meta` originally returned by the agent
+    /// host when sending the user message containing the accepted completion.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Content URI
+    pub uri: Uri,
+    /// Approximate size in bytes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_hint: Option<i64>,
+    /// Content MIME type
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1894,6 +2042,22 @@ pub enum ToolResultContent {
     Terminal(ToolResultTerminalContent),
     #[serde(rename = "subagent")]
     Subagent(ToolResultSubagentContent),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// An attachment associated with a `UserMessage`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum MessageAttachment {
+    #[serde(rename = "simple")]
+    Simple(SimpleMessageAttachment),
+    #[serde(rename = "embeddedResource")]
+    EmbeddedResource(MessageEmbeddedResourceAttachment),
+    #[serde(rename = "resource")]
+    Resource(MessageResourceAttachment),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

@@ -515,7 +515,7 @@ const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionInputAnswerState', 'SessionInputAnswerValueKind', 'SessionInputQuestionKind',
   'SessionInputResponseKind',
-  'TurnState', 'AttachmentType', 'ResponsePartKind', 'ToolCallStatus',
+  'TurnState', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason',
   'ConfirmationOptionKind',
   'ToolResultContentType', 'CustomizationStatus', 'TerminalClaimKind',
@@ -561,7 +561,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'SessionInputSingleSelectQuestion', omitDiscriminants: true },
   { name: 'SessionInputMultiSelectQuestion', omitDiscriminants: true },
   { name: 'SessionInputRequest' },
-  { name: 'MessageAttachment' },
+  { name: 'SimpleMessageAttachment', omitDiscriminants: true },
+  { name: 'MessageEmbeddedResourceAttachment', omitDiscriminants: true },
+  { name: 'MessageResourceAttachment', omitDiscriminants: true },
   { name: 'MarkdownResponsePart', omitDiscriminants: true },
   { name: 'ContentRef' },
   { name: 'ResourceReponsePart', omitDiscriminants: true, rustName: 'ResourceResponsePart' },
@@ -703,6 +705,18 @@ const TOOL_RESULT_CONTENT_UNION: UnionConfig = {
   unknown: true,
 };
 
+const MESSAGE_ATTACHMENT_UNION: UnionConfig = {
+  name: 'MessageAttachment',
+  discriminantField: 'type',
+  doc: 'An attachment associated with a `UserMessage`.',
+  variants: [
+    { variantName: 'Simple', innerType: 'SimpleMessageAttachment', wireValue: 'simple' },
+    { variantName: 'EmbeddedResource', innerType: 'MessageEmbeddedResourceAttachment', wireValue: 'embeddedResource' },
+    { variantName: 'Resource', innerType: 'MessageResourceAttachment', wireValue: 'resource' },
+  ],
+  unknown: true,
+};
+
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot — root, session, or terminal state.
 ///
@@ -759,6 +773,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_ANSWER_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_RESULT_CONTENT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(MESSAGE_ATTACHMENT_UNION));
   lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
@@ -933,7 +949,7 @@ pub struct ActionEnvelope {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ContentEncoding'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ContentEncoding', 'CompletionItemKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
@@ -958,6 +974,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
   { name: 'SessionConfigCompletionsParams' }, { name: 'SessionConfigCompletionsResult' },
   { name: 'SessionConfigValueItem' },
+  { name: 'CompletionsParams' }, { name: 'CompletionItem' }, { name: 'CompletionsResult' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -976,7 +993,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TerminalClaim, Turn};');
+  lines.push('use crate::state::{MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TerminalClaim, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1292,6 +1309,8 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputQuestion',
     'SessionInputAnswerValue',
     'SessionInputAnswer',
+    'MessageAttachment',
+    'MessageAttachmentBase',
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

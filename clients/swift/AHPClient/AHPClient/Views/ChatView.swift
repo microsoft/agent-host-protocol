@@ -654,7 +654,7 @@ private struct InputBarPreviewWrapper: View {
                 </userRequest>
                 """,
                 attachments: [
-                    MessageAttachment(type: .file, path: "src/auth.swift", displayName: "auth.swift")
+                    .resource(MessageResourceAttachment(label: "auth.swift", displayKind: "document", uri: "src/auth.swift", type: .resource))
                 ]
             )
             ReasoningPartView(part: ReasoningResponsePart(

@@ -474,7 +474,7 @@ const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionInputAnswerState', 'SessionInputAnswerValueKind', 'SessionInputQuestionKind',
   'SessionInputResponseKind',
-  'TurnState', 'AttachmentType', 'ResponsePartKind', 'ToolCallStatus',
+  'TurnState', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason', 'ConfirmationOptionKind',
   'ToolResultContentType', 'CustomizationStatus', 'TerminalClaimKind',
 ];
@@ -493,7 +493,8 @@ const STATE_STRUCTS = [
   'SessionInputNumberQuestion', 'SessionInputBooleanQuestion',
   'SessionInputSingleSelectQuestion', 'SessionInputMultiSelectQuestion',
   'SessionInputRequest',
-  'MessageAttachment', 'MarkdownResponsePart', 'ContentRef',
+  'SimpleMessageAttachment', 'MessageEmbeddedResourceAttachment', 'MessageResourceAttachment',
+  'MarkdownResponsePart', 'ContentRef',
   'ResourceReponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
   'ToolCallResult', 'ToolCallStreamingState',
   'ToolCallPendingConfirmationState', 'ToolCallRunningState',
@@ -582,6 +583,16 @@ const SESSION_INPUT_ANSWER_UNION: UnionConfig = {
     { caseName: 'draft', structName: 'SessionInputAnswered', discriminantValue: 'draft' },
     { caseName: 'submitted', structName: 'SessionInputAnswered', discriminantValue: 'submitted' },
     { caseName: 'skipped', structName: 'SessionInputSkipped', discriminantValue: 'skipped' },
+  ],
+};
+
+const MESSAGE_ATTACHMENT_UNION: UnionConfig = {
+  name: 'MessageAttachment',
+  discriminantField: 'type',
+  variants: [
+    { caseName: 'simple', structName: 'SimpleMessageAttachment', discriminantValue: 'simple' },
+    { caseName: 'embeddedResource', structName: 'MessageEmbeddedResourceAttachment', discriminantValue: 'embeddedResource' },
+    { caseName: 'resource', structName: 'MessageResourceAttachment', discriminantValue: 'resource' },
   ],
 };
 
@@ -746,6 +757,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_ANSWER_VALUE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_ANSWER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(MESSAGE_ATTACHMENT_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -957,7 +970,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ContentEncoding'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ContentEncoding', 'CompletionItemKind'];
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
@@ -979,6 +992,7 @@ const COMMAND_STRUCTS = [
   'SessionConfigPropertySchema', 'SessionConfigSchema',
   'SessionConfigCompletionsParams', 'SessionConfigCompletionsResult',
   'SessionConfigValueItem',
+  'CompletionsParams', 'CompletionItem', 'CompletionsResult',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1461,6 +1475,8 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputQuestion',         // SESSION_INPUT_QUESTION_UNION discriminated union
     'SessionInputAnswerValue',      // SESSION_INPUT_ANSWER_VALUE_UNION discriminated union
     'SessionInputAnswer',           // SESSION_INPUT_ANSWER_UNION discriminated union
+    'MessageAttachment',            // MESSAGE_ATTACHMENT_UNION discriminated union
+    'MessageAttachmentBase',        // base interface, flattened into the variant structs via `extends`
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

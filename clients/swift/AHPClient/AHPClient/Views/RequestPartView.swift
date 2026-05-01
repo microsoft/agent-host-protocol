@@ -20,19 +20,22 @@ struct UserBubble: View {
         var result = parsed.pills
         if let attachments, !attachments.isEmpty {
             for (i, a) in attachments.enumerated() {
-                let icon = attachmentIcon(a.type)
-                let label = a.displayName ?? a.path
-                result.append(ContextPill(id: "attachment-\(i)", label: label, icon: icon, content: a.path))
+                let icon = attachmentIcon(displayKind: a.displayKind)
+                let label = a.label
+                let content = a.contentString
+                result.append(ContextPill(id: "attachment-\(i)", label: label, icon: icon, content: content))
             }
         }
         return result
     }
 
-    private func attachmentIcon(_ type: AttachmentType) -> String {
-        switch type {
-        case .directory: return "folder"
-        case .file: return "doc"
-        case .selection: return "text.cursor"
+    private func attachmentIcon(displayKind: String?) -> String {
+        switch displayKind {
+        case "directory": return "folder"
+        case "selection": return "text.cursor"
+        case "image": return "photo"
+        case "symbol": return "function"
+        default: return "doc"
         }
     }
 
@@ -374,9 +377,9 @@ private struct InputBarPreviewWrapper: View {
             UserBubble(
                 text: "Please review these files",
                 attachments: [
-                    MessageAttachment(type: .file, path: "src/auth/login.swift", displayName: "login.swift"),
-                    MessageAttachment(type: .directory, path: "src/models/", displayName: "models"),
-                    MessageAttachment(type: .selection, path: "src/app.swift", displayName: "app.swift (selection)")
+                    .resource(MessageResourceAttachment(label: "login.swift", displayKind: "document", uri: "src/auth/login.swift", type: .resource)),
+                    .resource(MessageResourceAttachment(label: "models", displayKind: "directory", uri: "src/models/", type: .resource)),
+                    .resource(MessageResourceAttachment(label: "app.swift (selection)", displayKind: "selection", uri: "src/app.swift", type: .resource))
                 ]
             )
 
@@ -397,7 +400,7 @@ private struct InputBarPreviewWrapper: View {
                 </userRequest>
                 """,
                 attachments: [
-                    MessageAttachment(type: .file, path: "AGENTS.md", displayName: "AGENTS.md")
+                    .resource(MessageResourceAttachment(label: "AGENTS.md", displayKind: "document", uri: "AGENTS.md", type: .resource))
                 ]
             )
 
@@ -408,4 +411,35 @@ private struct InputBarPreviewWrapper: View {
         .padding()
     }
     .environment(AppStore())
+}
+
+// MARK: - MessageAttachment helpers
+
+extension MessageAttachment {
+    /// Human-readable label suitable for display.
+    var label: String {
+        switch self {
+        case .simple(let s): return s.label
+        case .embeddedResource(let e): return e.label
+        case .resource(let r): return r.label
+        }
+    }
+
+    /// Advisory display hint, if any.
+    var displayKind: String? {
+        switch self {
+        case .simple(let s): return s.displayKind
+        case .embeddedResource(let e): return e.displayKind
+        case .resource(let r): return r.displayKind
+        }
+    }
+
+    /// String representation of the attachment's content, for display in pills.
+    var contentString: String? {
+        switch self {
+        case .simple(let s): return s.modelRepresentation
+        case .embeddedResource: return nil
+        case .resource(let r): return r.uri
+        }
+    }
 }

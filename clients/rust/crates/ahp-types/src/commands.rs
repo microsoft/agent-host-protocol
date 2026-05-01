@@ -15,8 +15,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, Snapshot,
-    SnapshotState, TerminalClaim, Turn,
+    MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    Snapshot, SnapshotState, TerminalClaim, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -37,6 +37,16 @@ pub enum ContentEncoding {
     Base64,
     #[serde(rename = "utf-8")]
     Utf8,
+}
+
+/// The kind of completion items being requested.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CompletionItemKind {
+    /// Completions for the text of a {@link UserMessage} the user is composing.
+    /// Each returned item carries an attachment that gets associated with the
+    /// message when accepted.
+    #[serde(rename = "userMessage")]
+    UserMessage,
 }
 
 // ─── Command Payloads ─────────────────────────────────────────────────
@@ -76,6 +86,12 @@ pub struct InitializeResult {
     /// Suggested default directory for remote filesystem browsing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_directory: Option<Uri>,
+    /// Characters that, when typed in a {@link UserMessage} input, SHOULD cause
+    /// the client to issue a `completions` request with
+    /// {@link CompletionItemKind.UserMessage}. Typically includes characters like
+    /// `'@'` or `'/'`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_trigger_characters: Option<Vec<String>>,
 }
 
 /// Re-establishes a dropped connection. The server replays missed actions or
@@ -555,6 +571,68 @@ pub struct SessionConfigValueItem {
     /// Optional secondary description
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+}
+
+/// Requests completion items for a partially-typed input (e.g. a user message
+/// the user is currently composing). Used to power `@`-mention pickers,
+/// file/symbol references, and similar inline-completion experiences.
+///
+/// Servers SHOULD treat this command as best-effort and return promptly. The
+/// client SHOULD debounce calls to avoid flooding the server with requests on
+/// every keystroke.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletionsParams {
+    /// What kind of completion is being requested.
+    pub kind: CompletionItemKind,
+    /// The session URI the completion is being requested for.
+    pub session: Uri,
+    /// The complete text of the input being completed (e.g. the full user
+    /// message text typed so far).
+    pub text: String,
+    /// The character offset within `text` at which the completion is requested,
+    /// measured in UTF-16 code units. MUST satisfy `0 <= offset <= text.length`.
+    pub offset: i64,
+}
+
+/// A single completion item returned by the `completions` command.
+///
+/// When the user accepts an item, the client SHOULD:
+/// 1. Replace the range `[rangeStart, rangeEnd)` in the input with `insertText`
+///    (or insert `insertText` at the cursor when the range is omitted).
+/// 2. Associate the item's `attachment` with the resulting {@link UserMessage}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletionItem {
+    /// The text inserted into the input when this item is accepted.
+    pub insert_text: String,
+    /// If defined, the start of the range in the input's `text` that is replaced
+    /// by `insertText`. The range is the half-open interval
+    /// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
+    /// units.
+    ///
+    /// When omitted, the client SHOULD insert `insertText` at the cursor.
+    ///
+    /// Note: this range refers to positions in the *current* input. The
+    /// attachment's own `rangeStart`/`rangeEnd` (when present) refer to
+    /// positions in the final {@link UserMessage.text} after the item is
+    /// accepted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range_start: Option<i64>,
+    /// The end of the range in the input's `text` that is replaced by
+    /// `insertText`. See {@link rangeStart}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub range_end: Option<i64>,
+    /// The attachment associated with this completion item.
+    pub attachment: MessageAttachment,
+}
+
+/// Result of the `completions` command.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletionsResult {
+    /// The completion items, in the order the server suggests displaying them.
+    pub items: Vec<CompletionItem>,
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

@@ -1230,6 +1230,7 @@
     },
     "UserMessage": {
       "type": "object",
+      "description": "A user message and its associated attachments.\n\nAttachments MAY be referenced inside {@link UserMessage.text} via their\n{@link MessageAttachmentBase.rangeStart}/{@link MessageAttachmentBase.rangeEnd}\nfields. Attachments without a range are still associated with the message\nbut do not correspond to a specific span in the text.",
       "properties": {
         "text": {
           "type": "string",
@@ -1247,25 +1248,166 @@
         "text"
       ]
     },
-    "MessageAttachment": {
+    "MessageAttachmentBase": {
       "type": "object",
+      "description": "Common fields shared by all {@link MessageAttachment} variants.",
       "properties": {
-        "type": {
-          "$ref": "#/$defs/AttachmentType",
-          "description": "Attachment type"
-        },
-        "uri": {
-          "$ref": "#/$defs/URI",
-          "description": "File/directory URI"
-        },
-        "displayName": {
+        "label": {
           "type": "string",
-          "description": "Display name"
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "rangeStart": {
+          "type": "number",
+          "description": "If defined, the start of the range in {@link UserMessage.text} that\nreferences this attachment. The range is the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits.\n\nWhen present, `rangeEnd` MUST also be present and MUST be greater than or\nequal to `rangeStart`."
+        },
+        "rangeEnd": {
+          "type": "number",
+          "description": "The end of the range in {@link UserMessage.text} that references this\nattachment. See {@link rangeStart}."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
         }
       },
       "required": [
+        "label"
+      ]
+    },
+    "SimpleMessageAttachment": {
+      "type": "object",
+      "description": "A simple, opaque attachment whose model representation is described by\nthe producer.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "rangeStart": {
+          "type": "number",
+          "description": "If defined, the start of the range in {@link UserMessage.text} that\nreferences this attachment. The range is the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits.\n\nWhen present, `rangeEnd` MUST also be present and MUST be greater than or\nequal to `rangeStart`."
+        },
+        "rangeEnd": {
+          "type": "number",
+          "description": "The end of the range in {@link UserMessage.text} that references this\nattachment. See {@link rangeStart}."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
+        },
+        "type": {
+          "$ref": "#/$defs/MessageAttachmentKind.Simple",
+          "description": "Discriminant"
+        },
+        "modelRepresentation": {
+          "type": "string",
+          "description": "Representation of the attachment as it should be shown to the model.\n\nIf the attachment was produced by the client, this property MUST be\ndefined so the agent host can correctly interpret the attachment. This\nproperty MAY be omitted when the attachment originated from a\n`completions` response."
+        }
+      },
+      "required": [
+        "label",
+        "type"
+      ]
+    },
+    "MessageEmbeddedResourceAttachment": {
+      "type": "object",
+      "description": "An attachment whose data is embedded inline as a base64 string.\n\nUse this for small binary payloads (e.g. a pasted image) that should be\ndelivered with the user message itself rather than fetched separately.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "rangeStart": {
+          "type": "number",
+          "description": "If defined, the start of the range in {@link UserMessage.text} that\nreferences this attachment. The range is the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits.\n\nWhen present, `rangeEnd` MUST also be present and MUST be greater than or\nequal to `rangeStart`."
+        },
+        "rangeEnd": {
+          "type": "number",
+          "description": "The end of the range in {@link UserMessage.text} that references this\nattachment. See {@link rangeStart}."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
+        },
+        "type": {
+          "$ref": "#/$defs/MessageAttachmentKind.EmbeddedResource",
+          "description": "Discriminant"
+        },
+        "data": {
+          "type": "string",
+          "description": "Base64-encoded binary data"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type (e.g. `\"image/png\"`, `\"application/pdf\"`)"
+        }
+      },
+      "required": [
+        "label",
         "type",
-        "uri"
+        "data",
+        "contentType"
+      ]
+    },
+    "MessageResourceAttachment": {
+      "type": "object",
+      "description": "An attachment that references a resource by URI. The content is not\ndelivered inline; consumers can fetch it via `resourceRead` when needed.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "rangeStart": {
+          "type": "number",
+          "description": "If defined, the start of the range in {@link UserMessage.text} that\nreferences this attachment. The range is the half-open interval\n`[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code\nunits.\n\nWhen present, `rangeEnd` MUST also be present and MUST be greater than or\nequal to `rangeStart`."
+        },
+        "rangeEnd": {
+          "type": "number",
+          "description": "The end of the range in {@link UserMessage.text} that references this\nattachment. See {@link rangeStart}."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
+        },
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        },
+        "type": {
+          "$ref": "#/$defs/MessageAttachmentKind.Resource",
+          "description": "Discriminant"
+        }
+      },
+      "required": [
+        "label",
+        "uri",
+        "type"
       ]
     },
     "MarkdownResponsePart": {
@@ -2269,7 +2411,7 @@
     },
     "SessionCustomization": {
       "type": "object",
-      "description": "A customization active in a session.\n\nEntries without a `clientId` are server-provided; entries with a `clientId`\noriginate from that client.",
+      "description": "A customization active in a session.",
       "properties": {
         "customization": {
           "$ref": "#/$defs/CustomizationRef",
@@ -2625,6 +2767,21 @@
         }
       ],
       "description": "Draft, submitted, or skipped answer for one question."
+    },
+    "MessageAttachment": {
+      "oneOf": [
+        {},
+        {
+          "$ref": "#/$defs/SimpleMessageAttachment"
+        },
+        {
+          "$ref": "#/$defs/MessageEmbeddedResourceAttachment"
+        },
+        {
+          "$ref": "#/$defs/MessageResourceAttachment"
+        }
+      ],
+      "description": "An attachment associated with a {@link UserMessage}."
     },
     "ResponsePart": {
       "oneOf": [

@@ -404,11 +404,31 @@ function generateStateTypesPage(project: Project): string {
 
   const userMessage = getInterface(project, 'UserMessage');
   lines.push(renderHeading('UserMessage', userMessage));
+  lines.push(getJsDocDescription(userMessage) + '\n');
   lines.push(renderInterfaceTable(userMessage) + '\n');
 
-  const messageAttachment = getInterface(project, 'MessageAttachment');
-  lines.push(renderHeading('MessageAttachment', messageAttachment));
-  lines.push(renderInterfaceTable(messageAttachment) + '\n');
+  const attachmentBase = getInterface(project, 'MessageAttachmentBase');
+  lines.push(renderHeading('MessageAttachmentBase', attachmentBase));
+  lines.push(getJsDocDescription(attachmentBase) + '\n');
+  lines.push(renderInterfaceTable(attachmentBase) + '\n');
+
+  const simpleAttachment = getInterface(project, 'SimpleMessageAttachment');
+  lines.push(renderHeading('SimpleMessageAttachment', simpleAttachment));
+  lines.push(getJsDocDescription(simpleAttachment) + '\n');
+  lines.push(renderInterfaceTable(simpleAttachment) + '\n');
+
+  const embeddedAttachment = getInterface(project, 'MessageEmbeddedResourceAttachment');
+  lines.push(renderHeading('MessageEmbeddedResourceAttachment', embeddedAttachment));
+  lines.push(getJsDocDescription(embeddedAttachment) + '\n');
+  lines.push(renderInterfaceTable(embeddedAttachment) + '\n');
+
+  const resourceAttachment = getInterface(project, 'MessageResourceAttachment');
+  lines.push(renderHeading('MessageResourceAttachment', resourceAttachment));
+  lines.push(getJsDocDescription(resourceAttachment) + '\n');
+  lines.push(renderInterfaceTable(resourceAttachment) + '\n');
+
+  const messageAttachmentAlias = renderTypeAlias(project, 'MessageAttachment');
+  if (messageAttachmentAlias) lines.push(messageAttachmentAlias + '\n');
 
   // Response Parts
   lines.push('## Response Parts\n');
@@ -599,6 +619,7 @@ const COMMAND_ORDER: CommandMeta[] = [
   { method: 'resourceDelete', paramsInterface: 'ResourceDeleteParams', resultInterface: 'ResourceDeleteResult' },
   { method: 'resourceMove', paramsInterface: 'ResourceMoveParams', resultInterface: 'ResourceMoveResult' },
   { method: 'fetchTurns', paramsInterface: 'FetchTurnsParams', resultInterface: 'FetchTurnsResult' },
+  { method: 'completions', paramsInterface: 'CompletionsParams', resultInterface: 'CompletionsResult' },
 ];
 
 function generateCommandsPage(project: Project): string {

@@ -28,6 +28,10 @@ import type {
   ActiveTurn,
   UserMessage,
   MessageAttachment,
+  MessageAttachmentBase,
+  SimpleMessageAttachment,
+  MessageEmbeddedResourceAttachment,
+  MessageResourceAttachment,
   MarkdownResponsePart,
   ContentRef,
   ToolCallResponsePart,
@@ -158,6 +162,9 @@ import type {
   SessionConfigCompletionsParams,
   SessionConfigCompletionsResult,
   SessionConfigValueItem,
+  CompletionsParams,
+  CompletionItem,
+  CompletionsResult,
   InitializeParams,
   InitializeResult,
 } from '../commands.js';
@@ -203,6 +210,10 @@ type V1_ITurn = Turn;
 type V1_IActiveTurn = ActiveTurn;
 type V1_IUserMessage = UserMessage;
 type V1_IMessageAttachment = MessageAttachment;
+type V1_IMessageAttachmentBase = MessageAttachmentBase;
+type V1_ISimpleMessageAttachment = SimpleMessageAttachment;
+type V1_IMessageEmbeddedResourceAttachment = MessageEmbeddedResourceAttachment;
+type V1_IMessageResourceAttachment = MessageResourceAttachment;
 type V1_IMarkdownResponsePart = MarkdownResponsePart;
 type V1_IContentRef = ContentRef;
 type V1_IToolCallResponsePart = ToolCallResponsePart;
@@ -326,6 +337,9 @@ type V1_ISessionConfigSchema = SessionConfigSchema;
 type V1_ISessionConfigCompletionsParams = SessionConfigCompletionsParams;
 type V1_ISessionConfigCompletionsResult = SessionConfigCompletionsResult;
 type V1_ISessionConfigValueItem = SessionConfigValueItem;
+type V1_ICompletionsParams = CompletionsParams;
+type V1_ICompletionItem = CompletionItem;
+type V1_ICompletionsResult = CompletionsResult;
 type V1_IInitializeParams = InitializeParams;
 type V1_IInitializeResult = InitializeResult;
 type V1_ICommandMap = CommandMap;
@@ -366,6 +380,14 @@ type _CheckActiveTurn = AssertCompatible<V1_IActiveTurn, ActiveTurn>;
 type _CheckUserMessage = AssertCompatible<V1_IUserMessage, UserMessage>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckMessageAttachment = AssertCompatible<V1_IMessageAttachment, MessageAttachment>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckMessageAttachmentBase = AssertCompatible<V1_IMessageAttachmentBase, MessageAttachmentBase>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckSimpleMessageAttachment = AssertCompatible<V1_ISimpleMessageAttachment, SimpleMessageAttachment>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckMessageEmbeddedResourceAttachment = AssertCompatible<V1_IMessageEmbeddedResourceAttachment, MessageEmbeddedResourceAttachment>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckMessageResourceAttachment = AssertCompatible<V1_IMessageResourceAttachment, MessageResourceAttachment>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckMarkdownResponsePart = AssertCompatible<V1_IMarkdownResponsePart, MarkdownResponsePart>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -620,6 +642,12 @@ type _CheckSessionConfigCompletionsParams = AssertCompatible<V1_ISessionConfigCo
 type _CheckSessionConfigCompletionsResult = AssertCompatible<V1_ISessionConfigCompletionsResult, SessionConfigCompletionsResult>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckSessionConfigValueItem = AssertCompatible<V1_ISessionConfigValueItem, SessionConfigValueItem>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckCompletionsParams = AssertCompatible<V1_ICompletionsParams, CompletionsParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckCompletionItem = AssertCompatible<V1_ICompletionItem, CompletionItem>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckCompletionsResult = AssertCompatible<V1_ICompletionsResult, CompletionsResult>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckConfirmationOption = AssertCompatible<V1_IConfirmationOption, ConfirmationOption>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
