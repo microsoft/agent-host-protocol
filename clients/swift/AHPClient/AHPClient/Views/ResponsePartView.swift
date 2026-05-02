@@ -16,7 +16,40 @@ struct ResponsePartView: View {
             ToolCallPartView(toolCall: tc.toolCall)
         case .contentRef(let ref):
             ContentRefView(ref: ref)
+        case .systemNotification(let note):
+            SystemNotificationPartView(part: note)
         }
+    }
+}
+
+// MARK: - SystemNotificationPartView
+
+struct SystemNotificationPartView: View {
+    let part: SystemNotificationResponsePart
+
+    private var text: String {
+        switch part.content {
+        case .string(let s): return s
+        case .markdown(let m): return m
+        }
+    }
+
+    var body: some View {
+        Label {
+            Text(text)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } icon: {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(
+            Color.secondary.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
     }
 }
 
