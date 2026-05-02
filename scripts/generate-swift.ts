@@ -1,8 +1,14 @@
 /**
- * Swift Package Generator — Generates a Swift Package from TypeScript type
- * definitions parsed via ts-morph.
+ * Swift Package Generator — Generates the Swift sources of the AgentHostProtocol
+ * package from TypeScript type definitions parsed via ts-morph.
  *
- * Output: swift/AgentHostProtocol/ with Package.swift and Sources/
+ * Outputs (under clients/swift/AgentHostProtocol/):
+ *   - Sources/AgentHostProtocol/Generated/*.generated.swift   (always overwritten)
+ *   - Sources/AgentHostProtocol/AnyCodable.swift              (only if missing)
+ *
+ * Note: Package.swift lives at the repository root (see /Package.swift). It
+ * is hand-maintained, not generated, because SwiftPM requires the manifest to
+ * live at the repo root for remote (`.package(url:)`) consumption.
  */
 
 import {
@@ -1394,37 +1400,6 @@ public struct AnyCodable: Codable, Sendable, Equatable {
 `;
 }
 
-// ─── Package.swift ───────────────────────────────────────────────────────────
-
-function packageSwiftContent(): string {
-  return `// swift-tools-version: 5.9
-
-import PackageDescription
-
-let package = Package(
-    name: "AgentHostProtocol",
-    platforms: [
-        .iOS(.v16),
-        .macOS(.v13),
-        .tvOS(.v16),
-        .watchOS(.v9),
-    ],
-    products: [
-        .library(
-            name: "AgentHostProtocol",
-            targets: ["AgentHostProtocol"]
-        ),
-    ],
-    targets: [
-        .target(
-            name: "AgentHostProtocol",
-            path: "Sources/AgentHostProtocol"
-        ),
-    ]
-)
-`;
-}
-
 // ─── Exhaustiveness Check ─────────────────────────────────────────────────────
 
 /**
@@ -1509,12 +1484,11 @@ export function generateSwiftPackage(project: Project, outputDir: string): void 
   const generatedDir = path.join(outputDir, 'Sources', 'AgentHostProtocol', 'Generated');
   fs.mkdirSync(generatedDir, { recursive: true });
 
-  // Package.swift and AnyCodable are only written if they don't exist yet,
-  // so hand-edits to Package.swift are preserved across regeneration.
-  const pkgPath = path.join(outputDir, 'Package.swift');
-  if (!fs.existsSync(pkgPath)) {
-    fs.writeFileSync(pkgPath, packageSwiftContent());
-  }
+  // AnyCodable is only written if it doesn't exist yet, so hand-edits are
+  // preserved across regeneration. Package.swift is hand-maintained at the
+  // repository root (see /Package.swift) — SwiftPM requires the manifest to
+  // live at the repo root for remote consumption — so it is not generated
+  // here.
   const anyCodablePath = path.join(outputDir, 'Sources', 'AgentHostProtocol', 'AnyCodable.swift');
   if (!fs.existsSync(anyCodablePath)) {
     fs.mkdirSync(path.dirname(anyCodablePath), { recursive: true });

@@ -10,9 +10,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: clients/rust
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -42,3 +42,34 @@ jobs:
       - run: cargo clippy --workspace -- -D warnings
 
       - run: cargo test --workspace
+
+  swift:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Verify the committed Swift sources are in sync with the TypeScript
+      # protocol definitions. If `npm run generate:swift` produces any diff,
+      # the committed Generated/ files are stale.
+      - name: Verify generated Swift is up to date
+        run: |
+          npm run generate:swift
+          if ! git diff --quiet -- clients/swift/AgentHostProtocol; then
+            echo "::error::Generated Swift sources are out of date. Run 'npm run generate:swift' and commit the result."
+            git --no-pager diff -- clients/swift/AgentHostProtocol
+            exit 1
+          fi
+
+      - name: Build Swift package
+        run: swift build
+
+      - name: Test Swift package
+        run: swift test
+

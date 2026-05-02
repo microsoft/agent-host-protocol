@@ -211,7 +211,7 @@
 			mainGroup = 6F2049802F7744ED001049F9;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				6F2049CF2F7746D3001049F9 /* XCLocalSwiftPackageReference "../AgentHostProtocol" */,
+				6F2049CF2F7746D3001049F9 /* XCLocalSwiftPackageReference "../../.." */,
 				AA000001304700000003 /* XCRemoteSwiftPackageReference "dev-tunnels-swift" */,
 				AA000002304700000003 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 			);
@@ -606,9 +606,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		6F2049CF2F7746D3001049F9 /* XCLocalSwiftPackageReference "../AgentHostProtocol" */ = {
+		6F2049CF2F7746D3001049F9 /* XCLocalSwiftPackageReference "../../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../AgentHostProtocol;
+			relativePath = ../../..;
 		};
 /* End XCLocalSwiftPackageReference section */
 
