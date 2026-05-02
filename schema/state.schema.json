@@ -1380,7 +1380,7 @@
     },
     "SystemNotificationResponsePart": {
       "type": "object",
-      "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent host or a provider\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".\n\nUnlike ephemeral protocol notifications (`notify/*`), system notification\nparts live in session state, replay on reconnect, and preserve their\nposition in the response stream relative to markdown, reasoning, and tool\ncalls.",
+      "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent harness\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".",
       "properties": {
         "kind": {
           "$ref": "#/$defs/ResponsePartKind.SystemNotification",
@@ -1388,7 +1388,7 @@
         },
         "content": {
           "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Human/agent-readable content. Always renderable as a fallback."
+          "description": "The text of the system notification"
         }
       },
       "required": [

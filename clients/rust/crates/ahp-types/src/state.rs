@@ -1076,19 +1076,14 @@ pub struct ReasoningResponsePart {
 
 /// A system notification surfaced as part of the response stream.
 ///
-/// System notifications are messages authored by the agent host or a provider
+/// System notifications are messages authored by the agent harness
 /// that need to be visible to both the agent (for situational awareness) and
 /// the user (for transcript continuity). Examples include "background subagent
 /// X completed" or "task Y was cancelled".
-///
-/// Unlike ephemeral protocol notifications (`notify/*`), system notification
-/// parts live in session state, replay on reconnect, and preserve their
-/// position in the response stream relative to markdown, reasoning, and tool
-/// calls.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemNotificationResponsePart {
-    /// Human/agent-readable content. Always renderable as a fallback.
+    /// The text of the system notification
     pub content: StringOrMarkdown,
 }
 
