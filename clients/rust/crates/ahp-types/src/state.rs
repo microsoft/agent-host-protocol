@@ -155,6 +155,8 @@ pub enum ResponsePartKind {
     ToolCall,
     #[serde(rename = "reasoning")]
     Reasoning,
+    #[serde(rename = "systemNotification")]
+    SystemNotification,
 }
 
 /// Status of a tool call in the lifecycle state machine.
@@ -1072,6 +1074,24 @@ pub struct ReasoningResponsePart {
     pub content: String,
 }
 
+/// A system notification surfaced as part of the response stream.
+///
+/// System notifications are messages authored by the agent host or a provider
+/// that need to be visible to both the agent (for situational awareness) and
+/// the user (for transcript continuity). Examples include "background subagent
+/// X completed" or "task Y was cancelled".
+///
+/// Unlike ephemeral protocol notifications (`notify/*`), system notification
+/// parts live in session state, replay on reconnect, and preserve their
+/// position in the response stream relative to markdown, reasoning, and tool
+/// calls.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemNotificationResponsePart {
+    /// Human/agent-readable content. Always renderable as a fallback.
+    pub content: StringOrMarkdown,
+}
+
 /// Tool execution result details, available after execution completes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1764,6 +1784,8 @@ pub enum ResponsePart {
     ToolCall(Box<ToolCallResponsePart>),
     #[serde(rename = "reasoning")]
     Reasoning(ReasoningResponsePart),
+    #[serde(rename = "systemNotification")]
+    SystemNotification(SystemNotificationResponsePart),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

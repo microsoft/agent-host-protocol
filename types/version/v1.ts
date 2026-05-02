@@ -32,6 +32,7 @@ import type {
   ContentRef,
   ToolCallResponsePart,
   ReasoningResponsePart,
+  SystemNotificationResponsePart,
   ToolCallResult,
   ToolCallStreamingState,
   ToolCallPendingConfirmationState,
@@ -211,6 +212,7 @@ type V1_IMarkdownResponsePart = MarkdownResponsePart;
 type V1_IContentRef = ContentRef;
 type V1_IToolCallResponsePart = ToolCallResponsePart;
 type V1_IReasoningResponsePart = ReasoningResponsePart;
+type V1_ISystemNotificationResponsePart = SystemNotificationResponsePart;
 type V1_IToolCallResult = ToolCallResult;
 type V1_IToolCallStreamingState = ToolCallStreamingState;
 type V1_IToolCallPendingConfirmationState = ToolCallPendingConfirmationState;
@@ -382,6 +384,8 @@ type _CheckContentRef = AssertCompatible<V1_IContentRef, ContentRef>;
 type _CheckToolCallResponsePart = AssertCompatible<V1_IToolCallResponsePart, ToolCallResponsePart>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckReasoningResponsePart = AssertCompatible<V1_IReasoningResponsePart, ReasoningResponsePart>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckSystemNotificationResponsePart = AssertCompatible<V1_ISystemNotificationResponsePart, SystemNotificationResponsePart>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckToolCallResult = AssertCompatible<V1_IToolCallResult, ToolCallResult>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

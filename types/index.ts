@@ -29,6 +29,7 @@ export type {
   ContentRef,
   ToolCallResponsePart,
   ReasoningResponsePart,
+  SystemNotificationResponsePart,
   ResponsePart,
   ToolCallResult,
   ToolCallStreamingState,

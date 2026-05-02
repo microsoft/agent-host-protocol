@@ -1378,6 +1378,24 @@
         "content"
       ]
     },
+    "SystemNotificationResponsePart": {
+      "type": "object",
+      "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent host or a provider\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".\n\nUnlike ephemeral protocol notifications (`notify/*`), system notification\nparts live in session state, replay on reconnect, and preserve their\nposition in the response stream relative to markdown, reasoning, and tool\ncalls.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.SystemNotification",
+          "description": "Discriminant"
+        },
+        "content": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Human/agent-readable content. Always renderable as a fallback."
+        }
+      },
+      "required": [
+        "kind",
+        "content"
+      ]
+    },
     "ConfirmationOption": {
       "type": "object",
       "description": "A confirmation option that the server offers for a tool call awaiting\napproval. Allows richer choices beyond simple approve/deny — for example,\n\"Approve in this Session\" or \"Deny with reason.\"",
@@ -2628,6 +2646,7 @@
     },
     "ResponsePart": {
       "oneOf": [
+        {},
         {
           "$ref": "#/$defs/MarkdownResponsePart"
         },
@@ -2639,6 +2658,9 @@
         },
         {
           "$ref": "#/$defs/ReasoningResponsePart"
+        },
+        {
+          "$ref": "#/$defs/SystemNotificationResponsePart"
         }
       ]
     },
