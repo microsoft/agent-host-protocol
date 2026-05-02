@@ -422,6 +422,39 @@ public struct SessionModelInfo: Codable, Sendable {
     /// level). Clients present this as a form and pass the resolved values in
     /// {@link ModelSelection.config} when creating or changing sessions.
     public var configSchema: ConfigSchema?
+    /// Additional provider-specific metadata for this model.
+    /// 
+    /// Unlike {@link configSchema}, which describes the *input* surface a client
+    /// should render as a form and round-trip through {@link ModelSelection.config},
+    /// `_meta` carries intrinsic, server-asserted facts about the model that the
+    /// client may read and display but never sends back.
+    /// 
+    /// Clients MAY look for well-known keys here to provide enhanced UI:
+    /// 
+    /// - `pricing` — billing information for the model. Recommended shape is an
+    /// object that may include any of:
+    /// - `multiplier` (number): provider-defined quota multiplier (e.g. Copilot
+    /// premium-request multipliers like `1`, `0.33`, `5`).
+    /// - `inputPer1M` (number): cost per 1,000,000 input tokens.
+    /// - `outputPer1M` (number): cost per 1,000,000 output tokens.
+    /// - `cachedInputPer1M` (number): cost per 1,000,000 cached input tokens.
+    /// - `currency` (string): ISO 4217 currency code, defaults to `USD`.
+    /// 
+    /// Providers SHOULD omit the `pricing` key entirely when no billing data is
+    /// available rather than emitting a `null` or empty object, so clients can
+    /// distinguish "no pricing info" from a partially-populated payload.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case provider
+        case name
+        case maxContextWindow
+        case supportsVision
+        case policyState
+        case configSchema
+        case meta = "_meta"
+    }
 
     public init(
         id: String,
@@ -430,7 +463,8 @@ public struct SessionModelInfo: Codable, Sendable {
         maxContextWindow: Int? = nil,
         supportsVision: Bool? = nil,
         policyState: PolicyState? = nil,
-        configSchema: ConfigSchema? = nil
+        configSchema: ConfigSchema? = nil,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.id = id
         self.provider = provider
@@ -439,6 +473,7 @@ public struct SessionModelInfo: Codable, Sendable {
         self.supportsVision = supportsVision
         self.policyState = policyState
         self.configSchema = configSchema
+        self.meta = meta
     }
 }
 

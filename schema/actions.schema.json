@@ -1784,6 +1784,11 @@
         "configSchema": {
           "$ref": "#/$defs/ConfigSchema",
           "description": "Configuration schema describing model-specific options (e.g. thinking\nlevel). Clients present this as a form and pass the resolved values in\n{@link ModelSelection.config} when creating or changing sessions."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this model.\n\nUnlike {@link configSchema}, which describes the *input* surface a client\nshould render as a form and round-trip through {@link ModelSelection.config},\n`_meta` carries intrinsic, server-asserted facts about the model that the\nclient may read and display but never sends back.\n\nClients MAY look for well-known keys here to provide enhanced UI:\n\n- `pricing` — billing information for the model. Recommended shape is an\n  object that may include any of:\n  - `multiplier` (number): provider-defined quota multiplier (e.g. Copilot\n    premium-request multipliers like `1`, `0.33`, `5`).\n  - `inputPer1M` (number): cost per 1,000,000 input tokens.\n  - `outputPer1M` (number): cost per 1,000,000 output tokens.\n  - `cachedInputPer1M` (number): cost per 1,000,000 cached input tokens.\n  - `currency` (string): ISO 4217 currency code, defaults to `USD`.\n\n  Providers SHOULD omit the `pricing` key entirely when no billing data is\n  available rather than emitting a `null` or empty object, so clients can\n  distinguish \"no pricing info\" from a partially-populated payload."
         }
       },
       "required": [

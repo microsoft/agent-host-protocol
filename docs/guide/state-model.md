@@ -31,6 +31,7 @@ ModelInfo {
   supportsVision?: boolean
   policyState?: 'enabled' | 'disabled' | 'unconfigured'
   configSchema?: ConfigSchema   // model-specific options (e.g. thinking level)
+  _meta?: Record<string, unknown>  // intrinsic facts (e.g. pricing); see below
 }
 
 ConfigSchema {
@@ -52,6 +53,12 @@ ConfigPropertySchema {
 ```
 
 When a model has a `configSchema`, clients present it as a form and pass the resolved values in a `ModelSelection` (see [Session Summary](#session-summary)).
+
+`_meta` is a generic metadata bag for **intrinsic, server-asserted facts** about the model — things the client displays but never echoes back to the agent. This is distinct from `configSchema`, which describes *input* the client renders as a form and round-trips via `ModelSelection.config`.
+
+Clients MAY look for well-known keys in `_meta` to provide enhanced UI. The current convention:
+
+- `pricing` — billing information for the model. Recommended shape is an object that may include any of `multiplier` (number, provider-defined quota multiplier such as Copilot's premium-request multipliers `1`, `0.33`, `5`), `inputPer1M` / `outputPer1M` / `cachedInputPer1M` (number, cost per 1,000,000 tokens), and `currency` (ISO 4217, defaults to `USD`). Providers SHOULD omit the key entirely when no billing data is available rather than emitting `null` or an empty object.
 
 Root state is mutated only by server-originated actions (e.g. `root/agentsChanged`).
 
