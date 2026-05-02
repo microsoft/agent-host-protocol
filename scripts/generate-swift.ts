@@ -495,6 +495,7 @@ const STATE_STRUCTS = [
   'SessionInputRequest',
   'MessageAttachment', 'MarkdownResponsePart', 'ContentRef',
   'ResourceReponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
+  'SystemNotificationResponsePart',
   'ToolCallResult', 'ToolCallStreamingState',
   'ToolCallPendingConfirmationState', 'ToolCallRunningState',
   'ToolCallPendingResultConfirmationState', 'ToolCallCompletedState',
@@ -516,6 +517,7 @@ const RESPONSE_PART_UNION: UnionConfig = {
     { caseName: 'contentRef', structName: 'ResourceReponsePart', discriminantValue: 'contentRef' },
     { caseName: 'toolCall', structName: 'ToolCallResponsePart', discriminantValue: 'toolCall' },
     { caseName: 'reasoning', structName: 'ReasoningResponsePart', discriminantValue: 'reasoning' },
+    { caseName: 'systemNotification', structName: 'SystemNotificationResponsePart', discriminantValue: 'systemNotification' },
   ],
 };
 
@@ -971,6 +973,7 @@ const COMMAND_STRUCTS = [
   'ResourceCopyParams', 'ResourceCopyResult',
   'ResourceDeleteParams', 'ResourceDeleteResult',
   'ResourceMoveParams', 'ResourceMoveResult',
+  'ResourceRequestParams', 'ResourceRequestResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'AuthenticateParams', 'AuthenticateResult',
@@ -1097,7 +1100,6 @@ function generateNotificationsFile(project: Project): string {
 // ─── Errors File Generator ───────────────────────────────────────────────────
 
 function generateErrorsFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'errors.ts')!;
   const lines: string[] = [GENERATED_HEADER];
 
   lines.push('// MARK: - Standard JSON-RPC Error Codes\n');
@@ -1135,8 +1137,21 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let notFound = -32008');
   lines.push('    /// The client is not permitted to access the requested resource');
   lines.push('    public static let permissionDenied = -32009');
+  lines.push('    /// The target resource already exists and the operation does not allow overwriting');
+  lines.push('    public static let alreadyExists = -32010');
   lines.push('}');
   lines.push('');
+
+  lines.push('// MARK: - Error Detail Payloads\n');
+  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData']) {
+    try {
+      lines.push(generateStructFromInterface(project, ifaceName));
+      lines.push('');
+    } catch (e) {
+      lines.push(`// TODO: Could not generate ${ifaceName}: ${e}`);
+      lines.push('');
+    }
+  }
 
   return lines.join('\n');
 }
@@ -1266,6 +1281,10 @@ public enum AHPCommands {
 
     public static func resourceMove(id: Int, params: ResourceMoveParams) -> JsonRpcRequest<ResourceMoveParams> {
         JsonRpcRequest(id: id, method: "resourceMove", params: params)
+    }
+
+    public static func resourceRequest(id: Int, params: ResourceRequestParams) -> JsonRpcRequest<ResourceRequestParams> {
+        JsonRpcRequest(id: id, method: "resourceRequest", params: params)
     }
 
     public static func fetchTurns(id: Int, params: FetchTurnsParams) -> JsonRpcRequest<FetchTurnsParams> {
@@ -1461,6 +1480,11 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputQuestion',         // SESSION_INPUT_QUESTION_UNION discriminated union
     'SessionInputAnswerValue',      // SESSION_INPUT_ANSWER_VALUE_UNION discriminated union
     'SessionInputAnswer',           // SESSION_INPUT_ANSWER_UNION discriminated union
+    'AuthRequiredErrorData',        // emitted by generateErrorsFile()
+    'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
+    'AhpError',                     // typed via JsonRpcError; not a Swift struct
+    'AhpErrorDetailsMap',           // type-level mapping; not a Swift struct
+    'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

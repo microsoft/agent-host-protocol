@@ -380,7 +380,9 @@ where
             ResponsePart::ToolCall(tc) => Some(tool_call_id(&tc.tool_call).to_owned()),
             ResponsePart::Markdown(m) => Some(m.id.clone()),
             ResponsePart::Reasoning(r) => Some(r.id.clone()),
-            ResponsePart::ContentRef(_) | ResponsePart::Unknown(_) => None,
+            ResponsePart::ContentRef(_)
+            | ResponsePart::SystemNotification(_)
+            | ResponsePart::Unknown(_) => None,
         };
         if id.as_deref() == Some(part_id) {
             updater(part);

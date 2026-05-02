@@ -472,10 +472,27 @@ function generateErrorsSchema(project: Project): JsonSchema {
       AhpErrorCode: {
         description: 'AHP application-specific error codes.',
         type: 'number',
-        enum: [-32001, -32002, -32003, -32004, -32005, -32006],
+        enum: [-32001, -32002, -32003, -32004, -32005, -32006, -32007, -32008, -32009, -32010],
       },
     },
   };
+
+  // Add error detail interfaces (e.g. AuthRequiredErrorData, PermissionDeniedErrorData)
+  const errorIfaces = collectInterfacesFromFile(project, 'errors.ts');
+  for (const [name, iface] of errorIfaces) {
+    schema.$defs![name] = interfaceToSchema(iface, project);
+  }
+
+  // Add referenced types from state.ts and commands.ts so the error detail
+  // schemas are self-contained.
+  for (const file of ['state.ts', 'commands.ts']) {
+    const ifaces = collectInterfacesFromFile(project, file);
+    for (const [name, iface] of ifaces) {
+      if (!schema.$defs![name]) {
+        schema.$defs![name] = interfaceToSchema(iface, project);
+      }
+    }
+  }
 
   return schema;
 }

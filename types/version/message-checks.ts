@@ -13,6 +13,7 @@ import type {
   CommandMap,
   ClientNotificationMap,
   ServerNotificationMap,
+  ServerCommandMap,
 } from '../messages.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ type _ExpectedCommands =
   | 'resourceCopy'
   | 'resourceDelete'
   | 'resourceMove'
+  | 'resourceRequest'
   | 'fetchTurns'
   | 'authenticate'
   | 'resolveSessionConfig'
@@ -52,6 +54,10 @@ type _ExpectedServerNotifications =
   | 'action'
   | 'notification';
 
+/** All server → client request methods. */
+type _ExpectedServerCommands =
+  | 'resourceRequest';
+
 // ─── Assertions ──────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -60,3 +66,5 @@ type _CheckCommandMapKeys = _Exact<keyof CommandMap, _ExpectedCommands>;
 type _CheckClientNotificationMapKeys = _Exact<keyof ClientNotificationMap, _ExpectedClientNotifications>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckServerNotificationMapKeys = _Exact<keyof ServerNotificationMap, _ExpectedServerNotifications>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckServerCommandMapKeys = _Exact<keyof ServerCommandMap, _ExpectedServerCommands>;

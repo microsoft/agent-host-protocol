@@ -104,11 +104,19 @@
             "$ref": "#/$defs/ActionEnvelope"
           },
           "description": "Missed action envelopes since `lastSeenServerSeq`"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "URIs from `ReconnectParams.subscriptions` that the server cannot resume.\nThis includes resources that no longer exist (e.g. disposed sessions or\nterminals) as well as resources the client is no longer permitted to\nobserve. Clients SHOULD drop these from their local subscription set."
         }
       },
       "required": [
         "type",
-        "actions"
+        "actions",
+        "missing"
       ]
     },
     "ReconnectSnapshotResult": {
@@ -545,6 +553,32 @@
     "ResourceDeleteResult": {
       "type": "object",
       "description": "Result of the `resourceDelete` command.\n\nAn empty object on success.",
+      "properties": {}
+    },
+    "ResourceRequestParams": {
+      "type": "object",
+      "description": "Requests permission to access a resource on the receiver's filesystem.\n\n`resourceRequest` is symmetrical and MAY be sent in either direction: a\nclient asks the server to grant access to a server-side resource, or a\nserver asks the client to grant access to a client-side resource. The\nreceiver decides whether to allow, deny, or prompt the user for the\nrequested access.\n\nIf the receiver denies access, it MUST respond with `PermissionDenied`\n(-32009). The error data MAY include a `ResourceRequestParams` value\ndescribing the access the caller would need to be granted for the\noperation to succeed; see `PermissionDeniedErrorData` in\n`types/errors.ts`.\n\nAfter a successful `resourceRequest`, the caller MAY use the corresponding\n`resource*` commands (e.g. `resourceRead`, `resourceWrite`) to perform the\noperation. Receivers MAY rescind access at any time by returning\n`PermissionDenied` on subsequent operations.\n\nEither `read`, `write`, or both SHOULD be set to `true`. A request with\nneither flag set is treated as `read: true` by receivers.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Resource URI being requested. Typically a `file:` URI on the receiver's\nfilesystem, but any URI scheme that the receiver mediates access to is\nallowed."
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether the caller needs read access to the resource."
+        },
+        "write": {
+          "type": "boolean",
+          "description": "Whether the caller needs write access to the resource."
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
+    "ResourceRequestResult": {
+      "type": "object",
+      "description": "Result of the `resourceRequest` command.\n\nAn empty object on success.",
       "properties": {}
     },
     "ResourceMoveParams": {
@@ -2076,6 +2110,24 @@
         "content"
       ]
     },
+    "SystemNotificationResponsePart": {
+      "type": "object",
+      "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent harness\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.SystemNotification",
+          "description": "Discriminant"
+        },
+        "content": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "The text of the system notification"
+        }
+      },
+      "required": [
+        "kind",
+        "content"
+      ]
+    },
     "ConfirmationOption": {
       "type": "object",
       "description": "A confirmation option that the server offers for a tool call awaiting\napproval. Allows richer choices beyond simple approve/deny — for example,\n\"Approve in this Session\" or \"Deny with reason.\"",
@@ -2967,7 +3019,7 @@
     },
     "SessionCustomization": {
       "type": "object",
-      "description": "A customization active in a session.\n\nEntries without a `clientId` are server-provided; entries with a `clientId`\noriginate from that client.",
+      "description": "A customization active in a session.",
       "properties": {
         "customization": {
           "$ref": "#/$defs/CustomizationRef",

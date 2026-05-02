@@ -598,6 +598,7 @@ const COMMAND_ORDER: CommandMeta[] = [
   { method: 'resourceCopy', paramsInterface: 'ResourceCopyParams', resultInterface: 'ResourceCopyResult' },
   { method: 'resourceDelete', paramsInterface: 'ResourceDeleteParams', resultInterface: 'ResourceDeleteResult' },
   { method: 'resourceMove', paramsInterface: 'ResourceMoveParams', resultInterface: 'ResourceMoveResult' },
+  { method: 'resourceRequest', paramsInterface: 'ResourceRequestParams', resultInterface: 'ResourceRequestResult' },
   { method: 'fetchTurns', paramsInterface: 'FetchTurnsParams', resultInterface: 'FetchTurnsResult' },
 ];
 
@@ -894,7 +895,8 @@ function generateMessagesPage(_project: Project): string {
   lines.push('| `resourceList` | List directory entries on the server filesystem | [Commands](/reference/commands) |');
   lines.push('| `resourceCopy` | Copy a resource from one URI to another | [Commands](/reference/commands) |');
   lines.push('| `resourceDelete` | Delete a resource at a URI | [Commands](/reference/commands) |');
-  lines.push('| `resourceMove` | Move a resource from one URI to another | [Commands](/reference/commands) |\n');
+  lines.push('| `resourceMove` | Move a resource from one URI to another | [Commands](/reference/commands) |');
+  lines.push('| `resourceRequest` | Request access to a resource (also Server → Client) | [Commands](/reference/commands) |\n');
 
   lines.push('## Client → Server Notifications\n');
   lines.push('These methods have no `id` and expect no response.\n');

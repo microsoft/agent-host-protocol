@@ -862,6 +862,7 @@ export const enum ResponsePartKind {
   ContentRef = 'contentRef',
   ToolCall = 'toolCall',
   Reasoning = 'reasoning',
+  SystemNotification = 'systemNotification',
 }
 
 /**
@@ -931,7 +932,30 @@ export interface ReasoningResponsePart {
 /**
  * @category Response Parts
  */
-export type ResponsePart = MarkdownResponsePart | ResourceReponsePart | ToolCallResponsePart | ReasoningResponsePart;
+export type ResponsePart =
+  | MarkdownResponsePart
+  | ResourceReponsePart
+  | ToolCallResponsePart
+  | ReasoningResponsePart
+  | SystemNotificationResponsePart;
+
+/**
+ * A system notification surfaced as part of the response stream.
+ *
+ * System notifications are messages authored by the agent harness
+ * that need to be visible to both the agent (for situational awareness) and
+ * the user (for transcript continuity). Examples include "background subagent
+ * X completed" or "task Y was cancelled".
+ *
+ * @category Response Parts
+ */
+export interface SystemNotificationResponsePart {
+  /** Discriminant */
+  kind: ResponsePartKind.SystemNotification;
+  /** The text of the system notification */
+  content: StringOrMarkdown;
+}
+
 
 // ─── Tool Call Types ─────────────────────────────────────────────────────────
 
