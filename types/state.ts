@@ -215,25 +215,8 @@ export interface SessionModelInfo {
   /**
    * Additional provider-specific metadata for this model.
    *
-   * Unlike {@link configSchema}, which describes the *input* surface a client
-   * should render as a form and round-trip through {@link ModelSelection.config},
-   * `_meta` carries intrinsic, server-asserted facts about the model that the
-   * client may read and display but never sends back.
-   *
-   * Clients MAY look for well-known keys here to provide enhanced UI:
-   *
-   * - `pricing` — billing information for the model. Recommended shape is an
-   *   object that may include any of:
-   *   - `multiplier` (number): provider-defined quota multiplier (e.g. Copilot
-   *     premium-request multipliers like `1`, `0.33`, `5`).
-   *   - `inputPer1M` (number): cost per 1,000,000 input tokens.
-   *   - `outputPer1M` (number): cost per 1,000,000 output tokens.
-   *   - `cachedInputPer1M` (number): cost per 1,000,000 cached input tokens.
-   *   - `currency` (string): ISO 4217 currency code, defaults to `USD`.
-   *
-   *   Providers SHOULD omit the `pricing` key entirely when no billing data is
-   *   available rather than emitting a `null` or empty object, so clients can
-   *   distinguish "no pricing info" from a partially-populated payload.
+   * Clients MAY look for well-known keys here to provide enhanced UI.
+   * For example, a `pricing` key may carry model pricing metadata.
    */
   _meta?: Record<string, unknown>;
 }
