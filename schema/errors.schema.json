@@ -58,6 +58,22 @@
         }
       }
     },
+    "UnsupportedProtocolVersionErrorData": {
+      "type": "object",
+      "description": "Details carried in the `data` field of an `UnsupportedProtocolVersion`\n(-32005) error.",
+      "properties": {
+        "supportedVersions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Protocol versions the server is willing to speak.\n\nEach entry is either a [SemVer](https://semver.org) `MAJOR.MINOR.PATCH`\nstring (e.g. `\"0.1.0\"`) or a [SemVer range](https://semver.org/#spec-item-11)\nconstraint (e.g. `\">=0.1.0 <0.3.0\"` or `\"^0.2.0\"`)."
+        }
+      },
+      "required": [
+        "supportedVersions"
+      ]
+    },
     "AhpErrorDetailsMap": {
       "type": "object",
       "description": "Maps each AHP error code that carries structured `data` to the type of\nthat data.\n\nError codes not present in this map either have no `data` payload or\ncarry an unspecified payload that callers SHOULD treat as `unknown`.",
@@ -67,11 +83,15 @@
         },
         "[AhpErrorCodes.PermissionDenied]": {
           "$ref": "#/$defs/PermissionDeniedErrorData"
+        },
+        "[AhpErrorCodes.UnsupportedProtocolVersion]": {
+          "$ref": "#/$defs/UnsupportedProtocolVersionErrorData"
         }
       },
       "required": [
         "[AhpErrorCodes.AuthRequired]",
-        "[AhpErrorCodes.PermissionDenied]"
+        "[AhpErrorCodes.PermissionDenied]",
+        "[AhpErrorCodes.UnsupportedProtocolVersion]"
       ]
     },
     "Icon": {

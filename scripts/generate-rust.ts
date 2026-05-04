@@ -1179,6 +1179,17 @@ pub struct PermissionDeniedErrorData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request: Option<ResourceRequestParams>,
 }
+
+/// Details carried in the \`data\` field of an \`UnsupportedProtocolVersion\`
+/// (-32005) error.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnsupportedProtocolVersionErrorData {
+    /// Protocol versions the server is willing to speak. Each entry is
+    /// either a SemVer \`MAJOR.MINOR.PATCH\` string (e.g. \`"0.1.0"\`) or a
+    /// SemVer range constraint (e.g. \`">=0.1.0 <0.3.0"\` or \`"^0.2.0"\`).
+    pub supported_versions: Vec<String>,
+}
 `;
 }
 
@@ -1337,6 +1348,7 @@ function checkExhaustiveness(project: Project): void {
     'ReconnectResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
+    'UnsupportedProtocolVersionErrorData',
     'AhpError',
     'AhpErrorDetailsMap',
   ]);

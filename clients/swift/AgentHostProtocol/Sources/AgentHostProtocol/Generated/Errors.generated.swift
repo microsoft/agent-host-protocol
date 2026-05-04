@@ -67,3 +67,18 @@ public struct PermissionDeniedErrorData: Codable, Sendable {
         self.request = request
     }
 }
+
+public struct UnsupportedProtocolVersionErrorData: Codable, Sendable {
+    /// Protocol versions the server is willing to speak.
+    /// 
+    /// Each entry is either a [SemVer](https://semver.org) `MAJOR.MINOR.PATCH`
+    /// string (e.g. `"0.1.0"`) or a [SemVer range](https://semver.org/#spec-item-11)
+    /// constraint (e.g. `">=0.1.0 <0.3.0"` or `"^0.2.0"`).
+    public var supportedVersions: [String]
+
+    public init(
+        supportedVersions: [String]
+    ) {
+        self.supportedVersions = supportedVersions
+    }
+}

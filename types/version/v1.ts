@@ -189,6 +189,7 @@ import type {
   AhpErrorDetailsMap,
   AuthRequiredErrorData,
   PermissionDeniedErrorData,
+  UnsupportedProtocolVersionErrorData,
 } from '../errors.js';
 
 // ─── Bidirectional Assignability Check ───────────────────────────────────────
@@ -373,6 +374,7 @@ type V1_IAhpError = AhpError;
 type V1_IAhpErrorDetailsMap = AhpErrorDetailsMap;
 type V1_IAuthRequiredErrorData = AuthRequiredErrorData;
 type V1_IPermissionDeniedErrorData = PermissionDeniedErrorData;
+type V1_IUnsupportedProtocolVersionErrorData = UnsupportedProtocolVersionErrorData;
 
 // ─── Compatibility Assertions ────────────────────────────────────────────────
 
@@ -619,6 +621,8 @@ type _CheckAhpErrorDetailsMap = AssertCompatible<V1_IAhpErrorDetailsMap, AhpErro
 type _CheckAuthRequiredErrorData = AssertCompatible<V1_IAuthRequiredErrorData, AuthRequiredErrorData>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckPermissionDeniedErrorData = AssertCompatible<V1_IPermissionDeniedErrorData, PermissionDeniedErrorData>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckUnsupportedProtocolVersionErrorData = AssertCompatible<V1_IUnsupportedProtocolVersionErrorData, UnsupportedProtocolVersionErrorData>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckTerminalsChangedAction = AssertCompatible<V1_IRootTerminalsChangedAction, RootTerminalsChangedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

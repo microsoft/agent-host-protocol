@@ -1163,7 +1163,7 @@ function generateErrorsFile(project: Project): string {
   lines.push('');
 
   lines.push('// MARK: - Error Detail Payloads\n');
-  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData']) {
+  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData']) {
     try {
       lines.push(generateStructFromInterface(project, ifaceName));
       lines.push('');
@@ -1473,6 +1473,7 @@ function checkExhaustiveness(project: Project): void {
     'MessageAttachmentBase',        // base interface, flattened into the variant structs via `extends`
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
+    'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()
     'AhpError',                     // typed via JsonRpcError; not a Swift struct
     'AhpErrorDetailsMap',           // type-level mapping; not a Swift struct
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
