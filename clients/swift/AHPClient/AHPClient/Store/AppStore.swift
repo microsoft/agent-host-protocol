@@ -6,6 +6,25 @@ import SwiftUI
 
 // MARK: - AppStore
 
+struct SessionDebugEvent {
+    var label: String
+    var detail: String?
+    var timestamp: Date
+}
+
+struct SessionDebugStatus {
+    var lastTrigger: String?
+    var lastTriggerDetail: String?
+    var lastTriggerAt: Date?
+    var lastConnectionStateChangeAt: Date?
+    var lastSuccessfulConnectAt: Date?
+    var lastSuccessfulReconnectAt: Date?
+    var lastSessionSummariesFetchAt: Date?
+    var lastSessionRefreshAt: Date?
+    var lastSessionRefreshURI: String?
+    var recentEvents: [SessionDebugEvent] = []
+}
+
 /// Central state container for the AHP client app.
 ///
 /// Holds the root state (agents/models), per-session state, and the active connection.
@@ -20,8 +39,16 @@ final class AppStore {
     /// Root state: available agents and active session count.
     var rootState = RootState(agents: [])
 
-    /// Per-session state keyed by session URI.
+    /// Per-session state keyed by session URI. Populated lazily — only sessions
+    /// the user has actually opened (or just created) have full state here.
     var sessions: [String: SessionState] = [:]
+
+    /// Lightweight summary cache for every session the server knows about,
+    /// keyed by session URI. Populated on connect via `listSessions`, and kept
+    /// fresh by `notify/sessionAdded`, `notify/sessionRemoved`, and
+    /// `notify/sessionSummaryChanged`. The sidebar renders from this cache so
+    /// hundreds of sessions don't require hundreds of `subscribe` round-trips.
+    var sessionSummariesCache: [String: SessionSummary] = [:]
 
     /// Per-terminal state keyed by terminal URI. Populated lazily when a tool
     /// result references a terminal resource.
@@ -33,11 +60,28 @@ final class AppStore {
     /// Currently selected session URI.
     var selectedSessionURI: String?
 
+    /// Session URIs whose cached full state must be revalidated with a fresh
+    /// `subscribe` before we can trust them after a full reconnect/connect.
+    private var staleSessionURIs: Set<String> = []
+
+    /// Session URIs currently being refreshed from the server.
+    private var syncingSessionURIs: Set<String> = []
+
+    /// Sessions the user explicitly opened or created. These should remain
+    /// available even if they no longer match the background prefetch heuristic.
+    private var retainedSessionURIs: Set<String> = []
+
+    /// Sessions subscribed in the background because they are currently active.
+    private var autoPrefetchedSessionURIs: Set<String> = []
+
     /// Connection status.
     var connectionState: AHPConnection.ConnectionState = .disconnected
 
     /// `true` while a reconnect (or fallback connect) is in progress.
     var isReconnecting = false
+
+    /// Debounced reconnect banner state for the chat view.
+    var isReconnectBannerVisible = false
 
     /// Default working directory reported by the server (from `InitializeResult.defaultDirectory`).
     var defaultDirectory: String?
@@ -65,6 +109,9 @@ final class AppStore {
         return servers.first { $0.id == id }
     }
 
+    /// Debug-only connection/session troubleshooting data.
+    var sessionDebugStatus = SessionDebugStatus()
+
     // MARK: - Computed Properties
 
     /// The currently selected session state, if any.
@@ -73,11 +120,28 @@ final class AppStore {
         return sessions[uri]
     }
 
+    var isCurrentSessionStale: Bool {
+        guard let uri = selectedSessionURI else { return false }
+        return staleSessionURIs.contains(uri)
+    }
+
+    var isCurrentSessionSyncing: Bool {
+        guard let uri = selectedSessionURI else { return false }
+        return syncingSessionURIs.contains(uri)
+    }
+
     /// All session summaries, sorted by most recent.
+    ///
+    /// Merges the lightweight `sessionSummariesCache` (every session the server
+    /// knows about) with the live `summary` field of any sessions we have
+    /// subscribed to — the live one wins, so optimistic in-flight updates are
+    /// reflected immediately for the open chat.
     var sessionSummaries: [SessionSummary] {
-        sessions.values
-            .map(\.summary)
-            .sorted { $0.modifiedAt > $1.modifiedAt }
+        var merged = sessionSummariesCache
+        for (uri, state) in sessions {
+            merged[uri] = state.summary
+        }
+        return merged.values.sorted { $0.modifiedAt > $1.modifiedAt }
     }
 
     /// Available agents from root state.
@@ -93,14 +157,27 @@ final class AppStore {
     // MARK: - Private
 
     private let connection: AHPConnection
+    private let currentDateProvider: () -> Date
+    private let reconnectBannerDelayNanoseconds: UInt64
+    private var connectionSetupTask: Task<Void, Never>?
     private let serverStorage = ServerStorage.shared
     private var sessionReducer_ = AHPSessionReducer()
+    private var activeConnectTask: Task<Void, Never>?
+    private var activeReconnectTask: Task<Void, Never>?
+    private var reconnectBannerTask: Task<Void, Never>?
+    private let activeSessionPrefetchLimit = 5
 
     // MARK: - Init
 
-    init() {
-        let conn = AHPConnection()
+    init(
+        connection: AHPConnection = AHPConnection(),
+        currentDateProvider: @escaping () -> Date = Date.init,
+        reconnectBannerDelayNanoseconds: UInt64 = 700_000_000
+    ) {
+        let conn = connection
         self.connection = conn
+        self.currentDateProvider = currentDateProvider
+        self.reconnectBannerDelayNanoseconds = reconnectBannerDelayNanoseconds
 
         // Load saved servers
         servers = serverStorage.fetchServers()
@@ -112,9 +189,7 @@ final class AppStore {
             selectedServerId = uuid
         }
 
-        // Wire up callbacks — these are invoked on the MainActor because the
-        // connection dispatches them there.
-        Task {
+        connectionSetupTask = Task { [weak self] in
             await conn.setOnAction { [weak self] envelope in
                 self?.handleAction(envelope)
             }
@@ -123,11 +198,192 @@ final class AppStore {
             }
             await conn.setOnStateChange { [weak self] state in
                 self?.connectionState = state
+                self?.recordConnectionStateChange()
             }
             await conn.setOnUnexpectedDisconnect { [weak self] in
                 guard let self else { return }
-                Task { await self.reconnect() }
+                Task { await self.reconnect(debugTrigger: "unexpected disconnect") }
             }
+        }
+
+    }
+
+    private func now() -> Date {
+        currentDateProvider()
+    }
+
+    private func connectionStatusLabel(_ state: AHPConnection.ConnectionState) -> String {
+        switch state {
+        case .connected: "connected"
+        case .connecting: "connecting"
+        case .reconnecting: "reconnecting"
+        case .disconnected: "disconnected"
+        }
+    }
+
+    private func recordConnectionTrigger(_ trigger: String, detail: String? = nil) {
+        appendDebugEvent(label: trigger, detail: detail)
+        sessionDebugStatus.lastTrigger = trigger
+        sessionDebugStatus.lastTriggerDetail = detail
+        sessionDebugStatus.lastTriggerAt = now()
+    }
+
+    private func appendDebugEvent(label: String, detail: String? = nil) {
+        let event = SessionDebugEvent(label: label, detail: detail, timestamp: now())
+        if let last = sessionDebugStatus.recentEvents.last,
+           last.label == event.label,
+           last.detail == event.detail {
+            sessionDebugStatus.recentEvents[sessionDebugStatus.recentEvents.count - 1] = event
+        } else {
+            sessionDebugStatus.recentEvents.append(event)
+            if sessionDebugStatus.recentEvents.count > 6 {
+                sessionDebugStatus.recentEvents.removeFirst(sessionDebugStatus.recentEvents.count - 6)
+            }
+        }
+    }
+
+    private func recordConnectionStateChange() {
+        sessionDebugStatus.lastConnectionStateChangeAt = now()
+    }
+
+    private func recordSuccessfulConnect() {
+        sessionDebugStatus.lastSuccessfulConnectAt = now()
+    }
+
+    private func recordSuccessfulReconnect() {
+        sessionDebugStatus.lastSuccessfulReconnectAt = now()
+    }
+
+    private func setReconnectInFlight(_ active: Bool) {
+        isReconnecting = active
+        reconnectBannerTask?.cancel()
+        reconnectBannerTask = nil
+
+        guard active else {
+            isReconnectBannerVisible = false
+            return
+        }
+
+        let delay = reconnectBannerDelayNanoseconds
+        reconnectBannerTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            guard self.isReconnecting else { return }
+            self.isReconnectBannerVisible = true
+        }
+    }
+
+    private func updateStoredServer(_ server: ServerConfiguration) {
+        guard let index = servers.firstIndex(where: { $0.id == server.id }) else { return }
+        servers[index] = server
+        serverStorage.saveServer(server)
+    }
+
+    private func clearTunnelAuthentication(for server: ServerConfiguration) {
+        TunnelTokenStore.delete()
+        var cleared = server
+        cleared.token = ""
+        cleared.connectAccessToken = nil
+        updateStoredServer(cleared)
+    }
+
+    private func prepareTunnelServerForConnection(_ server: ServerConfiguration) async -> ServerConfiguration? {
+        guard server.isTunnel,
+              let tunnelId = server.tunnelId,
+              let clusterId = server.clusterId else {
+            return server
+        }
+
+        guard let cachedToken = TunnelTokenStore.load(), !cachedToken.isEmpty else {
+            clearTunnelAuthentication(for: server)
+            errorMessage = tunnelAuthenticationExpiredMessage
+            return nil
+        }
+
+        var updatedServer = server
+        if updatedServer.token != cachedToken {
+            updatedServer.token = cachedToken
+            updateStoredServer(updatedServer)
+        }
+
+        do {
+            let client = TunnelManagementClient(accessToken: cachedToken)
+            let tunnel = try await client.getTunnel(
+                clusterId: clusterId,
+                tunnelId: tunnelId,
+                options: TunnelRequestOptions(
+                    includePorts: true,
+                    tokenScopes: [TunnelAccessScopes.connect]
+                )
+            )
+            guard let connectToken = TunnelConnection.connectToken(from: tunnel),
+                  !connectToken.isEmpty else {
+                errorMessage = tunnelConnectTokenUnavailableMessage
+                return nil
+            }
+
+            updatedServer.connectAccessToken = connectToken
+            if let index = servers.firstIndex(where: { $0.id == updatedServer.id }) {
+                servers[index].token = updatedServer.token
+                servers[index].connectAccessToken = connectToken
+                serverStorage.saveServer(servers[index])
+            }
+            return updatedServer
+        } catch {
+            if isTunnelAuthenticationFailure(error) {
+                clearTunnelAuthentication(for: updatedServer)
+                errorMessage = tunnelAuthenticationExpiredMessage
+                return nil
+            }
+
+            if let connectToken = updatedServer.connectAccessToken, !connectToken.isEmpty {
+                return updatedServer
+            }
+
+            errorMessage = "Couldn't refresh the Dev Tunnel access token: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    func handleSceneActive() async {
+        recordConnectionTrigger("scene active")
+
+        guard selectedServer != nil else {
+            recordConnectionTrigger("scene active", detail: "ignored: no server")
+            return
+        }
+
+        if let activeConnectTask {
+            recordConnectionTrigger("scene active", detail: "waiting for active connect")
+            await activeConnectTask.value
+            return
+        }
+
+        if let activeReconnectTask {
+            recordConnectionTrigger("scene active", detail: "waiting for active reconnect")
+            await activeReconnectTask.value
+            return
+        }
+
+        switch connectionState {
+        case .connected:
+            let canReconnect = await connection.canReconnect
+            if canReconnect {
+                await reconnect(debugTrigger: "scene active reconnect")
+            } else {
+                await connect(debugTrigger: "scene active connect")
+            }
+        case .disconnected:
+            let canReconnect = await connection.canReconnect
+            if canReconnect {
+                await reconnect(debugTrigger: "scene active reconnect")
+            } else {
+                await connect(debugTrigger: "scene active connect")
+            }
+        case .connecting, .reconnecting:
+            recordConnectionTrigger("scene active", detail: "ignored: state \(connectionStatusLabel(connectionState))")
         }
     }
 
@@ -186,18 +442,23 @@ final class AppStore {
         }
     }
 
-    /// Select a server and connect to it.
+    /// Select a server and (re)connect to it.
+    ///
+    /// Always handles connection lifecycle internally — callers MUST NOT call
+    /// `connect()` afterwards. If the same server is already selected and
+    /// connected, this is a no-op. If a different server is currently active
+    /// it is disconnected first so per-server state (sessions, subscriptions,
+    /// the live WebSocket) can't leak between servers.
     func selectServer(_ id: UUID) {
         guard servers.contains(where: { $0.id == id }) else { return }
-        let wasConnected = selectedServerId != nil && connectionState == .connected
-        if wasConnected {
-            Task {
+        if selectedServerId == id && connectionState == .connected { return }
+        let needsDisconnect = selectedServerId != nil && connectionState != .disconnected
+        Task {
+            if needsDisconnect {
                 await disconnect()
-                selectedServerId = id
-                await connect()
             }
-        } else {
             selectedServerId = id
+            await connect()
         }
     }
 
@@ -263,115 +524,195 @@ final class AppStore {
     private var activeNetworkCheck: LocalNetworkPrivacy?
 
     /// Connect to the selected AHP server.
-    func connect() async {
-        guard var server = selectedServer else {
+    func connect(debugTrigger: String? = nil) async {
+        await connectionSetupTask?.value
+
+        let trigger = debugTrigger ?? "manual connect"
+
+        guard selectedServer != nil else {
+            recordConnectionTrigger(trigger, detail: "ignored: no server")
             errorMessage = "No server selected"
             return
         }
 
-        // For tunnel servers, refresh the connect access token by re-fetching
-        // the tunnel details with "connect" token scope. This gives us a fresh JWT.
-        // The GitHub token (server.token) is kept for management API calls.
-        if server.isTunnel, let tunnelId = server.tunnelId, let clusterId = server.clusterId {
-            if let cachedToken = TunnelTokenStore.load() {
-                // Keep the GitHub token up-to-date
-                if server.token != cachedToken {
-                    server.token = cachedToken
-                    if let index = servers.firstIndex(where: { $0.id == server.id }) {
-                        servers[index].token = cachedToken
-                        serverStorage.saveServer(servers[index])
-                    }
-                }
-                // Fetch a fresh connect access token from the management API
-                do {
-                    let client = TunnelManagementClient(accessToken: cachedToken)
-                    let tunnel = try await client.getTunnel(
-                        clusterId: clusterId,
-                        tunnelId: tunnelId,
-                        options: TunnelRequestOptions(
-                            includePorts: true,
-                            tokenScopes: [TunnelAccessScopes.connect]
-                        )
-                    )
-                    let connectToken = TunnelConnection.connectToken(from: tunnel)
-                    server.connectAccessToken = connectToken
-                    if let index = servers.firstIndex(where: { $0.id == server.id }) {
-                        servers[index].connectAccessToken = connectToken
-                    }
-                } catch {
-                    // If we can't refresh, try with whatever we have
-                    print("[AHP] Warning: failed to refresh connect token: \(error)")
-                }
-            }
+        if let activeConnectTask {
+            recordConnectionTrigger(trigger, detail: "waiting for existing connect")
+            await activeConnectTask.value
+            return
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performConnect(debugTrigger: trigger)
+        }
+        activeConnectTask = task
+        await task.value
+    }
+
+    private func performConnect(debugTrigger: String) async {
+        defer { activeConnectTask = nil }
+        recordConnectionTrigger(debugTrigger)
+
+        guard var server = selectedServer else { return }
+
+        if let preparedServer = await prepareTunnelServerForConnection(server) {
+            server = preparedServer
+        } else if server.isTunnel {
+            return
         }
 
         guard let url = URL(string: server.endpointURLString) else {
             errorMessage = "Invalid server URL"
             return
         }
-        do {
-            errorMessage = nil
 
-            // Reset all session state before connecting so that stale session URIs
-            // from a previous connection (e.g. after a server restart) cannot be
-            // used to send messages that the new server knows nothing about.
-            sessions.removeAll()
-            selectedSessionURI = nil
-            rootState = RootState(agents: [])
-
-            // For tunnel servers, send the connect access token so the
-            // devtunnels.ms relay authenticates the WebSocket upgrade.
-            var headers: [String: String] = [:]
-            if server.isTunnel, let connectToken = server.connectAccessToken, !connectToken.isEmpty {
-                headers["X-Tunnel-Authorization"] = "tunnel \(connectToken)"
-            }
-
-            let result = try await connection.connect(to: url, headers: headers)
-            defaultDirectory = result.defaultDirectory
-
-            // Process initial snapshots
-            for snapshot in result.snapshots {
-                applySnapshot(snapshot)
-            }
-
-            // Fetch existing sessions and subscribe to each
-            await fetchAndSubscribeSessions()
-        } catch {
-            errorMessage = error.localizedDescription
+        // For tunnel servers, send the connect access token so the
+        // devtunnels.ms relay authenticates the WebSocket upgrade.
+        var headers: [String: String] = [:]
+        if server.isTunnel, let connectToken = server.connectAccessToken, !connectToken.isEmpty {
+            headers["X-Tunnel-Authorization"] = "tunnel \(connectToken)"
         }
+
+        errorMessage = nil
+
+        // Retry the WebSocket handshake with backoff. Slow / flaky networks
+        // routinely fail the first attempt; one transient hiccup shouldn't
+        // strand the user on a "Disconnected" home screen requiring a
+        // manual tap. Auth-style failures (401/403) are not retried since
+        // a fresh attempt would just fail the same way.
+        let backoffsNs: [UInt64] = [0, 1_000_000_000, 2_000_000_000, 4_000_000_000]
+        var lastError: Error?
+        for (attempt, delay) in backoffsNs.enumerated() {
+            if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
+            do {
+                let result = try await connection.connect(to: url, headers: headers)
+                defaultDirectory = result.defaultDirectory
+
+                // Apply initial snapshots — these overwrite matching resources
+                // in place rather than requiring a full clear first.
+                for snapshot in result.snapshots {
+                    applySnapshot(snapshot)
+                }
+
+                // Fetch the lightweight list of session summaries. Full state
+                // remains lazy by default; we only prefetch a small bounded set
+                // of sessions that are currently active today.
+                let serverURIs = await fetchSessionSummaries()
+
+                // Prune sessions the server no longer knows about (e.g. after a
+                // server restart) — but only if we got a valid list. We do this
+                // AFTER populating new data so the UI never flashes empty.
+                if !serverURIs.isEmpty {
+                    let staleURIs = sessions.keys.filter { !serverURIs.contains($0) }
+                    for uri in staleURIs {
+                        sessions.removeValue(forKey: uri)
+                        staleSessionURIs.remove(uri)
+                        syncingSessionURIs.remove(uri)
+                        retainedSessionURIs.remove(uri)
+                        autoPrefetchedSessionURIs.remove(uri)
+                    }
+                }
+
+                // A full initialize only refreshes root + summaries. Any cached
+                // full session state from a prior connection must be revalidated
+                // with a fresh subscribe before we treat it as current again.
+                staleSessionURIs.formUnion(sessions.keys)
+
+                // If the selected session was pruned, fall back gracefully.
+                if let selected = selectedSessionURI, sessions[selected] == nil {
+                    selectedSessionURI = sessionSummaries.first?.resource
+                }
+
+                if let selected = selectedSessionURI,
+                   sessions[selected] != nil {
+                    await refreshSessionIfNeeded(
+                        uri: selected,
+                        allowReconnect: false,
+                        waitForActiveConnect: false
+                    )
+                }
+                recordSuccessfulConnect()
+                await reconcileActiveSessionPrefetch()
+                return
+            } catch {
+                lastError = error
+                if !shouldRetryConnect(error: error) || attempt == backoffsNs.count - 1 {
+                    break
+                }
+            }
+        }
+        if let lastError {
+            errorMessage = lastError.localizedDescription
+        }
+    }
+
+    /// Returns `false` for errors where retrying would obviously fail the same
+    /// way (bad URL, auth rejection). All other transport-level errors are
+    /// considered transient and worth retrying.
+    private func shouldRetryConnect(error: Error) -> Bool {
+        if let connErr = error as? AHPConnection.ConnectionError {
+            switch connErr {
+            case .requestFailed(let code, _):
+                return !(code == 401 || code == 403)
+            default:
+                return true
+            }
+        }
+        return true
     }
 
     /// Reconnect after an unexpected disconnect, preserving the `serverSeq` delta so the server
     /// can replay only the actions missed during the outage. Falls back to a full `connect()` if
     /// no prior connection state is available or if the reconnect handshake itself fails.
-    func reconnect() async {
+    func reconnect(refreshSummaries: Bool = true, debugTrigger: String? = nil) async {
+        let trigger = debugTrigger ?? "manual reconnect"
+
+        if let activeConnectTask {
+            recordConnectionTrigger(trigger, detail: "waiting for active connect")
+            await activeConnectTask.value
+            return
+        }
+
+        if let activeReconnectTask {
+            recordConnectionTrigger(trigger, detail: "waiting for existing reconnect")
+            await activeReconnectTask.value
+            return
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performReconnect(refreshSummaries: refreshSummaries, debugTrigger: trigger)
+        }
+        activeReconnectTask = task
+        await task.value
+    }
+
+    private func performReconnect(refreshSummaries: Bool, debugTrigger: String) async {
+        await connectionSetupTask?.value
+
+        recordConnectionTrigger(debugTrigger, detail: "starting reconnect")
+
         guard var server = selectedServer,
-              let url = URL(string: server.endpointURLString) else { return }
+              var url = URL(string: server.endpointURLString) else {
+            activeReconnectTask = nil
+            return
+        }
 
-        isReconnecting = true
-        defer { isReconnecting = false }
+        setReconnectInFlight(true)
+        defer {
+            setReconnectInFlight(false)
+            activeReconnectTask = nil
+        }
 
-        // For tunnel servers, fetch a fresh connect access token
-        if server.isTunnel, let tunnelId = server.tunnelId, let clusterId = server.clusterId,
-           let cachedToken = TunnelTokenStore.load() {
-            do {
-                let client = TunnelManagementClient(accessToken: cachedToken)
-                let tunnel = try await client.getTunnel(
-                    clusterId: clusterId,
-                    tunnelId: tunnelId,
-                    options: TunnelRequestOptions(
-                        includePorts: true,
-                        tokenScopes: [TunnelAccessScopes.connect]
-                    )
-                )
-                let connectToken = TunnelConnection.connectToken(from: tunnel)
-                server.connectAccessToken = connectToken
-                if let index = servers.firstIndex(where: { $0.id == server.id }) {
-                    servers[index].connectAccessToken = connectToken
-                }
-            } catch {
-                print("[AHP] Warning: failed to refresh connect token on reconnect: \(error)")
+        if let preparedServer = await prepareTunnelServerForConnection(server) {
+            server = preparedServer
+            guard let updatedURL = URL(string: server.endpointURLString) else {
+                errorMessage = "Invalid server URL"
+                return
             }
+            url = updatedURL
+        } else if server.isTunnel {
+            return
         }
 
         // Build tunnel auth headers if needed
@@ -386,8 +727,18 @@ final class AppStore {
                 errorMessage = nil
                 let result = try await connection.reconnect(to: url, headers: headers)
                 applyReconnectResult(result)
-                // Subscribe to any sessions that appeared while we were offline.
-                await fetchAndSubscribeSessions()
+                recordSuccessfulReconnect()
+                if refreshSummaries {
+                    // Refresh the summary cache for any sessions that appeared
+                    // while we were offline. The replay/snapshot pipeline keeps
+                    // already-subscribed sessions live; this catches the rest.
+                    do {
+                        _ = try await fetchSessionSummariesOnce()
+                        await reconcileActiveSessionPrefetch()
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
                 return
             } catch {
                 // Reconnect handshake failed (server restarted, etc.) — fall through to a
@@ -395,14 +746,28 @@ final class AppStore {
             }
         }
 
-        await connect()
+        await connect(debugTrigger: "\(debugTrigger) fallback connect")
     }
 
     /// Reconnect only when the connection is currently down (e.g. after the app returns to the
     /// foreground). Safe to call at any time; it's a no-op when already connected.
-    func reconnectIfNeeded() async {
-        guard selectedServer != nil, connectionState == .disconnected else { return }
-        await reconnect()
+    func reconnectIfNeeded(debugTrigger: String? = nil) async {
+        let trigger = debugTrigger ?? "reconnect if needed"
+
+        guard selectedServer != nil else {
+            recordConnectionTrigger(trigger, detail: "ignored: no server")
+            return
+        }
+        guard connectionState == .disconnected else {
+            recordConnectionTrigger(trigger, detail: "ignored: state \(connectionStatusLabel(connectionState))")
+            return
+        }
+        let canReconnect = await connection.canReconnect
+        guard canReconnect else {
+            recordConnectionTrigger(trigger, detail: "ignored: no reconnect state")
+            return
+        }
+        await reconnect(debugTrigger: trigger)
     }
 
     /// Apply a `ReconnectResult` to the current app state.
@@ -411,6 +776,7 @@ final class AppStore {
     ///   same outcome as if the actions had arrived in real time.
     /// - For `.snapshot`: each snapshot replaces the corresponding resource's state wholesale.
     func applyReconnectResult(_ result: ReconnectResult) {
+        staleSessionURIs.removeAll()
         switch result {
         case .replay(let r):
             for envelope in r.actions {
@@ -423,19 +789,43 @@ final class AppStore {
         }
     }
 
-    /// Fetch all existing sessions from the server and subscribe to them.
-    func fetchAndSubscribeSessions() async {
+    /// Fetch the list of session summaries from the server.
+    ///
+    /// This populates `sessionSummariesCache` so the sidebar can render
+    /// hundreds of sessions without paying for per-session `subscribe`
+    /// round-trips. Full session state is still lazy by default; only the
+    /// selected session and a small bounded set of active-today sessions are
+    /// subscribed in the background.
+    ///
+    /// Returns the set of session URIs known to the server, so the caller can
+    /// prune any local state for sessions that have disappeared.
+    @discardableResult
+    func fetchSessionSummaries() async -> Set<String> {
         do {
-            let summaries = try await connection.listSessions()
-            for summary in summaries {
-                if sessions[summary.resource] == nil {
-                    let snapshot = try await connection.subscribe(resource: summary.resource)
-                    applySnapshot(snapshot)
-                }
-            }
+            return try await fetchSessionSummariesOnce()
         } catch {
             // Non-fatal: sessions may not be available yet
             print("[AHP] Failed to fetch sessions: \(error)")
+            return []
+        }
+    }
+
+    func refreshSessionSummaries(debugTrigger: String? = nil) async {
+        recordConnectionTrigger(debugTrigger ?? "refresh summaries")
+        do {
+            _ = try await fetchSessionSummariesOnce()
+            await reconcileActiveSessionPrefetch()
+            errorMessage = nil
+        } catch {
+            guard shouldRecoverFromTransportError(error) else {
+                errorMessage = error.localizedDescription
+                return
+            }
+
+            await reconnect(debugTrigger: "refresh summaries recovery")
+            if connectionState != .connected && errorMessage == nil {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -443,8 +833,14 @@ final class AppStore {
     func disconnect() async {
         await connection.disconnect()
         sessions.removeAll()
+        staleSessionURIs.removeAll()
+        syncingSessionURIs.removeAll()
+        retainedSessionURIs.removeAll()
+        autoPrefetchedSessionURIs.removeAll()
+        sessionSummariesCache.removeAll()
         selectedSessionURI = nil
         rootState = RootState(agents: [])
+        setReconnectInFlight(false)
     }
 
     // MARK: - Session Management
@@ -464,6 +860,8 @@ final class AppStore {
             // Subscribe to the new session
             let snapshot = try await connection.subscribe(resource: uri)
             applySnapshot(snapshot)
+            retainedSessionURIs.insert(uri)
+            autoPrefetchedSessionURIs.remove(uri)
             selectedSessionURI = uri
         } catch {
             errorMessage = error.localizedDescription
@@ -476,6 +874,11 @@ final class AppStore {
             try await connection.disposeSession(session: uri)
             try await connection.unsubscribe(resource: uri)
             sessions.removeValue(forKey: uri)
+            staleSessionURIs.remove(uri)
+            syncingSessionURIs.remove(uri)
+            retainedSessionURIs.remove(uri)
+            autoPrefetchedSessionURIs.remove(uri)
+            sessionSummariesCache.removeValue(forKey: uri)
             if selectedSessionURI == uri {
                 selectedSessionURI = sessionSummaries.first?.resource
             }
@@ -485,34 +888,67 @@ final class AppStore {
     }
 
     /// Select a session by its URI.
-    func selectSession(uri: String) async {
-        // If we don't have it, subscribe
-        if sessions[uri] == nil {
-            do {
-                let snapshot = try await connection.subscribe(resource: uri)
-                applySnapshot(snapshot)
-            } catch {
-                errorMessage = error.localizedDescription
-                return
-            }
+    func selectSession(uri: String, debugTrigger: String? = nil) async {
+        recordConnectionTrigger(debugTrigger ?? "open session")
+        retainedSessionURIs.insert(uri)
+        autoPrefetchedSessionURIs.remove(uri)
+
+        if sessions[uri] != nil {
+            selectedSessionURI = uri
+        }
+
+        if needsSessionRefresh(uri: uri) {
+            let refreshed = await refreshSessionIfNeeded(uri: uri, allowReconnect: true)
+            guard refreshed else { return }
         }
         selectedSessionURI = uri
     }
 
     // MARK: - Conversation
 
-    /// Send a user message to the current session, starting a new turn.
+    /// Send a user message to the current session.
+    ///
+    /// The dispatch shape depends on whether a turn is already running:
+    ///
+    /// - **Idle session** (no `activeTurn`) — dispatch `session/turnStarted`
+    ///   directly with a fresh `turnId`. This is the canonical "user sent a
+    ///   message; server starts processing" path per the actions guide. It also
+    ///   means the optimistic UI shows the message as the active turn
+    ///   immediately, instead of briefly flashing as "queued" while waiting for
+    ///   the server to consume a pending entry — important on slow or flaky
+    ///   networks where that round-trip can be noticeable (or stuck).
+    /// - **Turn in progress** — dispatch `session/pendingMessageSet` with
+    ///   ``PendingMessageKind/queued``. The message stays in the queue and the
+    ///   server auto-starts it after the current turn completes, emitting a
+    ///   `session/turnStarted` with `queuedMessageId` linking back to the entry.
     func sendMessage(_ text: String, attachments: [MessageAttachment]? = nil) async {
         guard let uri = selectedSessionURI else { return }
-        let turnId = UUID().uuidString
-        let action = StateAction.sessionTurnStarted(SessionTurnStartedAction(
-            type: .sessionTurnStarted,
-            session: uri,
-            turnId: turnId,
-            userMessage: UserMessage(text: text, attachments: attachments)
-        ))
+        let userMessage = UserMessage(text: text, attachments: attachments)
+        let hasActiveTurn = sessions[uri]?.activeTurn != nil
 
-        // Optimistically apply the action locally
+        let action: StateAction
+        if hasActiveTurn {
+            action = .sessionPendingMessageSet(SessionPendingMessageSetAction(
+                type: .sessionPendingMessageSet,
+                session: uri,
+                kind: .queued,
+                id: UUID().uuidString,
+                userMessage: userMessage
+            ))
+        } else {
+            action = .sessionTurnStarted(SessionTurnStartedAction(
+                type: .sessionTurnStarted,
+                session: uri,
+                turnId: UUID().uuidString,
+                userMessage: userMessage
+            ))
+        }
+
+        // Optimistically apply the action locally so the message appears
+        // immediately — either as the active turn (idle case) or as a queued
+        // entry (turn-in-progress case). The server will echo the action back
+        // and, for the queued case, follow up with `pendingMessageRemoved` +
+        // `turnStarted` once it consumes the queue.
         applySessionAction(action, sessionURI: uri)
 
         // Dispatch to server
@@ -700,6 +1136,8 @@ final class AppStore {
             rootState = state
         case .session(let state):
             sessions[snapshot.resource] = state
+            staleSessionURIs.remove(snapshot.resource)
+            syncingSessionURIs.remove(snapshot.resource)
         case .terminal(let state):
             terminals[snapshot.resource] = state
         }
@@ -715,6 +1153,8 @@ final class AppStore {
         // Figure out which session this action targets
         let sessionURI = extractSessionURI(from: action)
         if let uri = sessionURI {
+            staleSessionURIs.remove(uri)
+            syncingSessionURIs.remove(uri)
             applySessionAction(action, sessionURI: uri)
         }
 
@@ -737,25 +1177,184 @@ final class AppStore {
     private func handleNotification(_ notification: ProtocolNotification) {
         switch notification {
         case .sessionAdded(let note):
-            // A new session was created (potentially by another client)
-            let uri = note.summary.resource
-            if sessions[uri] == nil {
-                // Auto-subscribe to new sessions
-                Task {
-                    await selectSession(uri: uri)
-                }
+            // Track the new session in the summary cache so it appears in the
+            // sidebar immediately. A later bounded reconciliation pass decides
+            // whether it also deserves a background subscription.
+            sessionSummariesCache[note.summary.resource] = note.summary
+            Task { @MainActor [weak self] in
+                await self?.reconcileActiveSessionPrefetch()
             }
         case .sessionRemoved(let note):
             sessions.removeValue(forKey: note.session)
+            staleSessionURIs.remove(note.session)
+            syncingSessionURIs.remove(note.session)
+            retainedSessionURIs.remove(note.session)
+            autoPrefetchedSessionURIs.remove(note.session)
+            sessionSummariesCache.removeValue(forKey: note.session)
             if selectedSessionURI == note.session {
                 selectedSessionURI = sessionSummaries.first?.resource
             }
-        case .sessionSummaryChanged:
-            // Summary updates are applied via reducer actions; nothing to do here.
-            break
+            Task { @MainActor [weak self] in
+                await self?.reconcileActiveSessionPrefetch()
+            }
+        case .sessionSummaryChanged(let note):
+            // Keep the cache fresh for sessions we haven't subscribed to.
+            // For subscribed sessions, the live `summary` is already updated
+            // by the per-action reducers (titleChanged, turnStarted, etc.) and
+            // wins in the merged `sessionSummaries`, so we still update the
+            // cache here as a fallback in case the user later unsubscribes.
+            applySummaryChange(uri: note.session, changes: note.changes)
+            Task { @MainActor [weak self] in
+                await self?.reconcileActiveSessionPrefetch()
+            }
         case .authRequired:
             errorMessage = "Authentication required"
         }
+    }
+
+    /// Apply a `PartialSessionSummary` patch to the cached summary for `uri`.
+    /// Identity fields (`resource`, `provider`, `createdAt`) are intentionally
+    /// not mutable — receivers must ignore them per the protocol spec.
+    private func applySummaryChange(uri: String, changes: PartialSessionSummary) {
+        guard var summary = sessionSummariesCache[uri] else { return }
+        if let v = changes.title { summary.title = v }
+        if let v = changes.status { summary.status = v }
+        if let v = changes.modifiedAt { summary.modifiedAt = v }
+        // Optional fields: presence in the patch always means "set to this
+        // value" (including nil to clear). We only get a non-nil here when the
+        // sender included the field, but since the generated type collapses
+        // "absent" and "explicit null" both to `nil`, treat any nil here as
+        // "no change" — clearing these fields is rare and the next full
+        // listSessions() would correct it anyway.
+        if let v = changes.activity { summary.activity = v }
+        if let v = changes.project { summary.project = v }
+        if let v = changes.model { summary.model = v }
+        if let v = changes.workingDirectory { summary.workingDirectory = v }
+        if let v = changes.diffs { summary.diffs = v }
+        sessionSummariesCache[uri] = summary
+    }
+
+    private func fetchSessionSummariesOnce() async throws -> Set<String> {
+        let summaries = try await connection.listSessions()
+        sessionDebugStatus.lastSessionSummariesFetchAt = now()
+        let serverURIs = Set(summaries.map(\.resource))
+
+        // Replace the cache wholesale — the server's list is authoritative.
+        // Subscribed sessions retain their live state in `sessions`; the
+        // merged `sessionSummaries` computed property layers them on top.
+        var cache: [String: SessionSummary] = [:]
+        cache.reserveCapacity(summaries.count)
+        for summary in summaries {
+            cache[summary.resource] = summary
+        }
+        sessionSummariesCache = cache
+
+        return serverURIs
+    }
+
+    private func needsSessionRefresh(uri: String) -> Bool {
+        sessions[uri] == nil || staleSessionURIs.contains(uri)
+    }
+
+    private func startOfCurrentDayTimestamp() -> Int {
+        let startOfDay = Calendar.current.startOfDay(for: currentDateProvider())
+        return Int(startOfDay.timeIntervalSince1970 * 1000)
+    }
+
+    private func autoPrefetchCandidateSessionURIs() -> [String] {
+        let startOfDay = startOfCurrentDayTimestamp()
+        return sessionSummaries
+            .filter { summary in
+                summary.status == .inProgress &&
+                    summary.modifiedAt >= startOfDay &&
+                    summary.resource != selectedSessionURI &&
+                    !retainedSessionURIs.contains(summary.resource)
+            }
+            .prefix(activeSessionPrefetchLimit)
+            .map(\.resource)
+    }
+
+    private func reconcileActiveSessionPrefetch() async {
+        let targetURIs = Set(autoPrefetchCandidateSessionURIs())
+
+        for uri in autoPrefetchedSessionURIs.subtracting(targetURIs) {
+            do {
+                try await connection.unsubscribe(resource: uri)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            autoPrefetchedSessionURIs.remove(uri)
+            staleSessionURIs.remove(uri)
+            syncingSessionURIs.remove(uri)
+            sessions.removeValue(forKey: uri)
+        }
+
+        for uri in autoPrefetchCandidateSessionURIs() {
+            let refreshed = await refreshSessionIfNeeded(
+                uri: uri,
+                allowReconnect: false,
+                waitForActiveConnect: false
+            )
+            if refreshed {
+                autoPrefetchedSessionURIs.insert(uri)
+            }
+        }
+    }
+
+    @discardableResult
+    private func refreshSessionIfNeeded(
+        uri: String,
+        allowReconnect: Bool,
+        waitForActiveConnect: Bool = true
+    ) async -> Bool {
+        if waitForActiveConnect, let activeConnectTask {
+            await activeConnectTask.value
+        }
+
+        guard needsSessionRefresh(uri: uri) else { return true }
+
+        syncingSessionURIs.insert(uri)
+        defer { syncingSessionURIs.remove(uri) }
+
+        do {
+            let snapshot = try await connection.subscribe(resource: uri)
+            applySnapshot(snapshot)
+            sessionDebugStatus.lastSessionRefreshAt = now()
+            sessionDebugStatus.lastSessionRefreshURI = uri
+            errorMessage = nil
+            return true
+        } catch {
+            guard allowReconnect, shouldRecoverFromTransportError(error) else {
+                errorMessage = error.localizedDescription
+                return false
+            }
+
+            await reconnect(refreshSummaries: false, debugTrigger: "session refresh recovery")
+
+            do {
+                let snapshot = try await connection.subscribe(resource: uri)
+                applySnapshot(snapshot)
+                sessionDebugStatus.lastSessionRefreshAt = now()
+                sessionDebugStatus.lastSessionRefreshURI = uri
+                errorMessage = nil
+                return true
+            } catch {
+                errorMessage = error.localizedDescription
+                return false
+            }
+        }
+    }
+
+    private func shouldRecoverFromTransportError(_ error: Error) -> Bool {
+        if let connectionError = error as? AHPConnection.ConnectionError {
+            switch connectionError {
+            case .requestFailed:
+                return false
+            default:
+                return true
+            }
+        }
+        return true
     }
 
     /// Extract the terminal URI from an action, if applicable.
@@ -902,22 +1501,5 @@ final class AppStore {
         default:
             return nil
         }
-    }
-}
-
-// MARK: - AHPConnection callback setters (actor-isolated)
-
-private extension AHPConnection {
-    func setOnAction(_ callback: @escaping @MainActor (ActionEnvelope) -> Void) {
-        onAction = callback
-    }
-    func setOnNotification(_ callback: @escaping @MainActor (ProtocolNotification) -> Void) {
-        onNotification = callback
-    }
-    func setOnStateChange(_ callback: @escaping @MainActor (AHPConnection.ConnectionState) -> Void) {
-        onStateChange = callback
-    }
-    func setOnUnexpectedDisconnect(_ callback: @escaping @MainActor () -> Void) {
-        onUnexpectedDisconnect = callback
     }
 }

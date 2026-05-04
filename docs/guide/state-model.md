@@ -31,6 +31,7 @@ ModelInfo {
   supportsVision?: boolean
   policyState?: 'enabled' | 'disabled' | 'unconfigured'
   configSchema?: ConfigSchema   // model-specific options (e.g. thinking level)
+  _meta?: Record<string, unknown>  // intrinsic facts (e.g. pricing); see below
 }
 
 ConfigSchema {
@@ -52,6 +53,8 @@ ConfigPropertySchema {
 ```
 
 When a model has a `configSchema`, clients present it as a form and pass the resolved values in a `ModelSelection` (see [Session Summary](#session-summary)).
+
+`_meta` carries additional provider-specific metadata. Clients MAY look for well-known keys here to provide enhanced UI — for example, a `pricing` key may carry model pricing metadata.
 
 Root state is mutated only by server-originated actions (e.g. `root/agentsChanged`).
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("showSessionDebugStatus") private var showSessionDebugStatus = false
     @State private var showingAddServer = false
     @State private var editingServer: ServerConfiguration?
     @State private var showingTunnels = false
@@ -13,6 +14,7 @@ struct SettingsView: View {
             Form {
                 serverListSection
                 tunnelSection
+                debugSection
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -47,6 +49,13 @@ struct SettingsView: View {
             } label: {
                 Label("Browse Tunnels", systemImage: "network")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var debugSection: some View {
+        Section("Debug") {
+            Toggle("Show session debug status", isOn: $showSessionDebugStatus)
         }
     }
 

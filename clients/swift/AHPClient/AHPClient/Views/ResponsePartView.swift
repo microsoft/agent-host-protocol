@@ -16,7 +16,40 @@ struct ResponsePartView: View {
             ToolCallPartView(toolCall: tc.toolCall)
         case .contentRef(let ref):
             ContentRefView(ref: ref)
+        case .systemNotification(let note):
+            SystemNotificationPartView(part: note)
         }
+    }
+}
+
+// MARK: - SystemNotificationPartView
+
+struct SystemNotificationPartView: View {
+    let part: SystemNotificationResponsePart
+
+    private var text: String {
+        switch part.content {
+        case .string(let s): return s
+        case .markdown(let m): return m
+        }
+    }
+
+    var body: some View {
+        Label {
+            Text(text)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } icon: {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(
+            Color.secondary.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+        )
     }
 }
 
@@ -90,7 +123,7 @@ struct ToolCallPartView: View {
     let toolCall: ToolCallState
     @Environment(AppStore.self) private var store
     @State private var showDetail = false
-    @State private var selectedConfirmationOptionId: String?
+    @State private var showInputRequest = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -150,13 +183,26 @@ struct ToolCallPartView: View {
                 .stroke(borderColor, lineWidth: 1)
         )
         .contentShape(Rectangle())
-        .onTapGesture { showDetail = true }
-        .onAppear(perform: syncPendingOptionSelection)
-        .onChange(of: confirmationOptionIDs) { _, _ in
-            syncPendingOptionSelection()
+        .onTapGesture {
+            if pendingInputRequest != nil {
+                showInputRequest = true
+            } else {
+                showDetail = true
+            }
+        }
+        .onChange(of: store.currentSession?.inputRequests?.map(\.id) ?? []) { _, ids in
+            // Auto-dismiss the input sheet if the request was resolved.
+            if showInputRequest, let req = pendingInputRequest, !ids.contains(req.id) {
+                showInputRequest = false
+            }
         }
         .sheet(isPresented: $showDetail) {
             ToolCallDetailSheet(toolCall: toolCall)
+        }
+        .sheet(isPresented: $showInputRequest) {
+            if let req = pendingInputRequest {
+                InputRequestSheet(request: req) { showInputRequest = false }
+            }
         }
     }
 
@@ -188,70 +234,150 @@ struct ToolCallPartView: View {
 
     @ViewBuilder
     private var actionButtons: some View {
+        // When the tool is awaiting user input via an open input request,
+        // surface a single "Respond" CTA. The request is opened on tap.
+        if pendingInputRequest != nil {
+            Button {
+                showInputRequest = true
+            } label: {
+                Label("Respond", systemImage: "arrow.up.message")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.roundedRectangle(radius: 8))
+        } else {
+            confirmationActionButtons
+        }
+    }
+
+    @ViewBuilder
+    private var confirmationActionButtons: some View {
         switch toolCall {
         case .pendingConfirmation(let pending):
-            if let options = pending.options, !options.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Picker("Permission", selection: confirmationSelection) {
-                        ForEach(options, id: \.id) { option in
-                            Text(option.label).tag(option.id)
-                        }
+            confirmationButtonStack(options: pending.options ?? [])
+        case .pendingResultConfirmation:
+            VStack(spacing: 8) {
+                Button {
+                    if let ids = turnAndToolId {
+                        Task { await store.approveToolCallResult(toolCallId: ids.toolCallId, turnId: ids.turnId) }
                     }
-                    .pickerStyle(.menu)
-
-                    if let selected = selectedConfirmationOption {
-                        if selected.kind == .approve {
-                            Button(selected.label) {
-                                submitSelectedConfirmation()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .buttonBorderShape(.roundedRectangle(radius: 8))
-                        } else {
-                            Button(selected.label, role: .destructive) {
-                                submitSelectedConfirmation()
-                            }
-                            .buttonStyle(.bordered)
-                            .buttonBorderShape(.roundedRectangle(radius: 8))
-                        }
-                    }
+                } label: {
+                    Text("Accept")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
                 }
-            } else {
-                HStack {
-                    Button("Deny", role: .destructive) {
-                        if let ids = turnAndToolId {
-                            Task { await store.denyToolCall(toolCallId: ids.toolCallId, turnId: ids.turnId) }
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.roundedRectangle(radius: 8))
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 8))
 
-                    Button("Approve") {
-                        if let ids = turnAndToolId {
-                            Task { await store.approveToolCall(toolCallId: ids.toolCallId, turnId: ids.turnId) }
-                        }
+                Button(role: .destructive) {
+                    // Result denial not exposed yet
+                } label: {
+                    Text("Reject")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.red)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    /// Render confirmation options as a vertical stack of full-width buttons.
+    /// All options are visible — no menus or chevrons — for easy thumb tapping.
+    /// Approve options render as prominent filled buttons; deny options render
+    /// as plain text buttons below, keeping visual weight on the positive action.
+    @ViewBuilder
+    private func confirmationButtonStack(options: [ConfirmationOption]) -> some View {
+        let approveOptions = options.filter { $0.kind == .approve }
+        let denyOptions = options.filter { $0.kind == .deny }
+
+        VStack(spacing: 8) {
+            // Approve options — prominent, full-width, easy to reach
+            if approveOptions.isEmpty {
+                Button {
+                    if let ids = turnAndToolId {
+                        Task { await store.approveToolCall(toolCallId: ids.toolCallId, turnId: ids.turnId) }
+                    }
+                } label: {
+                    Text("Approve")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 8))
+            } else {
+                // Primary approve option — prominent filled button
+                if let primary = approveOptions.first {
+                    Button {
+                        submit(primary)
+                    } label: {
+                        Text(primary.label)
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.roundedRectangle(radius: 8))
                 }
-            }
-        case .pendingResultConfirmation:
-            HStack {
-                Button("Reject", role: .destructive) {
-                    // Result denial not exposed yet
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 8))
-
-                Button("Accept") {
-                    if let ids = turnAndToolId {
-                        Task { await store.approveToolCallResult(toolCallId: ids.toolCallId, turnId: ids.turnId) }
+                // Secondary approve options — bordered, less prominent
+                ForEach(approveOptions.dropFirst(), id: \.id) { option in
+                    Button {
+                        submit(option)
+                    } label: {
+                        Text(option.label)
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.roundedRectangle(radius: 8))
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 8))
             }
-        default:
-            EmptyView()
+
+            // Deny options — subdued text buttons below
+            if denyOptions.isEmpty {
+                Button(role: .destructive) {
+                    if let ids = turnAndToolId {
+                        Task { await store.denyToolCall(toolCallId: ids.toolCallId, turnId: ids.turnId) }
+                    }
+                } label: {
+                    Text("Deny")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.red)
+            } else {
+                ForEach(denyOptions, id: \.id) { option in
+                    Button(role: .destructive) {
+                        submit(option)
+                    } label: {
+                        Text(option.label)
+                            .font(.subheadline)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+    private func submit(_ option: ConfirmationOption) {
+        guard let ids = turnAndToolId else { return }
+        Task {
+            switch option.kind {
+            case .approve:
+                await store.approveToolCall(
+                    toolCallId: ids.toolCallId,
+                    turnId: ids.turnId,
+                    selectedOptionId: option.id
+                )
+            case .deny:
+                await store.denyToolCall(
+                    toolCallId: ids.toolCallId,
+                    turnId: ids.turnId,
+                    selectedOptionId: option.id
+                )
+            }
         }
     }
 
@@ -327,11 +453,6 @@ struct ToolCallPartView: View {
         return pending.confirmationTitle
     }
 
-    private var confirmationOptions: [ConfirmationOption] {
-        guard case .pendingConfirmation(let pending) = toolCall else { return [] }
-        return pending.options ?? []
-    }
-
     private var selectedOption: ConfirmationOption? {
         switch toolCall {
         case .running(let state):
@@ -347,24 +468,6 @@ struct ToolCallPartView: View {
         }
     }
 
-    private var selectedConfirmationOption: ConfirmationOption? {
-        guard let selectedConfirmationOptionId else {
-            return confirmationOptions.first
-        }
-        return confirmationOptions.first { $0.id == selectedConfirmationOptionId } ?? confirmationOptions.first
-    }
-
-    private var confirmationSelection: Binding<String> {
-        Binding(
-            get: { selectedConfirmationOption?.id ?? "" },
-            set: { selectedConfirmationOptionId = $0 }
-        )
-    }
-
-    private var confirmationOptionIDs: String {
-        confirmationOptions.map(\.id).joined(separator: "|")
-    }
-
     /// Get turnId + toolCallId for dispatching actions.
     /// The turnId comes from the current active turn in the store.
     private var turnAndToolId: (turnId: String, toolCallId: String)? {
@@ -375,44 +478,39 @@ struct ToolCallPartView: View {
         return nil
     }
 
+    /// The session's first open input request, if this tool call is the
+    /// likely target. The protocol does not currently link a request to a
+    /// specific tool call, so we attribute it to the latest streaming/running
+    /// tool call in the active turn (assumed to be `self`).
+    private var pendingInputRequest: SessionInputRequest? {
+        guard let session = store.currentSession,
+              let requests = session.inputRequests, !requests.isEmpty else {
+            return nil
+        }
+        // Only attach to streaming/running tools — pendingConfirmation /
+        // pendingResultConfirmation have their own UI flow.
+        switch toolCall {
+        case .streaming, .running: break
+        default: return nil
+        }
+        // If multiple in-progress tool calls exist in the active turn, only
+        // the most recent one owns the prompt to avoid showing duplicate CTAs.
+        let activeParts = session.activeTurn?.responseParts ?? []
+        let lastRunningId: String? = activeParts.reversed().compactMap { part -> String? in
+            guard case .toolCall(let tc) = part else { return nil }
+            switch tc.toolCall {
+            case .streaming, .running: return tc.toolCall.toolCallId
+            default: return nil
+            }
+        }.first
+        guard lastRunningId == toolCall.toolCallId else { return nil }
+        return requests.first
+    }
+
     private func stringOrMarkdownText(_ value: StringOrMarkdown) -> String {
         switch value {
         case .string(let s): return s
         case .markdown(let m): return m
-        }
-    }
-
-    private func syncPendingOptionSelection() {
-        guard case .pendingConfirmation = toolCall else {
-            selectedConfirmationOptionId = nil
-            return
-        }
-        if let selectedConfirmationOptionId,
-           confirmationOptions.contains(where: { $0.id == selectedConfirmationOptionId }) {
-            return
-        }
-        selectedConfirmationOptionId = confirmationOptions.first?.id
-    }
-
-    private func submitSelectedConfirmation() {
-        guard let ids = turnAndToolId, let selectedOption = selectedConfirmationOption else {
-            return
-        }
-        Task {
-            switch selectedOption.kind {
-            case .approve:
-                await store.approveToolCall(
-                    toolCallId: ids.toolCallId,
-                    turnId: ids.turnId,
-                    selectedOptionId: selectedOption.id
-                )
-            case .deny:
-                await store.denyToolCall(
-                    toolCallId: ids.toolCallId,
-                    turnId: ids.turnId,
-                    selectedOptionId: selectedOption.id
-                )
-            }
         }
     }
 }

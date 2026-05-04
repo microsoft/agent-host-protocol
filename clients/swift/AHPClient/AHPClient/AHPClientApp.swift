@@ -13,15 +13,15 @@ struct AHPAppMain: App {
                 .environment(store)
                 .task {
                     if store.selectedServer != nil {
-                        await store.connect()
+                        await store.connect(debugTrigger: "app launch")
                     }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     // When the app returns to the foreground (e.g. after the screen was locked or
                     // the app was backgrounded) the WebSocket is often already dead. Attempt a
-                    // lightweight reconnect so the user doesn't have to manually refresh.
+                    // foreground recovery pass so the user doesn't have to manually refresh.
                     if newPhase == .active {
-                        Task { await store.reconnectIfNeeded() }
+                        Task { await store.handleSceneActive() }
                     }
                 }
         }

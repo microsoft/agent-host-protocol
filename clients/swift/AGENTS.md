@@ -4,12 +4,12 @@
 
 This directory contains two Swift packages for the Agent Host Protocol (AHP):
 
-1. **AgentHostProtocol** — A pure Swift library (no external dependencies) providing auto-generated types, actions, and reducers for the protocol. Targets iOS 16+, macOS 13+, Swift 5.9+.
+1. **AgentHostProtocol** — A pure Swift library (no external dependencies) providing auto-generated types, actions, and reducers for the protocol. Targets iOS 16+, macOS 13+, Swift 5.9+. The Swift sources live in `clients/swift/AgentHostProtocol/`, but the `Package.swift` manifest lives at the **repository root** (`/Package.swift`) so that external consumers can pull this in via `.package(url:)`. SwiftPM only resolves manifests at the root of a remote git repository.
 2. **AHPClient** — An example iOS app (Xcode project) demonstrating a full AHP client with WebSocket transport, state synchronization, reconnection, and a SwiftUI chat UI. Uses [dev-tunnels-swift](https://github.com/rebornix/dev-tunnels-swift) (remote Swift Package) for tunnel discovery, authentication, and relay connections.
 
 ## Code Generation
 
-Types in `AgentHostProtocol/Sources/AgentHostProtocol/Generated/` are **auto-generated** from the TypeScript definitions in `types/`. Do not edit these files directly.
+Types in `AgentHostProtocol/Sources/AgentHostProtocol/Generated/` are **auto-generated** from the TypeScript definitions in `types/`. Do not edit these files directly. Generated files are committed to source control so the package is consumable via SwiftPM without a code-generation toolchain.
 
 To regenerate after protocol changes:
 
@@ -19,7 +19,30 @@ npm run generate:swift    # runs: tsx scripts/generate.ts --swift
 
 Generated files: `State`, `Commands`, `Actions`, `Errors`, `Messages`, `Notifications` — all suffixed `.generated.swift`.
 
+CI verifies that the committed generated files match the output of `npm run generate:swift` and fails on drift.
+
 ## AgentHostProtocol Library
+
+### Installing via Swift Package Manager
+
+Add it as a dependency in your `Package.swift`:
+
+```swift
+.package(url: "https://github.com/microsoft/agent-host-protocol.git", from: "0.1.0")
+```
+
+…and reference the `AgentHostProtocol` product from your target:
+
+```swift
+.target(
+    name: "MyApp",
+    dependencies: [
+        .product(name: "AgentHostProtocol", package: "agent-host-protocol"),
+    ]
+),
+```
+
+In Xcode: **File ▸ Add Package Dependencies…** and enter `https://github.com/microsoft/agent-host-protocol`.
 
 ### Key Types
 
@@ -106,7 +129,7 @@ The app uses `#available(iOS 26.0, *)` checks for:
 
 ### Build & Run
 
-Open `AHPClient/AHPClient.xcodeproj` in Xcode. The project references `AgentHostProtocol` as a local Swift package dependency and `DevTunnelsClient` as a remote Swift package from [rebornix/dev-tunnels-swift](https://github.com/rebornix/dev-tunnels-swift). Code signing requires a `Signing.local.xcconfig` file (see `Config/Signing.local.xcconfig.example`).
+Open `AHPClient/AHPClient.xcodeproj` in Xcode. The project references `AgentHostProtocol` as a local Swift package whose manifest lives at the **repository root** (`../../..` relative to the Xcode project), and `DevTunnelsClient` as a remote Swift package from [rebornix/dev-tunnels-swift](https://github.com/rebornix/dev-tunnels-swift). Code signing requires a `Signing.local.xcconfig` file (see `Config/Signing.local.xcconfig.example`).
 
 **Dev Tunnels integration:** `TunnelListView.swift` uses the `DevTunnelsClient` library directly — `TunnelManagementClient` for tunnel listing/details, `DeviceCodeAuth` for GitHub OAuth, and `TunnelConnection` helpers for relay URIs and connect tokens. All calls are `async` — no shim layer or Rust FFI needed.
 

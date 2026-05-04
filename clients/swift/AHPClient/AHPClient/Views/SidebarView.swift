@@ -73,6 +73,7 @@ struct SidebarView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.colorScheme) private var colorScheme
     @Binding var navigationPath: [String]
+    let onShowSettings: () -> Void
 
     @State private var searchText = ""
     @State private var showingAddServer = false
@@ -197,7 +198,7 @@ struct SidebarView: View {
                     .padding(.horizontal, 16)
                 }
                 .refreshable {
-                    await store.fetchAndSubscribeSessions()
+                    await store.refreshSessionSummaries()
                 }
 
                 if #available(iOS 26.0, *) {
@@ -254,6 +255,12 @@ struct SidebarView: View {
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    Section {
+                        Button(action: onShowSettings) {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                    }
+
                     if store.selectedServer != nil {
                         Section {
                             Button {
@@ -297,7 +304,6 @@ struct SidebarView: View {
             AddServerView { server in
                 store.addServer(server)
                 store.selectServer(server.id)
-                Task { await store.connect() }
             }
             .environment(store)
         }
@@ -333,7 +339,6 @@ struct SidebarView: View {
                     // Find by host — addServer may have deduplicated to an existing entry.
                     let serverId = store.servers.first(where: { $0.host == server.host })?.id ?? server.id
                     store.selectServer(serverId)
-                    Task { await store.connect() }
                 })
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
@@ -354,7 +359,7 @@ struct SidebarView: View {
                 .textCase(.uppercase)
 
             ForEach(sessions, id: \.resource) { summary in
-                sessionButton(for: summary)
+                sessionButton(for: summary, showModel: false)
             }
         }
     }
@@ -404,7 +409,7 @@ struct SidebarView: View {
         }
     }
 
-    private func sessionButton(for summary: SessionSummary, showFolder: Bool = true) -> some View {
+    private func sessionButton(for summary: SessionSummary, showFolder: Bool = true, showModel: Bool = true) -> some View {
         Button {
             Task {
                 await store.selectSession(uri: summary.resource)
@@ -414,7 +419,8 @@ struct SidebarView: View {
             SessionRow(
                 summary: summary,
                 isActive: summary.status == .inProgress,
-                showFolder: showFolder
+                showFolder: showFolder,
+                showModel: showModel
             )
         }
         .buttonStyle(.plain)
@@ -434,7 +440,6 @@ struct SidebarView: View {
                     ForEach(store.servers) { server in
                         Button {
                             store.selectServer(server.id)
-                            Task { await store.connect() }
                         } label: {
                             HStack {
                                 Text(server.name)
@@ -495,7 +500,7 @@ struct SidebarView: View {
             agentName: store.agents.first?.provider.capitalized,
             activeSessions: activeSessions,
             idleSessions: idleSessions,
-            isConnected: store.connectionState == .connected
+            connectionState: store.connectionState
         )
     }
 
@@ -530,13 +535,38 @@ struct SummaryCardView: View, Equatable {
     let agentName: String?
     let activeSessions: Int
     let idleSessions: Int
-    let isConnected: Bool
+    let connectionState: AHPConnection.ConnectionState
 
     static func == (lhs: SummaryCardView, rhs: SummaryCardView) -> Bool {
         lhs.agentName == rhs.agentName
             && lhs.activeSessions == rhs.activeSessions
             && lhs.idleSessions == rhs.idleSessions
-            && lhs.isConnected == rhs.isConnected
+            && lhs.connectionState == rhs.connectionState
+    }
+
+    private var isConnected: Bool { connectionState == .connected }
+    private var isInProgress: Bool {
+        connectionState == .connecting || connectionState == .reconnecting
+    }
+
+    private var statusIcon: String {
+        if isConnected { return "bolt.fill" }
+        if isInProgress { return "bolt.horizontal.fill" }
+        return "bolt.slash.fill"
+    }
+
+    private var statusLabel: String {
+        switch connectionState {
+        case .connected: "Connected"
+        case .connecting: "Connecting…"
+        case .reconnecting: "Reconnecting…"
+        case .disconnected: "Disconnected"
+        }
+    }
+
+    private var statusStyle: AnyShapeStyle {
+        if isConnected { return AnyShapeStyle(.secondary) }
+        return AnyShapeStyle(Color.orange)
     }
 
     var body: some View {
@@ -563,13 +593,18 @@ struct SummaryCardView: View, Equatable {
                 }
             }
 
-            HStack(spacing: 2) {
-                Image(systemName: isConnected ? "bolt.fill" : "bolt.slash.fill")
-                    .font(.caption2)
-                Text(isConnected ? "Connected" : "Disconnected")
+            HStack(spacing: 6) {
+                if isInProgress {
+                    ProgressView()
+                        .controlSize(.mini)
+                } else {
+                    Image(systemName: statusIcon)
+                        .font(.caption2)
+                }
+                Text(statusLabel)
                     .font(.caption.weight(.medium))
             }
-            .foregroundStyle(isConnected ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.orange))
+            .foregroundStyle(statusStyle)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
@@ -605,6 +640,7 @@ struct SessionRow: View {
     let summary: SessionSummary
     var isActive: Bool = false
     var showFolder: Bool = true
+    var showModel: Bool = true
 
     var body: some View {
         HStack(spacing: 14) {
@@ -632,7 +668,7 @@ struct SessionRow: View {
                     }
                     Text(summary.provider)
                         .font(.caption)
-                    if let model = summary.model {
+                    if showModel, let model = summary.model {
                         Text("·")
                             .font(.caption)
                             .foregroundStyle(.tertiary)

@@ -1784,6 +1784,11 @@
         "configSchema": {
           "$ref": "#/$defs/ConfigSchema",
           "description": "Configuration schema describing model-specific options (e.g. thinking\nlevel). Clients present this as a form and pass the resolved values in\n{@link ModelSelection.config} when creating or changing sessions."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this model.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `pricing` key may carry model pricing metadata."
         }
       },
       "required": [
@@ -3083,6 +3088,24 @@
         "content"
       ]
     },
+    "SystemNotificationResponsePart": {
+      "type": "object",
+      "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent harness\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.SystemNotification",
+          "description": "Discriminant"
+        },
+        "content": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "The text of the system notification"
+        }
+      },
+      "required": [
+        "kind",
+        "content"
+      ]
+    },
     "ConfirmationOption": {
       "type": "object",
       "description": "A confirmation option that the server offers for a tool call awaiting\napproval. Allows richer choices beyond simple approve/deny — for example,\n\"Approve in this Session\" or \"Deny with reason.\"",
@@ -4348,6 +4371,7 @@
     },
     "ResponsePart": {
       "oneOf": [
+        {},
         {
           "$ref": "#/$defs/MarkdownResponsePart"
         },
@@ -4359,6 +4383,9 @@
         },
         {
           "$ref": "#/$defs/ReasoningResponsePart"
+        },
+        {
+          "$ref": "#/$defs/SystemNotificationResponsePart"
         }
       ]
     },

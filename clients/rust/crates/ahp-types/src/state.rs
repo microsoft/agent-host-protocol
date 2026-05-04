@@ -158,6 +158,8 @@ pub enum ResponsePartKind {
     ToolCall,
     #[serde(rename = "reasoning")]
     Reasoning,
+    #[serde(rename = "systemNotification")]
+    SystemNotification,
 }
 
 /// Status of a tool call in the lifecycle state machine.
@@ -467,6 +469,12 @@ pub struct SessionModelInfo {
     /// {@link ModelSelection.config} when creating or changing sessions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_schema: Option<ConfigSchema>,
+    /// Additional provider-specific metadata for this model.
+    ///
+    /// Clients MAY look for well-known keys here to provide enhanced UI.
+    /// For example, a `pricing` key may carry model pricing metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
 }
 
 /// A model selection: the chosen model ID together with any model-specific
@@ -1220,6 +1228,19 @@ pub struct ReasoningResponsePart {
     pub content: String,
 }
 
+/// A system notification surfaced as part of the response stream.
+///
+/// System notifications are messages authored by the agent harness
+/// that need to be visible to both the agent (for situational awareness) and
+/// the user (for transcript continuity). Examples include "background subagent
+/// X completed" or "task Y was cancelled".
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemNotificationResponsePart {
+    /// The text of the system notification
+    pub content: StringOrMarkdown,
+}
+
 /// Tool execution result details, available after execution completes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1912,6 +1933,8 @@ pub enum ResponsePart {
     ToolCall(Box<ToolCallResponsePart>),
     #[serde(rename = "reasoning")]
     Reasoning(ReasoningResponsePart),
+    #[serde(rename = "systemNotification")]
+    SystemNotification(SystemNotificationResponsePart),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

@@ -34,6 +34,7 @@
 		6F2049892F7744ED001049F9 /* AHPClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AHPClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6F20499B2F7744EF001049F9 /* AHPClientTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AHPClientTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6F2049A52F7744EF001049F9 /* AHPClientUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AHPClientUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F649B142FA81FA3004A262A /* AHPClient.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = AHPClient.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -86,6 +87,7 @@
 		6F2049802F7744ED001049F9 = {
 			isa = PBXGroup;
 			children = (
+				6F649B142FA81FA3004A262A /* AHPClient.xctestplan */,
 				6F20498B2F7744ED001049F9 /* AHPClient */,
 				6F20499E2F7744EF001049F9 /* AHPClientTests */,
 				6F2049A82F7744EF001049F9 /* AHPClientUITests */,
@@ -211,7 +213,7 @@
 			mainGroup = 6F2049802F7744ED001049F9;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				6F2049CF2F7746D3001049F9 /* XCLocalSwiftPackageReference "../AgentHostProtocol" */,
+				6F2049CF2F7746D3001049F9 /* XCLocalSwiftPackageReference "../../.." */,
 				AA000001304700000003 /* XCRemoteSwiftPackageReference "dev-tunnels-swift" */,
 				AA000002304700000003 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
 			);
@@ -606,9 +608,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		6F2049CF2F7746D3001049F9 /* XCLocalSwiftPackageReference "../AgentHostProtocol" */ = {
+		6F2049CF2F7746D3001049F9 /* XCLocalSwiftPackageReference "../../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../AgentHostProtocol;
+			relativePath = ../../..;
 		};
 /* End XCLocalSwiftPackageReference section */
 

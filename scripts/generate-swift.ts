@@ -1,8 +1,14 @@
 /**
- * Swift Package Generator — Generates a Swift Package from TypeScript type
- * definitions parsed via ts-morph.
+ * Swift Package Generator — Generates the Swift sources of the AgentHostProtocol
+ * package from TypeScript type definitions parsed via ts-morph.
  *
- * Output: swift/AgentHostProtocol/ with Package.swift and Sources/
+ * Outputs (under clients/swift/AgentHostProtocol/):
+ *   - Sources/AgentHostProtocol/Generated/*.generated.swift   (always overwritten)
+ *   - Sources/AgentHostProtocol/AnyCodable.swift              (only if missing)
+ *
+ * Note: Package.swift lives at the repository root (see /Package.swift). It
+ * is hand-maintained, not generated, because SwiftPM requires the manifest to
+ * live at the repo root for remote (`.package(url:)`) consumption.
  */
 
 import {
@@ -496,6 +502,7 @@ const STATE_STRUCTS = [
   'SimpleMessageAttachment', 'MessageEmbeddedResourceAttachment', 'MessageResourceAttachment',
   'MarkdownResponsePart', 'ContentRef',
   'ResourceReponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
+  'SystemNotificationResponsePart',
   'ToolCallResult', 'ToolCallStreamingState',
   'ToolCallPendingConfirmationState', 'ToolCallRunningState',
   'ToolCallPendingResultConfirmationState', 'ToolCallCompletedState',
@@ -517,6 +524,7 @@ const RESPONSE_PART_UNION: UnionConfig = {
     { caseName: 'contentRef', structName: 'ResourceReponsePart', discriminantValue: 'contentRef' },
     { caseName: 'toolCall', structName: 'ToolCallResponsePart', discriminantValue: 'toolCall' },
     { caseName: 'reasoning', structName: 'ReasoningResponsePart', discriminantValue: 'reasoning' },
+    { caseName: 'systemNotification', structName: 'SystemNotificationResponsePart', discriminantValue: 'systemNotification' },
   ],
 };
 
@@ -984,6 +992,7 @@ const COMMAND_STRUCTS = [
   'ResourceCopyParams', 'ResourceCopyResult',
   'ResourceDeleteParams', 'ResourceDeleteResult',
   'ResourceMoveParams', 'ResourceMoveResult',
+  'ResourceRequestParams', 'ResourceRequestResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
   'AuthenticateParams', 'AuthenticateResult',
@@ -1111,7 +1120,6 @@ function generateNotificationsFile(project: Project): string {
 // ─── Errors File Generator ───────────────────────────────────────────────────
 
 function generateErrorsFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'errors.ts')!;
   const lines: string[] = [GENERATED_HEADER];
 
   lines.push('// MARK: - Standard JSON-RPC Error Codes\n');
@@ -1149,8 +1157,21 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let notFound = -32008');
   lines.push('    /// The client is not permitted to access the requested resource');
   lines.push('    public static let permissionDenied = -32009');
+  lines.push('    /// The target resource already exists and the operation does not allow overwriting');
+  lines.push('    public static let alreadyExists = -32010');
   lines.push('}');
   lines.push('');
+
+  lines.push('// MARK: - Error Detail Payloads\n');
+  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData']) {
+    try {
+      lines.push(generateStructFromInterface(project, ifaceName));
+      lines.push('');
+    } catch (e) {
+      lines.push(`// TODO: Could not generate ${ifaceName}: ${e}`);
+      lines.push('');
+    }
+  }
 
   return lines.join('\n');
 }
@@ -1282,6 +1303,10 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "resourceMove", params: params)
     }
 
+    public static func resourceRequest(id: Int, params: ResourceRequestParams) -> JsonRpcRequest<ResourceRequestParams> {
+        JsonRpcRequest(id: id, method: "resourceRequest", params: params)
+    }
+
     public static func fetchTurns(id: Int, params: FetchTurnsParams) -> JsonRpcRequest<FetchTurnsParams> {
         JsonRpcRequest(id: id, method: "fetchTurns", params: params)
     }
@@ -1389,37 +1414,6 @@ public struct AnyCodable: Codable, Sendable, Equatable {
 `;
 }
 
-// ─── Package.swift ───────────────────────────────────────────────────────────
-
-function packageSwiftContent(): string {
-  return `// swift-tools-version: 5.9
-
-import PackageDescription
-
-let package = Package(
-    name: "AgentHostProtocol",
-    platforms: [
-        .iOS(.v16),
-        .macOS(.v13),
-        .tvOS(.v16),
-        .watchOS(.v9),
-    ],
-    products: [
-        .library(
-            name: "AgentHostProtocol",
-            targets: ["AgentHostProtocol"]
-        ),
-    ],
-    targets: [
-        .target(
-            name: "AgentHostProtocol",
-            path: "Sources/AgentHostProtocol"
-        ),
-    ]
-)
-`;
-}
-
 // ─── Exhaustiveness Check ─────────────────────────────────────────────────────
 
 /**
@@ -1477,6 +1471,11 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputAnswer',           // SESSION_INPUT_ANSWER_UNION discriminated union
     'MessageAttachment',            // MESSAGE_ATTACHMENT_UNION discriminated union
     'MessageAttachmentBase',        // base interface, flattened into the variant structs via `extends`
+    'AuthRequiredErrorData',        // emitted by generateErrorsFile()
+    'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
+    'AhpError',                     // typed via JsonRpcError; not a Swift struct
+    'AhpErrorDetailsMap',           // type-level mapping; not a Swift struct
+    'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));
@@ -1501,12 +1500,11 @@ export function generateSwiftPackage(project: Project, outputDir: string): void 
   const generatedDir = path.join(outputDir, 'Sources', 'AgentHostProtocol', 'Generated');
   fs.mkdirSync(generatedDir, { recursive: true });
 
-  // Package.swift and AnyCodable are only written if they don't exist yet,
-  // so hand-edits to Package.swift are preserved across regeneration.
-  const pkgPath = path.join(outputDir, 'Package.swift');
-  if (!fs.existsSync(pkgPath)) {
-    fs.writeFileSync(pkgPath, packageSwiftContent());
-  }
+  // AnyCodable is only written if it doesn't exist yet, so hand-edits are
+  // preserved across regeneration. Package.swift is hand-maintained at the
+  // repository root (see /Package.swift) — SwiftPM requires the manifest to
+  // live at the repo root for remote consumption — so it is not generated
+  // here.
   const anyCodablePath = path.join(outputDir, 'Sources', 'AgentHostProtocol', 'AnyCodable.swift');
   if (!fs.existsSync(anyCodablePath)) {
     fs.mkdirSync(path.dirname(anyCodablePath), { recursive: true });

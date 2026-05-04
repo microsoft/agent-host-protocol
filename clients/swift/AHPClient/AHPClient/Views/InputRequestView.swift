@@ -1,40 +1,98 @@
 import AgentHostProtocol
 import SwiftUI
 
-// MARK: - InputRequestView
+// MARK: - InputRequestPrompt
 
-/// Renders an active `SessionInputRequest`: message, optional URL, questions,
-/// and Accept/Decline buttons. Drafts are synchronized via
-/// `session/inputAnswerChanged` so every subscriber observes the same state.
-struct InputRequestView: View {
+/// Compact prompt card shown above the input bar when the agent is requesting
+/// input. Tapping it presents the full form in a modal sheet.
+struct InputRequestPrompt: View {
     let request: SessionInputRequest
+    let onTap: () -> Void
+
+    private var primaryText: String {
+        if let message = request.message, !message.isEmpty { return message }
+        return "Agent is requesting input"
+    }
+
+    private var secondaryText: String? {
+        guard let questions = request.questions, !questions.isEmpty else { return nil }
+        let count = questions.count
+        return count == 1 ? "1 question" : "\(count) questions"
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                Image(systemName: "questionmark.bubble.fill")
+                    .font(.title3)
+                    .foregroundStyle(Color.blue)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(primaryText)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    if let secondary = secondaryText {
+                        Text(secondary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                Text("Respond")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue, in: Capsule())
+            }
+            .padding(12)
+            .background(Color.blue.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - InputRequestSheet
+
+/// Modal sheet that renders the input request as a native iOS form with
+/// toolbar Cancel/Submit actions. Auto-dismissal on resolution is handled
+/// by the presenter.
+struct InputRequestSheet: View {
+    let request: SessionInputRequest
+    let onDismiss: () -> Void
     @Environment(AppStore.self) private var store
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack(spacing: 8) {
-                Image(systemName: "questionmark.bubble")
-                    .foregroundStyle(.blue)
-                Text(request.message)
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            // URL elicitation
-            if let url = request.url, let link = URL(string: url) {
-                Link(destination: link) {
-                    Label(url, systemImage: "link")
-                        .font(.caption)
-                        .lineLimit(1)
+        NavigationStack {
+            Form {
+                if let message = request.message, !message.isEmpty {
+                    Section {
+                        Text(message)
+                            .font(.body)
+                    }
                 }
-            }
 
-            // Questions
-            if let questions = request.questions, !questions.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
+                if let url = request.url, let link = URL(string: url) {
+                    Section {
+                        Link(destination: link) {
+                            Label(url, systemImage: "link")
+                                .lineLimit(1)
+                        }
+                    }
+                }
+
+                if let questions = request.questions {
                     ForEach(Array(questions.enumerated()), id: \.offset) { _, question in
-                        QuestionView(
+                        QuestionSection(
                             question: question,
                             answer: answer(for: questionId(of: question)),
                             onChange: { newAnswer in
@@ -50,42 +108,37 @@ struct InputRequestView: View {
                     }
                 }
             }
-
-            // Actions
-            HStack {
-                Button("Decline", role: .destructive) {
-                    Task {
-                        await store.completeInputRequest(
-                            requestId: request.id,
-                            response: .decline
-                        )
+            .navigationTitle("Agent Request")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Decline", role: .destructive) {
+                        Task {
+                            await store.completeInputRequest(
+                                requestId: request.id,
+                                response: .decline
+                            )
+                            onDismiss()
+                        }
                     }
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 8))
-
-                Spacer()
-
-                Button("Accept") {
-                    Task {
-                        await store.completeInputRequest(
-                            requestId: request.id,
-                            response: .accept,
-                            answers: submittedAnswers
-                        )
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Submit") {
+                        Task {
+                            await store.completeInputRequest(
+                                requestId: request.id,
+                                response: .accept,
+                                answers: submittedAnswers
+                            )
+                            onDismiss()
+                        }
                     }
+                    .disabled(!canAccept)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 8))
-                .disabled(!canAccept)
             }
         }
-        .padding(12)
-        .background(Color.blue.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-        )
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     // MARK: Helpers
@@ -95,7 +148,6 @@ struct InputRequestView: View {
     }
 
     private var submittedAnswers: [String: SessionInputAnswer]? {
-        // Promote any drafts to submitted on accept.
         guard let current = request.answers else { return nil }
         var result: [String: SessionInputAnswer] = [:]
         for (id, a) in current {
@@ -109,8 +161,6 @@ struct InputRequestView: View {
         return result
     }
 
-    /// Accept is allowed when every required question has an answer (draft,
-    /// submitted, or skipped). The server will still validate.
     private var canAccept: Bool {
         guard let questions = request.questions else { return true }
         for q in questions {
@@ -142,21 +192,21 @@ struct InputRequestView: View {
     }
 }
 
-// MARK: - QuestionView
+// MARK: - QuestionSection
 
-private struct QuestionView: View {
+/// Native `Form`-style rendering of a single question as a `Section`.
+private struct QuestionSection: View {
     let question: SessionInputQuestion
     let answer: SessionInputAnswer?
     let onChange: (SessionInputAnswer?) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let title = questionTitle, !title.isEmpty {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-            }
-            Text(questionMessage)
-                .font(.caption)
+        Section {
+            // Show the question message first so the user reads it before
+            // seeing the options — previously this was in the footer which
+            // placed it after the controls.
+            Text(message)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             switch question {
@@ -171,10 +221,14 @@ private struct QuestionView: View {
             case .multiSelect(let q):
                 MultiSelectQuestionField(question: q, answer: answer, onChange: onChange)
             }
+        } header: {
+            if let title = title, !title.isEmpty {
+                Text(title)
+            }
         }
     }
 
-    private var questionTitle: String? {
+    private var title: String? {
         switch question {
         case .text(let q): return q.title
         case .number(let q), .integer(let q): return q.title
@@ -184,7 +238,7 @@ private struct QuestionView: View {
         }
     }
 
-    private var questionMessage: String {
+    private var message: String {
         switch question {
         case .text(let q): return q.message
         case .number(let q), .integer(let q): return q.message
@@ -206,7 +260,6 @@ private struct TextQuestionField: View {
     var body: some View {
         TextField("Type your answer…", text: $text, axis: .vertical)
             .lineLimit(1...5)
-            .textFieldStyle(.roundedBorder)
             .onAppear {
                 if let a = answer, case .draft(let v) = a, case .text(let tv) = v.value {
                     text = tv.value
@@ -234,7 +287,6 @@ private struct NumberQuestionField: View {
     var body: some View {
         TextField("Number", text: $text)
             .keyboardType(.decimalPad)
-            .textFieldStyle(.roundedBorder)
             .onAppear {
                 if let a = answer, case .draft(let v) = a, case .number(let nv) = v.value {
                     text = formatted(nv.value)
@@ -287,9 +339,8 @@ private struct BooleanQuestionField: View {
                 onChange(.draft(SessionInputAnswered(state: .draft, value: v)))
             }
         )) {
-            Text(question.message).font(.caption)
+            Text(question.title ?? "Yes")
         }
-        .labelsHidden()
     }
 }
 
@@ -298,39 +349,101 @@ private struct SingleSelectQuestionField: View {
     let answer: SessionInputAnswer?
     let onChange: (SessionInputAnswer?) -> Void
 
+    @State private var freeformText: String = ""
+    @FocusState private var freeformFocused: Bool
+
+    private var allowsFreeform: Bool { question.allowFreeformInput ?? false }
+
+    private var currentValue: SessionInputSelectedAnswerValue? {
+        guard let answer else { return nil }
+        switch answer {
+        case .draft(let v), .submitted(let v):
+            if case .selected(let sv) = v.value { return sv }
+            return nil
+        case .skipped: return nil
+        }
+    }
+
     private var selectedId: String? {
-        if let a = answer, case .draft(let v) = a, case .selected(let sv) = v.value {
-            return sv.value
-        }
-        if let a = answer, case .submitted(let v) = a, case .selected(let sv) = v.value {
-            return sv.value
-        }
-        return nil
+        guard let v = currentValue else { return nil }
+        // Treat empty-string value as "freeform mode".
+        return v.value.isEmpty ? nil : v.value
+    }
+
+    private var isFreeformActive: Bool {
+        guard let v = currentValue else { return false }
+        return v.value.isEmpty && !(v.freeformValues?.isEmpty ?? true)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(question.options, id: \.id) { option in
-                Button {
+        ForEach(question.options, id: \.id) { option in
+            Button {
+                let v = SessionInputAnswerValue.selected(
+                    SessionInputSelectedAnswerValue(kind: .selected, value: option.id)
+                )
+                onChange(.draft(SessionInputAnswered(state: .draft, value: v)))
+                freeformText = ""
+                freeformFocused = false
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(option.label)
+                            .foregroundStyle(.primary)
+                        if let desc = option.description {
+                            Text(desc)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if selectedId == option.id {
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(Color.accentColor)
+                            .fontWeight(.semibold)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+
+        if allowsFreeform {
+            HStack(spacing: 8) {
+                Text("Other")
+                    .foregroundStyle(.secondary)
+                TextField("Type your answer\u{2026}", text: $freeformText, axis: .vertical)
+                    .lineLimit(1...4)
+                    .focused($freeformFocused)
+                    .multilineTextAlignment(.trailing)
+                if isFreeformActive {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(Color.accentColor)
+                        .fontWeight(.semibold)
+                }
+            }
+            .onAppear {
+                if let v = currentValue, v.value.isEmpty,
+                   let first = v.freeformValues?.first {
+                    freeformText = first
+                }
+            }
+            .onChange(of: freeformText) { _, newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    // Clear freeform-only answers; keep selected-option answers.
+                    if isFreeformActive {
+                        onChange(nil)
+                    }
+                } else {
                     let v = SessionInputAnswerValue.selected(
-                        SessionInputSelectedAnswerValue(kind: .selected, value: option.id)
+                        SessionInputSelectedAnswerValue(
+                            kind: .selected,
+                            value: "",
+                            freeformValues: [newValue]
+                        )
                     )
                     onChange(.draft(SessionInputAnswered(state: .draft, value: v)))
-                } label: {
-                    HStack {
-                        Image(systemName: selectedId == option.id ? "largecircle.fill.circle" : "circle")
-                            .foregroundStyle(selectedId == option.id ? Color.blue : Color.secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(option.label).font(.caption)
-                            if let desc = option.description {
-                                Text(desc).font(.caption2).foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                    }
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -341,49 +454,90 @@ private struct MultiSelectQuestionField: View {
     let answer: SessionInputAnswer?
     let onChange: (SessionInputAnswer?) -> Void
 
+    @State private var freeformText: String = ""
+
+    private var allowsFreeform: Bool { question.allowFreeformInput ?? false }
+
+    private var currentValue: SessionInputSelectedManyAnswerValue? {
+        guard let answer else { return nil }
+        switch answer {
+        case .draft(let v), .submitted(let v):
+            if case .selectedMany(let sv) = v.value { return sv }
+            return nil
+        case .skipped: return nil
+        }
+    }
+
     private var selectedIds: Set<String> {
-        if let a = answer, case .draft(let v) = a, case .selectedMany(let sv) = v.value {
-            return Set(sv.value)
-        }
-        if let a = answer, case .submitted(let v) = a, case .selectedMany(let sv) = v.value {
-            return Set(sv.value)
-        }
-        return []
+        Set(currentValue?.value ?? [])
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(question.options, id: \.id) { option in
-                Button {
-                    var current = selectedIds
-                    if current.contains(option.id) {
-                        current.remove(option.id)
-                    } else {
-                        current.insert(option.id)
-                    }
-                    let v = SessionInputAnswerValue.selectedMany(
-                        SessionInputSelectedManyAnswerValue(
-                            kind: .selectedMany,
-                            value: question.options.map(\.id).filter { current.contains($0) }
-                        )
-                    )
-                    onChange(.draft(SessionInputAnswered(state: .draft, value: v)))
-                } label: {
-                    HStack {
-                        Image(systemName: selectedIds.contains(option.id) ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(selectedIds.contains(option.id) ? Color.blue : Color.secondary)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(option.label).font(.caption)
-                            if let desc = option.description {
-                                Text(desc).font(.caption2).foregroundStyle(.secondary)
-                            }
+        ForEach(question.options, id: \.id) { option in
+            Button {
+                toggle(option.id)
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(option.label)
+                            .foregroundStyle(.primary)
+                        if let desc = option.description {
+                            Text(desc)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        Spacer()
                     }
-                    .contentShape(Rectangle())
+                    Spacer()
+                    if selectedIds.contains(option.id) {
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(Color.accentColor)
+                            .fontWeight(.semibold)
+                    }
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
         }
+
+        if allowsFreeform {
+            TextField("Add your own (one per line)\u{2026}", text: $freeformText, axis: .vertical)
+                .lineLimit(1...4)
+                .onAppear {
+                    if let values = currentValue?.freeformValues, !values.isEmpty {
+                        freeformText = values.joined(separator: "\n")
+                    }
+                }
+                .onChange(of: freeformText) { _, newValue in
+                    emitChange(selected: Array(selectedIds), freeform: parseFreeform(newValue))
+                }
+        }
+    }
+
+    private func toggle(_ id: String) {
+        var current = selectedIds
+        if current.contains(id) { current.remove(id) } else { current.insert(id) }
+        let ordered = question.options.map(\.id).filter { current.contains($0) }
+        emitChange(selected: ordered, freeform: parseFreeform(freeformText))
+    }
+
+    private func parseFreeform(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func emitChange(selected: [String], freeform: [String]) {
+        if selected.isEmpty && freeform.isEmpty {
+            onChange(nil)
+            return
+        }
+        let v = SessionInputAnswerValue.selectedMany(
+            SessionInputSelectedManyAnswerValue(
+                kind: .selectedMany,
+                value: selected,
+                freeformValues: freeform.isEmpty ? nil : freeform
+            )
+        )
+        onChange(.draft(SessionInputAnswered(state: .draft, value: v)))
     }
 }

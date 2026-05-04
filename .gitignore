@@ -6,11 +6,10 @@ docs/.vitepress/cache
 # Generated files (npm run generate)
 docs/reference/
 docs/public/schema/
-clients/swift/AgentHostProtocol/Sources/AgentHostProtocol/Generated/
-clients/swift/AgentHostProtocol/.build/
-clients/swift/AgentHostProtocol/.swiftpm/
-clients/swift/AHPApp/.build/
-clients/swift/AHPClient/.build/
+
+# SwiftPM build artifacts
+.build/
+.swiftpm/
 clients/swift/AHPClient/AHPClient/Config/Signing.local.xcconfig
 
 # Xcode / Swift

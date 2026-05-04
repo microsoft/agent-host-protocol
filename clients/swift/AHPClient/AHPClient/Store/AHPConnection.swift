@@ -5,6 +5,16 @@ import Network
 
 // MARK: - AHPConnection
 
+protocol AHPWebSocketTransport: Actor {
+    func connect() async throws
+    func send(_ data: Data) async throws
+    func sendPing(timeoutNanoseconds: UInt64) async throws
+    func receiveMessage() async throws -> Data
+    func close() async
+}
+
+typealias AHPWebSocketFactory = @Sendable (URL, [String: String]) -> any AHPWebSocketTransport
+
 /// WebSocket-based JSON-RPC transport for communicating with an Agent Host server.
 ///
 /// Handles the initialize/reconnect handshake, request/response correlation,
@@ -19,6 +29,7 @@ actor AHPConnection {
         case requestFailed(code: Int, message: String)
         case decodingFailed(String)
         case timeout
+        case connectTimeout
 
         var errorDescription: String? {
             switch self {
@@ -26,6 +37,7 @@ actor AHPConnection {
             case .requestFailed(let code, let msg): "Server error \(code): \(msg)"
             case .decodingFailed(let detail): "Decoding failed: \(detail)"
             case .timeout: "Request timed out"
+            case .connectTimeout: "Could not reach server"
             }
         }
     }
@@ -39,17 +51,24 @@ actor AHPConnection {
 
     // MARK: - Properties
 
-    private(set) var clientId: String
+    nonisolated let clientId: String
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let webSocketFactory: AHPWebSocketFactory
+    private let requestTimeoutNanoseconds: UInt64
+    private let heartbeatIntervalNanoseconds: UInt64
+    private let heartbeatTimeoutNanoseconds: UInt64
 
-    private var webSocket: NativeWebSocketConnection?
+    private var webSocket: (any AHPWebSocketTransport)?
     private var nextRequestId = 1
     private var pendingRequests: [Int: CheckedContinuation<Data, Error>] = [:]
+    private var requestTimeoutTasks: [Int: Task<Void, Never>] = [:]
     /// Last `serverSeq` received from the server. Internal so tests can inspect it.
     var serverSeq = 0
     private var subscriptions: [String] = []
+    private var pendingOutboundActions: [PendingOutboundAction] = []
     private var receiveTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
 
     private(set) var state: ConnectionState = .disconnected
 
@@ -93,10 +112,43 @@ actor AHPConnection {
         }
     }
 
+    private struct PendingOutboundAction: Sendable {
+        let clientSeq: Int
+        let action: StateAction
+    }
+
     // MARK: - Init
 
-    init(clientId: String = "ahp-app-\(UUID().uuidString.prefix(8))") {
+    init(
+        clientId: String = "ahp-app-\(UUID().uuidString.prefix(8))",
+        requestTimeoutNanoseconds: UInt64 = 15_000_000_000,
+        heartbeatIntervalNanoseconds: UInt64 = 10_000_000_000,
+        heartbeatTimeoutNanoseconds: UInt64 = 5_000_000_000,
+        webSocketFactory: @escaping AHPWebSocketFactory = { url, headers in
+            NativeWebSocketConnection(url: url, additionalHeaders: headers)
+        }
+    ) {
         self.clientId = clientId
+        self.requestTimeoutNanoseconds = requestTimeoutNanoseconds
+        self.heartbeatIntervalNanoseconds = heartbeatIntervalNanoseconds
+        self.heartbeatTimeoutNanoseconds = heartbeatTimeoutNanoseconds
+        self.webSocketFactory = webSocketFactory
+    }
+
+    func setOnAction(_ callback: @escaping @MainActor (ActionEnvelope) -> Void) {
+        onAction = callback
+    }
+
+    func setOnNotification(_ callback: @escaping @MainActor (ProtocolNotification) -> Void) {
+        onNotification = callback
+    }
+
+    func setOnStateChange(_ callback: @escaping @MainActor (ConnectionState) -> Void) {
+        onStateChange = callback
+    }
+
+    func setOnUnexpectedDisconnect(_ callback: @escaping @MainActor () -> Void) {
+        onUnexpectedDisconnect = callback
     }
 
     // MARK: - Connect
@@ -107,11 +159,10 @@ actor AHPConnection {
     func connect(to url: URL, headers: [String: String] = [:]) async throws -> InitializeResult {
         await setState(.connecting)
 
-        let ws = NativeWebSocketConnection(url: url, additionalHeaders: headers)
+        let ws = webSocketFactory(url, headers)
         do {
             try await ws.connect()
-            self.webSocket = ws
-            startReceiving()
+            await installWebSocket(ws)
 
             let params = InitializeParams(
                 protocolVersion: 1,
@@ -123,6 +174,8 @@ actor AHPConnection {
             subscriptions = ["agenthost:/root"]
 
             await setState(.connected)
+            try await replayPendingOutboundActions()
+            startHeartbeat()
             return result
         } catch {
             await cleanupAfterFailure(using: ws, error: error)
@@ -132,17 +185,23 @@ actor AHPConnection {
 
     /// Cleanly disconnects from the server.
     func disconnect() async {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         receiveTask?.cancel()
         receiveTask = nil
 
         let ws = webSocket
         webSocket = nil
+        cancelAllRequestTimeouts()
         failAllRequests(error: ConnectionError.notConnected)
 
         if let ws {
             await ws.close()
         }
 
+        serverSeq = 0
+        subscriptions.removeAll()
+        pendingOutboundActions.removeAll()
         await setState(.disconnected)
     }
 
@@ -158,11 +217,10 @@ actor AHPConnection {
     func reconnect(to url: URL, headers: [String: String] = [:]) async throws -> ReconnectResult {
         await setState(.reconnecting)
 
-        let ws = NativeWebSocketConnection(url: url, additionalHeaders: headers)
+        let ws = webSocketFactory(url, headers)
         do {
             try await ws.connect()
-            self.webSocket = ws
-            startReceiving()
+            await installWebSocket(ws)
 
             let params = ReconnectParams(
                 clientId: clientId,
@@ -180,7 +238,10 @@ actor AHPConnection {
                 serverSeq = r.snapshots.map(\.fromSeq).max() ?? serverSeq
             }
 
+            acknowledgeOutboundActions(in: result)
             await setState(.connected)
+            try await replayPendingOutboundActions()
+            startHeartbeat()
             return result
         } catch {
             await cleanupAfterFailure(using: ws, error: error)
@@ -265,10 +326,8 @@ actor AHPConnection {
     /// Dispatch a state action to the server.
     func dispatchAction(_ action: StateAction) async throws {
         let seq = nextSeq()
-        let notification = AHPClientNotifications.dispatchAction(
-            params: DispatchActionParams(clientSeq: seq, action: action)
-        )
-        try await sendNotification(notification)
+        pendingOutboundActions.append(PendingOutboundAction(clientSeq: seq, action: action))
+        try await sendDispatchAction(clientSeq: seq, action: action)
     }
 
     // MARK: - Private: JSON-RPC
@@ -291,11 +350,15 @@ actor AHPConnection {
 
         let responseData: Data = try await withCheckedThrowingContinuation { continuation in
             pendingRequests[id] = continuation
+            requestTimeoutTasks[id] = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: requestTimeoutNanoseconds)
+                await self?.handleRequestTimeout(id: id)
+            }
             Task { [weak self] in
                 do {
                     try await ws.send(data)
                 } catch {
-                    await self?.failRequest(id: id, error: error)
+                    await self?.handleTransportFailure(error)
                 }
             }
         }
@@ -315,14 +378,28 @@ actor AHPConnection {
     private func sendNotification<P: Codable & Sendable>(_ notification: JsonRpcNotification<P>) async throws {
         guard let ws = webSocket else { throw ConnectionError.notConnected }
         let data = try encoder.encode(notification)
-        try await ws.send(data)
+        do {
+            try await ws.send(data)
+        } catch {
+            await handleTransportFailure(error)
+            throw error
+        }
+    }
+
+    private func sendDispatchAction(clientSeq: Int, action: StateAction) async throws {
+        let notification = AHPClientNotifications.dispatchAction(
+            params: DispatchActionParams(clientSeq: clientSeq, action: action)
+        )
+        try await sendNotification(notification)
     }
 
     private func failRequest(id: Int, error: Error) {
+        cancelRequestTimeout(id: id)
         pendingRequests.removeValue(forKey: id)?.resume(throwing: error)
     }
 
     private func failAllRequests(error: Error) {
+        cancelAllRequestTimeouts()
         let continuations = pendingRequests.values
         pendingRequests.removeAll()
         for continuation in continuations {
@@ -343,11 +420,29 @@ actor AHPConnection {
                     await self.handleMessage(data)
                 } catch {
                     if !Task.isCancelled {
-                        await self.failAllRequests(error: error)
-                        await self.setState(.disconnected)
-                        if let callback = await self.onUnexpectedDisconnect {
-                            await MainActor.run { callback() }
-                        }
+                        await self.handleTransportFailure(error)
+                    }
+                    break
+                }
+            }
+        }
+    }
+
+    private func startHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                let interval = await self.heartbeatIntervalNanoseconds
+                try? await Task.sleep(nanoseconds: interval)
+                if Task.isCancelled { break }
+                guard let ws = await self.webSocket else { break }
+                do {
+                    let heartbeatTimeout = await self.heartbeatTimeoutNanoseconds
+                    try await ws.sendPing(timeoutNanoseconds: heartbeatTimeout)
+                } catch {
+                    if !Task.isCancelled {
+                        await self.handleTransportFailure(error)
                     }
                     break
                 }
@@ -362,6 +457,7 @@ actor AHPConnection {
         }
 
         if let id = probe.id, probe.method == nil {
+            cancelRequestTimeout(id: id)
             if let continuation = pendingRequests.removeValue(forKey: id) {
                 continuation.resume(returning: data)
             }
@@ -375,6 +471,7 @@ actor AHPConnection {
                     )
                     let params = envelope.params
                     serverSeq = params.serverSeq
+                    acknowledgeOutboundAction(from: params)
                     if let callback = onAction {
                         Task { @MainActor in callback(params) }
                     }
@@ -402,6 +499,83 @@ actor AHPConnection {
         }
     }
 
+    private func handleRequestTimeout(id: Int) async {
+        guard pendingRequests[id] != nil else { return }
+        await handleTransportFailure(ConnectionError.timeout)
+    }
+
+    private func cancelRequestTimeout(id: Int) {
+        requestTimeoutTasks.removeValue(forKey: id)?.cancel()
+    }
+
+    private func cancelAllRequestTimeouts() {
+        let tasks = requestTimeoutTasks.values
+        requestTimeoutTasks.removeAll()
+        for task in tasks {
+            task.cancel()
+        }
+    }
+
+    private func installWebSocket(_ ws: any AHPWebSocketTransport) async {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+        receiveTask?.cancel()
+        receiveTask = nil
+
+        if let current = webSocket,
+           !sameTransport(current, ws) {
+            webSocket = nil
+            await current.close()
+        }
+
+        webSocket = ws
+        startReceiving()
+    }
+
+    private func replayPendingOutboundActions() async throws {
+        for pending in pendingOutboundActions {
+            try await sendDispatchAction(clientSeq: pending.clientSeq, action: pending.action)
+        }
+    }
+
+    private func acknowledgeOutboundActions(in result: ReconnectResult) {
+        guard case .replay(let replay) = result else { return }
+        for envelope in replay.actions {
+            acknowledgeOutboundAction(from: envelope)
+        }
+    }
+
+    private func acknowledgeOutboundAction(from envelope: ActionEnvelope) {
+        guard let origin = envelope.origin,
+              origin.clientId == clientId else { return }
+        pendingOutboundActions.removeAll { $0.clientSeq <= origin.clientSeq }
+    }
+
+    private func handleTransportFailure(_ error: Error) async {
+        let shouldNotifyUnexpectedDisconnect = state == .connected
+
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+        receiveTask?.cancel()
+        receiveTask = nil
+
+        let ws = webSocket
+        webSocket = nil
+
+        failAllRequests(error: error)
+
+        if let ws {
+            await ws.close()
+        }
+
+        await setState(.disconnected)
+
+        if shouldNotifyUnexpectedDisconnect,
+           let callback = onUnexpectedDisconnect {
+            await MainActor.run { callback() }
+        }
+    }
+
     // MARK: - Private: State
 
     private func setState(_ newState: ConnectionState) async {
@@ -411,17 +585,24 @@ actor AHPConnection {
         }
     }
 
-    private func cleanupAfterFailure(using ws: NativeWebSocketConnection, error: Error) async {
+    private func cleanupAfterFailure(using ws: any AHPWebSocketTransport, error: Error) async {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         receiveTask?.cancel()
         receiveTask = nil
+        cancelAllRequestTimeouts()
         webSocket = nil
         failAllRequests(error: error)
         await ws.close()
         await setState(.disconnected)
     }
+
+    private func sameTransport(_ lhs: any AHPWebSocketTransport, _ rhs: any AHPWebSocketTransport) -> Bool {
+        ObjectIdentifier(lhs as AnyObject) == ObjectIdentifier(rhs as AnyObject)
+    }
 }
 
-private actor NativeWebSocketConnection {
+private actor NativeWebSocketConnection: AHPWebSocketTransport {
     private struct ParsedFrame {
         let fin: Bool
         let opcode: UInt8
@@ -438,6 +619,8 @@ private actor NativeWebSocketConnection {
         case disconnected
         case unsupportedFrameLength(UInt64)
         case malformedFrame
+        case connectTimeout
+        case pingTimeout
 
         var errorDescription: String? {
             switch self {
@@ -459,12 +642,19 @@ private actor NativeWebSocketConnection {
                 return "WebSocket frame length is unsupported: \(length)"
             case .malformedFrame:
                 return "Malformed WebSocket frame"
+            case .connectTimeout:
+                return "WebSocket connection timed out"
+            case .pingTimeout:
+                return "WebSocket heartbeat timed out"
             }
         }
     }
 
     private static let handshakeGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
     private static let headerDelimiter = Data([13, 10, 13, 10])
+    /// Maximum time we'll let `connect()` sit waiting for NWConnection to reach `.ready`
+    /// before giving up. NWConnection's `.waiting` state can otherwise hang indefinitely.
+    fileprivate static let connectTimeoutNanoseconds: UInt64 = 20_000_000_000
 
     private let url: URL
     private let additionalHeaders: [String: String]
@@ -472,6 +662,8 @@ private actor NativeWebSocketConnection {
 
     private var connection: NWConnection?
     private var connectContinuation: CheckedContinuation<Void, Error>?
+    private var pingContinuation: CheckedContinuation<Void, Error>?
+    private var pingTimeoutTask: Task<Void, Never>?
     private var readBuffer = Data()
     private var fragmentedOpcode: UInt8?
     private var fragmentedPayload = Data()
@@ -528,6 +720,12 @@ private actor NativeWebSocketConnection {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connectContinuation = continuation
             connection.start(queue: queue)
+            // Guard against the connection sitting in `.waiting` forever on a
+            // dead network. NWConnection won't fail on its own in that case.
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: Self.connectTimeoutNanoseconds)
+                await self?.timeoutConnectIfPending(for: connection)
+            }
         }
 
         do {
@@ -546,6 +744,29 @@ private actor NativeWebSocketConnection {
         guard handshakeComplete else { throw NativeWebSocketError.disconnected }
         let frame = makeClientFrame(opcode: 0x1, payload: data)
         try await sendRaw(frame)
+    }
+
+    func sendPing(timeoutNanoseconds: UInt64) async throws {
+        guard handshakeComplete else { throw NativeWebSocketError.disconnected }
+        guard pingContinuation == nil else { return }
+
+        let pingFrame = makeClientFrame(opcode: 0x9, payload: Data())
+        try await withCheckedThrowingContinuation { continuation in
+            pingContinuation = continuation
+            pingTimeoutTask?.cancel()
+            pingTimeoutTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                await self?.timeoutPendingPing()
+            }
+
+            Task { [weak self] in
+                do {
+                    try await self?.sendRaw(pingFrame)
+                } catch {
+                    await self?.resolvePendingPing(with: .failure(error))
+                }
+            }
+        }
     }
 
     func receiveMessage() async throws -> Data {
@@ -572,6 +793,7 @@ private actor NativeWebSocketConnection {
         connection.cancel()
         self.connection = nil
         handshakeComplete = false
+        resolvePendingPing(with: .failure(NativeWebSocketError.disconnected))
         readBuffer.removeAll(keepingCapacity: false)
         fragmentedOpcode = nil
         fragmentedPayload.removeAll(keepingCapacity: false)
@@ -583,8 +805,12 @@ private actor NativeWebSocketConnection {
             resolveConnectContinuation(with: .success(()))
         case .failed(let error):
             resolveConnectContinuation(with: .failure(error))
-        case .waiting(let error):
-            resolveConnectContinuation(with: .failure(error))
+        case .waiting:
+            // `.waiting` is a normal transient state on slow / constrained
+            // networks — NWConnection retries internally and typically
+            // progresses to `.ready`. Don't abort the handshake here; the
+            // outer connect-timeout handles networks that never recover.
+            break
         case .cancelled:
             resolveConnectContinuation(with: .failure(NativeWebSocketError.disconnected))
         default:
@@ -596,6 +822,28 @@ private actor NativeWebSocketConnection {
         guard let continuation = connectContinuation else { return }
         connectContinuation = nil
         continuation.resume(with: result)
+    }
+
+    /// Cancels a pending connect attempt that's been stuck (typically in
+    /// `.waiting`) past `connectTimeoutNanoseconds`. No-op if the connect
+    /// already resolved or if a different connection has since been started.
+    private func timeoutConnectIfPending(for connection: NWConnection) {
+        guard connectContinuation != nil, self.connection === connection else { return }
+        connection.cancel()
+        self.connection = nil
+        resolveConnectContinuation(with: .failure(NativeWebSocketError.connectTimeout))
+    }
+
+    private func resolvePendingPing(with result: Result<Void, Error>) {
+        pingTimeoutTask?.cancel()
+        pingTimeoutTask = nil
+        guard let continuation = pingContinuation else { return }
+        pingContinuation = nil
+        continuation.resume(with: result)
+    }
+
+    private func timeoutPendingPing() {
+        resolvePendingPing(with: .failure(NativeWebSocketError.pingTimeout))
     }
 
     private func performHandshake(path: String, hostHeader: String) async throws {
@@ -752,6 +1000,7 @@ private actor NativeWebSocketConnection {
             try await sendRaw(pong)
             return nil
         case 0xA:
+            resolvePendingPing(with: .success(()))
             return nil
         default:
             return nil

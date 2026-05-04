@@ -4,6 +4,16 @@
 
 #![allow(missing_docs)]
 
+#[allow(unused_imports)]
+use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
+#[allow(unused_imports)]
+use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
+use serde_repr::{Deserialize_repr, Serialize_repr};
+
+use crate::commands::ResourceRequestParams;
+use crate::state::ProtectedResourceMetadata;
+
 // ─── Standard JSON-RPC Error Codes ─────────────────────────────────────────
 
 /// Standard JSON-RPC 2.0 error codes.
@@ -48,3 +58,24 @@ pub mod ahp_error_codes {
 pub type AhpErrorCode = i32;
 /// Type alias: JSON-RPC 2.0 error code.
 pub type JsonRpcErrorCode = i32;
+
+// ─── Error Detail Payloads ────────────────────────────────────────────────
+
+/// Details carried in the `data` field of an `AuthRequired` (-32007) error.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthRequiredErrorData {
+    /// Protected resources that require authentication.
+    pub resources: Vec<ProtectedResourceMetadata>,
+}
+
+/// Details carried in the `data` field of a `PermissionDenied` (-32009) error.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionDeniedErrorData {
+    /// The resource access that, if granted via `resourceRequest`, would
+    /// unlock the operation. Omitted when no specific access grant would
+    /// resolve the denial.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<ResourceRequestParams>,
+}
