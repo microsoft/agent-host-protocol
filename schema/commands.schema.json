@@ -3518,6 +3518,11 @@
         "cacheReadTokens": {
           "type": "number",
           "description": "Tokens read from cache"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this usage report.\nClients MAY look for well-known optional keys here to provide enhanced UI,\nbut MUST ignore keys they do not understand."
         }
       }
     },
