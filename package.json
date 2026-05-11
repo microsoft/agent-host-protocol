@@ -35,7 +35,7 @@
     "@typescript-eslint/parser": "^8.57.2",
     "c8": "^11.0.0",
     "eslint": "^10.1.0",
-    "mermaid": "^11.13.0",
+    "mermaid": "^11.15.0",
     "ts-morph": "^24.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
