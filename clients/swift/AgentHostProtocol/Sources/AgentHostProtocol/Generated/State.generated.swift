@@ -2525,8 +2525,7 @@ public struct UsageInfo: Codable, Sendable {
     /// Tokens read from cache
     public var cacheReadTokens: Int?
     /// Additional provider-specific metadata for this usage report.
-    /// Clients MAY look for well-known optional keys here to provide enhanced UI,
-    /// but MUST ignore keys they do not understand.
+    /// Clients MAY look for well-known optional keys here to provide enhanced UI.
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {

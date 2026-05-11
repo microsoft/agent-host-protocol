@@ -1908,8 +1908,7 @@ pub struct UsageInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_read_tokens: Option<i64>,
     /// Additional provider-specific metadata for this usage report.
-    /// Clients MAY look for well-known optional keys here to provide enhanced UI,
-    /// but MUST ignore keys they do not understand.
+    /// Clients MAY look for well-known optional keys here to provide enhanced UI.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
 }

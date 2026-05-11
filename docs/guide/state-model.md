@@ -363,7 +363,7 @@ UsageInfo {
 }
 ```
 
-`_meta` carries provider-specific metadata for the usage report. Clients may inspect well-known optional keys to provide enhanced UI, but must ignore keys they do not understand.
+`_meta` carries provider-specific metadata for the usage report. Clients may inspect well-known optional keys to provide enhanced UI.
 
 ## Session List
 
