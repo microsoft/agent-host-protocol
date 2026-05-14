@@ -2928,7 +2928,7 @@
     },
     "PingParams": {
       "type": "object",
-      "description": "Measures end-to-end protocol responsiveness.\n\nApplication-level liveness over the AHP transport (WebSocket, SSH relay,\ntunnel relay) — not WebSocket ping frames. The server MUST respond\nregardless of whether the client has completed `initialize` or holds any\nsubscriptions. Request/response correlation is handled by the JSON-RPC\n`id` field; ping carries no payload in either direction.",
+      "description": "Verifies that the AHP connection is still alive and keeps it from being\nclosed by idle-timeout intermediaries (proxies, load balancers, etc.).\n\nThe server MUST respond regardless of whether the client has completed\n`initialize` or holds any subscriptions. Ping carries no payload in either\ndirection; the response itself is the signal.",
       "properties": {}
     },
     "ReconnectParams": {
