@@ -20,6 +20,7 @@ import type {
   SessionActiveClient,
   UsageInfo,
   SessionCustomization,
+  CustomizationRef,
   FileEdit,
   SessionInputAnswer,
   SessionInputRequest,
@@ -27,6 +28,7 @@ import type {
   TerminalClaim,
   SessionInputResponseKind,
   ConfirmationOption,
+  CustomizationStatus,
 } from './state.js';
 
 import { ToolCallConfirmationReason, ToolCallCancellationReason, PendingMessageKind } from './state.js';
@@ -71,6 +73,7 @@ export const enum ActionType {
   SessionInputCompleted = 'session/inputCompleted',
   SessionCustomizationsChanged = 'session/customizationsChanged',
   SessionCustomizationToggled = 'session/customizationToggled',
+  SessionCustomizationUpdated = 'session/customizationUpdated',
   SessionTruncated = 'session/truncated',
   SessionIsReadChanged = 'session/isReadChanged',
   SessionIsArchivedChanged = 'session/isArchivedChanged',
@@ -750,6 +753,37 @@ export interface SessionCustomizationToggledAction {
   enabled: boolean;
 }
 
+/**
+ * Upserts mutable fields on a single customization.
+ *
+ * Dispatched by the server to update one or more fields on a customization,
+ * or to add a new customization to the session, without republishing the
+ * entire `customizations` list. The reducer locates the existing entry by
+ * `customization.uri`:
+ *
+ * - If an entry exists, each provided field is assigned; absent (or
+ *   `undefined`) fields are left unchanged. The stored `customization`
+ *   ref is replaced with the one in the action.
+ * - If no entry exists, a new {@link SessionCustomization} is appended
+ *   using the provided fields; `enabled` defaults to `false` when absent.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionCustomizationUpdatedAction {
+  type: ActionType.SessionCustomizationUpdated;
+  /** Session URI */
+  session: URI;
+  /** The customization to update or insert (matched by `customization.uri`) */
+  customization: CustomizationRef;
+  /** New enabled state (defaults to `false` on insert) */
+  enabled?: boolean;
+  /** New loading status */
+  status?: CustomizationStatus;
+  /** New human-readable status detail */
+  statusMessage?: string;
+}
+
 // ─── Config Actions ──────────────────────────────────────────────────────────
 
 /**
@@ -1197,6 +1231,7 @@ export type StateAction =
   | SessionInputCompletedAction
   | SessionCustomizationsChangedAction
   | SessionCustomizationToggledAction
+  | SessionCustomizationUpdatedAction
   | SessionTruncatedAction
   | SessionIsReadChangedAction
   | SessionIsArchivedChangedAction

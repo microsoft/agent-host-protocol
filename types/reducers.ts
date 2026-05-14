@@ -5,7 +5,7 @@
  */
 
 import { ActionType } from './actions.js';
-import type { RootState, SessionInputRequest, SessionState, TerminalState, TerminalContentPart, ToolCallState, ResponsePart, ToolCallResponsePart, Turn, PendingMessage, ConfirmationOption } from './state.js';
+import type { RootState, SessionCustomization, SessionInputRequest, SessionState, TerminalState, TerminalContentPart, ToolCallState, ResponsePart, ToolCallResponsePart, Turn, PendingMessage, ConfirmationOption } from './state.js';
 import { SessionLifecycle, SessionStatus, TurnState, ToolCallStatus, ToolCallConfirmationReason, ToolCallCancellationReason, ResponsePartKind, PendingMessageKind } from './state.js';
 import type { RootAction, ClientRootAction, SessionAction, ClientSessionAction, TerminalAction, ClientTerminalAction } from './action-origin.generated.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
@@ -643,6 +643,37 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
       }
       const updated = [...list];
       updated[idx] = { ...list[idx], enabled: action.enabled };
+      return { ...state, customizations: updated };
+    }
+
+    case ActionType.SessionCustomizationUpdated: {
+      const list = state.customizations ?? [];
+      const idx = list.findIndex(c => c.customization.uri === action.customization.uri);
+      if (idx < 0) {
+        const inserted: SessionCustomization = {
+          customization: action.customization,
+          enabled: action.enabled ?? false,
+        };
+        if (action.status !== undefined) {
+          inserted.status = action.status;
+        }
+        if (action.statusMessage !== undefined) {
+          inserted.statusMessage = action.statusMessage;
+        }
+        return { ...state, customizations: [...list, inserted] };
+      }
+      const updated = [...list];
+      const next = { ...list[idx], customization: action.customization };
+      if (action.enabled !== undefined) {
+        next.enabled = action.enabled;
+      }
+      if (action.status !== undefined) {
+        next.status = action.status;
+      }
+      if (action.statusMessage !== undefined) {
+        next.statusMessage = action.statusMessage;
+      }
+      updated[idx] = next;
       return { ...state, customizations: updated };
     }
 

@@ -1,0 +1,67 @@
+{
+  "description": "session/customizationUpdated upserts a new customization when the URI is unknown",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": true
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/customizationUpdated",
+      "session": "copilot:/test-session",
+      "customization": {
+        "uri": "https://plugins.example/new",
+        "displayName": "New Plugin"
+      },
+      "enabled": true,
+      "status": "loading"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": true
+      },
+      {
+        "customization": {
+          "uri": "https://plugins.example/new",
+          "displayName": "New Plugin"
+        },
+        "enabled": true,
+        "status": "loading"
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,61 @@
+{
+  "description": "session/customizationUpdated updates enabled and statusMessage together",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": true,
+        "status": "loaded"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/customizationUpdated",
+      "session": "copilot:/test-session",
+      "customization": {
+        "uri": "https://plugins.example/a",
+        "displayName": "Plugin A"
+      },
+      "enabled": false,
+      "statusMessage": "Disabled by user"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": false,
+        "status": "loaded",
+        "statusMessage": "Disabled by user"
+      }
+    ]
+  }
+}

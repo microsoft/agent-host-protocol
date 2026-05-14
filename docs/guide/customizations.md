@@ -148,6 +148,26 @@ sequenceDiagram
     Note over Server: customizations: [Plugin A (enabled), Plugin B (enabled)]
 ```
 
+## Reporting Customization Updates
+
+The server reports plugin state via the `enabled`, `status` (`loading` / `loaded` / `degraded` / `error`) and `statusMessage` fields on each `SessionCustomization`. To change one or more of these for a single plugin — for example, when a plugin finishes loading or fails — the server dispatches `session/customizationUpdated` instead of republishing the entire `customizations` list:
+
+```typescript
+{
+  type: 'session/customizationUpdated'
+  session: URI
+  customization: CustomizationRef // matched by `customization.uri`
+  enabled?: boolean               // omit to leave unchanged (defaults to false on insert)
+  status?: CustomizationStatus    // omit to leave unchanged
+  statusMessage?: string          // omit to leave unchanged
+}
+```
+
+This action is an upsert. The reducer locates the entry by `customization.uri`:
+
+- If found, the stored `customization` ref is replaced with the one in the action and each provided mutable field is assigned. Absent fields are left unchanged.
+- If not found, a new entry is appended using the provided fields. `enabled` defaults to `false` when absent.
+
 ## Client-Provided Tools
 
 AHP sessions can expose tools from two sources: **server tools** provided by the agent host, and **client tools** provided by the active client (e.g. an IDE). Client tools let the agent invoke capabilities that only the client has access to.
@@ -269,6 +289,7 @@ This ensures tool calls do not remain stuck in `running` state indefinitely.
 |---|---|---|
 | `session/customizationsChanged` | No | Server updated the session's customization list (full replacement) |
 | `session/customizationToggled` | **Yes** | Client toggled a customization on or off |
+| `session/customizationUpdated` | No | Server upserts mutable fields on a single customization |
 | `session/activeClientChanged` | **Yes** | Client claims/releases the active role (with tools + customizations) |
 | `session/activeClientToolsChanged` | **Yes** | Client updates its tool list without re-claiming |
 | `session/toolCallStart` | No | Server begins a tool call (sets `toolClientId` for client tools) |

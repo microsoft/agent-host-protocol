@@ -55,10 +55,10 @@ use ahp_types::actions::{
 };
 use ahp_types::state::{
     ActiveTurn, ConfirmationOption, ErrorInfo, PendingMessage, PendingMessageKind, ResponsePart,
-    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
-    TerminalCommandPart, TerminalContentPart, TerminalState, TerminalUnclassifiedPart,
-    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
-    ToolCallConfirmationReason, ToolCallPendingConfirmationState,
+    RootState, SessionCustomization, SessionInputRequest, SessionLifecycle, SessionState,
+    SessionStatus, TerminalCommandPart, TerminalContentPart, TerminalState,
+    TerminalUnclassifiedPart, ToolCallCancellationReason, ToolCallCancelledState,
+    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallPendingConfirmationState,
     ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
     ToolCallState, ToolCallStreamingState, Turn, TurnState,
 };
@@ -615,6 +615,30 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                 return ReduceOutcome::NoOp;
             };
             list[idx].enabled = a.enabled;
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCustomizationUpdated(a) => {
+            let list = state.customizations.get_or_insert_with(Vec::new);
+            if let Some(idx) = list.iter().position(|c| c.customization.uri == a.customization.uri) {
+                list[idx].customization = a.customization.clone();
+                if let Some(enabled) = a.enabled {
+                    list[idx].enabled = enabled;
+                }
+                if let Some(status) = a.status.clone() {
+                    list[idx].status = Some(status);
+                }
+                if let Some(message) = a.status_message.clone() {
+                    list[idx].status_message = Some(message);
+                }
+            } else {
+                list.push(SessionCustomization {
+                    customization: a.customization.clone(),
+                    enabled: a.enabled.unwrap_or(false),
+                    client_id: None,
+                    status: a.status.clone(),
+                    status_message: a.status_message.clone(),
+                });
+            }
             ReduceOutcome::Applied
         }
         StateAction::SessionTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),

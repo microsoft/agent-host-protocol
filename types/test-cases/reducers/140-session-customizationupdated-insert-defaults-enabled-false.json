@@ -1,0 +1,48 @@
+{
+  "description": "session/customizationUpdated insert defaults enabled to false when absent",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": []
+  },
+  "actions": [
+    {
+      "type": "session/customizationUpdated",
+      "session": "copilot:/test-session",
+      "customization": {
+        "uri": "https://plugins.example/a",
+        "displayName": "Plugin A"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": false
+      }
+    ]
+  }
+}

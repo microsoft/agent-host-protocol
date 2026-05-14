@@ -414,6 +414,32 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         next.customizations = list
         return next
 
+    case .sessionCustomizationUpdated(let a):
+        var list = state.customizations ?? []
+        if let idx = list.firstIndex(where: { $0.customization.uri == a.customization.uri }) {
+            list[idx].customization = a.customization
+            if let enabled = a.enabled {
+                list[idx].enabled = enabled
+            }
+            if let status = a.status {
+                list[idx].status = status
+            }
+            if let message = a.statusMessage {
+                list[idx].statusMessage = message
+            }
+        } else {
+            list.append(SessionCustomization(
+                customization: a.customization,
+                enabled: a.enabled ?? false,
+                clientId: nil,
+                status: a.status,
+                statusMessage: a.statusMessage
+            ))
+        }
+        var next = state
+        next.customizations = list
+        return next
+
     // ── Truncation ────────────────────────────────────────────────────────
 
     case .sessionTruncated(let a):

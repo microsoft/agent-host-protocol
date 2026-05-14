@@ -1,0 +1,77 @@
+{
+  "description": "session/customizationUpdated updates status and statusMessage by URI",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": true,
+        "status": "loading"
+      },
+      {
+        "customization": {
+          "uri": "https://plugins.example/b",
+          "displayName": "Plugin B"
+        },
+        "enabled": true,
+        "status": "loaded"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/customizationUpdated",
+      "session": "copilot:/test-session",
+      "customization": {
+        "uri": "https://plugins.example/a",
+        "displayName": "Plugin A"
+      },
+      "status": "error",
+      "statusMessage": "Failed to load"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "turns": [],
+    "customizations": [
+      {
+        "customization": {
+          "uri": "https://plugins.example/a",
+          "displayName": "Plugin A"
+        },
+        "enabled": true,
+        "status": "error",
+        "statusMessage": "Failed to load"
+      },
+      {
+        "customization": {
+          "uri": "https://plugins.example/b",
+          "displayName": "Plugin B"
+        },
+        "enabled": true,
+        "status": "loaded"
+      }
+    ]
+  }
+}

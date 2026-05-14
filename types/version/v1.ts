@@ -108,6 +108,7 @@ import type {
   SessionQueuedMessagesReorderedAction,
   SessionCustomizationsChangedAction,
   SessionCustomizationToggledAction,
+  SessionCustomizationUpdatedAction,
   SessionTruncatedAction,
   SessionIsReadChangedAction,
   SessionIsArchivedChangedAction,
@@ -298,6 +299,7 @@ type V1_ISessionPendingMessageRemovedAction = SessionPendingMessageRemovedAction
 type V1_ISessionQueuedMessagesReorderedAction = SessionQueuedMessagesReorderedAction;
 type V1_ISessionCustomizationsChangedAction = SessionCustomizationsChangedAction;
 type V1_ISessionCustomizationToggledAction = SessionCustomizationToggledAction;
+type V1_ISessionCustomizationUpdatedAction = SessionCustomizationUpdatedAction;
 type V1_ISessionTruncatedAction = SessionTruncatedAction;
 type V1_ISessionIsReadChangedAction = SessionIsReadChangedAction;
 type V1_ISessionIsArchivedChangedAction = SessionIsArchivedChangedAction;
@@ -557,6 +559,8 @@ type _CheckSessionCustomization = AssertCompatible<V1_ISessionCustomization, Ses
 type _CheckCustomizationsChangedAction = AssertCompatible<V1_ISessionCustomizationsChangedAction, SessionCustomizationsChangedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckCustomizationToggledAction = AssertCompatible<V1_ISessionCustomizationToggledAction, SessionCustomizationToggledAction>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckCustomizationUpdatedAction = AssertCompatible<V1_ISessionCustomizationUpdatedAction, SessionCustomizationUpdatedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckTruncatedAction = AssertCompatible<V1_ISessionTruncatedAction, SessionTruncatedAction>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

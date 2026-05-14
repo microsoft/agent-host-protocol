@@ -38,6 +38,7 @@ public enum ActionType: String, Codable, Sendable {
     case sessionInputCompleted = "session/inputCompleted"
     case sessionCustomizationsChanged = "session/customizationsChanged"
     case sessionCustomizationToggled = "session/customizationToggled"
+    case sessionCustomizationUpdated = "session/customizationUpdated"
     case sessionTruncated = "session/truncated"
     case sessionIsReadChanged = "session/isReadChanged"
     case sessionIsArchivedChanged = "session/isArchivedChanged"
@@ -991,6 +992,36 @@ public struct SessionCustomizationToggledAction: Codable, Sendable {
     }
 }
 
+public struct SessionCustomizationUpdatedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Session URI
+    public var session: String
+    /// The customization to update or insert (matched by `customization.uri`)
+    public var customization: CustomizationRef
+    /// New enabled state (defaults to `false` on insert)
+    public var enabled: Bool?
+    /// New loading status
+    public var status: CustomizationStatus?
+    /// New human-readable status detail
+    public var statusMessage: String?
+
+    public init(
+        type: ActionType,
+        session: String,
+        customization: CustomizationRef,
+        enabled: Bool? = nil,
+        status: CustomizationStatus? = nil,
+        statusMessage: String? = nil
+    ) {
+        self.type = type
+        self.session = session
+        self.customization = customization
+        self.enabled = enabled
+        self.status = status
+        self.statusMessage = statusMessage
+    }
+}
+
 public struct SessionTruncatedAction: Codable, Sendable {
     public var type: ActionType
     /// Session URI
@@ -1400,6 +1431,7 @@ public enum StateAction: Codable, Sendable {
     case sessionInputCompleted(SessionInputCompletedAction)
     case sessionCustomizationsChanged(SessionCustomizationsChangedAction)
     case sessionCustomizationToggled(SessionCustomizationToggledAction)
+    case sessionCustomizationUpdated(SessionCustomizationUpdatedAction)
     case sessionTruncated(SessionTruncatedAction)
     case sessionDiffsChanged(SessionDiffsChangedAction)
     case sessionConfigChanged(SessionConfigChangedAction)
@@ -1495,6 +1527,8 @@ public enum StateAction: Codable, Sendable {
             self = .sessionCustomizationsChanged(try SessionCustomizationsChangedAction(from: decoder))
         case "session/customizationToggled":
             self = .sessionCustomizationToggled(try SessionCustomizationToggledAction(from: decoder))
+        case "session/customizationUpdated":
+            self = .sessionCustomizationUpdated(try SessionCustomizationUpdatedAction(from: decoder))
         case "session/truncated":
             self = .sessionTruncated(try SessionTruncatedAction(from: decoder))
         case "session/diffsChanged":
@@ -1572,6 +1606,7 @@ public enum StateAction: Codable, Sendable {
         case .sessionInputCompleted(let v): try v.encode(to: encoder)
         case .sessionCustomizationsChanged(let v): try v.encode(to: encoder)
         case .sessionCustomizationToggled(let v): try v.encode(to: encoder)
+        case .sessionCustomizationUpdated(let v): try v.encode(to: encoder)
         case .sessionTruncated(let v): try v.encode(to: encoder)
         case .sessionDiffsChanged(let v): try v.encode(to: encoder)
         case .sessionConfigChanged(let v): try v.encode(to: encoder)

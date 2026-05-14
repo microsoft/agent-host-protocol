@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::state::{
-    AgentInfo, ConfirmationOption, ErrorInfo, FileEdit, ModelSelection, PendingMessageKind,
-    ResponsePart, SessionActiveClient, SessionCustomization, SessionInputAnswer,
-    SessionInputRequest, SessionInputResponseKind, TerminalClaim, TerminalInfo,
+    AgentInfo, ConfirmationOption, CustomizationRef, CustomizationStatus, ErrorInfo, FileEdit,
+    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionCustomization,
+    SessionInputAnswer, SessionInputRequest, SessionInputResponseKind, TerminalClaim, TerminalInfo,
     ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallResult, ToolDefinition,
     ToolResultContent, UsageInfo, UserMessage,
 };
@@ -88,6 +88,8 @@ pub enum ActionType {
     SessionCustomizationsChanged,
     #[serde(rename = "session/customizationToggled")]
     SessionCustomizationToggled,
+    #[serde(rename = "session/customizationUpdated")]
+    SessionCustomizationUpdated,
     #[serde(rename = "session/truncated")]
     SessionTruncated,
     #[serde(rename = "session/isReadChanged")]
@@ -740,6 +742,36 @@ pub struct SessionCustomizationToggledAction {
     pub enabled: bool,
 }
 
+/// Upserts mutable fields on a single customization.
+///
+/// Dispatched by the server to update one or more fields on a customization,
+/// or to add a new customization to the session, without republishing the
+/// entire `customizations` list. The reducer locates the existing entry by
+/// `customization.uri`:
+///
+/// - If an entry exists, each provided field is assigned; absent (or
+///   `undefined`) fields are left unchanged. The stored `customization`
+///   ref is replaced with the one in the action.
+/// - If no entry exists, a new {@link SessionCustomization} is appended
+///   using the provided fields; `enabled` defaults to `false` when absent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCustomizationUpdatedAction {
+    /// Session URI
+    pub session: Uri,
+    /// The customization to update or insert (matched by `customization.uri`)
+    pub customization: CustomizationRef,
+    /// New enabled state (defaults to `false` on insert)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// New loading status
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<CustomizationStatus>,
+    /// New human-readable status detail
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<String>,
+}
+
 /// Truncates a session's history. If `turnId` is provided, all turns after that
 /// turn are removed and the specified turn is kept. If `turnId` is omitted, all
 /// turns are removed.
@@ -1077,6 +1109,8 @@ pub enum StateAction {
     SessionCustomizationsChanged(SessionCustomizationsChangedAction),
     #[serde(rename = "session/customizationToggled")]
     SessionCustomizationToggled(SessionCustomizationToggledAction),
+    #[serde(rename = "session/customizationUpdated")]
+    SessionCustomizationUpdated(SessionCustomizationUpdatedAction),
     #[serde(rename = "session/truncated")]
     SessionTruncated(SessionTruncatedAction),
     #[serde(rename = "session/diffsChanged")]
