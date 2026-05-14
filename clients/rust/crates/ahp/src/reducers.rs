@@ -624,7 +624,7 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                 if let Some(enabled) = a.enabled {
                     list[idx].enabled = enabled;
                 }
-                if let Some(status) = a.status.clone() {
+                if let Some(status) = a.status {
                     list[idx].status = Some(status);
                 }
                 if let Some(message) = a.status_message.clone() {
@@ -635,7 +635,7 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                     customization: a.customization.clone(),
                     enabled: a.enabled.unwrap_or(false),
                     client_id: None,
-                    status: a.status.clone(),
+                    status: a.status,
                     status_message: a.status_message.clone(),
                 });
             }
