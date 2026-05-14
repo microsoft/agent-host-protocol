@@ -194,6 +194,7 @@ export {
 export type {
   InitializeParams,
   InitializeResult,
+  PingParams,
   ReconnectParams,
   ReconnectReplayResult,
   ReconnectSnapshotResult,

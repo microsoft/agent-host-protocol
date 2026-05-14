@@ -10,6 +10,7 @@
 import type {
   InitializeParams,
   InitializeResult,
+  PingParams,
   ReconnectParams,
   ReconnectResult,
   SubscribeParams,
@@ -114,6 +115,7 @@ export interface JsonRpcNotification {
  */
 export interface CommandMap {
   'initialize': { params: InitializeParams; result: InitializeResult };
+  'ping': { params: PingParams; result: null };
   'reconnect': { params: ReconnectParams; result: ReconnectResult };
   'subscribe': { params: SubscribeParams; result: SubscribeResult };
   'createSession': { params: CreateSessionParams; result: null };

@@ -74,6 +74,11 @@
         "snapshots"
       ]
     },
+    "PingParams": {
+      "type": "object",
+      "description": "Measures end-to-end protocol responsiveness.\n\nApplication-level liveness over the AHP transport (WebSocket, SSH relay,\ntunnel relay) — not WebSocket ping frames. The server MUST respond\nregardless of whether the client has completed `initialize` or holds any\nsubscriptions. Request/response correlation is handled by the JSON-RPC\n`id` field; ping carries no payload in either direction.",
+      "properties": {}
+    },
     "ReconnectParams": {
       "type": "object",
       "description": "Re-establishes a dropped connection. The server replays missed actions or\nprovides fresh snapshots.",

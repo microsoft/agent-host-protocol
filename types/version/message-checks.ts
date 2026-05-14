@@ -25,6 +25,7 @@ type _Exact<A, B> = [A] extends [B] ? [B] extends [A] ? true : never : never;
 /** All methods annotated `@messageType Request` in commands.ts. */
 type _ExpectedCommands =
   | 'initialize'
+  | 'ping'
   | 'reconnect'
   | 'subscribe'
   | 'createSession'

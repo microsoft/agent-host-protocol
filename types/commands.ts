@@ -78,6 +78,24 @@ export interface InitializeResult {
   completionTriggerCharacters?: string[];
 }
 
+// ─── ping ────────────────────────────────────────────────────────────────────
+
+/**
+ * Measures end-to-end protocol responsiveness.
+ *
+ * Application-level liveness over the AHP transport. The server MUST respond
+ * regardless of whether the client has completed `initialize` or holds any
+ * subscriptions. Ping carries no payload in either direction.
+ *
+ * @category Commands
+ * @method ping
+ * @direction Client → Server
+ * @messageType Request
+ * @version 0.1.0
+ */
+export interface PingParams {
+}
+
 // ─── reconnect ───────────────────────────────────────────────────────────────
 
 /**
