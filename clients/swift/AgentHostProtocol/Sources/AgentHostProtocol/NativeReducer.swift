@@ -409,8 +409,19 @@ public struct AHPSessionReducer: Reducer {
             state.summary.activity = a.activity
 
         case .sessionConfigChanged(let a):
-            guard var config = state.config else { return }
-            config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
+            if state.config == nil {
+                guard let schema = a.schema else { return }
+                state.config = SessionConfigState(schema: schema, values: a.config ?? [:])
+                state.summary.modifiedAt = currentTimestamp()
+                return
+            }
+            var config = state.config!
+            if let incoming = a.config {
+                config.values = a.replace == true ? incoming : config.values.merging(incoming) { _, new in new }
+            }
+            if let schema = a.schema {
+                config.schema = schema
+            }
             state.config = config
             state.summary.modifiedAt = currentTimestamp()
 

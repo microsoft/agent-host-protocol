@@ -89,7 +89,9 @@ The session URI scheme is the provider name and the path is the session ID: `cop
 
 Once a session reaches `lifecycle: 'ready'`, the session is active:
 
-- The client MAY dispatch `session/turnStarted` to begin a turn.
+- The client MAY call the `startTurn` command to begin a turn. The server
+  may reject when the session config is incomplete relative to the current
+  schema.
 - The server streams back `session/delta`, `session/toolStart`, `session/permissionRequest`, and other actions.
 - The client MAY dispatch `session/permissionResolved` or `session/turnCancelled`.
 - The server dispatches `session/turnComplete` or `session/error` when the turn ends.
@@ -97,21 +99,45 @@ Once a session reaches `lifecycle: 'ready'`, the session is active:
 
 All actions MUST be scoped to the session URI and reference a valid turn ID when applicable.
 
+## Session Configuration
+
+Each session may declare a dynamic configuration schema describing
+provider-specific knobs (e.g. worktree mode, base branch). The protocol
+maintains a single source of truth in `state.config = { schema, values }`.
+
+- On `createSession`, and again whenever a client value change requires
+  re-resolving the schema, the server emits a `session/configChanged` action
+  carrying the new `schema` (and any server-resolved `values`). The reducer
+  fully replaces `state.config.schema` and merges (or replaces, when
+  `replace: true`) `state.config.values`.
+- Clients mutate values by dispatching `session/configChanged` with a
+  `config` payload. Only properties with `sessionMutable: true` may change
+  mid-session. Clients MUST NOT populate the `schema` field — the server is
+  the only authority for schema and silently drops any client-supplied
+  schema.
+
+When the user presses Enter, the client calls the rejectable `startTurn`
+command. The server validates the current `values` against the latest
+`schema` and returns a `-32602 InvalidParams` error (with
+`data.missingRequired`) if the config does not satisfy the schema, giving
+the client UI a chance to route the user back to the offending fields.
+
 ## Server Validation of Client Actions
 
 When the server receives a client-dispatched action, it MUST validate it before applying. Invalid actions MUST be echoed back with a `rejectionReason`. The following validation rules apply:
 
-| Action | Condition | Server Behavior |
-|---|---|---|
-| Any action referencing a non-existent session | Session URI not found | Server MUST silently ignore the action (no echo) |
-| `session/toolCallConfirmed` | Tool call not in `pending-confirmation` state | Server MUST reject the action |
-| `session/turnCancelled` | No active turn | Server MUST reject the action |
-| `session/modelChanged` | A turn is currently active | Server MUST defer the model change until the active turn completes, then apply it for the next turn |
-| `session/inputAnswerChanged` | No input request with matching `requestId` | Server SHOULD reject the action |
-| `session/inputAnswerChanged` | `answer.state` requires a value but `answer.value` is absent, or `answer.value.kind` is missing the matching payload field | Server SHOULD reject the action |
-| `session/inputCompleted` | No input request with matching `requestId` | Server SHOULD reject the action |
-| `session/inputCompleted` | `response` is `'accept'` but required questions do not have submitted answers | Server SHOULD reject the action |
-| `session/pendingMessageRemoved` | No pending message with matching `id` and `kind` | Server SHOULD reject the action |
+| Action                                        | Condition                                                                                                                  | Server Behavior                                                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Any action referencing a non-existent session | Session URI not found                                                                                                      | Server MUST silently ignore the action (no echo)                                                    |
+| `session/toolCallConfirmed`                   | Tool call not in `pending-confirmation` state                                                                              | Server MUST reject the action                                                                       |
+| `session/turnCancelled`                       | No active turn                                                                                                             | Server MUST reject the action                                                                       |
+| `session/modelChanged`                        | A turn is currently active                                                                                                 | Server MUST defer the model change until the active turn completes, then apply it for the next turn |
+| `session/inputAnswerChanged`                  | No input request with matching `requestId`                                                                                 | Server SHOULD reject the action                                                                     |
+| `session/inputAnswerChanged`                  | `answer.state` requires a value but `answer.value` is absent, or `answer.value.kind` is missing the matching payload field | Server SHOULD reject the action                                                                     |
+| `session/inputCompleted`                      | No input request with matching `requestId`                                                                                 | Server SHOULD reject the action                                                                     |
+| `session/inputCompleted`                      | `response` is `'accept'` but required questions do not have submitted answers                                              | Server SHOULD reject the action                                                                     |
+| `session/pendingMessageRemoved`               | No pending message with matching `id` and `kind`                                                                           | Server SHOULD reject the action                                                                     |
+| `session/configChanged`                       | Client populated the `schema` field                                                                                        | Server MUST silently drop the schema field; values are still applied if present                     |
 
 ## Pending Message Consumption
 
@@ -122,7 +148,7 @@ The server consumes pending messages according to their kind:
 When a turn completes and `queuedMessages` is non-empty, the server SHOULD:
 
 1. Dispatch `session/pendingMessageRemoved` with `kind: 'queued'` for the first queued message.
-2. Dispatch `session/turnStarted` with the queued message's `userMessage` and `queuedMessageId` set to the message's `id`.
+2. Begin the new turn — equivalent to a server-initiated `startTurn` — and emit a `session/turnStarted` action with the queued message's `userMessage` and `queuedMessageId` set to the message's `id`.
 
 When a queued message is added while the session is idle (no active turn), the server SHOULD immediately consume it using the same two-step sequence.
 
@@ -143,7 +169,7 @@ Steering messages added while idle are silently stored and consumed when a turn 
   "jsonrpc": "2.0",
   "id": 5,
   "method": "disposeSession",
-  "params": { "session": "copilot:/<uuid>" }
+  "params": { "session": "copilot:/<uuid>" },
 }
 ```
 

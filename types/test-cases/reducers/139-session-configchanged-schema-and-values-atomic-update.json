@@ -1,0 +1,63 @@
+{
+  "description": "session/configChanged with both schema and values atomically updates both",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test",
+      "provider": "copilot",
+      "title": "Test",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "title": "Target", "enum": ["workspace", "worktree"] }
+        }
+      },
+      "values": { "target": "workspace" }
+    },
+    "lifecycle": "ready",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/configChanged",
+      "session": "copilot:/test",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "title": "Target", "enum": ["workspace", "worktree"] },
+          "baseBranch": { "type": "string", "title": "Base Branch", "enum": ["main"] }
+        },
+        "required": ["baseBranch"]
+      },
+      "config": { "baseBranch": "main" }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test",
+      "provider": "copilot",
+      "title": "Test",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 9999
+    },
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "title": "Target", "enum": ["workspace", "worktree"] },
+          "baseBranch": { "type": "string", "title": "Base Branch", "enum": ["main"] }
+        },
+        "required": ["baseBranch"]
+      },
+      "values": { "target": "workspace", "baseBranch": "main" }
+    },
+    "lifecycle": "ready",
+    "turns": []
+  }
+}

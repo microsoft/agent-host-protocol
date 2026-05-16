@@ -28,6 +28,7 @@ import type {
   TerminalClaim,
   SessionInputResponseKind,
   ConfirmationOption,
+  SessionConfigSchema,
   CustomizationStatus,
 } from './state.js';
 
@@ -232,7 +233,6 @@ export interface SessionCreationFailedAction {
  *
  * @category Session Actions
  * @version 1
- * @clientDispatchable
  */
 export interface SessionTurnStartedAction {
   type: ActionType.SessionTurnStarted;
@@ -787,11 +787,23 @@ export interface SessionCustomizationUpdatedAction {
 // ─── Config Actions ──────────────────────────────────────────────────────────
 
 /**
- * Client changed a mutable config value mid-session.
+ * Session configuration values and/or schema changed.
  *
- * Only properties with `sessionMutable: true` in the config schema may be
- * changed. The server validates and broadcasts the action; the reducer merges
- * the new values into `state.config.values`.
+ * Two complementary uses:
+ *
+ * - **Client-dispatched (values).** A client mutates one or more properties.
+ *   Only properties with `sessionMutable: true` in the schema may be changed.
+ *   The server validates and broadcasts the action; the reducer merges the
+ *   new values into `state.config.values`. Clients MUST NOT populate the
+ *   `schema` field — the server is the only authority for schema and will
+ *   silently drop any client-supplied schema.
+ *
+ * - **Server-emitted (schema).** When the server (re-)resolves the dynamic
+ *   configuration schema for a session — typically right after `createSession`
+ *   or in response to a client value change — it broadcasts an action carrying
+ *   the new `schema`. The action MAY also carry refined `config` values
+ *   (e.g. server-resolved defaults) in the same emission, applied atomically.
+ *   This replaces the legacy `resolveSessionConfig` round-trip.
  *
  * @category Session Actions
  * @version 1
@@ -801,10 +813,29 @@ export interface SessionConfigChangedAction {
   type: ActionType.SessionConfigChanged;
   /** Session URI */
   session: URI;
-  /** Updated config values */
-  config: Record<string, unknown>;
-  /** When `true`, replaces all config values instead of merging */
+  /**
+   * Updated config values. Optional so that pure schema-only emissions from
+   * the server do not need to send a redundant values payload. When omitted,
+   * `state.config.values` is left unchanged.
+   */
+  config?: Record<string, unknown>;
+  /**
+   * When `true`, replaces all config values instead of merging. Affects
+   * `config` only; the `schema` field is always full-replacement when
+   * present.
+   */
   replace?: boolean;
+  /**
+   * New session configuration schema. When present, fully replaces
+   * `state.config.schema`. Server-emitted only — clients MUST NOT populate
+   * this field.
+   *
+   * If `state.config` is currently `undefined`, an action carrying `schema`
+   * creates the config object using `config ?? {}` for the values.
+   *
+   * @since v0.1.0 additive (server-managed config schema)
+   */
+  schema?: SessionConfigSchema;
 }
 
 /**

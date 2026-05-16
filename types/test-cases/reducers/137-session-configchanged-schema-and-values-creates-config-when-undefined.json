@@ -1,0 +1,50 @@
+{
+  "description": "session/configChanged with schema and values seeds both when state.config is undefined",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test",
+      "provider": "copilot",
+      "title": "Test",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "session/configChanged",
+      "session": "copilot:/test",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "title": "Target", "enum": ["workspace", "worktree"] }
+        }
+      },
+      "config": { "target": "worktree" }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test",
+      "provider": "copilot",
+      "title": "Test",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 9999
+    },
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "title": "Target", "enum": ["workspace", "worktree"] }
+        }
+      },
+      "values": { "target": "worktree" }
+    },
+    "lifecycle": "ready",
+    "turns": []
+  }
+}

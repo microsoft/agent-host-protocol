@@ -46,8 +46,8 @@ The host is the boundary between these two concerns.
 
 An AHP host implementation can use ACP as its agent backend protocol. The internal flow looks like this:
 
-1. **Client dispatches an action** (e.g. `session/turnStarted`) via AHP.
-2. **Host sequences it** — assigns a `serverSeq`, applies it to the authoritative state, broadcasts the action envelope to all subscribed clients.
+1. **Client calls `startTurn`** via AHP (the rejectable command form; the legacy `session/turnStarted` action is server-emitted only).
+2. **Host validates and sequences** — checks the session config, then assigns a `serverSeq`, broadcasts the `session/turnStarted` action envelope to all subscribed clients.
 3. **Host translates to ACP** — sends a `session/prompt` to the ACP agent.
 4. **Agent streams back** — the ACP agent sends `session/update` notifications with content chunks, tool calls, and permission requests.
 5. **Host maps to AHP actions** — the agent event mapper converts ACP-specific events into agent-agnostic AHP actions (`session/delta`, `session/toolStart`, `session/permissionRequest`, etc.).
@@ -63,7 +63,7 @@ When multiple clients connect to the same agent session, the host serializes the
 
 Concretely:
 
-- **Turn ownership**: Only one turn runs at a time. When Client A starts a turn, Clients B and C see the `session/turnStarted` action and know the session is busy. AHP's state tree makes this visible to everyone.
+- **Turn ownership**: Only one turn runs at a time. When Client A calls `startTurn`, the host emits a `session/turnStarted` action that Clients B and C see, and they know the session is busy. AHP's state tree makes this visible to everyone.
 - **Permission resolution**: When the agent requests permission, the host surfaces it as a state action. Any client can resolve it — but only once (the first `session/permissionResolved` wins; subsequent ones are rejected). The host arbitrates.
 - **Cancellation**: Any client can cancel a running turn. The host sequences the `session/turnCancelled` action and forwards the cancellation to the agent via ACP's `session/cancel`. All clients see the result.
 - **Optimistic updates with reconciliation**: Clients apply their own actions immediately (write-ahead) and reconcile when the server echoes them back. This gives responsive UI without sacrificing consistency — something a 1:1 protocol doesn't need to worry about.

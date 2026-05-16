@@ -453,7 +453,8 @@ sequenceDiagram
 
     Server->>Client: action (session/truncated)
 
-    Client->>Server: dispatchAction (session/turnStarted, edited message)
+    Client->>Server: startTurn (edited message)
+    Server->>Client: response (success)
     Server->>Client: action (session/turnStarted)
     Note over Server: New turn begins with edited message
 ```

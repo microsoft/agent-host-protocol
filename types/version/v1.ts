@@ -162,8 +162,6 @@ import type {
   CreateTerminalParams,
   CreateSessionParams,
   DisposeTerminalParams,
-  ResolveSessionConfigParams,
-  ResolveSessionConfigResult,
   SessionConfigPropertySchema,
   SessionConfigSchema,
   SessionConfigCompletionsParams,
@@ -172,6 +170,9 @@ import type {
   CompletionsParams,
   CompletionItem,
   CompletionsResult,
+  StartTurnParams,
+  StartTurnResult,
+  StartTurnInvalidConfigErrorData,
   InitializeParams,
   InitializeResult,
   ReconnectParams,
@@ -355,8 +356,6 @@ type V1_IResourceMoveParams = ResourceMoveParams;
 type V1_IResourceMoveResult = ResourceMoveResult;
 type V1_IResourceRequestParams = ResourceRequestParams;
 type V1_IResourceRequestResult = ResourceRequestResult;
-type V1_IResolveSessionConfigParams = ResolveSessionConfigParams;
-type V1_IResolveSessionConfigResult = ResolveSessionConfigResult;
 type V1_IConfigPropertySchema = ConfigPropertySchema;
 type V1_IConfigSchema = ConfigSchema;
 type V1_ISessionConfigPropertySchema = SessionConfigPropertySchema;
@@ -367,6 +366,9 @@ type V1_ISessionConfigValueItem = SessionConfigValueItem;
 type V1_ICompletionsParams = CompletionsParams;
 type V1_ICompletionItem = CompletionItem;
 type V1_ICompletionsResult = CompletionsResult;
+type V1_IStartTurnParams = StartTurnParams;
+type V1_IStartTurnResult = StartTurnResult;
+type V1_IStartTurnInvalidConfigErrorData = StartTurnInvalidConfigErrorData;
 type V1_IInitializeParams = InitializeParams;
 type V1_IInitializeResult = InitializeResult;
 type V1_IReconnectParams = ReconnectParams;
@@ -688,10 +690,6 @@ type _CheckCreateSessionParams = AssertCompatible<V1_ICreateSessionParams, Creat
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckDisposeTerminalParams = AssertCompatible<V1_IDisposeTerminalParams, DisposeTerminalParams>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckResolveSessionConfigParams = AssertCompatible<V1_IResolveSessionConfigParams, ResolveSessionConfigParams>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _CheckResolveSessionConfigResult = AssertCompatible<V1_IResolveSessionConfigResult, ResolveSessionConfigResult>;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckConfigPropertySchema = AssertCompatible<V1_IConfigPropertySchema, ConfigPropertySchema>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckConfigSchema = AssertCompatible<V1_IConfigSchema, ConfigSchema>;
@@ -711,6 +709,12 @@ type _CheckCompletionsParams = AssertCompatible<V1_ICompletionsParams, Completio
 type _CheckCompletionItem = AssertCompatible<V1_ICompletionItem, CompletionItem>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckCompletionsResult = AssertCompatible<V1_ICompletionsResult, CompletionsResult>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckStartTurnParams = AssertCompatible<V1_IStartTurnParams, StartTurnParams>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckStartTurnResult = AssertCompatible<V1_IStartTurnResult, StartTurnResult>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _CheckStartTurnInvalidConfigErrorData = AssertCompatible<V1_IStartTurnInvalidConfigErrorData, StartTurnInvalidConfigErrorData>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type _CheckConfirmationOption = AssertCompatible<V1_IConfirmationOption, ConfirmationOption>;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

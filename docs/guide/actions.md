@@ -29,7 +29,7 @@ These mutate the root state. **All root actions are server-only** — clients ob
 
 All scoped to a session URI. Some are server-only (produced by the agent backend), others can be dispatched directly by clients.
 
-When a client dispatches an action, the server applies it to the state and also reacts to it as a side effect (e.g. `session/turnStarted` triggers agent processing, `session/turnCancelled` aborts it). This avoids a separate command→action translation layer for the common interactive cases.
+When a client dispatches an action, the server applies it to the state and also reacts to it as a side effect (e.g. `session/turnCancelled` aborts the active turn). This avoids a separate command→action translation layer for the common interactive cases.
 
 ### Lifecycle
 
@@ -42,12 +42,22 @@ When a client dispatches an action, the server applies it to the state and also 
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
-| `session/turnStarted` | **Yes** | User sent a message; server starts processing |
+| `session/turnStarted` | No (server-emitted) | Server started processing a turn — broadcast in response to a `startTurn` command or a server-side queued-message consume |
 | `session/delta` | No | Streaming text chunk appended to a response part by `partId` |
 | `session/responsePart` | No | New response part created (markdown, reasoning, content ref) |
 | `session/turnComplete` | No | Turn finished (assistant idle) |
 | `session/turnCancelled` | **Yes** | Turn was aborted; server stops processing |
 | `session/error` | No | Error during turn processing |
+
+::: tip Starting a turn
+Clients begin a turn by calling the `startTurn`
+[command](/reference/commands#startturn) — a request/response message that the
+server may reject (for example, when the session config is incomplete
+relative to the current schema). On success the server broadcasts a
+`session/turnStarted` action to all subscribers; from the subscription's
+point of view the same action stream is observed regardless of which client
+initiated the turn.
+:::
 
 ### Tool Calls
 
@@ -80,6 +90,30 @@ A `session/toolUpdate` action for streaming incremental tool output (e.g. termin
 
 The `pendingMessageSet` and `pendingMessageRemoved` actions carry a `kind` discriminant (`'steering'` or `'queued'`). See the [State Model — Pending Messages](/guide/state-model#pending-messages) for semantics.
 
+### Configuration
+
+| Type | Client-dispatchable? | When |
+|---|---|---|
+| `session/configChanged` | **Yes** (values only) | Client updated mutable config values, **or** the server pushed a refined schema (and optionally refined values) |
+
+`session/configChanged` is bidirectional but the two directions populate
+different fields:
+
+- **Client → Server:** `config: Record<string, unknown>` carries the new
+  values. Only properties with `sessionMutable: true` in the schema may be
+  changed. Clients MUST NOT populate the `schema` field — the server is the
+  only authority for schema and silently drops any client-supplied schema.
+- **Server → Client:** the server emits this action with `schema:
+  SessionConfigSchema` whenever it (re-)resolves the dynamic configuration
+  schema for a session — typically right after `createSession` and again
+  after a client value change. The server MAY include `config` in the same
+  emission to apply server-resolved defaults atomically.
+
+When `state.config` is currently `undefined`, an action carrying `schema`
+creates the config object using `config ?? {}` for the values. The reducer
+fully replaces `schema` whenever it is present; the existing `replace` flag
+only governs values.
+
 ### Customizations
 
 | Type | Client-dispatchable? | When |
@@ -100,16 +134,17 @@ Clients interact with the server by dispatching actions as fire-and-forget notif
   "method": "dispatchAction",
   "params": {
     "clientSeq": 1,
-    "action": { "type": "session/turnStarted", "session": "copilot:/<uuid>", ... }
+    "action": { "type": "session/titleChanged", "session": "copilot:/<uuid>", "title": "Renamed" }
   }
 }
 ```
 
 The client applies the action **optimistically** to its local state before sending. When the server echoes it back in an `ActionEnvelope`, the client reconciles (see [Write-Ahead Reconciliation](/guide/reconciliation)).
 
+To start a turn, use the `startTurn` [command](/reference/commands#startturn) instead of dispatching an action — the command form lets the server reject the request when the session config is incomplete.
+
 | Action | Server-side effect |
 |---|---|
-| `session/turnStarted` | Begins agent processing for the new turn |
 | `session/toolCallConfirmed` | Approves or denies a pending tool call; unblocks or cancels tool execution |
 | `session/turnCancelled` | Aborts the in-progress turn |
 | `session/titleChanged` | Updates the session title (rename) |

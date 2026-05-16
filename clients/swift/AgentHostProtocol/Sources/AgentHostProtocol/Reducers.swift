@@ -368,8 +368,20 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         return next
 
     case .sessionConfigChanged(let a):
-        guard var config = state.config else { return state }
-        config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
+        if state.config == nil {
+            guard let schema = a.schema else { return state }
+            var next = state
+            next.config = SessionConfigState(schema: schema, values: a.config ?? [:])
+            next.summary.modifiedAt = currentTimestamp()
+            return next
+        }
+        var config = state.config!
+        if let incoming = a.config {
+            config.values = a.replace == true ? incoming : config.values.merging(incoming) { _, new in new }
+        }
+        if let schema = a.schema {
+            config.schema = schema
+        }
         var next = state
         next.config = config
         next.summary.modifiedAt = currentTimestamp()

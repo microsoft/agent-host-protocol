@@ -887,7 +887,7 @@ pub struct SessionToolCallConfirmedAction {
 function generateActionsFile(project: Project): string {
   const sf = project.getSourceFiles().find(f => f.getBaseName() === 'actions.ts')!;
   const lines: string[] = [GENERATED_HEADER];
-  lines.push('use crate::state::{AgentInfo, ConfirmationOption, CustomizationRef, CustomizationStatus, ErrorInfo, FileEdit, ModelSelection, ResponsePart, SessionActiveClient, SessionCustomization, SessionInputAnswer, SessionInputRequest, SessionInputResponseKind, TerminalClaim, TerminalInfo, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, UserMessage, PendingMessageKind};');
+  lines.push('use crate::state::{AgentInfo, ConfirmationOption, CustomizationRef, CustomizationStatus, ErrorInfo, FileEdit, ModelSelection, ResponsePart, SessionActiveClient, SessionConfigSchema, SessionCustomization, SessionInputAnswer, SessionInputRequest, SessionInputResponseKind, TerminalClaim, TerminalInfo, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, UserMessage, PendingMessageKind};');
   lines.push('');
 
   // ActionType enum
@@ -978,10 +978,10 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
-  { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
   { name: 'SessionConfigCompletionsParams' }, { name: 'SessionConfigCompletionsResult' },
   { name: 'SessionConfigValueItem' },
   { name: 'CompletionsParams' }, { name: 'CompletionItem' }, { name: 'CompletionsResult' },
+  { name: 'StartTurnParams' }, { name: 'StartTurnInvalidConfigErrorData' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1000,7 +1000,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TerminalClaim, Turn};');
+  lines.push('use crate::state::{MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TerminalClaim, Turn, UserMessage};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1350,6 +1350,7 @@ function checkExhaustiveness(project: Project): void {
     'MessageAttachment',
     'MessageAttachmentBase',
     'ReconnectResult',
+    'StartTurnResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',

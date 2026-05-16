@@ -173,12 +173,17 @@ describe('IS_CLIENT_DISPATCHABLE', () => {
 
 describe('isClientDispatchable', () => {
   it('returns true for client-dispatchable actions', () => {
-    const action = { type: ActionType.SessionTurnStarted, session: 'x', turnId: 't', userMessage: { text: 'Hello' } } as const;
+    const action = { type: ActionType.SessionTitleChanged, session: 'x', title: 'New Title' } as const;
     assert.equal(isClientDispatchable(action), true);
   });
 
   it('returns false for server-only actions', () => {
     const action = { type: ActionType.SessionReady, session: 'x' } as const;
+    assert.equal(isClientDispatchable(action), false);
+  });
+
+  it('returns false for SessionTurnStarted (server-emitted only since v0.2.0)', () => {
+    const action = { type: ActionType.SessionTurnStarted, session: 'x', turnId: 't', userMessage: { text: 'Hello' } } as const;
     assert.equal(isClientDispatchable(action), false);
   });
 });

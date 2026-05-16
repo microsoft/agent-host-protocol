@@ -1096,7 +1096,7 @@
     },
     "SessionConfigChangedAction": {
       "type": "object",
-      "description": "Client changed a mutable config value mid-session.\n\nOnly properties with `sessionMutable: true` in the config schema may be\nchanged. The server validates and broadcasts the action; the reducer merges\nthe new values into `state.config.values`.",
+      "description": "Session configuration values and/or schema changed.\n\nTwo complementary uses:\n\n- **Client-dispatched (values).** A client mutates one or more properties.\n  Only properties with `sessionMutable: true` in the schema may be changed.\n  The server validates and broadcasts the action; the reducer merges the\n  new values into `state.config.values`. Clients MUST NOT populate the\n  `schema` field — the server is the only authority for schema and will\n  silently drop any client-supplied schema.\n\n- **Server-emitted (schema).** When the server (re-)resolves the dynamic\n  configuration schema for a session — typically right after `createSession`\n  or in response to a client value change — it broadcasts an action carrying\n  the new `schema`. The action MAY also carry refined `config` values\n  (e.g. server-resolved defaults) in the same emission, applied atomically.\n  This replaces the legacy `resolveSessionConfig` round-trip.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.SessionConfigChanged"
@@ -1108,17 +1108,20 @@
         "config": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Updated config values"
+          "description": "Updated config values. Optional so that pure schema-only emissions from\nthe server do not need to send a redundant values payload. When omitted,\n`state.config.values` is left unchanged."
         },
         "replace": {
           "type": "boolean",
-          "description": "When `true`, replaces all config values instead of merging"
+          "description": "When `true`, replaces all config values instead of merging. Affects\n`config` only; the `schema` field is always full-replacement when\npresent."
+        },
+        "schema": {
+          "$ref": "#/$defs/SessionConfigSchema",
+          "description": "New session configuration schema. When present, fully replaces\n`state.config.schema`. Server-emitted only — clients MUST NOT populate\nthis field.\n\nIf `state.config` is currently `undefined`, an action carrying `schema`\ncreates the config object using `config ?? {}` for the values."
         }
       },
       "required": [
         "type",
-        "session",
-        "config"
+        "session"
       ]
     },
     "SessionMetaChangedAction": {

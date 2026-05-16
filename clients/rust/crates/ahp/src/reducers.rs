@@ -571,15 +571,29 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             ReduceOutcome::Applied
         }
         StateAction::SessionConfigChanged(a) => {
-            let Some(config) = state.config.as_mut() else {
-                return ReduceOutcome::NoOp;
-            };
-            if a.replace.unwrap_or(false) {
-                config.values = a.config.clone();
-            } else {
-                for (k, v) in &a.config {
-                    config.values.insert(k.clone(), v.clone());
+            if state.config.is_none() {
+                let Some(schema) = a.schema.clone() else {
+                    return ReduceOutcome::NoOp;
+                };
+                state.config = Some(ahp_types::state::SessionConfigState {
+                    schema,
+                    values: a.config.clone().unwrap_or_default(),
+                });
+                touch_modified(state);
+                return ReduceOutcome::Applied;
+            }
+            let config = state.config.as_mut().unwrap();
+            if let Some(incoming) = a.config.as_ref() {
+                if a.replace.unwrap_or(false) {
+                    config.values = incoming.clone();
+                } else {
+                    for (k, v) in incoming {
+                        config.values.insert(k.clone(), v.clone());
+                    }
                 }
+            }
+            if let Some(schema) = a.schema.as_ref() {
+                config.schema = schema.clone();
             }
             touch_modified(state);
             ReduceOutcome::Applied

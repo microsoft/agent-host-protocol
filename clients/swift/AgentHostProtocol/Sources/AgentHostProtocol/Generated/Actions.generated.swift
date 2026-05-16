@@ -1062,21 +1062,34 @@ public struct SessionConfigChangedAction: Codable, Sendable {
     public var type: ActionType
     /// Session URI
     public var session: String
-    /// Updated config values
-    public var config: [String: AnyCodable]
-    /// When `true`, replaces all config values instead of merging
+    /// Updated config values. Optional so that pure schema-only emissions from
+    /// the server do not need to send a redundant values payload. When omitted,
+    /// `state.config.values` is left unchanged.
+    public var config: [String: AnyCodable]?
+    /// When `true`, replaces all config values instead of merging. Affects
+    /// `config` only; the `schema` field is always full-replacement when
+    /// present.
     public var replace: Bool?
+    /// New session configuration schema. When present, fully replaces
+    /// `state.config.schema`. Server-emitted only — clients MUST NOT populate
+    /// this field.
+    /// 
+    /// If `state.config` is currently `undefined`, an action carrying `schema`
+    /// creates the config object using `config ?? {}` for the values.
+    public var schema: SessionConfigSchema?
 
     public init(
         type: ActionType,
         session: String,
-        config: [String: AnyCodable],
-        replace: Bool? = nil
+        config: [String: AnyCodable]? = nil,
+        replace: Bool? = nil,
+        schema: SessionConfigSchema? = nil
     ) {
         self.type = type
         self.session = session
         self.config = config
         self.replace = replace
+        self.schema = schema
     }
 }
 

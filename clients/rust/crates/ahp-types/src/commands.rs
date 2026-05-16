@@ -16,7 +16,7 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary,
-    Snapshot, SnapshotState, TerminalClaim, Turn,
+    Snapshot, SnapshotState, TerminalClaim, Turn, UserMessage,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -192,8 +192,12 @@ pub struct CreateSessionParams {
     /// from the source session up to and including the specified turn's response.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fork: Option<SessionForkSource>,
-    /// Agent-specific configuration values collected via `resolveSessionConfig`.
-    /// Keys and values correspond to the schema returned by the server.
+    /// Agent-specific configuration values. Keys and values correspond to the
+    /// schema the server publishes for the session via
+    /// {@link import('./actions.js').SessionConfigChangedAction.schema}. Clients
+    /// that need to inspect the schema before creating a session SHOULD subscribe
+    /// to root state to learn provider defaults and let the server publish the
+    /// fully-resolved schema once the session is created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
     /// Eagerly claim the active client role for the new session.
@@ -554,42 +558,10 @@ pub struct DisposeTerminalParams {
     pub terminal: Uri,
 }
 
-/// Iteratively resolves the session configuration schema. The client sends the
-/// current partial session config and any user-filled metadata values. The server
-/// returns a property schema describing what additional metadata is needed,
-/// contextual to the current selections.
-///
-/// The client calls this command whenever the user changes a significant input
-/// (e.g. picks a working directory, toggles a property). Each response returns
-/// the full current property set (not a delta). The returned `values` contain
-/// server-resolved defaults to pass to `createSession`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ResolveSessionConfigParams {
-    /// Agent provider ID
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
-    /// Working directory for the session
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub working_directory: Option<Uri>,
-    /// Current user-filled configuration values
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub config: Option<JsonObject>,
-}
-
-/// Result of the `resolveSessionConfig` command.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResolveSessionConfigResult {
-    /// JSON Schema describing available configuration properties given the current context
-    pub schema: SessionConfigSchema,
-    /// Current configuration values (echoed back with server-resolved defaults applied)
-    pub values: JsonObject,
-}
-
 /// Queries the server for allowed values of a dynamic session config property.
 ///
-/// Used when a property in the schema returned by `resolveSessionConfig` has
+/// Used when a property in the schema published by the server (via
+/// {@link import('./actions.js').SessionConfigChangedAction.schema}) has
 /// `enumDynamic: true`. The client sends a search query and receives matching
 /// values with display metadata.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -692,6 +664,49 @@ pub struct CompletionItem {
 pub struct CompletionsResult {
     /// The completion items, in the order the server suggests displaying them.
     pub items: Vec<CompletionItem>,
+}
+
+/// Starts a new turn in an existing session.
+///
+/// Replaces the legacy pattern of dispatching a `session/turnStarted` action
+/// directly from the client. The command form gives the server an opportunity
+/// to **reject** a turn start — most importantly, when the session's config is
+/// incomplete relative to the current schema (e.g. a freshly-resolved schema
+/// introduced a new required property and the user pressed Enter before the
+/// client had a chance to refine its values).
+///
+/// On success the server returns `{}` and broadcasts a single
+/// {@link import('./actions.js').SessionTurnStartedAction} to all subscribers
+/// of the session — exactly as it would for the legacy action-dispatch path.
+///
+/// On failure the server returns a JSON-RPC error:
+///
+/// - `-32602` `InvalidParams` with `data: { missingRequired: string[] }`
+///   when the current `state.config.values` does not satisfy
+///   `state.config.schema` (required fields missing). Other config validation
+///   errors (wrong type, not in enum, etc.) are logic errors on the client
+///   and are also rejected with plain `InvalidParams` without structured data.
+/// - `-32004` `TurnInProgress` when the session already has an active turn.
+/// - `-32001` `SessionNotFound` when the `session` URI is unknown.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartTurnParams {
+    /// Session URI
+    pub session: Uri,
+    /// Client-chosen turn identifier
+    pub turn_id: String,
+    /// User's message
+    pub user_message: UserMessage,
+}
+
+/// Error data accompanying a `-32602` `InvalidParams` error from `startTurn`
+/// when the session's config is missing required fields. Helps clients route
+/// the user back to the offending fields in the config picker.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartTurnInvalidConfigErrorData {
+    /// Required schema property ids that are missing from `state.config.values`.
+    pub missing_required: Vec<String>,
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

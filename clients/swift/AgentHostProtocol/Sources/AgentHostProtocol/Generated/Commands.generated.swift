@@ -194,8 +194,12 @@ public struct CreateSessionParams: Codable, Sendable {
     /// Fork from an existing session. The new session is populated with content
     /// from the source session up to and including the specified turn's response.
     public var fork: SessionForkSource?
-    /// Agent-specific configuration values collected via `resolveSessionConfig`.
-    /// Keys and values correspond to the schema returned by the server.
+    /// Agent-specific configuration values. Keys and values correspond to the
+    /// schema the server publishes for the session via
+    /// {@link import('./actions.js').SessionConfigChangedAction.schema}. Clients
+    /// that need to inspect the schema before creating a session SHOULD subscribe
+    /// to root state to learn provider defaults and let the server publish the
+    /// fully-resolved schema once the session is created.
     public var config: [String: AnyCodable]?
     /// Eagerly claim the active client role for the new session.
     /// 
@@ -599,40 +603,6 @@ public struct DisposeTerminalParams: Codable, Sendable {
     }
 }
 
-public struct ResolveSessionConfigParams: Codable, Sendable {
-    /// Agent provider ID
-    public var provider: String?
-    /// Working directory for the session
-    public var workingDirectory: String?
-    /// Current user-filled configuration values
-    public var config: [String: AnyCodable]?
-
-    public init(
-        provider: String? = nil,
-        workingDirectory: String? = nil,
-        config: [String: AnyCodable]? = nil
-    ) {
-        self.provider = provider
-        self.workingDirectory = workingDirectory
-        self.config = config
-    }
-}
-
-public struct ResolveSessionConfigResult: Codable, Sendable {
-    /// JSON Schema describing available configuration properties given the current context
-    public var schema: SessionConfigSchema
-    /// Current configuration values (echoed back with server-resolved defaults applied)
-    public var values: [String: AnyCodable]
-
-    public init(
-        schema: SessionConfigSchema,
-        values: [String: AnyCodable]
-    ) {
-        self.schema = schema
-        self.values = values
-    }
-}
-
 public struct SessionConfigPropertySchema: Codable, Sendable {
     /// JSON Schema: property type
     public var type: String
@@ -854,6 +824,36 @@ public struct CompletionsResult: Codable, Sendable {
         items: [CompletionItem]
     ) {
         self.items = items
+    }
+}
+
+public struct StartTurnParams: Codable, Sendable {
+    /// Session URI
+    public var session: String
+    /// Client-chosen turn identifier
+    public var turnId: String
+    /// User's message
+    public var userMessage: UserMessage
+
+    public init(
+        session: String,
+        turnId: String,
+        userMessage: UserMessage
+    ) {
+        self.session = session
+        self.turnId = turnId
+        self.userMessage = userMessage
+    }
+}
+
+public struct StartTurnInvalidConfigErrorData: Codable, Sendable {
+    /// Required schema property ids that are missing from `state.config.values`.
+    public var missingRequired: [String]
+
+    public init(
+        missingRequired: [String]
+    ) {
+        self.missingRequired = missingRequired
     }
 }
 

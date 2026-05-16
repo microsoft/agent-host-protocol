@@ -42,9 +42,9 @@ type _ExpectedCommands =
   | 'resourceRequest'
   | 'fetchTurns'
   | 'authenticate'
-  | 'resolveSessionConfig'
   | 'sessionConfigCompletions'
-  | 'completions';
+  | 'completions'
+  | 'startTurn';
 
 /** All methods annotated `@messageType Notification` (client → server) in commands.ts. */
 type _ExpectedClientNotifications =

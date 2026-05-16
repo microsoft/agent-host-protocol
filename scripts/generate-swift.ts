@@ -999,11 +999,11 @@ const COMMAND_STRUCTS = [
   'UnsubscribeParams', 'DispatchActionParams',
   'AuthenticateParams', 'AuthenticateResult',
   'CreateTerminalParams', 'DisposeTerminalParams',
-  'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
   'SessionConfigPropertySchema', 'SessionConfigSchema',
   'SessionConfigCompletionsParams', 'SessionConfigCompletionsResult',
   'SessionConfigValueItem',
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
+  'StartTurnParams', 'StartTurnInvalidConfigErrorData',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1479,6 +1479,7 @@ function checkExhaustiveness(project: Project): void {
     'AhpError',                     // typed via JsonRpcError; not a Swift struct
     'AhpErrorDetailsMap',           // type-level mapping; not a Swift struct
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
+    'StartTurnResult',              // type alias to `null`; no Swift emission needed
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

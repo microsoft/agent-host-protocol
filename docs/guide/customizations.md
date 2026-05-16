@@ -111,7 +111,7 @@ The protocol intentionally treats plugin resolution as implementation-defined. F
 For example, a host might:
 
 1. read a workspace file such as `.vscode/agent-host.json`
-2. expose the effective plugin list through `resolveSessionConfig`
+2. expose the effective plugin list through the session config schema (pushed via `SessionConfigChangedAction.schema`)
 3. load those plugins when creating or resuming the session
 4. publish them as `SessionCustomization` entries (without `clientId`)
 

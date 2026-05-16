@@ -82,28 +82,39 @@ The initial snapshot has `lifecycle: 'creating'`. The server asynchronously init
 
 ## Sending a Message
 
-To start a turn, the client dispatches a `session/turnStarted` action. This is a **write-ahead** action — the client applies it optimistically to its local state:
+To start a turn, the client calls the `startTurn` command. The command form
+gives the server a chance to **reject** the turn — most importantly when the
+session config is incomplete relative to the latest schema (e.g. a fresh
+schema introduced a new required property the user has not yet filled in):
 
 ```jsonc
-// Client → Server (notification, fire-and-forget)
+// Client → Server (request — server may reject)
 {
   "jsonrpc": "2.0",
-  "method": "dispatchAction",
+  "id": 5,
+  "method": "startTurn",
   "params": {
-    "clientSeq": 1,
-    "action": {
-      "type": "session/turnStarted",
-      "session": "copilot:/<uuid>",
-      "turnId": "turn-1",
-      "userMessage": { "text": "Explain this code" }
-    }
+    "session": "copilot:/<uuid>",
+    "turnId": "turn-1",
+    "userMessage": { "text": "Explain this code" }
   }
 }
+
+// Server → Client (success — empty-object result; a `session/turnStarted`
+// action follows on the subscription)
+{ "jsonrpc": "2.0", "id": 5, "result": {} }
 ```
 
 The server begins agent processing and streams back actions:
 
 ```jsonc
+// Server → Client: turn started (broadcast to every subscriber)
+{ "method": "action", "params": { "envelope": {
+  "action": { "type": "session/turnStarted", "session": "copilot:/<uuid>",
+    "turnId": "turn-1", "userMessage": { "text": "Explain this code" } },
+  "serverSeq": 5
+}}}
+
 // Server → Client: streaming text delta
 { "method": "action", "params": { "envelope": {
   "action": { "type": "session/delta", "session": "copilot:/<uuid>",
@@ -142,9 +153,9 @@ When the agent invokes a tool, the server sends `session/toolStart`. If permissi
       "session": "copilot:/<uuid>",
       "turnId": "turn-1",
       "requestId": "perm-1",
-      "approved": true
-    }
-  }
+      "approved": true,
+    },
+  },
 }
 ```
 
