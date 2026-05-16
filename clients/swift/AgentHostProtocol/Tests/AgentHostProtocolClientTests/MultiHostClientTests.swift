@@ -324,6 +324,97 @@ final class MultiHostClientTests: XCTestCase {
         await multi.shutdown()
     }
 
+    // MARK: - reconnect_replay_actions_are_fanned_out_with_advanced_seq
+
+    func testReconnectReplayActionsAreFannedOutWithAdvancedSeq() async throws {
+        let mode = ReconnectResponseModeSwitch()
+        let multi = MultiHostClient()
+        let events = await multi.events()
+        let config = HostConfig(
+            id: "h",
+            label: "Host",
+            transportFactory: makeReconnectResultFactory(mode: mode)
+        ).withInitialSubscriptions([RootResourceURI, "copilot:/missing"])
+
+        _ = try await multi.add(config)
+        await waitForHostState(multi, id: "h") { $0.isConnected }
+        let initialSnapshotValue = await multi.host("h")
+        let initialSnapshot = try XCTUnwrap(initialSnapshotValue)
+        let initialGeneration = initialSnapshot.generation
+
+        await mode.set(.replayWithMissingAndLiveAction)
+        try await multi.reconnect("h")
+        await waitUntil {
+            guard let snap = await multi.host("h") else { return false }
+            return snap.generation > initialGeneration && snap.state.isConnected
+        }
+
+        var iter = events.makeAsyncIterator()
+        let replayed = try await Self.nextWithTimeout(&iter, timeout: .seconds(2))
+        let replayEnvelope = try XCTUnwrap(actionEnvelope(from: replayed))
+        XCTAssertEqual(replayed?.hostId, "h")
+        XCTAssertEqual(replayed?.resource, RootResourceURI)
+        XCTAssertEqual(replayEnvelope.serverSeq, 42)
+        guard case .rootActiveSessionsChanged(let replayAction) = replayEnvelope.action else {
+            XCTFail("expected rootActiveSessionsChanged replay action")
+            return
+        }
+        XCTAssertEqual(replayAction.activeSessions, 7)
+
+        let live = try await Self.nextWithTimeout(&iter, timeout: .seconds(2))
+        let liveEnvelope = try XCTUnwrap(actionEnvelope(from: live))
+        XCTAssertEqual(live?.hostId, "h")
+        XCTAssertEqual(live?.resource, RootResourceURI)
+        XCTAssertEqual(liveEnvelope.serverSeq, 43)
+        guard case .rootActiveSessionsChanged(let liveAction) = liveEnvelope.action else {
+            XCTFail("expected rootActiveSessionsChanged live action")
+            return
+        }
+        XCTAssertEqual(liveAction.activeSessions, 8)
+
+        let snapValue = await multi.host("h")
+        let snap = try XCTUnwrap(snapValue)
+        XCTAssertEqual(snap.serverSeq, 43)
+        XCTAssertEqual(snap.activeSessions, 8)
+        XCTAssertFalse(snap.subscriptions.contains("copilot:/missing"))
+
+        await multi.shutdown()
+    }
+
+    // MARK: - reconnect_snapshot_applies_state_and_prunes_missing_subscriptions
+
+    func testReconnectSnapshotAppliesStateAndPrunesMissingSubscriptions() async throws {
+        let mode = ReconnectResponseModeSwitch()
+        let multi = MultiHostClient()
+        let config = HostConfig(
+            id: "h",
+            label: "Host",
+            transportFactory: makeReconnectResultFactory(mode: mode)
+        ).withInitialSubscriptions([RootResourceURI, "copilot:/missing"])
+
+        _ = try await multi.add(config)
+        await waitForHostState(multi, id: "h") { $0.isConnected }
+        let initialSnapshotValue = await multi.host("h")
+        let initialSnapshot = try XCTUnwrap(initialSnapshotValue)
+        let initialGeneration = initialSnapshot.generation
+
+        await mode.set(.snapshotRootOnly)
+        try await multi.reconnect("h")
+        await waitUntil {
+            guard let snap = await multi.host("h") else { return false }
+            return snap.generation > initialGeneration && snap.state.isConnected
+        }
+
+        let snapValue = await multi.host("h")
+        let snap = try XCTUnwrap(snapValue)
+        XCTAssertEqual(snap.serverSeq, 77)
+        XCTAssertEqual(snap.activeSessions, 9)
+        XCTAssertTrue(snap.subscriptions.contains(RootResourceURI))
+        XCTAssertFalse(snap.subscriptions.contains("copilot:/missing"))
+
+        await multi.shutdown()
+    }
+
     // MARK: - shutdown_tears_down_all_hosts_and_streams
 
     func testShutdownTearsDownAllHostsAndStreams() async throws {
@@ -562,6 +653,18 @@ private actor ActorBool {
     func set(_ v: Bool) { flag = v }
 }
 
+private enum ReconnectResponseMode: Sendable {
+    case emptyReplay
+    case replayWithMissingAndLiveAction
+    case snapshotRootOnly
+}
+
+private actor ReconnectResponseModeSwitch {
+    private var mode: ReconnectResponseMode = .emptyReplay
+    var value: ReconnectResponseMode { mode }
+    func set(_ mode: ReconnectResponseMode) { self.mode = mode }
+}
+
 /// `Sendable` flag used by drop-driven tests. Using a `final class` with a
 /// lock instead of an actor so the server-side `recv` loop can poll it
 /// without `await`-ing into actor isolation between every frame.
@@ -579,6 +682,157 @@ private final class DropSignal: @unchecked Sendable {
 }
 
 private struct TestTimeoutError: Error {}
+
+private func actionEnvelope(from event: HostSubscriptionEvent?) -> ActionEnvelope? {
+    guard let event else { return nil }
+    guard case .action(let envelope) = event.event else { return nil }
+    return envelope
+}
+
+// MARK: - Reconnect-result fake host
+
+private func makeReconnectResultFactory(mode: ReconnectResponseModeSwitch) -> HostTransportFactory {
+    { _ in
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        Task { await driveReconnectResultHost(transport: serverSide, mode: mode) }
+        return clientSide
+    }
+}
+
+private func driveReconnectResultHost(
+    transport: InMemoryTransport,
+    mode: ReconnectResponseModeSwitch
+) async {
+    while !Task.isCancelled {
+        let frame: TransportMessage?
+        do {
+            frame = try await transport.recv()
+        } catch {
+            return
+        }
+        guard let frame else { return }
+        guard case .text(let text) = frame,
+              let data = text.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = object["id"] as? Int,
+              let method = object["method"] as? String
+        else { continue }
+
+        let currentMode = await mode.value
+        let result: Any
+        switch method {
+        case "initialize":
+            result = initializeResult(serverSeq: 40, activeSessions: 1)
+        case "reconnect":
+            result = reconnectResult(for: currentMode)
+        case "listSessions":
+            result = ["items": []] as [String: Any]
+        default:
+            result = [:] as [String: Any]
+        }
+
+        guard await sendResponse(to: id, result: result, on: transport) else { return }
+
+        if method == "reconnect" && currentMode == .replayWithMissingAndLiveAction {
+            guard await sendActionNotification(
+                serverSeq: 43,
+                activeSessions: 8,
+                on: transport
+            ) else { return }
+        }
+    }
+}
+
+private func initializeResult(serverSeq: Int, activeSessions: Int) -> [String: Any] {
+    [
+        "protocolVersion": "0.1.0",
+        "serverSeq": serverSeq,
+        "snapshots": [rootSnapshot(fromSeq: serverSeq, activeSessions: activeSessions)],
+    ] as [String: Any]
+}
+
+private func reconnectResult(for mode: ReconnectResponseMode) -> [String: Any] {
+    switch mode {
+    case .emptyReplay:
+        return [
+            "type": "replay",
+            "actions": [],
+            "missing": [],
+        ] as [String: Any]
+    case .replayWithMissingAndLiveAction:
+        return [
+            "type": "replay",
+            "actions": [
+                actionEnvelopeJSON(serverSeq: 42, activeSessions: 7)
+            ],
+            "missing": ["copilot:/missing"],
+        ] as [String: Any]
+    case .snapshotRootOnly:
+        return [
+            "type": "snapshot",
+            "snapshots": [rootSnapshot(fromSeq: 77, activeSessions: 9)],
+        ] as [String: Any]
+    }
+}
+
+private func rootSnapshot(fromSeq: Int, activeSessions: Int) -> [String: Any] {
+    [
+        "resource": RootResourceURI,
+        "state": [
+            "agents": [],
+            "activeSessions": activeSessions,
+        ] as [String: Any],
+        "fromSeq": fromSeq,
+    ]
+}
+
+private func actionEnvelopeJSON(serverSeq: Int, activeSessions: Int) -> [String: Any] {
+    [
+        "action": [
+            "type": "root/activeSessionsChanged",
+            "activeSessions": activeSessions,
+        ] as [String: Any],
+        "serverSeq": serverSeq,
+    ]
+}
+
+private func sendResponse(
+    to id: Int,
+    result: Any,
+    on transport: InMemoryTransport
+) async -> Bool {
+    let response: [String: Any] = [
+        "jsonrpc": "2.0",
+        "id": id,
+        "result": result,
+    ]
+    return await sendJSONObject(response, on: transport)
+}
+
+private func sendActionNotification(
+    serverSeq: Int,
+    activeSessions: Int,
+    on transport: InMemoryTransport
+) async -> Bool {
+    let notification: [String: Any] = [
+        "jsonrpc": "2.0",
+        "method": "action",
+        "params": actionEnvelopeJSON(serverSeq: serverSeq, activeSessions: activeSessions),
+    ]
+    return await sendJSONObject(notification, on: transport)
+}
+
+private func sendJSONObject(_ object: [String: Any], on transport: InMemoryTransport) async -> Bool {
+    guard let data = try? JSONSerialization.data(withJSONObject: object),
+          let text = String(data: data, encoding: .utf8)
+    else { return false }
+    do {
+        try await transport.send(.text(text))
+        return true
+    } catch {
+        return false
+    }
+}
 
 // MARK: - Failing-handshake fake host
 

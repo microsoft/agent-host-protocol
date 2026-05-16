@@ -135,7 +135,56 @@ See the `ahp::hosts` rustdoc and `crates/ahp/tests/hosts.rs` for the full surfac
 
 ## Swift
 
-A matching `MultiHostClient` is planned for the Swift SDK in a follow-up PR — same shape (`HostId`, `HostConfig`, `HostHandle`, `HostClientHandle`, `MultiHostClient.single(...)`, multicast `events`/`hostEvents`, aggregated views) so consumers can apply the same mental model to both languages. This page will be updated when the Swift implementation lands.
+The Swift API lives in the `AgentHostProtocolClient` product and mirrors the Rust shape: `HostId`, `HostConfig`, `HostHandle`, `HostClientHandle`, `MultiHostClient.single(...)`, multicast `events()`/`hostEvents()`, and aggregated views.
+
+Single-host first:
+
+```swift
+import AgentHostProtocolClient
+import Foundation
+
+let config = HostConfig(id: "local", label: "Local sessions server") { _ in
+    URLSessionWebSocketTransport(url: URL(string: "wss://localhost.example/ahp")!)
+}
+
+let (multi, handle) = try await MultiHostClient.single(config)
+print("connected to \(handle.label): \(handle.state)")
+_ = multi
+```
+
+Multi-host shape:
+
+```swift
+import AgentHostProtocolClient
+
+let multi = MultiHostClient()
+try await multi.add(HostConfig(id: "local", label: "Local", transportFactory: openLocal))
+try await multi.add(HostConfig(id: "remote", label: "Remote", transportFactory: openRemote))
+
+let events = await multi.events()
+for await event in events {
+    print("[\(event.hostId)] resource=\(String(describing: event.resource)) event=\(event.event)")
+}
+```
+
+Aggregated views are snapshot reads from the per-host summary caches:
+
+```swift
+let inbox = await multi.aggregatedSessions()
+for hosted in inbox {
+    print("[\(hosted.hostLabel)] \(hosted.summary.title) (\(hosted.hostId))")
+}
+```
+
+Advanced consumers can borrow a generation-checked handle to the underlying single-host client:
+
+```swift
+if let handle = await multi.client(for: "local") {
+    try await handle.checkAlive()
+}
+```
+
+Configuration knobs live on `HostConfig` (`withClientId`, `withInitialSubscriptions`, `withClientConfig`, `withReconnectPolicy`) and `ReconnectPolicy` (`disabled`, `immediateForever`, `exponential`). For persistent identity across launches, provide a durable `ClientIdStore`; the default `InMemoryClientIdStore` is session-stable only.
 
 ## Choosing single-host vs multi-host
 

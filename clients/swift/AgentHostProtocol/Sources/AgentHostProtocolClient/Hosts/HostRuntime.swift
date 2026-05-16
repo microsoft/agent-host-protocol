@@ -306,31 +306,16 @@ internal final class HostRuntime: Sendable {
         let priorSeq = priorSnapshot.serverSeq
 
         var initResult: InitializeResult? = nil
+        var reconnectResult: ReconnectResult? = nil
         var newSeq = priorSeq
 
         if canReconnect {
             do {
-                _ = try await client.reconnect(
+                reconnectResult = try await client.reconnect(
                     clientId: clientId,
                     lastSeenServerSeq: priorSeq,
                     subscriptions: priorSubscriptions
                 )
-                // NOTE: the `ReconnectResult` is intentionally discarded
-                // here, mirroring the Rust `ahp::hosts` runtime. Three
-                // related gaps follow from this and are tracked together
-                // for both SDKs as a follow-up:
-                //   1. Replay actions returned synchronously by the server
-                //      are not fanned out (live `notify/action` frames after
-                //      reconnect still reach consumers normally).
-                //   2. `replay.missing` URIs (subscriptions the server
-                //      cannot resume) are not pruned from the replay set,
-                //      so the next reconnect re-asks for them.
-                //   3. `snapshot` results are not applied to the per-host
-                //      root mirror / `serverSeq`, so `HostHandle` can lag
-                //      behind the post-snapshot state until live events
-                //      catch up.
-                // All three should be fixed atomically across SDKs — see the
-                // parent multi-host series for tracking.
             } catch let error as AHPClientError {
                 if case .rpc = error {
                     let init1 = try await client.initialize(
@@ -391,9 +376,62 @@ internal final class HostRuntime: Sendable {
             return generation
         }()
 
+        if let reconnectResult {
+            await applyReconnectResult(reconnectResult, priorSubscriptions: priorSubscriptions)
+        }
+
         await transition(to: .connected, error: nil)
         await hostEventSink(.connected(config.id, generation: newGeneration))
         return ConnectionStreams(events: events, stateChanges: stateChanges)
+    }
+
+    /// Apply the result of a successful `reconnect` call.
+    ///
+    /// Replay envelopes use the same path as live action envelopes so host
+    /// mirrors and event consumers observe missed actions in `serverSeq` order.
+    /// Snapshot results refresh the per-host root mirror and cursor. In both
+    /// cases, subscriptions the server cannot resume are removed from the
+    /// replay set before the next reconnect.
+    private func applyReconnectResult(
+        _ result: ReconnectResult,
+        priorSubscriptions: [String]
+    ) async {
+        switch result {
+        case .replay(let replay):
+            for envelope in replay.actions {
+                let resource = actionResource(for: envelope.action)
+                await applyAction(envelope)
+                let hostEvent = HostSubscriptionEvent(
+                    hostId: config.id,
+                    resource: resource,
+                    event: .action(envelope)
+                )
+                await fanOut(hostEvent)
+            }
+            if !replay.missing.isEmpty {
+                await shared.update { state in
+                    state.subscriptions.removeAll { replay.missing.contains($0) }
+                }
+            }
+        case .snapshot(let snapshotResult):
+            await shared.update { state in
+                var surviving: [String] = []
+                surviving.reserveCapacity(snapshotResult.snapshots.count)
+                for snapshot in snapshotResult.snapshots {
+                    if snapshot.fromSeq > state.serverSeq {
+                        state.serverSeq = snapshot.fromSeq
+                    }
+                    if snapshot.resource == RootResourceURI,
+                       case .root(let root) = snapshot.state {
+                        state.rootState = root
+                    }
+                    surviving.append(snapshot.resource)
+                }
+                state.subscriptions.removeAll { uri in
+                    priorSubscriptions.contains(uri) && !surviving.contains(uri)
+                }
+            }
+        }
     }
 
     /// Drain commands and the event pump until the connection ends, the user
