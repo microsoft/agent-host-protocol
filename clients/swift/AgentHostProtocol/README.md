@@ -172,14 +172,20 @@ Apps should normally centralize protocol subscriptions in one owner, such as an 
 
 `AHPTransport` is the transport abstraction. The default `URLSessionWebSocketTransport` is suitable for many `wss://` deployments and simple clients.
 
-For iOS/macOS local development, LAN, and Tailscale-style `ws://` targets, a native `NWConnection` transport can be a better fit because it avoids `URLSession` ATS behavior and can expose explicit WebSocket handshake and ping behavior. The example iOS app currently uses a native transport for this reason. A reusable native transport is a good follow-up for this package.
+For iOS/macOS local development, LAN, and Tailscale-style `ws://` targets, `NWConnectionWebSocketTransport` uses Network.framework directly. It avoids `URLSession` ATS behavior for local `ws://` development, performs the WebSocket upgrade explicitly, and exposes `sendPing(...)` so higher layers can build opt-in liveness policy.
+
+```swift
+let transport = NWConnectionWebSocketTransport(
+    url: URL(string: "ws://192.168.1.42:8080/ahp")!,
+    headers: ["Authorization": "Bearer \(token)"]
+)
+```
 
 Prefer inbound `.text` or `.binary` frames from transports. Inbound `.parsed` frames may bypass the client's raw JSON parsing path that preserves Apple `NSNumber` Bool/Int distinctions.
 
 ## Next Steps For This Client
 
-- Add or promote a reusable native `NWConnection` WebSocket transport.
-- Add optional keepalive/liveness configuration for transports that support ping.
+- Add optional keepalive/liveness configuration that can use transports with ping support.
 - Expose caller-owned `clientSeq` dispatch through `MultiHostClient` or `HostClientHandle` so app-owned outboxes do not need to borrow `rawClient()`.
 - Add protocol transcript fixtures, similar in spirit to the reducer fixture tests, to validate client/server flows across languages.
 - Migrate the example iOS app through an adapter around `MultiHostClient`/`AHPClient` while keeping app policy in `AppStore`.

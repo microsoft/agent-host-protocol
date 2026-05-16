@@ -1,10 +1,9 @@
 // URLSessionWebSocketTransport — default WebSocket transport.
 //
 // Wraps `URLSessionWebSocketTask`. Suitable for `wss://` deployments and
-// `ws://` targets where ATS isn't a problem; consumers that need to bypass
-// ATS for `ws://` LAN/Tailscale targets should provide their own
-// `AHPTransport` (the example app uses a native `NWConnection` impl for that
-// reason).
+// `ws://` targets where ATS isn't a problem. Consumers that need native
+// Network.framework behavior for `ws://` LAN/Tailscale targets can use
+// `NWConnectionWebSocketTransport`.
 
 import Foundation
 

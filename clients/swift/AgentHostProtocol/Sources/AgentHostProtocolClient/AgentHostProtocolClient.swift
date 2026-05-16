@@ -3,6 +3,7 @@
 // This module ships:
 //   - `AHPTransport`: a pluggable async transport protocol (text/binary/parsed framing).
 //   - `URLSessionWebSocketTransport`: default WebSocket implementation.
+//   - `NWConnectionWebSocketTransport`: native Network.framework WebSocket implementation.
 //   - `InMemoryTransport`: paired in-memory transport for tests.
 //   - `AHPClient`: an actor that owns request/response correlation, subscription
 //     fan-out, a top-level `events` tap, and connection-state changes.

@@ -152,6 +152,8 @@ print("connected to \(handle.label): \(handle.state)")
 _ = multi
 ```
 
+For local `ws://` development targets, use `NWConnectionWebSocketTransport` in the same `HostConfig` transport factory.
+
 Multi-host shape:
 
 ```swift
