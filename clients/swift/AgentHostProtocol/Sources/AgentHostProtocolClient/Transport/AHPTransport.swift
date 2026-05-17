@@ -199,3 +199,13 @@ public protocol AHPTransport: AnyObject, Sendable {
     /// Close the transport and release any underlying resources.
     func close() async throws
 }
+
+/// Optional capability for transports that can send protocol-level pings.
+///
+/// `AHPClient` uses this only when `AHPClientConfig.keepAlive` is enabled.
+/// Transports that do not support pings can ignore the capability entirely;
+/// keepalive is simply unavailable for those transports.
+public protocol AHPKeepAliveTransport: AHPTransport {
+    /// Send a transport-level ping and return after the matching pong arrives.
+    func sendPing(timeout: Duration) async throws
+}

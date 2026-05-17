@@ -154,6 +154,15 @@ _ = multi
 
 For local `ws://` development targets, use `NWConnectionWebSocketTransport` in the same `HostConfig` transport factory.
 
+Opt-in keepalive is forwarded through `HostConfig.withClientConfig(...)` to the underlying single-host client. Ping failures surface as transport drops, so the host's reconnect policy handles recovery:
+
+```swift
+let config = HostConfig(id: "local", label: "Local", transportFactory: openLocal)
+    .withClientConfig(AHPClientConfig(
+        keepAlive: .enabled(interval: .seconds(30), timeout: .seconds(5))
+    ))
+```
+
 Multi-host shape:
 
 ```swift
@@ -183,6 +192,17 @@ Advanced consumers can borrow a generation-checked handle to the underlying sing
 ```swift
 if let handle = await multi.client(for: "local") {
     try await handle.checkAlive()
+}
+```
+
+Apps that own an outbound replay queue can preserve stable `clientSeq` values without borrowing the raw client:
+
+```swift
+let sent = try await multi.dispatch(host: "local", action: action, clientSeq: nextClientSeq)
+print(sent.clientSeq)
+
+if let handle = await multi.client(for: "local") {
+    try await handle.dispatch(action, clientSeq: nextClientSeq)
 }
 ```
 

@@ -135,5 +135,6 @@ final class AHPClientConfigTests: XCTestCase {
         let config = AHPClientConfig.default
         XCTAssertEqual(config.subscriptionBufferSize, 256)
         XCTAssertEqual(config.requestTimeout, .seconds(30))
+        XCTAssertEqual(config.keepAlive, .disabled)
     }
 }

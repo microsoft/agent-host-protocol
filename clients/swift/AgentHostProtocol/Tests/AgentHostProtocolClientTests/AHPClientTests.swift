@@ -360,6 +360,54 @@ final class AHPClientTests: XCTestCase {
         await client.shutdown()
     }
 
+    // MARK: - keepalive
+
+    func testKeepAlivePingsCapableTransport() async throws {
+        let transport = PingCountingTransport()
+        let client = AHPClient(
+            transport: transport,
+            config: AHPClientConfig(keepAlive: .enabled(
+                interval: .milliseconds(10),
+                timeout: .milliseconds(10)
+            ))
+        )
+
+        try await client.connect()
+        await waitUntil { await transport.pingCount() >= 2 }
+
+        await client.shutdown()
+    }
+
+    func testKeepAliveDisabledDoesNotPing() async throws {
+        let transport = PingCountingTransport()
+        let client = AHPClient(transport: transport, config: AHPClientConfig(keepAlive: .disabled))
+
+        try await client.connect()
+        try? await Task.sleep(for: .milliseconds(50))
+
+        let pingCount = await transport.pingCount()
+        XCTAssertEqual(pingCount, 0)
+
+        await client.shutdown()
+    }
+
+    func testKeepAliveFailureDisconnectsClient() async throws {
+        let transport = PingCountingTransport(failPing: true)
+        let client = AHPClient(
+            transport: transport,
+            config: AHPClientConfig(keepAlive: .enabled(
+                interval: .milliseconds(10),
+                timeout: .milliseconds(10)
+            ))
+        )
+
+        try await client.connect()
+        await waitUntil { await client.connectionState == .disconnected }
+
+        let closeCount = await transport.closeCount()
+        XCTAssertEqual(closeCount, 1)
+    }
+
 
     private struct ParsedRequest { let id: Int; let method: String; let params: AnyCodable? }
 
@@ -423,4 +471,46 @@ final class AHPClientTests: XCTestCase {
 private enum TestError: Error {
     case unexpectedClose
     case unexpectedMessage(String)
+}
+
+private actor PingCountingTransport: AHPKeepAliveTransport {
+    private let failPing: Bool
+    private var closed = false
+    private var pings = 0
+    private var closes = 0
+    private var recvContinuation: CheckedContinuation<TransportMessage?, Error>?
+
+    init(failPing: Bool = false) {
+        self.failPing = failPing
+    }
+
+    func send(_ message: TransportMessage) async throws {
+        if closed { throw TransportError.closed }
+    }
+
+    func recv() async throws -> TransportMessage? {
+        if closed { return nil }
+        return try await withCheckedThrowingContinuation { continuation in
+            recvContinuation = continuation
+        }
+    }
+
+    func close() async throws {
+        guard !closed else { return }
+        closed = true
+        closes += 1
+        recvContinuation?.resume(returning: nil)
+        recvContinuation = nil
+    }
+
+    func sendPing(timeout: Duration) async throws {
+        if closed { throw TransportError.closed }
+        pings += 1
+        if failPing {
+            throw TransportError.io("ping failed")
+        }
+    }
+
+    func pingCount() -> Int { pings }
+    func closeCount() -> Int { closes }
 }

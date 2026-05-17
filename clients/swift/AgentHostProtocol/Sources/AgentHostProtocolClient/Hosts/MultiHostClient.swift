@@ -197,6 +197,17 @@ public actor MultiHostClient {
         return try await runtime.dispatch(action)
     }
 
+    /// Dispatch an action on `host` with a caller-owned `clientSeq`. Use this
+    /// when an app-level outbox needs stable sequence numbers across
+    /// reconnect/replay.
+    @discardableResult
+    public func dispatch(host: HostId, action: StateAction, clientSeq: Int) async throws -> DispatchHandle {
+        guard let runtime = hosts[host] else {
+            throw HostError.unknownHost(host)
+        }
+        return try await runtime.dispatch(action, clientSeq: clientSeq)
+    }
+
     // MARK: - Event multicast
 
     /// Subscribe to a fan-in stream of every inbound event from every

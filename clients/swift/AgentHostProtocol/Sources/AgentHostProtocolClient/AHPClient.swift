@@ -74,6 +74,7 @@ public actor AHPClient {
     /// otherwise erase on Apple platforms.
     private var outboundContinuation: AsyncStream<Data>.Continuation?
     private var writerTask: Task<Void, Never>?
+    private var keepAliveTask: Task<Void, Never>?
 
     // ── Receive loop ─────────────────────────────────────────────────────
     private var receiveTask: Task<Void, Never>?
@@ -142,6 +143,8 @@ public actor AHPClient {
             await self?.runReceiveLoop()
         }
 
+        startKeepAliveIfNeeded()
+
         await transition(to: .connected)
     }
 
@@ -159,6 +162,8 @@ public actor AHPClient {
         outboundContinuation = nil
         writerTask?.cancel()
         writerTask = nil
+        keepAliveTask?.cancel()
+        keepAliveTask = nil
 
         receiveTask?.cancel()
         receiveTask = nil
@@ -171,6 +176,30 @@ public actor AHPClient {
         // Final state transition (also fans out).
         await transition(to: .disconnected)
         finishAllStateListeners()
+    }
+
+    private func startKeepAliveIfNeeded() {
+        keepAliveTask?.cancel()
+        keepAliveTask = nil
+
+        guard case .ping(let interval, let timeout) = config.keepAlive,
+              let pingTransport = transport as? AHPKeepAliveTransport
+        else { return }
+
+        keepAliveTask = Task { [weak self, pingTransport] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: interval)
+                    if Task.isCancelled { return }
+                    if self == nil { return }
+                    try await pingTransport.sendPing(timeout: timeout)
+                } catch {
+                    if Task.isCancelled { return }
+                    await self?.handleTransportFailure(error)
+                    return
+                }
+            }
+        }
     }
 
     // MARK: - Multicast taps
@@ -680,7 +709,7 @@ public actor AHPClient {
     /// Invoked when the receive loop terminates (clean close: `error == nil`,
     /// abnormal: `error != nil`) or the writer hits a send failure.
     private func handleTransportFailure(_ error: Error?) async {
-        if didShutdown { return }
+        if didShutdown || connectionState == .disconnected { return }
         let clientError: AHPClientError
         if let transportError = error as? TransportError {
             clientError = .transport(transportError)
@@ -694,6 +723,8 @@ public actor AHPClient {
         outboundContinuation = nil
         writerTask?.cancel()
         writerTask = nil
+        keepAliveTask?.cancel()
+        keepAliveTask = nil
         receiveTask?.cancel()
         receiveTask = nil
         try? await transport.close()

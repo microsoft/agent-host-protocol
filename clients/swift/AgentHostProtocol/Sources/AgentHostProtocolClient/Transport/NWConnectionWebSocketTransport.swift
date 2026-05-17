@@ -15,7 +15,7 @@ import Network
 /// Client-to-server frames are masked as required by RFC 6455. Incoming text
 /// frames are returned as `.text`, and binary frames are returned as `.binary`
 /// so `AHPClient` can preserve its raw JSON parsing path.
-public actor NWConnectionWebSocketTransport: AHPTransport {
+public actor NWConnectionWebSocketTransport: AHPTransport, AHPKeepAliveTransport {
     private struct ParsedFrame {
         let fin: Bool
         let opcode: UInt8
@@ -175,9 +175,10 @@ public actor NWConnectionWebSocketTransport: AHPTransport {
 
     /// Send a WebSocket ping and wait for the matching pong.
     ///
-    /// `AHPClient` does not call this directly today. Higher layers can opt in
-    /// and decide how ping failures should influence reconnect policy.
-    public func sendPing(timeoutNanoseconds: UInt64 = 5_000_000_000) async throws {
+    /// `AHPClient` calls this when `AHPClientConfig.keepAlive` is enabled.
+    /// Other callers may also opt in and decide how ping failures should
+    /// influence their own reconnect policy.
+    public func sendPing(timeout: Duration) async throws {
         do {
             try await connectIfNeeded()
             guard pingContinuation == nil else { return }
@@ -187,7 +188,7 @@ public actor NWConnectionWebSocketTransport: AHPTransport {
                 pingContinuation = continuation
                 pingTimeoutTask?.cancel()
                 pingTimeoutTask = Task { [weak self] in
-                    try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                    try? await Task.sleep(for: timeout)
                     await self?.timeoutPendingPing()
                 }
 
@@ -202,6 +203,10 @@ public actor NWConnectionWebSocketTransport: AHPTransport {
         } catch {
             throw mapError(error)
         }
+    }
+
+    public func sendPing(timeoutNanoseconds: UInt64 = 5_000_000_000) async throws {
+        try await sendPing(timeout: .nanoseconds(Int64(clamping: timeoutNanoseconds)))
     }
 
     // MARK: - Connection lifecycle

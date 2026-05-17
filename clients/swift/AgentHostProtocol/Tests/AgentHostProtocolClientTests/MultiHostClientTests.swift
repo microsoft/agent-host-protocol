@@ -132,6 +132,39 @@ final class MultiHostClientTests: XCTestCase {
         await multi.shutdown()
     }
 
+    // MARK: - dispatch_can_use_explicit_client_seq
+
+    func testDispatchCanUseExplicitClientSeqThroughMultiHostSurfaces() async throws {
+        let recorder = DispatchRecorder()
+        let factory: HostTransportFactory = { _ in
+            let (clientSide, serverSide) = InMemoryTransport.pair()
+            _ = startDispatchRecordingHost(transport: serverSide, recorder: recorder)
+            return clientSide
+        }
+
+        let multi = MultiHostClient()
+        _ = try await multi.add(HostConfig(id: "local", label: "Local", transportFactory: factory))
+        await waitForHostState(multi, id: "local") { $0.isConnected }
+
+        let action = StateAction.sessionTitleChanged(SessionTitleChangedAction(
+            type: .sessionTitleChanged,
+            session: "copilot:/s1",
+            title: "From app outbox"
+        ))
+
+        let first = try await multi.dispatch(host: "local", action: action, clientSeq: 42)
+        XCTAssertEqual(first.clientSeq, 42)
+
+        let handleValue = await multi.client(for: "local")
+        let handle = try XCTUnwrap(handleValue)
+        let second = try await handle.dispatch(action, clientSeq: 77)
+        XCTAssertEqual(second.clientSeq, 77)
+
+        await waitUntil { await recorder.clientSeqs() == [42, 77] }
+
+        await multi.shutdown()
+    }
+
     // MARK: - remove_host_terminates_supervisor_and_emits_event
 
     func testRemoveHostTerminatesSupervisorAndEmitsEvent() async throws {
@@ -831,6 +864,67 @@ private func sendJSONObject(_ object: [String: Any], on transport: InMemoryTrans
         return true
     } catch {
         return false
+    }
+}
+
+// MARK: - Dispatch-recording fake host
+
+private func startDispatchRecordingHost(
+    transport: InMemoryTransport,
+    recorder: DispatchRecorder
+) -> Task<Void, Never> {
+    Task {
+        while !Task.isCancelled {
+            let frame: TransportMessage?
+            do {
+                frame = try await transport.recv()
+            } catch {
+                return
+            }
+            guard let frame else { return }
+            guard case .text(let text) = frame,
+                  let data = text.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let method = object["method"] as? String
+            else { continue }
+
+            if let id = object["id"] as? Int {
+                switch method {
+                case "initialize":
+                    _ = await sendResponse(
+                        to: id,
+                        result: initializeResult(serverSeq: 0, activeSessions: 0),
+                        on: transport
+                    )
+                case "reconnect":
+                    _ = await sendResponse(
+                        to: id,
+                        result: ["type": "replay", "actions": [], "missing": []] as [String: Any],
+                        on: transport
+                    )
+                case "listSessions":
+                    _ = await sendResponse(to: id, result: ["items": []] as [String: Any], on: transport)
+                default:
+                    _ = await sendResponse(to: id, result: [:] as [String: Any], on: transport)
+                }
+            } else if method == "dispatchAction",
+                      let params = object["params"] as? [String: Any],
+                      let clientSeq = params["clientSeq"] as? Int {
+                await recorder.append(clientSeq)
+            }
+        }
+    }
+}
+
+private actor DispatchRecorder {
+    private var seqs: [Int] = []
+
+    func append(_ clientSeq: Int) {
+        seqs.append(clientSeq)
+    }
+
+    func clientSeqs() -> [Int] {
+        seqs
     }
 }
 

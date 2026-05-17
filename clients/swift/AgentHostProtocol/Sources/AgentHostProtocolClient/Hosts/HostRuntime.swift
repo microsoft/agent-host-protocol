@@ -145,9 +145,9 @@ internal final class HostRuntime: Sendable {
     /// Dispatch an action through the current connection. Throws
     /// `HostError.hostShutDown` if the host is disconnected.
     @discardableResult
-    func dispatch(_ action: StateAction) async throws -> DispatchHandle {
+    func dispatch(_ action: StateAction, clientSeq: Int? = nil) async throws -> DispatchHandle {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<DispatchHandle, Error>) in
-            cmdContinuation.yield(.dispatch(action: action, reply: continuation))
+            cmdContinuation.yield(.dispatch(action: action, clientSeq: clientSeq, reply: continuation))
         }
     }
 
@@ -492,8 +492,8 @@ internal final class HostRuntime: Sendable {
             case .unsubscribe(let uri, let reply):
                 let result = await handleUnsubscribe(uri)
                 resumeCommand(reply: reply, with: result)
-            case .dispatch(let action, let reply):
-                let result = await handleDispatch(action)
+            case .dispatch(let action, let clientSeq, let reply):
+                let result = await handleDispatch(action, clientSeq: clientSeq)
                 resumeCommand(reply: reply, with: result)
             }
         }
@@ -520,7 +520,7 @@ internal final class HostRuntime: Sendable {
             case .unsubscribe(let uri, let reply):
                 await shared.removeSubscription(uri)
                 reply.resume(returning: ())
-            case .dispatch(_, let reply):
+            case .dispatch(_, _, let reply):
                 reply.resume(throwing: HostError.hostShutDown(config.id))
             }
         }
@@ -563,7 +563,7 @@ internal final class HostRuntime: Sendable {
             case .unsubscribe(let uri, let reply):
                 await shared.removeSubscription(uri)
                 reply.resume(returning: ())
-            case .dispatch(_, let reply):
+            case .dispatch(_, _, let reply):
                 reply.resume(throwing: HostError.hostShutDown(config.id))
             }
         }
@@ -654,12 +654,17 @@ internal final class HostRuntime: Sendable {
         return .success(())
     }
 
-    private func handleDispatch(_ action: StateAction) async -> Result<DispatchHandle, HostError> {
+    private func handleDispatch(_ action: StateAction, clientSeq: Int?) async -> Result<DispatchHandle, HostError> {
         guard let client = await shared.currentClient() else {
             return .failure(.hostShutDown(config.id))
         }
         do {
-            let handle = try await client.dispatch(action)
+            let handle: DispatchHandle
+            if let clientSeq {
+                handle = try await client.dispatch(action, clientSeq: clientSeq)
+            } else {
+                handle = try await client.dispatch(action)
+            }
             return .success(handle)
         } catch let error as AHPClientError {
             return .failure(.client(error))
@@ -715,7 +720,7 @@ internal enum HostCommand: Sendable {
     case manualReconnect(reply: CheckedContinuation<Void, Error>)
     case subscribe(uri: String, reply: CheckedContinuation<SubscribeResult, Error>)
     case unsubscribe(uri: String, reply: CheckedContinuation<Void, Error>)
-    case dispatch(action: StateAction, reply: CheckedContinuation<DispatchHandle, Error>)
+    case dispatch(action: StateAction, clientSeq: Int?, reply: CheckedContinuation<DispatchHandle, Error>)
 }
 
 /// Outcome of one of the supervisor's drain loops.

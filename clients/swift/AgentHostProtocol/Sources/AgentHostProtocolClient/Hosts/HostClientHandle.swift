@@ -61,6 +61,18 @@ public struct HostClientHandle: Sendable {
         }
     }
 
+    /// Dispatch an action with a caller-owned `clientSeq`, refusing if the
+    /// connection has been replaced by a reconnect.
+    @discardableResult
+    public func dispatch(_ action: StateAction, clientSeq: Int) async throws -> DispatchHandle {
+        try await checkAlive()
+        do {
+            return try await client.dispatch(action, clientSeq: clientSeq)
+        } catch let error as AHPClientError {
+            throw HostError.client(error)
+        }
+    }
+
     /// Issue an arbitrary JSON-RPC request through this connection, refusing
     /// if the connection has been replaced by a reconnect.
     public func request<P: Encodable & Sendable, R: Decodable & Sendable>(

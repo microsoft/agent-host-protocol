@@ -129,7 +129,7 @@ A typical app-level reconnect flow is:
 
 `dispatchAction` is a fire-and-forget notification. The server acknowledgement comes later when a live or replayed `ActionEnvelope` includes the same `origin.clientId` and `origin.clientSeq`.
 
-`AHPClient.dispatch(_:)` is a convenience for simple clients; it assigns `clientSeq` internally and returns a `DispatchHandle` with the sequence that was sent.
+`AHPClient.dispatch(_:)` is a convenience for simple clients; it assigns `clientSeq` internally and returns a `DispatchHandle` with the sequence that was sent. `AHPClient.dispatch(_:clientSeq:)`, `MultiHostClient.dispatch(host:action:clientSeq:)`, and `HostClientHandle.dispatch(_:clientSeq:)` let higher layers supply stable sequence numbers directly.
 
 Apps that need to replay unacknowledged local actions after reconnect should own their outbound queue and send explicit `clientSeq` values:
 
@@ -142,12 +142,12 @@ struct PendingOutboundAction {
 var nextClientSeq = 1
 var pendingOutboundActions: [PendingOutboundAction] = []
 
-func dispatchFromApp(_ action: StateAction, client: AHPClient) async throws {
+func dispatchFromApp(_ action: StateAction, multi: MultiHostClient) async throws {
     let seq = nextClientSeq
     nextClientSeq += 1
     pendingOutboundActions.append(PendingOutboundAction(clientSeq: seq, action: action))
 
-    try await client.dispatch(action, clientSeq: seq)
+    try await multi.dispatch(host: "local", action: action, clientSeq: seq)
 }
 
 func acknowledge(_ envelope: ActionEnvelope, clientId: String) {
@@ -172,7 +172,7 @@ Apps should normally centralize protocol subscriptions in one owner, such as an 
 
 `AHPTransport` is the transport abstraction. The default `URLSessionWebSocketTransport` is suitable for many `wss://` deployments and simple clients.
 
-For iOS/macOS local development, LAN, and Tailscale-style `ws://` targets, `NWConnectionWebSocketTransport` uses Network.framework directly. It avoids `URLSession` ATS behavior for local `ws://` development, performs the WebSocket upgrade explicitly, and exposes `sendPing(...)` so higher layers can build opt-in liveness policy.
+For iOS/macOS local development, LAN, and Tailscale-style `ws://` targets, `NWConnectionWebSocketTransport` uses Network.framework directly. It avoids `URLSession` ATS behavior for local `ws://` development, performs the WebSocket upgrade explicitly, and exposes WebSocket ping support through `AHPKeepAliveTransport`.
 
 ```swift
 let transport = NWConnectionWebSocketTransport(
@@ -181,11 +181,17 @@ let transport = NWConnectionWebSocketTransport(
 )
 ```
 
+Keepalive is opt-in on `AHPClientConfig`. When enabled and the transport conforms to `AHPKeepAliveTransport`, ping failure is treated as a transport failure so the app or `MultiHostClient` reconnect policy can recover:
+
+```swift
+let config = AHPClientConfig(
+    keepAlive: .enabled(interval: .seconds(30), timeout: .seconds(5))
+)
+```
+
 Prefer inbound `.text` or `.binary` frames from transports. Inbound `.parsed` frames may bypass the client's raw JSON parsing path that preserves Apple `NSNumber` Bool/Int distinctions.
 
 ## Next Steps For This Client
 
-- Add optional keepalive/liveness configuration that can use transports with ping support.
-- Expose caller-owned `clientSeq` dispatch through `MultiHostClient` or `HostClientHandle` so app-owned outboxes do not need to borrow `rawClient()`.
 - Add protocol transcript fixtures, similar in spirit to the reducer fixture tests, to validate client/server flows across languages.
 - Migrate the example iOS app through an adapter around `MultiHostClient`/`AHPClient` while keeping app policy in `AppStore`.
