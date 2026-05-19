@@ -29,6 +29,9 @@ actor AHPConnection {
     enum ConnectionError: Error, LocalizedError {
         case notConnected
         case requestFailed(code: Int, message: String)
+        /// JSON-RPC `AuthRequired` (-32007) carrying decoded resources from `data`.
+        /// `resources` is empty when the server omitted the structured payload.
+        case authRequired(message: String, resources: [ProtectedResourceMetadata])
         case decodingFailed(String)
         case timeout
         case connectTimeout
@@ -37,6 +40,7 @@ actor AHPConnection {
             switch self {
             case .notConnected: "Not connected to server"
             case .requestFailed(let code, let msg): "Server error \(code): \(msg)"
+            case .authRequired(let msg, _): "Authentication required: \(msg)"
             case .decodingFailed(let detail): "Decoding failed: \(detail)"
             case .timeout: "Request timed out"
             case .connectTimeout: "Could not reach server"
@@ -213,6 +217,15 @@ actor AHPConnection {
 
     func createSession(params: CreateSessionParams) async throws {
         let _: AnyCodable? = try await sendRequest(method: "createSession", params: params)
+    }
+
+    /// Push a bearer token for a protected resource so subsequent agent
+    /// requests can succeed. Wraps the `authenticate` JSON-RPC command.
+    func authenticate(resource: String, token: String) async throws {
+        let _: AuthenticateResult = try await sendRequest(
+            method: "authenticate",
+            params: AuthenticateParams(resource: resource, token: token)
+        )
     }
 
     func disposeSession(session: String) async throws {
@@ -550,7 +563,11 @@ actor AHPConnection {
         switch error {
         case .transport(let transportError):
             return .requestFailed(code: -1, message: String(describing: transportError))
-        case .rpc(let code, let message, _):
+        case .rpc(let code, let message, let data):
+            if code == AhpErrorCodes.authRequired {
+                let resources = Self.decodeAuthRequiredResources(from: data)
+                return .authRequired(message: message, resources: resources)
+            }
             return .requestFailed(code: code, message: message)
         case .decoding(let detail):
             return .decodingFailed(detail)
@@ -558,6 +575,17 @@ actor AHPConnection {
             return .notConnected
         case .requestTimeout:
             return .timeout
+        }
+    }
+
+    private static func decodeAuthRequiredResources(from data: AnyCodable?) -> [ProtectedResourceMetadata] {
+        guard let data else { return [] }
+        do {
+            let json = try JSONEncoder().encode(data)
+            let decoded = try JSONDecoder().decode(AuthRequiredErrorData.self, from: json)
+            return decoded.resources
+        } catch {
+            return []
         }
     }
 

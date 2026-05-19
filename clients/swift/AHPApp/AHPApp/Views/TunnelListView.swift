@@ -175,26 +175,27 @@ struct TunnelListView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 4)
 
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             Button {
                                 UIPasteboard.general.string = dcr.userCode
                             } label: {
                                 Label("Copy Code", systemImage: "doc.on.doc")
+                                    .font(.subheadline.weight(.medium))
                                     .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.regular)
 
                             if let url = URL(string: dcr.verificationUri) {
                                 Link(destination: url) {
-                                    Label("Open GitHub", systemImage: "safari")
+                                    Label("Open GitHub", systemImage: "arrow.up.forward")
+                                        .font(.subheadline.weight(.medium))
                                         .frame(maxWidth: .infinity)
                                 }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.regular)
                             }
                         }
-                        .padding(.top, 2)
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .buttonBorderShape(.roundedRectangle(radius: 10))
+                        .padding(.top, 4)
 
                         if isPolling {
                             HStack {

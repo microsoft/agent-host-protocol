@@ -59,6 +59,11 @@ struct ChatView: View {
             ZStack(alignment: .bottomTrailing) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
+                        if store.currentSessionRequiresAuth {
+                            AuthRequiredPanel(session: store.currentSession)
+                                .padding(.top, 24)
+                        }
+
                         if let session = store.currentSession {
                             // Completed turns
                             ForEach(session.turns, id: \.id) { turn in
@@ -920,6 +925,154 @@ struct ReconnectButton: View {
             }
         }
         .disabled(isReconnecting)
+    }
+}
+
+// MARK: - AuthRequiredPanel
+
+/// Inline panel shown in the chat view when the selected session's agent has
+/// rejected our request with `AuthRequired` (-32007). Lets the user paste a
+/// bearer token (e.g. a GitHub PAT) that we forward to the server via the
+/// `authenticate` JSON-RPC command, then retries the subscribe.
+private struct AuthRequiredPanel: View {
+    @Environment(AppStore.self) private var store
+    let session: SessionState?
+
+    @State private var token: String = ""
+    @FocusState private var tokenFocused: Bool
+
+    private var providerLabel: String {
+        if let provider = session?.summary.provider, !provider.isEmpty {
+            return provider
+        }
+        return "this agent"
+    }
+
+    private var resources: [ProtectedResourceMetadata] {
+        store.currentAuthRequiredResources
+    }
+
+    private var primaryResource: ProtectedResourceMetadata? { resources.first }
+
+    private var isAuthenticating: Bool {
+        guard let uri = store.selectedSessionURI else { return false }
+        return store.authenticatingSessions.contains(uri)
+    }
+
+    private var canSubmit: Bool {
+        !isAuthenticating &&
+        !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !resources.isEmpty
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "lock.shield")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.tint)
+                Text("Sign-in required")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Text("\(providerLabel) needs a bearer token before this session can load. Paste a token below and we'll send it to the server.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let resource = primaryResource {
+                resourceDetails(resource)
+            }
+
+            SecureField("Bearer token", text: $token)
+                .textContentType(.password)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .focused($tokenFocused)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color(.separator), lineWidth: 0.5)
+                )
+                .disabled(isAuthenticating || resources.isEmpty)
+
+            HStack(spacing: 8) {
+                Button {
+                    Task {
+                        let captured = token
+                        let ok = await store.authenticateCurrentSession(token: captured)
+                        if ok { token = "" }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        if isAuthenticating {
+                            ProgressView().controlSize(.small)
+                        }
+                        Text(isAuthenticating ? "Signing in…" : "Sign in")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .buttonBorderShape(.roundedRectangle(radius: 10))
+                .disabled(!canSubmit)
+
+                Button {
+                    Task {
+                        if let uri = store.selectedSessionURI {
+                            await store.selectSession(uri: uri, debugTrigger: "manual retry")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.subheadline.weight(.medium))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .buttonBorderShape(.roundedRectangle(radius: 10))
+                .disabled(isAuthenticating)
+                .accessibilityLabel("Retry without signing in")
+            }
+
+            if resources.isEmpty {
+                Text("The server didn't advertise an authentication target. Try reconnecting or check the agent's configuration on the host.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func resourceDetails(_ resource: ProtectedResourceMetadata) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let name = resource.resourceName, !name.isEmpty {
+                Text(name)
+                    .font(.subheadline.weight(.medium))
+            }
+            Text(resource.resource)
+                .font(.footnote.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+            if let docs = resource.resourceDocumentation, let url = URL(string: docs) {
+                Link(destination: url) {
+                    Label("How to get a token", systemImage: "arrow.up.forward")
+                        .font(.footnote.weight(.medium))
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

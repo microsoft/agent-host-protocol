@@ -22,6 +22,7 @@ struct SessionDebugStatus {
     var lastSessionSummariesFetchAt: Date?
     var lastSessionRefreshAt: Date?
     var lastSessionRefreshURI: String?
+    var lastAutoAuthError: String?
     var recentEvents: [SessionDebugEvent] = []
 }
 
@@ -73,6 +74,23 @@ final class AppStore {
 
     /// Sessions subscribed in the background because they are currently active.
     private var autoPrefetchedSessionURIs: Set<String> = []
+
+    /// Sessions (or root) whose agent rejected our last request with
+    /// `AuthRequired` (-32007). Surfaced inline in the chat view rather than as
+    /// a global error modal, so the user can sign in to the agent without
+    /// losing context. The empty string `""` represents a connection-level
+    /// auth requirement (e.g. from `notify/authRequired` with no session).
+    var sessionsRequiringAuth: Set<String> = []
+
+    /// Protected resources advertised by the server alongside the last
+    /// `AuthRequired` error, keyed by session URI (or `""` for connection-level).
+    /// Drives the inline sign-in panel; empty array means the server didn't
+    /// include a structured payload and we can only offer a retry.
+    var authRequiredResources: [String: [ProtectedResourceMetadata]] = [:]
+
+    /// In-flight authenticate attempt per session, used to disable the panel
+    /// while we push the token.
+    var authenticatingSessions: Set<String> = []
 
     /// Connection status.
     var connectionState: AHPConnection.ConnectionState = .disconnected
@@ -594,6 +612,13 @@ final class AppStore {
                     applySnapshot(snapshot)
                 }
 
+                // Preemptively forward the user's GitHub token to every
+                // agent-declared protected resource, mirroring what
+                // vscode-dev does after `initialize`. This avoids the
+                // inline "Sign-in required" panel for agents (e.g. Copilot)
+                // that accept the same GitHub token already used for the tunnel.
+                await pushTokenToProtectedResources()
+
                 // Fetch the lightweight list of session summaries. Full state
                 // remains lazy by default; we only prefetch a small bounded set
                 // of sessions that are currently active today.
@@ -728,6 +753,9 @@ final class AppStore {
                 let result = try await connection.reconnect(to: url, headers: headers)
                 applyReconnectResult(result)
                 recordSuccessfulReconnect()
+                // Re-push the token after reconnect in case the server lost
+                // session-bound auth state across the outage.
+                await pushTokenToProtectedResources()
                 if refreshSummaries {
                     // Refresh the summary cache for any sessions that appeared
                     // while we were offline. The replay/snapshot pipeline keeps
@@ -838,6 +866,9 @@ final class AppStore {
         retainedSessionURIs.removeAll()
         autoPrefetchedSessionURIs.removeAll()
         sessionSummariesCache.removeAll()
+        sessionsRequiringAuth.removeAll()
+        authRequiredResources.removeAll()
+        authenticatingSessions.removeAll()
         selectedSessionURI = nil
         rootState = RootState(agents: [])
         setReconnectInFlight(false)
@@ -879,6 +910,9 @@ final class AppStore {
             retainedSessionURIs.remove(uri)
             autoPrefetchedSessionURIs.remove(uri)
             sessionSummariesCache.removeValue(forKey: uri)
+            sessionsRequiringAuth.remove(uri)
+            authRequiredResources.removeValue(forKey: uri)
+            authenticatingSessions.remove(uri)
             if selectedSessionURI == uri {
                 selectedSessionURI = sessionSummaries.first?.resource
             }
@@ -1207,8 +1241,20 @@ final class AppStore {
             Task { @MainActor [weak self] in
                 await self?.reconcileActiveSessionPrefetch()
             }
-        case .authRequired:
-            errorMessage = "Authentication required"
+        case .authRequired(let note):
+            // `resource` is the protected resource identifier (an agent
+            // provider URI). Map it onto any sessions that use that agent so
+            // the chat view can show an inline sign-in panel instead of the
+            // notification surfacing as a blocking error modal.
+            let affected = sessionSummariesCache.values
+                .filter { $0.provider == note.resource }
+                .map { $0.resource }
+            if affected.isEmpty {
+                // Connection-level requirement with no specific session bound.
+                sessionsRequiringAuth.insert(note.resource)
+            } else {
+                sessionsRequiringAuth.formUnion(affected)
+            }
         }
     }
 
@@ -1321,9 +1367,15 @@ final class AppStore {
             applySnapshot(snapshot)
             sessionDebugStatus.lastSessionRefreshAt = now()
             sessionDebugStatus.lastSessionRefreshURI = uri
+            sessionsRequiringAuth.remove(uri)
+            authRequiredResources.removeValue(forKey: uri)
             errorMessage = nil
             return true
         } catch {
+            if isAuthRequiredError(error) {
+                markAuthRequired(uri: uri, error: error)
+                return false
+            }
             guard allowReconnect, shouldRecoverFromTransportError(error) else {
                 errorMessage = error.localizedDescription
                 return false
@@ -1336,9 +1388,15 @@ final class AppStore {
                 applySnapshot(snapshot)
                 sessionDebugStatus.lastSessionRefreshAt = now()
                 sessionDebugStatus.lastSessionRefreshURI = uri
+                sessionsRequiringAuth.remove(uri)
+                authRequiredResources.removeValue(forKey: uri)
                 errorMessage = nil
                 return true
             } catch {
+                if isAuthRequiredError(error) {
+                    markAuthRequired(uri: uri, error: error)
+                    return false
+                }
                 errorMessage = error.localizedDescription
                 return false
             }
@@ -1355,6 +1413,116 @@ final class AppStore {
             }
         }
         return true
+    }
+
+    /// True when `error` is a JSON-RPC `AuthRequired` (-32007) response — i.e.
+    /// the agent itself is rejecting the request because the user hasn't
+    /// authenticated, not because the connection is broken.
+    func isAuthRequiredError(_ error: Error) -> Bool {
+        guard let connectionError = error as? AHPConnection.ConnectionError else { return false }
+        switch connectionError {
+        case .authRequired:
+            return true
+        case .requestFailed(let code, _) where code == AhpErrorCodes.authRequired:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Extract resources from an `AuthRequired` `ConnectionError`, if any.
+    private func authResources(from error: Error) -> [ProtectedResourceMetadata] {
+        if case .authRequired(_, let resources) = error as? AHPConnection.ConnectionError {
+            return resources
+        }
+        return []
+    }
+
+    /// Record an auth-required failure for `uri`, capturing any resources the
+    /// server provided so the inline panel can drive the OAuth flow.
+    private func markAuthRequired(uri: String, error: Error) {
+        sessionsRequiringAuth.insert(uri)
+        let resources = authResources(from: error)
+        if !resources.isEmpty {
+            authRequiredResources[uri] = resources
+        }
+    }
+
+    /// Resources advertised for the currently selected session's auth requirement.
+    var currentAuthRequiredResources: [ProtectedResourceMetadata] {
+        guard let uri = selectedSessionURI else { return [] }
+        return authRequiredResources[uri] ?? []
+    }
+
+    /// Push a bearer token for every resource the agent declared as protected,
+    /// then re-subscribe to the affected session. Returns `true` on success.
+    @discardableResult
+    func authenticateCurrentSession(token: String) async -> Bool {
+        guard let uri = selectedSessionURI else { return false }
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = "Token cannot be empty."
+            return false
+        }
+        let resources = authRequiredResources[uri] ?? []
+        guard !resources.isEmpty else {
+            errorMessage = "No authentication target advertised by the server."
+            return false
+        }
+        authenticatingSessions.insert(uri)
+        defer { authenticatingSessions.remove(uri) }
+        do {
+            for resource in resources {
+                try await connection.authenticate(resource: resource.resource, token: trimmed)
+            }
+        } catch {
+            errorMessage = "Sign in failed: \(error.localizedDescription)"
+            return false
+        }
+        sessionsRequiringAuth.remove(uri)
+        authRequiredResources.removeValue(forKey: uri)
+        await selectSession(uri: uri, debugTrigger: "retry after authenticate")
+        return true
+    }
+
+    /// Forward the user's saved GitHub token to every protected resource the
+    /// currently-known agents advertised. Mirrors vscode-dev's behaviour of
+    /// pushing the same token used for the tunnel/Dev Tunnels API to the AHP
+    /// host via the `authenticate` command right after `initialize`, so
+    /// `AuthRequired` (-32007) never fires in normal use.
+    ///
+    /// Best-effort: per-resource failures are recorded in
+    /// `sessionDebugStatus.lastAutoAuthError` but do not surface as a modal —
+    /// if a token is wrong the agent will reject a later request with
+    /// `AuthRequired`, at which point the inline panel takes over.
+    private func pushTokenToProtectedResources() async {
+        guard let token = TunnelTokenStore.load(), !token.isEmpty else { return }
+
+        var unique = Set<String>()
+        var resources: [String] = []
+        for agent in rootState.agents {
+            for meta in agent.protectedResources ?? [] {
+                if unique.insert(meta.resource).inserted {
+                    resources.append(meta.resource)
+                }
+            }
+        }
+        guard !resources.isEmpty else { return }
+
+        for resource in resources {
+            do {
+                try await connection.authenticate(resource: resource, token: token)
+            } catch {
+                sessionDebugStatus.lastAutoAuthError =
+                    "authenticate(\(resource)) failed: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// True if the currently selected session is blocked on agent authentication.
+    var currentSessionRequiresAuth: Bool {
+        guard let uri = selectedSessionURI else { return false }
+        return sessionsRequiringAuth.contains(uri)
     }
 
     /// Extract the terminal URI from an action, if applicable.
