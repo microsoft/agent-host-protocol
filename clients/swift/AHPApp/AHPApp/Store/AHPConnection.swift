@@ -47,18 +47,35 @@ actor AHPConnection {
         /// JSON-RPC `AuthRequired` (-32007) carrying decoded resources from `data`.
         /// `resources` is empty when the server omitted the structured payload.
         case authRequired(message: String, resources: [ProtectedResourceMetadata])
+        /// JSON-RPC `UnsupportedProtocolVersion` (-32005). `supportedVersions` is the
+        /// server-advertised list when present in the error `data`.
+        case unsupportedProtocolVersion(message: String, supportedVersions: [String])
+        /// Host runtime entered `.failed` for a reason that isn't a transport timeout —
+        /// usually a server-side rejection during initialize/reconnect.
+        case serverRejected(message: String)
         case decodingFailed(String)
         case timeout
         case connectTimeout
 
         var errorDescription: String? {
             switch self {
-            case .notConnected: "Not connected to server"
-            case .requestFailed(let code, let msg): "Server error \(code): \(msg)"
-            case .authRequired(let msg, _): "Authentication required: \(msg)"
-            case .decodingFailed(let detail): "Decoding failed: \(detail)"
-            case .timeout: "Request timed out"
-            case .connectTimeout: "Could not reach server"
+            case .notConnected:
+                return "Not connected to server"
+            case .requestFailed(let code, let msg):
+                return "Server error \(code): \(msg)"
+            case .authRequired(let msg, _):
+                return "Authentication required: \(msg)"
+            case .unsupportedProtocolVersion(_, let supported):
+                let supportedList = supported.isEmpty ? "unknown" : supported.joined(separator: ", ")
+                return "This app speaks AHP 0.2.0. The server only accepts \(supportedList). Update the AHP server."
+            case .serverRejected(let msg):
+                return "Server rejected connection: \(msg)"
+            case .decodingFailed(let detail):
+                return "Decoding failed: \(detail)"
+            case .timeout:
+                return "Request timed out"
+            case .connectTimeout:
+                return "Could not reach server"
             }
         }
     }
@@ -86,6 +103,7 @@ actor AHPConnection {
     private var connectedWaiters: [CheckedContinuation<HostHandle, Error>] = []
     private var latestReconnectResult: ReconnectResult?
     private var isDisconnecting = false
+    private var lastHostError: String?
 
     /// Last `serverSeq` received from the server. Internal so tests can inspect it.
     var serverSeq = 0
@@ -156,23 +174,28 @@ actor AHPConnection {
         await shutdownRuntime(clearProtocolState: false, clearOutbox: false)
         isDisconnecting = false
         latestReconnectResult = nil
+        lastHostError = nil
         await setState(.connecting)
 
         let client = MultiHostClient()
         multiHostClient = client
         await startEventTasks(for: client)
 
+        print("[AHP] connect → \(url.absoluteString) (auth header: \(headers["X-Tunnel-Authorization"] != nil))")
         do {
             let config = makeHostConfig(url: url, headers: headers)
             try await client.add(config)
             let handle = try await waitForConnectedHost()
             updateProtocolState(from: handle)
             try await replayPendingOutboundActions()
+            print("[AHP] connect OK serverSeq=\(serverSeq)")
             return initializeResult(from: handle)
         } catch {
+            let mapped = mapConnectionError(error)
+            print("[AHP] connect FAILED raw=\(error) mapped=\(mapped)")
             await shutdownRuntime(clearProtocolState: false, clearOutbox: false)
             await setState(.disconnected)
-            throw mapConnectionError(error)
+            throw mapped
         }
     }
 
@@ -370,8 +393,10 @@ actor AHPConnection {
         switch event {
         case .added(let id):
             guard id == hostId else { return }
-        case .stateChanged(let id, let hostState, _):
+        case .stateChanged(let id, let hostState, let lastError):
             guard id == hostId else { return }
+            print("[AHP] host state → \(hostState)\(lastError.map { " lastError=\($0)" } ?? "")")
+            if let lastError { lastHostError = lastError }
             await applyHostState(hostState)
         case .reconnectResult(let id, let result):
             guard id == hostId else { return }
@@ -400,9 +425,55 @@ actor AHPConnection {
         case .reconnecting, .failed:
             await transitionAwayFromConnected(to: .disconnected)
             if case .failed = hostState {
-                failConnectedWaiters(error: ConnectionError.connectTimeout)
+                failConnectedWaiters(error: connectionErrorForFailedHost())
             }
         }
+    }
+
+    /// Build the best `ConnectionError` we can from `lastHostError`. The host
+    /// runtime stringifies its underlying error before publishing it, so we
+    /// recognize known shapes (`AHPClientError.rpc(...)`) and surface specific
+    /// `ConnectionError` cases; otherwise we fall back to `.serverRejected`.
+    private func connectionErrorForFailedHost() -> ConnectionError {
+        guard let raw = lastHostError else { return .connectTimeout }
+        if let (code, message) = Self.parseRPCError(from: raw) {
+            if code == AhpErrorCodes.unsupportedProtocolVersion {
+                let versions = Self.parseSupportedVersions(from: raw)
+                return .unsupportedProtocolVersion(message: message, supportedVersions: versions)
+            }
+            return .requestFailed(code: code, message: message)
+        }
+        return .serverRejected(message: raw)
+    }
+
+    /// Extract `code` and `message` from a stringified
+    /// `AHPClientError.rpc(code: <N>, message: "...", ...)` representation.
+    private static func parseRPCError(from raw: String) -> (code: Int, message: String)? {
+        guard let codeRange = raw.range(of: #"rpc\(code:\s*(-?\d+),\s*message:\s*"(.*?)""#,
+                                        options: .regularExpression) else { return nil }
+        let match = String(raw[codeRange])
+        let nsmatch = match as NSString
+        let pattern = try? NSRegularExpression(pattern: #"code:\s*(-?\d+),\s*message:\s*"(.*)"$"#)
+        guard let result = pattern?.firstMatch(in: match, range: NSRange(location: 0, length: nsmatch.length)),
+              result.numberOfRanges >= 3,
+              let code = Int(nsmatch.substring(with: result.range(at: 1))) else { return nil }
+        let message = nsmatch.substring(with: result.range(at: 2)).replacingOccurrences(of: "\\\"", with: "\"")
+        return (code, message)
+    }
+
+    /// Extract `supportedVersions` from the stringified rpc `data` payload
+    /// produced by `AnyCodable.description`.
+    private static func parseSupportedVersions(from raw: String) -> [String] {
+        guard let r = raw.range(of: #""supportedVersions":\s*\[(.*?)\]"#, options: .regularExpression) else { return [] }
+        let inner = String(raw[r])
+        let nsinner = inner as NSString
+        let pattern = try? NSRegularExpression(pattern: #"\[(.*?)\]"#)
+        guard let match = pattern?.firstMatch(in: inner, range: NSRange(location: 0, length: nsinner.length)),
+              match.numberOfRanges >= 2 else { return [] }
+        let list = nsinner.substring(with: match.range(at: 1))
+        return list.split(separator: ",").map {
+            $0.trimmingCharacters(in: CharacterSet(charactersIn: " \""))
+        }.filter { !$0.isEmpty }
     }
 
     private func transitionAwayFromConnected(to newState: ConnectionState) async {

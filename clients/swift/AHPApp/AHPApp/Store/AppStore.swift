@@ -603,6 +603,7 @@ final class AppStore {
         var lastError: Error?
         for (attempt, delay) in backoffsNs.enumerated() {
             if delay > 0 { try? await Task.sleep(nanoseconds: delay) }
+            print("[AHP] connect attempt \(attempt + 1)/\(backoffsNs.count) → \(url.absoluteString)")
             do {
                 let result = try await connection.connect(to: url, headers: headers)
                 defaultDirectory = result.defaultDirectory
@@ -662,24 +663,28 @@ final class AppStore {
                 return
             } catch {
                 lastError = error
+                print("[AHP] connect attempt \(attempt + 1) failed: \(error)")
                 if !shouldRetryConnect(error: error) || attempt == backoffsNs.count - 1 {
                     break
                 }
             }
         }
         if let lastError {
+            print("[AHP] connect giving up: \(lastError)")
             errorMessage = lastError.localizedDescription
         }
     }
 
     /// Returns `false` for errors where retrying would obviously fail the same
-    /// way (bad URL, auth rejection). All other transport-level errors are
-    /// considered transient and worth retrying.
+    /// way (bad URL, auth rejection, protocol-version mismatch). All other
+    /// transport-level errors are considered transient and worth retrying.
     private func shouldRetryConnect(error: Error) -> Bool {
         if let connErr = error as? AHPConnection.ConnectionError {
             switch connErr {
             case .requestFailed(let code, _):
                 return !(code == 401 || code == 403)
+            case .unsupportedProtocolVersion, .authRequired, .serverRejected:
+                return false
             default:
                 return true
             }
