@@ -14,9 +14,9 @@ export default withMermaid(defineConfig({
     logo: '/logo.svg',
 
     nav: [
-      { text: 'Guide', link: '/guide/what-is-ahp' },
-      { text: 'Specification', link: '/specification/overview' },
-      { text: 'Reference', link: '/reference/common' },
+      { text: 'Guide', link: '/guide/what-is-ahp', activeMatch: '^/guide/' },
+      { text: 'Specification', link: '/specification/overview', activeMatch: '^/specification/' },
+      { text: 'Reference', link: '/reference/common', activeMatch: '^/reference/' },
     ],
 
     sidebar: {
