@@ -1,4 +1,5 @@
 import AgentHostProtocol
+import AgentHostProtocolClient
 import DevTunnelsClient
 import Foundation
 import Observation
@@ -46,8 +47,8 @@ final class AppStore {
 
     /// Lightweight summary cache for every session the server knows about,
     /// keyed by session URI. Populated on connect via `listSessions`, and kept
-    /// fresh by `notify/sessionAdded`, `notify/sessionRemoved`, and
-    /// `notify/sessionSummaryChanged`. The sidebar renders from this cache so
+    /// fresh by `root/sessionAdded`, `root/sessionRemoved`, and
+    /// `root/sessionSummaryChanged`. The sidebar renders from this cache so
     /// hundreds of sessions don't require hundreds of `subscribe` round-trips.
     var sessionSummariesCache: [String: SessionSummary] = [:]
 
@@ -882,15 +883,16 @@ final class AppStore {
         let uri = "\(provider):/\(sessionId)"
         do {
             try await connection.createSession(params: CreateSessionParams(
-                session: uri,
+                channel: uri,
                 provider: provider,
                 model: model.map { ModelSelection(id: $0) },
                 workingDirectory: workingDirectory
             ))
 
             // Subscribe to the new session
-            let snapshot = try await connection.subscribe(resource: uri)
-            applySnapshot(snapshot)
+            if let snapshot = try await connection.subscribe(resource: uri) {
+                applySnapshot(snapshot)
+            }
             retainedSessionURIs.insert(uri)
             autoPrefetchedSessionURIs.remove(uri)
             selectedSessionURI = uri
@@ -964,7 +966,6 @@ final class AppStore {
         if hasActiveTurn {
             action = .sessionPendingMessageSet(SessionPendingMessageSetAction(
                 type: .sessionPendingMessageSet,
-                session: uri,
                 kind: .queued,
                 id: UUID().uuidString,
                 userMessage: userMessage
@@ -972,7 +973,6 @@ final class AppStore {
         } else {
             action = .sessionTurnStarted(SessionTurnStartedAction(
                 type: .sessionTurnStarted,
-                session: uri,
                 turnId: UUID().uuidString,
                 userMessage: userMessage
             ))
@@ -987,7 +987,7 @@ final class AppStore {
 
         // Dispatch to server
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -999,12 +999,11 @@ final class AppStore {
               let turn = sessions[uri]?.activeTurn else { return }
         let action = StateAction.sessionTurnCancelled(SessionTurnCancelledAction(
             type: .sessionTurnCancelled,
-            session: uri,
             turnId: turn.id
         ))
         applySessionAction(action, sessionURI: uri)
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1024,13 +1023,12 @@ final class AppStore {
 
         let action = StateAction.sessionConfigChanged(SessionConfigChangedAction(
             type: .sessionConfigChanged,
-            session: uri,
             config: [property: value]
         ))
 
         applySessionAction(action, sessionURI: uri)
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1045,7 +1043,6 @@ final class AppStore {
     ) async {
         guard let uri = selectedSessionURI else { return }
         let action = StateAction.sessionToolCallConfirmed(SessionToolCallConfirmedAction(
-            session: uri,
             turnId: turnId,
             toolCallId: toolCallId,
             approved: true,
@@ -1055,7 +1052,7 @@ final class AppStore {
         ))
         applySessionAction(action, sessionURI: uri)
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1070,7 +1067,6 @@ final class AppStore {
     ) async {
         guard let uri = selectedSessionURI else { return }
         let action = StateAction.sessionToolCallConfirmed(SessionToolCallConfirmedAction(
-            session: uri,
             turnId: turnId,
             toolCallId: toolCallId,
             approved: false,
@@ -1080,7 +1076,7 @@ final class AppStore {
         ))
         applySessionAction(action, sessionURI: uri)
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1090,7 +1086,6 @@ final class AppStore {
     func approveToolCallResult(toolCallId: String, turnId: String) async {
         guard let uri = selectedSessionURI else { return }
         let action = StateAction.sessionToolCallResultConfirmed(SessionToolCallResultConfirmedAction(
-            session: uri,
             turnId: turnId,
             toolCallId: toolCallId,
             type: .sessionToolCallResultConfirmed,
@@ -1098,7 +1093,7 @@ final class AppStore {
         ))
         applySessionAction(action, sessionURI: uri)
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1111,14 +1106,13 @@ final class AppStore {
         guard let uri = selectedSessionURI else { return }
         let action = StateAction.sessionInputAnswerChanged(SessionInputAnswerChangedAction(
             type: .sessionInputAnswerChanged,
-            session: uri,
             requestId: requestId,
             questionId: questionId,
             answer: answer
         ))
         applySessionAction(action, sessionURI: uri)
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1133,14 +1127,13 @@ final class AppStore {
         guard let uri = selectedSessionURI else { return }
         let action = StateAction.sessionInputCompleted(SessionInputCompletedAction(
             type: .sessionInputCompleted,
-            session: uri,
             requestId: requestId,
             response: response,
             answers: answers
         ))
         applySessionAction(action, sessionURI: uri)
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1151,12 +1144,11 @@ final class AppStore {
         guard let uri = selectedSessionURI else { return }
         let action = StateAction.sessionModelChanged(SessionModelChangedAction(
             type: .sessionModelChanged,
-            session: uri,
             model: ModelSelection(id: modelId)
         ))
         applySessionAction(action, sessionURI: uri)
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: uri)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1174,29 +1166,30 @@ final class AppStore {
             syncingSessionURIs.remove(snapshot.resource)
         case .terminal(let state):
             terminals[snapshot.resource] = state
+        case .changeset:
+            break
         }
     }
 
     func handleAction(_ envelope: ActionEnvelope) {
         let action = envelope.action
-        print("[AHP] Received action: \(action), serverSeq: \(envelope.serverSeq)")
+        let channel = envelope.channel
+        print("[AHP] Received action: \(action), serverSeq: \(envelope.serverSeq), channel: \(channel)")
 
-        // Apply to root state
-        rootState = rootReducer(state: rootState, action: action)
-
-        // Figure out which session this action targets
-        let sessionURI = extractSessionURI(from: action)
-        if let uri = sessionURI {
-            staleSessionURIs.remove(uri)
-            syncingSessionURIs.remove(uri)
-            applySessionAction(action, sessionURI: uri)
+        if channel == "ahp-root://" {
+            rootState = rootReducer(state: rootState, action: action)
+            return
         }
-
-        // Figure out which terminal this action targets
-        if let uri = extractTerminalURI(from: action),
-           let state = terminals[uri] {
-            terminals[uri] = terminalReducer(state: state, action: action)
+        if channel.hasPrefix("terminal:/") {
+            if let state = terminals[channel] {
+                terminals[channel] = terminalReducer(state: state, action: action)
+            }
+            return
         }
+        // Anything else is a session channel.
+        staleSessionURIs.remove(channel)
+        syncingSessionURIs.remove(channel)
+        applySessionAction(action, sessionURI: channel)
     }
 
     private func applySessionAction(_ action: StateAction, sessionURI: String) {
@@ -1208,7 +1201,7 @@ final class AppStore {
         sessions[sessionURI] = state
     }
 
-    private func handleNotification(_ notification: ProtocolNotification) {
+    private func handleNotification(_ notification: AHPNotification) {
         switch notification {
         case .sessionAdded(let note):
             // Track the new session in the summary cache so it appears in the
@@ -1276,7 +1269,7 @@ final class AppStore {
         if let v = changes.project { summary.project = v }
         if let v = changes.model { summary.model = v }
         if let v = changes.workingDirectory { summary.workingDirectory = v }
-        if let v = changes.diffs { summary.diffs = v }
+        if let v = changes.changesets { summary.changesets = v }
         sessionSummariesCache[uri] = summary
     }
 
@@ -1363,8 +1356,9 @@ final class AppStore {
         defer { syncingSessionURIs.remove(uri) }
 
         do {
-            let snapshot = try await connection.subscribe(resource: uri)
-            applySnapshot(snapshot)
+            if let snapshot = try await connection.subscribe(resource: uri) {
+                applySnapshot(snapshot)
+            }
             sessionDebugStatus.lastSessionRefreshAt = now()
             sessionDebugStatus.lastSessionRefreshURI = uri
             sessionsRequiringAuth.remove(uri)
@@ -1384,8 +1378,9 @@ final class AppStore {
             await reconnect(refreshSummaries: false, debugTrigger: "session refresh recovery")
 
             do {
-                let snapshot = try await connection.subscribe(resource: uri)
-                applySnapshot(snapshot)
+                if let snapshot = try await connection.subscribe(resource: uri) {
+                    applySnapshot(snapshot)
+                }
                 sessionDebugStatus.lastSessionRefreshAt = now()
                 sessionDebugStatus.lastSessionRefreshURI = uri
                 sessionsRequiringAuth.remove(uri)
@@ -1473,7 +1468,7 @@ final class AppStore {
         defer { authenticatingSessions.remove(uri) }
         do {
             for resource in resources {
-                try await connection.authenticate(resource: resource.resource, token: trimmed)
+                try await connection.authenticate(channel: uri, resource: resource.resource, token: trimmed)
             }
         } catch {
             errorMessage = "Sign in failed: \(error.localizedDescription)"
@@ -1511,7 +1506,7 @@ final class AppStore {
 
         for resource in resources {
             do {
-                try await connection.authenticate(resource: resource, token: token)
+                try await connection.authenticate(channel: RootResourceURI, resource: resource, token: token)
             } catch {
                 sessionDebugStatus.lastAutoAuthError =
                     "authenticate(\(resource)) failed: \(error.localizedDescription)"
@@ -1525,25 +1520,6 @@ final class AppStore {
         return sessionsRequiringAuth.contains(uri)
     }
 
-    /// Extract the terminal URI from an action, if applicable.
-    private func extractTerminalURI(from action: StateAction) -> String? {
-        switch action {
-        case .terminalData(let a): return a.terminal
-        case .terminalInput(let a): return a.terminal
-        case .terminalResized(let a): return a.terminal
-        case .terminalClaimed(let a): return a.terminal
-        case .terminalTitleChanged(let a): return a.terminal
-        case .terminalCwdChanged(let a): return a.terminal
-        case .terminalExited(let a): return a.terminal
-        case .terminalCleared(let a): return a.terminal
-        case .terminalCommandDetectionAvailable(let a): return a.terminal
-        case .terminalCommandExecuted(let a): return a.terminal
-        case .terminalCommandFinished(let a): return a.terminal
-        default:
-            return nil
-        }
-    }
-
     /// Ensure we are subscribed to a terminal URI (no-op if already subscribed or
     /// a subscribe is in flight). Safe to call repeatedly from view `.task` handlers.
     func ensureTerminalSubscribed(uri: String) async {
@@ -1552,8 +1528,9 @@ final class AppStore {
         subscribingTerminals.insert(uri)
         defer { subscribingTerminals.remove(uri) }
         do {
-            let snapshot = try await connection.subscribe(resource: uri)
-            applySnapshot(snapshot)
+            if let snapshot = try await connection.subscribe(resource: uri) {
+                applySnapshot(snapshot)
+            }
         } catch {
             print("[AHP] Terminal subscribe failed for \(uri): \(error)")
         }
@@ -1566,7 +1543,7 @@ final class AppStore {
         let uri = "terminal:/\(terminalId)"
         do {
             try await connection.createTerminal(params: CreateTerminalParams(
-                terminal: uri,
+                channel: uri,
                 claim: .client(TerminalClientClaim(kind: .client, clientId: connection.clientId)),
                 name: name,
                 cols: cols,
@@ -1596,11 +1573,10 @@ final class AppStore {
     func dispatchTerminalInput(terminal: String, data: String) async {
         let action = StateAction.terminalInput(TerminalInputAction(
             type: .terminalInput,
-            terminal: terminal,
             data: data
         ))
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: terminal)
         } catch {
             print("[AHP] Terminal input dispatch failed: \(error)")
         }
@@ -1610,7 +1586,6 @@ final class AppStore {
     func dispatchTerminalResize(terminal: String, cols: Int, rows: Int) async {
         let action = StateAction.terminalResized(TerminalResizedAction(
             type: .terminalResized,
-            terminal: terminal,
             cols: cols,
             rows: rows
         ))
@@ -1619,55 +1594,9 @@ final class AppStore {
             terminals[terminal] = terminalReducer(state: state, action: action)
         }
         do {
-            try await connection.dispatchAction(action)
+            try await connection.dispatchAction(action, channel: terminal)
         } catch {
             print("[AHP] Terminal resize dispatch failed: \(error)")
-        }
-    }
-
-    /// Extract the session URI from an action, if applicable.
-    private func extractSessionURI(from action: StateAction) -> String? {
-        switch action {
-        case .rootAgentsChanged, .rootActiveSessionsChanged:
-            return nil
-        case .sessionReady(let a): return a.session
-        case .sessionCreationFailed(let a): return a.session
-        case .sessionTurnStarted(let a): return a.session
-        case .sessionDelta(let a): return a.session
-        case .sessionResponsePart(let a): return a.session
-        case .sessionToolCallStart(let a): return a.session
-        case .sessionToolCallDelta(let a): return a.session
-        case .sessionToolCallReady(let a): return a.session
-        case .sessionToolCallConfirmed(let a): return a.session
-        case .sessionToolCallComplete(let a): return a.session
-        case .sessionToolCallResultConfirmed(let a): return a.session
-        case .sessionTurnComplete(let a): return a.session
-        case .sessionTurnCancelled(let a): return a.session
-        case .sessionError(let a): return a.session
-        case .sessionTitleChanged(let a): return a.session
-        case .sessionUsage(let a): return a.session
-        case .sessionReasoning(let a): return a.session
-        case .sessionModelChanged(let a): return a.session
-        case .sessionServerToolsChanged(let a): return a.session
-        case .sessionActiveClientChanged(let a): return a.session
-        case .sessionActiveClientToolsChanged(let a): return a.session
-        case .sessionPendingMessageSet(let a): return a.session
-        case .sessionPendingMessageRemoved(let a): return a.session
-        case .sessionQueuedMessagesReordered(let a): return a.session
-        case .sessionCustomizationsChanged(let a): return a.session
-        case .sessionCustomizationToggled(let a): return a.session
-        case .sessionIsReadChanged(let a): return a.session
-        case .sessionIsArchivedChanged(let a): return a.session
-        case .sessionActivityChanged(let a): return a.session
-        case .sessionInputRequested(let a): return a.session
-        case .sessionInputAnswerChanged(let a): return a.session
-        case .sessionInputCompleted(let a): return a.session
-        case .sessionTruncated(let a): return a.session
-        case .sessionDiffsChanged(let a): return a.session
-        case .sessionConfigChanged(let a): return a.session
-        case .sessionToolCallContentChanged(let a): return a.session
-        default:
-            return nil
         }
     }
 }

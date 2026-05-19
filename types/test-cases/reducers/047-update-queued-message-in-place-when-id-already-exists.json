@@ -30,7 +30,6 @@
   "actions": [
     {
       "type": "session/pendingMessageSet",
-      "session": "copilot:/test-session",
       "kind": "queued",
       "id": "pm-1",
       "userMessage": {

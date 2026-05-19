@@ -4,12 +4,14 @@
   "initial": {
     "title": "bash",
     "content": [],
-    "claim": { "kind": "client", "clientId": "c1" }
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    }
   },
   "actions": [
     {
       "type": "terminal/commandExecuted",
-      "terminal": "agenthost:/terminal/1",
       "commandId": "cmd-1",
       "commandLine": "npm test",
       "timestamp": 1700000000000
@@ -27,7 +29,10 @@
         "isComplete": false
       }
     ],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   }
 }

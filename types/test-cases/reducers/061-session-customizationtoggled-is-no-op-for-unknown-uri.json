@@ -25,7 +25,6 @@
   "actions": [
     {
       "type": "session/customizationToggled",
-      "session": "copilot:/test-session",
       "uri": "https://plugins.example/unknown",
       "enabled": false
     }

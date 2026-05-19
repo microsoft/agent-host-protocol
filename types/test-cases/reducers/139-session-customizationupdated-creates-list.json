@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/customizationUpdated",
-      "session": "copilot:/test-session",
       "customization": {
         "uri": "https://plugins.example/a",
         "displayName": "Plugin A"

@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::actions::ActionEnvelope;
-use crate::notifications::ProtocolNotification;
 
 // ─── JSON-RPC Envelope ────────────────────────────────────────────────────
 
@@ -80,12 +79,6 @@ pub enum JsonRpcMessage {
     SuccessResponse(JsonRpcSuccessResponse),
     ErrorResponse(JsonRpcErrorResponse),
     Notification(JsonRpcNotification),
-}
-
-/// Params for the server → client `notification` method.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct NotificationMethodParams {
-    pub notification: ProtocolNotification,
 }
 
 /// Params for the server → client `action` method.

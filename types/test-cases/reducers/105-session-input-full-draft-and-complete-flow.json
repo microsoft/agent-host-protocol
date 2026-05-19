@@ -16,13 +16,13 @@
   "actions": [
     {
       "type": "session/turnStarted",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
-      "userMessage": { "text": "Hello" }
+      "userMessage": {
+        "text": "Hello"
+      }
     },
     {
       "type": "session/inputRequested",
-      "session": "copilot:/test-session",
       "request": {
         "id": "input-1",
         "message": "Clarify requirements",
@@ -32,8 +32,14 @@
             "kind": "single-select",
             "message": "Which runtime?",
             "options": [
-              { "id": "node", "label": "Node.js" },
-              { "id": "deno", "label": "Deno" }
+              {
+                "id": "node",
+                "label": "Node.js"
+              },
+              {
+                "id": "deno",
+                "label": "Deno"
+              }
             ]
           },
           {
@@ -46,27 +52,30 @@
     },
     {
       "type": "session/inputAnswerChanged",
-      "session": "copilot:/test-session",
       "requestId": "input-1",
       "questionId": "q1",
       "answer": {
         "state": "draft",
-        "value": { "kind": "selected", "value": "node" }
+        "value": {
+          "kind": "selected",
+          "value": "node"
+        }
       }
     },
     {
       "type": "session/inputAnswerChanged",
-      "session": "copilot:/test-session",
       "requestId": "input-1",
       "questionId": "q2",
       "answer": {
         "state": "draft",
-        "value": { "kind": "text", "value": "Keep it small." }
+        "value": {
+          "kind": "text",
+          "value": "Keep it small."
+        }
       }
     },
     {
       "type": "session/inputCompleted",
-      "session": "copilot:/test-session",
       "requestId": "input-1",
       "response": "accept"
     }
@@ -84,7 +93,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     }

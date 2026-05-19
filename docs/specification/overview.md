@@ -33,7 +33,7 @@ AHP uses [JSON-RPC 2.0](https://www.jsonrpc.org/specification) as its message fr
 |---|---|---|
 | Client → Server (notification) | Fire-and-forget | `unsubscribe`, `dispatchAction` |
 | Client → Server (request) | Expects a response | `initialize`, `reconnect`, `subscribe`, `createSession`, `disposeSession`, `listSessions`, `fetchTurns`, `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove` |
-| Server → Client (notification) | Pushed | `action`, `notification` |
+| Server → Client (notification) | Pushed | `action`, `root/sessionAdded`, `root/sessionRemoved`, `root/sessionSummaryChanged`, `auth/required` |
 | Server → Client (response) | Correlated by `id` | Success result or JSON-RPC error |
 
 ### Requests
@@ -41,7 +41,7 @@ AHP uses [JSON-RPC 2.0](https://www.jsonrpc.org/specification) as its message fr
 A JSON-RPC request has an `id` and a `method`. The server MUST respond with exactly one response carrying the same `id`.
 
 ```json
-{ "jsonrpc": "2.0", "id": 1, "method": "subscribe", "params": { "resource": "agenthost:/root" } }
+{ "jsonrpc": "2.0", "id": 1, "method": "subscribe", "params": { "channel": "ahp-root://" } }
 ```
 
 ### Responses
@@ -49,7 +49,7 @@ A JSON-RPC request has an `id` and a `method`. The server MUST respond with exac
 A success response:
 
 ```json
-{ "jsonrpc": "2.0", "id": 1, "result": { "resource": "...", "state": { ... }, "fromSeq": 5 } }
+{ "jsonrpc": "2.0", "id": 1, "result": { "snapshot": { "resource": "...", "state": { ... }, "fromSeq": 5 } } }
 ```
 
 An error response:
@@ -63,16 +63,20 @@ An error response:
 A JSON-RPC notification has a `method` but no `id`. It MUST NOT receive a response.
 
 ```json
-{ "jsonrpc": "2.0", "method": "action", "params": { "envelope": { ... } } }
+{ "jsonrpc": "2.0", "method": "action", "params": { "channel": "ahp-session:/<uuid>", "action": { ... }, "serverSeq": 6 } }
 ```
 
 ## Structure
 
-The specification is organized into the following sections:
+The specification is organised around the **channels** that AHP exposes — each channel page describes its URI, state, lifecycle, actions, and notifications. Cross-cutting concerns (transport, authentication, versioning) have their own pages.
 
 - **[Transport](/specification/transport)** — How messages are delivered between client and server.
-- **[Lifecycle](/specification/lifecycle)** — How connections are established and sessions are managed.
-- **[Subscriptions](/specification/subscriptions)** — URI-based state subscription mechanism.
+- **[Lifecycle](/specification/lifecycle)** — Connection handshake, reconnection, and disconnection.
+- **[Authentication](/specification/authentication)** — RFC 9728 / RFC 6750 authentication flow.
+- **[Channels & Subscriptions](/specification/subscriptions)** — The channel model and the URI-based subscription mechanism shared by every channel type.
+- **[Root Channel](/specification/root-channel)** — `ahp-root://` — agents, terminals catalogue, host config, session catalogue events.
+- **[Session Channel](/specification/session-channel)** — `ahp-session:/<uuid>` — per-session state, turns, tool calls, pending messages.
+- **[Terminal Channel](/specification/terminal-channel)** — per-terminal pty state, data flow, claims, command detection.
 - **[Versioning](/specification/versioning)** — Protocol version negotiation and compatibility.
 - **[State Types](/reference/state-types)** — Complete state type definitions.
 - **[Actions](/reference/actions)** — Complete action type definitions.

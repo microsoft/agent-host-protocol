@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/activeClientToolsChanged",
-      "session": "copilot:/test-session",
       "tools": [
         {
           "name": "openFile"

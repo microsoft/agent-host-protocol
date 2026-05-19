@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "toolCall",
@@ -32,7 +34,6 @@
   "actions": [
     {
       "type": "session/toolCallDelta",
-      "session": "copilot:/test-session",
       "turnId": "wrong-turn",
       "toolCallId": "tc-1",
       "content": "data"
@@ -51,7 +52,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "toolCall",

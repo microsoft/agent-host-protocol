@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     }
@@ -22,7 +24,6 @@
   "actions": [
     {
       "type": "session/toolCallStart",
-      "session": "copilot:/test-session",
       "turnId": "wrong-turn",
       "toolCallId": "tc-1",
       "toolName": "bash",
@@ -42,7 +43,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     }

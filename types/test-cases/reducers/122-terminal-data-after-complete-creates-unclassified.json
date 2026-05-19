@@ -15,13 +15,15 @@
         "durationMs": 50
       }
     ],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   },
   "actions": [
     {
       "type": "terminal/data",
-      "terminal": "agenthost:/terminal/1",
       "data": "$ "
     }
   ],
@@ -43,7 +45,10 @@
         "value": "$ "
       }
     ],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   }
 }

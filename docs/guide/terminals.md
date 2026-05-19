@@ -13,7 +13,7 @@ Terminals are a first-class subscribable resource in AHP, living alongside sessi
 
 ### Root State
 
-The root state at `agenthost:/root` includes a lightweight terminal listing:
+The root state at `ahp-root://` includes a lightweight terminal listing:
 
 ```typescript
 RootState {
@@ -274,7 +274,7 @@ sequenceDiagram
 
   C->>S: createTerminal({ terminal, name: "zsh", cwd, cols: 120, rows: 40 })
   S->>C: root/terminalsChanged (terminal added)
-  C->>S: subscribe({ resource: terminal })
+  C->>S: subscribe({ channel: terminal })
   S->>C: snapshot (initial terminal state)
 
   C->>S: terminal/claimed { claim: { kind: 'client', clientId } }

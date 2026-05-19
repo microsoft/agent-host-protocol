@@ -21,6 +21,9 @@ import type {
   UsageInfo,
   SessionCustomization,
   CustomizationRef,
+  ChangesetFile,
+  ChangesetOperation,
+  ChangesetSummary,
   FileEdit,
   SessionInputAnswer,
   SessionInputRequest,
@@ -31,7 +34,7 @@ import type {
   CustomizationStatus,
 } from './state.js';
 
-import { ToolCallConfirmationReason, ToolCallCancellationReason, PendingMessageKind } from './state.js';
+import { ToolCallConfirmationReason, ToolCallCancellationReason, PendingMessageKind, ChangesetStatus } from './state.js';
 
 // ─── Action Type Enum ────────────────────────────────────────────────────────
 
@@ -78,9 +81,14 @@ export const enum ActionType {
   SessionIsReadChanged = 'session/isReadChanged',
   SessionIsArchivedChanged = 'session/isArchivedChanged',
   SessionActivityChanged = 'session/activityChanged',
-  SessionDiffsChanged = 'session/diffsChanged',
+  SessionChangesetsChanged = 'session/changesetsChanged',
   SessionConfigChanged = 'session/configChanged',
   SessionMetaChanged = 'session/metaChanged',
+  ChangesetStatusChanged = 'changeset/statusChanged',
+  ChangesetFileSet = 'changeset/fileSet',
+  ChangesetFileRemoved = 'changeset/fileRemoved',
+  ChangesetOperationsChanged = 'changeset/operationsChanged',
+  ChangesetCleared = 'changeset/cleared',
   RootTerminalsChanged = 'root/terminalsChanged',
   RootConfigChanged = 'root/configChanged',
   TerminalData = 'terminal/data',
@@ -108,8 +116,16 @@ export interface ActionOrigin {
 
 /**
  * Every action is wrapped in an `ActionEnvelope`.
+ *
+ * The envelope identifies the channel the action belongs to (e.g.
+ * `ahp-root://` for root actions, the session URI for session actions, the
+ * terminal URI for terminal actions). Individual action payloads carry only
+ * fields that are intrinsic to the action; the channel comes from the
+ * envelope so that any subscribable resource can route its actions uniformly.
  */
 export interface ActionEnvelope {
+  /** Channel URI this action belongs to. */
+  readonly channel: URI;
   readonly action: StateAction;
   readonly serverSeq: number;
   readonly origin: ActionOrigin | undefined;
@@ -119,14 +135,13 @@ export interface ActionEnvelope {
 // ─── Root Actions ────────────────────────────────────────────────────────────
 
 /**
- * Base interface for all tool-call-scoped actions, carrying the common
- * session, turn, and tool call identifiers.
+ * Base interface for all tool-call-scoped actions, carrying the common turn
+ * and tool call identifiers. The owning session URI is identified by the
+ * enclosing {@link ActionEnvelope}'s `channel` field.
  *
  * @category Session Actions
  */
 interface ToolCallActionBase {
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
   /** Tool call identifier */
@@ -209,8 +224,6 @@ export interface RootConfigChangedAction {
  */
 export interface SessionReadyAction {
   type: ActionType.SessionReady;
-  /** Session URI */
-  session: URI;
 }
 
 /**
@@ -221,8 +234,6 @@ export interface SessionReadyAction {
  */
 export interface SessionCreationFailedAction {
   type: ActionType.SessionCreationFailed;
-  /** Session URI */
-  session: URI;
   /** Error details */
   error: ErrorInfo;
 }
@@ -236,8 +247,6 @@ export interface SessionCreationFailedAction {
  */
 export interface SessionTurnStartedAction {
   type: ActionType.SessionTurnStarted;
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
   /** User's message */
@@ -257,8 +266,6 @@ export interface SessionTurnStartedAction {
  */
 export interface SessionDeltaAction {
   type: ActionType.SessionDelta;
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
   /** Identifier of the response part to append to */
@@ -275,8 +282,6 @@ export interface SessionDeltaAction {
  */
 export interface SessionResponsePartAction {
   type: ActionType.SessionResponsePart;
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
   /** Response part (markdown or content ref) */
@@ -484,8 +489,6 @@ export interface SessionToolCallContentChangedAction extends ToolCallActionBase 
  */
 export interface SessionTurnCompleteAction {
   type: ActionType.SessionTurnComplete;
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
 }
@@ -499,8 +502,6 @@ export interface SessionTurnCompleteAction {
  */
 export interface SessionTurnCancelledAction {
   type: ActionType.SessionTurnCancelled;
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
 }
@@ -513,8 +514,6 @@ export interface SessionTurnCancelledAction {
  */
 export interface SessionErrorAction {
   type: ActionType.SessionError;
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
   /** Error details */
@@ -531,8 +530,6 @@ export interface SessionErrorAction {
  */
 export interface SessionTitleChangedAction {
   type: ActionType.SessionTitleChanged;
-  /** Session URI */
-  session: URI;
   /** New title */
   title: string;
 }
@@ -545,8 +542,6 @@ export interface SessionTitleChangedAction {
  */
 export interface SessionUsageAction {
   type: ActionType.SessionUsage;
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
   /** Token usage data */
@@ -564,8 +559,6 @@ export interface SessionUsageAction {
  */
 export interface SessionReasoningAction {
   type: ActionType.SessionReasoning;
-  /** Session URI */
-  session: URI;
   /** Turn identifier */
   turnId: string;
   /** Identifier of the reasoning response part to append to */
@@ -583,8 +576,6 @@ export interface SessionReasoningAction {
  */
 export interface SessionModelChangedAction {
   type: ActionType.SessionModelChanged;
-  /** Session URI */
-  session: URI;
   /** New model selection */
   model: ModelSelection;
 }
@@ -601,8 +592,6 @@ export interface SessionModelChangedAction {
  */
 export interface SessionIsReadChangedAction {
   type: ActionType.SessionIsReadChanged;
-  /** Session URI */
-  session: URI;
   /** Whether the session has been read */
   isRead: boolean;
 }
@@ -619,8 +608,6 @@ export interface SessionIsReadChangedAction {
  */
 export interface SessionIsArchivedChangedAction {
   type: ActionType.SessionIsArchivedChanged;
-  /** Session URI */
-  session: URI;
   /** Whether the session is archived */
   isArchived: boolean;
 }
@@ -636,27 +623,29 @@ export interface SessionIsArchivedChangedAction {
  */
 export interface SessionActivityChangedAction {
   type: ActionType.SessionActivityChanged;
-  /** Session URI */
-  session: URI;
   /** Human-readable description of current activity, or `undefined` to clear */
   activity: string | undefined;
 }
 
 /**
- * The file diffs for the session changed.
+ * The {@link ChangesetSummary | catalogue of changesets} the agent host
+ * advertises for this session changed. Replaces
+ * `state.summary.changesets` entirely (full-replacement semantics) — set
+ * to `undefined` to clear the catalogue.
  *
- * Full-replacement semantics: the `diffs` array replaces the previous
- * `summary.diffs` entirely.
+ * Producers dispatch this whenever entries are added, removed, or have
+ * their aggregate counts (`additions` / `deletions` / `files`) refreshed.
+ * The fan-out happens through this action so observers see catalogue
+ * mutations in the same {@link ChangesetAction | per-changeset} action
+ * stream they already follow for file-level updates.
  *
  * @category Session Actions
  * @version 1
  */
-export interface SessionDiffsChangedAction {
-  type: ActionType.SessionDiffsChanged;
-  /** Session URI */
-  session: URI;
-  /** Updated file diffs for the session */
-  diffs: FileEdit[];
+export interface SessionChangesetsChangedAction {
+  type: ActionType.SessionChangesetsChanged;
+  /** New catalogue, or `undefined` to clear it */
+  changesets: ChangesetSummary[] | undefined;
 }
 
 /**
@@ -669,8 +658,6 @@ export interface SessionDiffsChangedAction {
  */
 export interface SessionServerToolsChangedAction {
   type: ActionType.SessionServerToolsChanged;
-  /** Session URI */
-  session: URI;
   /** Updated server tools list (full replacement) */
   tools: ToolDefinition[];
 }
@@ -689,8 +676,6 @@ export interface SessionServerToolsChangedAction {
  */
 export interface SessionActiveClientChangedAction {
   type: ActionType.SessionActiveClientChanged;
-  /** Session URI */
-  session: URI;
   /** The new active client, or `null` to unset */
   activeClient: SessionActiveClient | null;
 }
@@ -708,8 +693,6 @@ export interface SessionActiveClientChangedAction {
  */
 export interface SessionActiveClientToolsChangedAction {
   type: ActionType.SessionActiveClientToolsChanged;
-  /** Session URI */
-  session: URI;
   /** Updated client tools list (full replacement) */
   tools: ToolDefinition[];
 }
@@ -727,8 +710,6 @@ export interface SessionActiveClientToolsChangedAction {
  */
 export interface SessionCustomizationsChangedAction {
   type: ActionType.SessionCustomizationsChanged;
-  /** Session URI */
-  session: URI;
   /** Updated customization list (full replacement) */
   customizations: SessionCustomization[];
 }
@@ -745,8 +726,6 @@ export interface SessionCustomizationsChangedAction {
  */
 export interface SessionCustomizationToggledAction {
   type: ActionType.SessionCustomizationToggled;
-  /** Session URI */
-  session: URI;
   /** The URI of the customization to toggle */
   uri: URI;
   /** Whether to enable or disable the customization */
@@ -772,8 +751,6 @@ export interface SessionCustomizationToggledAction {
  */
 export interface SessionCustomizationUpdatedAction {
   type: ActionType.SessionCustomizationUpdated;
-  /** Session URI */
-  session: URI;
   /** The customization to update or insert (matched by `customization.uri`) */
   customization: CustomizationRef;
   /** New enabled state (defaults to `false` on insert) */
@@ -799,8 +776,6 @@ export interface SessionCustomizationUpdatedAction {
  */
 export interface SessionConfigChangedAction {
   type: ActionType.SessionConfigChanged;
-  /** Session URI */
-  session: URI;
   /** Updated config values */
   config: Record<string, unknown>;
   /** When `true`, replaces all config values instead of merging */
@@ -817,8 +792,6 @@ export interface SessionConfigChangedAction {
  */
 export interface SessionMetaChangedAction {
   type: ActionType.SessionMetaChanged;
-  /** Session URI */
-  session: URI;
   /** New `_meta` payload, or `undefined` to clear it */
   _meta: Record<string, unknown> | undefined;
 }
@@ -842,8 +815,6 @@ export interface SessionMetaChangedAction {
  */
 export interface SessionTruncatedAction {
   type: ActionType.SessionTruncated;
-  /** Session URI */
-  session: URI;
   /** Keep turns up to and including this turn. Omit to clear all turns. */
   turnId?: string;
 }
@@ -865,8 +836,6 @@ export interface SessionTruncatedAction {
  */
 export interface SessionPendingMessageSetAction {
   type: ActionType.SessionPendingMessageSet;
-  /** Session URI */
-  session: URI;
   /** Whether this is a steering or queued message */
   kind: PendingMessageKind;
   /** Unique identifier for this pending message */
@@ -888,8 +857,6 @@ export interface SessionPendingMessageSetAction {
  */
 export interface SessionPendingMessageRemovedAction {
   type: ActionType.SessionPendingMessageRemoved;
-  /** Session URI */
-  session: URI;
   /** Whether this is a steering or queued message */
   kind: PendingMessageKind;
   /** Identifier of the pending message to remove */
@@ -911,8 +878,6 @@ export interface SessionPendingMessageRemovedAction {
  */
 export interface SessionQueuedMessagesReorderedAction {
   type: ActionType.SessionQueuedMessagesReordered;
-  /** Session URI */
-  session: URI;
   /** Queued message IDs in the desired order */
   order: string[];
 }
@@ -931,8 +896,6 @@ export interface SessionQueuedMessagesReorderedAction {
  */
 export interface SessionInputRequestedAction {
   type: ActionType.SessionInputRequested;
-  /** Session URI */
-  session: URI;
   /** Input request to create or replace */
   request: SessionInputRequest;
 }
@@ -948,8 +911,6 @@ export interface SessionInputRequestedAction {
  */
 export interface SessionInputAnswerChangedAction {
   type: ActionType.SessionInputAnswerChanged;
-  /** Session URI */
-  session: URI;
   /** Input request identifier */
   requestId: string;
   /** Question identifier within the input request */
@@ -970,8 +931,6 @@ export interface SessionInputAnswerChangedAction {
  */
 export interface SessionInputCompletedAction {
   type: ActionType.SessionInputCompleted;
-  /** Session URI */
-  session: URI;
   /** Input request identifier */
   requestId: string;
   /** Completion outcome */
@@ -999,8 +958,6 @@ export interface SessionInputCompletedAction {
  */
 export interface TerminalDataAction {
   type: ActionType.TerminalData;
-  /** Terminal URI */
-  terminal: URI;
   /** Output data (may contain ANSI escape sequences) */
   data: string;
 }
@@ -1020,8 +977,6 @@ export interface TerminalDataAction {
  */
 export interface TerminalInputAction {
   type: ActionType.TerminalInput;
-  /** Terminal URI */
-  terminal: URI;
   /** Input data to send to the pty */
   data: string;
 }
@@ -1038,8 +993,6 @@ export interface TerminalInputAction {
  */
 export interface TerminalResizedAction {
   type: ActionType.TerminalResized;
-  /** Terminal URI */
-  terminal: URI;
   /** Terminal width in columns */
   cols: number;
   /** Terminal height in rows */
@@ -1058,8 +1011,6 @@ export interface TerminalResizedAction {
  */
 export interface TerminalClaimedAction {
   type: ActionType.TerminalClaimed;
-  /** Terminal URI */
-  terminal: URI;
   /** The new claim */
   claim: TerminalClaim;
 }
@@ -1076,8 +1027,6 @@ export interface TerminalClaimedAction {
  */
 export interface TerminalTitleChangedAction {
   type: ActionType.TerminalTitleChanged;
-  /** Terminal URI */
-  terminal: URI;
   /** New terminal title */
   title: string;
 }
@@ -1090,8 +1039,6 @@ export interface TerminalTitleChangedAction {
  */
 export interface TerminalCwdChangedAction {
   type: ActionType.TerminalCwdChanged;
-  /** Terminal URI */
-  terminal: URI;
   /** New working directory */
   cwd: URI;
 }
@@ -1104,8 +1051,6 @@ export interface TerminalCwdChangedAction {
  */
 export interface TerminalExitedAction {
   type: ActionType.TerminalExited;
-  /** Terminal URI */
-  terminal: URI;
   /** Process exit code. `undefined` if the process was killed without an exit code. */
   exitCode?: number;
 }
@@ -1119,8 +1064,6 @@ export interface TerminalExitedAction {
  */
 export interface TerminalClearedAction {
   type: ActionType.TerminalCleared;
-  /** Terminal URI */
-  terminal: URI;
 }
 
 /**
@@ -1136,8 +1079,6 @@ export interface TerminalClearedAction {
  */
 export interface TerminalCommandDetectionAvailableAction {
   type: ActionType.TerminalCommandDetectionAvailable;
-  /** Terminal URI */
-  terminal: URI;
 }
 
 /**
@@ -1150,8 +1091,6 @@ export interface TerminalCommandDetectionAvailableAction {
  */
 export interface TerminalCommandExecutedAction {
   type: ActionType.TerminalCommandExecuted;
-  /** Terminal URI */
-  terminal: URI;
   /**
    * Stable identifier for this command, scoped to the terminal URI.
    * Allows correlating `commandExecuted` → `commandFinished` pairs.
@@ -1178,8 +1117,6 @@ export interface TerminalCommandExecutedAction {
  */
 export interface TerminalCommandFinishedAction {
   type: ActionType.TerminalCommandFinished;
-  /** Terminal URI */
-  terminal: URI;
   /** Matches the `commandId` from the corresponding `commandExecuted` */
   commandId: string;
   /** Shell exit code. `undefined` if the shell did not report one. */
@@ -1189,6 +1126,89 @@ export interface TerminalCommandFinishedAction {
    * shell integration script on the server side.
    */
   durationMs?: number;
+}
+
+// ─── Changeset Actions ───────────────────────────────────────────────────────
+
+/**
+ * The {@link ChangesetState.status} for this changeset transitioned (e.g.
+ * `computing → ready`). The error payload is set together with `status`
+ * whenever it transitions to {@link ChangesetStatus.Error | Error}.
+ *
+ * @category Changeset Actions
+ * @version 2
+ */
+export interface ChangesetStatusChangedAction {
+  type: ActionType.ChangesetStatusChanged;
+  /** New computation lifecycle status. */
+  status: ChangesetStatus;
+  /** Cause when `status === ChangesetStatus.Error`; otherwise omitted. */
+  error?: ErrorInfo;
+}
+
+/**
+ * Upsert a {@link ChangesetFile} in the changeset — adds a new entry, or
+ * replaces an existing one identified by {@link ChangesetFile.id}.
+ *
+ * @category Changeset Actions
+ * @version 2
+ */
+export interface ChangesetFileSetAction {
+  type: ActionType.ChangesetFileSet;
+  /** The new or replacement file entry. */
+  file: ChangesetFile;
+}
+
+/**
+ * Remove a {@link ChangesetFile} from the changeset by its id.
+ *
+ * Typically dispatched when a file is reverted, staged out, or otherwise
+ * no longer in scope (e.g. a renamed file is replaced by a new entry).
+ *
+ * @category Changeset Actions
+ * @version 2
+ */
+export interface ChangesetFileRemovedAction {
+  type: ActionType.ChangesetFileRemoved;
+  /** The {@link ChangesetFile.id} of the file to remove. */
+  fileId: string;
+}
+
+/**
+ * The set of operations available on this changeset changed. Full
+ * replacement semantics: `operations` replaces the previous list (or
+ * removes it entirely when `operations` is `undefined`).
+ *
+ * @category Changeset Actions
+ * @version 2
+ */
+export interface ChangesetOperationsChangedAction {
+  type: ActionType.ChangesetOperationsChanged;
+  /** Updated operation list. Pass `undefined` to clear all operations. */
+  operations: ChangesetOperation[] | undefined;
+}
+
+/**
+ * Drop every file from the changeset.
+ *
+ * Two cases use this:
+ * 1. The underlying source moved (branch switched, fork point invalidated,
+ *    …) and the server is recomputing from scratch — subsequent
+ *    {@link ChangesetFileSetAction} entries will repopulate it.
+ * 2. The owning session has ended and the URI is becoming
+ *    un-subscribable — the server will unsubscribe all clients shortly
+ *    after dispatching this action.
+ *
+ * Clients SHOULD release any references on receipt and SHOULD NOT
+ * distinguish the two cases from the action alone — instead, react to
+ * the corresponding session-level lifecycle signal (e.g.
+ * `root/sessionRemoved`) for the "going away" case.
+ *
+ * @category Changeset Actions
+ * @version 2
+ */
+export interface ChangesetClearedAction {
+  type: ActionType.ChangesetCleared;
 }
 
 // ─── Discriminated Union ─────────────────────────────────────────────────────
@@ -1236,9 +1256,14 @@ export type StateAction =
   | SessionIsReadChangedAction
   | SessionIsArchivedChangedAction
   | SessionActivityChangedAction
-  | SessionDiffsChangedAction
+  | SessionChangesetsChangedAction
   | SessionConfigChangedAction
   | SessionMetaChangedAction
+  | ChangesetStatusChangedAction
+  | ChangesetFileSetAction
+  | ChangesetFileRemovedAction
+  | ChangesetOperationsChangedAction
+  | ChangesetClearedAction
   | TerminalDataAction
   | TerminalInputAction
   | TerminalResizedAction

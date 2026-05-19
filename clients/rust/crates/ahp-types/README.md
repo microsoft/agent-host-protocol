@@ -31,7 +31,8 @@ serde_json = "1"
 use ahp_types::actions::{ActionEnvelope, StateAction};
 
 let json = r#"{
-  "action": { "type": "session/titleChanged", "session": "copilot:/s1", "title": "Hi" },
+  "channel": "ahp-session:/s1",
+  "action": { "type": "session/titleChanged", "title": "Hi" },
   "serverSeq": 7,
   "origin": null
 }"#;

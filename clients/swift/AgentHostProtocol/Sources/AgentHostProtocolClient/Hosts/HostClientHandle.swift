@@ -49,25 +49,25 @@ public struct HostClientHandle: Sendable {
         }
     }
 
-    /// Dispatch an action through this connection, refusing if the connection
-    /// has been replaced by a reconnect.
+    /// Dispatch an action through this connection on `channel`, refusing if
+    /// the connection has been replaced by a reconnect.
     @discardableResult
-    public func dispatch(_ action: StateAction) async throws -> DispatchHandle {
+    public func dispatch(_ action: StateAction, channel: String) async throws -> DispatchHandle {
         try await checkAlive()
         do {
-            return try await client.dispatch(action)
+            return try await client.dispatch(action, channel: channel)
         } catch let error as AHPClientError {
             throw HostError.client(error)
         }
     }
 
-    /// Dispatch an action with a caller-owned `clientSeq`, refusing if the
-    /// connection has been replaced by a reconnect.
+    /// Dispatch an action on `channel` with a caller-owned `clientSeq`,
+    /// refusing if the connection has been replaced by a reconnect.
     @discardableResult
-    public func dispatch(_ action: StateAction, clientSeq: Int) async throws -> DispatchHandle {
+    public func dispatch(_ action: StateAction, channel: String, clientSeq: Int) async throws -> DispatchHandle {
         try await checkAlive()
         do {
-            return try await client.dispatch(action, clientSeq: clientSeq)
+            return try await client.dispatch(action, channel: channel, clientSeq: clientSeq)
         } catch let error as AHPClientError {
             throw HostError.client(error)
         }

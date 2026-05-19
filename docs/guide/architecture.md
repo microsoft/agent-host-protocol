@@ -79,17 +79,18 @@ Adding a new agent provider means adding a new `IAgent` implementation on the se
 
 ## Session URIs
 
-Sessions are identified by URIs where the **scheme is the provider name** and the **path is the raw session ID**:
+Sessions are addressed by URIs under the `ahp-session:` scheme with the session's UUID as the path:
 
 ```
-copilot:/<uuid>
+ahp-session:/<uuid>
 ```
+
+The URI scheme does **not** carry the provider name. The session's provider is exposed on [`SessionSummary.provider`](/reference/state-types#sessionsummary) and remains stable for the lifetime of the session. This decoupling lets the same scheme address sessions backed by any agent, and matches the broader channel model described in [Channels & Subscriptions](/specification/subscriptions).
 
 | Helper | Purpose |
 |---|---|
-| `AgentSession.uri(provider, rawId)` | Create a session URI |
-| `AgentSession.id(session)` | Extract raw session ID from URI |
-| `AgentSession.provider(session)` | Extract provider name from URI scheme |
+| `AgentSession.uri(rawId)` | Build an `ahp-session:/<id>` URI |
+| `AgentSession.id(session)` | Extract the raw session ID from the URI path |
 
 ## Deployment Modes
 

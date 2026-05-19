@@ -30,7 +30,6 @@
   "actions": [
     {
       "type": "session/delta",
-      "session": "copilot:/test-session",
       "turnId": "wrong-turn",
       "partId": "md-1",
       "content": "orphan"

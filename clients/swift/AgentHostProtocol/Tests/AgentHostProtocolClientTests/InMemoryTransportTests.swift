@@ -91,7 +91,7 @@ final class InMemoryTransportTests: XCTestCase {
         let original = JsonRpcMessage.request(
             id: 1,
             method: "subscribe",
-            params: AnyCodable(["resource": "agenthost:/root"])
+            params: AnyCodable(["channel": "ahp-root://"])
         )
         let encoded = try TransportMessage.encode(original)
         let parsed = try encoded.intoParsed()
@@ -101,7 +101,7 @@ final class InMemoryTransportTests: XCTestCase {
         }
         XCTAssertEqual(id, 1)
         XCTAssertEqual(method, "subscribe")
-        XCTAssertEqual(params, AnyCodable(["resource": "agenthost:/root"]))
+        XCTAssertEqual(params, AnyCodable(["channel": "ahp-root://"]))
     }
 
     private func stringPayload(of message: TransportMessage?) -> String? {

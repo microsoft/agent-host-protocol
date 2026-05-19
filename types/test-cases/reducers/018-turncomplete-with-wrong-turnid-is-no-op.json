@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/turnComplete",
-      "session": "copilot:/test-session",
       "turnId": "wrong-turn"
     }
   ],

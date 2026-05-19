@@ -42,9 +42,14 @@ import type {
   SessionIsReadChangedAction,
   SessionIsArchivedChangedAction,
   SessionActivityChangedAction,
-  SessionDiffsChangedAction,
+  SessionChangesetsChangedAction,
   SessionConfigChangedAction,
   SessionMetaChangedAction,
+  ChangesetStatusChangedAction,
+  ChangesetFileSetAction,
+  ChangesetFileRemovedAction,
+  ChangesetOperationsChangedAction,
+  ChangesetClearedAction,
   TerminalDataAction,
   TerminalInputAction,
   TerminalResizedAction,
@@ -60,7 +65,7 @@ import type {
 
 import { ActionType } from './actions.js';
 
-// ─── Root vs Session vs Terminal Action Unions ───────────────────────────────
+// ─── Root vs Session vs Terminal vs Changeset Action Unions ─────────────────
 
 /** Union of all root-scoped actions. */
 export type RootAction =
@@ -119,7 +124,7 @@ export type SessionAction =
   | SessionIsReadChangedAction
   | SessionIsArchivedChangedAction
   | SessionActivityChangedAction
-  | SessionDiffsChangedAction
+  | SessionChangesetsChangedAction
   | SessionConfigChangedAction
   | SessionMetaChangedAction
 ;
@@ -166,7 +171,7 @@ export type ServerSessionAction =
   | SessionCustomizationsChangedAction
   | SessionCustomizationUpdatedAction
   | SessionActivityChangedAction
-  | SessionDiffsChangedAction
+  | SessionChangesetsChangedAction
   | SessionMetaChangedAction
 ;
 
@@ -202,6 +207,29 @@ export type ServerTerminalAction =
   | TerminalCommandDetectionAvailableAction
   | TerminalCommandExecutedAction
   | TerminalCommandFinishedAction
+;
+
+/** Union of all changeset-scoped actions. */
+export type ChangesetAction =
+  | ChangesetStatusChangedAction
+  | ChangesetFileSetAction
+  | ChangesetFileRemovedAction
+  | ChangesetOperationsChangedAction
+  | ChangesetClearedAction
+;
+
+/** Union of changeset actions that clients may dispatch. */
+export type ClientChangesetAction =
+  never
+;
+
+/** Union of changeset actions that only the server may produce. */
+export type ServerChangesetAction =
+  | ChangesetStatusChangedAction
+  | ChangesetFileSetAction
+  | ChangesetFileRemovedAction
+  | ChangesetOperationsChangedAction
+  | ChangesetClearedAction
 ;
 
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
@@ -250,9 +278,14 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionIsReadChanged]: true,
   [ActionType.SessionIsArchivedChanged]: true,
   [ActionType.SessionActivityChanged]: false,
-  [ActionType.SessionDiffsChanged]: false,
+  [ActionType.SessionChangesetsChanged]: false,
   [ActionType.SessionConfigChanged]: true,
   [ActionType.SessionMetaChanged]: false,
+  [ActionType.ChangesetStatusChanged]: false,
+  [ActionType.ChangesetFileSet]: false,
+  [ActionType.ChangesetFileRemoved]: false,
+  [ActionType.ChangesetOperationsChanged]: false,
+  [ActionType.ChangesetCleared]: false,
   [ActionType.TerminalData]: false,
   [ActionType.TerminalInput]: true,
   [ActionType.TerminalResized]: true,

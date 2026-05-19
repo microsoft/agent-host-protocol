@@ -36,8 +36,9 @@ The protocol is built around four core requirements:
 
 The server holds an **authoritative state tree** managed by a `SessionStateManager`. State is mutated by actions flowing through pure reducers. Raw progress events from agent backends are mapped to protocol state actions via an event mapper.
 
-Clients subscribe to URI-identified state resources and receive:
-1. An initial **snapshot** of the current state.
+Clients subscribe to URI-identified **channels** — the [Root Channel](/specification/root-channel) (`ahp-root://`), individual [Session Channels](/specification/session-channel) (`ahp-session:/<uuid>`), and [Terminal Channels](/specification/terminal-channel) — and receive:
+
+1. An initial **snapshot** of the current state (for state-bearing channels).
 2. Subsequent **action envelopes** that incrementally update the state.
 
 The same reducer code runs on both the server and clients, which is what makes write-ahead reconciliation possible.
@@ -46,12 +47,13 @@ The same reducer code runs on both the server and clients, which is what makes w
 
 | Concept | Description |
 |---|---|
-| **State** | Immutable tree of data — root state (agents) and session state (turns, tools, permissions). |
+| **Channels** | URI-identified subscribable resources. State channels (root, sessions, terminals) hold an immutable state tree; stateless channels exist for streaming data. |
+| **State** | Immutable tree per state channel — root state, per-session state, per-terminal state. |
 | **Actions** | Discriminated union of typed mutations. The sole mechanism for state change. |
 | **Reducers** | Pure functions: `(state, action) → newState`. Run identically on server and client. |
-| **Subscriptions** | Clients subscribe to URIs to receive state snapshots and action streams. |
+| **Subscriptions** | Clients subscribe to channels to receive snapshots and action streams. |
 | **Commands** | Imperative RPCs for operations that don't map to a single state action. |
-| **Notifications** | Ephemeral broadcasts (not part of state) for events like session added/removed. |
+| **Notifications** | Ephemeral broadcasts scoped to a channel (e.g. `root/sessionAdded`, `auth/required`). |
 
 ## Who is AHP For?
 

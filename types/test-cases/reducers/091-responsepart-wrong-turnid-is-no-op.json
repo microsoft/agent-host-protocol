@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     }
@@ -22,7 +24,6 @@
   "actions": [
     {
       "type": "session/responsePart",
-      "session": "copilot:/test-session",
       "turnId": "wrong-turn",
       "part": {
         "kind": "markdown",
@@ -44,7 +45,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     }

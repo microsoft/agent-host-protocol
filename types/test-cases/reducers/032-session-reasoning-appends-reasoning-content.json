@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/responsePart",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "part": {
         "kind": "reasoning",
@@ -34,14 +33,12 @@
     },
     {
       "type": "session/reasoning",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "partId": "r-1",
       "content": "Thinking about "
     },
     {
       "type": "session/reasoning",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "partId": "r-1",
       "content": "the answer"

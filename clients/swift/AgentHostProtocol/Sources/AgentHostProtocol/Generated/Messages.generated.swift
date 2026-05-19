@@ -64,15 +64,6 @@ public struct JsonRpcNotification<Params: Codable>: Codable, Sendable where Para
 /// Params for the server → client `action` notification.
 public typealias ActionNotificationParams = ActionEnvelope
 
-/// Params for the server → client `notification` method.
-public struct NotificationMethodParams: Codable, Sendable {
-    public let notification: ProtocolNotification
-
-    public init(notification: ProtocolNotification) {
-        self.notification = notification
-    }
-}
-
 // MARK: - AHP Command Helpers
 
 /// Typed helper for constructing AHP JSON-RPC requests.

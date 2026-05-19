@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "unknownFuturePart"
@@ -31,7 +33,6 @@
   "actions": [
     {
       "type": "session/delta",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "partId": "md-1",
       "content": " new"
@@ -50,7 +51,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "unknownFuturePart"

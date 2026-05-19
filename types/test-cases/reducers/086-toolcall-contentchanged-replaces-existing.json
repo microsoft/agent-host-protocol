@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "toolCall",
@@ -27,7 +29,11 @@
             "toolInput": "ls -la",
             "confirmed": "user-action",
             "content": [
-              { "type": "terminal", "resource": "agenthost:/terminal/1", "title": "bash" }
+              {
+                "type": "terminal",
+                "resource": "agenthost:/terminal/1",
+                "title": "bash"
+              }
             ]
           }
         }
@@ -38,12 +44,18 @@
   "actions": [
     {
       "type": "session/toolCallContentChanged",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "content": [
-        { "type": "terminal", "resource": "agenthost:/terminal/1", "title": "bash" },
-        { "type": "text", "text": "additional output" }
+        {
+          "type": "terminal",
+          "resource": "agenthost:/terminal/1",
+          "title": "bash"
+        },
+        {
+          "type": "text",
+          "text": "additional output"
+        }
       ]
     }
   ],
@@ -60,7 +72,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "toolCall",
@@ -73,8 +87,15 @@
             "toolInput": "ls -la",
             "confirmed": "user-action",
             "content": [
-              { "type": "terminal", "resource": "agenthost:/terminal/1", "title": "bash" },
-              { "type": "text", "text": "additional output" }
+              {
+                "type": "terminal",
+                "resource": "agenthost:/terminal/1",
+                "title": "bash"
+              },
+              {
+                "type": "text",
+                "text": "additional output"
+              }
             ]
           }
         }

@@ -100,7 +100,9 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
 
   // Known unions
-  if (tsType === 'RootState | SessionState' || tsType === 'RootState | SessionState | TerminalState') return 'SnapshotState';
+  if (tsType === 'RootState | SessionState'
+    || tsType === 'RootState | SessionState | TerminalState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState') return 'SnapshotState';
 
   // T | null → T?
   const nullMatch = tsType.match(/^(.+?)\s*\|\s*null$/);
@@ -483,6 +485,7 @@ const STATE_ENUMS = [
   'TurnState', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason', 'ConfirmationOptionKind',
   'ToolResultContentType', 'CustomizationStatus', 'TerminalClaimKind',
+  'ChangesetStatus', 'ChangesetOperationScope',
 ];
 
 const STATE_STRUCTS = [
@@ -515,6 +518,7 @@ const STATE_STRUCTS = [
   'TerminalClientClaim', 'TerminalSessionClaim', 'TerminalState',
   'TerminalUnclassifiedPart', 'TerminalCommandPart',
   'UsageInfo', 'ErrorInfo', 'Snapshot',
+  'ChangesetSummary', 'ChangesetState', 'ChangesetFile', 'ChangesetOperation',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -694,11 +698,12 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot — root state, session state, or terminal state.
+  return `/// The state payload of a snapshot — root, session, terminal, or changeset state.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
     case terminal(TerminalState)
+    case changeset(ChangesetState)
 
     public init(from decoder: Decoder) throws {
         // SessionState has required \`summary\` field, try it first
@@ -706,6 +711,8 @@ public enum SnapshotState: Codable, Sendable {
             self = .session(session)
         } else if let terminal = try? TerminalState(from: decoder) {
             self = .terminal(terminal)
+        } else if let changeset = try? ChangesetState(from: decoder) {
+            self = .changeset(changeset)
         } else {
             self = .root(try RootState(from: decoder))
         }
@@ -716,6 +723,7 @@ public enum SnapshotState: Codable, Sendable {
         case .root(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .terminal(let state): try state.encode(to: encoder)
+        case .changeset(let state): try state.encode(to: encoder)
         }
     }
 }`;
@@ -804,6 +812,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/isReadChanged', caseName: 'sessionIsReadChanged', tsInterface: 'SessionIsReadChangedAction' },
   { type: 'session/isArchivedChanged', caseName: 'sessionIsArchivedChanged', tsInterface: 'SessionIsArchivedChangedAction' },
   { type: 'session/activityChanged', caseName: 'sessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
+  { type: 'session/changesetsChanged', caseName: 'sessionChangesetsChanged', tsInterface: 'SessionChangesetsChangedAction' },
   { type: 'session/serverToolsChanged', caseName: 'sessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
   { type: 'session/activeClientChanged', caseName: 'sessionActiveClientChanged', tsInterface: 'SessionActiveClientChangedAction' },
   { type: 'session/activeClientToolsChanged', caseName: 'sessionActiveClientToolsChanged', tsInterface: 'SessionActiveClientToolsChangedAction' },
@@ -817,10 +826,14 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/customizationToggled', caseName: 'sessionCustomizationToggled', tsInterface: 'SessionCustomizationToggledAction' },
   { type: 'session/customizationUpdated', caseName: 'sessionCustomizationUpdated', tsInterface: 'SessionCustomizationUpdatedAction' },
   { type: 'session/truncated', caseName: 'sessionTruncated', tsInterface: 'SessionTruncatedAction' },
-  { type: 'session/diffsChanged', caseName: 'sessionDiffsChanged', tsInterface: 'SessionDiffsChangedAction' },
   { type: 'session/configChanged', caseName: 'sessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', caseName: 'sessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
   { type: 'session/toolCallContentChanged', caseName: 'sessionToolCallContentChanged', tsInterface: 'SessionToolCallContentChangedAction' },
+  { type: 'changeset/statusChanged', caseName: 'changesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
+  { type: 'changeset/fileSet', caseName: 'changesetFileSet', tsInterface: 'ChangesetFileSetAction' },
+  { type: 'changeset/fileRemoved', caseName: 'changesetFileRemoved', tsInterface: 'ChangesetFileRemovedAction' },
+  { type: 'changeset/operationsChanged', caseName: 'changesetOperationsChanged', tsInterface: 'ChangesetOperationsChangedAction' },
+  { type: 'changeset/cleared', caseName: 'changesetCleared', tsInterface: 'ChangesetClearedAction' },
   { type: 'root/terminalsChanged', caseName: 'rootTerminalsChanged', tsInterface: 'RootTerminalsChangedAction' },
   { type: 'root/configChanged', caseName: 'rootConfigChanged', tsInterface: 'RootConfigChangedAction' },
   { type: 'terminal/data', caseName: 'terminalData', tsInterface: 'TerminalDataAction' },
@@ -842,8 +855,6 @@ function generateMergedToolCallConfirmedStruct(): string {
 public struct SessionToolCallConfirmedAction: Codable, Sendable {
     /// Action type discriminant
     public var type: String
-    /// Session URI
-    public var session: String
     /// Turn identifier
     public var turnId: String
     /// Tool call identifier
@@ -866,13 +877,12 @@ public struct SessionToolCallConfirmedAction: Codable, Sendable {
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
-        case type, session, turnId, toolCallId, approved, confirmed, editedToolInput, reason, userSuggestion, reasonMessage, selectedOptionId
+        case type, turnId, toolCallId, approved, confirmed, editedToolInput, reason, userSuggestion, reasonMessage, selectedOptionId
         case meta = "_meta"
     }
 
     public init(
         type: String = "session/toolCallConfirmed",
-        session: String,
         turnId: String,
         toolCallId: String,
         approved: Bool,
@@ -885,7 +895,6 @@ public struct SessionToolCallConfirmedAction: Codable, Sendable {
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
-        self.session = session
         self.turnId = turnId
         self.toolCallId = toolCallId
         self.approved = approved
@@ -1004,6 +1013,8 @@ const COMMAND_STRUCTS = [
   'SessionConfigCompletionsParams', 'SessionConfigCompletionsResult',
   'SessionConfigValueItem',
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
+  'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
+  'ChangesetOperationFollowUp',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1047,27 +1058,90 @@ function generateCommandsFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(RECONNECT_RESULT_UNION));
   lines.push('');
 
+  lines.push('// MARK: - Changeset Operation Unions\n');
+  lines.push(generateChangesetOperationTargetSwift());
+  lines.push('');
+
   return lines.join('\n');
+}
+
+function generateChangesetOperationTargetSwift(): string {
+  return `/// Identifies the file or range a \`ChangesetOperation\` should act on.
+public enum ChangesetOperationTarget: Codable, Sendable {
+    case resource(ChangesetOperationResourceTarget)
+    case range(ChangesetOperationRangeTarget)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "resource":
+            self = .resource(try ChangesetOperationResourceTarget(from: decoder))
+        case "range":
+            self = .range(try ChangesetOperationRangeTarget(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ChangesetOperationTarget discriminant: \\(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .resource(let value): try value.encode(to: encoder)
+        case .range(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public struct ChangesetOperationResourceTarget: Codable, Sendable {
+    public var kind: String { "resource" }
+    public var resource: String
+    public var side: String?
+
+    public init(resource: String, side: String? = nil) {
+        self.resource = resource
+        self.side = side
+    }
+
+    private enum CodingKeys: String, CodingKey { case resource, side }
+}
+
+public struct ChangesetOperationRangeTarget: Codable, Sendable {
+    public var kind: String { "range" }
+    public var resource: String
+    public var side: String?
+    public var range: ChangesetOperationTargetRange
+
+    public init(resource: String, side: String? = nil, range: ChangesetOperationTargetRange) {
+        self.resource = resource
+        self.side = side
+        self.range = range
+    }
+
+    private enum CodingKeys: String, CodingKey { case resource, side, range }
+}
+
+public struct ChangesetOperationTargetRange: Codable, Sendable {
+    public var start: Int
+    public var end: Int
+
+    public init(start: Int, end: Int) {
+        self.start = start
+        self.end = end
+    }
+}`;
 }
 
 // ─── Notifications File Generator ────────────────────────────────────────────
 
-const NOTIFICATION_ENUMS = ['AuthRequiredReason', 'NotificationType'];
+const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
-  'SessionAddedNotification', 'SessionRemovedNotification', 'SessionSummaryChangedNotification', 'AuthRequiredNotification',
+  'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams', 'AuthRequiredParams',
 ];
-
-const PROTOCOL_NOTIFICATION_UNION: UnionConfig = {
-  name: 'ProtocolNotification',
-  discriminantField: 'type',
-  variants: [
-    { caseName: 'sessionAdded', structName: 'SessionAddedNotification', discriminantValue: 'notify/sessionAdded' },
-    { caseName: 'sessionRemoved', structName: 'SessionRemovedNotification', discriminantValue: 'notify/sessionRemoved' },
-    { caseName: 'sessionSummaryChanged', structName: 'SessionSummaryChangedNotification', discriminantValue: 'notify/sessionSummaryChanged' },
-    { caseName: 'authRequired', structName: 'AuthRequiredNotification', discriminantValue: 'notify/authRequired' },
-  ],
-};
 
 function generateNotificationsFile(project: Project): string {
   const sf = project.getSourceFiles().find(f => f.getBaseName() === 'notifications.ts')!;
@@ -1111,10 +1185,6 @@ function generateNotificationsFile(project: Project): string {
       }
     }
   }
-
-  lines.push('// MARK: - ProtocolNotification Union\n');
-  lines.push(generateDiscriminatedUnion(PROTOCOL_NOTIFICATION_UNION));
-  lines.push('');
 
   return lines.join('\n');
 }
@@ -1243,15 +1313,6 @@ public struct JsonRpcNotification<Params: Codable>: Codable, Sendable where Para
 
 /// Params for the server → client \`action\` notification.
 public typealias ActionNotificationParams = ActionEnvelope
-
-/// Params for the server → client \`notification\` method.
-public struct NotificationMethodParams: Codable, Sendable {
-    public let notification: ProtocolNotification
-
-    public init(notification: ProtocolNotification) {
-        self.notification = notification
-    }
-}
 
 // MARK: - AHP Command Helpers
 
@@ -1419,27 +1480,24 @@ public struct AnyCodable: Codable, Sendable, Equatable {
 // ─── Exhaustiveness Check ─────────────────────────────────────────────────────
 
 /**
- * Verifies that every type imported in types/version/v1.ts from the protocol
- * source modules (state, actions, commands, notifications) is covered by one
- * of the generator lists or a known special-cased code path.
+ * Verifies that every type exported from the protocol source modules
+ * (state, actions, commands, notifications, errors) is covered by one of
+ * the generator lists or a known special-cased code path.
  *
  * This catches the class of bug where a new type is added to the TypeScript
- * protocol and to v1.ts but the Swift generator lists are not updated.
+ * protocol but the Swift generator lists are not updated.
  */
 function checkExhaustiveness(project: Project): void {
-  const v1 = project.getSourceFiles().find(f => f.getBaseName() === 'v1.ts');
-  if (!v1) throw new Error('Could not find types/version/v1.ts in the project');
-
-  // Collect all interface/type names imported from protocol source modules.
-  // We skip messages.ts because its types (CommandMap etc.) are generated
-  // as literal Swift strings in generateMessagesFile(), not as struct lists.
-  const protocolModules = new Set(['state', 'actions', 'commands', 'notifications', 'errors']);
+  const protocolModules = ['state.ts', 'actions.ts', 'commands.ts', 'notifications.ts', 'errors.ts'];
   const imported = new Set<string>();
-  for (const decl of v1.getImportDeclarations()) {
-    const mod = decl.getModuleSpecifierValue().replace(/^\.\.\//, '').replace(/\.js$/, '');
-    if (!protocolModules.has(mod)) continue;
-    for (const named of decl.getNamedImports()) {
-      imported.add(named.getName());
+  for (const baseName of protocolModules) {
+    const sf = project.getSourceFiles().find(f => f.getBaseName() === baseName);
+    if (!sf) throw new Error(`Could not find types/${baseName} in the project`);
+    for (const decl of sf.getInterfaces()) {
+      if (decl.isExported()) imported.add(decl.getName());
+    }
+    for (const decl of sf.getTypeAliases()) {
+      if (decl.isExported()) imported.add(decl.getName());
     }
   }
 
@@ -1458,14 +1516,19 @@ function checkExhaustiveness(project: Project): void {
 
   // Types that ARE generated but via explicit non-list code paths.
   const knownSpecial = new Set<string>([
+    'URI',                          // type alias for string
+    'BaseParams',                    // marker base interface; flattened into each command params struct
     'StringOrMarkdown',              // generateStringOrMarkdown()
     'ToolCallState',                // TOOL_CALL_STATE_UNION discriminated union
     'StateAction',                  // StateAction enum in generateActionsFile()
     'ActionEnvelope',               // generateStructFromInterface() call in generateActionsFile()
     'ActionOrigin',                 // generateStructFromInterface() call in generateActionsFile()
+    'ResponsePart',                 // RESPONSE_PART_UNION discriminated union
+    'ToolResultContent',            // TOOL_RESULT_CONTENT_UNION discriminated union
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction
-    'ProtocolNotification',         // PROTOCOL_NOTIFICATION_UNION discriminated union
+    'SessionToolCallConfirmedAction', // emitted as merged variant
+    'PingParams',                    // empty interface; no Swift type emitted
     'TerminalClaim',                // TERMINAL_CLAIM_UNION discriminated union
     'TerminalContentPart',           // TERMINAL_CONTENT_PART_UNION discriminated union
     'SessionInputQuestion',         // SESSION_INPUT_QUESTION_UNION discriminated union
@@ -1478,14 +1541,18 @@ function checkExhaustiveness(project: Project): void {
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()
     'AhpError',                     // typed via JsonRpcError; not a Swift struct
     'AhpErrorDetailsMap',           // type-level mapping; not a Swift struct
+    'AhpErrorCode',                 // type-level alias over AhpErrorCodes const enum
+    'AhpErrorCodeWithData',         // type-level alias; not a Swift type
+    'JsonRpcErrorCode',             // type-level alias over JsonRpcErrorCodes const enum
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
+    'ChangesetOperationTarget',     // TS discriminated union; consumers should add a Swift case-iterable enum
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));
   if (missing.length > 0) {
     throw new Error(
       `generate-swift.ts exhaustiveness check failed.\n` +
-      `The following types are declared in types/version/v1.ts but are not covered by the Swift generator:\n` +
+      `The following types are exported from the protocol source modules but are not covered by the Swift generator:\n` +
       missing.map(n => `  - ${n}`).join('\n') + '\n\n' +
       `Add them to the appropriate list in scripts/generate-swift.ts:\n` +
       `  STATE_STRUCTS / STATE_ENUMS, COMMAND_STRUCTS / COMMAND_ENUMS,\n` +

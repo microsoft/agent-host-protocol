@@ -115,7 +115,7 @@ pub struct HostConfig {
     /// `clientId` sent to this host on `initialize` / `reconnect`.
     pub client_id: String,
     /// URIs to include in the `initialize` handshake. Defaults to
-    /// `["agenthost:/root"]` so root state is always tracked.
+    /// `["ahp-root://"]` so root state is always tracked.
     pub initial_subscriptions: Vec<String>,
     /// Configuration forwarded to the underlying [`Client`].
     pub client_config: ClientConfig,
@@ -233,7 +233,7 @@ pub struct HostHandle {
     pub completion_trigger_characters: Vec<String>,
     /// Cached session summaries keyed by URI. Seeded by `listSessions`
     /// after each connect and kept fresh by
-    /// `notify/sessionAdded`/`Removed`/`SummaryChanged` notifications.
+    /// `root/sessionAdded`/`Removed`/`SummaryChanged` notifications.
     pub session_summaries: Vec<SessionSummary>,
     /// Generation counter — bumped on every `connect` or `reconnect`.
     /// [`HostClientHandle`]s carry the generation they were issued at,
@@ -323,10 +323,11 @@ impl HostClientHandle {
     /// connection has been replaced by a reconnect.
     pub async fn dispatch(
         &self,
+        channel: ahp_types::common::Uri,
         action: ahp_types::actions::StateAction,
     ) -> Result<DispatchHandle, HostError> {
         self.check_alive().await?;
-        Ok(self.client.dispatch(action).await?)
+        Ok(self.client.dispatch(channel, action).await?)
     }
 
     /// Issue an arbitrary JSON-RPC request through this connection,
@@ -358,16 +359,16 @@ impl std::fmt::Debug for HostClientHandle {
 
 /// Inbound event tagged with host of origin.
 ///
-/// Delivered by [`super::MultiHostClient::events`]. The `resource` field
-/// carries the URI the event is scoped to (typically derived from the
-/// action payload). Protocol-level [`ahp_types::notifications::ProtocolNotification`]s
-/// have `resource: None` because they aren't bound to a single resource.
+/// Delivered by [`super::MultiHostClient::events`]. The `channel` field
+/// carries the URI the event is scoped to (the envelope's `channel` for
+/// actions, the notification params' `channel` for protocol
+/// notifications).
 #[derive(Debug, Clone)]
 pub struct HostSubscriptionEvent {
     /// Host that produced the event.
     pub host_id: HostId,
-    /// Resource URI, when applicable. `None` for protocol notifications.
-    pub resource: Option<String>,
+    /// Channel URI this event was scoped to.
+    pub channel: String,
     /// The underlying [`SubscriptionEvent`].
     pub event: SubscriptionEvent,
 }

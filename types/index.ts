@@ -87,6 +87,10 @@ export type {
   TerminalContentPart,
   TerminalUnclassifiedPart,
   TerminalCommandPart,
+  ChangesetSummary,
+  ChangesetState,
+  ChangesetFile,
+  ChangesetOperation,
 } from './state.js';
 
 export {
@@ -107,6 +111,8 @@ export {
   SessionInputQuestionKind,
   SessionInputResponseKind,
   TerminalClaimKind,
+  ChangesetStatus,
+  ChangesetOperationScope,
 } from './state.js';
 
 // Action types
@@ -149,8 +155,12 @@ export type {
   SessionIsReadChangedAction,
   SessionIsArchivedChangedAction,
   SessionActivityChangedAction,
-  SessionDiffsChangedAction,
   SessionConfigChangedAction,
+  ChangesetStatusChangedAction,
+  ChangesetFileSetAction,
+  ChangesetFileRemovedAction,
+  ChangesetOperationsChangedAction,
+  ChangesetClearedAction,
   StateAction,
   RootTerminalsChangedAction,
   RootConfigChangedAction,
@@ -178,6 +188,9 @@ export type {
   TerminalAction,
   ClientTerminalAction,
   ServerTerminalAction,
+  ChangesetAction,
+  ClientChangesetAction,
+  ServerChangesetAction,
 } from './action-origin.generated.js';
 
 export { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
@@ -187,6 +200,7 @@ export {
   rootReducer,
   sessionReducer,
   terminalReducer,
+  changesetReducer,
   isClientDispatchable,
 } from './reducers.js';
 
@@ -241,20 +255,23 @@ export type {
   CompletionsParams,
   CompletionsResult,
   CompletionItem,
+  InvokeChangesetOperationParams,
+  InvokeChangesetOperationResult,
+  ChangesetOperationTarget,
+  ChangesetOperationFollowUp,
 } from './commands.js';
 
 export { ReconnectResultType, ContentEncoding, CompletionItemKind } from './commands.js';
 
 // Notification types
 export type {
-  SessionAddedNotification,
-  SessionRemovedNotification,
-  SessionSummaryChangedNotification,
-  AuthRequiredNotification,
-  ProtocolNotification,
+  SessionAddedParams,
+  SessionRemovedParams,
+  SessionSummaryChangedParams,
+  AuthRequiredParams,
 } from './notifications.js';
 
-export { NotificationType, AuthRequiredReason } from './notifications.js';
+export { AuthRequiredReason } from './notifications.js';
 
 // Message types (JSON-RPC wire format)
 export type {
@@ -266,10 +283,8 @@ export type {
   AhpErrorResponse,
   CommandMap,
   ServerCommandMap,
-  NotificationMethodParams,
   ClientNotificationMap,
   ServerNotificationMap,
-  NotificationMap,
   AhpRequest,
   AhpServerRequest,
   AhpSuccessResponse,

@@ -26,7 +26,7 @@ final class AHPStateMirrorTests: XCTestCase {
         let mirror = AHPStateMirror()
         let session = SessionState(
             summary: SessionSummary(
-                resource: "copilot:/s1",
+                resource: "ahp-session:/s1",
                 provider: "test",
                 title: "T",
                 status: .idle,
@@ -36,13 +36,13 @@ final class AHPStateMirrorTests: XCTestCase {
             turns: []
         )
         let snapshot = Snapshot(
-            resource: "copilot:/s1",
+            resource: "ahp-session:/s1",
             state: .session(session),
             fromSeq: 0
         )
         await mirror.applySnapshot(snapshot)
         let sessions = await mirror.sessions
-        XCTAssertNotNil(sessions["copilot:/s1"])
+        XCTAssertNotNil(sessions["ahp-session:/s1"])
     }
 
     func testApplyRootActionUpdatesRoot() async {
@@ -51,6 +51,7 @@ final class AHPStateMirrorTests: XCTestCase {
             AgentInfo(provider: "x", displayName: "X", description: "", models: [])
         ]
         let envelope = ActionEnvelope(
+            channel: RootResourceURI,
             action: .rootAgentsChanged(RootAgentsChangedAction(
                 type: .rootAgentsChanged,
                 agents: agents
@@ -67,7 +68,7 @@ final class AHPStateMirrorTests: XCTestCase {
         let mirror = AHPStateMirror()
         let initial = SessionState(
             summary: SessionSummary(
-                resource: "copilot:/s1",
+                resource: "ahp-session:/s1",
                 provider: "test",
                 title: "Old",
                 status: .idle,
@@ -77,22 +78,22 @@ final class AHPStateMirrorTests: XCTestCase {
             turns: []
         )
         await mirror.applySnapshot(Snapshot(
-            resource: "copilot:/s1",
+            resource: "ahp-session:/s1",
             state: .session(initial),
             fromSeq: 0
         ))
 
         let envelope = ActionEnvelope(
+            channel: "ahp-session:/s1",
             action: .sessionTitleChanged(SessionTitleChangedAction(
                 type: .sessionTitleChanged,
-                session: "copilot:/s1",
                 title: "New"
             )),
             serverSeq: 1
         )
         await mirror.apply(envelope)
         let sessions = await mirror.sessions
-        XCTAssertEqual(sessions["copilot:/s1"]?.summary.title, "New")
+        XCTAssertEqual(sessions["ahp-session:/s1"]?.summary.title, "New")
     }
 
     func testResetClearsState() async {

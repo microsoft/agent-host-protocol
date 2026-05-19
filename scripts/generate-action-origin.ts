@@ -16,7 +16,7 @@ const GENERATED_HEADER = `// Generated from types/actions.ts — do not edit
 // Run \`npm run generate\` to regenerate.
 `;
 
-type ActionScope = 'root' | 'session' | 'terminal';
+type ActionScope = 'root' | 'session' | 'terminal' | 'changeset';
 
 interface ActionInfo {
   /** The interface name (e.g. 'RootAgentsChangedAction') */
@@ -115,6 +115,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
     const category = getJsDocTag(node as any, 'category') || '';
     const scope: ActionScope = category === 'Root Actions' ? 'root'
       : category === 'Terminal Actions' ? 'terminal'
+      : category === 'Changeset Actions' ? 'changeset'
       : 'session';
     const isClientDispatchable = hasJsDocTag(node as any, 'clientDispatchable');
 
@@ -163,12 +164,15 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const rootActions = actions.filter(a => a.scope === 'root');
   const sessionActions = actions.filter(a => a.scope === 'session');
   const terminalActions = actions.filter(a => a.scope === 'terminal');
+  const changesetActions = actions.filter(a => a.scope === 'changeset');
   const clientRootActions = rootActions.filter(a => a.isClientDispatchable);
   const serverRootActions = rootActions.filter(a => !a.isClientDispatchable);
   const clientSessionActions = sessionActions.filter(a => a.isClientDispatchable);
   const serverSessionActions = sessionActions.filter(a => !a.isClientDispatchable);
   const clientTerminalActions = terminalActions.filter(a => a.isClientDispatchable);
   const serverTerminalActions = terminalActions.filter(a => !a.isClientDispatchable);
+  const clientChangesetActions = changesetActions.filter(a => a.isClientDispatchable);
+  const serverChangesetActions = changesetActions.filter(a => !a.isClientDispatchable);
 
   const lines: string[] = [GENERATED_HEADER];
 
@@ -184,7 +188,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   lines.push(``);
 
   // RootAction
-  lines.push(`// ─── Root vs Session vs Terminal Action Unions ───────────────────────────────`);
+  lines.push(`// ─── Root vs Session vs Terminal vs Changeset Action Unions ─────────────────`);
   lines.push(``);
   lines.push(`/** Union of all root-scoped actions. */`);
   lines.push(`export type RootAction =`);
@@ -262,6 +266,41 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   lines.push(`export type ServerTerminalAction =`);
   for (let i = 0; i < serverTerminalActions.length; i++) {
     lines.push(`  | ${serverTerminalActions[i].name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  // ChangesetAction
+  lines.push(`/** Union of all changeset-scoped actions. */`);
+  lines.push(`export type ChangesetAction =`);
+  for (let i = 0; i < changesetActions.length; i++) {
+    lines.push(`  | ${changesetActions[i].name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  // ClientChangesetAction
+  lines.push(`/** Union of changeset actions that clients may dispatch. */`);
+  lines.push(`export type ClientChangesetAction =`);
+  if (clientChangesetActions.length === 0) {
+    lines.push(`  never`);
+  } else {
+    for (let i = 0; i < clientChangesetActions.length; i++) {
+      lines.push(`  | ${clientChangesetActions[i].name}`);
+    }
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  // ServerChangesetAction
+  lines.push(`/** Union of changeset actions that only the server may produce. */`);
+  lines.push(`export type ServerChangesetAction =`);
+  if (serverChangesetActions.length === 0) {
+    lines.push(`  never`);
+  } else {
+    for (let i = 0; i < serverChangesetActions.length; i++) {
+      lines.push(`  | ${serverChangesetActions[i].name}`);
+    }
   }
   lines.push(`;`);
   lines.push(``);

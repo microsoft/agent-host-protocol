@@ -92,7 +92,7 @@ final class ReducersTests: XCTestCase {
         let original = state.turns
         _ = sessionReducer(
             state: state,
-            action: .sessionTruncated(SessionTruncatedAction(type: .sessionTruncated, session: S, turnId: "t1"))
+            action: .sessionTruncated(SessionTruncatedAction(type: .sessionTruncated, turnId: "t1"))
         )
         XCTAssertEqual(state.turns.count, original.count)
     }
@@ -101,13 +101,13 @@ final class ReducersTests: XCTestCase {
 
     func testClientDispatchableReturnsTrue() {
         let action: StateAction = .sessionTurnStarted(SessionTurnStartedAction(
-            type: .sessionTurnStarted, session: S, turnId: T, userMessage: UserMessage(text: "Hello")
+            type: .sessionTurnStarted, turnId: T, userMessage: UserMessage(text: "Hello")
         ))
         XCTAssertTrue(isClientDispatchable(action))
     }
 
     func testClientDispatchableReturnsFalse() {
-        let action: StateAction = .sessionReady(SessionReadyAction(type: .sessionReady, session: S))
+        let action: StateAction = .sessionReady(SessionReadyAction(type: .sessionReady))
         XCTAssertFalse(isClientDispatchable(action))
     }
 
@@ -118,7 +118,7 @@ final class ReducersTests: XCTestCase {
         let next = sessionReducer(
             state: state,
             action: .sessionTurnStarted(SessionTurnStartedAction(
-                type: .sessionTurnStarted, session: S, turnId: T, userMessage: UserMessage(text: "Hello")
+                type: .sessionTurnStarted, turnId: T, userMessage: UserMessage(text: "Hello")
             ))
         )
         XCTAssertGreaterThan(next.summary.modifiedAt, state.summary.modifiedAt)
@@ -129,7 +129,7 @@ final class ReducersTests: XCTestCase {
         let next = sessionReducer(
             state: state,
             action: .sessionTitleChanged(SessionTitleChangedAction(
-                type: .sessionTitleChanged, session: S, title: "New Title"
+                type: .sessionTitleChanged, title: "New Title"
             ))
         )
         XCTAssertGreaterThan(next.summary.modifiedAt, state.summary.modifiedAt)

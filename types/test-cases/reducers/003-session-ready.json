@@ -15,8 +15,7 @@
   },
   "actions": [
     {
-      "type": "session/ready",
-      "session": "copilot:/test-session"
+      "type": "session/ready"
     }
   ],
   "expected": {

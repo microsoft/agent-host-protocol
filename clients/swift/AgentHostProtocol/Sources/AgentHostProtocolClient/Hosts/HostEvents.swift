@@ -5,11 +5,11 @@ import AgentHostProtocol
 
 /// Inbound subscription event tagged with the host that produced it.
 ///
-/// Delivered by `MultiHostClient.events()`. `resource` carries the URI the
-/// event is scoped to (typically derived from the underlying action's
-/// `session`/`terminal` field). Protocol-level notifications (session
-/// added/removed/changed, auth required) carry `resource: nil` because they
-/// aren't bound to a single resource.
+/// Delivered by `MultiHostClient.events()`. `resource` carries the URI of
+/// the channel the event was delivered on — for actions, this is
+/// `envelope.channel`; for protocol notifications, this is the
+/// `channel` field on the notification's params (typically the root channel
+/// for session-catalogue events).
 public struct HostSubscriptionEvent: Sendable {
     public let hostId: HostId
     public let resource: String?

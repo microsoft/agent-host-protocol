@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/toolCallDelta",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "nonexistent",
       "content": "data"

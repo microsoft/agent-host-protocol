@@ -16,8 +16,9 @@
   "actions": [
     {
       "type": "session/modelChanged",
-      "session": "copilot:/test-session",
-      "model": { "id": "gpt-4" }
+      "model": {
+        "id": "gpt-4"
+      }
     }
   ],
   "expected": {
@@ -28,7 +29,9 @@
       "status": 1,
       "createdAt": 1000,
       "modifiedAt": 9999,
-      "model": { "id": "gpt-4" }
+      "model": {
+        "id": "gpt-4"
+      }
     },
     "lifecycle": "creating",
     "turns": []

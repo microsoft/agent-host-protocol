@@ -22,7 +22,6 @@
   "actions": [
     {
       "type": "session/pendingMessageRemoved",
-      "session": "copilot:/test-session",
       "kind": "steering",
       "id": "sm-unknown"
     }

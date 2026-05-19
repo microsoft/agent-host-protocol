@@ -25,7 +25,6 @@
   "actions": [
     {
       "type": "session/customizationsChanged",
-      "session": "copilot:/test-session",
       "customizations": [
         {
           "customization": {

@@ -17,7 +17,6 @@
   "actions": [
     {
       "type": "session/activityChanged",
-      "session": "copilot:/test-session",
       "activity": null
     }
   ],

@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/toolCallStart",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "toolName": "bash",
@@ -32,7 +31,6 @@
     },
     {
       "type": "session/toolCallDelta",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "content": "ls -la",
@@ -40,7 +38,6 @@
     },
     {
       "type": "session/toolCallReady",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run: ls -la",
@@ -48,7 +45,6 @@
     },
     {
       "type": "session/toolCallConfirmed",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "approved": true,
@@ -56,7 +52,6 @@
     },
     {
       "type": "session/toolCallComplete",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "result": {

@@ -239,14 +239,15 @@ impl MultiHostClient {
         entry.unsubscribe(uri).await
     }
 
-    /// Convenience: dispatch `action` on `host_id`.
+    /// Convenience: dispatch `action` on `channel` against `host_id`.
     pub async fn dispatch(
         &self,
         host_id: &HostId,
+        channel: ahp_types::common::Uri,
         action: ahp_types::actions::StateAction,
     ) -> Result<crate::DispatchHandle, HostError> {
         let entry = self.host_entry(host_id).await?;
-        entry.dispatch(action).await
+        entry.dispatch(channel, action).await
     }
 
     /// Subscribe to a fan-in stream of every inbound event from every
@@ -363,12 +364,14 @@ impl HostHandleTxRef {
 
     async fn dispatch(
         &self,
+        channel: ahp_types::common::Uri,
         action: ahp_types::actions::StateAction,
     ) -> Result<crate::DispatchHandle, HostError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let host_id = self.host_id().await;
         self.cmd_tx
             .send(super::runtime::HostCommand::Dispatch {
+                channel,
                 action: Box::new(action),
                 reply: tx,
             })

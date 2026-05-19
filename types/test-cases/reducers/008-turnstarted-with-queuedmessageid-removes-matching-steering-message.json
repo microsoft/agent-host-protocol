@@ -22,7 +22,6 @@
   "actions": [
     {
       "type": "session/turnStarted",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "userMessage": {
         "text": "Steer"

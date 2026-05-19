@@ -21,11 +21,12 @@ import {
   rootReducer,
   sessionReducer,
   terminalReducer,
+  changesetReducer,
   isClientDispatchable,
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState } from './state.js';
+import type { RootState, SessionState, ChangesetState } from './state.js';
 import {
   SessionLifecycle,
   SessionStatus,
@@ -43,10 +44,10 @@ function readSource(file: string): string {
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'terminal';
-  initial: RootState | SessionState | TerminalState;
+  reducer: 'root' | 'session' | 'terminal' | 'changeset';
+  initial: RootState | SessionState | TerminalState | ChangesetState;
   actions: unknown[];
-  expected: RootState | SessionState | TerminalState;
+  expected: RootState | SessionState | TerminalState | ChangesetState;
 }
 
 /**
@@ -102,6 +103,8 @@ describe('reducer fixtures', () => {
           state = rootReducer(state as RootState, action as any);
         } else if (fixture.reducer === 'terminal') {
           state = terminalReducer(state as TerminalState, action as any);
+        } else if (fixture.reducer === 'changeset') {
+          state = changesetReducer(state as ChangesetState, action as any);
         } else {
           state = sessionReducer(state as SessionState, action as any);
         }

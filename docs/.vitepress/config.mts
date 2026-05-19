@@ -62,8 +62,16 @@ export default withMermaid(defineConfig({
             { text: 'Transport', link: '/specification/transport' },
             { text: 'Lifecycle', link: '/specification/lifecycle' },
             { text: 'Authentication', link: '/specification/authentication' },
-            { text: 'Subscriptions', link: '/specification/subscriptions' },
+            { text: 'Channels & Subscriptions', link: '/specification/subscriptions' },
             { text: 'Versioning', link: '/specification/versioning' },
+          ],
+        },
+        {
+          text: 'Channels',
+          items: [
+            { text: 'Root Channel', link: '/specification/root-channel' },
+            { text: 'Session Channel', link: '/specification/session-channel' },
+            { text: 'Terminal Channel', link: '/specification/terminal-channel' },
           ],
         },
       ],

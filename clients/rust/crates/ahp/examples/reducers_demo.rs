@@ -27,6 +27,7 @@ fn main() {
 
     let envelopes = vec![
         ActionEnvelope {
+            channel: ahp_types::ROOT_RESOURCE_URI.to_string(),
             action: StateAction::RootAgentsChanged(RootAgentsChangedAction {
                 agents: vec![AgentInfo {
                     provider: "copilot".into(),
@@ -42,6 +43,7 @@ fn main() {
             rejection_reason: None,
         },
         ActionEnvelope {
+            channel: ahp_types::ROOT_RESOURCE_URI.to_string(),
             action: StateAction::RootActiveSessionsChanged(RootActiveSessionsChangedAction {
                 active_sessions: 3,
             }),

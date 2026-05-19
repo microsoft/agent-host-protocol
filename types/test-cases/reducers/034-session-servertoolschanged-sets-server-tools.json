@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/serverToolsChanged",
-      "session": "copilot:/test-session",
       "tools": [
         {
           "name": "bash",

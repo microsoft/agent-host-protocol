@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     },
@@ -25,7 +27,10 @@
         "answers": {
           "q1": {
             "state": "draft",
-            "value": { "kind": "text", "value": "draft" }
+            "value": {
+              "kind": "text",
+              "value": "draft"
+            }
           }
         }
       }
@@ -34,7 +39,6 @@
   "actions": [
     {
       "type": "session/inputRequested",
-      "session": "copilot:/test-session",
       "request": {
         "id": "input-1",
         "message": "New message"
@@ -42,18 +46,18 @@
     },
     {
       "type": "session/inputRequested",
-      "session": "copilot:/test-session",
       "request": {
         "id": "input-1",
         "message": "New message",
         "answers": {
-          "q2": { "state": "skipped" }
+          "q2": {
+            "state": "skipped"
+          }
         }
       }
     },
     {
       "type": "session/inputAnswerChanged",
-      "session": "copilot:/test-session",
       "requestId": "input-1",
       "questionId": "q2"
     }
@@ -71,7 +75,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     },

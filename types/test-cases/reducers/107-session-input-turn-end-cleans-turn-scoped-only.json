@@ -14,21 +14,34 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     },
     "inputRequests": [
-      { "id": "url-input", "message": "Review this URL", "url": "https://example.com/form" },
-      { "id": "form-input", "message": "Answer this form", "questions": [
-        { "id": "q1", "kind": "boolean", "message": "Continue?" }
-      ] }
+      {
+        "id": "url-input",
+        "message": "Review this URL",
+        "url": "https://example.com/form"
+      },
+      {
+        "id": "form-input",
+        "message": "Answer this form",
+        "questions": [
+          {
+            "id": "q1",
+            "kind": "boolean",
+            "message": "Continue?"
+          }
+        ]
+      }
     ]
   },
   "actions": [
     {
       "type": "session/turnComplete",
-      "session": "copilot:/test-session",
       "turnId": "turn-1"
     }
   ],
@@ -45,7 +58,9 @@
     "turns": [
       {
         "id": "turn-1",
-        "userMessage": { "text": "Hello" },
+        "userMessage": {
+          "text": "Hello"
+        },
         "responseParts": [],
         "usage": null,
         "state": "complete",

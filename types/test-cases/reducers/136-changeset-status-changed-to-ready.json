@@ -1,0 +1,19 @@
+{
+  "description": "changeset/statusChanged transitions from computing to ready and clears any prior error",
+  "reducer": "changeset",
+  "initial": {
+    "status": "computing",
+    "error": { "errorType": "stale", "message": "old error" },
+    "files": []
+  },
+  "actions": [
+    {
+      "type": "changeset/statusChanged",
+      "status": "ready"
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": []
+  }
+}

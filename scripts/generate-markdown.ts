@@ -706,8 +706,9 @@ function generateCommandsPage(project: Project): string {
   lines.push('  "jsonrpc": "2.0",');
   lines.push('  "method": "dispatchAction",');
   lines.push('  "params": {');
+  lines.push('    "channel": "copilot:/<uuid>",');
   lines.push('    "clientSeq": 1,');
-  lines.push('    "action": { "type": "session/turnStarted", "session": "copilot:/<uuid>", ... }');
+  lines.push('    "action": { "type": "session/turnStarted", ... }');
   lines.push('  }');
   lines.push('}');
   lines.push('```\n');
@@ -731,14 +732,14 @@ function generateNotificationsPage(project: Project): string {
 
   const lines: string[] = [GENERATED_HEADER];
   lines.push('# Notifications\n');
-  lines.push('Notifications are ephemeral broadcasts that are **not** part of the state tree. They are not processed by reducers and are not replayed on reconnection.\n');
+  lines.push('Notifications are ephemeral broadcasts that are **not** part of the state tree. They are not processed by reducers and are not replayed on reconnection. Every notification carries a top-level `channel: URI` identifying the subscription it belongs to.\n');
   lines.push(schemaLink('notifications.schema.json'));
 
   // Protocol Notifications
   lines.push('## Protocol Notifications\n');
 
-  const sessionAdded = getInterface(project, 'SessionAddedNotification');
-  lines.push(`### \`notify/sessionAdded\` ${sourceLink(sessionAdded)}\n`);
+  const sessionAdded = getInterface(project, 'SessionAddedParams');
+  lines.push(`### \`root/sessionAdded\` ${sourceLink(sessionAdded)}\n`);
   lines.push(getJsDocDescription(sessionAdded) + '\n');
   lines.push(renderInterfaceTable(sessionAdded) + '\n');
 
@@ -748,8 +749,8 @@ function generateNotificationsPage(project: Project): string {
     lines.push(example + '\n');
   }
 
-  const sessionRemoved = getInterface(project, 'SessionRemovedNotification');
-  lines.push(`### \`notify/sessionRemoved\` ${sourceLink(sessionRemoved)}\n`);
+  const sessionRemoved = getInterface(project, 'SessionRemovedParams');
+  lines.push(`### \`root/sessionRemoved\` ${sourceLink(sessionRemoved)}\n`);
   lines.push(getJsDocDescription(sessionRemoved) + '\n');
   lines.push(renderInterfaceTable(sessionRemoved) + '\n');
 
@@ -759,8 +760,8 @@ function generateNotificationsPage(project: Project): string {
     lines.push(example + '\n');
   }
 
-  const sessionSummaryChanged = getInterface(project, 'SessionSummaryChangedNotification');
-  lines.push(`### \`notify/sessionSummaryChanged\` ${sourceLink(sessionSummaryChanged)}\n`);
+  const sessionSummaryChanged = getInterface(project, 'SessionSummaryChangedParams');
+  lines.push(`### \`root/sessionSummaryChanged\` ${sourceLink(sessionSummaryChanged)}\n`);
   lines.push(getJsDocDescription(sessionSummaryChanged) + '\n');
   lines.push(renderInterfaceTable(sessionSummaryChanged) + '\n');
 
@@ -770,20 +771,32 @@ function generateNotificationsPage(project: Project): string {
     lines.push(example + '\n');
   }
 
+  const authRequired = getInterface(project, 'AuthRequiredParams');
+  lines.push(`### \`auth/required\` ${sourceLink(authRequired)}\n`);
+  lines.push(getJsDocDescription(authRequired) + '\n');
+  lines.push(renderInterfaceTable(authRequired) + '\n');
+
+  const authRequiredExamples = getJsDocExamples(authRequired);
+  for (const example of authRequiredExamples) {
+    lines.push('**Example:**\n');
+    lines.push(example + '\n');
+  }
+
   // Usage Pattern
   lines.push('## Usage Pattern\n');
   lines.push('Clients use notifications to maintain a local session list cache:\n');
   lines.push('1. On connect, fetch the full session list via `listSessions()`.');
-  lines.push('2. Listen for `notify/sessionAdded` and `notify/sessionRemoved` to track lifecycle, and `notify/sessionSummaryChanged` to patch cached summaries in place.');
+  lines.push('2. Listen for `root/sessionAdded` and `root/sessionRemoved` to track lifecycle, and `root/sessionSummaryChanged` to patch cached summaries in place.');
   lines.push('3. On reconnect, **re-fetch** the full list — notifications are not replayed.\n');
 
   // Version Introduction
   lines.push('## Version Introduction\n');
-  lines.push('| Notification Type | Version |');
+  lines.push('| Notification Method | Version |');
   lines.push('|---|---|');
-  lines.push('| `notify/sessionAdded` | 1 |');
-  lines.push('| `notify/sessionRemoved` | 1 |');
-  lines.push('| `notify/sessionSummaryChanged` | 1 |\n');
+  lines.push('| `root/sessionAdded` | 1 |');
+  lines.push('| `root/sessionRemoved` | 1 |');
+  lines.push('| `root/sessionSummaryChanged` | 1 |');
+  lines.push('| `auth/required` | 1 |\n');
 
   // Server Notifications (action delivery)
   lines.push('## Server Notifications\n');
@@ -795,11 +808,10 @@ function generateNotificationsPage(project: Project): string {
   lines.push('  "jsonrpc": "2.0",');
   lines.push('  "method": "action",');
   lines.push('  "params": {');
-  lines.push('    "envelope": {');
-  lines.push('      "action": { "type": "session/delta", ... },');
-  lines.push('      "serverSeq": 43,');
-  lines.push('      "origin": { "clientId": "client-1", "clientSeq": 1 }');
-  lines.push('    }');
+  lines.push('    "channel": "copilot:/<uuid>",');
+  lines.push('    "action": { "type": "session/delta", ... },');
+  lines.push('    "serverSeq": 43,');
+  lines.push('    "origin": { "clientId": "client-1", "clientSeq": 1 }');
   lines.push('  }');
   lines.push('}');
   lines.push('```');
@@ -920,18 +932,21 @@ function generateMessagesPage(_project: Project): string {
   lines.push('| `resourceRequest` | Request access to a resource (also Server → Client) | [Commands](/reference/commands) |\n');
 
   lines.push('## Client → Server Notifications\n');
-  lines.push('These methods have no `id` and expect no response.\n');
+  lines.push('These methods have no `id` and expect no response. Every notification carries a top-level `channel: URI`.\n');
   lines.push('| Method | Description | Reference |');
   lines.push('|---|---|---|');
-  lines.push('| `unsubscribe` | Stop receiving updates for a URI | [Subscriptions](/specification/subscriptions) |');
+  lines.push('| `unsubscribe` | Stop receiving updates for a channel | [Subscriptions](/specification/subscriptions) |');
   lines.push('| `dispatchAction` | Fire-and-forget action dispatch (write-ahead) | [Actions](/guide/actions) |\n');
 
   lines.push('## Server → Client Notifications\n');
-  lines.push('These are pushed by the server without a preceding request.\n');
+  lines.push('These are pushed by the server without a preceding request. Every notification carries a top-level `channel: URI`.\n');
   lines.push('| Method | Description | Reference |');
   lines.push('|---|---|---|');
   lines.push('| `action` | Delivers an `ActionEnvelope` to subscribed clients | [Actions](/reference/actions) |');
-  lines.push('| `notification` | Ephemeral protocol notification (e.g. session added/removed) | [Notifications](/reference/notifications) |\n');
+  lines.push('| `root/sessionAdded` | Broadcast when a new session is created | [Notifications](/reference/notifications) |');
+  lines.push('| `root/sessionRemoved` | Broadcast when a session is disposed | [Notifications](/reference/notifications) |');
+  lines.push('| `root/sessionSummaryChanged` | Broadcast when a known session\'s summary mutates | [Notifications](/reference/notifications) |');
+  lines.push('| `auth/required` | A protected resource requires (re-)authentication | [Notifications](/reference/notifications) |\n');
 
   lines.push('## Version Introduction\n');
   lines.push('All messages listed above were introduced in protocol version **1**.\n');

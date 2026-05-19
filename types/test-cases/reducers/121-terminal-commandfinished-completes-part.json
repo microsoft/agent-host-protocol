@@ -13,13 +13,15 @@
         "isComplete": false
       }
     ],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   },
   "actions": [
     {
       "type": "terminal/commandFinished",
-      "terminal": "agenthost:/terminal/1",
       "commandId": "cmd-1",
       "exitCode": 0,
       "durationMs": 1234
@@ -39,7 +41,10 @@
         "durationMs": 1234
       }
     ],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   }
 }

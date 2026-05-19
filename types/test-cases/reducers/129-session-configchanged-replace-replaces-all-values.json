@@ -14,11 +14,28 @@
       "schema": {
         "type": "object",
         "properties": {
-          "target": { "type": "string", "title": "Target", "enum": ["workspace", "worktree"] },
-          "baseBranch": { "type": "string", "title": "Base Branch", "enum": ["main", "develop"] }
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "workspace",
+              "worktree"
+            ]
+          },
+          "baseBranch": {
+            "type": "string",
+            "title": "Base Branch",
+            "enum": [
+              "main",
+              "develop"
+            ]
+          }
         }
       },
-      "values": { "target": "worktree", "baseBranch": "main" }
+      "values": {
+        "target": "worktree",
+        "baseBranch": "main"
+      }
     },
     "lifecycle": "ready",
     "turns": []
@@ -26,8 +43,9 @@
   "actions": [
     {
       "type": "session/configChanged",
-      "session": "copilot:/test",
-      "config": { "baseBranch": "develop" },
+      "config": {
+        "baseBranch": "develop"
+      },
       "replace": true
     }
   ],
@@ -44,11 +62,27 @@
       "schema": {
         "type": "object",
         "properties": {
-          "target": { "type": "string", "title": "Target", "enum": ["workspace", "worktree"] },
-          "baseBranch": { "type": "string", "title": "Base Branch", "enum": ["main", "develop"] }
+          "target": {
+            "type": "string",
+            "title": "Target",
+            "enum": [
+              "workspace",
+              "worktree"
+            ]
+          },
+          "baseBranch": {
+            "type": "string",
+            "title": "Base Branch",
+            "enum": [
+              "main",
+              "develop"
+            ]
+          }
         }
       },
-      "values": { "baseBranch": "develop" }
+      "values": {
+        "baseBranch": "develop"
+      }
     },
     "lifecycle": "ready",
     "turns": []

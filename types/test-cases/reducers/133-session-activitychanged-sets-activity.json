@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/activityChanged",
-      "session": "copilot:/test-session",
       "activity": "Running terminal command"
     }
   ],

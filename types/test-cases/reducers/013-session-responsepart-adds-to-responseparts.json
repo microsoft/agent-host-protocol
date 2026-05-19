@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/responsePart",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "part": {
         "kind": "markdown",

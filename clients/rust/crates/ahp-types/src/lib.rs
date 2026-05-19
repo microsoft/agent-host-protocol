@@ -26,7 +26,7 @@
 //! | [`state`]         | [`RootState`], [`SessionState`], [`TerminalState`], tool-call lifecycle |
 //! | [`actions`]       | [`StateAction`] discriminated union and [`ActionEnvelope`] |
 //! | [`commands`]      | Request/response parameter and result types (`initialize`, `subscribe`, …) |
-//! | [`notifications`] | Server-pushed [`ProtocolNotification`]s |
+//! | [`notifications`] | Server-pushed protocol notification params ([`SessionAddedParams`], [`AuthRequiredParams`], …) |
 //! | [`messages`]      | JSON-RPC wire envelopes ([`JsonRpcMessage`] and friends) |
 //! | [`errors`]        | AHP and JSON-RPC [error codes][errors::AhpErrorCode] |
 //! | [`version`]       | Negotiation constants ([`PROTOCOL_VERSION`]) |
@@ -40,12 +40,14 @@
 //! use ahp_types::actions::{ActionEnvelope, StateAction};
 //!
 //! let json = r#"{
-//!   "action": { "type": "session/titleChanged", "session": "copilot:/s1", "title": "Hi" },
+//!   "channel": "ahp-session:/s1",
+//!   "action": { "type": "session/titleChanged", "title": "Hi" },
 //!   "serverSeq": 7,
 //!   "origin": null
 //! }"#;
 //! let env: ActionEnvelope = serde_json::from_str(json)?;
 //! assert_eq!(env.server_seq, 7);
+//! assert_eq!(env.channel, "ahp-session:/s1");
 //! match env.action {
 //!     StateAction::SessionTitleChanged(a) => assert_eq!(a.title, "Hi"),
 //!     _ => panic!("unexpected variant"),
@@ -61,9 +63,10 @@
 //! use ahp_types::common::AnyValue;
 //!
 //! let params = InitializeParams {
+//!     channel: "ahp-root://".into(),
 //!     protocol_versions: vec![ahp_types::PROTOCOL_VERSION.to_string()],
 //!     client_id: "my-host/1.0".into(),
-//!     initial_subscriptions: Some(vec!["agenthost:/root".into()]),
+//!     initial_subscriptions: Some(vec!["ahp-root://".into()]),
 //!     locale: Some("en".into()),
 //! };
 //!
@@ -120,6 +123,8 @@ pub use actions::{ActionEnvelope, ActionOrigin, ActionType, StateAction};
 pub use common::{StringOrMarkdown, Uri, ROOT_RESOURCE_URI};
 pub use errors::{AhpErrorCode, JsonRpcErrorCode};
 pub use messages::{JsonRpcError, JsonRpcErrorResponse, JsonRpcMessage};
-pub use notifications::{NotificationType, ProtocolNotification};
+pub use notifications::{
+    AuthRequiredParams, SessionAddedParams, SessionRemovedParams, SessionSummaryChangedParams,
+};
 pub use state::{Icon, ProtectedResourceMetadata, RootState, SessionState, TerminalState};
 pub use version::PROTOCOL_VERSION;

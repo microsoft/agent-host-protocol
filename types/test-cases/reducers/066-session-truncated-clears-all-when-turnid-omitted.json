@@ -43,8 +43,7 @@
   },
   "actions": [
     {
-      "type": "session/truncated",
-      "session": "copilot:/test-session"
+      "type": "session/truncated"
     }
   ],
   "expected": {

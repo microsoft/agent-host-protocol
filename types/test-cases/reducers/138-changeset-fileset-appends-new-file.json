@@ -1,0 +1,47 @@
+{
+  "description": "changeset/fileSet appends a new file when its id is unknown",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": {
+          "after": { "uri": "file:///src/a.ts", "content": { "uri": "content:/a" } },
+          "diff": { "added": 1 }
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/fileSet",
+      "file": {
+        "id": "file:///src/b.ts",
+        "edit": {
+          "after": { "uri": "file:///src/b.ts", "content": { "uri": "content:/b" } },
+          "diff": { "added": 5, "removed": 2 }
+        }
+      }
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": {
+          "after": { "uri": "file:///src/a.ts", "content": { "uri": "content:/a" } },
+          "diff": { "added": 1 }
+        }
+      },
+      {
+        "id": "file:///src/b.ts",
+        "edit": {
+          "after": { "uri": "file:///src/b.ts", "content": { "uri": "content:/b" } },
+          "diff": { "added": 5, "removed": 2 }
+        }
+      }
+    ]
+  }
+}

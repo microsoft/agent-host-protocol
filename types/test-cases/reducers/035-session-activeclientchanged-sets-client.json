@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/activeClientChanged",
-      "session": "copilot:/test-session",
       "activeClient": {
         "clientId": "vscode-1",
         "displayName": "VS Code",

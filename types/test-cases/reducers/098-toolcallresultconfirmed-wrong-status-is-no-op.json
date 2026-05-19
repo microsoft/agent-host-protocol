@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "toolCall",
@@ -35,7 +37,6 @@
   "actions": [
     {
       "type": "session/toolCallResultConfirmed",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "approved": true
@@ -54,7 +55,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "toolCall",

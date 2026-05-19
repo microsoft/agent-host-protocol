@@ -27,6 +27,8 @@ public enum CompletionItemKind: String, Codable, Sendable {
 // MARK: - Command Types
 
 public struct InitializeParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Protocol versions the client is willing to speak, ordered from most
     /// preferred to least preferred. Each entry is a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
@@ -45,11 +47,13 @@ public struct InitializeParams: Codable, Sendable {
     public var locale: String?
 
     public init(
+        channel: String,
         protocolVersions: [String],
         clientId: String,
         initialSubscriptions: [String]? = nil,
         locale: String? = nil
     ) {
+        self.channel = channel
         self.protocolVersions = protocolVersions
         self.clientId = clientId
         self.initialSubscriptions = initialSubscriptions
@@ -90,6 +94,8 @@ public struct InitializeResult: Codable, Sendable {
 }
 
 public struct ReconnectParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Client identifier from the original connection
     public var clientId: String
     /// Last `serverSeq` the client received
@@ -98,10 +104,12 @@ public struct ReconnectParams: Codable, Sendable {
     public var subscriptions: [String]
 
     public init(
+        channel: String,
         clientId: String,
         lastSeenServerSeq: Int,
         subscriptions: [String]
     ) {
+        self.channel = channel
         self.clientId = clientId
         self.lastSeenServerSeq = lastSeenServerSeq
         self.subscriptions = subscriptions
@@ -146,22 +154,22 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
 }
 
 public struct SubscribeParams: Codable, Sendable {
-    /// URI to subscribe to
-    public var resource: String
+    /// Channel URI this command targets.
+    public var channel: String
 
     public init(
-        resource: String
+        channel: String
     ) {
-        self.resource = resource
+        self.channel = channel
     }
 }
 
 public struct SubscribeResult: Codable, Sendable {
-    /// Snapshot of the subscribed resource
-    public var snapshot: Snapshot
+    /// Snapshot of the subscribed channel's state (omitted for stateless channels)
+    public var snapshot: Snapshot?
 
     public init(
-        snapshot: Snapshot
+        snapshot: Snapshot? = nil
     ) {
         self.snapshot = snapshot
     }
@@ -183,8 +191,8 @@ public struct SessionForkSource: Codable, Sendable {
 }
 
 public struct CreateSessionParams: Codable, Sendable {
-    /// Session URI (client-chosen, e.g. `copilot:/<uuid>`)
-    public var session: String
+    /// Channel URI this command targets.
+    public var channel: String
     /// Agent provider ID
     public var provider: String?
     /// Model selection (ID and optional model-specific configuration)
@@ -206,7 +214,7 @@ public struct CreateSessionParams: Codable, Sendable {
     public var activeClient: SessionActiveClient?
 
     public init(
-        session: String,
+        channel: String,
         provider: String? = nil,
         model: ModelSelection? = nil,
         workingDirectory: String? = nil,
@@ -214,7 +222,7 @@ public struct CreateSessionParams: Codable, Sendable {
         config: [String: AnyCodable]? = nil,
         activeClient: SessionActiveClient? = nil
     ) {
-        self.session = session
+        self.channel = channel
         self.provider = provider
         self.model = model
         self.workingDirectory = workingDirectory
@@ -225,23 +233,27 @@ public struct CreateSessionParams: Codable, Sendable {
 }
 
 public struct DisposeSessionParams: Codable, Sendable {
-    /// Session URI to dispose
-    public var session: String
+    /// Channel URI this command targets.
+    public var channel: String
 
     public init(
-        session: String
+        channel: String
     ) {
-        self.session = session
+        self.channel = channel
     }
 }
 
 public struct ListSessionsParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Optional filter criteria
     public var filter: AnyCodable?
 
     public init(
+        channel: String,
         filter: AnyCodable? = nil
     ) {
+        self.channel = channel
         self.filter = filter
     }
 }
@@ -258,15 +270,19 @@ public struct ListSessionsResult: Codable, Sendable {
 }
 
 public struct ResourceReadParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Content URI from a `ContentRef`
     public var uri: String
     /// Preferred encoding for the returned data (default: server-chosen)
     public var encoding: ContentEncoding?
 
     public init(
+        channel: String,
         uri: String,
         encoding: ContentEncoding? = nil
     ) {
+        self.channel = channel
         self.uri = uri
         self.encoding = encoding
     }
@@ -292,6 +308,8 @@ public struct ResourceReadResult: Codable, Sendable {
 }
 
 public struct ResourceWriteParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Target file URI on the server filesystem
     public var uri: String
     /// Content encoded as a string
@@ -305,12 +323,14 @@ public struct ResourceWriteParams: Codable, Sendable {
     public var createOnly: Bool?
 
     public init(
+        channel: String,
         uri: String,
         data: String,
         encoding: ContentEncoding,
         contentType: String? = nil,
         createOnly: Bool? = nil
     ) {
+        self.channel = channel
         self.uri = uri
         self.data = data
         self.encoding = encoding
@@ -328,12 +348,16 @@ public struct ResourceWriteResult: Codable, Sendable {
 }
 
 public struct ResourceListParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Directory URI on the server filesystem
     public var uri: String
 
     public init(
+        channel: String,
         uri: String
     ) {
+        self.channel = channel
         self.uri = uri
     }
 }
@@ -365,6 +389,8 @@ public struct DirectoryEntry: Codable, Sendable {
 }
 
 public struct ResourceCopyParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Source URI to copy from
     public var source: String
     /// Destination URI to copy to
@@ -374,10 +400,12 @@ public struct ResourceCopyParams: Codable, Sendable {
     public var failIfExists: Bool?
 
     public init(
+        channel: String,
         source: String,
         destination: String,
         failIfExists: Bool? = nil
     ) {
+        self.channel = channel
         self.source = source
         self.destination = destination
         self.failIfExists = failIfExists
@@ -393,6 +421,8 @@ public struct ResourceCopyResult: Codable, Sendable {
 }
 
 public struct ResourceDeleteParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// URI of the resource to delete
     public var uri: String
     /// If `true` and the target is a directory, delete it and all its contents
@@ -400,9 +430,11 @@ public struct ResourceDeleteParams: Codable, Sendable {
     public var recursive: Bool?
 
     public init(
+        channel: String,
         uri: String,
         recursive: Bool? = nil
     ) {
+        self.channel = channel
         self.uri = uri
         self.recursive = recursive
     }
@@ -417,6 +449,8 @@ public struct ResourceDeleteResult: Codable, Sendable {
 }
 
 public struct ResourceMoveParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Source URI to move from
     public var source: String
     /// Destination URI to move to
@@ -426,10 +460,12 @@ public struct ResourceMoveParams: Codable, Sendable {
     public var failIfExists: Bool?
 
     public init(
+        channel: String,
         source: String,
         destination: String,
         failIfExists: Bool? = nil
     ) {
+        self.channel = channel
         self.source = source
         self.destination = destination
         self.failIfExists = failIfExists
@@ -445,6 +481,8 @@ public struct ResourceMoveResult: Codable, Sendable {
 }
 
 public struct ResourceRequestParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Resource URI being requested. Typically a `file:` URI on the receiver's
     /// filesystem, but any URI scheme that the receiver mediates access to is
     /// allowed.
@@ -455,10 +493,12 @@ public struct ResourceRequestParams: Codable, Sendable {
     public var write: Bool?
 
     public init(
+        channel: String,
         uri: String,
         read: Bool? = nil,
         write: Bool? = nil
     ) {
+        self.channel = channel
         self.uri = uri
         self.read = read
         self.write = write
@@ -474,19 +514,19 @@ public struct ResourceRequestResult: Codable, Sendable {
 }
 
 public struct FetchTurnsParams: Codable, Sendable {
-    /// Session URI
-    public var session: String
+    /// Channel URI this command targets.
+    public var channel: String
     /// Turn ID to fetch before (exclusive). Omit to fetch from the most recent turn.
     public var before: String?
     /// Maximum number of turns to return. Server MAY impose its own upper bound.
     public var limit: Int?
 
     public init(
-        session: String,
+        channel: String,
         before: String? = nil,
         limit: Int? = nil
     ) {
-        self.session = session
+        self.channel = channel
         self.before = before
         self.limit = limit
     }
@@ -508,32 +548,38 @@ public struct FetchTurnsResult: Codable, Sendable {
 }
 
 public struct UnsubscribeParams: Codable, Sendable {
-    /// URI to unsubscribe from
-    public var resource: String
+    /// Channel URI to unsubscribe from
+    public var channel: String
 
     public init(
-        resource: String
+        channel: String
     ) {
-        self.resource = resource
+        self.channel = channel
     }
 }
 
 public struct DispatchActionParams: Codable, Sendable {
+    /// Channel URI this action targets
+    public var channel: String
     /// Client sequence number
     public var clientSeq: Int
     /// The action to dispatch
     public var action: StateAction
 
     public init(
+        channel: String,
         clientSeq: Int,
         action: StateAction
     ) {
+        self.channel = channel
         self.clientSeq = clientSeq
         self.action = action
     }
 }
 
 public struct AuthenticateParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// The protected resource identifier. MUST match a `resource` value from
     /// `ProtectedResourceMetadata` declared in `AgentInfo.protectedResources`.
     public var resource: String
@@ -541,9 +587,11 @@ public struct AuthenticateParams: Codable, Sendable {
     public var token: String
 
     public init(
+        channel: String,
         resource: String,
         token: String
     ) {
+        self.channel = channel
         self.resource = resource
         self.token = token
     }
@@ -558,8 +606,8 @@ public struct AuthenticateResult: Codable, Sendable {
 }
 
 public struct CreateTerminalParams: Codable, Sendable {
-    /// Terminal URI (client-chosen)
-    public var terminal: String
+    /// Channel URI this command targets.
+    public var channel: String
     /// Initial owner of the terminal
     public var claim: TerminalClaim
     /// Human-readable terminal name
@@ -572,14 +620,14 @@ public struct CreateTerminalParams: Codable, Sendable {
     public var rows: Int?
 
     public init(
-        terminal: String,
+        channel: String,
         claim: TerminalClaim,
         name: String? = nil,
         cwd: String? = nil,
         cols: Int? = nil,
         rows: Int? = nil
     ) {
-        self.terminal = terminal
+        self.channel = channel
         self.claim = claim
         self.name = name
         self.cwd = cwd
@@ -589,17 +637,19 @@ public struct CreateTerminalParams: Codable, Sendable {
 }
 
 public struct DisposeTerminalParams: Codable, Sendable {
-    /// Terminal URI to dispose
-    public var terminal: String
+    /// Channel URI this command targets.
+    public var channel: String
 
     public init(
-        terminal: String
+        channel: String
     ) {
-        self.terminal = terminal
+        self.channel = channel
     }
 }
 
 public struct ResolveSessionConfigParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Agent provider ID
     public var provider: String?
     /// Working directory for the session
@@ -608,10 +658,12 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
     public var config: [String: AnyCodable]?
 
     public init(
+        channel: String,
         provider: String? = nil,
         workingDirectory: String? = nil,
         config: [String: AnyCodable]? = nil
     ) {
+        self.channel = channel
         self.provider = provider
         self.workingDirectory = workingDirectory
         self.config = config
@@ -731,6 +783,8 @@ public struct SessionConfigSchema: Codable, Sendable {
 }
 
 public struct SessionConfigCompletionsParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// Agent provider ID
     public var provider: String?
     /// Working directory for the session
@@ -743,12 +797,14 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
     public var query: String?
 
     public init(
+        channel: String,
         provider: String? = nil,
         workingDirectory: String? = nil,
         config: [String: AnyCodable]? = nil,
         property: String,
         query: String? = nil
     ) {
+        self.channel = channel
         self.provider = provider
         self.workingDirectory = workingDirectory
         self.config = config
@@ -788,10 +844,10 @@ public struct SessionConfigValueItem: Codable, Sendable {
 }
 
 public struct CompletionsParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
     /// What kind of completion is being requested.
     public var kind: CompletionItemKind
-    /// The session URI the completion is being requested for.
-    public var session: String
     /// The complete text of the input being completed (e.g. the full user
     /// message text typed so far).
     public var text: String
@@ -800,13 +856,13 @@ public struct CompletionsParams: Codable, Sendable {
     public var offset: Int
 
     public init(
+        channel: String,
         kind: CompletionItemKind,
-        session: String,
         text: String,
         offset: Int
     ) {
+        self.channel = channel
         self.kind = kind
-        self.session = session
         self.text = text
         self.offset = offset
     }
@@ -857,6 +913,55 @@ public struct CompletionsResult: Codable, Sendable {
     }
 }
 
+public struct InvokeChangesetOperationParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Matches {@link ChangesetOperation.id} from the changeset's `operations` list.
+    public var operationId: String
+    /// Target of the operation. Required iff the chosen scope is
+    /// `'resource'` or `'range'`. Omit for changeset-scoped operations.
+    public var target: ChangesetOperationTarget?
+
+    public init(
+        channel: String,
+        operationId: String,
+        target: ChangesetOperationTarget? = nil
+    ) {
+        self.channel = channel
+        self.operationId = operationId
+        self.target = target
+    }
+}
+
+public struct InvokeChangesetOperationResult: Codable, Sendable {
+    /// Optional human-readable message describing the result.
+    public var message: StringOrMarkdown?
+    /// Optional follow-up: a URI to open (e.g. a PR), a content ref, etc.
+    public var followUp: ChangesetOperationFollowUp?
+
+    public init(
+        message: StringOrMarkdown? = nil,
+        followUp: ChangesetOperationFollowUp? = nil
+    ) {
+        self.message = message
+        self.followUp = followUp
+    }
+}
+
+public struct ChangesetOperationFollowUp: Codable, Sendable {
+    public var content: ContentRef
+    /// When `true`, open in an external handler rather than inline.
+    public var external: Bool?
+
+    public init(
+        content: ContentRef,
+        external: Bool? = nil
+    ) {
+        self.content = content
+        self.external = external
+    }
+}
+
 // MARK: - ReconnectResult Union
 
 public enum ReconnectResult: Codable, Sendable {
@@ -885,5 +990,75 @@ public enum ReconnectResult: Codable, Sendable {
         case .replay(let value): try value.encode(to: encoder)
         case .snapshot(let value): try value.encode(to: encoder)
         }
+    }
+}
+
+// MARK: - Changeset Operation Unions
+
+/// Identifies the file or range a `ChangesetOperation` should act on.
+public enum ChangesetOperationTarget: Codable, Sendable {
+    case resource(ChangesetOperationResourceTarget)
+    case range(ChangesetOperationRangeTarget)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "resource":
+            self = .resource(try ChangesetOperationResourceTarget(from: decoder))
+        case "range":
+            self = .range(try ChangesetOperationRangeTarget(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ChangesetOperationTarget discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .resource(let value): try value.encode(to: encoder)
+        case .range(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public struct ChangesetOperationResourceTarget: Codable, Sendable {
+    public var kind: String { "resource" }
+    public var resource: String
+    public var side: String?
+
+    public init(resource: String, side: String? = nil) {
+        self.resource = resource
+        self.side = side
+    }
+
+    private enum CodingKeys: String, CodingKey { case resource, side }
+}
+
+public struct ChangesetOperationRangeTarget: Codable, Sendable {
+    public var kind: String { "range" }
+    public var resource: String
+    public var side: String?
+    public var range: ChangesetOperationTargetRange
+
+    public init(resource: String, side: String? = nil, range: ChangesetOperationTargetRange) {
+        self.resource = resource
+        self.side = side
+        self.range = range
+    }
+
+    private enum CodingKeys: String, CodingKey { case resource, side, range }
+}
+
+public struct ChangesetOperationTargetRange: Codable, Sendable {
+    public var start: Int
+    public var end: Int
+
+    public init(start: Int, end: Int) {
+        self.start = start
+        self.end = end
     }
 }

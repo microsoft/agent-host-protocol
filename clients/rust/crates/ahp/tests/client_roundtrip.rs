@@ -82,7 +82,7 @@ async fn request_response_and_action_fanout() {
 
         let sub_result = serde_json::json!({
             "snapshot": {
-                "resource": "copilot:/s1",
+                "resource": "ahp-session:/s1",
                 "state": { "agents": [] },
                 "fromSeq": 0
             }
@@ -99,8 +99,8 @@ async fn request_response_and_action_fanout() {
 
         // Fan out an action envelope for the subscribed session.
         let envelope = ActionEnvelope {
+            channel: "ahp-session:/s1".into(),
             action: StateAction::SessionTitleChanged(SessionTitleChangedAction {
-                session: "copilot:/s1".into(),
                 title: "Hello".into(),
             }),
             server_seq: 1,
@@ -129,7 +129,7 @@ async fn request_response_and_action_fanout() {
 
     // Subscribe and await the action broadcast.
     let (_snap, mut sub) = client
-        .subscribe("copilot:/s1".into())
+        .subscribe("ahp-session:/s1".into())
         .await
         .expect("subscribe");
 
@@ -141,15 +141,15 @@ async fn request_response_and_action_fanout() {
     match event {
         SubscriptionEvent::Action(env) => {
             assert_eq!(env.server_seq, 1);
+            assert_eq!(env.channel, "ahp-session:/s1");
             match env.action {
                 StateAction::SessionTitleChanged(a) => {
                     assert_eq!(a.title, "Hello");
-                    assert_eq!(a.session, "copilot:/s1");
                 }
                 other => panic!("unexpected action: {:?}", other),
             }
         }
-        SubscriptionEvent::Notification(_) => panic!("expected an Action event"),
+        other => panic!("expected an Action event, got {other:?}"),
     }
 
     client.shutdown().await;

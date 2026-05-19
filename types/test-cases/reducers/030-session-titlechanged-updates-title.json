@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/titleChanged",
-      "session": "copilot:/test-session",
       "title": "New Title"
     }
   ],

@@ -1,0 +1,45 @@
+{
+  "description": "changeset/fileRemoved drops the matching file and is a no-op for unknown ids",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": {
+          "after": { "uri": "file:///src/a.ts", "content": { "uri": "content:/a" } },
+          "diff": { "added": 1 }
+        }
+      },
+      {
+        "id": "file:///src/b.ts",
+        "edit": {
+          "after": { "uri": "file:///src/b.ts", "content": { "uri": "content:/b" } },
+          "diff": { "added": 5 }
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/fileRemoved",
+      "fileId": "file:///src/a.ts"
+    },
+    {
+      "type": "changeset/fileRemoved",
+      "fileId": "file:///src/missing.ts"
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/b.ts",
+        "edit": {
+          "after": { "uri": "file:///src/b.ts", "content": { "uri": "content:/b" } },
+          "diff": { "added": 5 }
+        }
+      }
+    ]
+  }
+}

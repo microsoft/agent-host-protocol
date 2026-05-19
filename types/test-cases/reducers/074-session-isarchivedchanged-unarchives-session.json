@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/isArchivedChanged",
-      "session": "copilot:/test-session",
       "isArchived": false
     }
   ],

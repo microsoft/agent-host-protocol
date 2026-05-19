@@ -18,7 +18,7 @@ final class AHPClientTests: XCTestCase {
         let serverTask = Task {
             let request = try await readRequest(from: serverSide, expectedMethod: "initialize")
             let result = InitializeResult(
-                protocolVersion: "0.1.0",
+                protocolVersion: "0.2.0",
                 serverSeq: 0,
                 snapshots: []
             )
@@ -27,10 +27,10 @@ final class AHPClientTests: XCTestCase {
 
         let init1 = try await client.initialize(
             clientId: "test-client",
-            protocolVersions: ["0.1.0"],
+            protocolVersions: ["0.2.0"],
             initialSubscriptions: []
         )
-        XCTAssertEqual(init1.protocolVersion, "0.1.0")
+        XCTAssertEqual(init1.protocolVersion, "0.2.0")
         XCTAssertEqual(init1.serverSeq, 0)
 
         try await serverTask.value
@@ -45,13 +45,13 @@ final class AHPClientTests: XCTestCase {
         try await client.connect()
 
         let serverTask = Task {
-            // Respond to subscribe with an empty root snapshot.
+            // Respond to subscribe with a session snapshot.
             let request = try await readRequest(from: serverSide, expectedMethod: "subscribe")
             let snap = SubscribeResult(snapshot: Snapshot(
-                resource: "copilot:/s1",
+                resource: "ahp-session:/s1",
                 state: .session(SessionState(
                     summary: SessionSummary(
-                        resource: "copilot:/s1",
+                        resource: "ahp-session:/s1",
                         provider: "test",
                         title: "T",
                         status: .idle,
@@ -66,9 +66,9 @@ final class AHPClientTests: XCTestCase {
 
             // Push an action notification scoped to the subscribed URI.
             let envelope = ActionEnvelope(
+                channel: "ahp-session:/s1",
                 action: .sessionTitleChanged(SessionTitleChangedAction(
                     type: .sessionTitleChanged,
-                    session: "copilot:/s1",
                     title: "Hello"
                 )),
                 serverSeq: 1
@@ -80,7 +80,7 @@ final class AHPClientTests: XCTestCase {
             )
         }
 
-        let (_, stream) = try await client.subscribe("copilot:/s1")
+        let (_, stream) = try await client.subscribe("ahp-session:/s1")
         var iter = stream.makeAsyncIterator()
         let event = try await nextWithTimeout(&iter)
         guard case .action(let envelope) = event else {
@@ -88,11 +88,11 @@ final class AHPClientTests: XCTestCase {
             return
         }
         XCTAssertEqual(envelope.serverSeq, 1)
+        XCTAssertEqual(envelope.channel, "ahp-session:/s1")
         guard case .sessionTitleChanged(let action) = envelope.action else {
             XCTFail("unexpected action variant")
             return
         }
-        XCTAssertEqual(action.session, "copilot:/s1")
         XCTAssertEqual(action.title, "Hello")
 
         try await serverTask.value
@@ -117,34 +117,33 @@ final class AHPClientTests: XCTestCase {
         let serverTask = Task {
             let request = try await readRequest(from: serverSide, expectedMethod: "initialize")
             let result = InitializeResult(
-                protocolVersion: "0.1.0",
+                protocolVersion: "0.2.0",
                 serverSeq: 0,
                 snapshots: []
             )
             try await respond(to: request.id, with: result, on: serverSide)
 
             // Push a protocol notification *during* the handshake window.
-            let notification = ProtocolNotification.sessionAdded(SessionAddedNotification(
-                type: .sessionAdded,
+            let params = SessionAddedParams(
+                channel: RootResourceURI,
                 summary: SessionSummary(
-                    resource: "copilot:/s1",
+                    resource: "ahp-session:/s1",
                     provider: "test",
                     title: "T",
                     status: .idle,
                     createdAt: 1, modifiedAt: 1
                 )
-            ))
-            let wrapped = NotificationMethodParams(notification: notification)
+            )
             try await pushNotification(
-                method: "notification",
-                params: wrapped,
+                method: "root/sessionAdded",
+                params: params,
                 on: serverSide
             )
         }
 
         _ = try await client.initialize(
             clientId: "test-client",
-            protocolVersions: ["0.1.0"],
+            protocolVersions: ["0.2.0"],
             initialSubscriptions: []
         )
 
@@ -153,9 +152,8 @@ final class AHPClientTests: XCTestCase {
             XCTFail("events stream finished before delivering the notification")
             return
         }
-        XCTAssertNil(event.resource, "protocol notifications carry no resource URI")
-        guard case .notification(let proto) = event.event,
-              case .sessionAdded = proto else {
+        XCTAssertEqual(event.resource, RootResourceURI, "session-added notifications carry the root channel")
+        guard case .sessionAdded = event.event else {
             XCTFail("expected sessionAdded notification, got \(event.event)")
             return
         }
@@ -181,7 +179,7 @@ final class AHPClientTests: XCTestCase {
         do {
             _ = try await client.initialize(
                 clientId: "test-client",
-                protocolVersions: ["0.1.0"],
+                protocolVersions: ["0.2.0"],
                 initialSubscriptions: []
             )
             XCTFail("expected an error from initialize")
@@ -205,7 +203,7 @@ final class AHPClientTests: XCTestCase {
         let client = AHPClient(transport: clientSide)
         try await client.connect()
 
-        let stream = await client.attachSubscription("copilot:/s1")
+        let stream = await client.attachSubscription("ahp-session:/s1")
 
         // Server task: drain the unsubscribe notification so the writer
         // doesn't park forever when the test ends.
@@ -213,7 +211,7 @@ final class AHPClientTests: XCTestCase {
             _ = try await readNotification(from: serverSide, expectedMethod: "unsubscribe")
         }
 
-        try await client.unsubscribe("copilot:/s1")
+        try await client.unsubscribe("ahp-session:/s1")
 
         // Drain the stream: it should finish cleanly.
         var collected: [SubscriptionEvent] = []
@@ -231,14 +229,14 @@ final class AHPClientTests: XCTestCase {
         let client = AHPClient(transport: clientSide)
         try await client.connect()
 
-        let firstStream = await client.attachSubscription("copilot:/s1")
-        let secondStream = await client.attachSubscription("copilot:/s1")
+        let firstStream = await client.attachSubscription("ahp-session:/s1")
+        let secondStream = await client.attachSubscription("ahp-session:/s1")
 
         let serverTask = Task {
             _ = try await readNotification(from: serverSide, expectedMethod: "unsubscribe")
         }
 
-        try await client.unsubscribe("copilot:/s1")
+        try await client.unsubscribe("ahp-session:/s1")
 
         var firstIter = firstStream.makeAsyncIterator()
         let firstEvent = try await nextWithTimeout(&firstIter)
@@ -261,7 +259,7 @@ final class AHPClientTests: XCTestCase {
 
         let events = await client.events
         let stateChanges = await client.stateChanges
-        let subStream = await client.attachSubscription("copilot:/s1")
+        let subStream = await client.attachSubscription("ahp-session:/s1")
 
         await client.shutdown()
 
@@ -304,7 +302,7 @@ final class AHPClientTests: XCTestCase {
         }
 
         do {
-            _ = try await client.subscribe("copilot:/missing")
+            _ = try await client.subscribe("ahp-session:/missing")
             XCTFail("expected an RPC error")
         } catch let error as AHPClientError {
             guard case .rpc(let code, _, _) = error else {
@@ -319,7 +317,7 @@ final class AHPClientTests: XCTestCase {
         // The listener attached optimistically by `subscribe` must have been
         // removed when the request failed. Otherwise it would accumulate
         // unread events forever (the consumer never received the stream).
-        let count = await client._listenerCount(forUri: "copilot:/missing")
+        let count = await client._listenerCount(forUri: "ahp-session:/missing")
         XCTAssertEqual(count, 0, "subscribe failure should clean up its listener")
 
         // The pending continuation should also have been cleared.
@@ -338,22 +336,23 @@ final class AHPClientTests: XCTestCase {
 
         let action = StateAction.sessionTitleChanged(SessionTitleChangedAction(
             type: .sessionTitleChanged,
-            session: "copilot:/s1",
             title: "From app outbox"
         ))
 
         let serverTask = Task {
             let first = try await readDispatchNotification(from: serverSide)
             XCTAssertEqual(first.clientSeq, 42)
+            XCTAssertEqual(first.channel, "ahp-session:/s1")
 
             let second = try await readDispatchNotification(from: serverSide)
             XCTAssertEqual(second.clientSeq, 43)
+            XCTAssertEqual(second.channel, "ahp-session:/s1")
         }
 
-        let explicit = try await client.dispatch(action, clientSeq: 42)
+        let explicit = try await client.dispatch(action, channel: "ahp-session:/s1", clientSeq: 42)
         XCTAssertEqual(explicit.clientSeq, 42)
 
-        let automatic = try await client.dispatch(action)
+        let automatic = try await client.dispatch(action, channel: "ahp-session:/s1")
         XCTAssertEqual(automatic.clientSeq, 43)
 
         try await serverTask.value

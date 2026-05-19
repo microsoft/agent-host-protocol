@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/queuedMessagesReordered",
-      "session": "copilot:/test-session",
       "order": [
         "a",
         "b"

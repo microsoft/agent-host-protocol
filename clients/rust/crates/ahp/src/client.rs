@@ -33,11 +33,14 @@ use ahp_types::commands::{
     DispatchActionParams, InitializeParams, InitializeResult, ReconnectParams, ReconnectResult,
     SubscribeParams, SubscribeResult, UnsubscribeParams,
 };
+use ahp_types::common::{Uri, ROOT_RESOURCE_URI};
 use ahp_types::messages::{
     ActionNotificationParams, JsonRpcError, JsonRpcMessage, JsonRpcNotification, JsonRpcRequest,
-    JsonRpcVersion, NotificationMethodParams,
+    JsonRpcVersion,
 };
-use ahp_types::notifications::ProtocolNotification;
+use ahp_types::notifications::{
+    AuthRequiredParams, SessionAddedParams, SessionRemovedParams, SessionSummaryChangedParams,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
@@ -71,33 +74,37 @@ impl Default for ClientConfig {
 
 /// Inbound event fanned out to a [`SessionSubscription`].
 ///
-/// `Action` envelopes carry the write-ahead mutation stream; `Notification`
-/// frames carry protocol-level signals the server broadcasts (e.g. session
-/// added/removed, connectivity changes).
+/// `Action` envelopes carry the write-ahead mutation stream; the
+/// remaining variants carry per-channel protocol notifications the
+/// server emits as top-level JSON-RPC methods (session catalogue events
+/// on the root channel, auth-required signals scoped to a channel).
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum SubscriptionEvent {
-    /// A write-ahead action envelope for this subscription's resource.
+    /// A write-ahead action envelope for this subscription's channel.
     Action(ActionEnvelope),
-    /// A broadcast notification (shared across all subscriptions).
-    Notification(ProtocolNotification),
+    /// `root/sessionAdded`: a new session was created on the root channel.
+    SessionAdded(SessionAddedParams),
+    /// `root/sessionRemoved`: a session was disposed on the root channel.
+    SessionRemoved(SessionRemovedParams),
+    /// `root/sessionSummaryChanged`: a session summary mutated.
+    SessionSummaryChanged(SessionSummaryChangedParams),
+    /// `auth/required`: the server needs (re-)authentication for a channel.
+    AuthRequired(AuthRequiredParams),
 }
 
 /// Inbound event fanned out to a [`ClientEventStream`].
 ///
 /// Carries the same payload as [`SubscriptionEvent`] but tagged with the
-/// resource URI it was scoped to (or `None` for protocol-level
-/// notifications that aren't bound to a resource). This is what the
-/// multi-host runtime — or any consumer that needs to observe *every*
-/// inbound event from a single client without subscribing per-URI —
-/// listens on.
+/// channel URI it was scoped to. Every channel-tagged event — actions
+/// and protocol notifications alike — carries the channel from the
+/// payload, since the channel model puts a `channel` field on every
+/// pushable message.
 #[derive(Debug, Clone)]
 pub struct ClientEvent {
-    /// Resource URI this event was scoped to.
-    ///
-    /// `Some(uri)` for action envelopes, derived from the action payload.
-    /// `None` for protocol-level [`ProtocolNotification`]s, which apply
-    /// across resources rather than to any single one.
-    pub resource: Option<String>,
+    /// Channel URI this event was scoped to, drawn from the underlying
+    /// payload (the envelope or the notification params).
+    pub channel: Uri,
     /// The underlying subscription event.
     pub event: SubscriptionEvent,
 }
@@ -348,6 +355,7 @@ impl Client {
         initial_subscriptions: Vec<String>,
     ) -> Result<InitializeResult, ClientError> {
         let params = InitializeParams {
+            channel: ROOT_RESOURCE_URI.to_string(),
             protocol_versions,
             client_id,
             initial_subscriptions: if initial_subscriptions.is_empty() {
@@ -368,6 +376,7 @@ impl Client {
         subscriptions: Vec<String>,
     ) -> Result<ReconnectResult, ClientError> {
         let params = ReconnectParams {
+            channel: ROOT_RESOURCE_URI.to_string(),
             client_id,
             last_seen_server_seq,
             subscriptions,
@@ -376,14 +385,14 @@ impl Client {
     }
 
     /// Subscribe to a URI and obtain a handle that streams
-    /// [`SubscriptionEvent`]s for that resource.
+    /// [`SubscriptionEvent`]s for that channel.
     pub async fn subscribe(
         &self,
         uri: String,
     ) -> Result<(SubscribeResult, SessionSubscription), ClientError> {
         let sub = self.attach_subscription(&uri).await;
         let result: SubscribeResult = self
-            .request("subscribe", SubscribeParams { resource: uri })
+            .request("subscribe", SubscribeParams { channel: uri })
             .await?;
         Ok((result, sub))
     }
@@ -410,23 +419,23 @@ impl Client {
             let mut subs = self.shared.subscriptions.lock().await;
             subs.remove(&uri);
         }
-        self.notify("unsubscribe", UnsubscribeParams { resource: uri })
+        self.notify("unsubscribe", UnsubscribeParams { channel: uri })
             .await
     }
 
     /// Subscribe to a top-level stream of every inbound event from this
-    /// client, regardless of resource URI.
+    /// client, regardless of channel URI.
     ///
     /// Each call returns a fresh receiver — multiple consumers can listen
     /// independently. Useful for the multi-host runtime in
     /// [`crate::hosts`], or any consumer that needs a single fan-in feed
     /// rather than per-URI subscriptions.
     ///
-    /// Action envelopes carry their resource URI in
-    /// [`ClientEvent::resource`]. Protocol-level
-    /// [`ProtocolNotification`]s have `resource: None` because they
-    /// aren't bound to a single resource — they are also still delivered
-    /// once to each per-URI [`SessionSubscription`] (existing behaviour).
+    /// Every event carries its channel URI in [`ClientEvent::channel`] —
+    /// action envelopes from the envelope's `channel` field, protocol
+    /// notifications from the notification params. Events are also
+    /// delivered once to each per-URI [`SessionSubscription`] for the
+    /// matching channel.
     ///
     /// Once the underlying transport has closed, any in-flight call to
     /// [`ClientEventStream::recv`] resolves with `None` and subsequent
@@ -448,11 +457,19 @@ impl Client {
 
     /// Fire a write-ahead `dispatchAction` notification with a
     /// client-assigned sequence number.
-    pub async fn dispatch(&self, action: StateAction) -> Result<DispatchHandle, ClientError> {
+    pub async fn dispatch(
+        &self,
+        channel: Uri,
+        action: StateAction,
+    ) -> Result<DispatchHandle, ClientError> {
         let client_seq = self.shared.next_client_seq.fetch_add(1, Ordering::Relaxed) as i64;
         self.notify(
             "dispatchAction",
-            DispatchActionParams { client_seq, action },
+            DispatchActionParams {
+                channel,
+                client_seq,
+                action,
+            },
         )
         .await?;
         Ok(DispatchHandle { client_seq })
@@ -547,46 +564,37 @@ async fn handle_notification(shared: &Shared, n: JsonRpcNotification) {
     match n.method.as_str() {
         "action" => {
             if let Ok(envelope) = serde_json::from_value::<ActionNotificationParams>(params_val) {
-                let resource = action_resource(&envelope.action);
-                {
-                    let subs = shared.subscriptions.lock().await;
-                    if let Some(resource) = resource.as_ref() {
-                        if let Some(tx) = subs.get(resource) {
-                            let _ = tx.send(SubscriptionEvent::Action(envelope.clone()));
-                        }
-                    }
-                }
-                if let Ok(guard) = shared.all_events.lock() {
-                    if let Some(tx) = guard.as_ref() {
-                        let _ = tx.send(ClientEvent {
-                            resource,
-                            event: SubscriptionEvent::Action(envelope),
-                        });
-                    }
-                }
+                let channel = envelope.channel.clone();
+                fan_out(shared, &channel, SubscriptionEvent::Action(envelope)).await;
             }
         }
-        "notification" => {
-            if let Ok(wrapped) = serde_json::from_value::<NotificationMethodParams>(params_val) {
-                {
-                    let subs = shared.subscriptions.lock().await;
-                    // Protocol notifications are cross-resource; fan them out
-                    // to every active per-URI subscription. Callers that care
-                    // about a specific notification can filter.
-                    for tx in subs.values() {
-                        let _ = tx.send(SubscriptionEvent::Notification(
-                            wrapped.notification.clone(),
-                        ));
-                    }
-                }
-                if let Ok(guard) = shared.all_events.lock() {
-                    if let Some(tx) = guard.as_ref() {
-                        let _ = tx.send(ClientEvent {
-                            resource: None,
-                            event: SubscriptionEvent::Notification(wrapped.notification),
-                        });
-                    }
-                }
+        "root/sessionAdded" => {
+            if let Ok(params) = serde_json::from_value::<SessionAddedParams>(params_val) {
+                let channel = params.channel.clone();
+                fan_out(shared, &channel, SubscriptionEvent::SessionAdded(params)).await;
+            }
+        }
+        "root/sessionRemoved" => {
+            if let Ok(params) = serde_json::from_value::<SessionRemovedParams>(params_val) {
+                let channel = params.channel.clone();
+                fan_out(shared, &channel, SubscriptionEvent::SessionRemoved(params)).await;
+            }
+        }
+        "root/sessionSummaryChanged" => {
+            if let Ok(params) = serde_json::from_value::<SessionSummaryChangedParams>(params_val) {
+                let channel = params.channel.clone();
+                fan_out(
+                    shared,
+                    &channel,
+                    SubscriptionEvent::SessionSummaryChanged(params),
+                )
+                .await;
+            }
+        }
+        "auth/required" => {
+            if let Ok(params) = serde_json::from_value::<AuthRequiredParams>(params_val) {
+                let channel = params.channel.clone();
+                fan_out(shared, &channel, SubscriptionEvent::AuthRequired(params)).await;
             }
         }
         other => {
@@ -595,19 +603,21 @@ async fn handle_notification(shared: &Shared, n: JsonRpcNotification) {
     }
 }
 
-/// Extract the resource URI an action is scoped to.
-///
-/// Rather than enumerating every variant (which drifts as new actions are
-/// generated), we serialize the payload and inspect the `session` or
-/// `terminal` field. Root actions have neither and fall back to the
-/// well-known [`ahp_types::ROOT_RESOURCE_URI`].
-fn action_resource(action: &StateAction) -> Option<String> {
-    let val = serde_json::to_value(action).ok()?;
-    if let Some(uri) = val.get("session").and_then(Value::as_str) {
-        return Some(uri.to_string());
+/// Dispatch an inbound event to the matching per-URI subscription (if
+/// any) and to the top-level fan-in stream.
+async fn fan_out(shared: &Shared, channel: &Uri, event: SubscriptionEvent) {
+    {
+        let subs = shared.subscriptions.lock().await;
+        if let Some(tx) = subs.get(channel) {
+            let _ = tx.send(event.clone());
+        }
     }
-    if let Some(uri) = val.get("terminal").and_then(Value::as_str) {
-        return Some(uri.to_string());
+    if let Ok(guard) = shared.all_events.lock() {
+        if let Some(tx) = guard.as_ref() {
+            let _ = tx.send(ClientEvent {
+                channel: channel.clone(),
+                event,
+            });
+        }
     }
-    Some(ahp_types::ROOT_RESOURCE_URI.to_string())
 }

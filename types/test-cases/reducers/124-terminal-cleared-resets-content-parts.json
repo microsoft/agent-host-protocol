@@ -4,7 +4,10 @@
   "initial": {
     "title": "bash",
     "content": [
-      { "type": "unclassified", "value": "$ " },
+      {
+        "type": "unclassified",
+        "value": "$ "
+      },
       {
         "type": "command",
         "commandId": "cmd-1",
@@ -16,19 +19,24 @@
         "durationMs": 10
       }
     ],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   },
   "actions": [
     {
-      "type": "terminal/cleared",
-      "terminal": "agenthost:/terminal/1"
+      "type": "terminal/cleared"
     }
   ],
   "expected": {
     "title": "bash",
     "content": [],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   }
 }

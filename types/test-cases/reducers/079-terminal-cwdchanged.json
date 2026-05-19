@@ -5,12 +5,14 @@
     "title": "bash",
     "cwd": "file:///home/user",
     "content": [],
-    "claim": { "kind": "client", "clientId": "c1" }
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    }
   },
   "actions": [
     {
       "type": "terminal/cwdChanged",
-      "terminal": "agenthost:/terminal/1",
       "cwd": "file:///home/user/project"
     }
   ],
@@ -18,6 +20,9 @@
     "title": "bash",
     "cwd": "file:///home/user/project",
     "content": [],
-    "claim": { "kind": "client", "clientId": "c1" }
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    }
   }
 }

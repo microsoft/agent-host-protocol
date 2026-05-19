@@ -487,10 +487,6 @@ public struct AHPSessionReducer: Reducer {
         case .sessionIsArchivedChanged(let a):
             state.summary.status = Self.withStatusFlag(state.summary.status, .isArchived, a.isArchived)
 
-        // ── Diffs ─────────────────────────────────────────────────────────────
-
-        case .sessionDiffsChanged(let a):
-            state.summary.diffs = a.diffs
 
         // ── Tool Call Content ────────────────────────────────────────────────
 

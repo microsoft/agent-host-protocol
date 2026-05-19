@@ -367,6 +367,11 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         next.summary.activity = a.activity
         return next
 
+    case .sessionChangesetsChanged(let a):
+        var next = state
+        next.summary.changesets = a.changesets
+        return next
+
     case .sessionConfigChanged(let a):
         guard var config = state.config else { return state }
         config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
@@ -472,12 +477,6 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         next.summary.status = withStatusFlag(next.summary.status, .isArchived, a.isArchived)
         return next
 
-    // ── Diffs ─────────────────────────────────────────────────────────────
-
-    case .sessionDiffsChanged(let a):
-        var next = state
-        next.summary.diffs = a.diffs
-        return next
 
     // ── Tool Call Content ────────────────────────────────────────────────
 

@@ -20,7 +20,6 @@
   "actions": [
     {
       "type": "session/activeClientChanged",
-      "session": "copilot:/test-session",
       "activeClient": null
     }
   ],

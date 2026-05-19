@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/toolCallStart",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "toolName": "bash",
@@ -32,19 +31,32 @@
     },
     {
       "type": "session/toolCallReady",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run: echo hello",
       "options": [
-        { "id": "approve-once", "label": "Approve", "kind": "approve", "group": 1 },
-        { "id": "approve-session", "label": "Approve in this Session", "kind": "approve", "group": 1 },
-        { "id": "deny", "label": "Deny", "kind": "deny", "group": 2 }
+        {
+          "id": "approve-once",
+          "label": "Approve",
+          "kind": "approve",
+          "group": 1
+        },
+        {
+          "id": "approve-session",
+          "label": "Approve in this Session",
+          "kind": "approve",
+          "group": 1
+        },
+        {
+          "id": "deny",
+          "label": "Deny",
+          "kind": "deny",
+          "group": 2
+        }
       ]
     },
     {
       "type": "session/toolCallConfirmed",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "approved": true,
@@ -81,7 +93,12 @@
             "invocationMessage": "Run: echo hello",
             "toolInput": null,
             "confirmed": "user-action",
-            "selectedOption": { "id": "approve-session", "label": "Approve in this Session", "kind": "approve", "group": 1 }
+            "selectedOption": {
+              "id": "approve-session",
+              "label": "Approve in this Session",
+              "kind": "approve",
+              "group": 1
+            }
           }
         }
       ],

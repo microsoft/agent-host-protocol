@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "markdown",
@@ -28,7 +30,6 @@
   "actions": [
     {
       "type": "session/delta",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "partId": "nonexistent",
       "content": "data"
@@ -47,7 +48,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [
         {
           "kind": "markdown",

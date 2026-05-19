@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::state::{
-    AgentInfo, ConfirmationOption, CustomizationRef, CustomizationStatus, ErrorInfo, FileEdit,
-    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionCustomization,
+    AgentInfo, ChangesetFile, ChangesetOperation, ChangesetStatus, ChangesetSummary,
+    ConfirmationOption, CustomizationRef, CustomizationStatus, ErrorInfo, ModelSelection,
+    PendingMessageKind, ResponsePart, SessionActiveClient, SessionCustomization,
     SessionInputAnswer, SessionInputRequest, SessionInputResponseKind, TerminalClaim, TerminalInfo,
     ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallResult, ToolDefinition,
     ToolResultContent, UsageInfo, UserMessage,
@@ -98,12 +99,22 @@ pub enum ActionType {
     SessionIsArchivedChanged,
     #[serde(rename = "session/activityChanged")]
     SessionActivityChanged,
-    #[serde(rename = "session/diffsChanged")]
-    SessionDiffsChanged,
+    #[serde(rename = "session/changesetsChanged")]
+    SessionChangesetsChanged,
     #[serde(rename = "session/configChanged")]
     SessionConfigChanged,
     #[serde(rename = "session/metaChanged")]
     SessionMetaChanged,
+    #[serde(rename = "changeset/statusChanged")]
+    ChangesetStatusChanged,
+    #[serde(rename = "changeset/fileSet")]
+    ChangesetFileSet,
+    #[serde(rename = "changeset/fileRemoved")]
+    ChangesetFileRemoved,
+    #[serde(rename = "changeset/operationsChanged")]
+    ChangesetOperationsChanged,
+    #[serde(rename = "changeset/cleared")]
+    ChangesetCleared,
     #[serde(rename = "root/terminalsChanged")]
     RootTerminalsChanged,
     #[serde(rename = "root/configChanged")]
@@ -143,9 +154,17 @@ pub struct ActionOrigin {
 }
 
 /// Every action is wrapped in an `ActionEnvelope`.
+///
+/// The envelope identifies the channel the action belongs to (e.g.
+/// `ahp-root://` for root actions, the session URI for session actions, the
+/// terminal URI for terminal actions). Individual action payloads carry only
+/// fields that are intrinsic to the action; the channel comes from the
+/// envelope so that any subscribable resource can route its actions uniformly.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActionEnvelope {
+    /// Channel URI this action belongs to.
+    pub channel: Uri,
     pub action: StateAction,
     pub server_seq: u64,
     pub origin: Option<ActionOrigin>,
@@ -188,17 +207,12 @@ pub struct RootConfigChangedAction {
 /// Session backend initialized successfully.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SessionReadyAction {
-    /// Session URI
-    pub session: Uri,
-}
+pub struct SessionReadyAction {}
 
 /// Session backend failed to initialize.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionCreationFailedAction {
-    /// Session URI
-    pub session: Uri,
     /// Error details
     pub error: ErrorInfo,
 }
@@ -207,8 +221,6 @@ pub struct SessionCreationFailedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionTurnStartedAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// User's message
@@ -225,8 +237,6 @@ pub struct SessionTurnStartedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionDeltaAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Identifier of the response part to append to
@@ -239,8 +249,6 @@ pub struct SessionDeltaAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionResponsePartAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Response part (markdown or content ref)
@@ -255,8 +263,6 @@ pub struct SessionResponsePartAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionToolCallStartAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Tool call identifier
@@ -283,8 +289,6 @@ pub struct SessionToolCallStartAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionToolCallDeltaAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Tool call identifier
@@ -320,8 +324,6 @@ pub struct SessionToolCallDeltaAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionToolCallReadyAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Tool call identifier
@@ -363,7 +365,6 @@ pub struct SessionToolCallReadyAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionToolCallConfirmedAction {
-    pub session: Uri,
     pub turn_id: String,
     pub tool_call_id: String,
     /// Additional provider-specific metadata for this tool call.
@@ -404,8 +405,6 @@ pub struct SessionToolCallConfirmedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionToolCallCompleteAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Tool call identifier
@@ -431,8 +430,6 @@ pub struct SessionToolCallCompleteAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionToolCallResultConfirmedAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Tool call identifier
@@ -453,8 +450,6 @@ pub struct SessionToolCallResultConfirmedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionTurnCompleteAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
 }
@@ -463,8 +458,6 @@ pub struct SessionTurnCompleteAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionTurnCancelledAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
 }
@@ -473,8 +466,6 @@ pub struct SessionTurnCancelledAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionErrorAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Error details
@@ -486,8 +477,6 @@ pub struct SessionErrorAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionTitleChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// New title
     pub title: String,
 }
@@ -496,8 +485,6 @@ pub struct SessionTitleChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionUsageAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Token usage data
@@ -511,8 +498,6 @@ pub struct SessionUsageAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionReasoningAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Identifier of the reasoning response part to append to
@@ -525,8 +510,6 @@ pub struct SessionReasoningAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionModelChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// New model selection
     pub model: ModelSelection,
 }
@@ -538,8 +521,6 @@ pub struct SessionModelChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionIsReadChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Whether the session has been read
     pub is_read: bool,
 }
@@ -551,8 +532,6 @@ pub struct SessionIsReadChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionIsArchivedChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Whether the session is archived
     pub is_archived: bool,
 }
@@ -561,14 +540,30 @@ pub struct SessionIsArchivedChangedAction {
 ///
 /// Dispatched by the server to indicate what the session is currently doing
 /// (e.g. running a tool, thinking). Clear activity by setting it to `undefined`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionActivityChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Human-readable description of current activity, or `undefined` to clear
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
+}
+
+/// The {@link ChangesetSummary | catalogue of changesets} the agent host
+/// advertises for this session changed. Replaces
+/// `state.summary.changesets` entirely (full-replacement semantics) — set
+/// to `undefined` to clear the catalogue.
+///
+/// Producers dispatch this whenever entries are added, removed, or have
+/// their aggregate counts (`additions` / `deletions` / `files`) refreshed.
+/// The fan-out happens through this action so observers see catalogue
+/// mutations in the same {@link ChangesetAction | per-changeset} action
+/// stream they already follow for file-level updates.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChangesetsChangedAction {
+    /// New catalogue, or `undefined` to clear it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changesets: Option<Vec<ChangesetSummary>>,
 }
 
 /// Server tools for this session have changed.
@@ -577,8 +572,6 @@ pub struct SessionActivityChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionServerToolsChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Updated server tools list (full replacement)
     pub tools: Vec<ToolDefinition>,
 }
@@ -589,11 +582,9 @@ pub struct SessionServerToolsChangedAction {
 /// the active role, or with `null` to release it. The server SHOULD reject if
 /// another client is already active. The server SHOULD automatically dispatch
 /// this action with `activeClient: null` when the active client disconnects.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionActiveClientChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// The new active client, or `null` to unset
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_client: Option<SessionActiveClient>,
@@ -607,8 +598,6 @@ pub struct SessionActiveClientChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionActiveClientToolsChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Updated client tools list (full replacement)
     pub tools: Vec<ToolDefinition>,
 }
@@ -623,8 +612,6 @@ pub struct SessionActiveClientToolsChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionPendingMessageSetAction {
-    /// Session URI
-    pub session: Uri,
     /// Whether this is a steering or queued message
     pub kind: PendingMessageKind,
     /// Unique identifier for this pending message
@@ -641,8 +628,6 @@ pub struct SessionPendingMessageSetAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionPendingMessageRemovedAction {
-    /// Session URI
-    pub session: Uri,
     /// Whether this is a steering or queued message
     pub kind: PendingMessageKind,
     /// Identifier of the pending message to remove
@@ -659,8 +644,6 @@ pub struct SessionPendingMessageRemovedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionQueuedMessagesReorderedAction {
-    /// Session URI
-    pub session: Uri,
     /// Queued message IDs in the desired order
     pub order: Vec<String>,
 }
@@ -673,8 +656,6 @@ pub struct SessionQueuedMessagesReorderedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionInputRequestedAction {
-    /// Session URI
-    pub session: Uri,
     /// Input request to create or replace
     pub request: SessionInputRequest,
 }
@@ -685,8 +666,6 @@ pub struct SessionInputRequestedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionInputAnswerChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Input request identifier
     pub request_id: String,
     /// Question identifier within the input request
@@ -703,8 +682,6 @@ pub struct SessionInputAnswerChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionInputCompletedAction {
-    /// Session URI
-    pub session: Uri,
     /// Input request identifier
     pub request_id: String,
     /// Completion outcome
@@ -721,8 +698,6 @@ pub struct SessionInputCompletedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionCustomizationsChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Updated customization list (full replacement)
     pub customizations: Vec<SessionCustomization>,
 }
@@ -734,8 +709,6 @@ pub struct SessionCustomizationsChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionCustomizationToggledAction {
-    /// Session URI
-    pub session: Uri,
     /// The URI of the customization to toggle
     pub uri: Uri,
     /// Whether to enable or disable the customization
@@ -757,8 +730,6 @@ pub struct SessionCustomizationToggledAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionCustomizationUpdatedAction {
-    /// Session URI
-    pub session: Uri,
     /// The customization to update or insert (matched by `customization.uri`)
     pub customization: CustomizationRef,
     /// New enabled state (defaults to `false` on insert)
@@ -781,27 +752,12 @@ pub struct SessionCustomizationUpdatedAction {
 ///
 /// Common use-case: truncate old data then dispatch a new
 /// `session/turnStarted` with an edited message.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionTruncatedAction {
-    /// Session URI
-    pub session: Uri,
     /// Keep turns up to and including this turn. Omit to clear all turns.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn_id: Option<String>,
-}
-
-/// The file diffs for the session changed.
-///
-/// Full-replacement semantics: the `diffs` array replaces the previous
-/// `summary.diffs` entirely.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SessionDiffsChangedAction {
-    /// Session URI
-    pub session: Uri,
-    /// Updated file diffs for the session
-    pub diffs: Vec<FileEdit>,
 }
 
 /// Client changed a mutable config value mid-session.
@@ -812,8 +768,6 @@ pub struct SessionDiffsChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionConfigChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Updated config values
     pub config: JsonObject,
     /// When `true`, replaces all config values instead of merging
@@ -824,11 +778,9 @@ pub struct SessionConfigChangedAction {
 /// The session's `_meta` side-channel changed. Replaces `state._meta`
 /// entirely (full-replacement semantics). Producers SHOULD merge any
 /// keys they wish to preserve into the new value before dispatching.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionMetaChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// New `_meta` payload, or `undefined` to clear it
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
@@ -847,8 +799,6 @@ pub struct SessionMetaChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionToolCallContentChangedAction {
-    /// Session URI
-    pub session: Uri,
     /// Turn identifier
     pub turn_id: String,
     /// Tool call identifier
@@ -864,6 +814,68 @@ pub struct SessionToolCallContentChangedAction {
     /// The current partial content for the running tool call
     pub content: Vec<ToolResultContent>,
 }
+
+/// The {@link ChangesetState.status} for this changeset transitioned (e.g.
+/// `computing → ready`). The error payload is set together with `status`
+/// whenever it transitions to {@link ChangesetStatus.Error | Error}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetStatusChangedAction {
+    /// New computation lifecycle status.
+    pub status: ChangesetStatus,
+    /// Cause when `status === ChangesetStatus.Error`; otherwise omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorInfo>,
+}
+
+/// Upsert a {@link ChangesetFile} in the changeset — adds a new entry, or
+/// replaces an existing one identified by {@link ChangesetFile.id}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetFileSetAction {
+    /// The new or replacement file entry.
+    pub file: ChangesetFile,
+}
+
+/// Remove a {@link ChangesetFile} from the changeset by its id.
+///
+/// Typically dispatched when a file is reverted, staged out, or otherwise
+/// no longer in scope (e.g. a renamed file is replaced by a new entry).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetFileRemovedAction {
+    /// The {@link ChangesetFile.id} of the file to remove.
+    pub file_id: String,
+}
+
+/// The set of operations available on this changeset changed. Full
+/// replacement semantics: `operations` replaces the previous list (or
+/// removes it entirely when `operations` is `undefined`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetOperationsChangedAction {
+    /// Updated operation list. Pass `undefined` to clear all operations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operations: Option<Vec<ChangesetOperation>>,
+}
+
+/// Drop every file from the changeset.
+///
+/// Two cases use this:
+/// 1. The underlying source moved (branch switched, fork point invalidated,
+///    …) and the server is recomputing from scratch — subsequent
+///    {@link ChangesetFileSetAction} entries will repopulate it.
+/// 2. The owning session has ended and the URI is becoming
+///    un-subscribable — the server will unsubscribe all clients shortly
+///    after dispatching this action.
+///
+/// Clients SHOULD release any references on receipt and SHOULD NOT
+/// distinguish the two cases from the action alone — instead, react to
+/// the corresponding session-level lifecycle signal (e.g.
+/// `root/sessionRemoved`) for the "going away" case.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetClearedAction {}
 
 /// Fired when the list of known terminals changes.
 ///
@@ -889,8 +901,6 @@ pub struct RootTerminalsChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalDataAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// Output data (may contain ANSI escape sequences)
     pub data: String,
 }
@@ -905,8 +915,6 @@ pub struct TerminalDataAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalInputAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// Input data to send to the pty
     pub data: String,
 }
@@ -918,8 +926,6 @@ pub struct TerminalInputAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalResizedAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// Terminal width in columns
     pub cols: i64,
     /// Terminal height in rows
@@ -933,8 +939,6 @@ pub struct TerminalResizedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalClaimedAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// The new claim
     pub claim: TerminalClaim,
 }
@@ -946,8 +950,6 @@ pub struct TerminalClaimedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalTitleChangedAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// New terminal title
     pub title: String,
 }
@@ -956,18 +958,14 @@ pub struct TerminalTitleChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalCwdChangedAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// New working directory
     pub cwd: Uri,
 }
 
 /// Terminal process exited.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalExitedAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// Process exit code. `undefined` if the process was killed without an exit code.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i64>,
@@ -976,10 +974,7 @@ pub struct TerminalExitedAction {
 /// Terminal scrollback buffer cleared.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TerminalClearedAction {
-    /// Terminal URI
-    pub terminal: Uri,
-}
+pub struct TerminalClearedAction {}
 
 /// Shell integration has loaded and the terminal now supports command
 /// detection. The server dispatches this when shell integration becomes
@@ -989,10 +984,7 @@ pub struct TerminalClearedAction {
 /// (or `terminal/commandExecuted`) has been received.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TerminalCommandDetectionAvailableAction {
-    /// Terminal URI
-    pub terminal: Uri,
-}
+pub struct TerminalCommandDetectionAvailableAction {}
 
 /// A command has been submitted to the shell and is now executing.
 /// All subsequent `terminal/data` actions (until the matching
@@ -1000,8 +992,6 @@ pub struct TerminalCommandDetectionAvailableAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalCommandExecutedAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// Stable identifier for this command, scoped to the terminal URI.
     /// Allows correlating `commandExecuted` → `commandFinished` pairs.
     pub command_id: String,
@@ -1020,8 +1010,6 @@ pub struct TerminalCommandExecutedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalCommandFinishedAction {
-    /// Terminal URI
-    pub terminal: Uri,
     /// Matches the `commandId` from the corresponding `commandExecuted`
     pub command_id: String,
     /// Shell exit code. `undefined` if the shell did not report one.
@@ -1087,6 +1075,8 @@ pub enum StateAction {
     SessionIsArchivedChanged(SessionIsArchivedChangedAction),
     #[serde(rename = "session/activityChanged")]
     SessionActivityChanged(SessionActivityChangedAction),
+    #[serde(rename = "session/changesetsChanged")]
+    SessionChangesetsChanged(SessionChangesetsChangedAction),
     #[serde(rename = "session/serverToolsChanged")]
     SessionServerToolsChanged(SessionServerToolsChangedAction),
     #[serde(rename = "session/activeClientChanged")]
@@ -1113,14 +1103,22 @@ pub enum StateAction {
     SessionCustomizationUpdated(SessionCustomizationUpdatedAction),
     #[serde(rename = "session/truncated")]
     SessionTruncated(SessionTruncatedAction),
-    #[serde(rename = "session/diffsChanged")]
-    SessionDiffsChanged(SessionDiffsChangedAction),
     #[serde(rename = "session/configChanged")]
     SessionConfigChanged(SessionConfigChangedAction),
     #[serde(rename = "session/metaChanged")]
     SessionMetaChanged(SessionMetaChangedAction),
     #[serde(rename = "session/toolCallContentChanged")]
     SessionToolCallContentChanged(SessionToolCallContentChangedAction),
+    #[serde(rename = "changeset/statusChanged")]
+    ChangesetStatusChanged(ChangesetStatusChangedAction),
+    #[serde(rename = "changeset/fileSet")]
+    ChangesetFileSet(ChangesetFileSetAction),
+    #[serde(rename = "changeset/fileRemoved")]
+    ChangesetFileRemoved(ChangesetFileRemovedAction),
+    #[serde(rename = "changeset/operationsChanged")]
+    ChangesetOperationsChanged(ChangesetOperationsChangedAction),
+    #[serde(rename = "changeset/cleared")]
+    ChangesetCleared(ChangesetClearedAction),
     #[serde(rename = "root/terminalsChanged")]
     RootTerminalsChanged(RootTerminalsChangedAction),
     #[serde(rename = "terminal/data")]

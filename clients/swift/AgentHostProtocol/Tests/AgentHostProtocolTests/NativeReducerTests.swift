@@ -74,7 +74,7 @@ final class NativeReducerTests: XCTestCase {
     func testTypeErasure() {
         let erased = AnyReducer(AHPSessionReducer())
         var state = makeSessionState()
-        erased.reduce(into: &state, action: .sessionReady(SessionReadyAction(type: .sessionReady, session: S)))
+        erased.reduce(into: &state, action: .sessionReady(SessionReadyAction(type: .sessionReady)))
         XCTAssertEqual(state.lifecycle, .ready)
     }
 
@@ -93,12 +93,12 @@ final class NativeReducerTests: XCTestCase {
 
         var state = makeSessionState()
         combined.reduce(into: &state, action: .sessionTitleChanged(SessionTitleChangedAction(
-            type: .sessionTitleChanged, session: S, title: "Custom Title"
+            type: .sessionTitleChanged, title: "Custom Title"
         )))
         XCTAssertEqual(state.summary.title, "Custom Title")
 
         combined.reduce(into: &state, action: .sessionModelChanged(SessionModelChangedAction(
-            type: .sessionModelChanged, session: S, model: ModelSelection(id: "gpt-4")
+            type: .sessionModelChanged, model: ModelSelection(id: "gpt-4")
         )))
         XCTAssertEqual(state.summary.model?.id, "gpt-4")
     }
@@ -106,7 +106,7 @@ final class NativeReducerTests: XCTestCase {
     func testApplyingConvenience() {
         let state = makeSessionState()
         let next = sessionR.applying(
-            action: .sessionReady(SessionReadyAction(type: .sessionReady, session: S)),
+            action: .sessionReady(SessionReadyAction(type: .sessionReady)),
             to: state
         )
         XCTAssertEqual(state.lifecycle, .creating)
@@ -127,14 +127,14 @@ final class NativeReducerTests: XCTestCase {
         var state = makeSessionStateWithActiveTurn()
 
         sessionR.reduce(into: &state, action: .sessionResponsePart(SessionResponsePartAction(
-            type: .sessionResponsePart, session: S, turnId: T,
+            type: .sessionResponsePart, turnId: T,
             part: .markdown(MarkdownResponsePart(kind: .markdown, id: "md-1", content: ""))
         )))
         sessionR.reduce(into: &state, action: .sessionDelta(SessionDeltaAction(
-            type: .sessionDelta, session: S, turnId: T, partId: "md-1", content: "Hello"
+            type: .sessionDelta, turnId: T, partId: "md-1", content: "Hello"
         )))
         sessionR.reduce(into: &state, action: .sessionDelta(SessionDeltaAction(
-            type: .sessionDelta, session: S, turnId: T, partId: "md-1", content: " World"
+            type: .sessionDelta, turnId: T, partId: "md-1", content: " World"
         )))
 
         let text = state.activeTurn?.responseParts.compactMap { part in

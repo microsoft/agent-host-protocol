@@ -16,8 +16,9 @@
   "actions": [
     {
       "type": "session/configChanged",
-      "session": "copilot:/test",
-      "config": { "verbosity": "verbose" }
+      "config": {
+        "verbosity": "verbose"
+      }
     }
   ],
   "expected": {

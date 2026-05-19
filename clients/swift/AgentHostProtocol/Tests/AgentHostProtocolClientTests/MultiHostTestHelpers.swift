@@ -3,7 +3,7 @@
 // Mirrors the Rust integration-test scaffolding (`crates/ahp/tests/hosts.rs`):
 // a small "fake host" actor that drives the server side of an
 // `InMemoryTransport.pair()` and responds to `initialize`/`reconnect`/
-// `listSessions`/`subscribe`. Optionally pushes a `notify/sessionAdded`
+// `listSessions`/`subscribe`. Optionally pushes a `root/sessionAdded`
 // after `initialize` to exercise the post-handshake notification path.
 
 import Foundation
@@ -25,7 +25,7 @@ struct FakeHostState: Sendable {
 struct FakeHost {
     /// Spin up a fake host driving `transport` (the *server* side of an
     /// `InMemoryTransport.pair()`). When `injectAfterInit` is non-nil, the
-    /// fake pushes a `notify/sessionAdded` for that summary shortly after
+    /// fake pushes a `root/sessionAdded` for that summary shortly after
     /// answering `initialize` (or `reconnect`).
     static func start(
         transport: InMemoryTransport,
@@ -84,12 +84,10 @@ struct FakeHost {
                     }
                     let notif: [String: Any] = [
                         "jsonrpc": "2.0",
-                        "method": "notification",
+                        "method": "root/sessionAdded",
                         "params": [
-                            "notification": [
-                                "type": "notify/sessionAdded",
-                                "summary": summaryAny,
-                            ] as [String: Any],
+                            "channel": RootResourceURI,
+                            "summary": summaryAny,
                         ] as [String: Any],
                     ]
                     if let notifData = try? JSONSerialization.data(withJSONObject: notif),
@@ -118,7 +116,7 @@ struct FakeHost {
                 "fromSeq": state.serverSeq,
             ]
             return [
-                "protocolVersion": "0.1.0",
+                "protocolVersion": "0.2.0",
                 "serverSeq": state.serverSeq,
                 "snapshots": [snapshot],
             ]
@@ -132,7 +130,7 @@ struct FakeHost {
             let items = sessionSummariesToJSON(state.sessions)
             return ["items": items]
         case "subscribe":
-            let resource = (params as? [String: Any])?["resource"] as? String ?? RootResourceURI
+            let resource = (params as? [String: Any])?["channel"] as? String ?? RootResourceURI
             let snap: [String: Any] = [
                 "resource": resource,
                 "state": [
@@ -159,7 +157,7 @@ private func sessionSummariesToJSON<T: Encodable>(_ values: [T]) -> [Any] {
 
 /// Build a transport factory that, on every call, opens a fresh
 /// `InMemoryTransport.pair()` and starts a `FakeHost` driving the server
-/// side. Optionally injects a `notify/sessionAdded` after init.
+/// side. Optionally injects a `root/sessionAdded` after init.
 func makeFakeHostFactory(
     state: FakeHostState,
     injectAfterInit: SessionSummary? = nil,

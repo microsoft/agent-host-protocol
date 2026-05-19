@@ -13,7 +13,7 @@ use ahp_types::actions::{ActionEnvelope, StateAction};
 use ahp_types::commands::{
     ListSessionsParams, ListSessionsResult, ReconnectResult, SubscribeParams, SubscribeResult,
 };
-use ahp_types::notifications::ProtocolNotification;
+use ahp_types::common::{Uri, ROOT_RESOURCE_URI};
 use ahp_types::state::{RootState, SessionSummary, SnapshotState};
 use tokio::sync::{broadcast, mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
@@ -39,6 +39,7 @@ pub(super) enum HostCommand {
         reply: oneshot::Sender<Result<(), HostError>>,
     },
     Dispatch {
+        channel: Uri,
         action: Box<StateAction>,
         reply: oneshot::Sender<Result<DispatchHandle, HostError>>,
     },
@@ -305,7 +306,13 @@ impl HostRuntime {
         // connect, kept in sync by notifications afterward. Failures are
         // non-fatal: we just leave the cache as-is and log.
         let summaries: Result<ListSessionsResult, ClientError> = client
-            .request("listSessions", ListSessionsParams::default())
+            .request(
+                "listSessions",
+                ListSessionsParams {
+                    channel: ROOT_RESOURCE_URI.to_string(),
+                    filter: None,
+                },
+            )
             .await;
 
         // Bump generation and install the new client.
@@ -390,11 +397,11 @@ impl HostRuntime {
         match result {
             ReconnectResult::Replay(replay) => {
                 for envelope in replay.actions {
-                    let resource = action_resource(&envelope.action);
+                    let channel = envelope.channel.clone();
                     self.apply_action(&envelope).await;
                     let host_event = HostSubscriptionEvent {
                         host_id: self.config.id.clone(),
-                        resource: Some(resource),
+                        channel: channel.clone(),
                         event: SubscriptionEvent::Action(envelope),
                     };
                     let _ = self.fan_out.send(host_event);
@@ -453,8 +460,8 @@ impl HostRuntime {
                         let result = self.handle_unsubscribe(uri).await;
                         let _ = reply.send(result);
                     }
-                    Some(HostCommand::Dispatch { action, reply }) => {
-                        let result = self.handle_dispatch(*action).await;
+                    Some(HostCommand::Dispatch { channel, action, reply }) => {
+                        let result = self.handle_dispatch(channel, *action).await;
                         let _ = reply.send(result);
                     }
                 },
@@ -546,14 +553,30 @@ impl HostRuntime {
             SubscriptionEvent::Action(envelope) => {
                 self.apply_action(envelope).await;
             }
-            SubscriptionEvent::Notification(notification) => {
-                self.apply_notification(notification).await;
+            SubscriptionEvent::SessionAdded(n) => {
+                let mut state = self.shared.lock().await;
+                state
+                    .session_summaries
+                    .insert(n.summary.resource.clone(), n.summary.clone());
+            }
+            SubscriptionEvent::SessionRemoved(n) => {
+                let mut state = self.shared.lock().await;
+                state.session_summaries.remove(&n.session);
+            }
+            SubscriptionEvent::SessionSummaryChanged(n) => {
+                let mut state = self.shared.lock().await;
+                if let Some(existing) = state.session_summaries.get_mut(&n.session) {
+                    apply_summary_changes(existing, &n.changes);
+                }
+            }
+            SubscriptionEvent::AuthRequired(_) => {
+                // No cache update; consumers observe via the event stream.
             }
         }
 
         let host_event = HostSubscriptionEvent {
             host_id: self.config.id.clone(),
-            resource: event.resource,
+            channel: event.channel,
             event: event.event,
         };
         let _ = self.fan_out.send(host_event);
@@ -579,28 +602,6 @@ impl HostRuntime {
         }
     }
 
-    async fn apply_notification(&self, notification: &ProtocolNotification) {
-        let mut state = self.shared.lock().await;
-        match notification {
-            ProtocolNotification::SessionAdded(n) => {
-                state
-                    .session_summaries
-                    .insert(n.summary.resource.clone(), n.summary.clone());
-            }
-            ProtocolNotification::SessionRemoved(n) => {
-                state.session_summaries.remove(&n.session);
-            }
-            ProtocolNotification::SessionSummaryChanged(n) => {
-                if let Some(existing) = state.session_summaries.get_mut(&n.session) {
-                    apply_summary_changes(existing, &n.changes);
-                }
-            }
-            ProtocolNotification::AuthRequired(_) => {
-                // No cache update; consumers observe via the event stream.
-            }
-        }
-    }
-
     async fn handle_subscribe(&self, uri: String) -> Result<SubscribeResult, HostError> {
         let client = self
             .shared
@@ -613,7 +614,7 @@ impl HostRuntime {
             .request(
                 "subscribe",
                 SubscribeParams {
-                    resource: uri.clone(),
+                    channel: uri.clone(),
                 },
             )
             .await
@@ -643,7 +644,11 @@ impl HostRuntime {
         Ok(())
     }
 
-    async fn handle_dispatch(&self, action: StateAction) -> Result<DispatchHandle, HostError> {
+    async fn handle_dispatch(
+        &self,
+        channel: Uri,
+        action: StateAction,
+    ) -> Result<DispatchHandle, HostError> {
         let client = self
             .shared
             .lock()
@@ -651,7 +656,10 @@ impl HostRuntime {
             .current_client
             .clone()
             .ok_or_else(|| HostError::HostShutDown(self.config.id.clone()))?;
-        client.dispatch(action).await.map_err(HostError::Client)
+        client
+            .dispatch(channel, action)
+            .await
+            .map_err(HostError::Client)
     }
 
     async fn tear_down_client(&self) {
@@ -706,25 +714,9 @@ fn apply_summary_changes(
     if let Some(v) = &changes.working_directory {
         existing.working_directory = Some(v.clone());
     }
-    if let Some(v) = &changes.diffs {
-        existing.diffs = Some(v.clone());
+    if let Some(v) = &changes.changesets {
+        existing.changesets = Some(v.clone());
     }
-}
-
-/// Extract the resource URI a state action is scoped to.
-///
-/// Mirrors the helper in `client.rs` so `apply_reconnect_result` can
-/// tag replayed envelopes with the same URI semantics live envelopes
-/// carry.
-fn action_resource(action: &StateAction) -> String {
-    let val = serde_json::to_value(action).unwrap_or(serde_json::Value::Null);
-    if let Some(uri) = val.get("session").and_then(|v| v.as_str()) {
-        return uri.to_string();
-    }
-    if let Some(uri) = val.get("terminal").and_then(|v| v.as_str()) {
-        return uri.to_string();
-    }
-    ahp_types::ROOT_RESOURCE_URI.to_string()
 }
 
 // ─── Random helpers (no external dep on `rand`) ─────────────────────────────

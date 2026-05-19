@@ -1,0 +1,17 @@
+{
+  "description": "changeset unknown action type is no-op",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": []
+  },
+  "actions": [
+    {
+      "type": "changeset/nonExistentAction"
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": []
+  }
+}

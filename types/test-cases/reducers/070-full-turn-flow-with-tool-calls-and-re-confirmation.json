@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/turnStarted",
-      "session": "s",
       "turnId": "t1",
       "userMessage": {
         "text": "Fix the bug"
@@ -24,7 +23,6 @@
     },
     {
       "type": "session/responsePart",
-      "session": "s",
       "turnId": "t1",
       "part": {
         "kind": "markdown",
@@ -34,21 +32,18 @@
     },
     {
       "type": "session/delta",
-      "session": "s",
       "turnId": "t1",
       "partId": "md-1",
       "content": "I will "
     },
     {
       "type": "session/delta",
-      "session": "s",
       "turnId": "t1",
       "partId": "md-1",
       "content": "fix it."
     },
     {
       "type": "session/toolCallStart",
-      "session": "s",
       "turnId": "t1",
       "toolCallId": "tc1",
       "toolName": "edit",
@@ -56,7 +51,6 @@
     },
     {
       "type": "session/toolCallReady",
-      "session": "s",
       "turnId": "t1",
       "toolCallId": "tc1",
       "invocationMessage": "Edit main.ts",
@@ -64,7 +58,6 @@
     },
     {
       "type": "session/toolCallComplete",
-      "session": "s",
       "turnId": "t1",
       "toolCallId": "tc1",
       "result": {
@@ -74,7 +67,6 @@
     },
     {
       "type": "session/toolCallStart",
-      "session": "s",
       "turnId": "t1",
       "toolCallId": "tc2",
       "toolName": "write",
@@ -82,7 +74,6 @@
     },
     {
       "type": "session/toolCallReady",
-      "session": "s",
       "turnId": "t1",
       "toolCallId": "tc2",
       "invocationMessage": "Write /tmp/out",
@@ -90,7 +81,6 @@
     },
     {
       "type": "session/toolCallReady",
-      "session": "s",
       "turnId": "t1",
       "toolCallId": "tc2",
       "invocationMessage": "Write to /tmp/out",
@@ -101,7 +91,6 @@
     },
     {
       "type": "session/toolCallConfirmed",
-      "session": "s",
       "turnId": "t1",
       "toolCallId": "tc2",
       "approved": true,
@@ -109,7 +98,6 @@
     },
     {
       "type": "session/toolCallComplete",
-      "session": "s",
       "turnId": "t1",
       "toolCallId": "tc2",
       "result": {
@@ -119,7 +107,6 @@
     },
     {
       "type": "session/usage",
-      "session": "s",
       "turnId": "t1",
       "usage": {
         "inputTokens": 200,
@@ -128,7 +115,6 @@
     },
     {
       "type": "session/responsePart",
-      "session": "s",
       "turnId": "t1",
       "part": {
         "kind": "reasoning",
@@ -138,14 +124,12 @@
     },
     {
       "type": "session/reasoning",
-      "session": "s",
       "turnId": "t1",
       "partId": "r-1",
       "content": "The bug was in line 42"
     },
     {
       "type": "session/responsePart",
-      "session": "s",
       "turnId": "t1",
       "part": {
         "kind": "markdown",
@@ -155,7 +139,6 @@
     },
     {
       "type": "session/turnComplete",
-      "session": "s",
       "turnId": "t1"
     }
   ],

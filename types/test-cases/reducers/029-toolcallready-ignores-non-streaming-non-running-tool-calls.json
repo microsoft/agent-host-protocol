@@ -39,7 +39,6 @@
   "actions": [
     {
       "type": "session/toolCallReady",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run again"

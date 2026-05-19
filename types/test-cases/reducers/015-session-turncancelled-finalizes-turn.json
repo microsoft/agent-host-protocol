@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/turnCancelled",
-      "session": "copilot:/test-session",
       "turnId": "turn-1"
     }
   ],

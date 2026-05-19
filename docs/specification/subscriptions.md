@@ -1,17 +1,21 @@
-# Subscriptions
+# Channels & Subscriptions
 
-All state in AHP is identified by URIs. Clients subscribe to a URI to receive its current state snapshot and subsequent action updates. This is the single universal mechanism for state synchronization.
+AHP organises all push-based communication into **channels**. A channel is a URI-identified resource that a client subscribes to in order to receive updates. Channels MAY have state (root, sessions, terminals) or be stateless (future: logging, MCP relay, LSP relay). The subscription mechanism — `subscribe`, `unsubscribe`, and per-channel notifications — is uniform across channel types.
 
 ## URI Scheme
 
-| URI | State | Description |
+| URI | State type | Description |
 |---|---|---|
-| `agenthost:/root` | `RootState` | Global state (agents and their models). Always present. |
-| `copilot:/<uuid>` | `SessionState` | Per-session state. Scheme is the provider name. |
+| `ahp-root://` | `RootState` | Global state (agents, terminals, host config). Always present. |
+| `ahp-session:/<uuid>` | `SessionState` | Per-session state. The session's provider is carried on `SessionSummary.provider`, not in the URI scheme. |
+| `ahp-terminal:/<id>` | `TerminalState` | Per-terminal state. Server-defined id. |
+| `ahp-changeset:/<id>` | `ChangesetState` | Per-changeset state. URI is obtained by expanding a `ChangesetSummary.uriTemplate` advertised on a session; the id is server-defined. |
+
+Future channel types (stateless logging, LSP, MCP relay, …) introduce their own URI schemes. Clients MUST NOT subscribe to a scheme they do not understand.
 
 ## Subscribe (Request)
 
-`subscribe` is a JSON-RPC **request** — the client receives the snapshot as the response result:
+`subscribe` is a JSON-RPC **request**. The result includes a snapshot for state-bearing channels and omits it for stateless ones.
 
 ```jsonc
 // Client → Server
@@ -19,66 +23,93 @@ All state in AHP is identified by URIs. Clients subscribe to a URI to receive it
   "jsonrpc": "2.0",
   "id": 1,
   "method": "subscribe",
-  "params": { "resource": "copilot:/<uuid>" }
+  "params": { "channel": "ahp-session:/<uuid>" }
 }
 
-// Server → Client
+// Server → Client (state-bearing channel)
 {
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "resource": "copilot:/<uuid>",
-    "state": {
-      "summary": { "resource": "copilot:/<uuid>", "title": "New Session", ... },
-      "lifecycle": "creating",
-      "turns": [],
-      "activeTurn": null
-    },
-    "fromSeq": 5
+    "snapshot": {
+      "resource": "ahp-session:/<uuid>",
+      "state": {
+        "summary": { "resource": "ahp-session:/<uuid>", "title": "New Session", ... },
+        "lifecycle": "creating",
+        "turns": [],
+        "activeTurn": null
+      },
+      "fromSeq": 5
+    }
   }
+}
+
+// Server → Client (stateless channel)
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {}
 }
 ```
 
-After subscribing, the client receives all actions scoped to that URI with `serverSeq > fromSeq`. Multiple concurrent subscriptions are supported.
+After subscribing, the client receives all messages scoped to that channel — both action envelopes (for state channels) and any channel-specific notifications.
 
 ## Unsubscribe (Notification)
 
-`unsubscribe` is a notification (no response needed):
+`unsubscribe` is the canonical "base" notification: every notification at the wire level carries a top-level `channel: URI`.
 
 ```json
 {
   "jsonrpc": "2.0",
   "method": "unsubscribe",
-  "params": { "resource": "copilot:/<uuid>" }
+  "params": { "channel": "ahp-session:/<uuid>" }
 }
 ```
 
-After unsubscribing, the client stops receiving actions for that URI. The server drops the client from the subscription list.
+After unsubscribing, the client stops receiving messages for that channel.
 
-## Action Delivery
+## Action Delivery (`action`)
 
-The server broadcasts action envelopes as JSON-RPC notifications to subscribed clients:
+State channels deliver mutations via the `action` server notification. The params are an `ActionEnvelope` — flat, with `channel` identifying the channel and a single `action` payload:
 
 ```json
 {
   "jsonrpc": "2.0",
   "method": "action",
   "params": {
-    "envelope": {
-      "action": { "type": "session/delta", "session": "copilot:/<uuid>", "turnId": "t1", "content": "Hello" },
-      "serverSeq": 6,
-      "origin": { "clientId": "client-1", "clientSeq": 1 }
-    }
+    "channel": "ahp-session:/<uuid>",
+    "action": { "type": "session/delta", "turnId": "t1", "partId": "p1", "content": "Hello" },
+    "serverSeq": 6,
+    "origin": { "clientId": "client-1", "clientSeq": 1 }
   }
 }
 ```
 
-- **Root actions** go to all clients subscribed to `agenthost:/root`.
-- **Session actions** go to all clients subscribed to that session's URI.
+- Root actions go to all clients subscribed to `ahp-root://`.
+- Session actions go to all clients subscribed to that session's URI.
+- Terminal actions go to all clients subscribed to that terminal's URI.
+
+Action payloads (the inner `action` object) carry only fields intrinsic to the action — the channel comes from the envelope. Individual actions do NOT carry a `session: URI` or `terminal: URI` field of their own.
+
+The client → server dispatch path uses a different method, `dispatchAction`, with params `{ channel, clientSeq, action }`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "dispatchAction",
+  "params": {
+    "channel": "ahp-session:/<uuid>",
+    "clientSeq": 1,
+    "action": { "type": "session/turnStarted", "turnId": "t1", "userMessage": { "text": "Hi" } }
+  }
+}
+```
+
+See [Actions](/guide/actions) for the full list of client-dispatchable actions.
 
 ## Initial Subscriptions
 
-During the connection handshake, clients MAY include `initialSubscriptions` in the `initialize` request to subscribe to URIs in the same round-trip:
+During the handshake, clients MAY include `initialSubscriptions` in `initialize` to subscribe to channels in the same round-trip:
 
 ```json
 {
@@ -86,43 +117,47 @@ During the connection handshake, clients MAY include `initialSubscriptions` in t
   "id": 1,
   "method": "initialize",
   "params": {
-    "protocolVersions": ["0.1.0"],
+    "channel": "ahp-root://",
+    "protocolVersions": ["0.2.0"],
     "clientId": "client-abc",
-    "initialSubscriptions": ["agenthost:/root", "copilot:/<prev-session>"]
+    "initialSubscriptions": ["ahp-root://", "ahp-session:/<prev-session>"]
   }
 }
 ```
 
-The server includes snapshots for each in the `initialize` response.
+The server includes a snapshot for each state-bearing channel in the `initialize` response.
 
 ## Protocol Notifications
 
-In addition to action envelopes, the server broadcasts **protocol notifications** for ephemeral events:
+Beyond `action`, the server pushes per-channel **protocol notifications** for ephemeral events. Every protocol notification is a top-level JSON-RPC method with a `channel: URI` field on its params.
 
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "notification",
+  "method": "root/sessionAdded",
   "params": {
-    "notification": { "type": "notify/sessionAdded", "summary": { ... } }
+    "channel": "ahp-root://",
+    "summary": { "resource": "ahp-session:/<uuid>", "title": "New Session", ... }
   }
 }
 ```
 
-For partial updates to an existing session's summary (title, status, `modifiedAt`, etc.), the server broadcasts `notify/sessionSummaryChanged` with only the fields that changed:
+For partial updates to an existing session's summary, the server broadcasts `root/sessionSummaryChanged`:
 
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "notification",
+  "method": "root/sessionSummaryChanged",
   "params": {
-    "notification": {
-      "type": "notify/sessionSummaryChanged",
-      "session": "copilot:/<uuid>",
-      "changes": { "title": "Refactor auth middleware", "status": 8 }
-    }
+    "channel": "ahp-root://",
+    "session": "ahp-session:/<uuid>",
+    "changes": { "title": "Refactor auth middleware", "status": 8 }
   }
 }
 ```
 
-Protocol notifications go to all connected clients regardless of subscriptions. They are not stored in state and are not replayed on reconnection.
+Protocol notifications go only to clients subscribed to the channel they target. They are not stored in state and are not replayed on reconnection.
+
+## Stateless Channels
+
+A channel MAY be stateless — i.e. carry no `Snapshot`. Subscribing returns an empty result `{}`, and subsequent traffic flows via channel-specific methods rather than `action` envelopes. The subscription/unsubscription mechanism is identical to state channels. Stateless channels are not replayed across reconnection — clients re-subscribe and resume from the live edge.

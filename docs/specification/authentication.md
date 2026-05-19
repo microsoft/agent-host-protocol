@@ -4,7 +4,7 @@ AHP uses [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0 Pr
 
 ## Overview
 
-Each agent declares the **protected resources** it requires authentication for via the `protectedResources` field on [`AgentInfo`](/reference/state-types#agentinfo) in root state. Clients discover these requirements by subscribing to `agenthost:/root`, obtain tokens from the declared authorization servers using standard OAuth 2.0 flows, and push them to the server via the [`authenticate`](/reference/commands#authenticate) command.
+Each agent declares the **protected resources** it requires authentication for via the `protectedResources` field on [`AgentInfo`](/reference/state-types#agentinfo) in root state. Clients discover these requirements by subscribing to `ahp-root://`, obtain tokens from the declared authorization servers using standard OAuth 2.0 flows, and push them to the server via the [`authenticate`](/reference/commands#authenticate) command.
 
 ```mermaid
 sequenceDiagram
@@ -12,7 +12,7 @@ sequenceDiagram
     participant S as Agent Host (Server)
     participant AS as Authorization Server
 
-    C->>S: subscribe("agenthost:/root")
+    C->>S: subscribe("ahp-root://")
     S-->>C: snapshot: { agents: [{ protectedResources: [...] }] }
 
     C->>AS: OAuth token request
@@ -49,7 +49,7 @@ Authentication requirements are declared **per-agent** on [`AgentInfo.protectedR
 }
 ```
 
-Clients receive this metadata automatically via the root state snapshot (when subscribing to `agenthost:/root`) and via `root/agentsChanged` actions when the agent list changes.
+Clients receive this metadata automatically via the root state snapshot (when subscribing to `ahp-root://`) and via `root/agentsChanged` actions when the agent list changes.
 
 An agent with no `protectedResources` (or an empty array) does not require authentication.
 
@@ -96,6 +96,7 @@ Clients push Bearer tokens to the server using the [`authenticate`](/reference/c
   "id": 3,
   "method": "authenticate",
   "params": {
+    "channel": "ahp-root://",
     "resource": "https://api.github.com",
     "token": "gho_xxxxxxxxxxxx"
   }
@@ -129,7 +130,7 @@ The `data` field of the JSON-RPC error SHOULD contain a `ProtectedResourceMetada
   "jsonrpc": "2.0",
   "id": 5,
   "method": "createSession",
-  "params": { "session": "copilot:/<uuid>", "provider": "copilot" }
+  "params": { "channel": "ahp-session:/<uuid>", "provider": "copilot" }
 }
 
 // Server → Client (auth required)
@@ -160,18 +161,16 @@ Clients receiving an `AuthRequired` error SHOULD:
 
 ## Auth Expiry Notification
 
-The server MAY send a [`notify/authRequired`](/reference/notifications#notifyauthrequired) notification when a previously valid token expires or is revoked, or when new authentication requirements appear:
+The server MAY send an [`auth/required`](/reference/notifications#authrequired) notification when a previously valid token expires or is revoked, or when new authentication requirements appear:
 
 ```json
 {
   "jsonrpc": "2.0",
-  "method": "notification",
+  "method": "auth/required",
   "params": {
-    "notification": {
-      "type": "notify/authRequired",
-      "resource": "https://api.github.com",
-      "reason": "expired"
-    }
+    "channel": "ahp-root://",
+    "resource": "https://api.github.com",
+    "reason": "expired"
   }
 }
 ```
@@ -183,7 +182,7 @@ The `reason` field indicates why authentication is required:
 | `required` | The client has not yet authenticated for the resource |
 | `expired` | A previously valid token has expired or been revoked |
 
-Like all protocol notifications, `notify/authRequired` is ephemeral and is **not** replayed on reconnection. Clients SHOULD re-check authentication requirements after reconnecting.
+Like all protocol notifications, `auth/required` is ephemeral and is **not** replayed on reconnection. Clients SHOULD re-check authentication requirements after reconnecting.
 
 ## Design Decisions
 

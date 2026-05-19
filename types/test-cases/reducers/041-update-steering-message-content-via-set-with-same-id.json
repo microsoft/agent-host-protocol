@@ -22,7 +22,6 @@
   "actions": [
     {
       "type": "session/pendingMessageSet",
-      "session": "copilot:/test-session",
       "kind": "steering",
       "id": "sm-1",
       "userMessage": {

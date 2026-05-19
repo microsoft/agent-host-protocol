@@ -16,14 +16,14 @@
   "actions": [
     {
       "type": "session/inputAnswerChanged",
-      "session": "copilot:/test-session",
       "requestId": "missing",
       "questionId": "q1",
-      "answer": { "state": "skipped" }
+      "answer": {
+        "state": "skipped"
+      }
     },
     {
       "type": "session/inputCompleted",
-      "session": "copilot:/test-session",
       "requestId": "missing",
       "response": "cancel"
     }

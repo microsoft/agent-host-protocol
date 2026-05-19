@@ -30,7 +30,6 @@
   "actions": [
     {
       "type": "session/queuedMessagesReordered",
-      "session": "copilot:/test-session",
       "order": [
         "unknown",
         "b",

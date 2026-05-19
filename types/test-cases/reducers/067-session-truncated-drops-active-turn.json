@@ -43,7 +43,6 @@
   "actions": [
     {
       "type": "session/truncated",
-      "session": "copilot:/test-session",
       "turnId": "t1"
     }
   ],

@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/toolCallStart",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "toolName": "bash",
@@ -32,7 +31,6 @@
     },
     {
       "type": "session/toolCallReady",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run",
@@ -40,14 +38,12 @@
     },
     {
       "type": "session/toolCallReady",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Permission needed"
     },
     {
       "type": "session/toolCallConfirmed",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "approved": true,

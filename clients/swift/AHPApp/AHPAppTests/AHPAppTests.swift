@@ -30,7 +30,7 @@ struct ReconnectResultTests {
     @Test func applySnapshotUpdatesRootState() {
         let store = AppStore()
         let snapshot = Snapshot(
-            resource: "agenthost:/root",
+            resource: "ahp-root://",
             state: .root(RootState(agents: [Self.makeAgent(provider: "agent1")])),
             fromSeq: 10
         )
@@ -46,13 +46,14 @@ struct ReconnectResultTests {
 
         // Seed root state with one agent.
         store.applySnapshot(Snapshot(
-            resource: "agenthost:/root",
+            resource: "ahp-root://",
             state: .root(RootState(agents: [Self.makeAgent(provider: "old")])),
             fromSeq: 40
         ))
 
         // Replay two consecutive root actions that update the agent list.
         let action1 = ActionEnvelope(
+            channel: "ahp-root://",
             action: .rootAgentsChanged(RootAgentsChangedAction(
                 type: .rootAgentsChanged,
                 agents: [Self.makeAgent(provider: "mid")]
@@ -60,6 +61,7 @@ struct ReconnectResultTests {
             serverSeq: 41
         )
         let action2 = ActionEnvelope(
+            channel: "ahp-root://",
             action: .rootAgentsChanged(RootAgentsChangedAction(
                 type: .rootAgentsChanged,
                 agents: [Self.makeAgent(provider: "new")]
@@ -82,7 +84,7 @@ struct ReconnectResultTests {
     @Test func replayWithNoActionsLeavesStateUnchanged() {
         let store = AppStore()
         store.applySnapshot(Snapshot(
-            resource: "agenthost:/root",
+            resource: "ahp-root://",
             state: .root(RootState(agents: [Self.makeAgent(provider: "stable")])),
             fromSeq: 50
         ))
@@ -100,7 +102,7 @@ struct ReconnectResultTests {
 
         // Populate stale state.
         store.applySnapshot(Snapshot(
-            resource: "agenthost:/root",
+            resource: "ahp-root://",
             state: .root(RootState(agents: [Self.makeAgent(provider: "stale")])),
             fromSeq: 5
         ))
@@ -110,7 +112,7 @@ struct ReconnectResultTests {
         let result = ReconnectResult.snapshot(ReconnectSnapshotResult(
             type: .snapshot,
             snapshots: [Snapshot(
-                resource: "agenthost:/root",
+                resource: "ahp-root://",
                 state: .root(RootState(agents: [Self.makeAgent(provider: "fresh")])),
                 fromSeq: 60
             )]
@@ -126,7 +128,7 @@ struct ReconnectResultTests {
         let store = AppStore()
 
         // Simulate having a session already subscribed.
-        let sessionURI = "copilot:/test-session-id"
+        let sessionURI = "ahp-session:/test-session-id"
         let initialSessionState = SessionState(
             summary: SessionSummary(
                 resource: sessionURI,
@@ -158,7 +160,7 @@ struct ReconnectResultTests {
         let result = ReconnectResult.snapshot(ReconnectSnapshotResult(
             type: .snapshot,
             snapshots: [
-                Snapshot(resource: "agenthost:/root", state: .root(freshRoot), fromSeq: 70),
+                Snapshot(resource: "ahp-root://", state: .root(freshRoot), fromSeq: 70),
                 Snapshot(resource: sessionURI, state: .session(freshSession), fromSeq: 70),
             ]
         ))
@@ -176,13 +178,14 @@ struct ReconnectResultTests {
 
         // Apply a root snapshot at seq 10 so root state is initialized.
         store.applySnapshot(Snapshot(
-            resource: "agenthost:/root",
+            resource: "ahp-root://",
             state: .root(RootState(agents: [])),
             fromSeq: 10
         ))
 
         // Simulate two incoming live action envelopes.
         let envelope = ActionEnvelope(
+            channel: "ahp-root://",
             action: .rootAgentsChanged(RootAgentsChangedAction(
                 type: .rootAgentsChanged,
                 agents: [Self.makeAgent(provider: "live")]
@@ -384,7 +387,7 @@ struct InjectedTransportTests {
         #expect(reconnect.method == "reconnect")
 
         let reconnectParams = try decodeRequest(reconnect, as: ReconnectParams.self).params
-        #expect(reconnectParams.subscriptions.contains("agenthost:/root"))
+        #expect(reconnectParams.subscriptions.contains("ahp-root://"))
         #expect(reconnectParams.subscriptions.contains(sessionURI))
 
         try await transport.enqueueSuccessResponse(
@@ -604,7 +607,7 @@ struct InjectedTransportTests {
         let subscribe = try await transport.nextSentMessage(timeoutNanoseconds: 1_000_000_000)
         #expect(subscribe.method == "subscribe")
         let params = try decodeRequest(subscribe, as: SubscribeParams.self).params
-        #expect(params.resource == sessionURI)
+        #expect(params.channel == sessionURI)
         try await transport.enqueueSuccessResponse(
             id: try requireRequestID(subscribe),
             result: SubscribeResult(snapshot: refreshedSnapshot)
@@ -847,7 +850,7 @@ struct InjectedTransportTests {
             let subscribe = try await transport.nextSentMessage(timeoutNanoseconds: 1_000_000_000)
             #expect(subscribe.method == "subscribe")
             let params = try decodeRequest(subscribe, as: SubscribeParams.self).params
-            #expect(params.resource == expectedURI)
+            #expect(params.channel == expectedURI)
             try await transport.enqueueSuccessResponse(
                 id: try requireRequestID(subscribe),
                 result: SubscribeResult(snapshot: makeSessionSnapshot(resource: expectedURI, title: expectedURI, fromSeq: 20))
@@ -919,7 +922,7 @@ struct InjectedTransportTests {
         let unsubscribe = try await transport.nextSentMessage(timeoutNanoseconds: 1_000_000_000)
         #expect(unsubscribe.method == "unsubscribe")
         let params = try decodeNotification(unsubscribe, as: UnsubscribeParams.self).params
-        #expect(params.resource == sessionURI)
+        #expect(params.channel == sessionURI)
 
         await refreshTask.value
 
@@ -1099,7 +1102,7 @@ struct InjectedTransportTests {
 
         let reconnectParams = try decodeRequest(reconnect, as: ReconnectParams.self).params
         #expect(reconnectParams.lastSeenServerSeq == 10)
-        #expect(reconnectParams.subscriptions == ["agenthost:/root"])
+        #expect(reconnectParams.subscriptions == ["ahp-root://"])
 
         let snapshotResult = ReconnectResult.snapshot(ReconnectSnapshotResult(
             type: .snapshot,
@@ -1129,8 +1132,8 @@ struct InjectedTransportTests {
         let transport = TestWebSocketTransport()
         let connection = AHPConnection(clientId: "test-client") { _, _ in transport }
         let disconnectSignal = AsyncSignal()
-        let sessionURI = "copilot:/queued-session"
-        let replayedAction = makeTurnStartedAction(session: sessionURI, text: "Hello again")
+        let sessionURI = "ahp-session:/queued-session"
+        let replayedAction = makeTurnStartedAction(text: "Hello again")
 
         await connection.setOnUnexpectedDisconnect {
             Task { await disconnectSignal.fire() }
@@ -1138,14 +1141,14 @@ struct InjectedTransportTests {
 
         try await connectConnection(connection, over: transport, serverSeq: 20)
 
-        try await connection.dispatchAction(replayedAction)
+        try await connection.dispatchAction(replayedAction, channel: sessionURI)
         let dispatch = await transport.nextSentMessage()
 
         #expect(dispatch.method == "dispatchAction")
 
         let dispatchParams = try decodeNotification(dispatch, as: DispatchActionParams.self).params
         #expect(dispatchParams.clientSeq > 0)
-        #expect(extractSessionURI(from: dispatchParams.action) == sessionURI)
+        #expect(dispatchParams.channel == sessionURI)
 
         await transport.failNextReceive(TestWebSocketTransport.TransportError.receiveStopped)
         await disconnectSignal.wait()
@@ -1157,7 +1160,7 @@ struct InjectedTransportTests {
 
         let reconnectParams = try decodeRequest(reconnect, as: ReconnectParams.self).params
         #expect(reconnectParams.lastSeenServerSeq == 20)
-        #expect(reconnectParams.subscriptions == ["agenthost:/root"])
+        #expect(reconnectParams.subscriptions == ["ahp-root://"])
 
         let replayResult = ReconnectResult.replay(ReconnectReplayResult(
             type: .replay,
@@ -1174,7 +1177,7 @@ struct InjectedTransportTests {
 
         let replayedDispatchParams = try decodeNotification(replayedDispatch, as: DispatchActionParams.self).params
         #expect(replayedDispatchParams.clientSeq == dispatchParams.clientSeq)
-        #expect(extractSessionURI(from: replayedDispatchParams.action) == sessionURI)
+        #expect(replayedDispatchParams.channel == sessionURI)
 
         let result = try await reconnectTask.value
         guard case .replay(let replay) = result else {
@@ -1191,8 +1194,8 @@ struct InjectedTransportTests {
         let transport = TestWebSocketTransport()
         let connection = AHPConnection(clientId: "test-client") { _, _ in transport }
         let disconnectSignal = AsyncSignal()
-        let sessionURI = "copilot:/queued-session"
-        let replayedAction = makeTurnStartedAction(session: sessionURI, text: "Hello again")
+        let sessionURI = "ahp-session:/queued-session"
+        let replayedAction = makeTurnStartedAction(text: "Hello again")
 
         await connection.setOnUnexpectedDisconnect {
             Task { await disconnectSignal.fire() }
@@ -1200,7 +1203,7 @@ struct InjectedTransportTests {
 
         try await connectConnection(connection, over: transport, serverSeq: 20)
 
-        try await connection.dispatchAction(replayedAction)
+        try await connection.dispatchAction(replayedAction, channel: sessionURI)
         let dispatch = await transport.nextSentMessage()
         let dispatchParams = try decodeNotification(dispatch, as: DispatchActionParams.self).params
 
@@ -1213,6 +1216,7 @@ struct InjectedTransportTests {
         let replayResult = ReconnectResult.replay(ReconnectReplayResult(
             type: .replay,
             actions: [ActionEnvelope(
+                channel: sessionURI,
                 action: replayedAction,
                 serverSeq: 21,
                 origin: ActionOrigin(clientId: "test-client", clientSeq: dispatchParams.clientSeq)
@@ -1485,10 +1489,10 @@ private func decodeNotification<Params: Codable & Sendable>(
 
 private func makeInitializeResult(serverSeq: Int) -> InitializeResult {
     InitializeResult(
-        protocolVersion: "0.1.0",
+        protocolVersion: "0.2.0",
         serverSeq: serverSeq,
         snapshots: [Snapshot(
-            resource: "agenthost:/root",
+            resource: "ahp-root://",
             state: .root(RootState(agents: [])),
             fromSeq: serverSeq
         )]
@@ -1531,54 +1535,10 @@ private func timestampMilliseconds(_ date: Date) -> Int {
     Int(date.timeIntervalSince1970 * 1000)
 }
 
-private func makeTurnStartedAction(session: String, text: String) -> StateAction {
+private func makeTurnStartedAction(text: String) -> StateAction {
     .sessionTurnStarted(SessionTurnStartedAction(
         type: .sessionTurnStarted,
-        session: session,
         turnId: UUID().uuidString,
         userMessage: UserMessage(text: text)
     ))
-}
-
-private func extractSessionURI(from action: StateAction) -> String? {
-    switch action {
-    case .sessionReady(let value): return value.session
-    case .sessionCreationFailed(let value): return value.session
-    case .sessionTurnStarted(let value): return value.session
-    case .sessionDelta(let value): return value.session
-    case .sessionResponsePart(let value): return value.session
-    case .sessionToolCallStart(let value): return value.session
-    case .sessionToolCallDelta(let value): return value.session
-    case .sessionToolCallReady(let value): return value.session
-    case .sessionToolCallConfirmed(let value): return value.session
-    case .sessionToolCallComplete(let value): return value.session
-    case .sessionToolCallResultConfirmed(let value): return value.session
-    case .sessionTurnComplete(let value): return value.session
-    case .sessionTurnCancelled(let value): return value.session
-    case .sessionError(let value): return value.session
-    case .sessionTitleChanged(let value): return value.session
-    case .sessionUsage(let value): return value.session
-    case .sessionReasoning(let value): return value.session
-    case .sessionModelChanged(let value): return value.session
-    case .sessionServerToolsChanged(let value): return value.session
-    case .sessionActiveClientChanged(let value): return value.session
-    case .sessionActiveClientToolsChanged(let value): return value.session
-    case .sessionPendingMessageSet(let value): return value.session
-    case .sessionPendingMessageRemoved(let value): return value.session
-    case .sessionQueuedMessagesReordered(let value): return value.session
-    case .sessionCustomizationsChanged(let value): return value.session
-    case .sessionCustomizationToggled(let value): return value.session
-    case .sessionIsReadChanged(let value): return value.session
-    case .sessionIsArchivedChanged(let value): return value.session
-    case .sessionActivityChanged(let value): return value.session
-    case .sessionInputRequested(let value): return value.session
-    case .sessionInputAnswerChanged(let value): return value.session
-    case .sessionInputCompleted(let value): return value.session
-    case .sessionTruncated(let value): return value.session
-    case .sessionDiffsChanged(let value): return value.session
-    case .sessionConfigChanged(let value): return value.session
-    case .sessionToolCallContentChanged(let value): return value.session
-    default:
-        return nil
-    }
 }

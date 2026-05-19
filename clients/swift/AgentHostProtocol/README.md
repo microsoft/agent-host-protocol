@@ -31,7 +31,7 @@ Then depend on one or both products:
 
 ## Minimal Single-Host Client
 
-This example opens one WebSocket connection, subscribes to the root resource during `initialize`, applies the returned snapshots, and then applies subsequent action events.
+This example opens one WebSocket connection, subscribes to the root channel during `initialize`, applies the returned snapshots, and then applies subsequent action events.
 
 ```swift
 import AgentHostProtocol
@@ -51,10 +51,10 @@ Task {
         switch event.event {
         case .action(let envelope):
             await mirror.apply(envelope)
-        case .notification(let notification):
+        case .sessionAdded, .sessionRemoved, .sessionSummaryChanged, .authRequired:
             // Protocol notifications are ephemeral and are not replayed on
             // reconnect. Apps commonly refresh listSessions() after reconnect.
-            print("notification: \(notification)")
+            print("notification: \(event.event)")
         }
     }
 }
@@ -63,7 +63,7 @@ try await client.connect()
 
 let initialized = try await client.initialize(
     clientId: "my-client-id",
-    protocolVersions: ["0.1.0"],
+    protocolVersions: ["0.2.0"],
     initialSubscriptions: [RootResourceURI]
 )
 
@@ -129,25 +129,26 @@ A typical app-level reconnect flow is:
 
 `dispatchAction` is a fire-and-forget notification. The server acknowledgement comes later when a live or replayed `ActionEnvelope` includes the same `origin.clientId` and `origin.clientSeq`.
 
-`AHPClient.dispatch(_:)` is a convenience for simple clients; it assigns `clientSeq` internally and returns a `DispatchHandle` with the sequence that was sent. `AHPClient.dispatch(_:clientSeq:)`, `MultiHostClient.dispatch(host:action:clientSeq:)`, and `HostClientHandle.dispatch(_:clientSeq:)` let higher layers supply stable sequence numbers directly.
+`AHPClient.dispatch(_:channel:)` is a convenience for simple clients; it assigns `clientSeq` internally and returns a `DispatchHandle` with the sequence that was sent. `AHPClient.dispatch(_:channel:clientSeq:)`, `MultiHostClient.dispatch(host:action:channel:clientSeq:)`, and `HostClientHandle.dispatch(_:channel:clientSeq:)` let higher layers supply stable sequence numbers directly.
 
 Apps that need to replay unacknowledged local actions after reconnect should own their outbound queue and send explicit `clientSeq` values:
 
 ```swift
 struct PendingOutboundAction {
     let clientSeq: Int
+    let channel: String
     let action: StateAction
 }
 
 var nextClientSeq = 1
 var pendingOutboundActions: [PendingOutboundAction] = []
 
-func dispatchFromApp(_ action: StateAction, multi: MultiHostClient) async throws {
+func dispatchFromApp(_ action: StateAction, channel: String, multi: MultiHostClient) async throws {
     let seq = nextClientSeq
     nextClientSeq += 1
-    pendingOutboundActions.append(PendingOutboundAction(clientSeq: seq, action: action))
+    pendingOutboundActions.append(PendingOutboundAction(clientSeq: seq, channel: channel, action: action))
 
-    try await multi.dispatch(host: "local", action: action, clientSeq: seq)
+    try await multi.dispatch(host: "local", action: action, channel: channel, clientSeq: seq)
 }
 
 func acknowledge(_ envelope: ActionEnvelope, clientId: String) {

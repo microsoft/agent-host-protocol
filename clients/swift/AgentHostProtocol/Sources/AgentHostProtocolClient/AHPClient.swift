@@ -22,7 +22,7 @@ import AgentHostProtocol
 /// try await client.connect()
 /// let init = try await client.initialize(
 ///     clientId: "my-client",
-///     protocolVersions: ["0.1.0"],
+///     protocolVersions: ["0.2.0"],
 ///     initialSubscriptions: [RootResourceURI]
 /// )
 /// // ... use client ...
@@ -257,6 +257,7 @@ public actor AHPClient {
         initialSubscriptions: [String] = []
     ) async throws -> InitializeResult {
         let params = InitializeParams(
+            channel: RootResourceURI,
             protocolVersions: protocolVersions,
             clientId: clientId,
             initialSubscriptions: initialSubscriptions.isEmpty ? nil : initialSubscriptions
@@ -280,6 +281,7 @@ public actor AHPClient {
         subscriptions: [String]
     ) async throws -> ReconnectResult {
         let params = ReconnectParams(
+            channel: RootResourceURI,
             clientId: clientId,
             lastSeenServerSeq: lastSeenServerSeq,
             subscriptions: subscriptions
@@ -299,8 +301,9 @@ public actor AHPClient {
         return result
     }
 
-    /// Subscribe to a resource URI. Returns the snapshot the server provides
-    /// and a fresh stream of subsequent events.
+    /// Subscribe to a channel URI. Returns the subscribe result (whose
+    /// `snapshot` is `nil` for stateless channels) and a fresh stream of
+    /// subsequent events.
     ///
     /// If the request fails (RPC error, timeout, transport drop), the local
     /// listener is removed and its stream finished — callers don't need to
@@ -310,7 +313,7 @@ public actor AHPClient {
         do {
             let result: SubscribeResult = try await request(
                 method: "subscribe",
-                params: SubscribeParams(resource: uri)
+                params: SubscribeParams(channel: uri)
             )
             return (result, stream)
         } catch {
@@ -369,16 +372,16 @@ public actor AHPClient {
     public func unsubscribe(_ uri: String) async throws {
         let listeners = perUriListeners.removeValue(forKey: uri) ?? []
         for l in listeners { l.continuation.finish() }
-        try await notify(method: "unsubscribe", params: UnsubscribeParams(resource: uri))
+        try await notify(method: "unsubscribe", params: UnsubscribeParams(channel: uri))
     }
 
-    /// Fire a write-ahead `dispatchAction` notification. Returns a handle
-    /// carrying the assigned `clientSeq`.
+    /// Fire a write-ahead `dispatchAction` notification on `channel`. Returns
+    /// a handle carrying the assigned `clientSeq`.
     @discardableResult
-    public func dispatch(_ action: StateAction) async throws -> DispatchHandle {
+    public func dispatch(_ action: StateAction, channel: String) async throws -> DispatchHandle {
         let seq = nextClientSeq
         nextClientSeq += 1
-        return try await dispatch(action, clientSeq: seq)
+        return try await dispatch(action, channel: channel, clientSeq: seq)
     }
 
     /// Fire a write-ahead `dispatchAction` notification with a caller-owned
@@ -386,16 +389,16 @@ public actor AHPClient {
     ///
     /// Use this overload when a higher layer owns an outbound action queue and
     /// needs to replay unacknowledged actions across reconnects with stable
-    /// sequence numbers. The convenience `dispatch(_:)` overload remains
-    /// suitable for simple fire-and-forget clients.
+    /// sequence numbers. The convenience `dispatch(_:channel:)` overload
+    /// remains suitable for simple fire-and-forget clients.
     @discardableResult
-    public func dispatch(_ action: StateAction, clientSeq: Int) async throws -> DispatchHandle {
+    public func dispatch(_ action: StateAction, channel: String, clientSeq: Int) async throws -> DispatchHandle {
         if clientSeq >= nextClientSeq {
             nextClientSeq = clientSeq + 1
         }
         try await notify(
             method: "dispatchAction",
-            params: DispatchActionParams(clientSeq: clientSeq, action: action)
+            params: DispatchActionParams(channel: channel, clientSeq: clientSeq, action: action)
         )
         return DispatchHandle(clientSeq: clientSeq)
     }
@@ -653,8 +656,34 @@ public actor AHPClient {
         switch method {
         case "action":
             await handleActionNotification(paramsData: paramsData)
-        case "notification":
-            await handleProtocolNotification(paramsData: paramsData)
+        case "root/sessionAdded":
+            await handleSubscriptionParams(
+                paramsData: paramsData,
+                type: SessionAddedParams.self,
+                wrap: SubscriptionEvent.sessionAdded,
+                channel: { $0.channel }
+            )
+        case "root/sessionRemoved":
+            await handleSubscriptionParams(
+                paramsData: paramsData,
+                type: SessionRemovedParams.self,
+                wrap: SubscriptionEvent.sessionRemoved,
+                channel: { $0.channel }
+            )
+        case "root/sessionSummaryChanged":
+            await handleSubscriptionParams(
+                paramsData: paramsData,
+                type: SessionSummaryChangedParams.self,
+                wrap: SubscriptionEvent.sessionSummaryChanged,
+                channel: { $0.channel }
+            )
+        case "auth/required":
+            await handleSubscriptionParams(
+                paramsData: paramsData,
+                type: AuthRequiredParams.self,
+                wrap: SubscriptionEvent.authRequired,
+                channel: { $0.channel }
+            )
         default:
             #if DEBUG
             print("[AHPClient] unhandled notification: \(method)")
@@ -676,32 +705,39 @@ public actor AHPClient {
         if envelope.serverSeq > lastSeenServerSeq {
             lastSeenServerSeq = envelope.serverSeq
         }
-        let resource = actionResource(for: envelope.action)
+        let channel = envelope.channel
         let event = SubscriptionEvent.action(envelope)
-        if let resource, let listeners = perUriListeners[resource] {
+        if let listeners = perUriListeners[channel] {
             for l in listeners { l.continuation.yield(event) }
         }
-        broadcast(ClientEvent(resource: resource, event: event))
+        broadcast(ClientEvent(resource: channel, event: event))
     }
 
-    private func handleProtocolNotification(paramsData: Data?) async {
+    /// Decode a per-method notification params type, dispatch the resulting
+    /// `SubscriptionEvent` to listeners on `params.channel`, and also tee it
+    /// into the top-level events tap tagged with the channel.
+    private func handleSubscriptionParams<P: Decodable>(
+        paramsData: Data?,
+        type: P.Type,
+        wrap: (P) -> SubscriptionEvent,
+        channel: (P) -> String
+    ) async {
         guard let paramsData else { return }
-        let wrapped: NotificationMethodParams
+        let params: P
         do {
-            wrapped = try decoder.decode(NotificationMethodParams.self, from: paramsData)
+            params = try decoder.decode(P.self, from: paramsData)
         } catch {
             #if DEBUG
-            print("[AHPClient] failed to decode protocol notification: \(error)")
+            print("[AHPClient] failed to decode notification params: \(error)")
             #endif
             return
         }
-        let event = SubscriptionEvent.notification(wrapped.notification)
-        // Protocol notifications are cross-resource; fan to every subscription
-        // and to the top-level events tap (with no resource tag).
-        for listeners in perUriListeners.values {
+        let event = wrap(params)
+        let ch = channel(params)
+        if let listeners = perUriListeners[ch] {
             for l in listeners { l.continuation.yield(event) }
         }
-        broadcast(ClientEvent(resource: nil, event: event))
+        broadcast(ClientEvent(resource: ch, event: event))
     }
 
     // MARK: - Private: failure / cleanup
@@ -826,19 +862,6 @@ public actor AHPClient {
 
     // MARK: - Private: helpers
 
-    /// Determine the resource URI an action is scoped to, mirroring the Rust
-    /// fallback: serialize the payload, look up `session` then `terminal`,
-    /// fall back to `RootResourceURI`.
-    private func actionResource(for action: StateAction) -> String? {
-        guard let data = try? encoder.encode(action),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            return RootResourceURI
-        }
-        if let session = object["session"] as? String { return session }
-        if let terminal = object["terminal"] as? String { return terminal }
-        return RootResourceURI
-    }
     // MARK: - Internal test hooks
 
     /// Internal accessor used by tests to confirm listener cleanup. Counts

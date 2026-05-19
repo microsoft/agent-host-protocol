@@ -16,7 +16,7 @@
 
 import Foundation
 
-/// Well-known resource URI for root-state subscriptions and snapshots.
+/// Well-known channel URI for root-state subscriptions and snapshots.
 ///
 /// The protocol-level value referenced throughout the spec, docs, and the
 /// example app's initial subscriptions. Defined here as a constant so the
@@ -24,4 +24,4 @@ import Foundation
 ///
 /// TODO(codegen): Source this from `AgentHostProtocol` once codegen exposes a
 /// shared constant (TypeScript/Rust/Swift would all benefit).
-public let RootResourceURI: String = "agenthost:/root"
+public let RootResourceURI: String = "ahp-root://"

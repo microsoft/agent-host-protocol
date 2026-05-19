@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/isReadChanged",
-      "session": "copilot:/test-session",
       "isRead": false
     }
   ],

@@ -70,9 +70,10 @@ If the transport connection drops:
   "id": 2,
   "method": "reconnect",
   "params": {
+    "channel": "ahp-root://",
     "clientId": "client-1",
     "lastSeenServerSeq": 42,
-    "subscriptions": ["agenthost:/root", "copilot:/<uuid>"]
+    "subscriptions": ["ahp-root://", "ahp-session:/<uuid>"]
   }
 }
 ```
@@ -85,4 +86,5 @@ Protocol notifications (like `sessionAdded`/`sessionRemoved`) are **not** replay
 
 - [Actions](/guide/actions) — The action types that flow through reconciliation.
 - [Subscriptions](/specification/subscriptions) — How URI-based subscriptions work.
-- [Lifecycle](/specification/lifecycle) — Session creation, handshake, and shutdown.
+- [Lifecycle](/specification/lifecycle) — Connection handshake and reconnection.
+- [Session Channel](/specification/session-channel) — Session creation and lifecycle.

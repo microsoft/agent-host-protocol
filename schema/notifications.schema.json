@@ -5,12 +5,13 @@
   "title": "AHP Notification Types",
   "description": "All notification types in the Agent Host Protocol.",
   "$defs": {
-    "SessionAddedNotification": {
+    "SessionAddedParams": {
       "type": "object",
-      "description": "Broadcast to all connected clients when a new session is created.",
+      "description": "Broadcast to all clients subscribed to the root channel when a new session\nis created.",
       "properties": {
-        "type": {
-          "$ref": "#/$defs/NotificationType.SessionAdded"
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this notification belongs to (the root channel)"
         },
         "summary": {
           "$ref": "#/$defs/SessionSummary",
@@ -18,16 +19,17 @@
         }
       },
       "required": [
-        "type",
+        "channel",
         "summary"
       ]
     },
-    "SessionRemovedNotification": {
+    "SessionRemovedParams": {
       "type": "object",
-      "description": "Broadcast to all connected clients when a session is disposed.",
+      "description": "Broadcast to all clients subscribed to the root channel when a session is\ndisposed.",
       "properties": {
-        "type": {
-          "$ref": "#/$defs/NotificationType.SessionRemoved"
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this notification belongs to (the root channel)"
         },
         "session": {
           "$ref": "#/$defs/URI",
@@ -35,16 +37,17 @@
         }
       },
       "required": [
-        "type",
+        "channel",
         "session"
       ]
     },
-    "SessionSummaryChangedNotification": {
+    "SessionSummaryChangedParams": {
       "type": "object",
-      "description": "Broadcast to all connected clients when an existing session's summary\nchanges (title, status, `modifiedAt`, model, working directory, read/done\nstate, or diff statistics).\n\nThis notification lets clients that maintain a cached session list — for\nexample, the result of a previous `listSessions()` call — stay in sync with\nin-flight sessions without having to subscribe to every session URI\nindividually. It is complementary to, not a replacement for,\n`notify/sessionAdded` and `notify/sessionRemoved`: those signal lifecycle\n(creation/disposal), while this signals summary-level mutations on an\nalready-known session.\n\nSemantics:\n\n- Only fields present in `changes` have new values; omitted fields are\n  unchanged on the client's cached summary.\n- Identity fields (`resource`, `provider`, `createdAt`) never change and\n  are not carried.\n- Like all protocol notifications, this is ephemeral: it is **not**\n  replayed on reconnect. On reconnect, clients should re-fetch the full\n  catalog via `listSessions()` as usual.\n- The server SHOULD emit this notification whenever any mutable field on\n  {@link SessionSummary | `SessionSummary`} changes for a session the\n  server has surfaced via `listSessions()` or `notify/sessionAdded`.\n  Servers MAY coalesce or debounce updates for noisy fields (for example,\n  `modifiedAt` bumps while a turn is streaming, or rapidly changing\n  `diffs`) at their discretion.\n- Clients that have no cached entry for `session` MAY ignore the\n  notification; it is not a substitute for `notify/sessionAdded`.",
+      "description": "Broadcast to all clients subscribed to the root channel when an existing\nsession's summary changes (title, status, `modifiedAt`, model, working\ndirectory, read/done state, or diff statistics).\n\nThis notification lets clients that maintain a cached session list — for\nexample, the result of a previous `listSessions()` call — stay in sync with\nin-flight sessions without having to subscribe to every session URI\nindividually. It is complementary to, not a replacement for,\n`root/sessionAdded` and `root/sessionRemoved`: those signal lifecycle\n(creation/disposal), while this signals summary-level mutations on an\nalready-known session.\n\nSemantics:\n\n- Only fields present in `changes` have new values; omitted fields are\n  unchanged on the client's cached summary.\n- Identity fields (`resource`, `provider`, `createdAt`) never change and\n  are not carried.\n- Like all protocol notifications, this is ephemeral: it is **not**\n  replayed on reconnect. On reconnect, clients should re-fetch the full\n  catalog via `listSessions()` as usual.\n- The server SHOULD emit this notification whenever any mutable field on\n  {@link SessionSummary | `SessionSummary`} changes for a session the\n  server has surfaced via `listSessions()` or `root/sessionAdded`.\n  Servers MAY coalesce or debounce updates for noisy fields (for example,\n  `modifiedAt` bumps while a turn is streaming, or rapidly changing\n  `changesets`) at their discretion.\n- Clients that have no cached entry for `session` MAY ignore the\n  notification; it is not a substitute for `root/sessionAdded`.",
       "properties": {
-        "type": {
-          "$ref": "#/$defs/NotificationType.SessionSummaryChanged"
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this notification belongs to (the root channel)"
         },
         "session": {
           "$ref": "#/$defs/URI",
@@ -93,29 +96,30 @@
               "$ref": "#/$defs/URI",
               "description": "The working directory URI for this session"
             },
-            "diffs": {
+            "changesets": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/FileEdit"
+                "$ref": "#/$defs/ChangesetSummary"
               },
-              "description": "Files changed during this session with diff statistics"
+              "description": "Catalogue of changesets the server can produce for this session. Each\nentry advertises a subscribable view of file changes (uncommitted,\nsession-wide, per-turn, etc.) and the URI template the client expands\nbefore subscribing. See {@link ChangesetSummary} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model."
             }
           },
           "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`, `provider`, `createdAt`) never change and\nMUST be omitted by senders; receivers SHOULD ignore them if present."
         }
       },
       "required": [
-        "type",
+        "channel",
         "session",
         "changes"
       ]
     },
-    "AuthRequiredNotification": {
+    "AuthRequiredParams": {
       "type": "object",
-      "description": "Sent by the server when a protected resource requires (re-)authentication.\n\nThis notification is sent when a previously valid token expires or is\nrevoked, or when the server discovers a new authentication requirement.\nClients should obtain a fresh token and push it via the `authenticate`\ncommand.",
+      "description": "Sent by the server when a protected resource requires (re-)authentication.\n\nThis notification MAY be associated with any channel — for example, an\nagent advertised on the root channel, or a per-session resource. The\n`channel` field identifies the subscription the auth requirement belongs\nto; the `resource` field carries the OAuth-protected resource identifier\n(per RFC 9728).\n\nClients should obtain a fresh token and push it via the `authenticate`\ncommand.",
       "properties": {
-        "type": {
-          "$ref": "#/$defs/NotificationType.AuthRequired"
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this notification belongs to"
         },
         "resource": {
           "type": "string",
@@ -127,7 +131,7 @@
         }
       },
       "required": [
-        "type",
+        "channel",
         "resource"
       ]
     },
@@ -135,16 +139,16 @@
       "description": "Discriminated union of all protocol notifications.",
       "oneOf": [
         {
-          "$ref": "#/$defs/SessionAddedNotification"
+          "$ref": "#/$defs/SessionAddedParams"
         },
         {
-          "$ref": "#/$defs/SessionRemovedNotification"
+          "$ref": "#/$defs/SessionRemovedParams"
         },
         {
-          "$ref": "#/$defs/SessionSummaryChangedNotification"
+          "$ref": "#/$defs/SessionSummaryChangedParams"
         },
         {
-          "$ref": "#/$defs/AuthRequiredNotification"
+          "$ref": "#/$defs/AuthRequiredParams"
         }
       ]
     },
@@ -261,7 +265,7 @@
     },
     "RootState": {
       "type": "object",
-      "description": "Global state shared with every client subscribed to `agenthost:/root`.",
+      "description": "Global state shared with every client subscribed to `ahp-root://`.",
       "properties": {
         "agents": {
           "type": "array",
@@ -587,12 +591,12 @@
           "$ref": "#/$defs/URI",
           "description": "The working directory URI for this session"
         },
-        "diffs": {
+        "changesets": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/FileEdit"
+            "$ref": "#/$defs/ChangesetSummary"
           },
-          "description": "Files changed during this session with diff statistics"
+          "description": "Catalogue of changesets the server can produce for this session. Each\nentry advertises a subscribable view of file changes (uncommitted,\nsession-wide, per-turn, etc.) and the URI template the client expands\nbefore subscribing. See {@link ChangesetSummary} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model."
         }
       },
       "required": [
@@ -602,6 +606,133 @@
         "status",
         "createdAt",
         "modifiedAt"
+      ]
+    },
+    "ChangesetSummary": {
+      "type": "object",
+      "description": "Catalogue entry describing one changeset the server can produce for a\nsession.\n\nCatalogue entries are intentionally lightweight — just enough to render a\nchip or list row without subscribing. Full per-changeset detail\n({@link ChangesetState}) lives on the subscribable URI obtained by\nexpanding {@link uriTemplate}.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Human-readable label, e.g. `\"Uncommitted Changes\"`."
+        },
+        "uriTemplate": {
+          "type": "string",
+          "description": "RFC 6570 URI template. Clients parse the variables directly out of the\ntemplate using the standard `{name}` syntax — they are not redeclared\nhere.\n\nOnly the following template shapes are defined by this protocol; any\nother variable name MUST be ignored by clients (there is no\nprotocol-defined way to obtain values for unknown variables):\n\n| Variables in template                       | Meaning                                                                              |\n| ------------------------------------------- | ------------------------------------------------------------------------------------ |\n| _(none)_                                    | A static, session-wide changeset. The template is itself a subscribable URI.         |\n| `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the session.                            |\n| `{originalTurnId}` and `{modifiedTurnId}`   | Diff between two turns. Both variables MUST be present.                              |\n\nFuture protocol versions MAY add new well-known variables."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional longer description."
+        },
+        "additions": {
+          "type": "number",
+          "description": "Aggregate line additions across the changeset, when known."
+        },
+        "deletions": {
+          "type": "number",
+          "description": "Aggregate line deletions across the changeset, when known."
+        },
+        "files": {
+          "type": "number",
+          "description": "Number of files in the changeset, when known."
+        }
+      },
+      "required": [
+        "label",
+        "uriTemplate"
+      ]
+    },
+    "ChangesetState": {
+      "type": "object",
+      "description": "Full state for a single changeset, returned when a client subscribes to\nan expanded changeset URI.\n\nThe client already knows the URI it subscribed to, so this state does\nnot redundantly carry it (or the catalogue's `id`, `label`, etc.).\nAggregate counts (`additions`, `deletions`, `files`) are likewise\nomitted: clients trivially compute them from `files[].edit.diff`.",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/ChangesetStatus",
+          "description": "Computation lifecycle."
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Present iff `status === ChangesetStatus.Error`."
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChangesetFile"
+          },
+          "description": "Files in this changeset, keyed by {@link ChangesetFile.id}."
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChangesetOperation"
+          },
+          "description": "Operations the client may invoke against this changeset. Omit when no\noperations are available."
+        }
+      },
+      "required": [
+        "status",
+        "files"
+      ]
+    },
+    "ChangesetFile": {
+      "type": "object",
+      "description": "One file entry within a {@link ChangesetState}.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable identifier within the changeset. Typically `after.uri`\n(or `before.uri` for deletions)."
+        },
+        "edit": {
+          "$ref": "#/$defs/FileEdit",
+          "description": "Reuses the existing {@link FileEdit} shape. Clients derive line\nadditions, deletions, and rename/create/delete semantics from this."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Server-defined opaque metadata, surfaced to operations and tooling\nbut not interpreted by the protocol."
+        }
+      },
+      "required": [
+        "id",
+        "edit"
+      ]
+    },
+    "ChangesetOperation": {
+      "type": "object",
+      "description": "A server-declared invokable verb the client can run against a\nchangeset, a file, or a range — `\"stage\"`, `\"revert\"`, `\"create-pr\"`,\nand so on.\n\nThe term \"operation\" is used deliberately to avoid colliding with the\nprotocol-level [Actions](/guide/actions) that mutate state.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable identifier, unique within this changeset."
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable button/menu label."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional longer description shown on hover or in tooltips."
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChangesetOperationScope"
+          },
+          "description": "Where this operation can be invoked."
+        },
+        "confirmation": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Optional confirmation prompt to show before invoking. When present,\nthe client MUST display this message to the user (typically in a\nconfirmation dialog) and only invoke the operation after the user\naccepts. The presence of this field also signals that the operation\nis destructive — clients SHOULD style the affirmative button\naccordingly (e.g. with a warning colour)."
+        },
+        "icon": {
+          "type": "string",
+          "description": "Optional generic icon hint, e.g. `\"check\"`, `\"trash\"`."
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "scopes"
       ]
     },
     "ConfigPropertySchema": {
@@ -2884,7 +3015,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribed resource URI (e.g. `agenthost:/root` or `copilot:/<uuid>`)"
+          "description": "The subscribed channel URI (e.g. `ahp-root://` or `ahp-session:/<uuid>`)"
         },
         "state": {
           "oneOf": [
@@ -2896,6 +3027,9 @@
             },
             {
               "$ref": "#/$defs/TerminalState"
+            },
+            {
+              "$ref": "#/$defs/ChangesetState"
             }
           ],
           "description": "The current state of the resource"

@@ -14,7 +14,6 @@
   "actions": [
     {
       "type": "terminal/claimed",
-      "terminal": "agenthost:/terminal/1",
       "claim": {
         "kind": "session",
         "session": "copilot:/s1"

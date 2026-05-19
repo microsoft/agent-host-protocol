@@ -21,11 +21,11 @@ public enum MultiHostExample {
     /// aggregated session list before tearing down.
     public static func runDemo() async throws {
         let storeA = ExampleHostState(label: "Local", sessions: [
-            exampleSummary("copilot:/local-1", "Local: refactor", modifiedAt: 1_700)
+            exampleSummary("ahp-session:/local-1", "Local: refactor", modifiedAt: 1_700)
         ])
         let storeB = ExampleHostState(label: "Tunnel", sessions: [
-            exampleSummary("copilot:/remote-1", "Tunnel: feature work", modifiedAt: 2_000),
-            exampleSummary("copilot:/remote-2", "Tunnel: bugfix", modifiedAt: 1_500)
+            exampleSummary("ahp-session:/remote-1", "Tunnel: feature work", modifiedAt: 2_000),
+            exampleSummary("ahp-session:/remote-2", "Tunnel: bugfix", modifiedAt: 1_500)
         ])
 
         let multi = MultiHostClient()
@@ -100,7 +100,7 @@ private func driveExampleHost(
                 "fromSeq": 0,
             ]
             result = [
-                "protocolVersion": "0.1.0",
+                "protocolVersion": "0.2.0",
                 "serverSeq": 0,
                 "snapshots": [snapshotJSON],
             ] as [String: Any]

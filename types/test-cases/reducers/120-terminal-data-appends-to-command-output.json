@@ -13,18 +13,19 @@
         "isComplete": false
       }
     ],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   },
   "actions": [
     {
       "type": "terminal/data",
-      "terminal": "agenthost:/terminal/1",
       "data": "PASS src/index.test.ts\r\n"
     },
     {
       "type": "terminal/data",
-      "terminal": "agenthost:/terminal/1",
       "data": "All tests passed\r\n"
     }
   ],
@@ -40,7 +41,10 @@
         "isComplete": false
       }
     ],
-    "claim": { "kind": "client", "clientId": "c1" },
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    },
     "supportsCommandDetection": true
   }
 }

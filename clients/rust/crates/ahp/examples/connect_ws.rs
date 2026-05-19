@@ -46,8 +46,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(SubscriptionEvent::Action(a)) => {
                     println!("action seq={} {}", a.server_seq, serde_json::to_string(&a.action)?);
                 }
-                Some(SubscriptionEvent::Notification(n)) => {
-                    println!("notification {}", serde_json::to_string(&n)?);
+                Some(other) => {
+                    println!("notification {}", serde_json::to_string(&serde_notif(&other))?);
                 }
                 None => break,
             },
@@ -60,4 +60,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     client.shutdown().await;
     Ok(())
+}
+
+fn serde_notif(ev: &SubscriptionEvent) -> serde_json::Value {
+    match ev {
+        SubscriptionEvent::SessionAdded(n) => serde_json::to_value(n).unwrap_or_default(),
+        SubscriptionEvent::SessionRemoved(n) => serde_json::to_value(n).unwrap_or_default(),
+        SubscriptionEvent::SessionSummaryChanged(n) => serde_json::to_value(n).unwrap_or_default(),
+        SubscriptionEvent::AuthRequired(n) => serde_json::to_value(n).unwrap_or_default(),
+        _ => serde_json::Value::Null,
+    }
 }

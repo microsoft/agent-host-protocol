@@ -14,7 +14,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     }
@@ -22,23 +24,28 @@
   "actions": [
     {
       "type": "session/inputRequested",
-      "session": "copilot:/test-session",
       "request": {
         "id": "input-1",
         "message": "Clarify requirements",
         "questions": [
-          { "id": "q1", "kind": "number", "message": "How many?" }
+          {
+            "id": "q1",
+            "kind": "number",
+            "message": "How many?"
+          }
         ]
       }
     },
     {
       "type": "session/inputAnswerChanged",
-      "session": "copilot:/test-session",
       "requestId": "input-1",
       "questionId": "q1",
       "answer": {
         "state": "draft",
-        "value": { "kind": "number", "value": 1.5 }
+        "value": {
+          "kind": "number",
+          "value": 1.5
+        }
       }
     }
   ],
@@ -55,7 +62,9 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
-      "userMessage": { "text": "Hello" },
+      "userMessage": {
+        "text": "Hello"
+      },
       "responseParts": [],
       "usage": null
     },
@@ -64,12 +73,19 @@
         "id": "input-1",
         "message": "Clarify requirements",
         "questions": [
-          { "id": "q1", "kind": "number", "message": "How many?" }
+          {
+            "id": "q1",
+            "kind": "number",
+            "message": "How many?"
+          }
         ],
         "answers": {
           "q1": {
             "state": "draft",
-            "value": { "kind": "number", "value": 1.5 }
+            "value": {
+              "kind": "number",
+              "value": 1.5
+            }
           }
         }
       }

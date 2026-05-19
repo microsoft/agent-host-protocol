@@ -5,4 +5,4 @@
 #![allow(missing_docs)]
 
 /// Current protocol version (SemVer `MAJOR.MINOR.PATCH`).
-pub const PROTOCOL_VERSION: &str = "0.1.0";
+pub const PROTOCOL_VERSION: &str = "0.2.0";

@@ -3,19 +3,34 @@
   "reducer": "terminal",
   "initial": {
     "title": "bash",
-    "content": [{ "type": "unclassified", "value": "$ " }],
-    "claim": { "kind": "client", "clientId": "c1" }
+    "content": [
+      {
+        "type": "unclassified",
+        "value": "$ "
+      }
+    ],
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    }
   },
   "actions": [
     {
       "type": "terminal/input",
-      "terminal": "agenthost:/terminal/1",
       "data": "ls -la\r"
     }
   ],
   "expected": {
     "title": "bash",
-    "content": [{ "type": "unclassified", "value": "$ " }],
-    "claim": { "kind": "client", "clientId": "c1" }
+    "content": [
+      {
+        "type": "unclassified",
+        "value": "$ "
+      }
+    ],
+    "claim": {
+      "kind": "client",
+      "clientId": "c1"
+    }
   }
 }

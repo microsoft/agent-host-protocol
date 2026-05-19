@@ -47,7 +47,7 @@ public struct HostHandle: Sendable {
     public let completionTriggerCharacters: [String]
     /// Cached session summaries, sorted by `modifiedAt` descending. Seeded by
     /// `listSessions` after each connect and kept fresh by
-    /// `notify/sessionAdded`/`notify/sessionRemoved`/`notify/sessionSummaryChanged`.
+    /// `root/sessionAdded`/`root/sessionRemoved`/`root/sessionSummaryChanged`.
     public let sessionSummaries: [SessionSummary]
     /// Generation counter — bumped on every `connect` or `reconnect`.
     /// `HostClientHandle`s carry the generation they were issued at and

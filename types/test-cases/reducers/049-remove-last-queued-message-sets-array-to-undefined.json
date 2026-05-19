@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/pendingMessageRemoved",
-      "session": "copilot:/test-session",
       "kind": "queued",
       "id": "pm-1"
     }

@@ -24,7 +24,6 @@
   "actions": [
     {
       "type": "session/responsePart",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "part": {
         "kind": "markdown",
@@ -34,14 +33,12 @@
     },
     {
       "type": "session/delta",
-      "session": "copilot:/test-session",
       "turnId": "turn-1",
       "partId": "md-1",
       "content": "Response text"
     },
     {
       "type": "session/turnComplete",
-      "session": "copilot:/test-session",
       "turnId": "turn-1"
     }
   ],

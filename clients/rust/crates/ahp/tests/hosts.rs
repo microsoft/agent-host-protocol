@@ -109,7 +109,7 @@ async fn drive_fake_host_basic(mut transport: MemTransport, state: FakeHostState
     }
 }
 
-/// Like `drive_fake_host_basic`, but also injects a `notify/sessionAdded`
+/// Like `drive_fake_host_basic`, but also injects a `root/sessionAdded`
 /// notification once `initialize` completes. Returns when the client
 /// closes the transport.
 async fn drive_fake_host_with_injection(
@@ -148,14 +148,12 @@ async fn drive_fake_host_with_injection(
                     // listSessions response before the notification arrives.
                     tokio::time::sleep(Duration::from_millis(20)).await;
                     let payload = serde_json::json!({
-                        "notification": {
-                            "type": "notify/sessionAdded",
-                            "summary": summary,
-                        }
+                        "channel": ahp_types::ROOT_RESOURCE_URI,
+                        "summary": summary,
                     });
                     let notif = JsonRpcMessage::Notification(JsonRpcNotification {
                         jsonrpc: JsonRpcVersion::V2,
-                        method: "notification".into(),
+                        method: "root/sessionAdded".into(),
                         params: Some(ahp_types::common::AnyValue::from(payload)),
                     });
                     if transport
@@ -200,7 +198,7 @@ fn handle_request(req: &JsonRpcRequest, state: &FakeHostState) -> serde_json::Va
                 .params
                 .as_ref()
                 .and_then(|p| p.as_object())
-                .and_then(|m| m.get("resource"))
+                .and_then(|m| m.get("channel"))
                 .and_then(|v| v.as_str())
                 .unwrap_or(ahp_types::ROOT_RESOURCE_URI)
                 .to_string();
@@ -453,10 +451,8 @@ async fn fan_in_events_carry_host_id_and_resource() {
         match tokio::time::timeout(Duration::from_millis(500), events.recv()).await {
             Ok(Some(event)) => {
                 hosts_seen.insert(event.host_id.clone());
-                // Notifications carry no resource URI by design; actions
-                // would. The injected sessionAdded is a notification so
-                // resource is None.
-                assert!(event.resource.is_none());
+                // The injected sessionAdded is a root-channel notification.
+                assert_eq!(event.channel, ahp_types::ROOT_RESOURCE_URI);
             }
             _ => break,
         }
@@ -598,10 +594,7 @@ async fn reconnect_replay_actions_are_fanned_out_with_advanced_seq() {
                         })
                     ) {
                         assert_eq!(event.host_id, HostId::new("h"));
-                        assert_eq!(
-                            event.resource.as_deref(),
-                            Some(ahp_types::ROOT_RESOURCE_URI)
-                        );
+                        assert_eq!(event.channel, ahp_types::ROOT_RESOURCE_URI);
                         saw_replayed_action = true;
                         break;
                     }
@@ -726,7 +719,7 @@ fn make_summary(uri: &str, title: &str, modified_at: i64) -> ahp_types::state::S
         project: None,
         model: None,
         working_directory: None,
-        diffs: None,
+        changesets: None,
     }
 }
 
@@ -837,6 +830,7 @@ async fn drive_fake_host_replay(
                     "type": "replay",
                     "actions": [
                         {
+                            "channel": ahp_types::ROOT_RESOURCE_URI,
                             "action": {
                                 "type": "root/activeSessionsChanged",
                                 "activeSessions": 7

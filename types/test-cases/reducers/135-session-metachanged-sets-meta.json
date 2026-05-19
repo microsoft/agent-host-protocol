@@ -12,13 +12,21 @@
     },
     "lifecycle": "ready",
     "turns": [],
-    "_meta": { "git": { "branch": "main" } }
+    "_meta": {
+      "git": {
+        "branch": "main"
+      }
+    }
   },
   "actions": [
     {
       "type": "session/metaChanged",
-      "session": "copilot:/test-session",
-      "_meta": { "git": { "branch": "feature" }, "vscode.foo": 42 }
+      "_meta": {
+        "git": {
+          "branch": "feature"
+        },
+        "vscode.foo": 42
+      }
     }
   ],
   "expected": {
@@ -32,6 +40,11 @@
     },
     "lifecycle": "ready",
     "turns": [],
-    "_meta": { "git": { "branch": "feature" }, "vscode.foo": 42 }
+    "_meta": {
+      "git": {
+        "branch": "feature"
+      },
+      "vscode.foo": 42
+    }
   }
 }

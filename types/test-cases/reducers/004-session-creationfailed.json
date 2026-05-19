@@ -16,7 +16,6 @@
   "actions": [
     {
       "type": "session/creationFailed",
-      "session": "copilot:/test-session",
       "error": {
         "errorType": "init",
         "message": "Failed to start"

@@ -9,7 +9,9 @@
       "status": 1,
       "createdAt": 1000,
       "modifiedAt": 1000,
-      "model": { "id": "gpt-4o" }
+      "model": {
+        "id": "gpt-4o"
+      }
     },
     "lifecycle": "ready",
     "turns": []
@@ -17,7 +19,6 @@
   "actions": [
     {
       "type": "session/modelChanged",
-      "session": "copilot:/test-session",
       "model": {
         "id": "o3",
         "config": {

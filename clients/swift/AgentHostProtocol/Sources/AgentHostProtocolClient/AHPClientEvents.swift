@@ -3,14 +3,18 @@
 import Foundation
 import AgentHostProtocol
 
-/// One event delivered by a per-URI subscription.
+/// One event delivered by a per-channel subscription.
 ///
-/// `Action` envelopes carry the write-ahead mutation stream for a resource;
-/// `Notification` frames carry protocol-level signals the server broadcasts
-/// (session added/removed, summary changed, auth required).
+/// `action` envelopes carry the write-ahead mutation stream for a stateful
+/// channel; the remaining cases carry protocol-level signals the server
+/// broadcasts. Every case carries a `channel: String` on its associated
+/// params, which is how the client routes them to subscriptions.
 public enum SubscriptionEvent: Sendable {
     case action(ActionEnvelope)
-    case notification(ProtocolNotification)
+    case sessionAdded(SessionAddedParams)
+    case sessionRemoved(SessionRemovedParams)
+    case sessionSummaryChanged(SessionSummaryChangedParams)
+    case authRequired(AuthRequiredParams)
 }
 
 /// One event delivered by `AHPClient.events` — the top-level multicast tap.

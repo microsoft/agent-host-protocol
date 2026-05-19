@@ -11,13 +11,13 @@ Agent Host Protocol server over WebSocket and exchange JSON-RPC 2.0 messages.
 
 ## Available MCP tools
 
-| Tool                | Purpose |
-|---------------------|---------|
-| `connect`           | Open (or re-open) a WebSocket to an AHP server URL |
+| Tool                | Purpose                                                                  |
+| ------------------- | ------------------------------------------------------------------------ |
+| `connect`           | Open (or re-open) a WebSocket to an AHP server URL                       |
 | `send`              | Send a JSON-RPC message and get the response + any pending notifications |
-| `get_notifications` | Drain the notification inbox (optionally wait N seconds first) |
-| `status`            | Check connection state, pending request count, inbox depth |
-| `next_id`           | Get a unique incrementing integer for JSON-RPC request `id` fields |
+| `get_notifications` | Drain the notification inbox (optionally wait N seconds first)           |
+| `status`            | Check connection state, pending request count, inbox depth               |
+| `next_id`           | Get a unique incrementing integer for JSON-RPC request `id` fields       |
 
 ## Quick-start workflow
 
@@ -36,8 +36,9 @@ over WebSocket. The server maintains an authoritative state tree; clients apply
 actions optimistically and reconcile with the server's echoed actions.
 
 Key concepts:
-- **Root state** (`agenthost:/root`) – lists available agents/models.
-- **Session state** (`<provider>:/<uuid>`) – per-conversation state with turns,
+
+- **Root state** (`ahp-root://`) – lists available agents/models.
+- **Session state** (`ahp-session:/<uuid>`) – per-conversation state with turns,
   deltas, tool calls, and permissions.
 - **Actions** – the sole mutation mechanism, wrapped in `ActionEnvelope`s with a
   `serverSeq`.
@@ -57,9 +58,9 @@ Send an `initialize` **notification** (no `id` field):
   "jsonrpc": "2.0",
   "method": "initialize",
   "params": {
-    "protocolVersions": ["0.1.0"],
+    "protocolVersions": ["0.2.0"],
     "clientId": "<unique-client-id>",
-    "initialSubscriptions": ["agenthost:/root"]
+    "initialSubscriptions": ["ahp-root://"]
   }
 }
 ```
@@ -74,7 +75,7 @@ which includes snapshots for any initial subscriptions.
   "jsonrpc": "2.0",
   "id": 1,
   "method": "subscribe",
-  "params": { "resource": "agenthost:/root" }
+  "params": { "channel": "ahp-root://" }
 }
 ```
 
@@ -107,10 +108,10 @@ Dispatch a `session/turnStarted` action as a **notification** (fire-and-forget):
   "jsonrpc": "2.0",
   "method": "dispatchAction",
   "params": {
+    "channel": "<provider>:/<uuid>",
     "clientSeq": 1,
     "action": {
       "type": "session/turnStarted",
-      "session": "<provider>:/<uuid>",
       "turnId": "<unique-turn-id>",
       "userMessage": { "text": "Hello, world!" }
     }
@@ -124,6 +125,7 @@ actions until you see `session/turnComplete`.
 ### 5. Handle tool calls and permissions
 
 If the agent calls a tool, the server sends:
+
 - `session/toolStart` – tool invocation started
 - `session/permissionRequest` – user approval needed
 
@@ -134,10 +136,10 @@ Resolve permissions with:
   "jsonrpc": "2.0",
   "method": "dispatchAction",
   "params": {
+    "channel": "<provider>:/<uuid>",
     "clientSeq": 2,
     "action": {
       "type": "session/permissionResolved",
-      "session": "<provider>:/<uuid>",
       "turnId": "<turn-id>",
       "requestId": "<perm-request-id>",
       "approved": true
@@ -148,17 +150,17 @@ Resolve permissions with:
 
 ### 6. Other commands
 
-| Command             | Purpose |
-|---------------------|---------|
-| `listSessions`      | List all session summaries |
-| `disposeSession`    | Tear down a session |
-| `resourceRead`      | Read content by URI reference |
-| `resourceList`      | List directory entries |
-| `resourceCopy`      | Copy a resource |
-| `resourceDelete`    | Delete a resource |
-| `resourceMove`      | Move/rename a resource |
-| `resourceWrite`     | Write content to a file |
-| `fetchTurns`        | Fetch historical turns for a session |
+| Command          | Purpose                              |
+| ---------------- | ------------------------------------ |
+| `listSessions`   | List all session summaries           |
+| `disposeSession` | Tear down a session                  |
+| `resourceRead`   | Read content by URI reference        |
+| `resourceList`   | List directory entries               |
+| `resourceCopy`   | Copy a resource                      |
+| `resourceDelete` | Delete a resource                    |
+| `resourceMove`   | Move/rename a resource               |
+| `resourceWrite`  | Write content to a file              |
+| `fetchTurns`     | Fetch historical turns for a session |
 
 ### 7. Reconnection
 
@@ -172,7 +174,7 @@ instead of `initialize`:
   "params": {
     "clientId": "<same-client-id>",
     "lastSeenServerSeq": 42,
-    "subscriptions": ["agenthost:/root", "<provider>:/<uuid>"]
+    "subscriptions": ["ahp-root://", "<provider>:/<uuid>"]
   }
 }
 ```
@@ -180,26 +182,28 @@ instead of `initialize`:
 ## Action types reference
 
 ### Client-dispatchable actions
-| Action                       | Effect |
-|------------------------------|--------|
-| `session/turnStarted`        | Begin a new turn with a user message |
+
+| Action                       | Effect                                    |
+| ---------------------------- | ----------------------------------------- |
+| `session/turnStarted`        | Begin a new turn with a user message      |
 | `session/permissionResolved` | Approve or deny a pending tool permission |
-| `session/turnCancelled`      | Abort an in-progress turn |
-| `session/modelChanged`       | Switch the model for future turns |
+| `session/turnCancelled`      | Abort an in-progress turn                 |
+| `session/modelChanged`       | Switch the model for future turns         |
 
 ### Server-originated actions
-| Action                       | Meaning |
-|------------------------------|---------|
-| `root/agentsChanged`         | Available agents or models changed |
-| `session/ready`              | Session backend initialized |
-| `session/creationFailed`     | Session failed to initialize |
-| `session/delta`              | Streaming text content for a turn |
-| `session/toolStart`          | Agent is calling a tool |
-| `session/toolDelta`          | Streaming tool output |
-| `session/toolComplete`       | Tool execution finished |
-| `session/permissionRequest`  | User approval needed for a tool |
-| `session/turnComplete`       | Turn finished |
-| `session/error`              | Error during turn |
+
+| Action                      | Meaning                            |
+| --------------------------- | ---------------------------------- |
+| `root/agentsChanged`        | Available agents or models changed |
+| `session/ready`             | Session backend initialized        |
+| `session/creationFailed`    | Session failed to initialize       |
+| `session/delta`             | Streaming text content for a turn  |
+| `session/toolStart`         | Agent is calling a tool            |
+| `session/toolDelta`         | Streaming tool output              |
+| `session/toolComplete`      | Tool execution finished            |
+| `session/permissionRequest` | User approval needed for a tool    |
+| `session/turnComplete`      | Turn finished                      |
+| `session/error`             | Error during turn                  |
 
 ## Full documentation
 

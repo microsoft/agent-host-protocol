@@ -15,8 +15,7 @@
   },
   "actions": [
     {
-      "type": "session/nonExistentAction",
-      "session": "copilot:/test-session"
+      "type": "session/nonExistentAction"
     }
   ],
   "expected": {

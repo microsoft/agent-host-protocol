@@ -1,0 +1,8 @@
+{
+  "name": "ahp-channels-migration",
+  "version": "0.1.0",
+  "description": "Migration assistant skill for upgrading an Agent Host Protocol consumer from the pre-channels model to the current channel-based model.",
+  "author": "Microsoft",
+  "repository": "https://github.com/microsoft/agent-host-protocol",
+  "license": "MIT"
+}

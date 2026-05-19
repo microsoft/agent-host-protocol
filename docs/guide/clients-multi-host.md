@@ -16,7 +16,7 @@ Without one, every consumer ends up writing the same things:
 - N transports + reconnect supervisors with backoff and cancellation
 - A registry that keys per-host metadata (label, URL, connection state, last error, agents, `serverSeq`, subscriptions, default directory) for UX
 - A fan-in of inbound events tagged with which host produced them
-- Per-host scoping of resource URIs (`copilot:/s1` on Host A ≠ `copilot:/s1` on Host B)
+- Per-host scoping of resource URIs (`ahp-session:/s1` on Host A ≠ `ahp-session:/s1` on Host B)
 - Persistence of `clientId` per host so reconnect identity survives restarts
 - A per-host root state mirror + session summary cache so sidebars and inboxes don't degrade to "subscribe to everything"
 
@@ -36,7 +36,7 @@ Every registered host appears as a `HostHandle` snapshot:
 | `server_seq` | Highest `serverSeq` seen for this host |
 | `agents`, `active_sessions`, `terminals` | Mirrored from the host's `RootState` |
 | `subscriptions` | URIs the supervisor will (re-)subscribe to across reconnects |
-| `session_summaries` | Cached `SessionSummary[]` kept fresh by `listSessions` + `notify/sessionAdded`/`Removed`/`SummaryChanged` |
+| `session_summaries` | Cached `SessionSummary[]` kept fresh by `listSessions` + `root/sessionAdded`/`Removed`/`SummaryChanged` |
 | `generation` | Bumped on every (re)connect; used to invalidate stale client handles |
 
 Snapshots are immutable. To observe changes, listen to the connection-event stream (`host_events`) or take fresh snapshots when you need them.

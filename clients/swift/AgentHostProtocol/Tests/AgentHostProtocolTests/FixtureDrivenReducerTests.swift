@@ -89,8 +89,8 @@ final class FixtureDrivenReducerTests: XCTestCase {
         var skipped: [(file: String, description: String, message: String)] = []
 
         for (file, fixture) in Self.fixtures {
-            // Skip terminal fixtures — terminalReducer is not yet implemented in Swift
-            if fixture.reducer == "terminal" {
+            // Skip terminal/changeset fixtures — those reducers are not yet implemented in Swift
+            if fixture.reducer == "terminal" || fixture.reducer == "changeset" {
                 continue
             }
 

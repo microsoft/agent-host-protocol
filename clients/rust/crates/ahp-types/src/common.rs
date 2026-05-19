@@ -7,15 +7,15 @@
 
 use serde::{Deserialize, Serialize};
 
-/// A URI string, e.g. `agenthost:/root` or `copilot:/<uuid>`.
+/// A URI string, e.g. `ahp-root://` or `ahp-session:/<uuid>`.
 pub type Uri = String;
 
-/// Well-known resource URI for global agent host state.
+/// Well-known channel URI for the root channel.
 ///
 /// Subscribe to this URI to receive [`crate::state::RootState`] snapshots
 /// and root-level actions (agents changed, active sessions changed,
 /// terminals changed, config changed). Always present on every host.
-pub const ROOT_RESOURCE_URI: &str = "agenthost:/root";
+pub const ROOT_RESOURCE_URI: &str = "ahp-root://";
 
 /// A string that may optionally be rendered as Markdown.
 ///
