@@ -40,9 +40,10 @@ export default withMermaid(defineConfig({
           ],
         },
         {
-          text: 'Design',
+          text: 'More',
           items: [
             { text: 'AHP and ACP', link: '/guide/ahp-and-acp' },
+            { text: 'Implementations', link: '/guide/implementations' },
           ],
         },
       ],
