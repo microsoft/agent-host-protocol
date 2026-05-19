@@ -1,6 +1,6 @@
 //
 //  Persistence.swift
-//  AHPClient
+//  AHPApp
 //
 //  Created by Peng Lyu on 3/27/26.
 //
@@ -32,7 +32,7 @@ struct PersistenceController {
     let container: NSPersistentContainer
 
     init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "AHPClient")
+        container = NSPersistentContainer(name: "AHPApp")
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         }

@@ -1,13 +1,13 @@
 //
-//  AHPClientUITestsLaunchTests.swift
-//  AHPClientUITests
+//  AHPAppUITestsLaunchTests.swift
+//  AHPAppUITests
 //
 //  Created by Peng Lyu on 3/27/26.
 //
 
 import XCTest
 
-final class AHPClientUITestsLaunchTests: XCTestCase {
+final class AHPAppUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

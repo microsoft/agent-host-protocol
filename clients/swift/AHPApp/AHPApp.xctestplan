@@ -11,26 +11,26 @@
   "defaultOptions" : {
     "performanceAntipatternCheckerEnabled" : true,
     "targetForVariableExpansion" : {
-      "containerPath" : "container:AHPClient.xcodeproj",
+      "containerPath" : "container:AHPApp.xcodeproj",
       "identifier" : "6F2049882F7744ED001049F9",
-      "name" : "AHPClient"
+      "name" : "AHPApp"
     }
   },
   "testTargets" : [
     {
       "parallelizable" : false,
       "target" : {
-        "containerPath" : "container:AHPClient.xcodeproj",
+        "containerPath" : "container:AHPApp.xcodeproj",
         "identifier" : "6F20499A2F7744EF001049F9",
-        "name" : "AHPClientTests"
+        "name" : "AHPAppTests"
       }
     },
     {
       "parallelizable" : true,
       "target" : {
-        "containerPath" : "container:AHPClient.xcodeproj",
+        "containerPath" : "container:AHPApp.xcodeproj",
         "identifier" : "6F2049A42F7744EF001049F9",
-        "name" : "AHPClientUITests"
+        "name" : "AHPAppUITests"
       }
     }
   ],

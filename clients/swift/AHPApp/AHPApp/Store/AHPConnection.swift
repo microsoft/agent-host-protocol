@@ -1,4 +1,5 @@
 import AgentHostProtocol
+import AgentHostProtocolClient
 import CryptoKit
 import Foundation
 import Network
@@ -15,11 +16,626 @@ protocol AHPWebSocketTransport: Actor {
 
 typealias AHPWebSocketFactory = @Sendable (URL, [String: String]) -> any AHPWebSocketTransport
 
+private typealias AHPTransportFactory = @Sendable (URL, [String: String]) async throws -> any AHPTransport
+
+/// Facade used by `AppStore` for the currently selected Agent Host.
+///
+/// The app keeps ownership of product state in `AppStore`; this actor adapts the reusable
+/// `AgentHostProtocolClient` multi-host runtime to the app's existing single-selected-host API.
+actor AHPConnection {
+
+    // MARK: - Types
+
+    enum ConnectionError: Error, LocalizedError {
+        case notConnected
+        case requestFailed(code: Int, message: String)
+        case decodingFailed(String)
+        case timeout
+        case connectTimeout
+
+        var errorDescription: String? {
+            switch self {
+            case .notConnected: "Not connected to server"
+            case .requestFailed(let code, let msg): "Server error \(code): \(msg)"
+            case .decodingFailed(let detail): "Decoding failed: \(detail)"
+            case .timeout: "Request timed out"
+            case .connectTimeout: "Could not reach server"
+            }
+        }
+    }
+
+    enum ConnectionState: Sendable, Equatable {
+        case disconnected
+        case connecting
+        case connected
+        case reconnecting
+    }
+
+    // MARK: - Properties
+
+    nonisolated let clientId: String
+    private let transportFactory: AHPTransportFactory
+    private let requestTimeoutNanoseconds: UInt64
+    private let heartbeatIntervalNanoseconds: UInt64
+    private let heartbeatTimeoutNanoseconds: UInt64
+    private let hostId: HostId = "selected"
+
+    private var multiHostClient: MultiHostClient?
+    private var subscriptionEventTask: Task<Void, Never>?
+    private var hostEventTask: Task<Void, Never>?
+    private var nextClientSeq = 1
+    private var connectedWaiters: [CheckedContinuation<HostHandle, Error>] = []
+    private var latestReconnectResult: ReconnectResult?
+    private var isDisconnecting = false
+
+    /// Last `serverSeq` received from the server. Internal so tests can inspect it.
+    var serverSeq = 0
+    private var subscriptions: [String] = []
+    private var pendingOutboundActions: [PendingOutboundAction] = []
+    private(set) var state: ConnectionState = .disconnected
+
+    /// `true` when there is enough state to attempt a `reconnect` handshake rather than
+    /// a full `initialize`. Requires at least one prior successful connection.
+    var canReconnect: Bool { serverSeq > 0 && !subscriptions.isEmpty }
+
+    var onAction: (@MainActor (ActionEnvelope) -> Void)?
+    var onNotification: (@MainActor (ProtocolNotification) -> Void)?
+    var onStateChange: (@MainActor (ConnectionState) -> Void)?
+    var onUnexpectedDisconnect: (@MainActor () -> Void)?
+
+    private struct PendingOutboundAction: Sendable {
+        let clientSeq: Int
+        let action: StateAction
+    }
+
+    // MARK: - Init
+
+    init(
+        clientId: String = "ahp-app-\(UUID().uuidString.prefix(8))",
+        requestTimeoutNanoseconds: UInt64 = 15_000_000_000,
+        heartbeatIntervalNanoseconds: UInt64 = 10_000_000_000,
+        heartbeatTimeoutNanoseconds: UInt64 = 5_000_000_000,
+        webSocketFactory: AHPWebSocketFactory? = nil
+    ) {
+        self.clientId = clientId
+        self.requestTimeoutNanoseconds = requestTimeoutNanoseconds
+        self.heartbeatIntervalNanoseconds = heartbeatIntervalNanoseconds
+        self.heartbeatTimeoutNanoseconds = heartbeatTimeoutNanoseconds
+
+        if let webSocketFactory {
+            self.transportFactory = { url, headers in
+                WebSocketTransportAdapter(webSocket: webSocketFactory(url, headers))
+            }
+        } else {
+            self.transportFactory = { url, headers in
+                NWConnectionWebSocketTransport(url: url, headers: headers)
+            }
+        }
+    }
+
+    func setOnAction(_ callback: @escaping @MainActor (ActionEnvelope) -> Void) {
+        onAction = callback
+    }
+
+    func setOnNotification(_ callback: @escaping @MainActor (ProtocolNotification) -> Void) {
+        onNotification = callback
+    }
+
+    func setOnStateChange(_ callback: @escaping @MainActor (ConnectionState) -> Void) {
+        onStateChange = callback
+    }
+
+    func setOnUnexpectedDisconnect(_ callback: @escaping @MainActor () -> Void) {
+        onUnexpectedDisconnect = callback
+    }
+
+    // MARK: - Connect
+
+    @discardableResult
+    func connect(to url: URL, headers: [String: String] = [:]) async throws -> InitializeResult {
+        await shutdownRuntime(clearProtocolState: false, clearOutbox: false)
+        isDisconnecting = false
+        latestReconnectResult = nil
+        await setState(.connecting)
+
+        let client = MultiHostClient()
+        multiHostClient = client
+        await startEventTasks(for: client)
+
+        do {
+            let config = makeHostConfig(url: url, headers: headers)
+            try await client.add(config)
+            let handle = try await waitForConnectedHost()
+            updateProtocolState(from: handle)
+            try await replayPendingOutboundActions()
+            return initializeResult(from: handle)
+        } catch {
+            await shutdownRuntime(clearProtocolState: false, clearOutbox: false)
+            await setState(.disconnected)
+            throw mapConnectionError(error)
+        }
+    }
+
+    func disconnect() async {
+        isDisconnecting = true
+        await shutdownRuntime(clearProtocolState: true, clearOutbox: true)
+        await setState(.disconnected)
+        isDisconnecting = false
+    }
+
+    // MARK: - Reconnect
+
+    @discardableResult
+    func reconnect(to url: URL, headers: [String: String] = [:]) async throws -> ReconnectResult {
+        guard let client = multiHostClient else { throw ConnectionError.notConnected }
+
+        latestReconnectResult = nil
+        await setState(.reconnecting)
+
+        do {
+            try await client.reconnect(hostId)
+            let handle = try await waitForConnectedHost()
+            updateProtocolState(from: handle)
+            let result = latestReconnectResult ?? emptyReconnectResult()
+            acknowledgeOutboundActions(in: result)
+            try await replayPendingOutboundActions()
+            return result
+        } catch {
+            await setState(.disconnected)
+            throw mapConnectionError(error)
+        }
+    }
+
+    // MARK: - Commands
+
+    func subscribe(resource: String) async throws -> Snapshot {
+        guard let client = multiHostClient else { throw ConnectionError.notConnected }
+        do {
+            let result = try await client.subscribe(host: hostId, uri: resource)
+            if !subscriptions.contains(resource) {
+                subscriptions.append(resource)
+            }
+            return result.snapshot
+        } catch {
+            throw mapConnectionError(error)
+        }
+    }
+
+    func unsubscribe(resource: String) async throws {
+        guard let client = multiHostClient else { throw ConnectionError.notConnected }
+        do {
+            try await client.unsubscribe(host: hostId, uri: resource)
+            subscriptions.removeAll { $0 == resource }
+        } catch {
+            throw mapConnectionError(error)
+        }
+    }
+
+    func createSession(params: CreateSessionParams) async throws {
+        let _: AnyCodable? = try await sendRequest(method: "createSession", params: params)
+    }
+
+    func disposeSession(session: String) async throws {
+        let _: AnyCodable? = try await sendRequest(
+            method: "disposeSession",
+            params: DisposeSessionParams(session: session)
+        )
+    }
+
+    func createTerminal(params: CreateTerminalParams) async throws {
+        let _: AnyCodable? = try await sendRequest(method: "createTerminal", params: params)
+    }
+
+    func disposeTerminal(terminal: String) async throws {
+        let _: AnyCodable? = try await sendRequest(
+            method: "disposeTerminal",
+            params: DisposeTerminalParams(terminal: terminal)
+        )
+    }
+
+    func listSessions() async throws -> [SessionSummary] {
+        let result: ListSessionsResult = try await sendRequest(
+            method: "listSessions",
+            params: ListSessionsParams()
+        )
+        return result.items
+    }
+
+    func fetchTurns(session: String, before: String? = nil, limit: Int? = nil) async throws -> FetchTurnsResult {
+        try await sendRequest(
+            method: "fetchTurns",
+            params: FetchTurnsParams(session: session, before: before, limit: limit)
+        )
+    }
+
+    func fetchContent(uri: String, encoding: ContentEncoding? = nil) async throws -> ResourceReadResult {
+        try await sendRequest(
+            method: "resourceRead",
+            params: ResourceReadParams(uri: uri, encoding: encoding)
+        )
+    }
+
+    func dispatchAction(_ action: StateAction) async throws {
+        let seq = nextSeq()
+        pendingOutboundActions.append(PendingOutboundAction(clientSeq: seq, action: action))
+        do {
+            try await sendDispatchAction(clientSeq: seq, action: action)
+        } catch {
+            throw mapConnectionError(error)
+        }
+    }
+
+    // MARK: - Private: SDK wiring
+
+    private func makeHostConfig(url: URL, headers: [String: String]) -> HostConfig {
+        HostConfig(
+            id: hostId,
+            label: url.host(percentEncoded: false) ?? url.absoluteString,
+            transportFactory: { [transportFactory] _ in
+                try await transportFactory(url, headers)
+            }
+        )
+        .withClientId(clientId)
+        .withInitialSubscriptions([RootResourceURI])
+        .withClientConfig(AHPClientConfig(
+            requestTimeout: duration(fromNanoseconds: requestTimeoutNanoseconds),
+            keepAlive: .enabled(
+                interval: duration(fromNanoseconds: heartbeatIntervalNanoseconds),
+                timeout: duration(fromNanoseconds: heartbeatTimeoutNanoseconds)
+            )
+        ))
+        .withReconnectPolicy(.disabled)
+        .withSessionSummaryRefreshOnConnect(false)
+        .withReconnectReplayFanOut(false)
+    }
+
+    private func startEventTasks(for client: MultiHostClient) async {
+        subscriptionEventTask?.cancel()
+        hostEventTask?.cancel()
+
+        let subscriptionEvents = await client.events()
+        subscriptionEventTask = Task { [weak self] in
+            guard let self else { return }
+            for await event in subscriptionEvents where event.hostId == "selected" {
+                await self.handleSubscriptionEvent(event)
+            }
+        }
+
+        let hostEvents = await client.hostEvents()
+        hostEventTask = Task { [weak self, client] in
+            guard let self else { return }
+            for await event in hostEvents {
+                await self.handleHostEvent(event, client: client)
+            }
+        }
+    }
+
+    private func handleSubscriptionEvent(_ event: HostSubscriptionEvent) async {
+        switch event.event {
+        case .action(let envelope):
+            serverSeq = envelope.serverSeq
+            acknowledgeOutboundAction(from: envelope)
+            if let callback = onAction {
+                await MainActor.run { callback(envelope) }
+            }
+        case .notification(let notification):
+            if let callback = onNotification {
+                await MainActor.run { callback(notification) }
+            }
+        }
+    }
+
+    private func handleHostEvent(_ event: HostEvent, client: MultiHostClient) async {
+        switch event {
+        case .added(let id):
+            guard id == hostId else { return }
+        case .stateChanged(let id, let hostState, _):
+            guard id == hostId else { return }
+            await applyHostState(hostState)
+        case .reconnectResult(let id, let result):
+            guard id == hostId else { return }
+            latestReconnectResult = result
+        case .connected(let id, generation: _):
+            guard id == hostId else { return }
+            guard let handle = await client.host(id) else { return }
+            updateProtocolState(from: handle)
+            await setState(.connected)
+            resumeConnectedWaiters(returning: handle)
+        case .removed(let id):
+            guard id == hostId else { return }
+            await setState(.disconnected)
+            failConnectedWaiters(error: ConnectionError.notConnected)
+        }
+    }
+
+    private func applyHostState(_ hostState: HostState) async {
+        switch hostState {
+        case .disconnected:
+            await transitionAwayFromConnected(to: .disconnected)
+        case .connecting:
+            await setState(state == .reconnecting ? .reconnecting : .connecting)
+        case .connected:
+            break
+        case .reconnecting, .failed:
+            await transitionAwayFromConnected(to: .disconnected)
+            if case .failed = hostState {
+                failConnectedWaiters(error: ConnectionError.connectTimeout)
+            }
+        }
+    }
+
+    private func transitionAwayFromConnected(to newState: ConnectionState) async {
+        let shouldNotifyUnexpectedDisconnect = state == .connected && !isDisconnecting
+        await setState(newState)
+        if shouldNotifyUnexpectedDisconnect,
+           let callback = onUnexpectedDisconnect {
+            await MainActor.run { callback() }
+        }
+    }
+
+    private func waitForConnectedHost() async throws -> HostHandle {
+        if let client = multiHostClient,
+           let handle = await client.host(hostId) {
+            switch handle.state {
+            case .connected:
+                return handle
+            case .failed:
+                throw ConnectionError.connectTimeout
+            default:
+                break
+            }
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            connectedWaiters.append(continuation)
+        }
+    }
+
+    private func resumeConnectedWaiters(returning handle: HostHandle) {
+        let waiters = connectedWaiters
+        connectedWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume(returning: handle)
+        }
+    }
+
+    private func failConnectedWaiters(error: Error) {
+        let waiters = connectedWaiters
+        connectedWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume(throwing: error)
+        }
+    }
+
+    private func shutdownRuntime(clearProtocolState: Bool, clearOutbox: Bool) async {
+        subscriptionEventTask?.cancel()
+        subscriptionEventTask = nil
+        hostEventTask?.cancel()
+        hostEventTask = nil
+
+        failConnectedWaiters(error: ConnectionError.notConnected)
+
+        let client = multiHostClient
+        multiHostClient = nil
+        if let client {
+            await client.shutdown()
+        }
+
+        latestReconnectResult = nil
+        if clearProtocolState {
+            serverSeq = 0
+            subscriptions.removeAll()
+        }
+        if clearOutbox {
+            pendingOutboundActions.removeAll()
+        }
+    }
+
+    // MARK: - Private: Commands
+
+    private func sendRequest<P: Encodable & Sendable, R: Decodable & Sendable>(
+        method: String,
+        params: P
+    ) async throws -> R {
+        do {
+            let handle = try await currentClientHandle()
+            return try await handle.request(method: method, params: params)
+        } catch {
+            throw mapConnectionError(error)
+        }
+    }
+
+    private func currentClientHandle() async throws -> HostClientHandle {
+        guard let client = multiHostClient,
+              let handle = await client.client(for: hostId) else {
+            throw ConnectionError.notConnected
+        }
+        return handle
+    }
+
+    private func nextSeq() -> Int {
+        let seq = nextClientSeq
+        nextClientSeq += 1
+        return seq
+    }
+
+    private func sendDispatchAction(clientSeq: Int, action: StateAction) async throws {
+        guard let client = multiHostClient else { throw ConnectionError.notConnected }
+        do {
+            try await client.dispatch(host: hostId, action: action, clientSeq: clientSeq)
+        } catch {
+            throw mapConnectionError(error)
+        }
+    }
+
+    private func replayPendingOutboundActions() async throws {
+        for pending in pendingOutboundActions {
+            try await sendDispatchAction(clientSeq: pending.clientSeq, action: pending.action)
+        }
+    }
+
+    private func acknowledgeOutboundActions(in result: ReconnectResult) {
+        guard case .replay(let replay) = result else { return }
+        for envelope in replay.actions {
+            acknowledgeOutboundAction(from: envelope)
+        }
+    }
+
+    private func acknowledgeOutboundAction(from envelope: ActionEnvelope) {
+        guard let origin = envelope.origin,
+              origin.clientId == clientId else { return }
+        pendingOutboundActions.removeAll { $0.clientSeq <= origin.clientSeq }
+    }
+
+    // MARK: - Private: State and errors
+
+    private func updateProtocolState(from handle: HostHandle) {
+        serverSeq = handle.serverSeq
+        subscriptions = handle.subscriptions
+    }
+
+    private func initializeResult(from handle: HostHandle) -> InitializeResult {
+        let root = RootState(
+            agents: handle.agents,
+            activeSessions: handle.activeSessions,
+            terminals: handle.terminals
+        )
+        let snapshot = Snapshot(
+            resource: RootResourceURI,
+            state: .root(root),
+            fromSeq: handle.serverSeq
+        )
+        return InitializeResult(
+            protocolVersion: handle.protocolVersion ?? "0.1.0",
+            serverSeq: handle.serverSeq,
+            snapshots: [snapshot],
+            defaultDirectory: handle.defaultDirectory,
+            completionTriggerCharacters: handle.completionTriggerCharacters
+        )
+    }
+
+    private func emptyReconnectResult() -> ReconnectResult {
+        .replay(ReconnectReplayResult(type: .replay, actions: [], missing: []))
+    }
+
+    private func setState(_ newState: ConnectionState) async {
+        state = newState
+        if let callback = onStateChange {
+            await MainActor.run { callback(newState) }
+        }
+    }
+
+    private func mapConnectionError(_ error: Error) -> Error {
+        if let connectionError = error as? ConnectionError {
+            return connectionError
+        }
+        if let hostError = error as? HostError {
+            switch hostError {
+            case .client(let clientError):
+                return mapClientError(clientError)
+            default:
+                return ConnectionError.notConnected
+            }
+        }
+        if let clientError = error as? AHPClientError {
+            return mapClientError(clientError)
+        }
+        if let transportError = error as? TransportError {
+            return ConnectionError.requestFailed(code: -1, message: String(describing: transportError))
+        }
+        return error
+    }
+
+    private func mapClientError(_ error: AHPClientError) -> ConnectionError {
+        switch error {
+        case .transport(let transportError):
+            return .requestFailed(code: -1, message: String(describing: transportError))
+        case .rpc(let code, let message, _):
+            return .requestFailed(code: code, message: message)
+        case .decoding(let detail):
+            return .decodingFailed(detail)
+        case .shutdown:
+            return .notConnected
+        case .requestTimeout:
+            return .timeout
+        }
+    }
+
+    private func duration(fromNanoseconds nanoseconds: UInt64) -> Duration {
+        if nanoseconds > UInt64(Int64.max) {
+            return .nanoseconds(Int64.max)
+        }
+        return .nanoseconds(Int64(nanoseconds))
+    }
+}
+
+private actor WebSocketTransportAdapter: AHPTransport, AHPKeepAliveTransport {
+    private let webSocket: any AHPWebSocketTransport
+    private let encoder = JSONEncoder()
+    private var didConnect = false
+    private var didClose = false
+
+    init(webSocket: any AHPWebSocketTransport) {
+        self.webSocket = webSocket
+    }
+
+    func send(_ message: TransportMessage) async throws {
+        try await connectIfNeeded()
+        let data: Data
+        switch message {
+        case .parsed(let parsed):
+            data = try encoder.encode(parsed)
+        case .text(let text):
+            data = Data(text.utf8)
+        case .binary(let binary):
+            data = binary
+        }
+        try await webSocket.send(data)
+    }
+
+    func recv() async throws -> TransportMessage? {
+        try await connectIfNeeded()
+        do {
+            return .binary(try await webSocket.receiveMessage())
+        } catch {
+            if didClose { return nil }
+            throw error
+        }
+    }
+
+    func close() async throws {
+        didClose = true
+        await webSocket.close()
+    }
+
+    func sendPing(timeout: Duration) async throws {
+        try await connectIfNeeded()
+        try await webSocket.sendPing(timeoutNanoseconds: nanoseconds(from: timeout))
+    }
+
+    private func connectIfNeeded() async throws {
+        guard !didConnect else { return }
+        try await webSocket.connect()
+        didConnect = true
+    }
+
+    private func nanoseconds(from duration: Duration) -> UInt64 {
+        let components = duration.components
+        let seconds = components.seconds > 0 ? UInt64(clamping: components.seconds) : 0
+        let attoseconds = components.attoseconds > 0 ? UInt64(clamping: components.attoseconds) : 0
+        let nanos = attoseconds / 1_000_000_000
+        if seconds > (UInt64.max - nanos) / 1_000_000_000 {
+            return UInt64.max
+        }
+        return seconds * 1_000_000_000 + nanos
+    }
+}
+
 /// WebSocket-based JSON-RPC transport for communicating with an Agent Host server.
 ///
 /// Handles the initialize/reconnect handshake, request/response correlation,
 /// and dispatches incoming server actions and notifications to the store.
-actor AHPConnection {
+private actor LegacyAHPConnection {
 
     // MARK: - Types
 
@@ -658,7 +1274,7 @@ private actor NativeWebSocketConnection: AHPWebSocketTransport {
 
     private let url: URL
     private let additionalHeaders: [String: String]
-    private let queue = DispatchQueue(label: "AHPClient.NativeWebSocketConnection")
+    private let queue = DispatchQueue(label: "AHPApp.NativeWebSocketConnection")
 
     private var connection: NWConnection?
     private var connectContinuation: CheckedContinuation<Void, Error>?

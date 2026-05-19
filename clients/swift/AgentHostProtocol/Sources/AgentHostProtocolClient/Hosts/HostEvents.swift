@@ -28,6 +28,8 @@ public enum HostEvent: Sendable {
     case added(HostId)
     /// The host's `HostState` changed.
     case stateChanged(HostId, HostState, lastError: String?)
+    /// The host received and applied a successful `reconnect` result.
+    case reconnectResult(HostId, ReconnectResult)
     /// The host successfully (re)connected; `generation` is the new value.
     case connected(HostId, generation: UInt64)
     /// A host was removed from `MultiHostClient`.

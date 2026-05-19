@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "6F2049882F7744ED001049F9"
-               BuildableName = "AHPClient.app"
-               BlueprintName = "AHPClient"
-               ReferencedContainer = "container:AHPClient.xcodeproj">
+               BuildableName = "AHPApp.app"
+               BlueprintName = "AHPApp"
+               ReferencedContainer = "container:AHPApp.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -30,7 +30,7 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:AHPClient.xctestplan"
+            reference = "container:AHPApp.xctestplan"
             default = "YES">
          </TestPlanReference>
       </TestPlans>
@@ -41,9 +41,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "6F20499A2F7744EF001049F9"
-               BuildableName = "AHPClientTests.xctest"
-               BlueprintName = "AHPClientTests"
-               ReferencedContainer = "container:AHPClient.xcodeproj">
+               BuildableName = "AHPAppTests.xctest"
+               BlueprintName = "AHPAppTests"
+               ReferencedContainer = "container:AHPApp.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -52,9 +52,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "6F2049A42F7744EF001049F9"
-               BuildableName = "AHPClientUITests.xctest"
-               BlueprintName = "AHPClientUITests"
-               ReferencedContainer = "container:AHPClient.xcodeproj">
+               BuildableName = "AHPAppUITests.xctest"
+               BlueprintName = "AHPAppUITests"
+               ReferencedContainer = "container:AHPApp.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -74,9 +74,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "6F2049882F7744ED001049F9"
-            BuildableName = "AHPClient.app"
-            BlueprintName = "AHPClient"
-            ReferencedContainer = "container:AHPClient.xcodeproj">
+            BuildableName = "AHPApp.app"
+            BlueprintName = "AHPApp"
+            ReferencedContainer = "container:AHPApp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -91,9 +91,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "6F2049882F7744ED001049F9"
-            BuildableName = "AHPClient.app"
-            BlueprintName = "AHPClient"
-            ReferencedContainer = "container:AHPClient.xcodeproj">
+            BuildableName = "AHPApp.app"
+            BlueprintName = "AHPApp"
+            ReferencedContainer = "container:AHPApp.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

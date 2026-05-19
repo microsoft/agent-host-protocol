@@ -31,6 +31,14 @@ public struct HostConfig: Sendable {
     public var transportFactory: HostTransportFactory
     /// Reconnect behaviour after an unexpected drop.
     public var reconnectPolicy: ReconnectPolicy
+    /// Whether the supervisor should seed `sessionSummaries` with `listSessions`
+    /// after each successful connect. Defaults to `true` for multi-host views.
+    public var refreshSessionSummariesOnConnect: Bool
+    /// Whether replayed actions from a reconnect response should be fanned out
+    /// through `events()`. Defaults to `true`; facade layers that return the
+    /// raw `ReconnectResult` to another store can disable it to avoid applying
+    /// the same replay twice.
+    public var fanOutReconnectReplayActions: Bool
 
     public init(
         id: HostId,
@@ -44,6 +52,8 @@ public struct HostConfig: Sendable {
         self.clientConfig = .default
         self.transportFactory = transportFactory
         self.reconnectPolicy = .exponential
+        self.refreshSessionSummariesOnConnect = true
+        self.fanOutReconnectReplayActions = true
     }
 
     /// Override the explicit `clientId` for this host (skips the
@@ -72,6 +82,22 @@ public struct HostConfig: Sendable {
     public func withReconnectPolicy(_ policy: ReconnectPolicy) -> Self {
         var copy = self
         copy.reconnectPolicy = policy
+        return copy
+    }
+
+    /// Control whether the supervisor runs `listSessions` after successful
+    /// connect/reconnect handshakes.
+    public func withSessionSummaryRefreshOnConnect(_ enabled: Bool) -> Self {
+        var copy = self
+        copy.refreshSessionSummariesOnConnect = enabled
+        return copy
+    }
+
+    /// Control whether replayed reconnect actions are emitted through
+    /// `events()` after being applied to the host mirror.
+    public func withReconnectReplayFanOut(_ enabled: Bool) -> Self {
+        var copy = self
+        copy.fanOutReconnectReplayActions = enabled
         return copy
     }
 }

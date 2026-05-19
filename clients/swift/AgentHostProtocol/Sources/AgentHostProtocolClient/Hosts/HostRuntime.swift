@@ -342,10 +342,11 @@ internal final class HostRuntime: Sendable {
         // Refresh session summaries from `listSessions`. Cheap on first
         // connect; kept in sync by notifications afterward. Failures are
         // non-fatal: the cache stays as-is.
-        let summaries: ListSessionsResult? = try? await client.request(
-            method: "listSessions",
-            params: ListSessionsParams()
-        )
+        let summaries: ListSessionsResult? = if config.refreshSessionSummariesOnConnect {
+            try? await client.request(method: "listSessions", params: ListSessionsParams())
+        } else {
+            nil
+        }
 
         let newGeneration: UInt64 = await {
             var generation: UInt64 = 0
@@ -378,6 +379,7 @@ internal final class HostRuntime: Sendable {
 
         if let reconnectResult {
             await applyReconnectResult(reconnectResult, priorSubscriptions: priorSubscriptions)
+            await hostEventSink(.reconnectResult(config.id, reconnectResult))
         }
 
         await transition(to: .connected, error: nil)
@@ -406,7 +408,9 @@ internal final class HostRuntime: Sendable {
                     resource: resource,
                     event: .action(envelope)
                 )
-                await fanOut(hostEvent)
+                if config.fanOutReconnectReplayActions {
+                    await fanOut(hostEvent)
+                }
             }
             if !replay.missing.isEmpty {
                 await shared.update { state in

@@ -1,14 +1,15 @@
 //
-//  AHPClientTests.swift
-//  AHPClientTests
+//  AHPAppTests.swift
+//  AHPAppTests
 //
 //  Created by Peng Lyu on 3/27/26.
 //
 
 import Testing
 import AgentHostProtocol
+import DevTunnelsClient
 import Foundation
-@testable import AHPClient
+@testable import AHPApp
 
 // MARK: - Reconnect State Tests
 //

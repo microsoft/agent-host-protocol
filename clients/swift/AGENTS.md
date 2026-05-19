@@ -5,7 +5,7 @@
 This directory contains two Swift packages for the Agent Host Protocol (AHP):
 
 1. **AgentHostProtocol** — A pure Swift library (no external dependencies) providing auto-generated types, actions, and reducers for the protocol. Targets iOS 16+, macOS 13+, Swift 5.9+. The Swift sources live in `clients/swift/AgentHostProtocol/`, but the `Package.swift` manifest lives at the **repository root** (`/Package.swift`) so that external consumers can pull this in via `.package(url:)`. SwiftPM only resolves manifests at the root of a remote git repository.
-2. **AHPClient** — An example iOS app (Xcode project) demonstrating a full AHP client with WebSocket transport, state synchronization, reconnection, and a SwiftUI chat UI. Uses [dev-tunnels-swift](https://github.com/rebornix/dev-tunnels-swift) (remote Swift Package) for tunnel discovery, authentication, and relay connections.
+2. **AHPApp** — An example iOS app (Xcode project) demonstrating a full AHP client with WebSocket transport, state synchronization, reconnection, and a SwiftUI chat UI. Uses [dev-tunnels-swift](https://github.com/rebornix/dev-tunnels-swift) (remote Swift Package) for tunnel discovery, authentication, and relay connections.
 
 ## Code Generation
 
@@ -63,12 +63,12 @@ Inspired by Swift Composable Architecture (TCA). Key abstractions:
 
 Reducers are pure functions — replaying actions in `serverSeq` order on any prior state snapshot produces identical results. This is critical for the reconnection protocol.
 
-## AHPClient App
+## AHPApp
 
 ### Architecture
 
 ```
-AHPClientApp (@main, scenePhase monitoring)
+AHPAppMain (@main, scenePhase monitoring)
   └─ AppStore (@Observable, @MainActor)
        ├─ AHPConnection (actor — WebSocket JSON-RPC transport)
        ├─ RootState + [SessionState] (protocol state, mutated by reducers)
@@ -124,13 +124,13 @@ The app uses `#available(iOS 26.0, *)` checks for:
 
 ### Testing
 
-- **AHPClientTests** — Reconnection state tests: snapshot restore, replay ordering, empty replay, multi-resource snapshot, live action application.
+- **AHPAppTests** — Reconnection state tests: snapshot restore, replay ordering, empty replay, multi-resource snapshot, live action application.
 - **AgentHostProtocol Tests** — Reducer unit tests (root reducer, session reducer, native reducer).
 
 ### Build & Run
 
-Open `AHPClient/AHPClient.xcodeproj` in Xcode. The project references `AgentHostProtocol` as a local Swift package whose manifest lives at the **repository root** (`../../..` relative to the Xcode project), and `DevTunnelsClient` as a remote Swift package from [rebornix/dev-tunnels-swift](https://github.com/rebornix/dev-tunnels-swift). Code signing requires a `Signing.local.xcconfig` file (see `Config/Signing.local.xcconfig.example`).
+Open `AHPApp/AHPApp.xcodeproj` in Xcode. The project references `AgentHostProtocol` as a local Swift package whose manifest lives at the **repository root** (`../../..` relative to the Xcode project), and `DevTunnelsClient` as a remote Swift package from [rebornix/dev-tunnels-swift](https://github.com/rebornix/dev-tunnels-swift). Code signing requires a `Signing.local.xcconfig` file (see `Config/Signing.local.xcconfig.example`).
 
 **Dev Tunnels integration:** `TunnelListView.swift` uses the `DevTunnelsClient` library directly — `TunnelManagementClient` for tunnel listing/details, `DeviceCodeAuth` for GitHub OAuth, and `TunnelConnection` helpers for relay URIs and connect tokens. All calls are `async` — no shim layer or Rust FFI needed.
 
-For development, `AHPClient` uses a native `NWConnection` WebSocket transport instead of `URLSessionWebSocketTask`,  avoiding `URLSession` ATS enforcement for direct `ws://` development targets such as local LAN addresses or Tailscale tailnet IPs. Public or internet-exposed deployments should still prefer `wss://`.
+For development, `AHPApp` uses a native `NWConnection` WebSocket transport instead of `URLSessionWebSocketTask`,  avoiding `URLSession` ATS enforcement for direct `ws://` development targets such as local LAN addresses or Tailscale tailnet IPs. Public or internet-exposed deployments should still prefer `wss://`.

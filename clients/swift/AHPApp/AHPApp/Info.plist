@@ -12,7 +12,7 @@
 		<false/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>AHPClient needs access to your local network to connect to AHP agent servers running on your computer.</string>
+	<string>AHPApp needs access to your local network to connect to AHP agent servers running on your computer.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_lnp._tcp.</string>

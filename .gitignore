@@ -10,7 +10,7 @@ docs/public/schema/
 # SwiftPM build artifacts
 .build/
 .swiftpm/
-clients/swift/AHPClient/AHPClient/Config/Signing.local.xcconfig
+clients/swift/AHPApp/AHPApp/Config/Signing.local.xcconfig
 
 # Xcode / Swift
 DerivedData

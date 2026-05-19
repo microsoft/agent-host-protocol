@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		6F2049CE2F774586001049F9 /* AgentHostProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 6F2049CD2F774586001049F9 /* AgentHostProtocol */; };
 		6F2049D12F7746D3001049F9 /* AgentHostProtocol in Frameworks */ = {isa = PBXBuildFile; productRef = 6F2049D02F7746D3001049F9 /* AgentHostProtocol */; };
+		6F2049D32F775020001049F9 /* AgentHostProtocolClient in Frameworks */ = {isa = PBXBuildFile; productRef = 6F2049D22F775020001049F9 /* AgentHostProtocolClient */; };
 		AA000001304700000001 /* DevTunnelsClient in Frameworks */ = {isa = PBXBuildFile; productRef = AA000001304700000002 /* DevTunnelsClient */; };
 		AA000002304700000001 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = AA000002304700000002 /* SwiftTerm */; };
 /* End PBXBuildFile section */
@@ -19,38 +20,38 @@
 			containerPortal = 6F2049812F7744ED001049F9 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 6F2049882F7744ED001049F9;
-			remoteInfo = AHPClient;
+			remoteInfo = AHPApp;
 		};
 		6F2049A62F7744EF001049F9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6F2049812F7744ED001049F9 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 6F2049882F7744ED001049F9;
-			remoteInfo = AHPClient;
+			remoteInfo = AHPApp;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		6F2049892F7744ED001049F9 /* AHPClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AHPClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		6F20499B2F7744EF001049F9 /* AHPClientTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AHPClientTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		6F2049A52F7744EF001049F9 /* AHPClientUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AHPClientUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		6F649B142FA81FA3004A262A /* AHPClient.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = AHPClient.xctestplan; sourceTree = "<group>"; };
+		6F2049892F7744ED001049F9 /* AHPApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AHPApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F20499B2F7744EF001049F9 /* AHPAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AHPAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F2049A52F7744EF001049F9 /* AHPAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AHPAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F649B142FA81FA3004A262A /* AHPApp.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = AHPApp.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		6F20498B2F7744ED001049F9 /* AHPClient */ = {
+		6F20498B2F7744ED001049F9 /* AHPApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AHPClient;
+			path = AHPApp;
 			sourceTree = "<group>";
 		};
-		6F20499E2F7744EF001049F9 /* AHPClientTests */ = {
+		6F20499E2F7744EF001049F9 /* AHPAppTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AHPClientTests;
+			path = AHPAppTests;
 			sourceTree = "<group>";
 		};
-		6F2049A82F7744EF001049F9 /* AHPClientUITests */ = {
+		6F2049A82F7744EF001049F9 /* AHPAppUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = AHPClientUITests;
+			path = AHPAppUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -60,6 +61,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6F2049D32F775020001049F9 /* AgentHostProtocolClient in Frameworks */,
 				6F2049D12F7746D3001049F9 /* AgentHostProtocol in Frameworks */,
 				6F2049CE2F774586001049F9 /* AgentHostProtocol in Frameworks */,
 				AA000001304700000001 /* DevTunnelsClient in Frameworks */,
@@ -87,10 +89,10 @@
 		6F2049802F7744ED001049F9 = {
 			isa = PBXGroup;
 			children = (
-				6F649B142FA81FA3004A262A /* AHPClient.xctestplan */,
-				6F20498B2F7744ED001049F9 /* AHPClient */,
-				6F20499E2F7744EF001049F9 /* AHPClientTests */,
-				6F2049A82F7744EF001049F9 /* AHPClientUITests */,
+				6F649B142FA81FA3004A262A /* AHPApp.xctestplan */,
+				6F20498B2F7744ED001049F9 /* AHPApp */,
+				6F20499E2F7744EF001049F9 /* AHPAppTests */,
+				6F2049A82F7744EF001049F9 /* AHPAppUITests */,
 				6F20498A2F7744ED001049F9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -98,9 +100,9 @@
 		6F20498A2F7744ED001049F9 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				6F2049892F7744ED001049F9 /* AHPClient.app */,
-				6F20499B2F7744EF001049F9 /* AHPClientTests.xctest */,
-				6F2049A52F7744EF001049F9 /* AHPClientUITests.xctest */,
+				6F2049892F7744ED001049F9 /* AHPApp.app */,
+				6F20499B2F7744EF001049F9 /* AHPAppTests.xctest */,
+				6F2049A52F7744EF001049F9 /* AHPAppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,9 +110,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		6F2049882F7744ED001049F9 /* AHPClient */ = {
+		6F2049882F7744ED001049F9 /* AHPApp */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6F2049AF2F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPClient" */;
+			buildConfigurationList = 6F2049AF2F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPApp" */;
 			buildPhases = (
 				6F2049852F7744ED001049F9 /* Sources */,
 				6F2049862F7744ED001049F9 /* Frameworks */,
@@ -121,22 +123,23 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				6F20498B2F7744ED001049F9 /* AHPClient */,
+				6F20498B2F7744ED001049F9 /* AHPApp */,
 			);
-			name = AHPClient;
+			name = AHPApp;
 			packageProductDependencies = (
+				6F2049D22F775020001049F9 /* AgentHostProtocolClient */,
 				6F2049CD2F774586001049F9 /* AgentHostProtocol */,
 				6F2049D02F7746D3001049F9 /* AgentHostProtocol */,
 				AA000001304700000002 /* DevTunnelsClient */,
 				AA000002304700000002 /* SwiftTerm */,
 			);
-			productName = AHPClient;
-			productReference = 6F2049892F7744ED001049F9 /* AHPClient.app */;
+			productName = AHPApp;
+			productReference = 6F2049892F7744ED001049F9 /* AHPApp.app */;
 			productType = "com.apple.product-type.application";
 		};
-		6F20499A2F7744EF001049F9 /* AHPClientTests */ = {
+		6F20499A2F7744EF001049F9 /* AHPAppTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6F2049B22F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPClientTests" */;
+			buildConfigurationList = 6F2049B22F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPAppTests" */;
 			buildPhases = (
 				6F2049972F7744EF001049F9 /* Sources */,
 				6F2049982F7744EF001049F9 /* Frameworks */,
@@ -148,18 +151,18 @@
 				6F20499D2F7744EF001049F9 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				6F20499E2F7744EF001049F9 /* AHPClientTests */,
+				6F20499E2F7744EF001049F9 /* AHPAppTests */,
 			);
-			name = AHPClientTests;
+			name = AHPAppTests;
 			packageProductDependencies = (
 			);
-			productName = AHPClientTests;
-			productReference = 6F20499B2F7744EF001049F9 /* AHPClientTests.xctest */;
+			productName = AHPAppTests;
+			productReference = 6F20499B2F7744EF001049F9 /* AHPAppTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		6F2049A42F7744EF001049F9 /* AHPClientUITests */ = {
+		6F2049A42F7744EF001049F9 /* AHPAppUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6F2049B52F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPClientUITests" */;
+			buildConfigurationList = 6F2049B52F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPAppUITests" */;
 			buildPhases = (
 				6F2049A12F7744EF001049F9 /* Sources */,
 				6F2049A22F7744EF001049F9 /* Frameworks */,
@@ -171,13 +174,13 @@
 				6F2049A72F7744EF001049F9 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				6F2049A82F7744EF001049F9 /* AHPClientUITests */,
+				6F2049A82F7744EF001049F9 /* AHPAppUITests */,
 			);
-			name = AHPClientUITests;
+			name = AHPAppUITests;
 			packageProductDependencies = (
 			);
-			productName = AHPClientUITests;
-			productReference = 6F2049A52F7744EF001049F9 /* AHPClientUITests.xctest */;
+			productName = AHPAppUITests;
+			productReference = 6F2049A52F7744EF001049F9 /* AHPAppUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -203,7 +206,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 6F2049842F7744ED001049F9 /* Build configuration list for PBXProject "AHPClient" */;
+			buildConfigurationList = 6F2049842F7744ED001049F9 /* Build configuration list for PBXProject "AHPApp" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -222,9 +225,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				6F2049882F7744ED001049F9 /* AHPClient */,
-				6F20499A2F7744EF001049F9 /* AHPClientTests */,
-				6F2049A42F7744EF001049F9 /* AHPClientUITests */,
+				6F2049882F7744ED001049F9 /* AHPApp */,
+				6F20499A2F7744EF001049F9 /* AHPAppTests */,
+				6F2049A42F7744EF001049F9 /* AHPAppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -280,12 +283,12 @@
 /* Begin PBXTargetDependency section */
 		6F20499D2F7744EF001049F9 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 6F2049882F7744ED001049F9 /* AHPClient */;
+			target = 6F2049882F7744ED001049F9 /* AHPApp */;
 			targetProxy = 6F20499C2F7744EF001049F9 /* PBXContainerItemProxy */;
 		};
 		6F2049A72F7744EF001049F9 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 6F2049882F7744ED001049F9 /* AHPClient */;
+			target = 6F2049882F7744ED001049F9 /* AHPApp */;
 			targetProxy = 6F2049A62F7744EF001049F9 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -293,7 +296,7 @@
 /* Begin XCBuildConfiguration section */
 		6F2049AD2F7744EF001049F9 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = 6F20498B2F7744ED001049F9 /* AHPClient */;
+			baseConfigurationReferenceAnchor = 6F20498B2F7744ED001049F9 /* AHPApp */;
 			baseConfigurationReferenceRelativePath = Config/Signing.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -358,7 +361,7 @@
 		};
 		6F2049AE2F7744EF001049F9 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReferenceAnchor = 6F20498B2F7744ED001049F9 /* AHPClient */;
+			baseConfigurationReferenceAnchor = 6F20498B2F7744ED001049F9 /* AHPApp */;
 			baseConfigurationReferenceRelativePath = Config/Signing.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -425,7 +428,7 @@
 				ENABLE_PREVIEWS = YES;
 				EXCLUDED_SOURCE_FILE_NAMES = Info.plist;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = AHPClient/Info.plist;
+				INFOPLIST_FILE = AHPApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -436,7 +439,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPClient;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -459,7 +462,7 @@
 				ENABLE_PREVIEWS = YES;
 				EXCLUDED_SOURCE_FILE_NAMES = Info.plist;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = AHPClient/Info.plist;
+				INFOPLIST_FILE = AHPApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -470,7 +473,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPClient;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -492,7 +495,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPClientTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPAppTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -500,7 +503,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AHPClient.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AHPClient";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AHPApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AHPApp";
 			};
 			name = Debug;
 		};
@@ -514,7 +517,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPClientTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPAppTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -522,7 +525,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AHPClient.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AHPClient";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AHPApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AHPApp";
 			};
 			name = Release;
 		};
@@ -534,7 +537,7 @@
 				DEVELOPMENT_TEAM = "$(AHP_DEVELOPMENT_TEAM)";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPClientUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPAppUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -542,7 +545,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = AHPClient;
+				TEST_TARGET_NAME = AHPApp;
 			};
 			name = Debug;
 		};
@@ -554,7 +557,7 @@
 				DEVELOPMENT_TEAM = "$(AHP_DEVELOPMENT_TEAM)";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPClientUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rebornix.AHPAppUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -562,14 +565,14 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = AHPClient;
+				TEST_TARGET_NAME = AHPApp;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		6F2049842F7744ED001049F9 /* Build configuration list for PBXProject "AHPClient" */ = {
+		6F2049842F7744ED001049F9 /* Build configuration list for PBXProject "AHPApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6F2049AD2F7744EF001049F9 /* Debug */,
@@ -578,7 +581,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6F2049AF2F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPClient" */ = {
+		6F2049AF2F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6F2049B02F7744EF001049F9 /* Debug */,
@@ -587,7 +590,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6F2049B22F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPClientTests" */ = {
+		6F2049B22F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPAppTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6F2049B32F7744EF001049F9 /* Debug */,
@@ -596,7 +599,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		6F2049B52F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPClientUITests" */ = {
+		6F2049B52F7744EF001049F9 /* Build configuration list for PBXNativeTarget "AHPAppUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6F2049B62F7744EF001049F9 /* Debug */,
@@ -641,6 +644,10 @@
 		6F2049D02F7746D3001049F9 /* AgentHostProtocol */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = AgentHostProtocol;
+		};
+		6F2049D22F775020001049F9 /* AgentHostProtocolClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AgentHostProtocolClient;
 		};
 		AA000001304700000002 /* DevTunnelsClient */ = {
 			isa = XCSwiftPackageProductDependency;

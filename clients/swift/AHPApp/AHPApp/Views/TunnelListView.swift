@@ -36,7 +36,7 @@ extension Tunnel: @retroactive Identifiable {
 /// Persists the GitHub access token in the iOS Keychain so it survives
 /// across sheet presentations and app launches.
 enum TunnelTokenStore {
-    private static let service = "com.rebornix.AHPClient.DevTunnels"
+    private static let service = "com.rebornix.AHPApp.DevTunnels"
     private static let account = "github-token"
 
     static func save(_ token: String) {
