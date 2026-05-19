@@ -67,3 +67,7 @@ edit the generated files by hand.
 ```sh
 cargo test --workspace
 ```
+
+## Multi-host clients
+
+See [MULTI_HOST.md](MULTI_HOST.md) for the Rust SDK's multi-host registry, reconnect supervision, fan-in events, aggregated views, and single-host convenience API.

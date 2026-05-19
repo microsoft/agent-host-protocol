@@ -26,7 +26,6 @@ export default withMermaid(defineConfig({
           items: [
             { text: 'What is AHP?', link: '/guide/what-is-ahp' },
             { text: 'Getting Started', link: '/guide/getting-started' },
-            { text: 'Architecture', link: '/guide/architecture' },
           ],
         },
         {
@@ -43,14 +42,7 @@ export default withMermaid(defineConfig({
         {
           text: 'Design',
           items: [
-            { text: 'Design Decisions', link: '/guide/design' },
             { text: 'AHP and ACP', link: '/guide/ahp-and-acp' },
-          ],
-        },
-        {
-          text: 'Clients',
-          items: [
-            { text: 'Multiple Hosts', link: '/guide/clients-multi-host' },
           ],
         },
       ],

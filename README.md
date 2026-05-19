@@ -13,8 +13,6 @@ The Agent Host Protocol (AHP) defines how a portable, standalone sessions server
 - **Swift** — Add `https://github.com/microsoft/agent-host-protocol` as a Swift Package Manager dependency to use the `AgentHostProtocol` library. See [`clients/swift/`](clients/swift/) for an example iOS client. The `Package.swift` manifest lives at the repository root because SwiftPM only resolves manifests at the root of a remote git repo; the actual Swift sources live under `clients/swift/AgentHostProtocol/`.
 - **Rust** — See [`clients/rust/`](clients/rust/) for the `ahp`, `ahp-types`, and `ahp-ws` crates.
 
-For consumers that need to talk to two or more hosts at once, the Rust SDK ships a `MultiHostClient` abstraction in [`ahp::hosts`](https://docs.rs/ahp/latest/ahp/hosts/); single-host consumers use the same API via `MultiHostClient::single`. See [Connecting to Multiple Hosts](https://microsoft.github.io/agent-host-protocol/guide/clients-multi-host) for the design and surface. A matching Swift API is planned in a follow-up PR.
-
 ## Development
 
 ```bash

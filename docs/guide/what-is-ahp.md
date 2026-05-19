@@ -6,6 +6,8 @@ This protocol is under active development and is not yet stabilized. Breaking ch
 
 The **Agent Host Protocol (AHP)** defines how a portable, standalone sessions server communicates with its clients. Multiple clients can connect to the server and see a synchronized view of AI agent sessions. Clients send commands that are reflected back as state-changing actions.
 
+AHP stays agent-agnostic: it describes client-facing session state and display-ready metadata without binding clients to a specific agent runtime or backend-specific tool vocabulary.
+
 ## Channels: the core abstraction
 
 Every push-style interaction in AHP lives on a **channel** — a URI-identified subscribable resource. The root catalogue (`ahp-root://`), each session (`ahp-session:/<uuid>`), each terminal (`ahp-terminal:/<id>`), and each changeset (`ahp-changeset:/<id>`) is its own channel. A channel MAY hold an immutable state tree, or it MAY be a stateless pub/sub topic (planned: logging, MCP relay, LSP relay).
@@ -42,14 +44,14 @@ The protocol is built around four core requirements:
 └──────────────┘                          └──────────────┘
 ```
 
-The server holds an **authoritative state tree** per state-bearing channel, managed by a `SessionStateManager`. State is mutated by actions flowing through pure reducers. Raw progress events from agent backends are mapped to protocol state actions via an event mapper.
+The server holds an **authoritative state tree** per state-bearing channel. State changes are represented as ordered protocol actions, which lets every subscribed client converge on the same view of the session.
 
 Clients subscribe to channels by URI and receive:
 
 1. An initial **snapshot** of the current state (for state-bearing channels; stateless channels return `{}`).
 2. Subsequent **action envelopes** that incrementally update the state, plus any channel-specific protocol notifications.
 
-The same reducer code runs on both the server and clients, which is what makes write-ahead reconciliation possible.
+Because updates arrive as ordered actions against shared snapshots, clients can reconcile optimistic local changes with the authoritative server stream.
 
 ## Key Concepts
 
@@ -72,5 +74,4 @@ The same reducer code runs on both the server and clients, which is what makes w
 ## Next Steps
 
 - [Getting Started](/guide/getting-started) — Walk through a basic client-server interaction.
-- [Architecture](/guide/architecture) — Understand the process model and communication layers.
 - [State Model](/guide/state-model) — Learn about root state, session state, and content references.

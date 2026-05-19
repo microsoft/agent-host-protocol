@@ -166,6 +166,5 @@ To deny, dispatch the same action with `approved: false` and a `reason` (`"denie
 
 ## Next Steps
 
-- [Architecture](/guide/architecture) — Process model and communication layers.
 - [State Model](/guide/state-model) — Full state tree structure.
 - [Messages Reference](/reference/messages) — Index of every JSON-RPC method, linked to the channel that documents it.

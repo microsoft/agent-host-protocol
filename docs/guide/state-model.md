@@ -167,7 +167,6 @@ UserMessage {
   attachments?: MessageAttachment[]
 }
 
-// Discriminated union — see types/state.ts for full definitions.
 type MessageAttachment =
   | SimpleMessageAttachment            // type: 'simple'
   | MessageEmbeddedResourceAttachment  // type: 'embeddedResource'
