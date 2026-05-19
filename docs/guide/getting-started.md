@@ -2,12 +2,16 @@
 
 This guide walks through a basic client-server interaction using the Agent Host Protocol.
 
+## The shape of every message
+
+Before walking through the handshake, note the one structural rule that runs through every example below: **every command's and every notification's params carries a top-level `channel: URI`**. Channel-scoped messages set it to the target channel (e.g. `ahp-session:/<uuid>`); connection-level commands set it to `'ahp-root://'`. Servers, clients, and intermediate proxies dispatch every message by `(method, params.channel)`. See [Channels & Subscriptions](/specification/subscriptions) for the full model.
+
 ## Connection Handshake
 
 Every AHP session starts with a JSON-RPC handshake over the transport (WebSocket, MessagePort, etc.):
 
 ```
-1. Client → Server:  initialize(protocolVersions[], clientId, initialSubscriptions?)
+1. Client → Server:  initialize(channel: 'ahp-root://', protocolVersions[], clientId, initialSubscriptions?)
 2. Server → Client:  { protocolVersion, serverSeq, snapshots[], defaultDirectory? }
 ```
 
@@ -162,6 +166,5 @@ To deny, dispatch the same action with `approved: false` and a `reason` (`"denie
 
 ## Next Steps
 
-- [Architecture](/guide/architecture) — Process model and communication layers.
 - [State Model](/guide/state-model) — Full state tree structure.
-- [Actions Reference](/reference/actions) — Complete list of action types.
+- [Messages Reference](/reference/messages) — Index of every JSON-RPC method, linked to the channel that documents it.

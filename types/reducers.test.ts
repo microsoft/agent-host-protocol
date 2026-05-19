@@ -40,6 +40,32 @@ function readSource(file: string): string {
   return readFileSync(resolve(root, file), 'utf-8');
 }
 
+/**
+ * Reads and concatenates every canonical per-channel source file matching
+ * `baseName` (e.g. `actions.ts`) under `types/common/` and
+ * `types/channels-*\/`. Used after the channel-organized refactor so the
+ * parsing in this test sees the union of declarations split across channels.
+ */
+function readChannelSources(baseName: string): string {
+  const dirs = [
+    'common',
+    'channels-root',
+    'channels-session',
+    'channels-terminal',
+    'channels-changeset',
+  ];
+  return dirs
+    .map(dir => {
+      const p = resolve(root, dir, baseName);
+      try {
+        return readFileSync(p, 'utf-8');
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
+}
+
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
 interface Fixture {
@@ -120,7 +146,7 @@ describe('reducer fixtures', () => {
 
 describe('IS_CLIENT_DISPATCHABLE', () => {
   it('matches @clientDispatchable annotations in actions.ts', () => {
-    const source = readSource('actions.ts');
+    const source = readChannelSources('actions.ts');
 
     const jsdocInterfaceRe = /\/\*\*([\s\S]*?)\*\/\s*export\s+(?:interface|type)\s+(\w+)/g;
     const clientDispatchableTypes = new Set<string>();
@@ -159,7 +185,7 @@ describe('IS_CLIENT_DISPATCHABLE', () => {
   it('covers every ActionType enum member', () => {
     const enumValueRe = /(\w+)\s*=\s*'([^']+)'/g;
     const allValues: string[] = [];
-    for (const match of readSource('actions.ts').matchAll(enumValueRe)) {
+    for (const match of readChannelSources('actions.ts').matchAll(enumValueRe)) {
       allValues.push(match[2]);
     }
 

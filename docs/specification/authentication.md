@@ -4,7 +4,7 @@ AHP uses [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0 Pr
 
 ## Overview
 
-Each agent declares the **protected resources** it requires authentication for via the `protectedResources` field on [`AgentInfo`](/reference/state-types#agentinfo) in root state. Clients discover these requirements by subscribing to `ahp-root://`, obtain tokens from the declared authorization servers using standard OAuth 2.0 flows, and push them to the server via the [`authenticate`](/reference/commands#authenticate) command.
+Each agent declares the **protected resources** it requires authentication for via the `protectedResources` field on [`AgentInfo`](/reference/root#agentinfo) in root state. Clients discover these requirements by subscribing to `ahp-root://`, obtain tokens from the declared authorization servers using standard OAuth 2.0 flows, and push them to the server via the [`authenticate`](/reference/common#authenticate) command.
 
 ```mermaid
 sequenceDiagram
@@ -26,7 +26,7 @@ sequenceDiagram
 
 ## Discovery
 
-Authentication requirements are declared **per-agent** on [`AgentInfo.protectedResources`](/reference/state-types#agentinfo). Each entry is an [`ProtectedResourceMetadata`](/reference/state-types#protectedresourcemetadata) object following the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) shape:
+Authentication requirements are declared **per-agent** on [`AgentInfo.protectedResources`](/reference/root#agentinfo). Each entry is an [`ProtectedResourceMetadata`](/reference/common#protectedresourcemetadata) object following the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) shape:
 
 ```json
 {
@@ -87,7 +87,7 @@ Different agents MAY require authentication with different providers. For exampl
 
 ## Token Delivery
 
-Clients push Bearer tokens to the server using the [`authenticate`](/reference/commands#authenticate) command. The `resource` field MUST match a `resource` value from the agent's `protectedResources` metadata:
+Clients push Bearer tokens to the server using the [`authenticate`](/reference/common#authenticate) command. The `resource` field MUST match a `resource` value from the agent's `protectedResources` metadata:
 
 ```jsonc
 // Client → Server
@@ -161,7 +161,7 @@ Clients receiving an `AuthRequired` error SHOULD:
 
 ## Auth Expiry Notification
 
-The server MAY send an [`auth/required`](/reference/notifications#authrequired) notification when a previously valid token expires or is revoked, or when new authentication requirements appear:
+The server MAY send an [`auth/required`](/reference/common#authrequired) notification when a previously valid token expires or is revoked, or when new authentication requirements appear:
 
 ```json
 {

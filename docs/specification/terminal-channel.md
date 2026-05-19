@@ -14,7 +14,7 @@ The scheme and path of a terminal URI are server-defined. The lightweight termin
 
 ## State
 
-Subscribers receive a [`TerminalState`](/reference/state-types#terminalstate) snapshot:
+Subscribers receive a [`TerminalState`](/reference/terminal#terminalstate) snapshot:
 
 ```typescript
 TerminalState {
@@ -37,7 +37,7 @@ A terminal is **always owned** — the [`claim`](/guide/terminals#claims-and-own
 
 ### Creation
 
-[`createTerminal`](/reference/commands#createterminal) is a JSON-RPC request that allocates a new terminal with a required initial claim plus optional name, cwd, and dimensions:
+[`createTerminal`](/reference/terminal#createterminal) is a JSON-RPC request that allocates a new terminal with a required initial claim plus optional name, cwd, and dimensions:
 
 ```jsonc
 // Client → Server
@@ -60,7 +60,27 @@ After creation, the server dispatches `root/terminalsChanged` so that subscriber
 
 ### Disposal
 
-[`disposeTerminal`](/reference/commands#disposeterminal) kills the underlying pty (if running) and removes the terminal. The server dispatches `root/terminalsChanged` to reflect the new catalogue. There is no "release without disposal" — when a terminal is no longer needed, it is disposed.
+[`disposeTerminal`](/reference/terminal#disposeterminal) kills the underlying pty (if running) and removes the terminal. The server dispatches `root/terminalsChanged` to reflect the new catalogue. There is no "release without disposal" — when a terminal is no longer needed, it is disposed.
+
+## Methods and events on this channel
+
+This section lists wire methods that are interpreted in the context of a
+terminal URI (`ahp-terminal:/<id>`).
+
+### Commands (`params.channel = "ahp-terminal:/<id>"`)
+
+| Method | Kind | Purpose |
+|---|---|---|
+| `createTerminal` | request | Create a terminal at the chosen URI with an initial claim. |
+| `disposeTerminal` | request | Dispose this terminal and kill its pty if still running. |
+
+### Notifications (`params.channel = "ahp-terminal:/<id>"`)
+
+| Method | Kind | Meaning |
+|---|---|---|
+| `action` | server → client notification | Terminal action envelope (`terminal/*` action payloads). |
+| `dispatchAction` | client → server notification | Dispatch terminal client actions (`terminal/input`, `terminal/resized`, `terminal/claimed`, `terminal/titleChanged`, `terminal/cleared`). |
+| `unsubscribe` | client → server notification | Stop receiving messages for this terminal channel. |
 
 ## Actions
 
@@ -104,8 +124,8 @@ The server MUST NOT include shell integration escape sequences in `terminal/data
 
 ## Commands
 
-- [`createTerminal`](/reference/commands#createterminal) — create a new terminal with an initial claim
-- [`disposeTerminal`](/reference/commands#disposeterminal) — kill the pty (if running) and remove the terminal
+- [`createTerminal`](/reference/terminal#createterminal) — create a new terminal with an initial claim
+- [`disposeTerminal`](/reference/terminal#disposeterminal) — kill the pty (if running) and remove the terminal
 
 ## Catalogue Notifications
 

@@ -14,6 +14,7 @@ import {
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
+import { findProtocolSourceFiles } from './find-protocol-sources.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -250,10 +251,10 @@ function collectInterfacesFromFile(
   fileName: string,
 ): Map<string, InterfaceDeclaration> {
   const map = new Map<string, InterfaceDeclaration>();
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === fileName);
-  if (!sf) return map;
-  for (const iface of sf.getInterfaces()) {
-    map.set(iface.getName(), iface);
+  for (const sf of findProtocolSourceFiles(project, fileName)) {
+    for (const iface of sf.getInterfaces()) {
+      map.set(iface.getName(), iface);
+    }
   }
   return map;
 }
@@ -314,8 +315,7 @@ function generateStateSchema(project: Project): JsonSchema {
   }
 
   // Add type aliases to $defs
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'state.ts');
-  if (sf) {
+  for (const sf of findProtocolSourceFiles(project, 'state.ts')) {
     for (const ta of sf.getTypeAliases()) {
       const name = ta.getName();
       // Skip simple alias like URI = string, and indexed access types like ToolCallState['status']
@@ -347,8 +347,7 @@ function generateActionsSchema(project: Project): JsonSchema {
   }
 
   // Add action type aliases (e.g. SessionToolCallConfirmedAction union)
-  const actionSf = project.getSourceFiles().find(f => f.getBaseName() === 'actions.ts');
-  if (actionSf) {
+  for (const actionSf of findProtocolSourceFiles(project, 'actions.ts')) {
     for (const ta of actionSf.getTypeAliases()) {
       const name = ta.getName();
       if (name === 'StateAction') continue; // handled below
@@ -368,8 +367,7 @@ function generateActionsSchema(project: Project): JsonSchema {
   }
 
   // Add state type aliases needed for refs
-  const stateSf = project.getSourceFiles().find(f => f.getBaseName() === 'state.ts');
-  if (stateSf) {
+  for (const stateSf of findProtocolSourceFiles(project, 'state.ts')) {
     for (const ta of stateSf.getTypeAliases()) {
       const name = ta.getName();
       const typeText = ta.getTypeNode()?.getText() || '';
@@ -383,7 +381,9 @@ function generateActionsSchema(project: Project): JsonSchema {
   }
 
   // StateAction as oneOf — derive members from the StateAction type alias itself
-  const stateActionAlias = actionSf?.getTypeAlias('StateAction');
+  const stateActionAlias = findProtocolSourceFiles(project, 'actions.ts')
+    .map(sf => sf.getTypeAlias('StateAction'))
+    .find(ta => ta !== undefined);
   const stateActionMembers = stateActionAlias
     ? splitUnionType(stateActionAlias.getTypeNode()?.getText() || '').map(s => s.trim())
     : [];

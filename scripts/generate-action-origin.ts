@@ -11,6 +11,7 @@ import {
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
+import { findProtocolSourceFiles } from './find-protocol-sources.js';
 
 const GENERATED_HEADER = `// Generated from types/actions.ts — do not edit
 // Run \`npm run generate\` to regenerate.
@@ -78,11 +79,43 @@ function resolveActionType(
 }
 
 export function generateActionOrigin(project: Project, outDir: string): void {
-  const actionsFile = project.getSourceFileOrThrow('actions.ts');
+  // After the channel-organized refactor, the `ActionType` enum and
+  // `StateAction` union live in `types/common/actions.ts`, while the
+  // individual action interfaces live in `types/channels-*/actions.ts`.
+  // Look up declarations across every canonical actions file.
+  const actionsFiles = findProtocolSourceFiles(project, 'actions.ts');
+  if (actionsFiles.length === 0) {
+    throw new Error('No canonical types/**/actions.ts files found in the project');
+  }
+
+  function findEnumAcross(name: string) {
+    for (const sf of actionsFiles) {
+      const e = sf.getEnum(name);
+      if (e) return e;
+    }
+    return undefined;
+  }
+  function findTypeAliasAcross(name: string) {
+    for (const sf of actionsFiles) {
+      const ta = sf.getTypeAlias(name);
+      if (ta) return ta;
+    }
+    return undefined;
+  }
+  function findInterfaceAcross(name: string) {
+    for (const sf of actionsFiles) {
+      const iface = sf.getInterface(name);
+      if (iface) return iface;
+    }
+    return undefined;
+  }
 
   // Parse ActionType enum values
   const enumValues = new Map<string, string>();
-  const actionTypeEnum = actionsFile.getEnumOrThrow('ActionType');
+  const actionTypeEnum = findEnumAcross('ActionType');
+  if (!actionTypeEnum) {
+    throw new Error('ActionType enum not found in any types/**/actions.ts');
+  }
   for (const member of actionTypeEnum.getMembers()) {
     const value = member.getValue();
     if (typeof value === 'string') {
@@ -91,7 +124,10 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   }
 
   // Find the StateAction union to know which types are in scope
-  const stateActionAlias = actionsFile.getTypeAliasOrThrow('StateAction');
+  const stateActionAlias = findTypeAliasAcross('StateAction');
+  if (!stateActionAlias) {
+    throw new Error('StateAction type alias not found in any types/**/actions.ts');
+  }
   const unionText = stateActionAlias.getTypeNodeOrThrow().getText();
 
   // Extract interface names from the union (e.g. "RootAgentsChangedAction")
@@ -104,12 +140,12 @@ export function generateActionOrigin(project: Project, outDir: string): void {
 
   for (const name of unionMembers) {
     // Could be an interface or a type alias (SessionToolCallConfirmedAction is a type alias)
-    const iface = actionsFile.getInterface(name);
-    const typeAlias = actionsFile.getTypeAlias(name);
+    const iface = findInterfaceAcross(name);
+    const typeAlias = findTypeAliasAcross(name);
     const node = iface || typeAlias;
 
     if (!node) {
-      throw new Error(`Could not find declaration for ${name} in actions.ts`);
+      throw new Error(`Could not find declaration for ${name} in any types/**/actions.ts`);
     }
 
     const category = getJsDocTag(node as any, 'category') || '';

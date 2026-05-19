@@ -316,31 +316,18 @@ internal final class HostRuntime: Sendable {
         let priorSeq = priorSnapshot.serverSeq
 
         var initResult: InitializeResult? = nil
+        var reconnectResult: ReconnectResult? = nil
         var newSeq = priorSeq
 
         if canReconnect {
             do {
-                _ = try await client.reconnect(
+                let result = try await client.reconnect(
                     clientId: clientId,
                     lastSeenServerSeq: priorSeq,
                     subscriptions: priorSubscriptions
                 )
-                // NOTE: the `ReconnectResult` is intentionally discarded
-                // here, mirroring the Rust `ahp::hosts` runtime. Three
-                // related gaps follow from this and are tracked together
-                // for both SDKs as a follow-up:
-                //   1. Replay actions returned synchronously by the server
-                //      are not fanned out (live `action` frames after
-                //      reconnect still reach consumers normally).
-                //   2. `replay.missing` URIs (subscriptions the server
-                //      cannot resume) are not pruned from the replay set,
-                //      so the next reconnect re-asks for them.
-                //   3. `snapshot` results are not applied to the per-host
-                //      root mirror / `serverSeq`, so `HostHandle` can lag
-                //      behind the post-snapshot state until live events
-                //      catch up.
-                // All three should be fixed atomically across SDKs — see the
-                // parent multi-host series for tracking.
+                reconnectResult = result
+                newSeq = max(newSeq, serverSeq(from: result))
             } catch let error as AHPClientError {
                 if case .rpc = error {
                     let init1 = try await client.initialize(
@@ -390,6 +377,9 @@ internal final class HostRuntime: Sendable {
                         }
                     }
                 }
+                if let reconnectResult {
+                    applyReconnectResult(reconnectResult, to: &state)
+                }
                 if let list = summaries {
                     state.sessionSummaries.removeAll()
                     for summary in list.items {
@@ -400,6 +390,11 @@ internal final class HostRuntime: Sendable {
             }
             return generation
         }()
+
+        if let reconnectResult {
+            await hostEventSink(.reconnectResult(config.id, reconnectResult))
+            await fanOutReplayActions(from: reconnectResult)
+        }
 
         await transition(to: .connected, error: nil)
         await hostEventSink(.connected(config.id, generation: newGeneration))
@@ -587,6 +582,62 @@ internal final class HostRuntime: Sendable {
             if envelope.channel == RootResourceURI {
                 state.rootState = rootReducer(state: state.rootState, action: envelope.action)
             }
+        }
+    }
+
+    private func applyReconnectResult(_ result: ReconnectResult, to state: inout HostInternal) {
+        switch result {
+        case .replay(let replay):
+            for envelope in replay.actions {
+                applyAction(envelope, to: &state)
+            }
+            if !replay.missing.isEmpty {
+                state.subscriptions.removeAll { replay.missing.contains($0) }
+            }
+        case .snapshot(let snapshot):
+            state.subscriptions = snapshot.snapshots.map(\.resource)
+            for snap in snapshot.snapshots {
+                applySnapshot(snap, to: &state)
+            }
+        }
+    }
+
+    private func applyAction(_ envelope: ActionEnvelope, to state: inout HostInternal) {
+        if envelope.serverSeq > state.serverSeq {
+            state.serverSeq = envelope.serverSeq
+        }
+        if envelope.channel == RootResourceURI {
+            state.rootState = rootReducer(state: state.rootState, action: envelope.action)
+        }
+    }
+
+    private func applySnapshot(_ snapshot: Snapshot, to state: inout HostInternal) {
+        if snapshot.fromSeq > state.serverSeq {
+            state.serverSeq = snapshot.fromSeq
+        }
+        if snapshot.resource == RootResourceURI,
+           case .root(let root) = snapshot.state {
+            state.rootState = root
+        }
+    }
+
+    private func fanOutReplayActions(from result: ReconnectResult) async {
+        guard case .replay(let replay) = result else { return }
+        for envelope in replay.actions {
+            await fanOut(HostSubscriptionEvent(
+                hostId: config.id,
+                resource: envelope.channel,
+                event: .action(envelope)
+            ))
+        }
+    }
+
+    private func serverSeq(from result: ReconnectResult) -> Int {
+        switch result {
+        case .replay(let replay):
+            return replay.actions.map(\.serverSeq).max() ?? 0
+        case .snapshot(let snapshot):
+            return snapshot.snapshots.map(\.fromSeq).max() ?? 0
         }
     }
 

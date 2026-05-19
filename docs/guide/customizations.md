@@ -334,4 +334,4 @@ sequenceDiagram
 
 - [State Model](/guide/state-model) — The state tree that customizations and tools live in, including the tool call lifecycle state machine.
 - [Actions](/guide/actions) — How state is mutated by actions.
-- [State Types Reference](/reference/state-types) — `SessionActiveClient`, `ToolDefinition`, `ToolCallState`, `CustomizationRef`, and more.
+- [Session Channel Reference](/reference/session) — `SessionActiveClient`, `ToolDefinition`, `ToolCallState`, `CustomizationRef`, and more.

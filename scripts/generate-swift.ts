@@ -20,6 +20,7 @@ import {
 } from 'ts-morph';
 import fs from 'fs';
 import path from 'path';
+import { findProtocolSourceFiles } from './find-protocol-sources.js';
 
 const GENERATED_HEADER = '// Generated from types/*.ts — do not edit\n\nimport Foundation\n';
 
@@ -211,6 +212,14 @@ function findInterface(project: Project, name: string): InterfaceDeclaration | u
   for (const sf of project.getSourceFiles()) {
     const iface = sf.getInterface(name);
     if (iface) return iface;
+  }
+  return undefined;
+}
+
+function findEnum(project: Project, name: string): EnumDeclaration | undefined {
+  for (const sf of project.getSourceFiles()) {
+    const e = sf.getEnum(name);
+    if (e) return e;
   }
   return undefined;
 }
@@ -730,7 +739,6 @@ public enum SnapshotState: Codable, Sendable {
 }
 
 function generateStateFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'state.ts')!;
   const lines: string[] = [GENERATED_HEADER];
 
   lines.push('// MARK: - Type Aliases\n');
@@ -742,7 +750,7 @@ function generateStateFile(project: Project): string {
 
   lines.push('// MARK: - Enums\n');
   for (const enumName of STATE_ENUMS) {
-    const decl = sf.getEnum(enumName);
+    const decl = findEnum(project, enumName);
     if (decl) {
       lines.push(generateSwiftEnum(decl));
       lines.push('');
@@ -910,12 +918,11 @@ public struct SessionToolCallConfirmedAction: Codable, Sendable {
 }
 
 function generateActionsFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'actions.ts')!;
   const lines: string[] = [GENERATED_HEADER];
 
   // ActionType enum
   lines.push('// MARK: - ActionType\n');
-  const actionTypeEnum = sf.getEnum('ActionType');
+  const actionTypeEnum = findEnum(project, 'ActionType');
   if (actionTypeEnum) {
     lines.push(generateSwiftEnum(actionTypeEnum));
     lines.push('');
@@ -1027,12 +1034,11 @@ const RECONNECT_RESULT_UNION: UnionConfig = {
 };
 
 function generateCommandsFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'commands.ts')!;
   const lines: string[] = [GENERATED_HEADER];
 
   lines.push('// MARK: - Command Enums\n');
   for (const enumName of COMMAND_ENUMS) {
-    const decl = sf.getEnum(enumName);
+    const decl = findEnum(project, enumName);
     if (decl) {
       lines.push(generateSwiftEnum(decl));
       lines.push('');
@@ -1144,12 +1150,11 @@ const NOTIFICATION_STRUCTS = [
 ];
 
 function generateNotificationsFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'notifications.ts')!;
   const lines: string[] = [GENERATED_HEADER];
 
   lines.push('// MARK: - Notification Enums\n');
   for (const enumName of NOTIFICATION_ENUMS) {
-    const decl = sf.getEnum(enumName);
+    const decl = findEnum(project, enumName);
     if (decl) {
       lines.push(generateSwiftEnum(decl));
       lines.push('');
@@ -1491,13 +1496,15 @@ function checkExhaustiveness(project: Project): void {
   const protocolModules = ['state.ts', 'actions.ts', 'commands.ts', 'notifications.ts', 'errors.ts'];
   const imported = new Set<string>();
   for (const baseName of protocolModules) {
-    const sf = project.getSourceFiles().find(f => f.getBaseName() === baseName);
-    if (!sf) throw new Error(`Could not find types/${baseName} in the project`);
-    for (const decl of sf.getInterfaces()) {
-      if (decl.isExported()) imported.add(decl.getName());
-    }
-    for (const decl of sf.getTypeAliases()) {
-      if (decl.isExported()) imported.add(decl.getName());
+    const sources = findProtocolSourceFiles(project, baseName);
+    if (sources.length === 0) throw new Error(`Could not find types/${baseName} in the project`);
+    for (const sf of sources) {
+      for (const decl of sf.getInterfaces()) {
+        if (decl.isExported()) imported.add(decl.getName());
+      }
+      for (const decl of sf.getTypeAliases()) {
+        if (decl.isExported()) imported.add(decl.getName());
+      }
     }
   }
 

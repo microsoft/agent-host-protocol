@@ -1,0 +1,145 @@
+/**
+ * Root Channel Notifications — Session catalogue events delivered on the
+ * `ahp-root://` channel.
+ *
+ * @module channels-root/notifications
+ */
+
+import type { URI } from '../common/state.js';
+import type { SessionSummary } from '../channels-session/state.js';
+
+// ─── root/sessionAdded ───────────────────────────────────────────────────────
+
+/**
+ * Broadcast to all clients subscribed to the root channel when a new session
+ * is created.
+ *
+ * @category Protocol Notifications
+ * @method root/sessionAdded
+ * @direction Server → Client
+ * @messageType Notification
+ * @version 1
+ * @example
+ * ```json
+ * {
+ *   "jsonrpc": "2.0",
+ *   "method": "root/sessionAdded",
+ *   "params": {
+ *     "channel": "ahp-root://",
+ *     "summary": {
+ *       "resource": "ahp-session:/<uuid>",
+ *       "provider": "copilot",
+ *       "title": "New Session",
+ *       "status": 1,
+ *       "createdAt": 1710000000000,
+ *       "modifiedAt": 1710000000000
+ *     }
+ *   }
+ * }
+ * ```
+ */
+export interface SessionAddedParams {
+  /** Channel URI this notification belongs to (the root channel) */
+  channel: URI;
+  /** Summary of the new session */
+  summary: SessionSummary;
+}
+
+// ─── root/sessionRemoved ─────────────────────────────────────────────────────
+
+/**
+ * Broadcast to all clients subscribed to the root channel when a session is
+ * disposed.
+ *
+ * @category Protocol Notifications
+ * @method root/sessionRemoved
+ * @direction Server → Client
+ * @messageType Notification
+ * @version 1
+ * @example
+ * ```json
+ * {
+ *   "jsonrpc": "2.0",
+ *   "method": "root/sessionRemoved",
+ *   "params": {
+ *     "channel": "ahp-root://",
+ *     "session": "ahp-session:/<uuid>"
+ *   }
+ * }
+ * ```
+ */
+export interface SessionRemovedParams {
+  /** Channel URI this notification belongs to (the root channel) */
+  channel: URI;
+  /** URI of the removed session */
+  session: URI;
+}
+
+// ─── root/sessionSummaryChanged ──────────────────────────────────────────────
+
+/**
+ * Broadcast to all clients subscribed to the root channel when an existing
+ * session's summary changes (title, status, `modifiedAt`, model, working
+ * directory, read/done state, or diff statistics).
+ *
+ * This notification lets clients that maintain a cached session list — for
+ * example, the result of a previous `listSessions()` call — stay in sync with
+ * in-flight sessions without having to subscribe to every session URI
+ * individually. It is complementary to, not a replacement for,
+ * `root/sessionAdded` and `root/sessionRemoved`: those signal lifecycle
+ * (creation/disposal), while this signals summary-level mutations on an
+ * already-known session.
+ *
+ * Semantics:
+ *
+ * - Only fields present in `changes` have new values; omitted fields are
+ *   unchanged on the client's cached summary.
+ * - Identity fields (`resource`, `provider`, `createdAt`) never change and
+ *   are not carried.
+ * - Like all protocol notifications, this is ephemeral: it is **not**
+ *   replayed on reconnect. On reconnect, clients should re-fetch the full
+ *   catalog via `listSessions()` as usual.
+ * - The server SHOULD emit this notification whenever any mutable field on
+ *   {@link SessionSummary | `SessionSummary`} changes for a session the
+ *   server has surfaced via `listSessions()` or `root/sessionAdded`.
+ *   Servers MAY coalesce or debounce updates for noisy fields (for example,
+ *   `modifiedAt` bumps while a turn is streaming, or rapidly changing
+ *   `changesets`) at their discretion.
+ * - Clients that have no cached entry for `session` MAY ignore the
+ *   notification; it is not a substitute for `root/sessionAdded`.
+ *
+ * @category Protocol Notifications
+ * @method root/sessionSummaryChanged
+ * @direction Server → Client
+ * @messageType Notification
+ * @version 1
+ * @example
+ * ```json
+ * {
+ *   "jsonrpc": "2.0",
+ *   "method": "root/sessionSummaryChanged",
+ *   "params": {
+ *     "channel": "ahp-root://",
+ *     "session": "ahp-session:/<uuid>",
+ *     "changes": {
+ *       "title": "Refactor auth middleware",
+ *       "status": 8,
+ *       "modifiedAt": 1710000123456
+ *     }
+ *   }
+ * }
+ * ```
+ */
+export interface SessionSummaryChangedParams {
+  /** Channel URI this notification belongs to (the root channel) */
+  channel: URI;
+  /** URI of the session whose summary changed */
+  session: URI;
+  /**
+   * Mutable summary fields that changed; omitted fields are unchanged.
+   *
+   * Identity fields (`resource`, `provider`, `createdAt`) never change and
+   * MUST be omitted by senders; receivers SHOULD ignore them if present.
+   */
+  changes: Partial<SessionSummary>;
+}

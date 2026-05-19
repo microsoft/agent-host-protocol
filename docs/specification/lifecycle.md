@@ -65,7 +65,7 @@ If the server cannot accept the connection for any other reason, it MUST return 
 
 ## Authentication
 
-Agents MAY declare `protectedResources` in their [`AgentInfo`](/reference/state-types#agentinfo). Before interacting with a session backed by such an agent, the client SHOULD authenticate by obtaining a Bearer token from the declared authorization server(s) and pushing it via the [`authenticate`](/reference/commands#authenticate) command.
+Agents MAY declare `protectedResources` in their [`AgentInfo`](/reference/root#agentinfo). Before interacting with a session backed by such an agent, the client SHOULD authenticate by obtaining a Bearer token from the declared authorization server(s) and pushing it via the [`authenticate`](/reference/common#authenticate) command.
 
 If a client attempts to create or use a session with an agent that requires authentication and has not yet provided a token, the server SHOULD return error code `-32007` (`AuthRequired`) with the required resource metadata in the error's `data` field.
 
@@ -124,7 +124,7 @@ If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
 }
 ```
 
-Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via [`listSessions`](/reference/commands#listsessions). Stateless channels are simply re-subscribed; missed messages are dropped.
+Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions). Stateless channels are simply re-subscribed; missed messages are dropped.
 
 ## Unexpected Disconnection
 

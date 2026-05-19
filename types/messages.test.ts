@@ -17,6 +17,32 @@ function readSource(file: string): string {
   return readFileSync(resolve(root, file), 'utf-8');
 }
 
+/**
+ * Reads and concatenates every canonical per-channel source file matching
+ * `baseName` (e.g. `commands.ts`) under `types/common/` and
+ * `types/channels-*\/`. Used after the channel-organized refactor so the
+ * parsing in this test sees the union of declarations split across channels.
+ */
+function readChannelSources(baseName: string): string {
+  const dirs = [
+    'common',
+    'channels-root',
+    'channels-session',
+    'channels-terminal',
+    'channels-changeset',
+  ];
+  return dirs
+    .map(dir => {
+      const p = resolve(root, dir, baseName);
+      try {
+        return readFileSync(p, 'utf-8');
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
+}
+
 // ─── Parse commands.ts ───────────────────────────────────────────────────────
 
 interface MethodInfo {
@@ -84,8 +110,8 @@ function parseExpectedUnion(source: string, typeName: string): string[] {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-const commandsSrc = readSource('commands.ts');
-const messagesSrc = readSource('messages.ts');
+const commandsSrc = readChannelSources('commands.ts');
+const messagesSrc = readChannelSources('messages.ts');
 const messageChecksSrc = readSource('version/message-checks.ts');
 
 const allMethods = parseCommandMethods(commandsSrc);

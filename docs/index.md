@@ -17,12 +17,15 @@ hero:
       link: https://github.com/microsoft/agent-host-protocol
 
 features:
+  - icon: 📡
+    title: Channels All the Way Down
+    details: 'Every push-style interaction lives on a URI-identified channel — root, sessions, terminals, changesets, and more. Every command and notification carries a top-level <code>channel</code> URI, so any message can be routed by inspecting <code>(method, channel)</code>.'
   - icon: 🔄
     title: Synchronized Multi-Client State
-    details: An immutable, Redux-like state tree mutated exclusively by actions flowing through pure reducers. Multiple clients see the same synchronized view.
+    details: An immutable, Redux-like state tree per state-bearing channel, mutated exclusively by actions flowing through pure reducers. Multiple clients see the same synchronized view.
   - icon: 📦
     title: Lazy Loading & Subscriptions
-    details: Clients subscribe to state by URI and load data on demand. Large content is stored by reference and fetched separately, keeping the state tree small.
+    details: Clients subscribe to channels by URI and load data on demand. Large content is stored by reference and fetched separately, keeping the state tree small.
   - icon: ⚡
     title: Write-Ahead Reconciliation
     details: Clients optimistically apply their own actions locally, then reconcile when the server echoes them back alongside concurrent actions from other clients.

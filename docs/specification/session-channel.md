@@ -8,13 +8,13 @@ A session channel carries the full state of a single agent conversation: turns, 
 ahp-session:/<uuid>
 ```
 
-The path is a server-unique identifier (typically a UUID) chosen by the client at creation time. The session's provider (e.g. `"copilot"`) is **not** encoded in the URI scheme — it is carried on [`SessionSummary.provider`](/reference/state-types#sessionsummary). This decoupling lets the same scheme address sessions backed by any agent.
+The path is a server-unique identifier (typically a UUID) chosen by the client at creation time. The session's provider (e.g. `"copilot"`) is **not** encoded in the URI scheme — it is carried on [`SessionSummary.provider`](/reference/session#sessionsummary). This decoupling lets the same scheme address sessions backed by any agent.
 
 Multiple session channels may be active simultaneously. Clients subscribe to each one whose state they want to track.
 
 ## State
 
-Subscribers receive a [`SessionState`](/reference/state-types#sessionstate) snapshot containing the session summary, lifecycle phase, history of completed turns, the active turn (if any), pending messages, outstanding input requests, model and active-client state, and other per-session fields. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`SessionState`](/reference/session#sessionstate) snapshot containing the session summary, lifecycle phase, history of completed turns, the active turn (if any), pending messages, outstanding input requests, model and active-client state, and other per-session fields. Refer to the [State Model guide](/guide/state-model) for a structural overview.
 
 ## Lifecycle
 
@@ -31,7 +31,7 @@ Subscribers receive a [`SessionState`](/reference/state-types#sessionstate) snap
 
 ### Creation
 
-[`createSession`](/reference/commands#createsession) is a JSON-RPC request. The client picks the URI; the server allocates session state and begins backend initialisation. If the URI is already in use the server returns `SessionAlreadyExists` (`-32003`).
+[`createSession`](/reference/session#createsession) is a JSON-RPC request. The client picks the URI; the server allocates session state and begins backend initialisation. If the URI is already in use the server returns `SessionAlreadyExists` (`-32003`).
 
 ### Active session
 
@@ -58,6 +58,32 @@ All actions dispatched on this channel travel on `ActionEnvelope`s whose `channe
 ```
 
 The server tears down the session backend, drops associated subscriptions, and broadcasts `root/sessionRemoved` to clients subscribed to `ahp-root://`.
+
+## Methods and events on this channel
+
+This section lists wire methods that are interpreted in the context of a
+session URI (`ahp-session:/<uuid>`).
+
+### Commands (`params.channel = "ahp-session:/<uuid>"`)
+
+| Method | Kind | Purpose |
+|---|---|---|
+| `createSession` | request | Create a session at the chosen URI. |
+| `disposeSession` | request | Dispose this session and its backend resources. |
+| `fetchTurns` | request | Page historical turns for this session. |
+| `completions` | request | Session-scoped inline completions (e.g. user-message mentions). |
+
+### Notifications (`params.channel = "ahp-session:/<uuid>"`)
+
+| Method | Kind | Meaning |
+|---|---|---|
+| `action` | server → client notification | Session action envelope (`session/*` action payloads). |
+| `dispatchAction` | client → server notification | Dispatch client actions on this session (`session/turnStarted`, `session/toolCallConfirmed`, ...). |
+| `unsubscribe` | client → server notification | Stop receiving messages for this session channel. |
+
+`auth/required` may also target a session URI when auth is required for an
+operation scoped to that session; see
+[Authentication](/specification/authentication).
 
 ## Server Validation of Client Actions
 
@@ -97,20 +123,9 @@ When a turn is active and `steeringMessages` is non-empty, the server MAY consum
 
 Steering messages added while idle are silently stored and consumed when a turn becomes active.
 
-## Commands
-
-Session-scoped commands:
-
-- [`createSession`](/reference/commands#createsession) — create a new session
-- [`disposeSession`](/reference/commands#disposesession) — dispose an existing session
-- [`listSessions`](/reference/commands#listsessions) — fetch summaries for all sessions
-- [`fetchTurns`](/reference/commands#fetchturns) — lazy-load historical turns
-- [`resolveSessionConfig`](/reference/commands#resolvesessionconfig) — iteratively resolve the session config schema before creation
-- [`sessionConfigCompletions`](/reference/commands#sessionconfigcompletions), [`completions`](/reference/commands#completions) — value completions inside a session
-
 ## Actions
 
-Refer to [Actions](/reference/actions) for the full per-action reference. All session-scoped action envelopes carry `channel: "ahp-session:/<uuid>"`.
+Refer to the [Session Channel Reference](/reference/session#actions) for the full per-action reference. All session-scoped action envelopes carry `channel: "ahp-session:/<uuid>"`.
 
 ## Catalogue Notifications
 

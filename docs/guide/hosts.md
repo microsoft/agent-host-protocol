@@ -1,7 +1,7 @@
 ---
-redirect: /guide/architecture
+redirect: /guide/what-is-ahp
 ---
 
 # Hosts
 
-This page has moved. See [Architecture](/guide/architecture) for information about the host server in the Agent Host Protocol.
+This page has moved. See [What is AHP?](/guide/what-is-ahp) for an overview of hosts in the Agent Host Protocol.

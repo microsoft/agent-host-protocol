@@ -4,7 +4,7 @@ All state in AHP is organised into **channels**, each addressed by a URI. Client
 
 ## Root State
 
-Subscribable on the [Root Channel](/specification/root-channel) at `ahp-root://`. Contains global, lightweight data that all clients need. **Does not contain the session list** — that is fetched imperatively via RPC (see [Commands](/reference/commands)) and kept in sync via `root/sessionAdded` / `root/sessionRemoved` / `root/sessionSummaryChanged` notifications.
+Subscribable on the [Root Channel](/specification/root-channel) at `ahp-root://`. Contains global, lightweight data that all clients need. **Does not contain the session list** — that is fetched imperatively via RPC (see [`listSessions`](/reference/root#listsessions)) and kept in sync via `root/sessionAdded` / `root/sessionRemoved` / `root/sessionSummaryChanged` notifications.
 
 ```typescript
 RootState {
@@ -167,7 +167,6 @@ UserMessage {
   attachments?: MessageAttachment[]
 }
 
-// Discriminated union — see types/state.ts for full definitions.
 type MessageAttachment =
   | SimpleMessageAttachment            // type: 'simple'
   | MessageEmbeddedResourceAttachment  // type: 'embeddedResource'
@@ -486,4 +485,4 @@ The forked session is an independent copy — subsequent changes to either sessi
 - [Elicitation](/guide/elicitation) — How sessions request user input.
 - [Customizations](/guide/customizations) — Extending sessions with Open Plugins.
 - [Write-Ahead Reconciliation](/guide/reconciliation) — How clients stay in sync.
-- [State Types Reference](/reference/state-types) — Complete type definitions.
+- [Channel Reference Pages](/reference/common) — Per-channel state, actions, commands, and notifications. The cross-cutting types live on the [Common](/reference/common) page; per-channel types live on [Root](/reference/root), [Session](/reference/session), [Terminal](/reference/terminal), and [Changeset](/reference/changeset).

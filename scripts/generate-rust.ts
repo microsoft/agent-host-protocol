@@ -20,6 +20,7 @@ import {
 import { execFileSync, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { findProtocolSourceFiles } from './find-protocol-sources.js';
 
 const GENERATED_BANNER = '// Generated from types/*.ts — do not edit.\n//\n// Regenerate with: npm run generate:rust\n\n#![allow(missing_docs)]\n';
 
@@ -746,12 +747,11 @@ pub enum SnapshotState {
 }
 
 function generateStateFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'state.ts')!;
   const lines: string[] = [GENERATED_HEADER];
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of STATE_ENUMS) {
-    const decl = sf.getEnum(enumName);
+    const decl = findEnum(project, enumName);
     if (decl) {
       lines.push(generateRustEnum(decl));
       lines.push('');
@@ -898,14 +898,13 @@ pub struct SessionToolCallConfirmedAction {
 }
 
 function generateActionsFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'actions.ts')!;
   const lines: string[] = [GENERATED_HEADER];
   lines.push('use crate::state::{AgentInfo, ConfirmationOption, CustomizationRef, CustomizationStatus, ErrorInfo, ModelSelection, ResponsePart, SessionActiveClient, SessionCustomization, SessionInputAnswer, SessionInputRequest, SessionInputResponseKind, TerminalClaim, TerminalInfo, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, UserMessage, PendingMessageKind, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetSummary};');
   lines.push('');
 
   // ActionType enum
   lines.push('// ─── ActionType ──────────────────────────────────────────────────────\n');
-  const actionTypeEnum = sf.getEnum('ActionType');
+  const actionTypeEnum = findEnum(project, 'ActionType');
   if (actionTypeEnum) {
     lines.push(generateRustEnum(actionTypeEnum));
     lines.push('');
@@ -1018,7 +1017,6 @@ const RECONNECT_RESULT_UNION: UnionConfig = {
 };
 
 function generateCommandsFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'commands.ts')!;
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
@@ -1028,7 +1026,7 @@ function generateCommandsFile(project: Project): string {
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of COMMAND_ENUMS) {
-    const decl = sf.getEnum(enumName);
+    const decl = findEnum(project, enumName);
     if (decl) {
       lines.push(generateRustEnum(decl));
       lines.push('');
@@ -1101,7 +1099,6 @@ const NOTIFICATION_STRUCTS = [
 ];
 
 function generateNotificationsFile(project: Project): string {
-  const sf = project.getSourceFiles().find(f => f.getBaseName() === 'notifications.ts')!;
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::state::{ChangesetSummary, FileEdit, ModelSelection, ProjectInfo, SessionStatus, SessionSummary};');
@@ -1109,7 +1106,7 @@ function generateNotificationsFile(project: Project): string {
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of NOTIFICATION_ENUMS) {
-    const decl = sf.getEnum(enumName);
+    const decl = findEnum(project, enumName);
     if (decl) {
       lines.push(generateRustEnum(decl));
       lines.push('');
@@ -1342,13 +1339,13 @@ function checkExhaustiveness(project: Project): void {
   const protocolModules = ['state.ts', 'actions.ts', 'commands.ts', 'notifications.ts', 'errors.ts'];
   const imported = new Set<string>();
   for (const baseName of protocolModules) {
-    const sf = project.getSourceFiles().find(f => f.getBaseName() === baseName);
-    if (!sf) continue;
-    for (const decl of sf.getInterfaces()) {
-      if (decl.isExported()) imported.add(decl.getName());
-    }
-    for (const decl of sf.getTypeAliases()) {
-      if (decl.isExported()) imported.add(decl.getName());
+    for (const sf of findProtocolSourceFiles(project, baseName)) {
+      for (const decl of sf.getInterfaces()) {
+        if (decl.isExported()) imported.add(decl.getName());
+      }
+      for (const decl of sf.getTypeAliases()) {
+        if (decl.isExported()) imported.add(decl.getName());
+      }
     }
   }
 

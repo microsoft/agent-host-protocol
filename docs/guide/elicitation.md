@@ -72,6 +72,5 @@ Servers SHOULD reject client-dispatched input actions when:
 
 ## Related Reference
 
-- [State Types](/reference/state-types) — `SessionInputRequest`, `SessionInputQuestion`, and answer value types.
-- [Actions Reference](/reference/actions) — `session/inputRequested`, `session/inputAnswerChanged`, and `session/inputCompleted`.
+- [Session Channel Reference](/reference/session) — `SessionInputRequest`, `SessionInputQuestion`, answer value types, and the `session/input*` action variants.
 - [Session Channel](/specification/session-channel) — Session creation, active turns, and client-action validation.

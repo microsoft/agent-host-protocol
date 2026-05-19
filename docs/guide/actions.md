@@ -199,5 +199,6 @@ The reducer `switch` on action `type` is exhaustive — the compiler errors if a
 
 - [Channels & Subscriptions](/specification/subscriptions) — How channels and the action envelope route mutations.
 - [Write-Ahead Reconciliation](/guide/reconciliation) — How clients stay in sync.
-- [Actions Reference](/reference/actions) — Complete action type definitions.
+- [Messages Reference](/reference/messages) — Index of every JSON-RPC method, linked to the channel that documents it.
+- [Common Reference](/reference/common#action-envelope) — `ActionEnvelope`, `ActionType`, and the `StateAction` union.
 - [State Model](/guide/state-model) — The state tree these actions mutate.

@@ -69,5 +69,5 @@ See `tests/client_roundtrip.rs` for a complete in-memory example.
 
 - [`ahp-types`](https://crates.io/crates/ahp-types) — wire types only (no I/O)
 - [`ahp-ws`](https://crates.io/crates/ahp-ws) — WebSocket transport
-- [Connecting to multiple hosts](https://microsoft.github.io/agent-host-protocol/guide/clients-multi-host) — the [`hosts`](https://docs.rs/ahp/latest/ahp/hosts/) module wraps multi-host registry, reconnect, fan-in, and aggregated views; single-host consumers use `MultiHostClient::single`
+- [Connecting to multiple hosts](https://github.com/microsoft/agent-host-protocol/blob/main/clients/rust/MULTI_HOST.md) — the [`hosts`](https://docs.rs/ahp/latest/ahp/hosts/) module wraps multi-host registry, reconnect, fan-in, and aggregated views; single-host consumers use `MultiHostClient::single`
 - [Protocol documentation](https://microsoft.github.io/agent-host-protocol/)

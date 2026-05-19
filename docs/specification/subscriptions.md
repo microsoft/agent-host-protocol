@@ -1,6 +1,22 @@
 # Channels & Subscriptions
 
-AHP organises all push-based communication into **channels**. A channel is a URI-identified resource that a client subscribes to in order to receive updates. Channels MAY have state (root, sessions, terminals) or be stateless (future: logging, MCP relay, LSP relay). The subscription mechanism — `subscribe`, `unsubscribe`, and per-channel notifications — is uniform across channel types.
+AHP organises all push-based communication into **channels**. A channel is a URI-identified resource that a client subscribes to in order to receive updates. Channels MAY have state (root, sessions, terminals, changesets) or be stateless (future: logging, MCP relay, LSP relay). The subscription mechanism — `subscribe`, `unsubscribe`, and per-channel notifications — is uniform across channel types.
+
+## Every message carries `channel`
+
+The channel concept is woven into every wire message. **Every command and every notification has a top-level `channel: URI` field on its params.** This invariant lets servers, clients, and intermediate proxies dispatch any incoming message by inspecting `(method, params.channel)` without per-method knowledge of the rest of the payload.
+
+| Direction | Methods | `channel` value |
+|---|---|---|
+| Client → Server commands (channel-scoped) | `subscribe`, `unsubscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation` | The target channel's URI (e.g. `ahp-session:/<uuid>`). |
+| Client → Server commands (connection-level) | `initialize`, `ping`, `reconnect`, `listSessions`, `authenticate`, `resolveSessionConfig`, `sessionConfigCompletions`, `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceRequest` | Literal `'ahp-root://'`. |
+| Client → Server `dispatchAction` | The channel the action targets. |
+| Server → Client `action` | The channel that owns the action envelope. |
+| Server → Client protocol notifications | `root/sessionAdded`, `root/sessionRemoved`, `root/sessionSummaryChanged`, `auth/required` | The channel the notification scopes to (the root channel for `root/*`; the channel the auth requirement targets for `auth/required`). |
+
+The constraint is encoded in the TypeScript types: every entry in `CommandMap` and the notification maps has params assignable to `BaseParams` (or, for notifications, structurally `{ channel: URI }`). The compile-time check in `types/version/message-checks.ts` fails if any new method omits the field.
+
+The rest of this page details the URI scheme and the lifecycle of a subscription. The mechanics of action delivery and protocol notifications are described under each channel page ([Root](/specification/root-channel), [Session](/specification/session-channel), [Terminal](/specification/terminal-channel)).
 
 ## URI Scheme
 
@@ -56,7 +72,7 @@ After subscribing, the client receives all messages scoped to that channel — b
 
 ## Unsubscribe (Notification)
 
-`unsubscribe` is the canonical "base" notification: every notification at the wire level carries a top-level `channel: URI`.
+`unsubscribe` is a fire-and-forget client → server notification. Like every wire message, its params carry the channel URI being released.
 
 ```json
 {
@@ -129,7 +145,7 @@ The server includes a snapshot for each state-bearing channel in the `initialize
 
 ## Protocol Notifications
 
-Beyond `action`, the server pushes per-channel **protocol notifications** for ephemeral events. Every protocol notification is a top-level JSON-RPC method with a `channel: URI` field on its params.
+Beyond `action`, the server pushes per-channel **protocol notifications** for ephemeral events. Each one is its own top-level JSON-RPC method (e.g. `root/sessionAdded`, `auth/required`) — there is no `notification` wrapper.
 
 ```json
 {
