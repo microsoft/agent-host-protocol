@@ -71,9 +71,10 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
     // ── Lifecycle ──────────────────────────────────────────────────────────
 
     case .sessionReady:
+        // Lifecycle-only transition. Must not touch `summary.status`: see
+        // the equivalent TypeScript reducer for the rationale.
         var next = state
         next.lifecycle = .ready
-        next.summary.status = .idle
         return next
 
     case .sessionCreationFailed(let a):

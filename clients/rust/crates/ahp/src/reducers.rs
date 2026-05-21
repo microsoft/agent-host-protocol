@@ -432,8 +432,9 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
 pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -> ReduceOutcome {
     match action {
         StateAction::SessionReady(_) => {
+            // Lifecycle-only transition. Must not touch `summary.status`: see
+            // the equivalent TypeScript reducer for the rationale.
             state.lifecycle = SessionLifecycle::Ready;
-            state.summary.status = summary_status(state, None);
             ReduceOutcome::Applied
         }
         StateAction::SessionCreationFailed(a) => {
