@@ -342,10 +342,16 @@ final class AppStore {
                 errorMessage = tunnelConnectTokenUnavailableMessage
                 return nil
             }
+            guard DevTunnelServerEndpoint.updateEndpoint(for: &updatedServer, from: tunnel) else {
+                errorMessage = tunnelEndpointUnavailableMessage
+                return nil
+            }
 
             updatedServer.connectAccessToken = connectToken
             if let index = servers.firstIndex(where: { $0.id == updatedServer.id }) {
                 servers[index].token = updatedServer.token
+                servers[index].scheme = updatedServer.scheme
+                servers[index].host = updatedServer.host
                 servers[index].connectAccessToken = connectToken
                 serverStorage.saveServer(servers[index])
             }
@@ -409,10 +415,12 @@ final class AppStore {
     // MARK: - Server Management
 
     /// Add a new server configuration and persist it.
-    /// For tunnel servers, if a server with the same host already exists, updates it instead.
+    /// For tunnel servers, if a server with the same tunnel identity already exists, updates it instead.
     func addServer(_ server: ServerConfiguration) {
         if server.isTunnel,
-           let existingIndex = servers.firstIndex(where: { $0.host == server.host }) {
+           let existingIndex = servers.firstIndex(where: {
+               $0.tunnelId == server.tunnelId && $0.clusterId == server.clusterId
+           }) {
             var updated = server
             updated = ServerConfiguration(
                 id: servers[existingIndex].id,
@@ -421,7 +429,8 @@ final class AppStore {
                 host: server.host,
                 token: server.token,
                 tunnelId: server.tunnelId,
-                clusterId: server.clusterId
+                clusterId: server.clusterId,
+                connectAccessToken: server.connectAccessToken
             )
             servers[existingIndex] = updated
             serverStorage.saveServer(updated)

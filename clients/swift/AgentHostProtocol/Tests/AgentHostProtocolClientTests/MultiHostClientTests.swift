@@ -821,7 +821,6 @@ private func rootSnapshot(fromSeq: Int, activeSessions: Int) -> [String: Any] {
 
 private func actionEnvelopeJSON(serverSeq: Int, activeSessions: Int) -> [String: Any] {
     [
-        "channel": RootResourceURI,
         "action": [
             "type": "root/activeSessionsChanged",
             "activeSessions": activeSessions,

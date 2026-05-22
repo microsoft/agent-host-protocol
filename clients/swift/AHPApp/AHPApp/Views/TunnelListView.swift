@@ -80,6 +80,7 @@ enum TunnelTokenStore {
 
 let tunnelAuthenticationExpiredMessage = "GitHub sign-in expired. Sign in again to browse or connect to Dev Tunnels."
 let tunnelConnectTokenUnavailableMessage = "Couldn't acquire a Dev Tunnel connect token. Sign in again from Dev Tunnels."
+let tunnelEndpointUnavailableMessage = "Couldn't find a Dev Tunnel endpoint for the Agent Host port. Restart the tunnel and try again."
 
 func isTunnelAuthenticationFailure(_ error: Error) -> Bool {
     let nsError = error as NSError

@@ -201,6 +201,27 @@ struct ReconnectResultTests {
 }
 
 struct TunnelAuthenticationTests {
+    @Test func tunnelServerEndpointUsesAdvertisedPortUriFormat() {
+        let tunnel = Tunnel(
+            clusterId: "usw2",
+            tunnelId: "kind-river-j323ccs",
+            name: "mac-pro-dev",
+            accessTokens: [TunnelAccessScopes.connect: "connect-token"],
+            endpoints: [TunnelEndpoint(portUriFormat: "https://jnm28zd6-{port}.usw2.devtunnels.ms/")]
+        )
+
+        let server = DevTunnelServerEndpoint.serverConfiguration(
+            name: tunnel.displayName,
+            tunnel: tunnel,
+            accessToken: "github-token",
+            connectToken: "connect-token"
+        )
+
+        #expect(server?.scheme == "wss")
+        #expect(server?.host == "jnm28zd6-31546.usw2.devtunnels.ms")
+        #expect(server?.endpointURLString == "wss://jnm28zd6-31546.usw2.devtunnels.ms")
+    }
+
     @Test func tunnelAuthenticationFailureMatchesHTTPStatusCode() {
         let error = NSError(
             domain: "TunnelTests",

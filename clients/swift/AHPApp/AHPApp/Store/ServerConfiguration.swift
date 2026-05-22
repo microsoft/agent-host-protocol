@@ -1,3 +1,4 @@
+import DevTunnelsClient
 import Foundation
 
 /// A saved server configuration for connecting to an AHP server.
@@ -48,5 +49,86 @@ struct ServerConfiguration: Identifiable, Equatable {
         self.tunnelId = tunnelId
         self.clusterId = clusterId
         self.connectAccessToken = connectAccessToken
+    }
+}
+
+enum DevTunnelServerEndpoint {
+    static let agentHostPort: UInt16 = 31_546
+
+    static func directURL(for tunnel: Tunnel, port: UInt16 = agentHostPort) -> URL? {
+        if let endpointURL = tunnel.endpoints?
+            .lazy
+            .compactMap({ TunnelConnection.directURL(endpoint: $0, port: port) })
+            .first {
+            return endpointURL
+        }
+        return TunnelConnection.directURL(tunnel: tunnel, port: port)
+    }
+
+    static func serverConfiguration(
+        name: String,
+        tunnel: Tunnel,
+        accessToken: String,
+        connectToken: String,
+        port: UInt16 = agentHostPort
+    ) -> ServerConfiguration? {
+        guard let tunnelId = tunnel.tunnelId,
+              let clusterId = tunnel.clusterId,
+              let url = directURL(for: tunnel, port: port),
+              let endpoint = endpointParts(from: url) else {
+            return nil
+        }
+        return ServerConfiguration(
+            name: name,
+            scheme: endpoint.scheme,
+            host: endpoint.host,
+            token: accessToken,
+            tunnelId: tunnelId,
+            clusterId: clusterId,
+            connectAccessToken: connectToken
+        )
+    }
+
+    @discardableResult
+    static func updateEndpoint(
+        for server: inout ServerConfiguration,
+        from tunnel: Tunnel,
+        port: UInt16 = agentHostPort
+    ) -> Bool {
+        guard let url = directURL(for: tunnel, port: port),
+              let endpoint = endpointParts(from: url) else {
+            return false
+        }
+        server.scheme = endpoint.scheme
+        server.host = endpoint.host
+        return true
+    }
+
+    static func displayURLString(for tunnel: Tunnel, port: UInt16 = agentHostPort) -> String? {
+        directURL(for: tunnel, port: port)?.absoluteString
+    }
+
+    private static func endpointParts(from url: URL) -> (scheme: String, host: String)? {
+        guard let scheme = url.scheme?.lowercased(),
+              let hostName = url.host(percentEncoded: false) else {
+            return nil
+        }
+
+        var host = hostName
+        if let port = url.port {
+            host += ":\(port)"
+        }
+
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            let path = components.percentEncodedPath
+            if !path.isEmpty && path != "/" {
+                host += path
+            }
+            if let query = components.percentEncodedQuery, !query.isEmpty {
+                host += "?\(query)"
+            }
+        }
+
+        return (scheme, host)
     }
 }
