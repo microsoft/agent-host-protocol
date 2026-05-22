@@ -100,7 +100,7 @@ actor AHPConnection {
     private var subscriptionEventTask: Task<Void, Never>?
     private var hostEventTask: Task<Void, Never>?
     private var nextClientSeq = 1
-    private var connectedWaiters: [CheckedContinuation<HostHandle, Error>] = []
+    private var connectedWaiters: [ConnectedWaiter] = []
     private var latestReconnectResult: ReconnectResult?
     private var isDisconnecting = false
     private var lastHostError: String?
@@ -124,6 +124,11 @@ actor AHPConnection {
         let clientSeq: Int
         let channel: String
         let action: StateAction
+    }
+
+    private struct ConnectedWaiter {
+        let minimumGeneration: UInt64?
+        let continuation: CheckedContinuation<HostHandle, Error>
     }
 
     // MARK: - Init
@@ -214,10 +219,11 @@ actor AHPConnection {
 
         latestReconnectResult = nil
         await setState(.reconnecting)
+        let priorGeneration = await client.host(hostId)?.generation ?? 0
 
         do {
             try await client.reconnect(hostId)
-            let handle = try await waitForConnectedHost()
+            let handle = try await waitForConnectedHost(after: priorGeneration)
             updateProtocolState(from: handle)
             let result = latestReconnectResult ?? emptyReconnectResult()
             acknowledgeOutboundActions(in: result)
@@ -485,12 +491,14 @@ actor AHPConnection {
         }
     }
 
-    private func waitForConnectedHost() async throws -> HostHandle {
+    private func waitForConnectedHost(after minimumGeneration: UInt64? = nil) async throws -> HostHandle {
         if let client = multiHostClient,
            let handle = await client.host(hostId) {
             switch handle.state {
             case .connected:
-                return handle
+                if minimumGeneration == nil || handle.generation > minimumGeneration! {
+                    return handle
+                }
             case .failed:
                 throw ConnectionError.connectTimeout
             default:
@@ -499,15 +507,22 @@ actor AHPConnection {
         }
 
         return try await withCheckedThrowingContinuation { continuation in
-            connectedWaiters.append(continuation)
+            connectedWaiters.append(ConnectedWaiter(
+                minimumGeneration: minimumGeneration,
+                continuation: continuation
+            ))
         }
     }
 
     private func resumeConnectedWaiters(returning handle: HostHandle) {
-        let waiters = connectedWaiters
-        connectedWaiters.removeAll()
+        let waiters = connectedWaiters.filter { waiter in
+            waiter.minimumGeneration == nil || handle.generation > waiter.minimumGeneration!
+        }
+        connectedWaiters.removeAll { waiter in
+            waiter.minimumGeneration == nil || handle.generation > waiter.minimumGeneration!
+        }
         for waiter in waiters {
-            waiter.resume(returning: handle)
+            waiter.continuation.resume(returning: handle)
         }
     }
 
@@ -515,7 +530,7 @@ actor AHPConnection {
         let waiters = connectedWaiters
         connectedWaiters.removeAll()
         for waiter in waiters {
-            waiter.resume(throwing: error)
+            waiter.continuation.resume(throwing: error)
         }
     }
 
@@ -553,11 +568,21 @@ actor AHPConnection {
             let handle = try await currentClientHandle()
             return try await handle.request(method: method, params: params)
         } catch {
-            throw mapConnectionError(error)
+            let mapped = mapConnectionError(error)
+            if let connectionError = mapped as? ConnectionError,
+               case .timeout = connectionError {
+                await closeAfterRequestTimeout()
+            }
+            throw mapped
         }
     }
 
+    private func closeAfterRequestTimeout() async {
+        await transitionAwayFromConnected(to: .disconnected)
+    }
+
     private func currentClientHandle() async throws -> HostClientHandle {
+        guard state == .connected else { throw ConnectionError.notConnected }
         guard let client = multiHostClient,
               let handle = await client.client(for: hostId) else {
             throw ConnectionError.notConnected
