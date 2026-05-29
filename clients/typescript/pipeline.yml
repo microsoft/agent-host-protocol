@@ -99,10 +99,15 @@ extends:
 
           - bash: |
               set -euo pipefail
-              if [ -n "$(git status --porcelain -- clients/typescript)" ]; then
+              # Note: clients/typescript/src/types/ is gitignored — generated
+              # TS sources are produced fresh in CI and never committed. We
+              # check only clients/typescript/src (not the whole
+              # clients/typescript dir) so that lockfile mutations from the
+              # internal npm registry rewriting `resolved` URLs don't trip
+              # this check. Matches the GHA ci.yml pattern.
+              if ! git diff --quiet -- clients/typescript/src; then
                 echo "##vso[task.logissue type=error]Generated TypeScript sources are out of date. Run 'npm run generate:typescript' and commit the result."
-                git status --porcelain -- clients/typescript
-                git --no-pager diff -- clients/typescript
+                git --no-pager diff -- clients/typescript/src
                 exit 1
               fi
             displayName: ✅ Verify generated TypeScript is up to date
