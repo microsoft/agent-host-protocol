@@ -12,9 +12,10 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             when (requested.id.id) {
-                "org.jetbrains.kotlin.jvm",
-                "org.jetbrains.kotlin.plugin.serialization" ->
+                "org.jetbrains.kotlin.jvm" ->
                     useModule("org.jetbrains.kotlin:kotlin-gradle-plugin:${requested.version}")
+                "org.jetbrains.kotlin.plugin.serialization" ->
+                    useModule("org.jetbrains.kotlin:kotlin-serialization:${requested.version}")
                 "com.vanniktech.maven.publish" ->
                     useModule("com.vanniktech:gradle-maven-publish-plugin:${requested.version}")
             }
