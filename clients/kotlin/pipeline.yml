@@ -107,10 +107,16 @@ extends:
 
       - bash: |
           set -euo pipefail
-          if [ -n "$(git status --porcelain -- clients/kotlin)" ]; then
+          # Narrow path filter: only the generated/ subdir, not all of
+          # clients/kotlin. The ADO maven-package template drops files
+          # like NOTICE.txt into clients/kotlin during the publish step,
+          # which a broad check would mistake for stale generated source
+          # drift. Matches the GHA ci.yml pattern.
+          GENERATED_DIR=clients/kotlin/src/main/kotlin/com/microsoft/agenthostprotocol/generated
+          if [ -n "$(git status --porcelain -- $GENERATED_DIR)" ]; then
             echo "##vso[task.logissue type=error]Generated Kotlin sources are out of date. Run 'npm run generate:kotlin' and commit the result."
-            git status --porcelain -- clients/kotlin
-            git --no-pager diff -- clients/kotlin
+            git status --porcelain -- $GENERATED_DIR
+            git --no-pager diff -- $GENERATED_DIR
             exit 1
           fi
         displayName: ✅ Verify generated Kotlin is up to date
