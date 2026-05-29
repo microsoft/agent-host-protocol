@@ -16,9 +16,18 @@ name: $(Date:yyyyMMdd)$(Rev:.r)
 #      Central via the Sonatype Central Portal.
 #
 # The pipeline can also be triggered manually from the ADO UI as a
-# hotfix escape hatch — manual runs publish too. Per-commit CI runs on
-# `main` are handled by `.github/workflows/ci.yml`, so this pipeline
-# only triggers on tags and manual runs.
+# hotfix escape hatch — manual runs publish too by default. Untick
+# the `publish` parameter at queue time to run a dry-run build that
+# exercises validation + build + test + Maven staging but skips the
+# final ESRP upload. Per-commit CI runs on `main` are handled by
+# `.github/workflows/ci.yml`, so this pipeline only triggers on tags
+# and manual runs.
+parameters:
+  - name: publish
+    displayName: Publish to Maven Central (untick for a dry-run build)
+    type: boolean
+    default: true
+
 trigger:
   branches:
     exclude:
@@ -42,9 +51,11 @@ extends:
     packageName: agent-host-protocol
     projectRootDirectory: $(Build.SourcesDirectory)/clients/kotlin
     artifactStagingDirectory: $(Build.SourcesDirectory)/clients/kotlin/build/maven-staging
-    # Always publish: the only entry points to this pipeline are
-    # `kotlin/v*` tag pushes and manual ADO UI runs.
-    publishPackage: true
+    # Driven by the top-level `publish` parameter so manual queue-time
+    # runs can opt out of the ESRP upload for testing while still
+    # exercising the full validation + build + staging path. Tag-driven
+    # runs use the default (true).
+    publishPackage: ${{ parameters.publish }}
     # The GitHub tag is what triggers this pipeline, so there's no
     # need for the pipeline to also push a tag back.
     ghCreateTag: false
