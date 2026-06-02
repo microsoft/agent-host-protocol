@@ -451,6 +451,35 @@ enum class ChangesetStatus {
 }
 
 /**
+ * Execution lifecycle of a {@link ChangesetOperation}.
+ * 
+ * An operation is invoked imperatively via `invokeChangesetOperation`, but
+ * its progress and outcome are reflected back into changeset state so that
+ * every subscriber observes a consistent view (e.g. a spinner on a "Create
+ * Pull Request" button, or an inline error after a failed "revert").
+ */
+@Serializable
+enum class ChangesetOperationStatus {
+    /**
+     * The operation is ready to be invoked. This is the default when
+     * {@link ChangesetOperation.status} is omitted.
+     */
+    @SerialName("idle")
+    IDLE,
+    /**
+     * An invocation of this operation is currently in flight.
+     */
+    @SerialName("running")
+    RUNNING,
+    /**
+     * The most recent invocation failed. The cause is described by
+     * {@link ChangesetOperation.error}.
+     */
+    @SerialName("error")
+    ERROR
+}
+
+/**
  * Where a {@link ChangesetOperation} can be invoked.
  */
 @Serializable
@@ -2994,7 +3023,24 @@ data class ChangesetOperation(
     /**
      * Optional generic icon hint, e.g. `"check"`, `"trash"`.
      */
-    val icon: String? = null
+    val icon: String? = null,
+    /**
+     * Current execution status. The server sets
+     * {@link ChangesetOperationStatus.Running | Running} while an invocation
+     * is in flight, {@link ChangesetOperationStatus.Error | Error} when the
+     * most recent invocation failed, and
+     * {@link ChangesetOperationStatus.Idle | Idle} otherwise.
+     * 
+     * Clients SHOULD reflect this state in the UI — e.g. disabling the
+     * control or showing a spinner while `Running`, and surfacing
+     * {@link error} while `Error`.
+     */
+    val status: ChangesetOperationStatus,
+    /**
+     * Cause of failure. Present iff
+     * `status === ChangesetOperationStatus.Error`; otherwise omitted.
+     */
+    val error: ErrorInfo? = null
 )
 
 @Serializable

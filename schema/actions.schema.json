@@ -1436,6 +1436,32 @@
         "operations"
       ]
     },
+    "ChangesetOperationStatusChangedAction": {
+      "type": "object",
+      "description": "The {@link ChangesetOperation.status} for a single operation transitioned\n(e.g. `idle → running → idle`, or `running → error`). The error payload\nis set together with `status` whenever it transitions to\n{@link ChangesetOperationStatus.Error | Error}, and cleared on any other\ntransition.\n\nTargets one operation by its {@link ChangesetOperation.id}. If no\noperation with that id is currently present in the changeset, the action\nis a no-op. Use {@link ChangesetOperationsChangedAction} to add, remove,\nor otherwise replace the operation list itself.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChangesetOperationStatusChanged"
+        },
+        "operationId": {
+          "type": "string",
+          "description": "The {@link ChangesetOperation.id} whose status changed."
+        },
+        "status": {
+          "$ref": "#/$defs/ChangesetOperationStatus",
+          "description": "New execution status."
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Cause when `status === ChangesetOperationStatus.Error`; otherwise omitted."
+        }
+      },
+      "required": [
+        "type",
+        "operationId",
+        "status"
+      ]
+    },
     "ChangesetClearedAction": {
       "type": "object",
       "description": "Drop every file from the changeset.\n\nTwo cases use this:\n1. The underlying source moved (branch switched, fork point invalidated,\n   …) and the server is recomputing from scratch — subsequent\n   {@link ChangesetFileSetAction} entries will repopulate it.\n2. The owning session has ended and the URI is becoming\n   un-subscribable — the server will unsubscribe all clients shortly\n   after dispatching this action.\n\nClients SHOULD release any references on receipt and SHOULD NOT\ndistinguish the two cases from the action alone — instead, react to\nthe corresponding session-level lifecycle signal (e.g.\n`root/sessionRemoved`) for the \"going away\" case.",
@@ -4935,12 +4961,21 @@
         "icon": {
           "type": "string",
           "description": "Optional generic icon hint, e.g. `\"check\"`, `\"trash\"`."
+        },
+        "status": {
+          "$ref": "#/$defs/ChangesetOperationStatus",
+          "description": "Current execution status. The server sets\n{@link ChangesetOperationStatus.Running | Running} while an invocation\nis in flight, {@link ChangesetOperationStatus.Error | Error} when the\nmost recent invocation failed, and\n{@link ChangesetOperationStatus.Idle | Idle} otherwise.\n\nClients SHOULD reflect this state in the UI — e.g. disabling the\ncontrol or showing a spinner while `Running`, and surfacing\n{@link error} while `Error`."
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Cause of failure. Present iff\n`status === ChangesetOperationStatus.Error`; otherwise omitted."
         }
       },
       "required": [
         "id",
         "label",
-        "scopes"
+        "scopes",
+        "status"
       ]
     },
     "TelemetryCapabilities": {
@@ -5422,6 +5457,9 @@
         },
         {
           "$ref": "#/$defs/ChangesetOperationsChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChangesetOperationStatusChangedAction"
         },
         {
           "$ref": "#/$defs/ChangesetClearedAction"

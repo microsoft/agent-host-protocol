@@ -249,6 +249,25 @@ const (
 	ChangesetStatusError ChangesetStatus = "error"
 )
 
+// Execution lifecycle of a {@link ChangesetOperation}.
+//
+// An operation is invoked imperatively via `invokeChangesetOperation`, but
+// its progress and outcome are reflected back into changeset state so that
+// every subscriber observes a consistent view (e.g. a spinner on a "Create
+// Pull Request" button, or an inline error after a failed "revert").
+type ChangesetOperationStatus string
+
+const (
+	// The operation is ready to be invoked. This is the default when
+	// {@link ChangesetOperation.status} is omitted.
+	ChangesetOperationStatusIdle ChangesetOperationStatus = "idle"
+	// An invocation of this operation is currently in flight.
+	ChangesetOperationStatusRunning ChangesetOperationStatus = "running"
+	// The most recent invocation failed. The cause is described by
+	// {@link ChangesetOperation.error}.
+	ChangesetOperationStatusError ChangesetOperationStatus = "error"
+)
+
 // Where a {@link ChangesetOperation} can be invoked.
 type ChangesetOperationScope string
 
@@ -2079,6 +2098,19 @@ type ChangesetOperation struct {
 	Confirmation *StringOrMarkdown `json:"confirmation,omitempty"`
 	// Optional generic icon hint, e.g. `"check"`, `"trash"`.
 	Icon *string `json:"icon,omitempty"`
+	// Current execution status. The server sets
+	// {@link ChangesetOperationStatus.Running | Running} while an invocation
+	// is in flight, {@link ChangesetOperationStatus.Error | Error} when the
+	// most recent invocation failed, and
+	// {@link ChangesetOperationStatus.Idle | Idle} otherwise.
+	//
+	// Clients SHOULD reflect this state in the UI — e.g. disabling the
+	// control or showing a spinner while `Running`, and surfacing
+	// {@link error} while `Error`.
+	Status ChangesetOperationStatus `json:"status"`
+	// Cause of failure. Present iff
+	// `status === ChangesetOperationStatus.Error`; otherwise omitted.
+	Error *ErrorInfo `json:"error,omitempty"`
 }
 
 // OTLP telemetry channels the agent host emits.

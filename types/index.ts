@@ -116,6 +116,7 @@ export {
   SessionInputResponseKind,
   TerminalClaimKind,
   ChangesetStatus,
+  ChangesetOperationStatus,
   ChangesetOperationScope,
   ResourceChangeType,
 } from './state.js';
@@ -166,6 +167,7 @@ export type {
   ChangesetFileSetAction,
   ChangesetFileRemovedAction,
   ChangesetOperationsChangedAction,
+  ChangesetOperationStatusChangedAction,
   ChangesetClearedAction,
   StateAction,
   RootTerminalsChangedAction,

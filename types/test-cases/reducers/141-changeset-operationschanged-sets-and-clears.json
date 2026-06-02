@@ -10,7 +10,8 @@
         "label": "Stage",
         "scopes": [
           "resource"
-        ]
+        ],
+        "status": "idle"
       }
     ]
   },
@@ -23,7 +24,8 @@
           "label": "Create Pull Request",
           "scopes": [
             "changeset"
-          ]
+          ],
+          "status": "idle"
         }
       ]
     },

@@ -231,6 +231,23 @@ public enum ChangesetStatus: String, Codable, Sendable {
     case error = "error"
 }
 
+/// Execution lifecycle of a {@link ChangesetOperation}.
+/// 
+/// An operation is invoked imperatively via `invokeChangesetOperation`, but
+/// its progress and outcome are reflected back into changeset state so that
+/// every subscriber observes a consistent view (e.g. a spinner on a "Create
+/// Pull Request" button, or an inline error after a failed "revert").
+public enum ChangesetOperationStatus: String, Codable, Sendable {
+    /// The operation is ready to be invoked. This is the default when
+    /// {@link ChangesetOperation.status} is omitted.
+    case idle = "idle"
+    /// An invocation of this operation is currently in flight.
+    case running = "running"
+    /// The most recent invocation failed. The cause is described by
+    /// {@link ChangesetOperation.error}.
+    case error = "error"
+}
+
 /// Where a {@link ChangesetOperation} can be invoked.
 public enum ChangesetOperationScope: String, Codable, Sendable {
     /// Applies to the whole changeset.
@@ -3275,6 +3292,19 @@ public struct ChangesetOperation: Codable, Sendable {
     public var confirmation: StringOrMarkdown?
     /// Optional generic icon hint, e.g. `"check"`, `"trash"`.
     public var icon: String?
+    /// Current execution status. The server sets
+    /// {@link ChangesetOperationStatus.Running | Running} while an invocation
+    /// is in flight, {@link ChangesetOperationStatus.Error | Error} when the
+    /// most recent invocation failed, and
+    /// {@link ChangesetOperationStatus.Idle | Idle} otherwise.
+    /// 
+    /// Clients SHOULD reflect this state in the UI — e.g. disabling the
+    /// control or showing a spinner while `Running`, and surfacing
+    /// {@link error} while `Error`.
+    public var status: ChangesetOperationStatus
+    /// Cause of failure. Present iff
+    /// `status === ChangesetOperationStatus.Error`; otherwise omitted.
+    public var error: ErrorInfo?
 
     public init(
         id: String,
@@ -3282,7 +3312,9 @@ public struct ChangesetOperation: Codable, Sendable {
         description: String? = nil,
         scopes: [ChangesetOperationScope],
         confirmation: StringOrMarkdown? = nil,
-        icon: String? = nil
+        icon: String? = nil,
+        status: ChangesetOperationStatus,
+        error: ErrorInfo? = nil
     ) {
         self.id = id
         self.label = label
@@ -3290,6 +3322,8 @@ public struct ChangesetOperation: Codable, Sendable {
         self.scopes = scopes
         self.confirmation = confirmation
         self.icon = icon
+        self.status = status
+        self.error = error
     }
 }
 

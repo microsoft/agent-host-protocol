@@ -116,6 +116,8 @@ pub enum ActionType {
     ChangesetFileRemoved,
     #[serde(rename = "changeset/operationsChanged")]
     ChangesetOperationsChanged,
+    #[serde(rename = "changeset/operationStatusChanged")]
+    ChangesetOperationStatusChanged,
     #[serde(rename = "changeset/cleared")]
     ChangesetCleared,
     #[serde(rename = "root/terminalsChanged")]
@@ -886,6 +888,28 @@ pub struct ChangesetOperationsChangedAction {
     pub operations: Option<Vec<ChangesetOperation>>,
 }
 
+/// The {@link ChangesetOperation.status} for a single operation transitioned
+/// (e.g. `idle → running → idle`, or `running → error`). The error payload
+/// is set together with `status` whenever it transitions to
+/// {@link ChangesetOperationStatus.Error | Error}, and cleared on any other
+/// transition.
+///
+/// Targets one operation by its {@link ChangesetOperation.id}. If no
+/// operation with that id is currently present in the changeset, the action
+/// is a no-op. Use {@link ChangesetOperationsChangedAction} to add, remove,
+/// or otherwise replace the operation list itself.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetOperationStatusChangedAction {
+    /// The {@link ChangesetOperation.id} whose status changed.
+    pub operation_id: String,
+    /// New execution status.
+    pub status: ChangesetOperationStatus,
+    /// Cause when `status === ChangesetOperationStatus.Error`; otherwise omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorInfo>,
+}
+
 /// Drop every file from the changeset.
 ///
 /// Two cases use this:
@@ -1162,6 +1186,8 @@ pub enum StateAction {
     ChangesetFileRemoved(ChangesetFileRemovedAction),
     #[serde(rename = "changeset/operationsChanged")]
     ChangesetOperationsChanged(ChangesetOperationsChangedAction),
+    #[serde(rename = "changeset/operationStatusChanged")]
+    ChangesetOperationStatusChanged(ChangesetOperationStatusChangedAction),
     #[serde(rename = "changeset/cleared")]
     ChangesetCleared(ChangesetClearedAction),
     #[serde(rename = "root/terminalsChanged")]

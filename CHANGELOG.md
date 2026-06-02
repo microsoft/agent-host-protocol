@@ -27,6 +27,10 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 
 Spec version: `0.3.0`
 
+- Added `status` and `error` to `ChangesetOperation` and a new
+  `changeset/operationStatusChanged` action so servers can reflect an
+  operation's execution lifecycle (`idle → running → error`) back into
+  changeset state.
 - Renamed the `UserMessage` type to `Message` and surfaced it consistently
   across turn state (`Turn.message`, `ActiveTurn.message`, `PendingMessage.message`)
   and the actions that carry it (`session/turnStarted`,

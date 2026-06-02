@@ -52,6 +52,7 @@ public enum ActionType: String, Codable, Sendable {
     case changesetFileSet = "changeset/fileSet"
     case changesetFileRemoved = "changeset/fileRemoved"
     case changesetOperationsChanged = "changeset/operationsChanged"
+    case changesetOperationStatusChanged = "changeset/operationStatusChanged"
     case changesetCleared = "changeset/cleared"
     case rootTerminalsChanged = "root/terminalsChanged"
     case rootConfigChanged = "root/configChanged"
@@ -1078,6 +1079,28 @@ public struct ChangesetOperationsChangedAction: Codable, Sendable {
     }
 }
 
+public struct ChangesetOperationStatusChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The {@link ChangesetOperation.id} whose status changed.
+    public var operationId: String
+    /// New execution status.
+    public var status: ChangesetOperationStatus
+    /// Cause when `status === ChangesetOperationStatus.Error`; otherwise omitted.
+    public var error: ErrorInfo?
+
+    public init(
+        type: ActionType,
+        operationId: String,
+        status: ChangesetOperationStatus,
+        error: ErrorInfo? = nil
+    ) {
+        self.type = type
+        self.operationId = operationId
+        self.status = status
+        self.error = error
+    }
+}
+
 public struct ChangesetClearedAction: Codable, Sendable {
     public var type: ActionType
 
@@ -1353,6 +1376,7 @@ public enum StateAction: Codable, Sendable {
     case changesetFileSet(ChangesetFileSetAction)
     case changesetFileRemoved(ChangesetFileRemovedAction)
     case changesetOperationsChanged(ChangesetOperationsChangedAction)
+    case changesetOperationStatusChanged(ChangesetOperationStatusChangedAction)
     case changesetCleared(ChangesetClearedAction)
     case rootTerminalsChanged(RootTerminalsChangedAction)
     case rootConfigChanged(RootConfigChangedAction)
@@ -1469,6 +1493,8 @@ public enum StateAction: Codable, Sendable {
             self = .changesetFileRemoved(try ChangesetFileRemovedAction(from: decoder))
         case "changeset/operationsChanged":
             self = .changesetOperationsChanged(try ChangesetOperationsChangedAction(from: decoder))
+        case "changeset/operationStatusChanged":
+            self = .changesetOperationStatusChanged(try ChangesetOperationStatusChangedAction(from: decoder))
         case "changeset/cleared":
             self = .changesetCleared(try ChangesetClearedAction(from: decoder))
         case "root/terminalsChanged":
@@ -1552,6 +1578,7 @@ public enum StateAction: Codable, Sendable {
         case .changesetFileSet(let v): try v.encode(to: encoder)
         case .changesetFileRemoved(let v): try v.encode(to: encoder)
         case .changesetOperationsChanged(let v): try v.encode(to: encoder)
+        case .changesetOperationStatusChanged(let v): try v.encode(to: encoder)
         case .changesetCleared(let v): try v.encode(to: encoder)
         case .rootTerminalsChanged(let v): try v.encode(to: encoder)
         case .rootConfigChanged(let v): try v.encode(to: encoder)

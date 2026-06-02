@@ -118,6 +118,8 @@ enum class ActionType {
     CHANGESET_FILE_REMOVED,
     @SerialName("changeset/operationsChanged")
     CHANGESET_OPERATIONS_CHANGED,
+    @SerialName("changeset/operationStatusChanged")
+    CHANGESET_OPERATION_STATUS_CHANGED,
     @SerialName("changeset/cleared")
     CHANGESET_CLEARED,
     @SerialName("root/terminalsChanged")
@@ -833,6 +835,23 @@ data class ChangesetOperationsChangedAction(
 )
 
 @Serializable
+data class ChangesetOperationStatusChangedAction(
+    val type: ActionType,
+    /**
+     * The {@link ChangesetOperation.id} whose status changed.
+     */
+    val operationId: String,
+    /**
+     * New execution status.
+     */
+    val status: ChangesetOperationStatus,
+    /**
+     * Cause when `status === ChangesetOperationStatus.Error`; otherwise omitted.
+     */
+    val error: ErrorInfo? = null
+)
+
+@Serializable
 data class ChangesetClearedAction(
     val type: ActionType
 )
@@ -1042,6 +1061,7 @@ sealed interface StateAction
 @JvmInline value class StateActionChangesetFileSet(val value: ChangesetFileSetAction) : StateAction
 @JvmInline value class StateActionChangesetFileRemoved(val value: ChangesetFileRemovedAction) : StateAction
 @JvmInline value class StateActionChangesetOperationsChanged(val value: ChangesetOperationsChangedAction) : StateAction
+@JvmInline value class StateActionChangesetOperationStatusChanged(val value: ChangesetOperationStatusChangedAction) : StateAction
 @JvmInline value class StateActionChangesetCleared(val value: ChangesetClearedAction) : StateAction
 @JvmInline value class StateActionRootTerminalsChanged(val value: RootTerminalsChangedAction) : StateAction
 @JvmInline value class StateActionRootConfigChanged(val value: RootConfigChangedAction) : StateAction
@@ -1118,6 +1138,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "changeset/fileSet" -> StateActionChangesetFileSet(input.json.decodeFromJsonElement(ChangesetFileSetAction.serializer(), element))
             "changeset/fileRemoved" -> StateActionChangesetFileRemoved(input.json.decodeFromJsonElement(ChangesetFileRemovedAction.serializer(), element))
             "changeset/operationsChanged" -> StateActionChangesetOperationsChanged(input.json.decodeFromJsonElement(ChangesetOperationsChangedAction.serializer(), element))
+            "changeset/operationStatusChanged" -> StateActionChangesetOperationStatusChanged(input.json.decodeFromJsonElement(ChangesetOperationStatusChangedAction.serializer(), element))
             "changeset/cleared" -> StateActionChangesetCleared(input.json.decodeFromJsonElement(ChangesetClearedAction.serializer(), element))
             "root/terminalsChanged" -> StateActionRootTerminalsChanged(input.json.decodeFromJsonElement(RootTerminalsChangedAction.serializer(), element))
             "root/configChanged" -> StateActionRootConfigChanged(input.json.decodeFromJsonElement(RootConfigChangedAction.serializer(), element))
@@ -1187,6 +1208,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChangesetFileSet -> output.json.encodeToJsonElement(ChangesetFileSetAction.serializer(), value.value)
             is StateActionChangesetFileRemoved -> output.json.encodeToJsonElement(ChangesetFileRemovedAction.serializer(), value.value)
             is StateActionChangesetOperationsChanged -> output.json.encodeToJsonElement(ChangesetOperationsChangedAction.serializer(), value.value)
+            is StateActionChangesetOperationStatusChanged -> output.json.encodeToJsonElement(ChangesetOperationStatusChangedAction.serializer(), value.value)
             is StateActionChangesetCleared -> output.json.encodeToJsonElement(ChangesetClearedAction.serializer(), value.value)
             is StateActionRootTerminalsChanged -> output.json.encodeToJsonElement(RootTerminalsChangedAction.serializer(), value.value)
             is StateActionRootConfigChanged -> output.json.encodeToJsonElement(RootConfigChangedAction.serializer(), value.value)

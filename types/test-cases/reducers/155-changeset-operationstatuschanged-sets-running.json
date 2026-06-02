@@ -1,0 +1,39 @@
+{
+    "description": "changeset/operationStatusChanged sets the status on the matching operation",
+    "reducer": "changeset",
+    "initial": {
+        "status": "ready",
+        "files": [],
+        "operations": [
+            {
+                "id": "create-pr",
+                "label": "Create Pull Request",
+                "scopes": [
+                    "changeset"
+                ],
+                "status": "idle"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "changeset/operationStatusChanged",
+            "operationId": "create-pr",
+            "status": "running"
+        }
+    ],
+    "expected": {
+        "status": "ready",
+        "files": [],
+        "operations": [
+            {
+                "id": "create-pr",
+                "label": "Create Pull Request",
+                "scopes": [
+                    "changeset"
+                ],
+                "status": "running"
+            }
+        ]
+    }
+}

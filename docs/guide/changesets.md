@@ -70,14 +70,15 @@ ChangesetFile {
 Updates flow through changeset-scoped actions, broadcast to subscribers
 of the changeset URI:
 
-| Type                          | Client-dispatchable? | When                                                          |
-| ----------------------------- | -------------------- | ------------------------------------------------------------- |
-| `changeset/statusChanged`     | No                   | `status` transitioned (e.g. `computing → ready`).             |
-| `changeset/fileSet`           | No                   | Upsert a `ChangesetFile` (new or replacing existing by `id`). |
-| `changeset/fileRemoved`       | No                   | A file is no longer in the changeset.                         |
-| `changeset/operationsChanged` | No                   | The set of available `operations` changed.                    |
-| `changeset/cleared`           | No                   | All files dropped (e.g. branch switched).                     |
-| `changeset/disposed`          | No                   | The changeset URI is no longer subscribable.                  |
+| Type                                | Client-dispatchable? | When                                                                         |
+| ----------------------------------- | -------------------- | ---------------------------------------------------------------------------- |
+| `changeset/statusChanged`           | No                   | `status` transitioned (e.g. `computing → ready`).                            |
+| `changeset/fileSet`                 | No                   | Upsert a `ChangesetFile` (new or replacing existing by `id`).                |
+| `changeset/fileRemoved`             | No                   | A file is no longer in the changeset.                                        |
+| `changeset/operationsChanged`       | No                   | The set of available `operations` changed.                                   |
+| `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |
+| `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched).                                    |
+| `changeset/disposed`                | No                   | The changeset URI is no longer subscribable.                                 |
 
 ### Changeset Operations
 
@@ -99,8 +100,24 @@ ChangesetOperation {
    */
   confirmation?: StringOrMarkdown
   icon?: string
+  /**
+   * Execution status of the operation. The server sets `'running'` while
+   * an invocation is in flight, `'error'` (with `error`) when the most
+   * recent invocation failed, and `'idle'` otherwise.
+   */
+  status: 'idle' | 'running' | 'error'
+  /** Present iff `status === 'error'`. */
+  error?: ErrorInfo
 }
 ```
+
+Because `invokeChangesetOperation` is a request/response command, an
+operation's progress and outcome are reflected back into changeset state
+via the `changeset/operationStatusChanged` action so that every subscriber
+observes a consistent view (e.g. a spinner on a "Create Pull Request"
+button, or an inline error after a failed "revert"). The action targets a
+single operation by `operationId` and is a no-op if no operation with that
+id is currently present.
 
 Operations are invoked via the `invokeChangesetOperation` JSON-RPC
 command (not via dispatched actions, because they return data and may

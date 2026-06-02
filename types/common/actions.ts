@@ -63,6 +63,7 @@ import type {
   ChangesetFileSetAction,
   ChangesetFileRemovedAction,
   ChangesetOperationsChangedAction,
+  ChangesetOperationStatusChangedAction,
   ChangesetClearedAction,
 } from '../channels-changeset/actions.js';
 
@@ -138,6 +139,7 @@ export const enum ActionType {
   ChangesetFileSet = 'changeset/fileSet',
   ChangesetFileRemoved = 'changeset/fileRemoved',
   ChangesetOperationsChanged = 'changeset/operationsChanged',
+  ChangesetOperationStatusChanged = 'changeset/operationStatusChanged',
   ChangesetCleared = 'changeset/cleared',
   RootTerminalsChanged = 'root/terminalsChanged',
   RootConfigChanged = 'root/configChanged',
@@ -237,6 +239,7 @@ export type StateAction =
   | ChangesetFileSetAction
   | ChangesetFileRemovedAction
   | ChangesetOperationsChangedAction
+  | ChangesetOperationStatusChangedAction
   | ChangesetClearedAction
   | TerminalDataAction
   | TerminalInputAction

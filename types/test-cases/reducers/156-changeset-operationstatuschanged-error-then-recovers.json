@@ -1,0 +1,48 @@
+{
+    "description": "changeset/operationStatusChanged attaches the error on Error and clears it on a later transition",
+    "reducer": "changeset",
+    "initial": {
+        "status": "ready",
+        "files": [],
+        "operations": [
+            {
+                "id": "create-pr",
+                "label": "Create Pull Request",
+                "scopes": [
+                    "changeset"
+                ],
+                "status": "running"
+            }
+        ]
+    },
+    "actions": [
+        {
+            "type": "changeset/operationStatusChanged",
+            "operationId": "create-pr",
+            "status": "error",
+            "error": {
+                "errorType": "git",
+                "message": "fatal: failed to push some refs"
+            }
+        },
+        {
+            "type": "changeset/operationStatusChanged",
+            "operationId": "create-pr",
+            "status": "idle"
+        }
+    ],
+    "expected": {
+        "status": "ready",
+        "files": [],
+        "operations": [
+            {
+                "id": "create-pr",
+                "label": "Create Pull Request",
+                "scopes": [
+                    "changeset"
+                ],
+                "status": "idle"
+            }
+        ]
+    }
+}
