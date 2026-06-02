@@ -12,11 +12,12 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::state::{
-    AgentInfo, AgentSelection, ChangesetFile, ChangesetOperation, ChangesetStatus,
-    ChangesetSummary, ConfirmationOption, Customization, ErrorInfo, Message, ModelSelection,
-    PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputAnswer, SessionInputRequest,
-    SessionInputResponseKind, TerminalClaim, TerminalInfo, ToolCallCancellationReason,
-    ToolCallConfirmationReason, ToolCallResult, ToolDefinition, ToolResultContent, UsageInfo,
+    AgentInfo, AgentSelection, ChangesetFile, ChangesetOperation, ChangesetOperationStatus,
+    ChangesetStatus, ChangesetSummary, ConfirmationOption, Customization, ErrorInfo, Message,
+    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputAnswer,
+    SessionInputRequest, SessionInputResponseKind, TerminalClaim, TerminalInfo,
+    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallResult, ToolDefinition,
+    ToolResultContent, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────

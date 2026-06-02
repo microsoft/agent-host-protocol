@@ -12,6 +12,7 @@ import com.microsoft.agenthostprotocol.generated.AgentSelection
 import com.microsoft.agenthostprotocol.generated.ChangesetFile
 import com.microsoft.agenthostprotocol.generated.ChangesetState
 import com.microsoft.agenthostprotocol.generated.ChangesetStatus
+import com.microsoft.agenthostprotocol.generated.ChangesetOperationStatus
 import com.microsoft.agenthostprotocol.generated.ChildCustomization
 import com.microsoft.agenthostprotocol.generated.ChildCustomizationAgent
 import com.microsoft.agenthostprotocol.generated.ChildCustomizationHook
@@ -48,6 +49,7 @@ import com.microsoft.agenthostprotocol.generated.StateActionChangesetCleared
 import com.microsoft.agenthostprotocol.generated.StateActionChangesetFileRemoved
 import com.microsoft.agenthostprotocol.generated.StateActionChangesetFileSet
 import com.microsoft.agenthostprotocol.generated.StateActionChangesetOperationsChanged
+import com.microsoft.agenthostprotocol.generated.StateActionChangesetOperationStatusChanged
 import com.microsoft.agenthostprotocol.generated.StateActionChangesetStatusChanged
 import com.microsoft.agenthostprotocol.generated.StateActionRootActiveSessionsChanged
 import com.microsoft.agenthostprotocol.generated.StateActionRootAgentsChanged
@@ -1304,6 +1306,26 @@ public fun changesetReducer(state: ChangesetState, action: StateAction): Changes
 
     is StateActionChangesetOperationsChanged ->
         state.copy(operations = action.value.operations)
+
+    is StateActionChangesetOperationStatusChanged -> {
+        val operations = state.operations
+        val idx = operations?.indexOfFirst { it.id == action.value.operationId } ?: -1
+        if (operations == null || idx < 0) {
+            state
+        } else {
+            // Carry `error` only when the new status is `Error` so we don't
+            // leave a stale error on an operation that recovered or started
+            // running.
+            val current = operations[idx]
+            val nextOp = if (action.value.status == ChangesetOperationStatus.ERROR) {
+                current.copy(status = action.value.status, error = action.value.error)
+            } else {
+                current.copy(status = action.value.status, error = null)
+            }
+            val next = operations.toMutableList().also { it[idx] = nextOp }
+            state.copy(operations = next)
+        }
+    }
 
     is StateActionChangesetCleared ->
         if (state.files.isEmpty()) state else state.copy(files = emptyList())
