@@ -4,25 +4,39 @@ Status: Draft for discussion (not a protocol change yet)
 
 ## Scope
 
-This proposal covers **multiple chats per session** with shared context — the
-*breadth* axis of multi-agent topologies.
+This proposal covers **multiple chats per session** with shared context — a
+session becomes a coordination scope, and chats are independently subscribable
+conversation streams over that scope.
 
-Arbitrary **depth** (nesting via sub-sessions / a session tree) is a related
-but orthogonal axis and is **deferred to a separate proposal**. The two are
-designed to *compose* — the chat catalog and `ahp-chat:` channel introduced
-here are intended to extend cleanly with a later `parentSession?` addition,
-without further breakage — but neither requires the other, and they have very
-different protocol surfaces and hard problems. Sub-sessions in particular need
-their own design pass for cross-edge concerns (result-reporting child→parent,
-dispose-cascade semantics, tree-aggregation under fan-out, cycle invariants,
-mixed-provider trees). Bundling would bury both designs.
+The proposal deliberately does **not** model agent hierarchies (lead/worker,
+planner/executor, etc.) or session-level nesting. Those are host
+implementation concerns that real systems express in many different ways; the
+protocol stays at the UI-interoperability layer (the "DAP / LSP for agent
+hosts" framing). Where richer coordination — work items, operations,
+assignments — eventually belongs in AHP is sketched in §12 as a separate
+future axis; this proposal is designed to compose with it without further
+breaking changes.
 
 ## 1. Motivation
 
-Today an AHP **session is exactly one linear chat**. `SessionState` holds
-`turns: Turn[]` plus a single optional `activeTurn`; there is no threading or
-grouping key. We want one session to hold **multiple chats** that deliver five
-capabilities:
+The framing for this proposal is that **a session is a coordination scope, and
+chats are the conversation streams over that scope.** A session owns the
+shared context (workspace, project, model/agent defaults, config,
+customizations, server tools) within which work happens; chats are
+independently subscribable conversations that happen *within* that scope.
+
+This is the AHP-style framing — the protocol exposes primitives (a scope and a
+stream of conversations over it), not a topology (lead/worker, planner/executor,
+manager/reviewer). Whatever organisational structure a host wants to layer on
+top is a host concern, expressed through host-specific metadata; the protocol
+itself doesn't model agent hierarchies. (See §12 for the natural future axis
+of coordination primitives such as work items / operations.)
+
+Today an AHP **session is exactly one linear chat** — the session *is* the
+conversation stream, with no separation between scope and stream. `SessionState`
+holds `turns: Turn[]` plus a single optional `activeTurn`; there is no
+threading or grouping key. We want one session to hold **multiple chats** that
+deliver five capabilities:
 
 1. **Shared context** — chats under a session share workspace, files, default
    model/agent, config, and server tools.
@@ -69,8 +83,12 @@ Default-plus-override model.
 - `customizations`
 - `activeClient` — **session-level / shared** (resolved Q6). The attached client
   contributes workspace-scoped tools and customizations that apply to every chat.
+- a **catalog** of chats on `SessionState` (NOT on `SessionSummary` — see §4)
+- a **`defaultChat?: URI`** on `SessionState`: the chat that receives input when
+  the user addresses the session without selecting a specific chat. This is a UI
+  *routing* hint, not a hierarchy marker — chats remain equal peers at the
+  protocol level. Hosts MAY change it over the session's lifetime.
 - aggregate `summary` (title, status, activity, modifiedAt) derived across chats
-- a **catalog** of chats (NOT an unbounded array in state — see §4)
 
 **Chat-level (per `ahp-chat:` state):**
 - `turns: Turn[]`, `activeTurn?: ActiveTurn`
@@ -78,28 +96,42 @@ Default-plus-override model.
 - `inputRequests?`
 - per-chat `summary`: title, status, activity, modifiedAt, isRead/isArchived
 - **optional** `model` / `agent` / config overrides
-- fork lineage (`forkedFrom`) and UI grouping parent (kept as *separate* fields)
+- **`origin?`** — flexible provenance union (user-created / forked / created by
+  an operation), see §5
 
-## 4. Chat catalog lives on the session summary
+## 4. Chat catalog lives on the session state
 
-The chat catalog mirrors how **changesets** already sit on `SessionSummary`
-(resolved Q2), rather than introducing a root-style `listChats` command:
+The chat catalog is a property of the **full session state** (loaded on
+subscribe to `ahp-session:/<sid>`), not of the lightweight `SessionSummary`
+shown in session lists:
 
-- `SessionSummary.chats: ChatSummary[]` — a lightweight catalog of the session's
+- `SessionState.chats: ChatSummary[]` — a lightweight catalog of the session's
   chats. Each `ChatSummary` advertises the chat's URI plus its per-chat
   `title`/`status`/`activity`/`modifiedAt`. Full per-chat state (turns,
   `activeTurn`) is loaded lazily by subscribing to the `ahp-chat:` channel.
 - Catalog changes (a chat added or removed, or a chat summary changing)
-  propagate through the existing **session summary** update path
-  (`root/sessionSummaryChanged`), exactly as changeset catalog changes do — no
-  dedicated `chatAdded`/`chatRemoved` notifications are introduced.
-- There is **no primary chat** — all chats are equal peers. Session-level
-  `status`/`activity`/`modifiedAt` are aggregates derived across the chats (Q3).
+  propagate through the **session state** update path — there is a single
+  source of truth and a single set of actions that mutate it.
+- The lightweight `SessionSummary` returned by `listSessions` carries only the
+  rollups needed by the session-list view (title, status, activity, timestamps)
+  — chats are not enumerated there. A client that wants to display chats
+  subscribes to the session.
+- Session-level `status`/`activity`/`modifiedAt` rollups *are* still derived
+  across chats and exposed on `SessionSummary` (Q3) so the session list reflects
+  per-session activity without needing the full catalog.
 - Chat creation is **bi-directional**: a chat can be **user-initiated** via a
   client command (`createChat`, channel = the session URI) or
   **agent/server-initiated** (the server adds it to the catalog, surfaced via
-  the next session summary update). The protocol does not force all chats to
+  the next session state update). The protocol does not force all chats to
   originate from tool calls.
+
+**Coordination with issue #187.** Issue
+[#187](https://github.com/microsoft/agent-host-protocol/issues/187) splits
+`SessionSummary` out of `SessionState` so each has its own update path. Placing
+`chats[]` directly on `SessionState` from the start (rather than via
+`SessionSummary`) avoids re-creating the dual-update problem #187 is fixing,
+and means this proposal composes cleanly with that refactor regardless of which
+lands first.
 
 ## 5. Branching
 
@@ -109,8 +141,32 @@ Keep **both** fork operations; they are distinct:
   via a new `createChat` command. Chat forks are **intra-session only** (Q8): the
   source chat must belong to the same session.
 
-Keep **fork lineage** (semantic source of history) and **UI grouping parent**
-(organizational) as two separate fields; do not overload one `parentChat`.
+### Chat provenance: an `origin` union, not a single `forkedFrom`
+
+Rather than modelling a single fork-specific field, every chat carries an
+optional **`origin`** that captures how it came into existence. A discriminated
+union keeps the door open to future provenance kinds (e.g. operations) without
+further breaking changes:
+
+```ts
+type ChatOrigin =
+  | { kind: 'userCreated' }
+  | { kind: 'forked'; sourceChat: URI; sourceTurnId: string }
+  | { kind: 'createdByOperation'; operationId: string };
+
+interface ChatSummary {
+  // ...other fields...
+  origin?: ChatOrigin;
+}
+```
+
+This proposal initially populates the **`userCreated`** and **`forked`**
+variants; **`createdByOperation`** is reserved for the future coordination-primitives
+work referenced in §12 — declaring the shape now avoids a breaking change when
+operations land. The field is **purely informational** (lineage / provenance);
+it does not imply hierarchy, delegation, or supervision and is not used for
+routing or aggregation. A separate UI-grouping parent, if needed later, would
+live in a separate field.
 
 ### Why both operations are needed
 
@@ -212,7 +268,9 @@ rather than via deprecated projection shims:
   state. There is no "primary chat" — all chats are equal peers (Q2).
 - `SessionSummary.status` is an explicit **aggregate** over chats (see Q3):
   `InputNeeded` if any chat needs input → else `InProgress` if any chat active →
-  else `Idle`. `ChatSummary.status` is authoritative per conversation.
+  else `Idle`. `ChatSummary.status` is authoritative per conversation. The
+  `chats[]` catalog itself lives on `SessionState`, not `SessionSummary`, so the
+  session list view stays cheap.
 - Chat-unaware clients are handled by a whole-protocol SemVer version bump at
   `initialize` (Q10) — no per-feature capability flags. A multi-chat server MAY
   also speak the old version with a single-chat projection, or return `-32005`.
@@ -222,7 +280,7 @@ rather than via deprecated projection shims:
 `ahp-chat:` is a first-class channel, parallel to session/terminal/changeset:
 URI scheme docs, subscription snapshots, reconnect/replay, command map, action
 union + reducers (+ tests), generated schema, the chat catalog on the session
-summary, auth
+**state** (plus `defaultChat?` and per-chat `origin?`), auth
 scoping, `message-checks.ts` (every params carries `channel`), docs page, and a
 root/session→chat relationship doc. CHANGELOGs: root + every client (a `types/`
 change ripples to all).
@@ -234,10 +292,11 @@ change ripples to all).
 - **Q1. Chat URI shape.** Opaque `ahp-chat:/<cid>`, matching the existing
   flat/opaque pattern used by sessions, terminals, and changesets. The session
   it belongs to is discovered via the catalog, not encoded in the URI.
-- **Q2. Chat catalog.** Lives as `chats: ChatSummary[]` on `SessionSummary`
-  (mirrors how `changesets` already sit on the summary). No separate
-  `listChats` command and no "primary chat" concept — all chats are equal
-  peers.
+- **Q2. Chat catalog.** Lives as `chats: ChatSummary[]` on **`SessionState`**
+  (loaded on subscribe), not on `SessionSummary`. Session-list views stay cheap;
+  the full catalog arrives when a client subscribes to a session. There is no
+  separate `listChats` command. Chats are equal peers at the protocol level
+  (see Q11 for the UI input-routing hint).
 - **Q3. Session aggregate rules.** Session-level `status`, `activity`, and
   `modifiedAt` are first-class aggregates derived from the chats:
   - `status`: `InputNeeded` if any chat needs input, else `InProgress` if any
@@ -307,6 +366,27 @@ change ripples to all).
   feature's size. (If anything, a large/novel feature argues *for* gating; the
   deciding factors here are the data-model removal and the pre-1.0 status.)
 
+- **Q11. Default input target.** `SessionState` carries an optional
+  `defaultChat?: URI` indicating which chat receives input when the user
+  addresses the session without picking a chat. This is a **UI routing hint**,
+  not a hierarchy marker — chats remain equal peers and the field is purely
+  about resolving "where does this message go?" when the addressee is
+  ambiguous. Hosts MAY change it over the session's lifetime as work moves
+  between chats. (Surveyed multi-agent systems — Gas Town, Claude Agent Teams,
+  AutoGen, LangGraph, CrewAI, MetaGPT, ChatDev — uniformly designate a lead
+  chat for inbound user messages; `defaultChat` standardises that routing
+  without introducing a privileged "primary" in state semantics.)
+
+- **Q12. Chat provenance shape.** Each chat carries an optional
+  `origin?: ChatOrigin` discriminated union (`'userCreated'`, `'forked'`,
+  `'createdByOperation'`) rather than a single fork-specific `forkedFrom`
+  field. We initially populate `userCreated` and `forked`; `createdByOperation`
+  is reserved for a future coordination-primitives proposal (see §12).
+  Declaring the union shape now lets later provenance kinds land additively
+  without further breaking changes. `origin` is **informational** — it does not
+  imply hierarchy, delegation, or routing semantics, and is not used by
+  aggregation.
+
 ### What actually breaks for old clients
 
 Multi-chat is breaking, but the blast radius is contained to **conversation /
@@ -316,13 +396,15 @@ remain structurally compatible.
 | Decision | Breaks old clients? | Why |
 |---|---|---|
 | Q1 — `ahp-chat:` channel | No | Additive; old clients never subscribe. |
-| Q2 — `chats[]` on `SessionSummary` | No | Additive field; unknown fields ignored. |
+| Q2 — `chats[]` on `SessionState` | No | Additive field on the subscribed state; unknown fields ignored. |
 | Q3 — session aggregate status/activity/modifiedAt | No | Same field shapes; only server derivation changes. Keeps the session list working. |
 | **Q4 — remove `turns`/`activeTurn`** | **Yes** | The one real break: session-level turn data is gone. |
 | Q5 — chat config inheritance | No | Session still carries its own model/agent; overrides live on the chat. |
 | Q6 — `activeClient` session-level | No | Unchanged from today. |
 | Q8 — intra-session chat forks only | No | Constraint on a new operation. |
 | Q9 — `fetchTurns`/`completions` → chat | Same break as Q4 | Not a new break; turns simply no longer live on the session. |
+| Q11 — `defaultChat?` on `SessionState` | No | Additive optional field; absence means "no default". |
+| Q12 — `origin?` union on `ChatSummary` | No | Additive optional field; new chat type so no field replacement. |
 
 The single lever for backward compatibility is **Q4**. The only way to keep old
 clients fully working would be to retain `turns`/`activeTurn` as a single-chat
@@ -359,16 +441,6 @@ need answers (or explicit "out-of-scope") statements before the implementing PR:
   use case becomes `listChats` + N × `fetchTurns` + client-side merge. We
   should decide whether a session-scoped overload that returns time-merged
   turns is worth adding, or whether the per-chat-only model is acceptable.
-- **UI "default chat" hint.** Q2 keeps chats as equal peers at the protocol
-  level (no first-class primary), but every UI will pick one to show by
-  default. A non-normative `defaultChat?: URI` hint on the session summary
-  would let clients converge on the same heuristic without re-introducing a
-  protocol primary-chat.
-- **Forward-compatibility with sub-sessions.** This proposal is designed to
-  compose with a later session-tree extension (`parentSession?` on session
-  state). Confirm no field added here conflicts with that extension, and
-  consider whether any reserved field name (e.g. avoiding `parent*` on
-  `ChatSummary`) should be set aside now.
 
 ## 10. Validation against Claude "Agent Teams"
 
@@ -395,7 +467,7 @@ layered on equal-peer chats; an explicit role field is a gap, see below.)
 |---|---|
 | Teammates run concurrently, each own context | ✅ each chat is its own channel with its own `activeTurn` |
 | Shared workspace / project / config / tools | ✅ session-level shared context |
-| Team = container of members with a catalog | ✅ session + chat catalog (`SessionSummary.chats`) |
+| Team = container of members with a catalog | ✅ session + chat catalog (`SessionState.chats`) |
 | Per-teammate model / agent type | ✅ per-chat model/agent override |
 | "Talk to a teammate directly" | ✅ dispatch `session/turnStarted` to that chat's channel |
 | Spawn / shut down a teammate | ⚠️ partial — `createChat` + catalog removal, but no handshake |
@@ -454,7 +526,7 @@ elicitation**, and **(d)** lifecycle **handshakes** (shutdown, plan approval).
 | **Shared context** | session-level defaults (model, agent, workspace, config, tools) inherited by all chats |
 | **Branching/forking** | new chat seeded from another chat's turn via `ChatForkSource` |
 | **Concurrent turns** | each chat is its own channel with its own `activeTurn` + write-ahead stream |
-| **UI grouping** | session = parent container, chats are enumerable via `SessionSummary.chats` (propagated through session summary updates) |
+| **UI grouping** | session = parent container, chats are enumerable via `SessionState.chats` (loaded on session subscribe) |
 | **Task decomposition** | break a feature into subtasks, each runs as a chat (user-initiated or agent-spawned), grouped under one session |
 | **Agent/user-initiated chats** | `createChat` (user) and server-side catalog additions (server) both create first-class chats, no tool-call coupling |
 
@@ -521,7 +593,7 @@ clients ignore it.
 - **Keep** `SessionState.turns` / `activeTurn` as a **single-chat projection**
   (the simple "first/primary chat only" flavor — *not* a cross-chat merge), so
   old clients keep seeing a working conversation.
-- The new `ahp-chat:` channel and the `SessionSummary.chats[]` catalog are
+- The new `ahp-chat:` channel and the `SessionState.chats[]` catalog are
   purely additive — an unknown field to old clients, the capability signal to
   new ones (exactly like an absent vs present `telemetry.logs`).
 - Chat-aware clients read the chat channels; chat-unaware clients transparently
@@ -558,12 +630,26 @@ chat-unaware clients functioning indefinitely.
 
 ---
 
-A future proposal will add depth to this model — a `parentSession?` (or
-equivalent) link on session state, turning sessions into a tree that delegates
-across context boundaries. The chat catalog and `ahp-chat:` channel introduced
-here are deliberately shaped so that extension composes orthogonally: chats
-remain the *breadth* primitive (peer conversations sharing one session's
-context), sub-sessions become the *depth* primitive (delegated tasks with their
-own context boundary). Subagent / agent-team / dynamic-workflow topologies are
-expressible as combinations of the two without further breaking changes to the
-shapes introduced here.
+### Future direction: coordination primitives, not session trees
+
+A natural follow-up axis — once multi-chat lands — is **coordination
+primitives** (work items, operations, assignments, lifecycle state,
+participants) rather than nested sessions.
+
+Looking at real multi-agent systems (Gas Town convoys, CrewAI tasks, AutoGen
+jobs, Claude Agent Teams tasks, LangGraph state graphs), the thing they
+actually coordinate around is **work units**, not transcript trees. A
+deeply-nested session hierarchy is rarely the abstraction these systems reach
+for; explicit work-tracking primitives are. This also matches AHP's existing
+shape — the protocol already exposes generic `changesets` and `operations`
+rather than Git-specific concepts like commits or pull requests, and would
+analogously expose generic work coordination rather than host-specific roles
+("mayor", "planner", "reviewer", etc.).
+
+The chat-catalog shape introduced here is intentionally compatible with that
+direction: a future `ChatOrigin.createdByOperation` variant (already declared
+in Q12) lets work units spawn chats without further breaking changes, and
+nothing in the current state shape precludes adding a sibling `operations[]`
+or `workItems[]` catalog to `SessionState` later. That work is out of scope
+for this proposal — flagged here only so reviewers know where the model is
+headed and can confirm the shapes chosen here don't paint us into a corner.
