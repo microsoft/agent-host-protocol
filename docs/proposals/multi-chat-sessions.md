@@ -145,14 +145,20 @@ Keep **both** fork operations; they are distinct:
 
 Rather than modelling a single fork-specific field, every chat carries an
 optional **`origin`** that captures how it came into existence. A discriminated
-union keeps the door open to future provenance kinds (e.g. operations) without
-further breaking changes:
+union (with a `const enum` discriminator, matching AHP's style) keeps the door
+open to future provenance kinds without further breaking changes:
 
 ```ts
-type ChatOrigin =
-  | { kind: 'userCreated' }
-  | { kind: 'forked'; sourceChat: URI; sourceTurnId: string }
-  | { kind: 'createdByOperation'; operationId: string };
+export const enum ChatOriginKind {
+  User = 'user',
+  Fork = 'fork',
+  Tool = 'tool',
+}
+
+export type ChatOrigin =
+  | { kind: ChatOriginKind.User }
+  | { kind: ChatOriginKind.Fork; chat: URI; turnId: string }
+  | { kind: ChatOriginKind.Tool; chat: URI; toolCallId: string };
 
 interface ChatSummary {
   // ...other fields...
@@ -160,13 +166,16 @@ interface ChatSummary {
 }
 ```
 
-This proposal initially populates the **`userCreated`** and **`forked`**
-variants; **`createdByOperation`** is reserved for the future coordination-primitives
-work referenced in §12 — declaring the shape now avoids a breaking change when
-operations land. The field is **purely informational** (lineage / provenance);
-it does not imply hierarchy, delegation, or supervision and is not used for
-routing or aggregation. A separate UI-grouping parent, if needed later, would
-live in a separate field.
+The three variants cover today's expected creation paths:
+- **`User`** — user-initiated via `createChat`.
+- **`Fork`** — branched from another chat at a specific turn (`ChatForkSource`).
+- **`Tool`** — spawned by a tool call in another chat (the realistic agent-spawn
+  path: a tool the agent invokes ends up creating a sibling chat).
+
+The field is **purely informational** — provenance, not topology. It does not
+imply hierarchy, delegation, or supervision and is not used by routing or
+aggregation. A future provenance kind can be added by extending the
+`ChatOriginKind` enum and the union; existing variants are unaffected.
 
 ### Why both operations are needed
 
@@ -378,14 +387,18 @@ change ripples to all).
   without introducing a privileged "primary" in state semantics.)
 
 - **Q12. Chat provenance shape.** Each chat carries an optional
-  `origin?: ChatOrigin` discriminated union (`'userCreated'`, `'forked'`,
-  `'createdByOperation'`) rather than a single fork-specific `forkedFrom`
-  field. We initially populate `userCreated` and `forked`; `createdByOperation`
-  is reserved for a future coordination-primitives proposal (see §12).
-  Declaring the union shape now lets later provenance kinds land additively
-  without further breaking changes. `origin` is **informational** — it does not
-  imply hierarchy, delegation, or routing semantics, and is not used by
-  aggregation.
+  `origin?: ChatOrigin` discriminated union with a `const enum ChatOriginKind`
+  discriminator (`User`, `Fork`, `Tool`), rather than a single fork-specific
+  `forkedFrom` field. `User` is the user-initiated `createChat` path; `Fork`
+  carries `{ chat, turnId }` for branched chats; `Tool` carries
+  `{ chat, toolCallId }` for chats spawned by an agent tool call. `origin` is
+  **informational** — it does not imply hierarchy, delegation, or routing
+  semantics, and is not used by aggregation. Future provenance kinds can be
+  added additively by extending the enum and the union.
+
+  (Note: "operation" was deliberately avoided as a variant name to prevent
+  overlap with `ChangesetOperation*` types, which use the word for an unrelated
+  concept.)
 
 ### What actually breaks for old clients
 
@@ -647,9 +660,10 @@ analogously expose generic work coordination rather than host-specific roles
 ("mayor", "planner", "reviewer", etc.).
 
 The chat-catalog shape introduced here is intentionally compatible with that
-direction: a future `ChatOrigin.createdByOperation` variant (already declared
-in Q12) lets work units spawn chats without further breaking changes, and
-nothing in the current state shape precludes adding a sibling `operations[]`
-or `workItems[]` catalog to `SessionState` later. That work is out of scope
-for this proposal — flagged here only so reviewers know where the model is
-headed and can confirm the shapes chosen here don't paint us into a corner.
+direction: `ChatOrigin` is a discriminated union (Q12) so a future provenance
+kind (e.g. a `WorkItem` variant) can be added without breaking the existing
+`User` / `Fork` / `Tool` variants, and nothing in the current state shape
+precludes adding a sibling `workItems[]` catalog to `SessionState` later. That
+work is out of scope for this proposal — flagged here only so reviewers know
+where the model is headed and can confirm the shapes chosen here don't paint
+us into a corner.
