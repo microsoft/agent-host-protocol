@@ -733,10 +733,7 @@ data class RootState(
     /**
      * Additional implementation-defined metadata about the agent host itself.
      * 
-     * Clients MAY look for well-known keys here to provide enhanced UI. For
-     * example, a `hostBuild` key may carry build information (version, commit,
-     * date) about the program hosting the agent host. Mirrors the MCP `_meta`
-     * convention.
+     * Clients MAY look for well-known keys here to provide enhanced UI.
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null

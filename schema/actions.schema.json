@@ -1986,7 +1986,7 @@
         "_meta": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Additional implementation-defined metadata about the agent host itself.\n\nClients MAY look for well-known keys here to provide enhanced UI. For\nexample, a `hostBuild` key may carry build information (version, commit,\ndate) about the program hosting the agent host. Mirrors the MCP `_meta`\nconvention."
+          "description": "Additional implementation-defined metadata about the agent host itself.\n\nClients MAY look for well-known keys here to provide enhanced UI."
         }
       },
       "required": [
