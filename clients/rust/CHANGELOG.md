@@ -15,6 +15,12 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
+### Added
+
+- `RootState` now exposes an optional `_meta` property bag (`meta:
+  Option<JsonObject>`) for implementation-defined agent-host metadata, such as
+  a well-known `hostBuild` key carrying the host's build version/commit/date.
+
 ## [0.3.0] — 2026-06-05
 
 Implements AHP 0.3.0.

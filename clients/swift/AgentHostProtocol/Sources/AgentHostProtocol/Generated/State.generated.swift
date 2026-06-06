@@ -450,17 +450,34 @@ public struct RootState: Codable, Sendable {
     public var terminals: [TerminalInfo]?
     /// Agent host configuration schema and current values
     public var config: RootConfigState?
+    /// Additional implementation-defined metadata about the agent host itself.
+    /// 
+    /// Clients MAY look for well-known keys here to provide enhanced UI. For
+    /// example, a `hostBuild` key may carry build information (version, commit,
+    /// date) about the program hosting the agent host. Mirrors the MCP `_meta`
+    /// convention.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case agents
+        case activeSessions
+        case terminals
+        case config
+        case meta = "_meta"
+    }
 
     public init(
         agents: [AgentInfo],
         activeSessions: Int? = nil,
         terminals: [TerminalInfo]? = nil,
-        config: RootConfigState? = nil
+        config: RootConfigState? = nil,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.agents = agents
         self.activeSessions = activeSessions
         self.terminals = terminals
         self.config = config
+        self.meta = meta
     }
 }
 

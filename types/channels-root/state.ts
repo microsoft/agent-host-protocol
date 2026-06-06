@@ -38,6 +38,15 @@ export interface RootState {
   terminals?: TerminalInfo[];
   /** Agent host configuration schema and current values */
   config?: RootConfigState;
+  /**
+   * Additional implementation-defined metadata about the agent host itself.
+   *
+   * Clients MAY look for well-known keys here to provide enhanced UI. For
+   * example, a `hostBuild` key may carry build information (version, commit,
+   * date) about the program hosting the agent host. Mirrors the MCP `_meta`
+   * convention.
+   */
+  _meta?: Record<string, unknown>;
 }
 
 /**

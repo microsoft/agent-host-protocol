@@ -552,6 +552,14 @@ pub struct RootState {
     /// Agent host configuration schema and current values
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<RootConfigState>,
+    /// Additional implementation-defined metadata about the agent host itself.
+    ///
+    /// Clients MAY look for well-known keys here to provide enhanced UI. For
+    /// example, a `hostBuild` key may carry build information (version, commit,
+    /// date) about the program hosting the agent host. Mirrors the MCP `_meta`
+    /// convention.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
 }
 
 /// Live agent-host configuration metadata.
