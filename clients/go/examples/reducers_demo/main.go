@@ -24,8 +24,8 @@ func main() {
 
 	actions := []ahptypes.StateAction{
 		{Value: &ahptypes.SessionTurnStartedAction{
-			Type:        ahptypes.ActionTypeSessionTurnStarted,
-			TurnId:      "t1",
+			Type:    ahptypes.ActionTypeSessionTurnStarted,
+			TurnId:  "t1",
 			Message: ahptypes.Message{Text: "Hello!"},
 		}},
 		{Value: &ahptypes.SessionResponsePartAction{

@@ -240,6 +240,15 @@ jobs:
       - name: Build Go module
         run: go build ./...
 
+      - name: Check Go formatting
+        run: |
+          OUT=$(gofmt -l .)
+          if [ -n "$OUT" ]; then
+            echo "::error::gofmt -l reported unformatted files. Run 'gofmt -w' on them and commit the result:"
+            echo "$OUT"
+            exit 1
+          fi
+
       - name: Vet Go module
         run: go vet ./...
 

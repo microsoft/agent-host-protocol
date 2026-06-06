@@ -14,11 +14,11 @@ import (
 // memTransport is an in-memory paired transport: the two ends share
 // each other's send/recv channels. Used as a fake server in tests.
 type memTransport struct {
-	inbox    chan TransportMessage
-	outbox   chan TransportMessage
-	closeMu  *sync.Mutex
-	closed   *bool
-	closeCh  chan struct{}
+	inbox   chan TransportMessage
+	outbox  chan TransportMessage
+	closeMu *sync.Mutex
+	closed  *bool
+	closeCh chan struct{}
 }
 
 func newMemTransportPair() (*memTransport, *memTransport) {
