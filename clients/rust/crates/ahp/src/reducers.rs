@@ -26,6 +26,7 @@
 //!     active_sessions: None,
 //!     terminals: None,
 //!     config: None,
+//!     meta: None,
 //! };
 //!
 //! // A root-scoped action mutates `RootState`.
@@ -1342,6 +1343,7 @@ mod tests {
             active_sessions: None,
             terminals: None,
             config: None,
+            meta: None,
         };
         let a = StateAction::RootActiveSessionsChanged(
             ahp_types::actions::RootActiveSessionsChangedAction { active_sessions: 3 },

@@ -137,6 +137,7 @@ impl MultiHostStateMirror {
                     active_sessions: None,
                     terminals: None,
                     config: None,
+                    meta: None,
                 });
             apply_action_to_root(root, &envelope.action);
             return;

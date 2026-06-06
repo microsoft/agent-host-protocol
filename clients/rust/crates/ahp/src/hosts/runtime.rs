@@ -98,6 +98,7 @@ pub(super) fn spawn(
             active_sessions: None,
             terminals: None,
             config: None,
+            meta: None,
         },
         subscriptions: config.initial_subscriptions.clone(),
         completion_trigger_characters: vec![],

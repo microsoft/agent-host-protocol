@@ -116,6 +116,7 @@
 //!     active_sessions: None,
 //!     terminals: None,
 //!     config: None,
+//!     meta: None,
 //! };
 //!
 //! let action = StateAction::RootActiveSessionsChanged(

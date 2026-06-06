@@ -23,6 +23,7 @@ fn main() {
         active_sessions: None,
         terminals: None,
         config: None,
+        meta: None,
     };
 
     let envelopes = vec![
