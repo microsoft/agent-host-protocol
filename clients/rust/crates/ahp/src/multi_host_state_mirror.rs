@@ -207,8 +207,7 @@ impl MultiHostStateMirror {
         self.terminals.retain(|key, _| &key.host_id != host);
         self.changesets.retain(|key, _| &key.host_id != host);
         self.annotations.retain(|key, _| &key.host_id != host);
-        self.resource_watches
-            .retain(|key, _| &key.host_id != host);
+        self.resource_watches.retain(|key, _| &key.host_id != host);
     }
 
     /// Drop every host's state.
