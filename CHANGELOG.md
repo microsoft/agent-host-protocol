@@ -23,6 +23,13 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+### Changed
+
+- `Snapshot.state` now accepts `ResourceWatchState`, so `initialize` /
+  `reconnect` / `subscribe` can seed an `ahp-resource-watch:` channel from a
+  point-in-time snapshot. Existing variants (root, session, terminal,
+  changeset, annotations) are unchanged.
+
 ## [0.4.0] — Unreleased
 
 Spec version: `0.4.0`

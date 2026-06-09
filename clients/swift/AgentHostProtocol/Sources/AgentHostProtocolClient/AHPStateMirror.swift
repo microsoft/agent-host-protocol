@@ -16,6 +16,7 @@ public actor AHPStateMirror {
     public private(set) var terminals: [String: TerminalState] = [:]
     public private(set) var changesets: [String: ChangesetState] = [:]
     public private(set) var annotations: [String: AnnotationsState] = [:]
+    public private(set) var resourceWatches: [String: ResourceWatchState] = [:]
 
     public init() {}
 
@@ -54,11 +55,17 @@ public actor AHPStateMirror {
             // mutated only when fresh snapshots arrive.
             return
         }
+        if resourceWatches[channel] != nil {
+            // Resource watches are descriptor-only and never mutated by
+            // actions — `resourceWatch/changed` is an event channel, not
+            // a reducer input. The slot is seeded by `applySnapshot`.
+            return
+        }
     }
 
     /// Seed the mirror from a `Snapshot` — root, session, terminal,
-    /// changeset, or annotations as the snapshot's `state` discriminator
-    /// dictates.
+    /// changeset, resource-watch, or annotations as the snapshot's
+    /// `state` discriminator dictates.
     public func applySnapshot(_ snapshot: Snapshot) {
         switch snapshot.state {
         case .root(let state):
@@ -69,6 +76,8 @@ public actor AHPStateMirror {
             terminals[snapshot.resource] = state
         case .changeset(let state):
             changesets[snapshot.resource] = state
+        case .resourceWatch(let state):
+            resourceWatches[snapshot.resource] = state
         case .annotations(let state):
             annotations[snapshot.resource] = state
         }
@@ -81,5 +90,6 @@ public actor AHPStateMirror {
         terminals.removeAll()
         changesets.removeAll()
         annotations.removeAll()
+        resourceWatches.removeAll()
     }
 }

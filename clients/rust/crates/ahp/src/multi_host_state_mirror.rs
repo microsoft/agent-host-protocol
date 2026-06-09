@@ -37,7 +37,8 @@ use std::collections::HashMap;
 use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AnnotationsState, ChangesetState, RootState, SessionState, SnapshotState, TerminalState,
+    AnnotationsState, ChangesetState, ResourceWatchState, RootState, SessionState, SnapshotState,
+    TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
@@ -87,6 +88,7 @@ pub struct MultiHostStateMirror {
     terminals: HashMap<HostedResourceKey, TerminalState>,
     changesets: HashMap<HostedResourceKey, ChangesetState>,
     annotations: HashMap<HostedResourceKey, AnnotationsState>,
+    resource_watches: HashMap<HostedResourceKey, ResourceWatchState>,
 }
 
 impl MultiHostStateMirror {
@@ -118,6 +120,11 @@ impl MultiHostStateMirror {
     /// Borrow the annotations states map keyed by `(host_id, uri)`.
     pub fn annotations(&self) -> &HashMap<HostedResourceKey, AnnotationsState> {
         &self.annotations
+    }
+
+    /// Borrow the resource-watch states map keyed by `(host_id, uri)`.
+    pub fn resource_watches(&self) -> &HashMap<HostedResourceKey, ResourceWatchState> {
+        &self.resource_watches
     }
 
     /// Convenience: apply a [`HostSubscriptionEvent`] produced by
@@ -164,8 +171,9 @@ impl MultiHostStateMirror {
     }
 
     /// Seed the mirror from a [`Snapshot`](ahp_types::state::Snapshot)
-    /// scoped to `host` — root, session, terminal, or changeset as
-    /// the snapshot's `state` discriminator dictates.
+    /// scoped to `host` — root, session, terminal, changeset,
+    /// resource-watch, or annotations as the snapshot's `state`
+    /// discriminator dictates.
     pub fn apply_snapshot(&mut self, host: &HostId, snapshot: &ahp_types::state::Snapshot) {
         let key = HostedResourceKey::new(host.clone(), snapshot.resource.clone());
         match &snapshot.state {
@@ -182,6 +190,9 @@ impl MultiHostStateMirror {
             SnapshotState::Changeset(state) => {
                 self.changesets.insert(key, state.as_ref().clone());
             }
+            SnapshotState::ResourceWatch(state) => {
+                self.resource_watches.insert(key, state.as_ref().clone());
+            }
             SnapshotState::Annotations(state) => {
                 self.annotations.insert(key, state.as_ref().clone());
             }
@@ -189,13 +200,15 @@ impl MultiHostStateMirror {
     }
 
     /// Drop every slot keyed under `host` — root state, sessions,
-    /// terminals, changesets, and annotations.
+    /// terminals, changesets, resource watches, and annotations.
     pub fn reset_host(&mut self, host: &HostId) {
         self.root_states.remove(host);
         self.sessions.retain(|key, _| &key.host_id != host);
         self.terminals.retain(|key, _| &key.host_id != host);
         self.changesets.retain(|key, _| &key.host_id != host);
         self.annotations.retain(|key, _| &key.host_id != host);
+        self.resource_watches
+            .retain(|key, _| &key.host_id != host);
     }
 
     /// Drop every host's state.
@@ -205,5 +218,6 @@ impl MultiHostStateMirror {
         self.terminals.clear();
         self.changesets.clear();
         self.annotations.clear();
+        self.resource_watches.clear();
     }
 }

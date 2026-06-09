@@ -17,6 +17,13 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 
 ### Added
 
+- `SnapshotState.ResourceWatch` value class — the `Snapshot.state` union now
+  accepts `ResourceWatchState`, so a snapshot of an `ahp-resource-watch:`
+  channel decodes via the existing `SnapshotStateSerializer` shape probe
+  (required `root` + `recursive` keys).
+
+### Added
+
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
   existing annotation's `turnId` / `resource` / `range` / `resolved` without
   resending its entries. Handled by the annotations reducer (no-op on unknown

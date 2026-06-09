@@ -19,6 +19,15 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Added
 
+- `SnapshotState.resourceWatch` case and matching
+  `MultiHostStateMirror.resourceWatches` slot, so `applySnapshot(host:snapshot:)`
+  can seed an `ahp-resource-watch:` channel's descriptor (root URI, recursive
+  flag, optional includes/excludes) alongside the existing root / session /
+  terminal / changeset / annotations slots. `reset(host:)` / `reset()` clear
+  the new slot.
+
+### Added
+
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
   existing annotation's `turnId` / `resource` / `range` / `resolved` without
   resending its entries. Handled by the annotations reducer (no-op on unknown

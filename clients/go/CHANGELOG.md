@@ -16,6 +16,13 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Added
 
+- `SnapshotState.ResourceWatch` pointer field — the `Snapshot.state` union
+  now accepts `ResourceWatchState`, decoded by probing for the required
+  `root` + `recursive` keys (ordered between the existing changeset and
+  annotations probes).
+
+### Added
+
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
   existing annotation's `TurnID` / `Resource` / `Range` / `Resolved` without
   resending its entries. Handled by the annotations reducer (no-op on unknown

@@ -22,6 +22,13 @@ hotfix escape hatch.
 
 ### Added
 
+- `Snapshot.state` now accepts `ResourceWatchState`, so the existing
+  `initialize` / `reconnect` / `subscribe` snapshot path can carry an
+  `ahp-resource-watch:` channel's descriptor alongside the existing root /
+  session / terminal / changeset / annotations variants.
+
+### Added
+
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
   existing annotation's `turnId` / `resource` / `range` / `resolved` without
   resending its entries. Handled by `annotationsReducer` (no-op on unknown id).

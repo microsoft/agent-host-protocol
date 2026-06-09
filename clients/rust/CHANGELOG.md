@@ -17,6 +17,15 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Added
 
+- `SnapshotState::ResourceWatch` variant and matching
+  `MultiHostStateMirror::resource_watches()` slot, so `apply_snapshot` can
+  seed an `ahp-resource-watch:` channel's descriptor (root URI, recursive
+  flag, optional includes/excludes) alongside the existing root / session /
+  terminal / changeset / annotations slots. `reset_host` / `reset` clear the
+  new slot.
+
+### Added
+
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
   existing annotation's `turn_id` / `resource` / `range` / `resolved` without
   resending its entries. Handled by the annotations reducer (no-op on unknown
