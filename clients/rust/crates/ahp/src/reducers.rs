@@ -875,6 +875,9 @@ fn apply_tool_call_delta(
         ToolCallState::Streaming(mut s) => {
             let current = s.partial_input.unwrap_or_default();
             s.partial_input = Some(current + &a.content);
+            if let Some(meta) = &a.meta {
+                s.meta = Some(meta.clone());
+            }
             if let Some(im) = &a.invocation_message {
                 s.invocation_message = Some(im.clone());
             }
@@ -890,6 +893,7 @@ fn apply_tool_call_ready(
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
         let (tool_call_id, tool_name, display_name, contributor, meta) = tool_call_meta(&tc);
+        let meta = a.meta.clone().or(meta);
         match tc {
             ToolCallState::Streaming(_) | ToolCallState::Running(_) => {
                 if let Some(confirmed) = a.confirmed {
@@ -949,7 +953,7 @@ fn apply_tool_call_confirmed(
         let tool_name = s.tool_name;
         let display_name = s.display_name;
         let contributor = s.contributor;
-        let meta = s.meta;
+        let meta = a.meta.clone().or(s.meta);
         let invocation_message = s.invocation_message;
         let tool_input = s.tool_input;
         if a.approved {
@@ -989,6 +993,7 @@ fn apply_tool_call_complete(
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
         let (tool_call_id, tool_name, display_name, contributor, meta) = tool_call_meta(&tc);
+        let meta = a.meta.clone().or(meta);
         let (invocation_message, tool_input, confirmed, selected_option) = match tc {
             ToolCallState::Running(s) => (
                 s.invocation_message,
@@ -1056,7 +1061,7 @@ fn apply_tool_call_result_confirmed(
                 tool_name: s.tool_name,
                 display_name: s.display_name,
                 contributor: s.contributor,
-                meta: s.meta,
+                meta: a.meta.clone().or(s.meta),
                 invocation_message: s.invocation_message,
                 tool_input: s.tool_input,
                 success: s.success,
@@ -1073,7 +1078,7 @@ fn apply_tool_call_result_confirmed(
                 tool_name: s.tool_name,
                 display_name: s.display_name,
                 contributor: s.contributor,
-                meta: s.meta,
+                meta: a.meta.clone().or(s.meta),
                 invocation_message: s.invocation_message,
                 tool_input: s.tool_input,
                 reason: ToolCallCancellationReason::ResultDenied,
@@ -1091,6 +1096,9 @@ fn apply_tool_call_content_changed(
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| match tc {
         ToolCallState::Running(mut s) => {
+            if let Some(meta) = &a.meta {
+                s.meta = Some(meta.clone());
+            }
             s.content = Some(a.content.clone());
             ToolCallState::Running(s)
         }

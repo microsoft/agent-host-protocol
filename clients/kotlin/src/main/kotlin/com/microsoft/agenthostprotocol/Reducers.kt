@@ -269,7 +269,9 @@ private data class ToolCallBase(
     val displayName: String,
     val contributor: ToolCallContributor?,
     val meta: Map<String, JsonElement>?,
-)
+) {
+    fun withMeta(meta: Map<String, JsonElement>?): ToolCallBase = copy(meta = meta ?: this.meta)
+}
 
 private fun toolCallBase(tc: ToolCallState): ToolCallBase = when (tc) {
     is ToolCallStateStreaming -> tc.value.let {
@@ -672,6 +674,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
             if (tc !is ToolCallStateStreaming) tc else {
                 ToolCallStateStreaming(
                     tc.value.copy(
+                        meta = a.meta ?: tc.value.meta,
                         partialInput = (tc.value.partialInput ?: "") + a.content,
                         invocationMessage = a.invocationMessage ?: tc.value.invocationMessage,
                     ),
@@ -687,7 +690,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 if (tc !is ToolCallStateStreaming && tc !is ToolCallStateRunning) {
                     tc
                 } else {
-                    val base = toolCallBase(tc)
+                    val base = toolCallBase(tc).withMeta(a.meta)
                     if (a.confirmed != null) {
                         ToolCallStateRunning(
                             ToolCallRunningState(
@@ -730,7 +733,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         refreshSummaryStatus(
             updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
                 if (tc !is ToolCallStatePendingConfirmation) tc else {
-                    val base = toolCallBase(tc)
+                    val base = toolCallBase(tc).withMeta(a.meta)
                     val selectedOption = resolveSelectedOption(tc.value.options, a.selectedOptionId)
                     if (a.approved) {
                         ToolCallStateRunning(
@@ -791,7 +794,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                     )
                     else -> return@updateToolCallInParts tc
                 }
-                val base = toolCallBase(tc)
+                val base = toolCallBase(tc).withMeta(a.meta)
                 if (a.requiresResultConfirmation == true) {
                     ToolCallStatePendingResultConfirmation(
                         ToolCallPendingResultConfirmationState(
@@ -842,7 +845,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         refreshSummaryStatus(
             updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
                 if (tc !is ToolCallStatePendingResultConfirmation) tc else {
-                    val base = toolCallBase(tc)
+                    val base = toolCallBase(tc).withMeta(a.meta)
                     if (a.approved) {
                         ToolCallStateCompleted(
                             ToolCallCompletedState(
@@ -888,7 +891,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         val a = action.value
         updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
             if (tc !is ToolCallStateRunning) tc else {
-                ToolCallStateRunning(tc.value.copy(content = a.content))
+                ToolCallStateRunning(tc.value.copy(meta = a.meta ?: tc.value.meta, content = a.content))
             }
         }
     }

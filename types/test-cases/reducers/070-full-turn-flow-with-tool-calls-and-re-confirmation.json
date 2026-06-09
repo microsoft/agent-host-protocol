@@ -194,7 +194,10 @@
               "toolName": "write",
               "displayName": "Write File",
               "contributor": null,
-              "_meta": null,
+              "_meta": {
+                "permissionKind": "write",
+                "path": "/tmp/out"
+              },
               "invocationMessage": "Write to /tmp/out",
               "toolInput": null,
               "confirmed": "user-action",

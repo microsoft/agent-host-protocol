@@ -200,6 +200,7 @@ public struct AHPSessionReducer: Reducer {
         case .sessionToolCallDelta(let a):
             Self.updateToolCallInPlace(state: &state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
                 guard case .streaming(var s) = tc else { return }
+                s.meta = a.meta ?? s.meta
                 s.partialInput = (s.partialInput ?? "") + a.content
                 if let msg = a.invocationMessage {
                     s.invocationMessage = msg
@@ -215,13 +216,14 @@ public struct AHPSessionReducer: Reducer {
                 default: return
                 }
                 let base = tc.baseFields
+                let meta = a.meta ?? base.meta
                 if let confirmed = a.confirmed {
                     tc = .running(ToolCallRunningState(
                         toolCallId: base.toolCallId,
                         toolName: base.toolName,
                         displayName: base.displayName,
                         contributor: base.contributor,
-                        meta: base.meta,
+                        meta: meta,
                         invocationMessage: a.invocationMessage,
                         toolInput: a.toolInput,
                         status: .running,
@@ -233,7 +235,7 @@ public struct AHPSessionReducer: Reducer {
                         toolName: base.toolName,
                         displayName: base.displayName,
                         contributor: base.contributor,
-                        meta: base.meta,
+                        meta: meta,
                         invocationMessage: a.invocationMessage,
                         toolInput: a.toolInput,
                         status: .pendingConfirmation,
@@ -250,6 +252,7 @@ public struct AHPSessionReducer: Reducer {
             Self.updateToolCallInPlace(state: &state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
                 guard case .pendingConfirmation(let pending) = tc else { return }
                 let base = tc.baseFields
+                let meta = a.meta ?? base.meta
                 let selectedOption = Self.resolveSelectedOption(pending.options, id: a.selectedOptionId)
                 if a.approved {
                     tc = .running(ToolCallRunningState(
@@ -257,7 +260,7 @@ public struct AHPSessionReducer: Reducer {
                         toolName: base.toolName,
                         displayName: base.displayName,
                         contributor: base.contributor,
-                        meta: base.meta,
+                        meta: meta,
                         invocationMessage: pending.invocationMessage,
                         toolInput: a.editedToolInput ?? pending.toolInput,
                         status: .running,
@@ -270,7 +273,7 @@ public struct AHPSessionReducer: Reducer {
                         toolName: base.toolName,
                         displayName: base.displayName,
                         contributor: base.contributor,
-                        meta: base.meta,
+                        meta: meta,
                         invocationMessage: pending.invocationMessage,
                         toolInput: pending.toolInput,
                         status: .cancelled,
@@ -286,6 +289,7 @@ public struct AHPSessionReducer: Reducer {
         case .sessionToolCallComplete(let a):
             Self.updateToolCallInPlace(state: &state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
                 let base = tc.baseFields
+                let meta = a.meta ?? base.meta
                 let confirmed: ToolCallConfirmationReason
                 let invocationMessage: StringOrMarkdown
                 let toolInput: String?
@@ -311,7 +315,7 @@ public struct AHPSessionReducer: Reducer {
                         toolName: base.toolName,
                         displayName: base.displayName,
                         contributor: base.contributor,
-                        meta: base.meta,
+                        meta: meta,
                         invocationMessage: invocationMessage,
                         toolInput: toolInput,
                         success: a.result.success,
@@ -329,7 +333,7 @@ public struct AHPSessionReducer: Reducer {
                         toolName: base.toolName,
                         displayName: base.displayName,
                         contributor: base.contributor,
-                        meta: base.meta,
+                        meta: meta,
                         invocationMessage: invocationMessage,
                         toolInput: toolInput,
                         success: a.result.success,
@@ -349,13 +353,14 @@ public struct AHPSessionReducer: Reducer {
             Self.updateToolCallInPlace(state: &state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
                 guard case .pendingResultConfirmation(let prc) = tc else { return }
                 let base = tc.baseFields
+                let meta = a.meta ?? base.meta
                 if a.approved {
                     tc = .completed(ToolCallCompletedState(
                         toolCallId: base.toolCallId,
                         toolName: base.toolName,
                         displayName: base.displayName,
                         contributor: base.contributor,
-                        meta: base.meta,
+                        meta: meta,
                         invocationMessage: prc.invocationMessage,
                         toolInput: prc.toolInput,
                         success: prc.success,
@@ -373,7 +378,7 @@ public struct AHPSessionReducer: Reducer {
                         toolName: base.toolName,
                         displayName: base.displayName,
                         contributor: base.contributor,
-                        meta: base.meta,
+                        meta: meta,
                         invocationMessage: prc.invocationMessage,
                         toolInput: prc.toolInput,
                         status: .cancelled,
@@ -526,6 +531,7 @@ public struct AHPSessionReducer: Reducer {
         case .sessionToolCallContentChanged(let a):
             Self.updateToolCallInPlace(state: &state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
                 guard case .running(var r) = tc else { return }
+                r.meta = a.meta ?? r.meta
                 r.content = a.content
                 tc = .running(r)
             }

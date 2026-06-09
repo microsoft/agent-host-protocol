@@ -1,0 +1,389 @@
+{
+  "description": "tool-call-scoped actions update tool call _meta",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 8,
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "session/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-delta",
+      "toolName": "stream",
+      "displayName": "Stream Tool",
+      "_meta": {
+        "phase": "start"
+      }
+    },
+    {
+      "type": "session/toolCallDelta",
+      "turnId": "turn-1",
+      "toolCallId": "tc-delta",
+      "content": "abc",
+      "invocationMessage": "Streaming input",
+      "_meta": {
+        "phase": "delta"
+      }
+    },
+    {
+      "type": "session/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-ready-running",
+      "toolName": "run",
+      "displayName": "Run Tool"
+    },
+    {
+      "type": "session/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-ready-running",
+      "invocationMessage": "Run now",
+      "toolInput": "{}",
+      "confirmed": "not-needed",
+      "_meta": {
+        "phase": "ready-running"
+      }
+    },
+    {
+      "type": "session/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-ready-pending",
+      "toolName": "ask",
+      "displayName": "Ask Tool"
+    },
+    {
+      "type": "session/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-ready-pending",
+      "invocationMessage": "Needs approval",
+      "_meta": {
+        "phase": "ready-pending"
+      }
+    },
+    {
+      "type": "session/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-confirm-approved",
+      "toolName": "approve",
+      "displayName": "Approve Tool"
+    },
+    {
+      "type": "session/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-confirm-approved",
+      "invocationMessage": "Approve this"
+    },
+    {
+      "type": "session/toolCallConfirmed",
+      "turnId": "turn-1",
+      "toolCallId": "tc-confirm-approved",
+      "approved": true,
+      "confirmed": "user-action",
+      "_meta": {
+        "phase": "confirmed-approved"
+      }
+    },
+    {
+      "type": "session/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-confirm-denied",
+      "toolName": "deny",
+      "displayName": "Deny Tool"
+    },
+    {
+      "type": "session/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-confirm-denied",
+      "invocationMessage": "Deny this"
+    },
+    {
+      "type": "session/toolCallConfirmed",
+      "turnId": "turn-1",
+      "toolCallId": "tc-confirm-denied",
+      "approved": false,
+      "reason": "denied",
+      "_meta": {
+        "phase": "confirmed-denied"
+      }
+    },
+    {
+      "type": "session/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-complete",
+      "toolName": "complete",
+      "displayName": "Complete Tool"
+    },
+    {
+      "type": "session/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-complete",
+      "invocationMessage": "Complete this",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "session/toolCallComplete",
+      "turnId": "turn-1",
+      "toolCallId": "tc-complete",
+      "result": {
+        "success": true,
+        "pastTenseMessage": "Completed"
+      },
+      "_meta": {
+        "phase": "complete"
+      }
+    },
+    {
+      "type": "session/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-result-confirmed",
+      "toolName": "result",
+      "displayName": "Result Tool"
+    },
+    {
+      "type": "session/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-result-confirmed",
+      "invocationMessage": "Result this",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "session/toolCallComplete",
+      "turnId": "turn-1",
+      "toolCallId": "tc-result-confirmed",
+      "result": {
+        "success": true,
+        "pastTenseMessage": "Produced result"
+      },
+      "requiresResultConfirmation": true,
+      "_meta": {
+        "phase": "complete-before-result"
+      }
+    },
+    {
+      "type": "session/toolCallResultConfirmed",
+      "turnId": "turn-1",
+      "toolCallId": "tc-result-confirmed",
+      "approved": true,
+      "_meta": {
+        "phase": "result-confirmed"
+      }
+    },
+    {
+      "type": "session/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-content",
+      "toolName": "content",
+      "displayName": "Content Tool"
+    },
+    {
+      "type": "session/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-content",
+      "invocationMessage": "Content this",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "session/toolCallContentChanged",
+      "turnId": "turn-1",
+      "toolCallId": "tc-content",
+      "content": [
+        {
+          "type": "terminal",
+          "resource": "agenthost:/terminal/meta",
+          "title": "meta"
+        }
+      ],
+      "_meta": {
+        "phase": "content-changed"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 24,
+      "createdAt": 1000,
+      "modifiedAt": 2000
+    },
+    "lifecycle": "ready",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "streaming",
+            "toolCallId": "tc-delta",
+            "toolName": "stream",
+            "displayName": "Stream Tool",
+            "contributor": null,
+            "_meta": {
+              "phase": "delta"
+            },
+            "partialInput": "abc",
+            "invocationMessage": "Streaming input"
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-ready-running",
+            "toolName": "run",
+            "displayName": "Run Tool",
+            "contributor": null,
+            "_meta": {
+              "phase": "ready-running"
+            },
+            "invocationMessage": "Run now",
+            "toolInput": "{}",
+            "confirmed": "not-needed"
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "pending-confirmation",
+            "toolCallId": "tc-ready-pending",
+            "toolName": "ask",
+            "displayName": "Ask Tool",
+            "contributor": null,
+            "_meta": {
+              "phase": "ready-pending"
+            },
+            "invocationMessage": "Needs approval",
+            "toolInput": null,
+            "confirmationTitle": null,
+            "edits": null,
+            "editable": null
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-confirm-approved",
+            "toolName": "approve",
+            "displayName": "Approve Tool",
+            "contributor": null,
+            "_meta": {
+              "phase": "confirmed-approved"
+            },
+            "invocationMessage": "Approve this",
+            "toolInput": null,
+            "confirmed": "user-action"
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "cancelled",
+            "toolCallId": "tc-confirm-denied",
+            "toolName": "deny",
+            "displayName": "Deny Tool",
+            "contributor": null,
+            "_meta": {
+              "phase": "confirmed-denied"
+            },
+            "invocationMessage": "Deny this",
+            "toolInput": null,
+            "reason": "denied",
+            "reasonMessage": null,
+            "userSuggestion": null
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "completed",
+            "toolCallId": "tc-complete",
+            "toolName": "complete",
+            "displayName": "Complete Tool",
+            "contributor": null,
+            "_meta": {
+              "phase": "complete"
+            },
+            "invocationMessage": "Complete this",
+            "toolInput": null,
+            "confirmed": "not-needed",
+            "success": true,
+            "pastTenseMessage": "Completed"
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "completed",
+            "toolCallId": "tc-result-confirmed",
+            "toolName": "result",
+            "displayName": "Result Tool",
+            "contributor": null,
+            "_meta": {
+              "phase": "result-confirmed"
+            },
+            "invocationMessage": "Result this",
+            "toolInput": null,
+            "confirmed": "not-needed",
+            "success": true,
+            "pastTenseMessage": "Produced result",
+            "content": null,
+            "structuredContent": null,
+            "error": null
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-content",
+            "toolName": "content",
+            "displayName": "Content Tool",
+            "contributor": null,
+            "_meta": {
+              "phase": "content-changed"
+            },
+            "invocationMessage": "Content this",
+            "toolInput": null,
+            "confirmed": "not-needed",
+            "content": [
+              {
+                "type": "terminal",
+                "resource": "agenthost:/terminal/meta",
+                "title": "meta"
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    }
+  }
+}

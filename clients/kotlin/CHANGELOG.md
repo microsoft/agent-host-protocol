@@ -22,6 +22,11 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
   channel decodes via the existing `SnapshotStateSerializer` shape probe
   (required `root` + `recursive` keys).
 
+### Fixed
+
+- `sessionReducer` now applies `_meta` (`meta`) updates from every
+  tool-call-scoped action, not only `session/toolCallStart`.
+
 ### Added
 
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an

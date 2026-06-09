@@ -463,6 +463,9 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 	case *ahptypes.SessionToolCallContentChangedAction:
 		return updateToolCall(state, a.TurnId, a.ToolCallId, func(tc ahptypes.ToolCallState) ahptypes.ToolCallState {
 			if r, ok := tc.Value.(*ahptypes.ToolCallRunningState); ok {
+				if a.Meta != nil {
+					r.Meta = a.Meta
+				}
 				r.Content = append([]ahptypes.ToolResultContent(nil), a.Content...)
 			}
 			return tc
@@ -760,6 +763,9 @@ func applyToolCallDelta(state *ahptypes.SessionState, a *ahptypes.SessionToolCal
 		}
 		joined := current + a.Content
 		s.PartialInput = &joined
+		if a.Meta != nil {
+			s.Meta = a.Meta
+		}
 		if a.InvocationMessage != nil {
 			im := *a.InvocationMessage
 			s.InvocationMessage = &im
@@ -771,6 +777,9 @@ func applyToolCallDelta(state *ahptypes.SessionState, a *ahptypes.SessionToolCal
 func applyToolCallReady(state *ahptypes.SessionState, a *ahptypes.SessionToolCallReadyAction) ReduceOutcome {
 	return updateToolCall(state, a.TurnId, a.ToolCallId, func(tc ahptypes.ToolCallState) ahptypes.ToolCallState {
 		common := toolCallMeta(tc)
+		if a.Meta != nil {
+			common.meta = a.Meta
+		}
 		switch tc.Value.(type) {
 		case *ahptypes.ToolCallStreamingState, *ahptypes.ToolCallRunningState:
 			if a.Confirmed != nil {
@@ -830,6 +839,10 @@ func applyToolCallConfirmed(state *ahptypes.SessionState, a *ahptypes.SessionToo
 			if a.EditedToolInput != nil {
 				toolInput = a.EditedToolInput
 			}
+			meta := s.Meta
+			if a.Meta != nil {
+				meta = a.Meta
+			}
 			confirmed := ahptypes.ToolCallConfirmationReasonNotNeeded
 			if a.Confirmed != nil {
 				confirmed = *a.Confirmed
@@ -840,7 +853,7 @@ func applyToolCallConfirmed(state *ahptypes.SessionState, a *ahptypes.SessionToo
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
 				Contributor:       s.Contributor,
-				Meta:              s.Meta,
+				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
 				ToolInput:         toolInput,
 				Confirmed:         confirmed,
@@ -851,13 +864,17 @@ func applyToolCallConfirmed(state *ahptypes.SessionState, a *ahptypes.SessionToo
 		if a.Reason != nil {
 			reason = *a.Reason
 		}
+		meta := s.Meta
+		if a.Meta != nil {
+			meta = a.Meta
+		}
 		return ahptypes.ToolCallState{Value: &ahptypes.ToolCallCancelledState{
 			Status:            ahptypes.ToolCallStatusCancelled,
 			ToolCallId:        s.ToolCallId,
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
 			Contributor:       s.Contributor,
-			Meta:              s.Meta,
+			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
 			ToolInput:         s.ToolInput,
 			Reason:            reason,
@@ -871,6 +888,9 @@ func applyToolCallConfirmed(state *ahptypes.SessionState, a *ahptypes.SessionToo
 func applyToolCallComplete(state *ahptypes.SessionState, a *ahptypes.SessionToolCallCompleteAction) ReduceOutcome {
 	return updateToolCall(state, a.TurnId, a.ToolCallId, func(tc ahptypes.ToolCallState) ahptypes.ToolCallState {
 		common := toolCallMeta(tc)
+		if a.Meta != nil {
+			common.meta = a.Meta
+		}
 		var (
 			invocation     ahptypes.StringOrMarkdown
 			toolInput      *string
@@ -936,13 +956,17 @@ func applyToolCallResultConfirmed(state *ahptypes.SessionState, a *ahptypes.Sess
 			return tc
 		}
 		if a.Approved {
+			meta := s.Meta
+			if a.Meta != nil {
+				meta = a.Meta
+			}
 			return ahptypes.ToolCallState{Value: &ahptypes.ToolCallCompletedState{
 				Status:            ahptypes.ToolCallStatusCompleted,
 				ToolCallId:        s.ToolCallId,
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
 				Contributor:       s.Contributor,
-				Meta:              s.Meta,
+				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
 				ToolInput:         s.ToolInput,
 				Success:           s.Success,
@@ -954,13 +978,17 @@ func applyToolCallResultConfirmed(state *ahptypes.SessionState, a *ahptypes.Sess
 				SelectedOption:    s.SelectedOption,
 			}}
 		}
+		meta := s.Meta
+		if a.Meta != nil {
+			meta = a.Meta
+		}
 		return ahptypes.ToolCallState{Value: &ahptypes.ToolCallCancelledState{
 			Status:            ahptypes.ToolCallStatusCancelled,
 			ToolCallId:        s.ToolCallId,
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
 			Contributor:       s.Contributor,
-			Meta:              s.Meta,
+			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
 			ToolInput:         s.ToolInput,
 			Reason:            ahptypes.ToolCallCancellationReasonResultDenied,

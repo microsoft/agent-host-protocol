@@ -24,6 +24,11 @@ matching `## [X.Y.Z]` heading is missing from this file.
   terminal / changeset / annotations slots. `reset_host` / `reset` clear the
   new slot.
 
+### Fixed
+
+- Session reducers now apply `_meta` (`meta`) updates from every
+  tool-call-scoped action, not only `session/toolCallStart`.
+
 ### Added
 
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an

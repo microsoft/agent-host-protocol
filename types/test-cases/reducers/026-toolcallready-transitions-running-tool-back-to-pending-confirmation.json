@@ -78,7 +78,10 @@
             "toolName": "bash",
             "displayName": "Run Command",
             "contributor": null,
-            "_meta": null,
+            "_meta": {
+              "permissionKind": "shell",
+              "fullCommandText": "rm -rf /tmp/test"
+            },
             "invocationMessage": "Run: rm -rf /tmp/test",
             "toolInput": null,
             "confirmationTitle": null,

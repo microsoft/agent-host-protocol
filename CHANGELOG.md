@@ -30,6 +30,11 @@ changes accumulate. Track in-flight protocol changes via PRs touching
   point-in-time snapshot. Existing variants (root, session, terminal,
   changeset, annotations) are unchanged.
 
+### Fixed
+
+- Session reducers now apply `_meta` updates from every tool-call-scoped
+  action, not only `session/toolCallStart`.
+
 ## [0.4.0] — Unreleased
 
 Spec version: `0.4.0`

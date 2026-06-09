@@ -27,6 +27,11 @@ hotfix escape hatch.
   `ahp-resource-watch:` channel's descriptor alongside the existing root /
   session / terminal / changeset / annotations variants.
 
+### Fixed
+
+- `sessionReducer` now applies `_meta` updates from every tool-call-scoped
+  action, not only `session/toolCallStart`.
+
 ### Added
 
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an

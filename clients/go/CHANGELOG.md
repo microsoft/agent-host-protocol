@@ -21,6 +21,11 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
   `root` + `recursive` keys (ordered between the existing changeset and
   annotations probes).
 
+### Fixed
+
+- Reducer parity fixtures now require `_meta` updates from every
+  tool-call-scoped action, not only `session/toolCallStart`.
+
 ### Added
 
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an

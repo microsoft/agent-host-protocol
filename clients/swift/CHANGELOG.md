@@ -26,6 +26,11 @@ the tag matches the version pinned in [`VERSION`](VERSION).
   terminal / changeset / annotations slots. `reset(host:)` / `reset()` clear
   the new slot.
 
+### Fixed
+
+- Session reducers now apply `_meta` (`meta`) updates from every
+  tool-call-scoped action, not only `session/toolCallStart`.
+
 ### Added
 
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
