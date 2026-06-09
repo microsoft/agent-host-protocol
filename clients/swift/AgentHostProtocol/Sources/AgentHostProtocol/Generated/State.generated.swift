@@ -4417,12 +4417,13 @@ public enum ToolResultContent: Codable, Sendable {
     }
 }
 
-/// The state payload of a snapshot — root, session, terminal, changeset, or annotations state.
+/// The state payload of a snapshot — root, session, terminal, changeset, resource-watch, or annotations state.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
     case terminal(TerminalState)
     case changeset(ChangesetState)
+    case resourceWatch(ResourceWatchState)
     case annotations(AnnotationsState)
 
     public init(from decoder: Decoder) throws {
@@ -4433,6 +4434,8 @@ public enum SnapshotState: Codable, Sendable {
             self = .terminal(terminal)
         } else if let changeset = try? ChangesetState(from: decoder) {
             self = .changeset(changeset)
+        } else if let resourceWatch = try? ResourceWatchState(from: decoder) {
+            self = .resourceWatch(resourceWatch)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
         } else {
@@ -4446,6 +4449,7 @@ public enum SnapshotState: Codable, Sendable {
         case .session(let state): try state.encode(to: encoder)
         case .terminal(let state): try state.encode(to: encoder)
         case .changeset(let state): try state.encode(to: encoder)
+        case .resourceWatch(let state): try state.encode(to: encoder)
         case .annotations(let state): try state.encode(to: encoder)
         }
     }

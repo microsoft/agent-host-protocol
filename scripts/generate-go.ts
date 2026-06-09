@@ -164,6 +164,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
   ) {
     return 'SnapshotState';
   }
@@ -940,15 +941,17 @@ const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
 
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
-// terminal, changeset, or annotations state. The active variant is chosen by which
-// pointer field is non-nil; UnmarshalJSON probes for required fields in
-// the canonical order (session → terminal → changeset → annotations → root).
+// terminal, changeset, resource-watch, or annotations state. The active
+// variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
+// for required fields in the canonical order
+// (session → terminal → changeset → resourceWatch → annotations → root).
 type SnapshotState struct {
-\tRoot      *RootState      \`json:"-"\`
-\tSession   *SessionState   \`json:"-"\`
-\tTerminal  *TerminalState  \`json:"-"\`
-\tChangeset *ChangesetState \`json:"-"\`
-	Annotations *AnnotationsState  \`json:"-"\`
+\tRoot          *RootState          \`json:"-"\`
+\tSession       *SessionState       \`json:"-"\`
+\tTerminal      *TerminalState      \`json:"-"\`
+\tChangeset     *ChangesetState     \`json:"-"\`
+\tResourceWatch *ResourceWatchState \`json:"-"\`
+\tAnnotations   *AnnotationsState   \`json:"-"\`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
@@ -960,8 +963,10 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Terminal)
 \tcase s.Changeset != nil:
 \t\treturn json.Marshal(s.Changeset)
-	case s.Annotations != nil:
-		return json.Marshal(s.Annotations)
+\tcase s.ResourceWatch != nil:
+\t\treturn json.Marshal(s.ResourceWatch)
+\tcase s.Annotations != nil:
+\t\treturn json.Marshal(s.Annotations)
 \tcase s.Root != nil:
 \t\treturn json.Marshal(s.Root)
 \tdefault:
@@ -996,12 +1001,18 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Changeset = &v
-	case containsAll(probe, "annotations"):
-		var v AnnotationsState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Annotations = &v
+\tcase containsAll(probe, "root", "recursive"):
+\t\tvar v ResourceWatchState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.ResourceWatch = &v
+\tcase containsAll(probe, "annotations"):
+\t\tvar v AnnotationsState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Annotations = &v
 \tdefault:
 \t\tvar v RootState
 \t\tif err := json.Unmarshal(data, &v); err != nil {

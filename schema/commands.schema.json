@@ -1584,6 +1584,9 @@
               "$ref": "#/$defs/ChangesetState"
             },
             {
+              "$ref": "#/$defs/ResourceWatchState"
+            },
+            {
               "$ref": "#/$defs/AnnotationsState"
             }
           ],

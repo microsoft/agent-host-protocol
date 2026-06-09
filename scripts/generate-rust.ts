@@ -151,7 +151,8 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   if (tsType === 'IRootState | ISessionState' || tsType === 'IRootState | ISessionState | ITerminalState'
     || tsType === 'RootState | SessionState' || tsType === 'RootState | SessionState | TerminalState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState') {
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState') {
     return 'SnapshotState';
   }
 
@@ -844,18 +845,19 @@ const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
 
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot — root, session, terminal,
-/// changeset, or annotations state.
+/// changeset, resource-watch, or annotations state.
 ///
 /// Deserialized by trying session first (has required \`summary\`), then
 /// terminal (has required \`content\`), then changeset (has required
-/// \`status\` and \`files\`), then annotations (has required \`annotations\`),
-/// then root.
+/// \`status\` and \`files\`), then resource-watch (has required \`root\` and
+/// \`recursive\`), then annotations (has required \`annotations\`), then root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
     Session(Box<SessionState>),
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
+    ResourceWatch(Box<ResourceWatchState>),
     Annotations(Box<AnnotationsState>),
     Root(Box<RootState>),
 }`;

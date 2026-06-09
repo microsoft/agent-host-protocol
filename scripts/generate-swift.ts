@@ -107,7 +107,8 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   if (tsType === 'RootState | SessionState'
     || tsType === 'RootState | SessionState | TerminalState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState') return 'SnapshotState';
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState') return 'SnapshotState';
 
   // T | null → T?
   const nullMatch = tsType.match(/^(.+?)\s*\|\s*null$/);
@@ -795,12 +796,13 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot — root, session, terminal, changeset, or annotations state.
+  return `/// The state payload of a snapshot — root, session, terminal, changeset, resource-watch, or annotations state.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
     case terminal(TerminalState)
     case changeset(ChangesetState)
+    case resourceWatch(ResourceWatchState)
     case annotations(AnnotationsState)
 
     public init(from decoder: Decoder) throws {
@@ -811,6 +813,8 @@ public enum SnapshotState: Codable, Sendable {
             self = .terminal(terminal)
         } else if let changeset = try? ChangesetState(from: decoder) {
             self = .changeset(changeset)
+        } else if let resourceWatch = try? ResourceWatchState(from: decoder) {
+            self = .resourceWatch(resourceWatch)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
         } else {
@@ -824,6 +828,7 @@ public enum SnapshotState: Codable, Sendable {
         case .session(let state): try state.encode(to: encoder)
         case .terminal(let state): try state.encode(to: encoder)
         case .changeset(let state): try state.encode(to: encoder)
+        case .resourceWatch(let state): try state.encode(to: encoder)
         case .annotations(let state): try state.encode(to: encoder)
         }
     }

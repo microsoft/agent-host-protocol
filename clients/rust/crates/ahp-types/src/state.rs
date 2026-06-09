@@ -3325,18 +3325,19 @@ pub enum ToolCallContributor {
 }
 
 /// The state payload of a snapshot — root, session, terminal,
-/// changeset, or annotations state.
+/// changeset, resource-watch, or annotations state.
 ///
 /// Deserialized by trying session first (has required `summary`), then
 /// terminal (has required `content`), then changeset (has required
-/// `status` and `files`), then annotations (has required `annotations`),
-/// then root.
+/// `status` and `files`), then resource-watch (has required `root` and
+/// `recursive`), then annotations (has required `annotations`), then root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
     Session(Box<SessionState>),
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
+    ResourceWatch(Box<ResourceWatchState>),
     Annotations(Box<AnnotationsState>),
     Root(Box<RootState>),
 }

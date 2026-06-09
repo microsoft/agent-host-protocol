@@ -4319,7 +4319,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 
 /**
  * The state payload of a snapshot — root, session, terminal, changeset,
- * or annotations state.
+ * resource-watch, or annotations state.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
@@ -4327,6 +4327,7 @@ sealed interface SnapshotState {
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Terminal(val value: TerminalState) : SnapshotState
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
+    @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
 }
 
@@ -4342,12 +4343,15 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. SessionState has required
         // `summary`; ChangesetState has required `status` + `files`;
+        // ResourceWatchState has required `root` + `recursive`;
         // AnnotationsState has required `annotations`; TerminalState has `uri`
         // / `size` / `buffer`; RootState is the catch-all.
         return when {
             obj.containsKey("summary") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
                 SnapshotState.Changeset(input.json.decodeFromJsonElement(ChangesetState.serializer(), element))
+            obj.containsKey("root") && obj.containsKey("recursive") ->
+                SnapshotState.ResourceWatch(input.json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
             obj.containsKey("annotations") ->
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
             obj.containsKey("size") || obj.containsKey("uri") || obj.containsKey("buffer") ->
@@ -4364,6 +4368,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Terminal -> output.json.encodeToJsonElement(TerminalState.serializer(), value.value)
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
+            is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
         }
         output.encodeJsonElement(element)
