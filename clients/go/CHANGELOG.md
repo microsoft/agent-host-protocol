@@ -33,12 +33,22 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
   resending its entries. Handled by the annotations reducer (no-op on unknown
   id).
 
-### Added
-
+- `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` / `disposeChat` commands.
+- `ChatSummary.WorkingDirectory` — optional per-chat working directory. Falls back to the session's `WorkingDirectory` when absent.
+- Three discrete chat-catalog actions on the session channel — `SessionChatAddedAction` (upsert by `Summary.Resource`), `SessionChatRemovedAction`, and `SessionChatUpdatedAction` (partial-update payload).
 - `RootState` now exposes an optional `_meta` property bag (`Meta
   map[string]json.RawMessage`) for implementation-defined agent-host metadata,
   such as a well-known `hostBuild` key carrying the host's build
   version/commit/date.
+
+### Changed
+
+- `ChatState` is now flat — the previous embedded `Summary` has been replaced with inlined `Resource` / `Title` / `Status` / `Activity` / `ModifiedAt` / `Model` / `Agent` / `Origin` / `WorkingDirectory` fields. `ChatSummary` remains as the standalone catalog entry on `SessionState.Chats`.
+- `ChatSummary.ModifiedAt` and `ChatState.ModifiedAt` are now ISO 8601 `string` values instead of integer milliseconds.
+
+### Removed
+
+- `SessionChatsChangedAction` (replaced by the three discrete chat-catalog actions above).
 
 ## [0.3.0] — 2026-06-05
 
@@ -85,11 +95,14 @@ Implements AHP 0.3.0.
 
 ### Changed
 
+- Reducers split into per-chat and session-aggregate handlers to match the multi-chat protocol shape.
+- `fetchTurns` and `completions` now target an `ahp-chat:` channel; `PROTOCOL_VERSION` bumped to `0.4.0`.
 - Renamed the `ChangesetSummary` type to `Changeset`. The on-the-wire shape is unchanged.
 - Moved the `changesets` catalogue from `SessionSummary` to `SessionState`. The `session/changesetsChanged` action now updates `state.changesets` directly instead of `state.summary.changesets`.
 
 ### Removed
 
+- `SessionState.turns`, `SessionState.activeTurn`, `SessionState.steeringMessage`, `SessionState.queuedMessages`, `SessionState.inputRequests` (moved to `ChatState`).
 - Removed the `additions`, `deletions`, and `files` fields from `ChangesetSummary`. Aggregate counts now live on `SessionSummary.changes`; per-changeset views derive their own totals from `ChangesetState.files`.
 
 ### Changed

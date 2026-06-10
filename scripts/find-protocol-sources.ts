@@ -18,6 +18,7 @@ export const PROTOCOL_SOURCE_DIRS: readonly string[] = [
   'common',
   'channels-root',
   'channels-session',
+  'channels-chat',
   'channels-terminal',
   'channels-changeset',
   'channels-annotations',

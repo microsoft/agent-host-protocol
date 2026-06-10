@@ -13,7 +13,8 @@ final class ReducersTests: XCTestCase {
 
     // MARK: - Constants
 
-    private let S = "copilot:/test-session"
+    private let S = "ahp-session:/test-session"
+    private let C = "ahp-chat:/test-session/default"
     private let T = "turn-1"
 
     // MARK: - Fixtures
@@ -36,21 +37,16 @@ final class ReducersTests: XCTestCase {
                 modifiedAt: 1000
             ),
             lifecycle: lifecycle,
-            turns: []
+            chats: []
         )
     }
 
-    private func makeSessionStateWithActiveTurn() -> SessionState {
-        SessionState(
-            summary: SessionSummary(
-                resource: S,
-                provider: "copilot",
-                title: "Test Session",
-                status: .inProgress,
-                createdAt: 1000,
-                modifiedAt: 2000
-            ),
-            lifecycle: .ready,
+    private func makeChatStateWithActiveTurn() -> ChatState {
+        ChatState(
+            resource: C,
+            title: "Test Chat",
+            status: .inProgress,
+            modifiedAt: "1970-01-01T00:00:02.000Z",
             turns: [],
             activeTurn: ActiveTurn(
                 id: T,
@@ -73,26 +69,21 @@ final class ReducersTests: XCTestCase {
         XCTAssertEqual(state.agents.count, 0)
     }
 
-    func testSessionReducerDoesNotMutateTurnsArray() {
+    func testChatReducerDoesNotMutateTurnsArray() {
         let turn1 = Turn(id: "t1", message: Message(text: "First", origin: AnyCodable(["kind": "user"])), responseParts: [], state: .complete)
         let turn2 = Turn(id: "t2", message: Message(text: "Second", origin: AnyCodable(["kind": "user"])), responseParts: [], state: .complete)
         let turn3 = Turn(id: "t3", message: Message(text: "Third", origin: AnyCodable(["kind": "user"])), responseParts: [], state: .complete)
-        let state = SessionState(
-            summary: SessionSummary(
-                resource: S,
-                provider: "copilot",
-                title: "T",
-                status: .idle,
-                createdAt: 1000,
-                modifiedAt: 1000
-            ),
-            lifecycle: .ready,
+        let state = ChatState(
+            resource: C,
+            title: "T",
+            status: .idle,
+            modifiedAt: "1970-01-01T00:00:01.000Z",
             turns: [turn1, turn2, turn3]
         )
         let original = state.turns
-        _ = sessionReducer(
+        _ = chatReducer(
             state: state,
-            action: .sessionTruncated(SessionTruncatedAction(type: .sessionTruncated, turnId: "t1"))
+            action: .chatTruncated(ChatTruncatedAction(type: .chatTruncated, turnId: "t1"))
         )
         XCTAssertEqual(state.turns.count, original.count)
     }
@@ -100,8 +91,8 @@ final class ReducersTests: XCTestCase {
     // MARK: - Dispatch Validation
 
     func testClientDispatchableReturnsTrue() {
-        let action: StateAction = .sessionTurnStarted(SessionTurnStartedAction(
-            type: .sessionTurnStarted, turnId: T, message: Message(text: "Hello", origin: AnyCodable(["kind": "user"]))
+        let action: StateAction = .chatTurnStarted(ChatTurnStartedAction(
+            type: .chatTurnStarted, turnId: T, message: Message(text: "Hello", origin: AnyCodable(["kind": "user"]))
         ))
         XCTAssertTrue(isClientDispatchable(action))
     }
@@ -113,15 +104,21 @@ final class ReducersTests: XCTestCase {
 
     // MARK: - Timestamp Behavior
 
-    func testTurnStartedUpdatesModifiedAt() {
-        let state = makeSessionState(lifecycle: .ready)
-        let next = sessionReducer(
+    func testChatTurnStartedUpdatesModifiedAt() {
+        let state = ChatState(
+            resource: C,
+            title: "Test Chat",
+            status: .idle,
+            modifiedAt: "1970-01-01T00:00:01.000Z",
+            turns: []
+        )
+        let next = chatReducer(
             state: state,
-            action: .sessionTurnStarted(SessionTurnStartedAction(
-                type: .sessionTurnStarted, turnId: T, message: Message(text: "Hello", origin: AnyCodable(["kind": "user"]))
+            action: .chatTurnStarted(ChatTurnStartedAction(
+                type: .chatTurnStarted, turnId: T, message: Message(text: "Hello", origin: AnyCodable(["kind": "user"]))
             ))
         )
-        XCTAssertGreaterThan(next.summary.modifiedAt, state.summary.modifiedAt)
+        XCTAssertGreaterThan(next.modifiedAt, state.modifiedAt)
     }
 
     func testTitleChangedUpdatesModifiedAt() {

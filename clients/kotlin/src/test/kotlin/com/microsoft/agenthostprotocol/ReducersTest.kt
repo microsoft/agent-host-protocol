@@ -1,46 +1,6 @@
 package com.microsoft.agenthostprotocol
 
-import com.microsoft.agenthostprotocol.generated.AgentInfo
-import com.microsoft.agenthostprotocol.generated.ChangesetFile
-import com.microsoft.agenthostprotocol.generated.ChangesetState
-import com.microsoft.agenthostprotocol.generated.ChangesetStatus
-import com.microsoft.agenthostprotocol.generated.ChangesetStatusChangedAction
-import com.microsoft.agenthostprotocol.generated.ActionType
-import com.microsoft.agenthostprotocol.generated.ChangesetClearedAction
-import com.microsoft.agenthostprotocol.generated.ChangesetFileSetAction
-import com.microsoft.agenthostprotocol.generated.CustomizationUnknown
-import com.microsoft.agenthostprotocol.generated.ErrorInfo
-import com.microsoft.agenthostprotocol.generated.FileEdit
-import com.microsoft.agenthostprotocol.generated.Message
-import com.microsoft.agenthostprotocol.generated.PendingMessage
-import com.microsoft.agenthostprotocol.generated.PendingMessageKind
-import com.microsoft.agenthostprotocol.generated.RootAgentsChangedAction
-import com.microsoft.agenthostprotocol.generated.RootState
-import com.microsoft.agenthostprotocol.generated.SessionCustomizationUpdatedAction
-import com.microsoft.agenthostprotocol.generated.SessionLifecycle
-import com.microsoft.agenthostprotocol.generated.SessionPendingMessageSetAction
-import com.microsoft.agenthostprotocol.generated.SessionQueuedMessagesReorderedAction
-import com.microsoft.agenthostprotocol.generated.SessionState
-import com.microsoft.agenthostprotocol.generated.SessionStatus
-import com.microsoft.agenthostprotocol.generated.SessionSummary
-import com.microsoft.agenthostprotocol.generated.SessionTitleChangedAction
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetCleared
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetFileSet
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetStatusChanged
-import com.microsoft.agenthostprotocol.generated.StateActionRootAgentsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionCustomizationUpdated
-import com.microsoft.agenthostprotocol.generated.StateActionSessionPendingMessageSet
-import com.microsoft.agenthostprotocol.generated.StateActionSessionQueuedMessagesReordered
-import com.microsoft.agenthostprotocol.generated.StateActionSessionTitleChanged
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalData
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalInput
-import com.microsoft.agenthostprotocol.generated.TerminalClientClaim
-import com.microsoft.agenthostprotocol.generated.TerminalClaimClient
-import com.microsoft.agenthostprotocol.generated.TerminalClaimKind
-import com.microsoft.agenthostprotocol.generated.TerminalContentPartUnclassified
-import com.microsoft.agenthostprotocol.generated.TerminalDataAction
-import com.microsoft.agenthostprotocol.generated.TerminalInputAction
-import com.microsoft.agenthostprotocol.generated.TerminalState
+import com.microsoft.agenthostprotocol.generated.*
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -173,14 +133,14 @@ class ReducersTest {
             PendingMessage(id = "m2", message = userMessage("2")),
             PendingMessage(id = "m3", message = userMessage("3")),
         )
-        val session = newSession().copy(queuedMessages = original)
-        val reorder = StateActionSessionQueuedMessagesReordered(
-            SessionQueuedMessagesReorderedAction(
-                type = ActionType.SESSION_QUEUED_MESSAGES_REORDERED,
+        val chat = newChat().copy(queuedMessages = original)
+        val reorder = StateActionChatQueuedMessagesReordered(
+            ChatQueuedMessagesReorderedAction(
+                type = ActionType.CHAT_QUEUED_MESSAGES_REORDERED,
                 order = listOf("m3", "m1"),
             ),
         )
-        val result = sessionReducer(session, reorder)
+        val result = chatReducer(chat, reorder)
         assertEquals(listOf("m3", "m1", "m2"), result.queuedMessages?.map { it.id })
     }
 
@@ -190,61 +150,61 @@ class ReducersTest {
             PendingMessage(id = "m1", message = userMessage("1")),
             PendingMessage(id = "m2", message = userMessage("2")),
         )
-        val session = newSession().copy(queuedMessages = original)
-        val reorder = StateActionSessionQueuedMessagesReordered(
-            SessionQueuedMessagesReorderedAction(
-                type = ActionType.SESSION_QUEUED_MESSAGES_REORDERED,
+        val chat = newChat().copy(queuedMessages = original)
+        val reorder = StateActionChatQueuedMessagesReordered(
+            ChatQueuedMessagesReorderedAction(
+                type = ActionType.CHAT_QUEUED_MESSAGES_REORDERED,
                 order = listOf("m2", "m999", "m2", "m1"),
             ),
         )
-        val result = sessionReducer(session, reorder)
+        val result = chatReducer(chat, reorder)
         assertEquals(listOf("m2", "m1"), result.queuedMessages?.map { it.id })
     }
 
     @Test
     fun `pendingMessageSet upserts steering and queued messages distinctly`() {
-        val session = newSession()
-        val setSteering = StateActionSessionPendingMessageSet(
-            SessionPendingMessageSetAction(
-                type = ActionType.SESSION_PENDING_MESSAGE_SET,
+        val chat = newChat()
+        val setSteering = StateActionChatPendingMessageSet(
+            ChatPendingMessageSetAction(
+                type = ActionType.CHAT_PENDING_MESSAGE_SET,
                 kind = PendingMessageKind.STEERING,
                 id = "s1",
                 message = userMessage("steer"),
             ),
         )
-        val withSteering = sessionReducer(session, setSteering)
+        val withSteering = chatReducer(chat, setSteering)
         assertEquals("s1", withSteering.steeringMessage?.id)
         assertNull(withSteering.queuedMessages)
 
-        val setQueued1 = StateActionSessionPendingMessageSet(
-            SessionPendingMessageSetAction(
-                type = ActionType.SESSION_PENDING_MESSAGE_SET,
+        val setQueued1 = StateActionChatPendingMessageSet(
+            ChatPendingMessageSetAction(
+                type = ActionType.CHAT_PENDING_MESSAGE_SET,
                 kind = PendingMessageKind.QUEUED,
                 id = "q1",
                 message = userMessage("q-1"),
             ),
         )
-        val setQueued2 = StateActionSessionPendingMessageSet(
-            SessionPendingMessageSetAction(
-                type = ActionType.SESSION_PENDING_MESSAGE_SET,
+        val setQueued2 = StateActionChatPendingMessageSet(
+            ChatPendingMessageSetAction(
+                type = ActionType.CHAT_PENDING_MESSAGE_SET,
                 kind = PendingMessageKind.QUEUED,
                 id = "q2",
                 message = userMessage("q-2"),
             ),
         )
-        val withTwo = sessionReducer(sessionReducer(withSteering, setQueued1), setQueued2)
+        val withTwo = chatReducer(chatReducer(withSteering, setQueued1), setQueued2)
         assertEquals(listOf("q1", "q2"), withTwo.queuedMessages?.map { it.id })
 
         // Re-setting q1 with a new body should replace in place rather than append.
-        val replaceQueued1 = StateActionSessionPendingMessageSet(
-            SessionPendingMessageSetAction(
-                type = ActionType.SESSION_PENDING_MESSAGE_SET,
+        val replaceQueued1 = StateActionChatPendingMessageSet(
+            ChatPendingMessageSetAction(
+                type = ActionType.CHAT_PENDING_MESSAGE_SET,
                 kind = PendingMessageKind.QUEUED,
                 id = "q1",
                 message = userMessage("q-1-revised"),
             ),
         )
-        val withReplacement = sessionReducer(withTwo, replaceQueued1)
+        val withReplacement = chatReducer(withTwo, replaceQueued1)
         assertEquals(listOf("q1", "q2"), withReplacement.queuedMessages?.map { it.id })
         assertEquals("q-1-revised", withReplacement.queuedMessages?.first()?.message?.text)
     }
@@ -258,6 +218,18 @@ class ReducersTest {
         )
         val result = sessionReducer(session, titleAction)
         assertEquals(12345L, result.summary.modifiedAt)
+
+        val chatResult = chatReducer(
+            newChat(),
+            StateActionChatTurnStarted(
+                ChatTurnStartedAction(
+                    type = ActionType.CHAT_TURN_STARTED,
+                    turnId = "turn-1",
+                    message = userMessage("hello"),
+                ),
+            ),
+        )
+        assertEquals("1970-01-01T00:00:12.345Z", chatResult.modifiedAt)
     }
 
     @Test
@@ -322,7 +294,7 @@ class ReducersTest {
 
     private fun newSession(): SessionState = SessionState(
         summary = SessionSummary(
-            resource = "copilot:/test",
+            resource = "ahp-session:/test",
             provider = "copilot",
             title = "Test",
             status = SessionStatus.IDLE,
@@ -330,6 +302,14 @@ class ReducersTest {
             modifiedAt = 1000L,
         ),
         lifecycle = SessionLifecycle.READY,
+        chats = emptyList(),
+    )
+
+    private fun newChat(): ChatState = ChatState(
+        resource = "ahp-chat:/test/default",
+        title = "Test",
+        status = SessionStatus.IDLE,
+        modifiedAt = "1970-01-01T00:00:01Z",
         turns = emptyList(),
     )
 

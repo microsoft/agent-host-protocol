@@ -1,16 +1,7 @@
 {
   "description": "toolCallReady ignores non-streaming/non-running tool calls",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 24,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -37,26 +28,21 @@
         }
       ],
       "usage": null
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   },
   "actions": [
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run again"
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 24,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -83,6 +69,10 @@
         }
       ],
       "usage": null
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   }
 }

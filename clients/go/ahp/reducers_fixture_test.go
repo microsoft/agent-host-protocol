@@ -91,10 +91,11 @@ var reducerFixturesSkipList = map[string]string{
 func TestFixtureDrivenReducerParity(t *testing.T) {
 	dir := findFixtureDir(t)
 
-	// Use a deterministic timestamp so summary.modifiedAt matches
-	// what the TypeScript reference reducer stamps in fixtures.
-	const mockNow int64 = 9999
-	SetNowProvider(func() int64 { return mockNow })
+	// Use a deterministic timestamp so modifiedAt matches the TypeScript
+	// reference reducer: Date.now() === 9999, so chat timestamps become
+	// "1970-01-01T00:00:09.999Z".
+	const mockNowMillis int64 = 9999
+	SetNowProvider(func() int64 { return mockNowMillis })
 	t.Cleanup(func() { SetNowProvider(nil) })
 
 	entries, err := os.ReadDir(dir)
@@ -149,6 +150,8 @@ func TestFixtureDrivenReducerParity(t *testing.T) {
 				runFixture[ahptypes.RootState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToRoot)
 			case "session":
 				runFixture[ahptypes.SessionState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToSession)
+			case "chat":
+				runFixture[ahptypes.ChatState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToChat)
 			case "terminal":
 				runFixture[ahptypes.TerminalState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToTerminal)
 			case "changeset":

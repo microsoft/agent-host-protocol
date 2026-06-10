@@ -11,7 +11,7 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": []
+    "chats": []
   },
   "actions": [
     {
@@ -32,10 +32,10 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creationFailed",
-    "turns": [],
     "creationError": {
       "errorType": "init",
       "message": "Failed to start"
-    }
+    },
+    "chats": []
   }
 }

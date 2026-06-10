@@ -24,16 +24,6 @@ const (
 	PolicyStateUnconfigured PolicyState = "unconfigured"
 )
 
-// Discriminant for pending message kinds.
-type PendingMessageKind string
-
-const (
-	// Injected into the current turn at a convenient point
-	PendingMessageKindSteering PendingMessageKind = "steering"
-	// Sent automatically as a new turn after the current turn finishes
-	PendingMessageKindQueued PendingMessageKind = "queued"
-)
-
 // Session initialization state.
 type SessionLifecycle string
 
@@ -71,45 +61,63 @@ func (s SessionStatus) Has(other SessionStatus) bool { return s&other == other }
 // Or returns s combined with the flags in other.
 func (s SessionStatus) Or(other SessionStatus) SessionStatus { return s | other }
 
-// Answer lifecycle state.
-type SessionInputAnswerState string
+type ChatOriginKind string
 
 const (
-	SessionInputAnswerStateDraft     SessionInputAnswerState = "draft"
-	SessionInputAnswerStateSubmitted SessionInputAnswerState = "submitted"
-	SessionInputAnswerStateSkipped   SessionInputAnswerState = "skipped"
+	ChatOriginKindUser ChatOriginKind = "user"
+	ChatOriginKindFork ChatOriginKind = "fork"
+	ChatOriginKindTool ChatOriginKind = "tool"
+)
+
+// Discriminant for pending message kinds.
+type PendingMessageKind string
+
+const (
+	// Injected into the current turn at a convenient point
+	PendingMessageKindSteering PendingMessageKind = "steering"
+	// Sent automatically as a new turn after the current turn finishes
+	PendingMessageKindQueued PendingMessageKind = "queued"
+)
+
+// Answer lifecycle state.
+type ChatInputAnswerState string
+
+const (
+	ChatInputAnswerStateDraft     ChatInputAnswerState = "draft"
+	ChatInputAnswerStateSubmitted ChatInputAnswerState = "submitted"
+	ChatInputAnswerStateSkipped   ChatInputAnswerState = "skipped"
 )
 
 // Answer value kind.
-type SessionInputAnswerValueKind string
+type ChatInputAnswerValueKind string
 
 const (
-	SessionInputAnswerValueKindText         SessionInputAnswerValueKind = "text"
-	SessionInputAnswerValueKindNumber       SessionInputAnswerValueKind = "number"
-	SessionInputAnswerValueKindBoolean      SessionInputAnswerValueKind = "boolean"
-	SessionInputAnswerValueKindSelected     SessionInputAnswerValueKind = "selected"
-	SessionInputAnswerValueKindSelectedMany SessionInputAnswerValueKind = "selected-many"
+	ChatInputAnswerValueKindText         ChatInputAnswerValueKind = "text"
+	ChatInputAnswerValueKindNumber       ChatInputAnswerValueKind = "number"
+	ChatInputAnswerValueKindBoolean      ChatInputAnswerValueKind = "boolean"
+	ChatInputAnswerValueKindSelected     ChatInputAnswerValueKind = "selected"
+	ChatInputAnswerValueKindSelectedMany ChatInputAnswerValueKind = "selected-many"
 )
 
 // Question/input control kind.
-type SessionInputQuestionKind string
+type ChatInputQuestionKind string
 
 const (
-	SessionInputQuestionKindText         SessionInputQuestionKind = "text"
-	SessionInputQuestionKindNumber       SessionInputQuestionKind = "number"
-	SessionInputQuestionKindInteger      SessionInputQuestionKind = "integer"
-	SessionInputQuestionKindBoolean      SessionInputQuestionKind = "boolean"
-	SessionInputQuestionKindSingleSelect SessionInputQuestionKind = "single-select"
-	SessionInputQuestionKindMultiSelect  SessionInputQuestionKind = "multi-select"
+	ChatInputQuestionKindText         ChatInputQuestionKind = "text"
+	ChatInputQuestionKindNumber       ChatInputQuestionKind = "number"
+	ChatInputQuestionKindInteger      ChatInputQuestionKind = "integer"
+	ChatInputQuestionKindBoolean      ChatInputQuestionKind = "boolean"
+	ChatInputQuestionKindSingleSelect ChatInputQuestionKind = "single-select"
+	ChatInputQuestionKindMultiSelect  ChatInputQuestionKind = "multi-select"
 )
 
 // How a client completed an input request.
-type SessionInputResponseKind string
+type ChatInputResponseKind string
 
 const (
-	SessionInputResponseKindAccept  SessionInputResponseKind = "accept"
-	SessionInputResponseKindDecline SessionInputResponseKind = "decline"
-	SessionInputResponseKindCancel  SessionInputResponseKind = "cancel"
+	ChatInputResponseKindAccept  ChatInputResponseKind = "accept"
+	ChatInputResponseKindDecline ChatInputResponseKind = "decline"
+	ChatInputResponseKindCancel  ChatInputResponseKind = "cancel"
 )
 
 // How a turn ended.
@@ -573,18 +581,6 @@ type ConfigSchema struct {
 	Required []string `json:"required,omitempty"`
 }
 
-// A message queued for future delivery to the agent.
-//
-// Steering messages are injected into the current turn mid-flight.
-// Queued messages are automatically started as new turns after the
-// current turn naturally finishes.
-type PendingMessage struct {
-	// Unique identifier for this pending message
-	Id string `json:"id"`
-	// The message that will start the next turn
-	Message Message `json:"message"`
-}
-
 // Full state for a single session, loaded when a client subscribes to the session's URI.
 type SessionState struct {
 	// Lightweight session metadata
@@ -597,16 +593,13 @@ type SessionState struct {
 	ServerTools []ToolDefinition `json:"serverTools,omitempty"`
 	// The client currently providing tools and interactive capabilities to this session
 	ActiveClient *SessionActiveClient `json:"activeClient,omitempty"`
-	// Completed turns
-	Turns []Turn `json:"turns"`
-	// Currently in-progress turn
-	ActiveTurn *ActiveTurn `json:"activeTurn,omitempty"`
-	// Message to inject into the current turn at a convenient point
-	SteeringMessage *PendingMessage `json:"steeringMessage,omitempty"`
-	// Messages to send automatically as new turns after the current turn finishes
-	QueuedMessages []PendingMessage `json:"queuedMessages,omitempty"`
-	// Requests for user input that are currently blocking or informing session progress
-	InputRequests []SessionInputRequest `json:"inputRequests,omitempty"`
+	// Catalog of chats in this session.
+	Chats []ChatSummary `json:"chats"`
+	// The chat that receives input when the user addresses the session without
+	// selecting a specific chat. This is a UI routing hint, not a hierarchy
+	// marker — chats remain equal peers at the protocol level. Hosts MAY change
+	// this over the session's lifetime.
+	DefaultChat *URI `json:"defaultChat,omitempty"`
 	// Session configuration schema and current values
 	Config *SessionConfigState `json:"config,omitempty"`
 	// Top-level customizations active in this session.
@@ -663,6 +656,39 @@ type SessionActiveClient struct {
 	Customizations []ClientPluginCustomization `json:"customizations,omitempty"`
 }
 
+// Lightweight catalog entry summarizing one session. Surfaced via
+// {@link RootChannelCommands.listSessions | `root/listSessions`} and
+// `root/sessionAdded`/`root/sessionSummaryChanged` notifications.
+//
+// **Aggregation across chats.** Once a session contains more than one chat,
+// several `SessionSummary` fields are derived from the underlying
+// {@link SessionState.chats | chat catalog}. Producers SHOULD follow these
+// rules so clients that only consume the session summary (e.g. a session
+// list) still see meaningful state:
+//
+//   - `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /
+//     `Error` — bits 0–4) from the
+//     {@link SessionState.defaultChat | default chat} when present, else from
+//     the most recently modified chat. **Promote** `InputNeeded` whenever any
+//     chat in the session needs input, and **promote** `Error` whenever any
+//     chat is in an error state — both override the default-chat bits. The
+//     orthogonal flag bits (`IsRead`, `IsArchived`) remain session-scoped.
+//   - `activity`: mirror the activity string of the default chat, or of the
+//     chat currently driving the promoted status bits when a non-default chat
+//     wins (e.g. the chat that raised `InputNeeded`).
+//   - `modifiedAt`: the max of all chats' `modifiedAt`.
+//   - `model` / `agent`: the session-level selection. Per-chat overrides are
+//     surfaced on individual {@link ChatSummary} entries, not aggregated up.
+//   - `workingDirectory`: the session-level **default**. Individual chats MAY
+//     override via {@link ChatSummary.workingDirectory}; aggregating these up
+//     is meaningless and SHOULD NOT be attempted.
+//   - `changes`: optional roll-up across all chats. Producers MAY sum the
+//     per-chat changeset stats or report the most expensive chat's stats —
+//     whichever is cheaper for the host to compute.
+//
+// Sessions with a single chat trivially satisfy all of the above (the chat's
+// values pass through unchanged). The rules only matter once a session
+// carries multiple chats.
 type SessionSummary struct {
 	// Session URI
 	Resource URI `json:"resource"`
@@ -687,7 +713,10 @@ type SessionSummary struct {
 	// Absent (`undefined`) means no custom agent is selected for this session
 	// — the session uses the provider's default behavior.
 	Agent *AgentSelection `json:"agent,omitempty"`
-	// The working directory URI for this session
+	// The default working directory URI for this session. Individual chats
+	// MAY override via {@link ChatSummary.workingDirectory | their own
+	// `workingDirectory`}; this field acts as the fallback for any chat that
+	// does not.
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
 	// Aggregate summary of file changes associated with this session. Servers
 	// may populate this to give clients a quick at-a-glance view of the
@@ -712,6 +741,96 @@ type ChangesSummary struct {
 	Deletions *int64 `json:"deletions,omitempty"`
 	// Number of files that have changes.
 	Files *int64 `json:"files,omitempty"`
+}
+
+// Full state for a single chat, loaded when a client subscribes to the chat's
+// URI.
+//
+// The lightweight catalog representation of a chat is {@link ChatSummary},
+// carried in {@link SessionState.chats | `SessionState.chats`}. `ChatState`
+// **denormalizes** every {@link ChatSummary} field directly onto itself so
+// subscribers receive one flat object instead of having to merge a nested
+// `summary` sub-object. Producers MUST keep the two representations
+// consistent: any change to the inlined fields below SHOULD also be
+// announced on the parent session via the matching
+// {@link SessionChatUpdatedAction | `session/chatUpdated`} action.
+type ChatState struct {
+	// Chat URI
+	Resource URI `json:"resource"`
+	// Chat title
+	Title string `json:"title"`
+	// Current chat status (reuses SessionStatus shape)
+	Status SessionStatus `json:"status"`
+	// Human-readable description of what the chat is currently doing
+	Activity *string `json:"activity,omitempty"`
+	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+	ModifiedAt string `json:"modifiedAt"`
+	// Optional per-chat model override (defaults to the session's model)
+	Model *ModelSelection `json:"model,omitempty"`
+	// Optional per-chat agent override (defaults to the session's agent)
+	Agent *AgentSelection `json:"agent,omitempty"`
+	// How this chat came into existence
+	Origin *ChatOrigin `json:"origin,omitempty"`
+	// Optional per-chat working directory.
+	//
+	// If absent, the chat inherits
+	// {@link SessionSummary.workingDirectory | the session's working directory}.
+	// Hosts MAY override this for individual chats — for example, to give a
+	// subordinate chat its own git worktree so multiple chats in a session can
+	// make independent edits that the orchestrator later merges back.
+	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+	// Completed turns
+	Turns []Turn `json:"turns"`
+	// Currently in-progress turn
+	ActiveTurn *ActiveTurn `json:"activeTurn,omitempty"`
+	// Message to inject into the current turn at a convenient point
+	SteeringMessage *PendingMessage `json:"steeringMessage,omitempty"`
+	// Messages to send automatically as new turns after the current turn finishes
+	QueuedMessages []PendingMessage `json:"queuedMessages,omitempty"`
+	// Requests for user input that are currently blocking or informing chat progress
+	InputRequests []ChatInputRequest `json:"inputRequests,omitempty"`
+	// Additional provider-specific metadata for this chat.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Lightweight catalog entry for a chat, carried in
+// {@link SessionState.chats | `SessionState.chats`}. The full conversation
+// lives in {@link ChatState}, which inlines (denormalizes) every field below.
+type ChatSummary struct {
+	// Chat URI
+	Resource URI `json:"resource"`
+	// Chat title
+	Title string `json:"title"`
+	// Current chat status (reuses SessionStatus shape)
+	Status SessionStatus `json:"status"`
+	// Human-readable description of what the chat is currently doing
+	Activity *string `json:"activity,omitempty"`
+	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+	ModifiedAt string `json:"modifiedAt"`
+	// Optional per-chat model override (defaults to the session's model)
+	Model *ModelSelection `json:"model,omitempty"`
+	// Optional per-chat agent override (defaults to the session's agent)
+	Agent *AgentSelection `json:"agent,omitempty"`
+	// How this chat came into existence
+	Origin *ChatOrigin `json:"origin,omitempty"`
+	// Optional per-chat working directory.
+	//
+	// If absent, the chat inherits
+	// {@link SessionSummary.workingDirectory | the session's working directory}.
+	// See {@link ChatState.workingDirectory} for usage notes.
+	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+}
+
+// A message queued for future delivery to the agent.
+//
+// Steering messages are injected into the current turn mid-flight.
+// Queued messages are automatically started as new turns after the
+// current turn naturally finishes.
+type PendingMessage struct {
+	// Unique identifier for this pending message
+	Id string `json:"id"`
+	// The message that will start the next turn
+	Message Message `json:"message"`
 }
 
 // Server-owned project metadata for a session.
@@ -835,7 +954,7 @@ type Message struct {
 }
 
 // A choice in a select-style question.
-type SessionInputOption struct {
+type ChatInputOption struct {
 	// Stable option identifier; for MCP enum values this is the enum string
 	Id string `json:"id"`
 	// Display label
@@ -847,51 +966,51 @@ type SessionInputOption struct {
 }
 
 // Value captured for one answer.
-type SessionInputTextAnswerValue struct {
-	Kind  SessionInputAnswerValueKind `json:"kind"`
-	Value string                      `json:"value"`
+type ChatInputTextAnswerValue struct {
+	Kind  ChatInputAnswerValueKind `json:"kind"`
+	Value string                   `json:"value"`
 }
 
-type SessionInputNumberAnswerValue struct {
-	Kind  SessionInputAnswerValueKind `json:"kind"`
-	Value float64                     `json:"value"`
+type ChatInputNumberAnswerValue struct {
+	Kind  ChatInputAnswerValueKind `json:"kind"`
+	Value float64                  `json:"value"`
 }
 
-type SessionInputBooleanAnswerValue struct {
-	Kind  SessionInputAnswerValueKind `json:"kind"`
-	Value bool                        `json:"value"`
+type ChatInputBooleanAnswerValue struct {
+	Kind  ChatInputAnswerValueKind `json:"kind"`
+	Value bool                     `json:"value"`
 }
 
-type SessionInputSelectedAnswerValue struct {
-	Kind  SessionInputAnswerValueKind `json:"kind"`
-	Value string                      `json:"value"`
+type ChatInputSelectedAnswerValue struct {
+	Kind  ChatInputAnswerValueKind `json:"kind"`
+	Value string                   `json:"value"`
 	// Free-form text entered instead of selecting an option
 	FreeformValues []string `json:"freeformValues,omitempty"`
 }
 
-type SessionInputSelectedManyAnswerValue struct {
-	Kind  SessionInputAnswerValueKind `json:"kind"`
-	Value []string                    `json:"value"`
+type ChatInputSelectedManyAnswerValue struct {
+	Kind  ChatInputAnswerValueKind `json:"kind"`
+	Value []string                 `json:"value"`
 	// Free-form text entered in addition to selected options
 	FreeformValues []string `json:"freeformValues,omitempty"`
 }
 
-type SessionInputAnswered struct {
+type ChatInputAnswered struct {
 	// Answer state
-	State SessionInputAnswerState `json:"state"`
+	State ChatInputAnswerState `json:"state"`
 	// Answer value
-	Value SessionInputAnswerValue `json:"value"`
+	Value ChatInputAnswerValue `json:"value"`
 }
 
-type SessionInputSkipped struct {
+type ChatInputSkipped struct {
 	// Answer state
-	State SessionInputAnswerState `json:"state"`
+	State ChatInputAnswerState `json:"state"`
 	// Free-form reason or value captured while skipping, if any
 	FreeformValues []string `json:"freeformValues,omitempty"`
 }
 
-// Text question within a session input request.
-type SessionInputTextQuestion struct {
+// Text question within a chat input request.
+type ChatInputTextQuestion struct {
 	// Stable question identifier used as the key in `answers`
 	Id string `json:"id"`
 	// Short display title
@@ -899,8 +1018,8 @@ type SessionInputTextQuestion struct {
 	// Prompt shown to the user
 	Message string `json:"message"`
 	// Whether the user must answer this question to accept the request
-	Required *bool                    `json:"required,omitempty"`
-	Kind     SessionInputQuestionKind `json:"kind"`
+	Required *bool                 `json:"required,omitempty"`
+	Kind     ChatInputQuestionKind `json:"kind"`
 	// Format hint for text questions, such as `email`, `uri`, `date`, or `date-time`
 	Format *string `json:"format,omitempty"`
 	// Minimum string length
@@ -911,8 +1030,8 @@ type SessionInputTextQuestion struct {
 	DefaultValue *string `json:"defaultValue,omitempty"`
 }
 
-// Numeric question within a session input request.
-type SessionInputNumberQuestion struct {
+// Numeric question within a chat input request.
+type ChatInputNumberQuestion struct {
 	// Stable question identifier used as the key in `answers`
 	Id string `json:"id"`
 	// Short display title
@@ -920,8 +1039,8 @@ type SessionInputNumberQuestion struct {
 	// Prompt shown to the user
 	Message string `json:"message"`
 	// Whether the user must answer this question to accept the request
-	Required *bool                    `json:"required,omitempty"`
-	Kind     SessionInputQuestionKind `json:"kind"`
+	Required *bool                 `json:"required,omitempty"`
+	Kind     ChatInputQuestionKind `json:"kind"`
 	// Minimum value
 	Min *float64 `json:"min,omitempty"`
 	// Maximum value
@@ -930,8 +1049,8 @@ type SessionInputNumberQuestion struct {
 	DefaultValue *float64 `json:"defaultValue,omitempty"`
 }
 
-// Boolean question within a session input request.
-type SessionInputBooleanQuestion struct {
+// Boolean question within a chat input request.
+type ChatInputBooleanQuestion struct {
 	// Stable question identifier used as the key in `answers`
 	Id string `json:"id"`
 	// Short display title
@@ -939,14 +1058,14 @@ type SessionInputBooleanQuestion struct {
 	// Prompt shown to the user
 	Message string `json:"message"`
 	// Whether the user must answer this question to accept the request
-	Required *bool                    `json:"required,omitempty"`
-	Kind     SessionInputQuestionKind `json:"kind"`
+	Required *bool                 `json:"required,omitempty"`
+	Kind     ChatInputQuestionKind `json:"kind"`
 	// Default boolean value
 	DefaultValue *bool `json:"defaultValue,omitempty"`
 }
 
-// Single-select question within a session input request.
-type SessionInputSingleSelectQuestion struct {
+// Single-select question within a chat input request.
+type ChatInputSingleSelectQuestion struct {
 	// Stable question identifier used as the key in `answers`
 	Id string `json:"id"`
 	// Short display title
@@ -954,16 +1073,16 @@ type SessionInputSingleSelectQuestion struct {
 	// Prompt shown to the user
 	Message string `json:"message"`
 	// Whether the user must answer this question to accept the request
-	Required *bool                    `json:"required,omitempty"`
-	Kind     SessionInputQuestionKind `json:"kind"`
+	Required *bool                 `json:"required,omitempty"`
+	Kind     ChatInputQuestionKind `json:"kind"`
 	// Options the user may select from
-	Options []SessionInputOption `json:"options"`
+	Options []ChatInputOption `json:"options"`
 	// Whether the user may enter text instead of selecting an option
 	AllowFreeformInput *bool `json:"allowFreeformInput,omitempty"`
 }
 
-// Multi-select question within a session input request.
-type SessionInputMultiSelectQuestion struct {
+// Multi-select question within a chat input request.
+type ChatInputMultiSelectQuestion struct {
 	// Stable question identifier used as the key in `answers`
 	Id string `json:"id"`
 	// Short display title
@@ -971,10 +1090,10 @@ type SessionInputMultiSelectQuestion struct {
 	// Prompt shown to the user
 	Message string `json:"message"`
 	// Whether the user must answer this question to accept the request
-	Required *bool                    `json:"required,omitempty"`
-	Kind     SessionInputQuestionKind `json:"kind"`
+	Required *bool                 `json:"required,omitempty"`
+	Kind     ChatInputQuestionKind `json:"kind"`
 	// Options the user may select from
-	Options []SessionInputOption `json:"options"`
+	Options []ChatInputOption `json:"options"`
 	// Whether the user may enter text in addition to selecting options
 	AllowFreeformInput *bool `json:"allowFreeformInput,omitempty"`
 	// Minimum selected item count
@@ -985,10 +1104,10 @@ type SessionInputMultiSelectQuestion struct {
 
 // A live request for user input.
 //
-// The server creates or replaces requests with `session/inputRequested`.
-// Clients sync drafts with `session/inputAnswerChanged` and complete requests
-// with `session/inputCompleted`.
-type SessionInputRequest struct {
+// The server creates or replaces requests with `chat/inputRequested`.
+// Clients sync drafts with `chat/inputAnswerChanged` and complete requests
+// with `chat/inputCompleted`.
+type ChatInputRequest struct {
 	// Stable request identifier
 	Id string `json:"id"`
 	// Display message for the request as a whole
@@ -996,9 +1115,9 @@ type SessionInputRequest struct {
 	// URL the user should review or open, for URL-style elicitations
 	Url *URI `json:"url,omitempty"`
 	// Ordered questions to ask the user
-	Questions []SessionInputQuestion `json:"questions,omitempty"`
+	Questions []ChatInputQuestion `json:"questions,omitempty"`
 	// Current draft or submitted answers, keyed by question ID
-	Answers map[string]SessionInputAnswer `json:"answers,omitempty"`
+	Answers map[string]ChatInputAnswer `json:"answers,omitempty"`
 }
 
 // A zero-based position within a textual document.
@@ -1191,7 +1310,7 @@ type MessageAnnotationsAttachment struct {
 type MarkdownResponsePart struct {
 	// Discriminant
 	Kind ResponsePartKind `json:"kind"`
-	// Part identifier, used by `session/delta` to target this part for content appends
+	// Part identifier, used by `chat/delta` to target this part for content appends
 	Id string `json:"id"`
 	// Markdown content
 	Content string `json:"content"`
@@ -1235,7 +1354,7 @@ type ToolCallResponsePart struct {
 type ReasoningResponsePart struct {
 	// Discriminant
 	Kind ResponsePartKind `json:"kind"`
-	// Part identifier, used by `session/reasoning` to target this part for content appends
+	// Part identifier, used by `chat/reasoning` to target this part for content appends
 	Id string `json:"id"`
 	// Accumulated reasoning text
 	Content string `json:"content"`
@@ -2128,7 +2247,7 @@ type ToolCallClientContributor struct {
 	// Absent for server-side tools.
 	//
 	// When set, the identified client is responsible for executing the tool and
-	// dispatching `session/toolCallComplete` with the result.
+	// dispatching `chat/toolCallComplete` with the result.
 	ClientId string `json:"clientId"`
 }
 
@@ -2272,7 +2391,7 @@ type ErrorInfo struct {
 // A point-in-time snapshot of a subscribed resource's state, returned by
 // `initialize`, `reconnect`, and `subscribe`.
 type Snapshot struct {
-	// The subscribed channel URI (e.g. `ahp-root://` or `ahp-session:/<uuid>`)
+	// The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)
 	Resource URI `json:"resource"`
 	// The current state of the resource
 	State SnapshotState `json:"state"`
@@ -2847,67 +2966,67 @@ func (u TerminalContentPart) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
-// SessionInputQuestion is one question within a session input request.
-type SessionInputQuestion struct {
-	Value isSessionInputQuestion
+// ChatInputQuestion is one question within a chat input request.
+type ChatInputQuestion struct {
+	Value isChatInputQuestion
 }
 
-// isSessionInputQuestion is the marker interface implemented by every
-// concrete variant of SessionInputQuestion.
-type isSessionInputQuestion interface{ isSessionInputQuestion() }
+// isChatInputQuestion is the marker interface implemented by every
+// concrete variant of ChatInputQuestion.
+type isChatInputQuestion interface{ isChatInputQuestion() }
 
-func (*SessionInputTextQuestion) isSessionInputQuestion()         {}
-func (*SessionInputNumberQuestion) isSessionInputQuestion()       {}
-func (*SessionInputBooleanQuestion) isSessionInputQuestion()      {}
-func (*SessionInputSingleSelectQuestion) isSessionInputQuestion() {}
-func (*SessionInputMultiSelectQuestion) isSessionInputQuestion()  {}
+func (*ChatInputTextQuestion) isChatInputQuestion()         {}
+func (*ChatInputNumberQuestion) isChatInputQuestion()       {}
+func (*ChatInputBooleanQuestion) isChatInputQuestion()      {}
+func (*ChatInputSingleSelectQuestion) isChatInputQuestion() {}
+func (*ChatInputMultiSelectQuestion) isChatInputQuestion()  {}
 
-// SessionInputQuestionUnknown carries an unrecognized SessionInputQuestion variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
-type SessionInputQuestionUnknown struct {
+// ChatInputQuestionUnknown carries an unrecognized ChatInputQuestion variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ChatInputQuestionUnknown struct {
 	Raw json.RawMessage
 }
 
-func (*SessionInputQuestionUnknown) isSessionInputQuestion() {}
+func (*ChatInputQuestionUnknown) isChatInputQuestion() {}
 
 // UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
-func (u *SessionInputQuestion) UnmarshalJSON(data []byte) error {
+func (u *ChatInputQuestion) UnmarshalJSON(data []byte) error {
 	disc, _, err := readDiscriminator(data, "kind")
 	if err != nil {
 		return err
 	}
 	switch disc {
 	case "text":
-		var value SessionInputTextQuestion
+		var value ChatInputTextQuestion
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "number":
-		var value SessionInputNumberQuestion
+		var value ChatInputNumberQuestion
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "integer":
-		var value SessionInputNumberQuestion
+		var value ChatInputNumberQuestion
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "boolean":
-		var value SessionInputBooleanQuestion
+		var value ChatInputBooleanQuestion
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "single-select":
-		var value SessionInputSingleSelectQuestion
+		var value ChatInputSingleSelectQuestion
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "multi-select":
-		var value SessionInputMultiSelectQuestion
+		var value ChatInputMultiSelectQuestion
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -2915,14 +3034,14 @@ func (u *SessionInputQuestion) UnmarshalJSON(data []byte) error {
 	default:
 		raw := make(json.RawMessage, len(data))
 		copy(raw, data)
-		u.Value = &SessionInputQuestionUnknown{Raw: raw}
+		u.Value = &ChatInputQuestionUnknown{Raw: raw}
 	}
 	return nil
 }
 
 // MarshalJSON encodes the active variant back to JSON.
-func (u SessionInputQuestion) MarshalJSON() ([]byte, error) {
-	if unk, ok := u.Value.(*SessionInputQuestionUnknown); ok {
+func (u ChatInputQuestion) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ChatInputQuestionUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}
@@ -2934,61 +3053,61 @@ func (u SessionInputQuestion) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
-// SessionInputAnswerValue is the value captured for one answer.
-type SessionInputAnswerValue struct {
-	Value isSessionInputAnswerValue
+// ChatInputAnswerValue is the value captured for one answer.
+type ChatInputAnswerValue struct {
+	Value isChatInputAnswerValue
 }
 
-// isSessionInputAnswerValue is the marker interface implemented by every
-// concrete variant of SessionInputAnswerValue.
-type isSessionInputAnswerValue interface{ isSessionInputAnswerValue() }
+// isChatInputAnswerValue is the marker interface implemented by every
+// concrete variant of ChatInputAnswerValue.
+type isChatInputAnswerValue interface{ isChatInputAnswerValue() }
 
-func (*SessionInputTextAnswerValue) isSessionInputAnswerValue()         {}
-func (*SessionInputNumberAnswerValue) isSessionInputAnswerValue()       {}
-func (*SessionInputBooleanAnswerValue) isSessionInputAnswerValue()      {}
-func (*SessionInputSelectedAnswerValue) isSessionInputAnswerValue()     {}
-func (*SessionInputSelectedManyAnswerValue) isSessionInputAnswerValue() {}
+func (*ChatInputTextAnswerValue) isChatInputAnswerValue()         {}
+func (*ChatInputNumberAnswerValue) isChatInputAnswerValue()       {}
+func (*ChatInputBooleanAnswerValue) isChatInputAnswerValue()      {}
+func (*ChatInputSelectedAnswerValue) isChatInputAnswerValue()     {}
+func (*ChatInputSelectedManyAnswerValue) isChatInputAnswerValue() {}
 
-// SessionInputAnswerValueUnknown carries an unrecognized SessionInputAnswerValue variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
-type SessionInputAnswerValueUnknown struct {
+// ChatInputAnswerValueUnknown carries an unrecognized ChatInputAnswerValue variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ChatInputAnswerValueUnknown struct {
 	Raw json.RawMessage
 }
 
-func (*SessionInputAnswerValueUnknown) isSessionInputAnswerValue() {}
+func (*ChatInputAnswerValueUnknown) isChatInputAnswerValue() {}
 
 // UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
-func (u *SessionInputAnswerValue) UnmarshalJSON(data []byte) error {
+func (u *ChatInputAnswerValue) UnmarshalJSON(data []byte) error {
 	disc, _, err := readDiscriminator(data, "kind")
 	if err != nil {
 		return err
 	}
 	switch disc {
 	case "text":
-		var value SessionInputTextAnswerValue
+		var value ChatInputTextAnswerValue
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "number":
-		var value SessionInputNumberAnswerValue
+		var value ChatInputNumberAnswerValue
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "boolean":
-		var value SessionInputBooleanAnswerValue
+		var value ChatInputBooleanAnswerValue
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "selected":
-		var value SessionInputSelectedAnswerValue
+		var value ChatInputSelectedAnswerValue
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "selected-many":
-		var value SessionInputSelectedManyAnswerValue
+		var value ChatInputSelectedManyAnswerValue
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -2996,14 +3115,14 @@ func (u *SessionInputAnswerValue) UnmarshalJSON(data []byte) error {
 	default:
 		raw := make(json.RawMessage, len(data))
 		copy(raw, data)
-		u.Value = &SessionInputAnswerValueUnknown{Raw: raw}
+		u.Value = &ChatInputAnswerValueUnknown{Raw: raw}
 	}
 	return nil
 }
 
 // MarshalJSON encodes the active variant back to JSON.
-func (u SessionInputAnswerValue) MarshalJSON() ([]byte, error) {
-	if unk, ok := u.Value.(*SessionInputAnswerValueUnknown); ok {
+func (u ChatInputAnswerValue) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ChatInputAnswerValueUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}
@@ -3015,46 +3134,46 @@ func (u SessionInputAnswerValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
-// SessionInputAnswer is a draft, submitted, or skipped answer for one question.
-type SessionInputAnswer struct {
-	Value isSessionInputAnswer
+// ChatInputAnswer is a draft, submitted, or skipped answer for one question.
+type ChatInputAnswer struct {
+	Value isChatInputAnswer
 }
 
-// isSessionInputAnswer is the marker interface implemented by every
-// concrete variant of SessionInputAnswer.
-type isSessionInputAnswer interface{ isSessionInputAnswer() }
+// isChatInputAnswer is the marker interface implemented by every
+// concrete variant of ChatInputAnswer.
+type isChatInputAnswer interface{ isChatInputAnswer() }
 
-func (*SessionInputAnswered) isSessionInputAnswer() {}
-func (*SessionInputSkipped) isSessionInputAnswer()  {}
+func (*ChatInputAnswered) isChatInputAnswer() {}
+func (*ChatInputSkipped) isChatInputAnswer()  {}
 
-// SessionInputAnswerUnknown carries an unrecognized SessionInputAnswer variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
-type SessionInputAnswerUnknown struct {
+// ChatInputAnswerUnknown carries an unrecognized ChatInputAnswer variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ChatInputAnswerUnknown struct {
 	Raw json.RawMessage
 }
 
-func (*SessionInputAnswerUnknown) isSessionInputAnswer() {}
+func (*ChatInputAnswerUnknown) isChatInputAnswer() {}
 
 // UnmarshalJSON decodes the variant indicated by the "state" discriminator.
-func (u *SessionInputAnswer) UnmarshalJSON(data []byte) error {
+func (u *ChatInputAnswer) UnmarshalJSON(data []byte) error {
 	disc, _, err := readDiscriminator(data, "state")
 	if err != nil {
 		return err
 	}
 	switch disc {
 	case "draft":
-		var value SessionInputAnswered
+		var value ChatInputAnswered
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "submitted":
-		var value SessionInputAnswered
+		var value ChatInputAnswered
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "skipped":
-		var value SessionInputSkipped
+		var value ChatInputSkipped
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -3062,14 +3181,14 @@ func (u *SessionInputAnswer) UnmarshalJSON(data []byte) error {
 	default:
 		raw := make(json.RawMessage, len(data))
 		copy(raw, data)
-		u.Value = &SessionInputAnswerUnknown{Raw: raw}
+		u.Value = &ChatInputAnswerUnknown{Raw: raw}
 	}
 	return nil
 }
 
 // MarshalJSON encodes the active variant back to JSON.
-func (u SessionInputAnswer) MarshalJSON() ([]byte, error) {
-	if unk, ok := u.Value.(*SessionInputAnswerUnknown); ok {
+func (u ChatInputAnswer) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ChatInputAnswerUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}
@@ -3613,14 +3732,96 @@ func (u ToolCallContributor) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
+// ChatOrigin describes how a chat came into existence.
+type ChatOrigin struct {
+	Value isChatOrigin
+}
+
+// isChatOrigin is the marker interface for chat origin variants.
+type isChatOrigin interface{ isChatOrigin() }
+
+type ChatUserOrigin struct {
+	Kind ChatOriginKind `json:"kind"`
+}
+
+func (*ChatUserOrigin) isChatOrigin() {}
+
+type ChatForkOrigin struct {
+	Kind   ChatOriginKind `json:"kind"`
+	Chat   URI            `json:"chat"`
+	TurnId string         `json:"turnId"`
+}
+
+func (*ChatForkOrigin) isChatOrigin() {}
+
+type ChatToolOrigin struct {
+	Kind       ChatOriginKind `json:"kind"`
+	Chat       URI            `json:"chat"`
+	ToolCallId string         `json:"toolCallId"`
+}
+
+func (*ChatToolOrigin) isChatOrigin() {}
+
+type ChatOriginUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*ChatOriginUnknown) isChatOrigin() {}
+
+func (o *ChatOrigin) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "user":
+		var v ChatUserOrigin
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		o.Value = &v
+	case "fork":
+		var v ChatForkOrigin
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		o.Value = &v
+	case "tool":
+		var v ChatToolOrigin
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		o.Value = &v
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		o.Value = &ChatOriginUnknown{Raw: raw}
+	}
+	return nil
+}
+
+func (o ChatOrigin) MarshalJSON() ([]byte, error) {
+	if unk, ok := o.Value.(*ChatOriginUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if o.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(o.Value)
+}
+
 // SnapshotState is the state payload of a snapshot — root, session,
-// terminal, changeset, resource-watch, or annotations state. The active
+// chat, terminal, changeset, resource-watch, or annotations state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (session → terminal → changeset → resourceWatch → annotations → root).
+// (session → chat → terminal → changeset → resourceWatch → annotations → root).
 type SnapshotState struct {
 	Root          *RootState          `json:"-"`
 	Session       *SessionState       `json:"-"`
+	Chat          *ChatState          `json:"-"`
 	Terminal      *TerminalState      `json:"-"`
 	Changeset     *ChangesetState     `json:"-"`
 	ResourceWatch *ResourceWatchState `json:"-"`
@@ -3632,6 +3833,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	switch {
 	case s.Session != nil:
 		return json.Marshal(s.Session)
+	case s.Chat != nil:
+		return json.Marshal(s.Chat)
 	case s.Terminal != nil:
 		return json.Marshal(s.Terminal)
 	case s.Changeset != nil:
@@ -3662,6 +3865,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Session = &v
+	case containsAll(probe, "summary", "turns"):
+		var v ChatState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Chat = &v
 	case containsAll(probe, "content"):
 		var v TerminalState
 		if err := json.Unmarshal(data, &v); err != nil {

@@ -8,143 +8,8 @@
 
 package com.microsoft.agenthostprotocol
 
-import com.microsoft.agenthostprotocol.generated.AgentSelection
-import com.microsoft.agenthostprotocol.generated.ChangesetFile
-import com.microsoft.agenthostprotocol.generated.ChangesetState
-import com.microsoft.agenthostprotocol.generated.ChangesetStatus
-import com.microsoft.agenthostprotocol.generated.ChangesetOperationStatus
-import com.microsoft.agenthostprotocol.generated.ChildCustomization
-import com.microsoft.agenthostprotocol.generated.ChildCustomizationAgent
-import com.microsoft.agenthostprotocol.generated.ChildCustomizationHook
-import com.microsoft.agenthostprotocol.generated.ChildCustomizationMcpServer
-import com.microsoft.agenthostprotocol.generated.ChildCustomizationPrompt
-import com.microsoft.agenthostprotocol.generated.ChildCustomizationRule
-import com.microsoft.agenthostprotocol.generated.ChildCustomizationSkill
-import com.microsoft.agenthostprotocol.generated.ChildCustomizationUnknown
-import com.microsoft.agenthostprotocol.generated.AnnotationEntry
-import com.microsoft.agenthostprotocol.generated.Annotation
-import com.microsoft.agenthostprotocol.generated.AnnotationsState
-import com.microsoft.agenthostprotocol.generated.ConfirmationOption
-import com.microsoft.agenthostprotocol.generated.Customization
-import com.microsoft.agenthostprotocol.generated.CustomizationDirectory
-import com.microsoft.agenthostprotocol.generated.CustomizationMcpServer
-import com.microsoft.agenthostprotocol.generated.CustomizationPlugin
-import com.microsoft.agenthostprotocol.generated.CustomizationUnknown
-import com.microsoft.agenthostprotocol.generated.ErrorInfo
-import com.microsoft.agenthostprotocol.generated.MarkdownResponsePart
-import com.microsoft.agenthostprotocol.generated.PendingMessage
-import com.microsoft.agenthostprotocol.generated.PendingMessageKind
-import com.microsoft.agenthostprotocol.generated.ReasoningResponsePart
-import com.microsoft.agenthostprotocol.generated.ResponsePart
-import com.microsoft.agenthostprotocol.generated.ResponsePartKind
-import com.microsoft.agenthostprotocol.generated.ResponsePartMarkdown
-import com.microsoft.agenthostprotocol.generated.ResponsePartReasoning
-import com.microsoft.agenthostprotocol.generated.ResponsePartToolCall
-import com.microsoft.agenthostprotocol.generated.RootState
-import com.microsoft.agenthostprotocol.generated.SessionActiveClient
-import com.microsoft.agenthostprotocol.generated.ResourceWatchState
-import com.microsoft.agenthostprotocol.generated.SessionInputRequest
-import com.microsoft.agenthostprotocol.generated.SessionLifecycle
-import com.microsoft.agenthostprotocol.generated.SessionState
-import com.microsoft.agenthostprotocol.generated.SessionStatus
-import com.microsoft.agenthostprotocol.generated.SessionSummary
-import com.microsoft.agenthostprotocol.generated.StateAction
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetCleared
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetFileRemoved
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetFileSet
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetOperationsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetOperationStatusChanged
-import com.microsoft.agenthostprotocol.generated.StateActionChangesetStatusChanged
-import com.microsoft.agenthostprotocol.generated.StateActionAnnotationsEntryRemoved
-import com.microsoft.agenthostprotocol.generated.StateActionAnnotationsEntrySet
-import com.microsoft.agenthostprotocol.generated.StateActionAnnotationsRemoved
-import com.microsoft.agenthostprotocol.generated.StateActionAnnotationsSet
-import com.microsoft.agenthostprotocol.generated.StateActionAnnotationsUpdated
-import com.microsoft.agenthostprotocol.generated.StateActionRootActiveSessionsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionRootAgentsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionRootConfigChanged
-import com.microsoft.agenthostprotocol.generated.StateActionRootTerminalsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionResourceWatchChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionActiveClientChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionActiveClientToolsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionActivityChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionAgentChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionChangesetsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionConfigChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionCreationFailed
-import com.microsoft.agenthostprotocol.generated.StateActionSessionCustomizationRemoved
-import com.microsoft.agenthostprotocol.generated.StateActionSessionCustomizationToggled
-import com.microsoft.agenthostprotocol.generated.StateActionSessionCustomizationUpdated
-import com.microsoft.agenthostprotocol.generated.StateActionSessionCustomizationsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionDelta
-import com.microsoft.agenthostprotocol.generated.StateActionSessionError
-import com.microsoft.agenthostprotocol.generated.StateActionSessionInputAnswerChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionInputCompleted
-import com.microsoft.agenthostprotocol.generated.StateActionSessionInputRequested
-import com.microsoft.agenthostprotocol.generated.StateActionSessionIsArchivedChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionIsReadChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionMcpServerStateChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionMetaChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionModelChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionPendingMessageRemoved
-import com.microsoft.agenthostprotocol.generated.StateActionSessionPendingMessageSet
-import com.microsoft.agenthostprotocol.generated.StateActionSessionQueuedMessagesReordered
-import com.microsoft.agenthostprotocol.generated.StateActionSessionReady
-import com.microsoft.agenthostprotocol.generated.StateActionSessionReasoning
-import com.microsoft.agenthostprotocol.generated.StateActionSessionResponsePart
-import com.microsoft.agenthostprotocol.generated.StateActionSessionServerToolsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionTitleChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionToolCallComplete
-import com.microsoft.agenthostprotocol.generated.StateActionSessionToolCallConfirmed
-import com.microsoft.agenthostprotocol.generated.StateActionSessionToolCallContentChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionToolCallDelta
-import com.microsoft.agenthostprotocol.generated.StateActionSessionToolCallReady
-import com.microsoft.agenthostprotocol.generated.StateActionSessionToolCallResultConfirmed
-import com.microsoft.agenthostprotocol.generated.StateActionSessionToolCallStart
-import com.microsoft.agenthostprotocol.generated.StateActionSessionTruncated
-import com.microsoft.agenthostprotocol.generated.StateActionSessionTurnCancelled
-import com.microsoft.agenthostprotocol.generated.StateActionSessionTurnComplete
-import com.microsoft.agenthostprotocol.generated.StateActionSessionTurnStarted
-import com.microsoft.agenthostprotocol.generated.StateActionSessionUsage
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalClaimed
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalCleared
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalCommandDetectionAvailable
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalCommandExecuted
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalCommandFinished
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalCwdChanged
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalData
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalExited
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalInput
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalResized
-import com.microsoft.agenthostprotocol.generated.StateActionTerminalTitleChanged
-import com.microsoft.agenthostprotocol.generated.TerminalCommandPart
-import com.microsoft.agenthostprotocol.generated.TerminalContentPart
-import com.microsoft.agenthostprotocol.generated.TerminalContentPartCommand
-import com.microsoft.agenthostprotocol.generated.TerminalContentPartUnclassified
-import com.microsoft.agenthostprotocol.generated.TerminalState
-import com.microsoft.agenthostprotocol.generated.TerminalUnclassifiedPart
-import com.microsoft.agenthostprotocol.generated.ToolCallCancellationReason
-import com.microsoft.agenthostprotocol.generated.ToolCallCancelledState
-import com.microsoft.agenthostprotocol.generated.ToolCallCompletedState
-import com.microsoft.agenthostprotocol.generated.ToolCallConfirmationReason
-import com.microsoft.agenthostprotocol.generated.ToolCallContributor
-import com.microsoft.agenthostprotocol.generated.ToolCallPendingConfirmationState
-import com.microsoft.agenthostprotocol.generated.ToolCallPendingResultConfirmationState
-import com.microsoft.agenthostprotocol.generated.ToolCallResponsePart
-import com.microsoft.agenthostprotocol.generated.ToolCallRunningState
-import com.microsoft.agenthostprotocol.generated.ToolCallState
-import com.microsoft.agenthostprotocol.generated.ToolCallStateCancelled
-import com.microsoft.agenthostprotocol.generated.ToolCallStateCompleted
-import com.microsoft.agenthostprotocol.generated.ToolCallStatePendingConfirmation
-import com.microsoft.agenthostprotocol.generated.ToolCallStatePendingResultConfirmation
-import com.microsoft.agenthostprotocol.generated.ToolCallStateRunning
-import com.microsoft.agenthostprotocol.generated.ToolCallStateStreaming
-import com.microsoft.agenthostprotocol.generated.ToolCallStateUnknown
-import com.microsoft.agenthostprotocol.generated.ToolCallStatus
-import com.microsoft.agenthostprotocol.generated.ToolCallStreamingState
-import com.microsoft.agenthostprotocol.generated.Turn
-import com.microsoft.agenthostprotocol.generated.ActiveTurn
-import com.microsoft.agenthostprotocol.generated.TurnState
+import com.microsoft.agenthostprotocol.generated.*
+import java.time.Instant
 import kotlinx.serialization.json.JsonElement
 
 // ─── Reducer Interface ──────────────────────────────────────────────────────
@@ -173,6 +38,12 @@ public object RootReducer : Reducer<RootState, StateAction> {
 public object SessionReducer : Reducer<SessionState, StateAction> {
     override fun reduce(state: SessionState, action: StateAction): SessionState =
         sessionReducer(state, action)
+}
+
+/** Pure chat reducer as a [Reducer] instance. Delegates to [chatReducer]. */
+public object ChatReducer : Reducer<ChatState, StateAction> {
+    override fun reduce(state: ChatState, action: StateAction): ChatState =
+        chatReducer(state, action)
 }
 
 /** Pure terminal reducer as a [Reducer] instance. Delegates to [terminalReducer]. */
@@ -210,6 +81,7 @@ public object ResourceWatchReducer : Reducer<ResourceWatchState, StateAction> {
 public var currentTimestampProvider: () -> Long = { System.currentTimeMillis() }
 
 private fun now(): Long = currentTimestampProvider()
+private fun nowIsoString(): String = Instant.ofEpochMilli(currentTimestampProvider()).toString()
 
 // ─── Status Bitset Helpers ──────────────────────────────────────────────────
 
@@ -225,7 +97,7 @@ private fun withStatusFlag(status: SessionStatus, flag: SessionStatus, set: Bool
     }
 
 /** Derives the summary status from live session work, preserving orthogonal flags. */
-private fun summaryStatus(state: SessionState, terminalStatus: SessionStatus? = null): SessionStatus {
+private fun chatSummaryStatus(state: ChatState, terminalStatus: SessionStatus? = null): SessionStatus {
     val activity: SessionStatus = when {
         terminalStatus != null -> terminalStatus
         (state.inputRequests?.size ?: 0) > 0 || hasPendingToolCallConfirmation(state) ->
@@ -233,25 +105,25 @@ private fun summaryStatus(state: SessionState, terminalStatus: SessionStatus? = 
         state.activeTurn != null -> SessionStatus.IN_PROGRESS
         else -> SessionStatus.IDLE
     }
-    val preserved = state.summary.status.rawValue and STATUS_ACTIVITY_MASK.inv()
+    val preserved = state.status.rawValue and STATUS_ACTIVITY_MASK.inv()
     return SessionStatus(preserved or activity.rawValue)
 }
 
 /**
- * Returns a state with `summary.status` recomputed. Use after reducers that
- * change data feeding into [summaryStatus] (e.g. tool call lifecycle
+ * Returns a state with chat [ChatState.status] recomputed. Use after reducers that
+ * change data feeding into [chatSummaryStatus] (e.g. tool call lifecycle
  * transitions that may enter or leave a pending-confirmation state).
  */
-private fun refreshSummaryStatus(state: SessionState): SessionState {
-    val status = summaryStatus(state)
-    if (status.rawValue == state.summary.status.rawValue) {
+private fun refreshChatSummaryStatus(state: ChatState): ChatState {
+    val status = chatSummaryStatus(state)
+    if (status.rawValue == state.status.rawValue) {
         return state
     }
-    return state.copy(summary = state.summary.copy(status = status))
+    return state.copy(status = status)
 }
 
 /** Returns `true` if the active turn has any tool call awaiting user confirmation. */
-private fun hasPendingToolCallConfirmation(state: SessionState): Boolean {
+private fun hasPendingToolCallConfirmation(state: ChatState): Boolean {
     val active = state.activeTurn ?: return false
     return active.responseParts.any { part ->
         part is ResponsePartToolCall &&
@@ -355,11 +227,11 @@ private fun childCustomizationId(c: ChildCustomization): String? = when (c) {
  * active turn or tool call doesn't match.
  */
 private fun updateToolCallInParts(
-    state: SessionState,
+    state: ChatState,
     turnId: String,
     toolCallId: String,
     updater: (ToolCallState) -> ToolCallState,
-): SessionState {
+): ChatState {
     val activeTurn = state.activeTurn ?: return state
     if (activeTurn.id != turnId) return state
 
@@ -387,11 +259,11 @@ private fun updateToolCallInParts(
  * matches on `toolCall.toolCallId`.
  */
 private fun updateResponsePart(
-    state: SessionState,
+    state: ChatState,
     turnId: String,
     partId: String,
     updater: (ResponsePart) -> ResponsePart,
-): SessionState {
+): ChatState {
     val activeTurn = state.activeTurn ?: return state
     if (activeTurn.id != turnId) return state
 
@@ -424,12 +296,12 @@ private fun updateResponsePart(
  * stripped from those tool call parts in the process.
  */
 private fun endTurn(
-    state: SessionState,
+    state: ChatState,
     turnId: String,
     turnState: TurnState,
     terminalStatus: SessionStatus? = null,
     error: ErrorInfo? = null,
-): SessionState {
+): ChatState {
     val active = state.activeTurn ?: return state
     if (active.id != turnId) return state
 
@@ -492,17 +364,15 @@ private fun endTurn(
         turns = state.turns + turn,
         activeTurn = null,
         inputRequests = null,
-        summary = state.summary.copy(modifiedAt = now()),
+        modifiedAt = nowIsoString(),
     )
-    return withoutTurn.copy(
-        summary = withoutTurn.summary.copy(status = summaryStatus(withoutTurn, terminalStatus)),
-    )
+    return withoutTurn.copy(status = chatSummaryStatus(withoutTurn, terminalStatus))
 }
 
-private fun upsertInputRequest(state: SessionState, request: SessionInputRequest): SessionState {
+private fun upsertInputRequest(state: ChatState, request: ChatInputRequest): ChatState {
     val existing = state.inputRequests ?: emptyList()
     val idx = existing.indexOfFirst { it.id == request.id }
-    val updated: List<SessionInputRequest> = if (idx >= 0) {
+    val updated: List<ChatInputRequest> = if (idx >= 0) {
         val priorAnswers = existing[idx].answers
         existing.toMutableList().also { it[idx] = request.copy(answers = request.answers ?: priorAnswers) }
     } else {
@@ -510,10 +380,8 @@ private fun upsertInputRequest(state: SessionState, request: SessionInputRequest
     }
     val next = state.copy(inputRequests = updated)
     return next.copy(
-        summary = next.summary.copy(
-            status = withStatusFlag(summaryStatus(next), SessionStatus.IS_READ, false),
-            modifiedAt = now(),
-        ),
+        status = withStatusFlag(chatSummaryStatus(next), SessionStatus.IS_READ, false),
+        modifiedAt = nowIsoString(),
     )
 }
 
@@ -559,25 +427,218 @@ public fun rootReducer(state: RootState, action: StateAction): RootState = when 
  * no-ops that return [state] unchanged.
  */
 public fun sessionReducer(state: SessionState, action: StateAction): SessionState = when (action) {
-
-    // ── Lifecycle ──────────────────────────────────────────────────────────
-
-    is StateActionSessionReady -> {
-        // Lifecycle-only transition (Creating → Ready). Must not touch
-        // `summary.status`: for provisional sessions the first turn can
-        // start before materialisation completes, so an `activeTurn` may
-        // already be set. The TS reference impl notes this in detail.
-        state.copy(lifecycle = SessionLifecycle.READY)
-    }
+    is StateActionSessionReady -> state.copy(lifecycle = SessionLifecycle.READY)
 
     is StateActionSessionCreationFailed -> state.copy(
         lifecycle = SessionLifecycle.CREATION_FAILED,
         creationError = action.value.error,
     )
 
+    is StateActionSessionChatAdded -> {
+        val summary = action.value.summary
+        val idx = state.chats.indexOfFirst { it.resource == summary.resource }
+        if (idx < 0) {
+            state.copy(chats = state.chats + summary)
+        } else {
+            val updated = state.chats.toMutableList()
+            updated[idx] = summary
+            state.copy(chats = updated)
+        }
+    }
+
+    is StateActionSessionChatRemoved -> {
+        val chat = action.value.chat
+        val idx = state.chats.indexOfFirst { it.resource == chat }
+        if (idx < 0) {
+            state
+        } else {
+            val updated = state.chats.toMutableList()
+            updated.removeAt(idx)
+            state.copy(
+                chats = updated,
+                defaultChat = if (state.defaultChat == chat) null else state.defaultChat,
+            )
+        }
+    }
+
+    is StateActionSessionChatUpdated -> {
+        val a = action.value
+        val idx = state.chats.indexOfFirst { it.resource == a.chat }
+        if (idx < 0) {
+            state
+        } else {
+            val prior = state.chats[idx]
+            val c = a.changes
+            val updatedSummary = prior.copy(
+                title = c.title ?: prior.title,
+                status = c.status ?: prior.status,
+                activity = c.activity ?: prior.activity,
+                modifiedAt = c.modifiedAt ?: prior.modifiedAt,
+                model = c.model ?: prior.model,
+                agent = c.agent ?: prior.agent,
+                origin = c.origin ?: prior.origin,
+                workingDirectory = c.workingDirectory ?: prior.workingDirectory,
+            )
+            val updated = state.chats.toMutableList()
+            updated[idx] = updatedSummary
+            state.copy(chats = updated)
+        }
+    }
+
+    is StateActionSessionDefaultChatChanged -> state.copy(defaultChat = action.value.defaultChat)
+
+    is StateActionSessionTitleChanged -> state.copy(
+        summary = state.summary.copy(title = action.value.title, modifiedAt = now()),
+    )
+
+    is StateActionSessionModelChanged -> state.copy(
+        summary = state.summary.copy(model = action.value.model, modifiedAt = now()),
+    )
+
+    is StateActionSessionAgentChanged -> state.copy(
+        summary = state.summary.copy(agent = action.value.agent, modifiedAt = now()),
+    )
+
+    is StateActionSessionIsReadChanged -> state.copy(
+        summary = state.summary.copy(
+            status = withStatusFlag(state.summary.status, SessionStatus.IS_READ, action.value.isRead),
+        ),
+    )
+
+    is StateActionSessionIsArchivedChanged -> state.copy(
+        summary = state.summary.copy(
+            status = withStatusFlag(state.summary.status, SessionStatus.IS_ARCHIVED, action.value.isArchived),
+        ),
+    )
+
+    is StateActionSessionActivityChanged -> state.copy(
+        summary = state.summary.copy(activity = action.value.activity),
+    )
+
+    is StateActionSessionChangesetsChanged -> state.copy(changesets = action.value.changesets)
+
+    is StateActionSessionConfigChanged -> {
+        val a = action.value
+        val config = state.config
+        if (config == null) state else {
+            val newValues = if (a.replace == true) a.config else config.values + a.config
+            state.copy(config = config.copy(values = newValues), summary = state.summary.copy(modifiedAt = now()))
+        }
+    }
+
+    is StateActionSessionMetaChanged -> state.copy(meta = action.value.meta)
+
+    is StateActionSessionServerToolsChanged -> state.copy(serverTools = action.value.tools)
+
+    is StateActionSessionActiveClientChanged -> state.copy(activeClient = action.value.activeClient)
+
+    is StateActionSessionActiveClientToolsChanged -> {
+        val client = state.activeClient
+        if (client == null) state else state.copy(activeClient = client.copy(tools = action.value.tools))
+    }
+
+    is StateActionSessionCustomizationsChanged -> state.copy(customizations = action.value.customizations)
+
+    is StateActionSessionCustomizationToggled -> {
+        val a = action.value
+        val list = state.customizations
+        if (list == null) state else {
+            val idx = list.indexOfFirst { customizationId(it) == a.id }
+            if (idx < 0) state else {
+                val updated = list.toMutableList()
+                updated[idx] = withCustomizationEnabled(updated[idx], a.enabled)
+                state.copy(customizations = updated)
+            }
+        }
+    }
+
+    is StateActionSessionCustomizationUpdated -> {
+        val a = action.value
+        val targetId = customizationId(a.customization)
+        if (targetId == null) state else {
+            val list = state.customizations ?: emptyList()
+            val idx = list.indexOfFirst { customizationId(it) == targetId }
+            if (idx < 0) state.copy(customizations = list + a.customization) else {
+                val updated = list.toMutableList()
+                updated[idx] = a.customization
+                state.copy(customizations = updated)
+            }
+        }
+    }
+
+    is StateActionSessionCustomizationRemoved -> {
+        val a = action.value
+        val list = state.customizations
+        if (list == null) state else {
+            val topIdx = list.indexOfFirst { customizationId(it) == a.id }
+            if (topIdx >= 0) {
+                val updated = list.toMutableList()
+                updated.removeAt(topIdx)
+                state.copy(customizations = updated)
+            } else {
+                var changed = false
+                val updated = list.map { container ->
+                    val children = customizationChildren(container)
+                    if (children == null) container else {
+                        val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
+                        if (childIdx < 0) container else {
+                            changed = true
+                            val newChildren = children.toMutableList()
+                            newChildren.removeAt(childIdx)
+                            withCustomizationChildren(container, newChildren)
+                        }
+                    }
+                }
+                if (!changed) state else state.copy(customizations = updated)
+            }
+        }
+    }
+
+    is StateActionSessionMcpServerStateChanged -> {
+        val a = action.value
+        val list = state.customizations
+        if (list == null) state else {
+            val topIdx = list.indexOfFirst { customizationId(it) == a.id }
+            if (topIdx >= 0) {
+                val entry = list[topIdx]
+                if (entry !is CustomizationMcpServer) state else {
+                    val updated = list.toMutableList()
+                    updated[topIdx] = CustomizationMcpServer(entry.value.copy(state = a.state, channel = a.channel))
+                    state.copy(customizations = updated)
+                }
+            } else {
+                var changed = false
+                val updated = list.map { container ->
+                    val children = customizationChildren(container)
+                    if (children == null) container else {
+                        val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
+                        if (childIdx < 0) container else {
+                            val child = children[childIdx]
+                            if (child !is ChildCustomizationMcpServer) container else {
+                                changed = true
+                                val newChildren = children.toMutableList()
+                                newChildren[childIdx] = ChildCustomizationMcpServer(child.value.copy(state = a.state, channel = a.channel))
+                                withCustomizationChildren(container, newChildren)
+                            }
+                        }
+                    }
+                }
+                if (!changed) state else state.copy(customizations = updated)
+            }
+        }
+    }
+
+    else -> state
+}
+
+// ─── Chat Reducer ───────────────────────────────────────────────────────────
+
+/** Pure reducer for [ChatState]. Handles all chat-channel action variants. */
+public fun chatReducer(state: ChatState, action: StateAction): ChatState = when (action) {
+
     // ── Turn Lifecycle ────────────────────────────────────────────────────
 
-    is StateActionSessionTurnStarted -> {
+    is StateActionChatTurnStarted -> {
         val a = action.value
         val withTurn = state.copy(
             activeTurn = ActiveTurn(
@@ -588,10 +649,8 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
             ),
         )
         val withStatus = withTurn.copy(
-            summary = withTurn.summary.copy(
-                status = withStatusFlag(summaryStatus(withTurn), SessionStatus.IS_READ, false),
-                modifiedAt = now(),
-            ),
+            status = withStatusFlag(chatSummaryStatus(withTurn), SessionStatus.IS_READ, false),
+            modifiedAt = nowIsoString(),
         )
         if (a.queuedMessageId == null) {
             withStatus
@@ -609,7 +668,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionDelta -> {
+    is StateActionChatDelta -> {
         val a = action.value
         updateResponsePart(state, a.turnId, a.partId) { part ->
             if (part is ResponsePartMarkdown) {
@@ -620,7 +679,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionResponsePart -> {
+    is StateActionChatResponsePart -> {
         val a = action.value
         val activeTurn = state.activeTurn
         if (activeTurn == null || activeTurn.id != a.turnId) {
@@ -632,18 +691,18 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionTurnComplete ->
+    is StateActionChatTurnComplete ->
         endTurn(state, action.value.turnId, TurnState.COMPLETE)
 
-    is StateActionSessionTurnCancelled ->
+    is StateActionChatTurnCancelled ->
         endTurn(state, action.value.turnId, TurnState.CANCELLED)
 
-    is StateActionSessionError ->
+    is StateActionChatError ->
         endTurn(state, action.value.turnId, TurnState.ERROR, SessionStatus.ERROR, action.value.error)
 
     // ── Tool Call State Machine ───────────────────────────────────────────
 
-    is StateActionSessionToolCallStart -> {
+    is StateActionChatToolCallStart -> {
         val a = action.value
         val activeTurn = state.activeTurn
         if (activeTurn == null || activeTurn.id != a.turnId) {
@@ -668,7 +727,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionToolCallDelta -> {
+    is StateActionChatToolCallDelta -> {
         val a = action.value
         updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
             if (tc !is ToolCallStateStreaming) tc else {
@@ -683,9 +742,9 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionToolCallReady -> {
+    is StateActionChatToolCallReady -> {
         val a = action.value
-        refreshSummaryStatus(
+        refreshChatSummaryStatus(
             updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
                 if (tc !is ToolCallStateStreaming && tc !is ToolCallStateRunning) {
                     tc
@@ -728,9 +787,9 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         )
     }
 
-    is StateActionSessionToolCallConfirmed -> {
+    is StateActionChatToolCallConfirmed -> {
         val a = action.value
-        refreshSummaryStatus(
+        refreshChatSummaryStatus(
             updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
                 if (tc !is ToolCallStatePendingConfirmation) tc else {
                     val base = toolCallBase(tc).withMeta(a.meta)
@@ -774,10 +833,10 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         )
     }
 
-    is StateActionSessionToolCallComplete -> {
+    is StateActionChatToolCallComplete -> {
         val a = action.value
         val result = a.result
-        refreshSummaryStatus(
+        refreshChatSummaryStatus(
             updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
                 val (invocationMessage, toolInput, confirmed, selectedOption) = when (tc) {
                     is ToolCallStateRunning -> CompleteCtx(
@@ -840,9 +899,9 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         )
     }
 
-    is StateActionSessionToolCallResultConfirmed -> {
+    is StateActionChatToolCallResultConfirmed -> {
         val a = action.value
-        refreshSummaryStatus(
+        refreshChatSummaryStatus(
             updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
                 if (tc !is ToolCallStatePendingResultConfirmation) tc else {
                     val base = toolCallBase(tc).withMeta(a.meta)
@@ -887,7 +946,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         )
     }
 
-    is StateActionSessionToolCallContentChanged -> {
+    is StateActionChatToolCallContentChanged -> {
         val a = action.value
         updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
             if (tc !is ToolCallStateRunning) tc else {
@@ -897,12 +956,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
     }
 
     // ── Metadata ──────────────────────────────────────────────────────────
-
-    is StateActionSessionTitleChanged -> state.copy(
-        summary = state.summary.copy(title = action.value.title, modifiedAt = now()),
-    )
-
-    is StateActionSessionUsage -> {
+    is StateActionChatUsage -> {
         val a = action.value
         val activeTurn = state.activeTurn
         if (activeTurn == null || activeTurn.id != a.turnId) {
@@ -912,7 +966,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionReasoning -> {
+    is StateActionChatReasoning -> {
         val a = action.value
         updateResponsePart(state, a.turnId, a.partId) { part ->
             if (part is ResponsePartReasoning) {
@@ -922,220 +976,32 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
             }
         }
     }
-
-    is StateActionSessionModelChanged -> state.copy(
-        summary = state.summary.copy(model = action.value.model, modifiedAt = now()),
-    )
-
-    is StateActionSessionAgentChanged -> state.copy(
-        summary = state.summary.copy(agent = action.value.agent, modifiedAt = now()),
-    )
-
-    is StateActionSessionIsReadChanged -> state.copy(
-        summary = state.summary.copy(
-            status = withStatusFlag(state.summary.status, SessionStatus.IS_READ, action.value.isRead),
-        ),
-    )
-
-    is StateActionSessionIsArchivedChanged -> state.copy(
-        summary = state.summary.copy(
-            status = withStatusFlag(state.summary.status, SessionStatus.IS_ARCHIVED, action.value.isArchived),
-        ),
-    )
-
-    is StateActionSessionActivityChanged -> state.copy(
-        summary = state.summary.copy(activity = action.value.activity),
-    )
-
-    is StateActionSessionChangesetsChanged -> state.copy(
-        changesets = action.value.changesets,
-    )
-
-    is StateActionSessionConfigChanged -> {
-        val a = action.value
-        val config = state.config
-        if (config == null) {
-            state
-        } else {
-            val newValues = if (a.replace == true) a.config else config.values + a.config
-            state.copy(
-                config = config.copy(values = newValues),
-                summary = state.summary.copy(modifiedAt = now()),
-            )
-        }
-    }
-
-    is StateActionSessionMetaChanged -> state.copy(meta = action.value.meta)
-
-    is StateActionSessionServerToolsChanged -> state.copy(serverTools = action.value.tools)
-
-    is StateActionSessionActiveClientChanged -> state.copy(activeClient = action.value.activeClient)
-
-    is StateActionSessionActiveClientToolsChanged -> {
-        val client = state.activeClient
-        if (client == null) {
-            state
-        } else {
-            state.copy(activeClient = client.copy(tools = action.value.tools))
-        }
-    }
-
-    // ── Customizations ────────────────────────────────────────────────────
-
-    is StateActionSessionCustomizationsChanged ->
-        state.copy(customizations = action.value.customizations)
-
-    is StateActionSessionCustomizationToggled -> {
-        val a = action.value
-        val list = state.customizations
-        if (list == null) {
-            state
-        } else {
-            val idx = list.indexOfFirst { customizationId(it) == a.id }
-            if (idx < 0) {
-                state
-            } else {
-                val updated = list.toMutableList()
-                updated[idx] = withCustomizationEnabled(updated[idx], a.enabled)
-                state.copy(customizations = updated)
-            }
-        }
-    }
-
-    is StateActionSessionCustomizationUpdated -> {
-        val a = action.value
-        // Match Rust: an unknown customization has no id, so we can't locate or
-        // insert it sensibly — NoOp the update entirely.
-        val targetId = customizationId(a.customization)
-        if (targetId == null) {
-            state
-        } else {
-            val list = state.customizations ?: emptyList()
-            val idx = list.indexOfFirst { customizationId(it) == targetId }
-            if (idx < 0) {
-                state.copy(customizations = list + a.customization)
-            } else {
-                val updated = list.toMutableList()
-                updated[idx] = a.customization
-                state.copy(customizations = updated)
-            }
-        }
-    }
-
-    is StateActionSessionCustomizationRemoved -> {
-        val a = action.value
-        val list = state.customizations
-        if (list == null) {
-            state
-        } else {
-            val topIdx = list.indexOfFirst { customizationId(it) == a.id }
-            if (topIdx >= 0) {
-                val updated = list.toMutableList()
-                updated.removeAt(topIdx)
-                state.copy(customizations = updated)
-            } else {
-                var changed = false
-                val updated = list.map { container ->
-                    val children = customizationChildren(container)
-                    if (children == null) {
-                        container
-                    } else {
-                        val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
-                        if (childIdx < 0) {
-                            container
-                        } else {
-                            changed = true
-                            val newChildren = children.toMutableList()
-                            newChildren.removeAt(childIdx)
-                            withCustomizationChildren(container, newChildren)
-                        }
-                    }
-                }
-                if (!changed) state else state.copy(customizations = updated)
-            }
-        }
-    }
-
-    is StateActionSessionMcpServerStateChanged -> {
-        // Full-replacement of an MCP server customization's `state` + `channel`,
-        // located by id. Mirrors the canonical TS reducer (and the Go/Rust/Swift
-        // ports): a top-level McpServer entry is matched first (hosts MAY surface
-        // MCP servers directly at the top level); otherwise the search descends
-        // into container children. A no-op when no customization carries the id,
-        // or when the matched id belongs to a non-MCP customization type.
-        val a = action.value
-        val list = state.customizations
-        if (list == null) {
-            state
-        } else {
-            val topIdx = list.indexOfFirst { customizationId(it) == a.id }
-            if (topIdx >= 0) {
-                val entry = list[topIdx]
-                if (entry !is CustomizationMcpServer) {
-                    state
-                } else {
-                    val updated = list.toMutableList()
-                    updated[topIdx] = CustomizationMcpServer(
-                        entry.value.copy(state = a.state, channel = a.channel),
-                    )
-                    state.copy(customizations = updated)
-                }
-            } else {
-                var changed = false
-                val updated = list.map { container ->
-                    val children = customizationChildren(container)
-                    if (children == null) {
-                        container
-                    } else {
-                        val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
-                        if (childIdx < 0) {
-                            container
-                        } else {
-                            val child = children[childIdx]
-                            if (child !is ChildCustomizationMcpServer) {
-                                container
-                            } else {
-                                changed = true
-                                val newChildren = children.toMutableList()
-                                newChildren[childIdx] = ChildCustomizationMcpServer(
-                                    child.value.copy(state = a.state, channel = a.channel),
-                                )
-                                withCustomizationChildren(container, newChildren)
-                            }
-                        }
-                    }
-                }
-                if (!changed) state else state.copy(customizations = updated)
-            }
-        }
-    }
-
     // ── Truncation ────────────────────────────────────────────────────────
 
-    is StateActionSessionTruncated -> {
+    is StateActionChatTruncated -> {
         val a = action.value
         val turns = if (a.turnId == null) {
             emptyList()
         } else {
             val idx = state.turns.indexOfFirst { it.id == a.turnId }
-            if (idx < 0) return@sessionReducer state
+            if (idx < 0) return@chatReducer state
             state.turns.subList(0, idx + 1).toList()
         }
         val next = state.copy(
             turns = turns,
             activeTurn = null,
             inputRequests = null,
-            summary = state.summary.copy(modifiedAt = now()),
+            modifiedAt = nowIsoString(),
         )
-        next.copy(summary = next.summary.copy(status = summaryStatus(next)))
+        next.copy(status = chatSummaryStatus(next))
     }
 
     // ── Session Input Requests ────────────────────────────────────────────
 
-    is StateActionSessionInputRequested ->
+    is StateActionChatInputRequested ->
         upsertInputRequest(state, action.value.request)
 
-    is StateActionSessionInputAnswerChanged -> {
+    is StateActionChatInputAnswerChanged -> {
         val a = action.value
         val existing = state.inputRequests
         val idx = existing?.indexOfFirst { it.id == a.requestId } ?: -1
@@ -1153,12 +1019,12 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
             val updated = existing.toMutableList().also { it[idx] = newRequest }
             state.copy(
                 inputRequests = updated,
-                summary = state.summary.copy(modifiedAt = now()),
+                modifiedAt = nowIsoString(),
             )
         }
     }
 
-    is StateActionSessionInputCompleted -> {
+    is StateActionChatInputCompleted -> {
         val a = action.value
         val existing = state.inputRequests
         if (existing == null || existing.none { it.id == a.requestId }) {
@@ -1167,17 +1033,15 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
             val remaining = existing.filter { it.id != a.requestId }
             val next = state.copy(inputRequests = remaining.ifEmpty { null })
             next.copy(
-                summary = next.summary.copy(
-                    status = summaryStatus(next),
-                    modifiedAt = now(),
-                ),
+                status = chatSummaryStatus(next),
+                modifiedAt = nowIsoString(),
             )
         }
     }
 
     // ── Pending Messages ──────────────────────────────────────────────────
 
-    is StateActionSessionPendingMessageSet -> {
+    is StateActionChatPendingMessageSet -> {
         val a = action.value
         val entry = PendingMessage(id = a.id, message = a.message)
         if (a.kind == PendingMessageKind.STEERING) {
@@ -1194,7 +1058,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionPendingMessageRemoved -> {
+    is StateActionChatPendingMessageRemoved -> {
         val a = action.value
         if (a.kind == PendingMessageKind.STEERING) {
             val steering = state.steeringMessage
@@ -1204,7 +1068,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 state.copy(steeringMessage = null)
             }
         } else {
-            val existing = state.queuedMessages ?: return@sessionReducer state
+            val existing = state.queuedMessages ?: return@chatReducer state
             val filtered = existing.filter { it.id != a.id }
             if (filtered.size == existing.size) {
                 state
@@ -1214,9 +1078,9 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
-    is StateActionSessionQueuedMessagesReordered -> {
+    is StateActionChatQueuedMessagesReordered -> {
         val a = action.value
-        val existing = state.queuedMessages ?: return@sessionReducer state
+        val existing = state.queuedMessages ?: return@chatReducer state
         val byId = existing.associateBy { it.id }
         val ordered = LinkedHashSet<String>()
         val reordered = mutableListOf<PendingMessage>()
@@ -1235,12 +1099,13 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
     }
 
     else -> state
+
 }
 
 /**
- * Locally scoped helper for [StateActionSessionToolCallComplete] to avoid
- * Pair/Triple noise when carrying the four context fields from the prior
- * tool call state into the new one.
+ * Locally scoped helper for tool-call completion to avoid Pair/Triple noise
+ * when carrying the four context fields from the prior tool call state into
+ * the new one.
  */
 private data class CompleteCtx(
     val invocationMessage: com.microsoft.agenthostprotocol.generated.StringOrMarkdown,
@@ -1248,6 +1113,7 @@ private data class CompleteCtx(
     val confirmed: ToolCallConfirmationReason,
     val selectedOption: ConfirmationOption?,
 )
+
 
 // ─── Terminal Reducer ───────────────────────────────────────────────────────
 
@@ -1455,7 +1321,7 @@ public fun annotationsReducer(state: AnnotationsState, action: StateAction): Ann
         if (idx < 0) {
             state
         } else {
-            val next: List<Annotation> = state.annotations.toMutableList().also { it.removeAt(idx) }
+            val next = state.annotations.toMutableList().also { it.removeAt(idx) }
             state.copy(annotations = next)
         }
     }

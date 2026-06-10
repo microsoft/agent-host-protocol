@@ -11,7 +11,7 @@
       "modifiedAt": 1000
     },
     "lifecycle": "ready",
-    "turns": [],
+    "chats": [],
     "customizations": [
       {
         "type": "plugin",
@@ -34,13 +34,17 @@
     {
       "type": "session/mcpServerStateChanged",
       "id": "plugin-a",
-      "state": { "kind": "ready" },
+      "state": {
+        "kind": "ready"
+      },
       "channel": "mcp://nope"
     },
     {
       "type": "session/mcpServerStateChanged",
       "id": "skill-1",
-      "state": { "kind": "ready" },
+      "state": {
+        "kind": "ready"
+      },
       "channel": "mcp://nope"
     }
   ],
@@ -54,7 +58,7 @@
       "modifiedAt": 1000
     },
     "lifecycle": "ready",
-    "turns": [],
+    "chats": [],
     "customizations": [
       {
         "type": "plugin",

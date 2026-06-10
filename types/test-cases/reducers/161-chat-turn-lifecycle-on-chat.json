@@ -1,0 +1,76 @@
+{
+  "description": "chat turn lifecycle starts, streams, and completes on a chat channel",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "origin": {
+      "kind": "user"
+    }
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-1",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      }
+    },
+    {
+      "type": "chat/responsePart",
+      "turnId": "turn-1",
+      "part": {
+        "kind": "markdown",
+        "id": "md-1",
+        "content": ""
+      }
+    },
+    {
+      "type": "chat/delta",
+      "turnId": "turn-1",
+      "partId": "md-1",
+      "content": "Hello from chat"
+    },
+    {
+      "type": "chat/turnComplete",
+      "turnId": "turn-1"
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "Hello",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [
+          {
+            "kind": "markdown",
+            "id": "md-1",
+            "content": "Hello from chat"
+          }
+        ],
+        "usage": null,
+        "state": "complete",
+        "error": null
+      }
+    ],
+    "activeTurn": null,
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:09.999Z",
+    "origin": {
+      "kind": "user"
+    }
+  }
+}

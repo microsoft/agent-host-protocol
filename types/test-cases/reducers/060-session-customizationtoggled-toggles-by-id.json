@@ -11,7 +11,6 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": [],
     "customizations": [
       {
         "type": "plugin",
@@ -27,7 +26,8 @@
         "name": "Plugin B",
         "enabled": true
       }
-    ]
+    ],
+    "chats": []
   },
   "actions": [
     {
@@ -46,7 +46,6 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": [],
     "customizations": [
       {
         "type": "plugin",
@@ -62,6 +61,7 @@
         "name": "Plugin B",
         "enabled": true
       }
-    ]
+    ],
+    "chats": []
   }
 }

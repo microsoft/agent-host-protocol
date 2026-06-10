@@ -9,11 +9,13 @@ import type { URI } from '../common/state.js';
 import type { BaseParams } from '../common/commands.js';
 import type { ModelSelection } from '../channels-root/state.js';
 import type {
-  Turn,
   SessionActiveClient,
-  MessageAttachment,
   AgentSelection,
 } from './state.js';
+import type {
+  Turn,
+  MessageAttachment,
+} from '../channels-chat/state.js';
 
 // ─── createSession ───────────────────────────────────────────────────────────
 
@@ -116,7 +118,7 @@ export interface DisposeSessionParams extends BaseParams {}
 // ─── fetchTurns ──────────────────────────────────────────────────────────────
 
 /**
- * Fetches historical turns for a session. Used for lazy loading of conversation
+ * Fetches historical turns for a chat. Used for lazy loading of conversation
  * history.
  *
  * @category Commands
@@ -128,7 +130,7 @@ export interface DisposeSessionParams extends BaseParams {}
  * ```jsonc
  * // Client → Server (fetch the 20 most recent turns)
  * { "jsonrpc": "2.0", "id": 8, "method": "fetchTurns",
- *   "params": { "channel": "ahp-session:/<uuid>", "limit": 20 } }
+ *   "params": { "channel": "ahp-chat:/<uuid>", "limit": 20 } }
  *
  * // Server → Client
  * { "jsonrpc": "2.0", "id": 8, "result": {
@@ -138,11 +140,11 @@ export interface DisposeSessionParams extends BaseParams {}
  *
  * // Client → Server (fetch 20 turns before t1)
  * { "jsonrpc": "2.0", "id": 9, "method": "fetchTurns",
- *   "params": { "channel": "ahp-session:/<uuid>", "before": "t1", "limit": 20 } }
+ *   "params": { "channel": "ahp-chat:/<uuid>", "before": "t1", "limit": 20 } }
  * ```
  */
 export interface FetchTurnsParams extends BaseParams {
-  /** Session URI */
+  /** Chat URI */
   channel: URI;
   /** Turn ID to fetch before (exclusive). Omit to fetch from the most recent turn. */
   before?: string;
@@ -195,7 +197,7 @@ export const enum CompletionItemKind {
  * // User has typed "look at @foo" and the cursor is just after "@foo".
  * // Client → Server
  * { "jsonrpc": "2.0", "id": 12, "method": "completions",
- *   "params": { "kind": "userMessage", "channel": "ahp-session:/<uuid>",
+ *   "params": { "kind": "userMessage", "channel": "ahp-chat:/<uuid>",
  *               "text": "look at @foo", "offset": 12 } }
  *
  * // Server → Client
@@ -219,7 +221,7 @@ export const enum CompletionItemKind {
 export interface CompletionsParams extends BaseParams {
   /** What kind of completion is being requested. */
   kind: CompletionItemKind;
-  /** The session URI the completion is being requested for. */
+  /** The chat URI the completion is being requested for. */
   channel: URI;
   /**
    * The complete text of the input being completed (e.g. the full user

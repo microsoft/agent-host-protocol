@@ -11,7 +11,6 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": [],
     "customizations": [
       {
         "type": "plugin",
@@ -20,7 +19,8 @@
         "name": "Plugin A",
         "enabled": true
       }
-    ]
+    ],
+    "chats": []
   },
   "actions": [
     {
@@ -31,7 +31,9 @@
         "uri": "https://plugins.example/new",
         "name": "New Plugin",
         "enabled": true,
-        "load": { "kind": "loading" }
+        "load": {
+          "kind": "loading"
+        }
       }
     }
   ],
@@ -45,7 +47,6 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": [],
     "customizations": [
       {
         "type": "plugin",
@@ -60,8 +61,11 @@
         "uri": "https://plugins.example/new",
         "name": "New Plugin",
         "enabled": true,
-        "load": { "kind": "loading" }
+        "load": {
+          "kind": "loading"
+        }
       }
-    ]
+    ],
+    "chats": []
   }
 }

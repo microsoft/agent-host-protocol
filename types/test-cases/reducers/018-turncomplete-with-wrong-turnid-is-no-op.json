@@ -1,16 +1,7 @@
 {
   "description": "turnComplete with wrong turnId is no-op",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 8,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -22,24 +13,19 @@
       },
       "responseParts": [],
       "usage": null
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   },
   "actions": [
     {
-      "type": "session/turnComplete",
+      "type": "chat/turnComplete",
       "turnId": "wrong-turn"
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 8,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -51,6 +37,10 @@
       },
       "responseParts": [],
       "usage": null
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   }
 }

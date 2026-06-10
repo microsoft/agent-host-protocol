@@ -11,12 +11,12 @@
       "modifiedAt": 1000
     },
     "lifecycle": "ready",
-    "turns": [],
     "_meta": {
       "git": {
         "branch": "main"
       }
-    }
+    },
+    "chats": []
   },
   "actions": [
     {
@@ -39,12 +39,12 @@
       "modifiedAt": 1000
     },
     "lifecycle": "ready",
-    "turns": [],
     "_meta": {
       "git": {
         "branch": "feature"
       },
       "vscode.foo": 42
-    }
+    },
+    "chats": []
   }
 }

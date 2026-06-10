@@ -23,39 +23,43 @@ const (
 	ActionTypeRootActiveSessionsChanged         ActionType = "root/activeSessionsChanged"
 	ActionTypeSessionReady                      ActionType = "session/ready"
 	ActionTypeSessionCreationFailed             ActionType = "session/creationFailed"
-	ActionTypeSessionTurnStarted                ActionType = "session/turnStarted"
-	ActionTypeSessionDelta                      ActionType = "session/delta"
-	ActionTypeSessionResponsePart               ActionType = "session/responsePart"
-	ActionTypeSessionToolCallStart              ActionType = "session/toolCallStart"
-	ActionTypeSessionToolCallDelta              ActionType = "session/toolCallDelta"
-	ActionTypeSessionToolCallReady              ActionType = "session/toolCallReady"
-	ActionTypeSessionToolCallConfirmed          ActionType = "session/toolCallConfirmed"
-	ActionTypeSessionToolCallComplete           ActionType = "session/toolCallComplete"
-	ActionTypeSessionToolCallResultConfirmed    ActionType = "session/toolCallResultConfirmed"
-	ActionTypeSessionToolCallContentChanged     ActionType = "session/toolCallContentChanged"
-	ActionTypeSessionTurnComplete               ActionType = "session/turnComplete"
-	ActionTypeSessionTurnCancelled              ActionType = "session/turnCancelled"
-	ActionTypeSessionError                      ActionType = "session/error"
+	ActionTypeSessionChatAdded                  ActionType = "session/chatAdded"
+	ActionTypeSessionChatRemoved                ActionType = "session/chatRemoved"
+	ActionTypeSessionChatUpdated                ActionType = "session/chatUpdated"
+	ActionTypeSessionDefaultChatChanged         ActionType = "session/defaultChatChanged"
+	ActionTypeChatTurnStarted                   ActionType = "chat/turnStarted"
+	ActionTypeChatDelta                         ActionType = "chat/delta"
+	ActionTypeChatResponsePart                  ActionType = "chat/responsePart"
+	ActionTypeChatToolCallStart                 ActionType = "chat/toolCallStart"
+	ActionTypeChatToolCallDelta                 ActionType = "chat/toolCallDelta"
+	ActionTypeChatToolCallReady                 ActionType = "chat/toolCallReady"
+	ActionTypeChatToolCallConfirmed             ActionType = "chat/toolCallConfirmed"
+	ActionTypeChatToolCallComplete              ActionType = "chat/toolCallComplete"
+	ActionTypeChatToolCallResultConfirmed       ActionType = "chat/toolCallResultConfirmed"
+	ActionTypeChatToolCallContentChanged        ActionType = "chat/toolCallContentChanged"
+	ActionTypeChatTurnComplete                  ActionType = "chat/turnComplete"
+	ActionTypeChatTurnCancelled                 ActionType = "chat/turnCancelled"
+	ActionTypeChatError                         ActionType = "chat/error"
 	ActionTypeSessionTitleChanged               ActionType = "session/titleChanged"
-	ActionTypeSessionUsage                      ActionType = "session/usage"
-	ActionTypeSessionReasoning                  ActionType = "session/reasoning"
+	ActionTypeChatUsage                         ActionType = "chat/usage"
+	ActionTypeChatReasoning                     ActionType = "chat/reasoning"
 	ActionTypeSessionModelChanged               ActionType = "session/modelChanged"
 	ActionTypeSessionAgentChanged               ActionType = "session/agentChanged"
 	ActionTypeSessionServerToolsChanged         ActionType = "session/serverToolsChanged"
 	ActionTypeSessionActiveClientChanged        ActionType = "session/activeClientChanged"
 	ActionTypeSessionActiveClientToolsChanged   ActionType = "session/activeClientToolsChanged"
-	ActionTypeSessionPendingMessageSet          ActionType = "session/pendingMessageSet"
-	ActionTypeSessionPendingMessageRemoved      ActionType = "session/pendingMessageRemoved"
-	ActionTypeSessionQueuedMessagesReordered    ActionType = "session/queuedMessagesReordered"
-	ActionTypeSessionInputRequested             ActionType = "session/inputRequested"
-	ActionTypeSessionInputAnswerChanged         ActionType = "session/inputAnswerChanged"
-	ActionTypeSessionInputCompleted             ActionType = "session/inputCompleted"
+	ActionTypeChatPendingMessageSet             ActionType = "chat/pendingMessageSet"
+	ActionTypeChatPendingMessageRemoved         ActionType = "chat/pendingMessageRemoved"
+	ActionTypeChatQueuedMessagesReordered       ActionType = "chat/queuedMessagesReordered"
+	ActionTypeChatInputRequested                ActionType = "chat/inputRequested"
+	ActionTypeChatInputAnswerChanged            ActionType = "chat/inputAnswerChanged"
+	ActionTypeChatInputCompleted                ActionType = "chat/inputCompleted"
 	ActionTypeSessionCustomizationsChanged      ActionType = "session/customizationsChanged"
 	ActionTypeSessionCustomizationToggled       ActionType = "session/customizationToggled"
 	ActionTypeSessionCustomizationUpdated       ActionType = "session/customizationUpdated"
 	ActionTypeSessionCustomizationRemoved       ActionType = "session/customizationRemoved"
 	ActionTypeSessionMcpServerStateChanged      ActionType = "session/mcpServerStateChanged"
-	ActionTypeSessionTruncated                  ActionType = "session/truncated"
+	ActionTypeChatTruncated                     ActionType = "chat/truncated"
 	ActionTypeSessionIsReadChanged              ActionType = "session/isReadChanged"
 	ActionTypeSessionIsArchivedChanged          ActionType = "session/isArchivedChanged"
 	ActionTypeSessionActivityChanged            ActionType = "session/activityChanged"
@@ -148,10 +152,56 @@ type SessionCreationFailedAction struct {
 	Error ErrorInfo `json:"error"`
 }
 
+// A chat was added to this session's catalog. Upsert semantics: if a chat
+// with the same `summary.resource` already exists, the existing entry is
+// replaced.
+//
+// Mirrors the root-channel `root/sessionAdded` notification.
+type SessionChatAddedAction struct {
+	Type ActionType `json:"type"`
+	// The full summary of the newly added (or upserted) chat.
+	Summary ChatSummary `json:"summary"`
+}
+
+// A chat was removed from this session's catalog. No-op when no entry matches.
+//
+// Mirrors the root-channel `root/sessionRemoved` notification.
+type SessionChatRemovedAction struct {
+	Type ActionType `json:"type"`
+	// The URI of the chat to remove.
+	Chat URI `json:"chat"`
+}
+
+// One existing chat's summary fields changed.
+//
+// Partial-update semantics: only fields present in `changes` are written;
+// omitted fields are preserved. Identity fields (`resource`) MUST NOT be
+// carried in `changes`. No-op when no entry with `chat` exists — clients
+// SHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.
+//
+// Mirrors the root-channel `root/sessionSummaryChanged` notification.
+type SessionChatUpdatedAction struct {
+	Type ActionType `json:"type"`
+	// The URI of the chat whose summary changed.
+	Chat URI `json:"chat"`
+	// Mutable summary fields that changed; omitted fields are unchanged.
+	//
+	// Identity fields (`resource`) never change and MUST be omitted by
+	// senders; receivers SHOULD ignore them if present.
+	Changes PartialChatSummary `json:"changes"`
+}
+
+// The default chat input-routing hint for this session changed.
+type SessionDefaultChatChangedAction struct {
+	Type ActionType `json:"type"`
+	// New default chat URI, or `undefined` to clear the hint.
+	DefaultChat *URI `json:"defaultChat,omitempty"`
+}
+
 // A new message has been sent to the agent, and a new turn starts.
 //
 // A client is only allowed to send {@link MessageKind.User} messages.
-type SessionTurnStartedAction struct {
+type ChatTurnStartedAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
@@ -163,9 +213,9 @@ type SessionTurnStartedAction struct {
 
 // Streaming text chunk from the assistant, appended to a specific response part.
 //
-// The server MUST first emit a `session/responsePart` to create the target
+// The server MUST first emit a `chat/responsePart` to create the target
 // part (markdown or reasoning), then use this action to append text to it.
-type SessionDeltaAction struct {
+type ChatDeltaAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
@@ -176,7 +226,7 @@ type SessionDeltaAction struct {
 }
 
 // Structured content appended to the response.
-type SessionResponsePartAction struct {
+type ChatResponsePartAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
@@ -189,9 +239,9 @@ type SessionResponsePartAction struct {
 // The server sets {@link ToolCallContributor | `contributor`} to identify
 // the origin of the tool. For client-provided tools, the named client is
 // responsible for executing the tool once it reaches the `running` state
-// and dispatching `session/toolCallComplete`. For MCP-served tools, the
+// and dispatching `chat/toolCallComplete`. For MCP-served tools, the
 // server executes the call against the named `McpServerCustomization`.
-type SessionToolCallStartAction struct {
+type ChatToolCallStartAction struct {
 	// Turn identifier
 	TurnId string `json:"turnId"`
 	// Tool call identifier
@@ -214,7 +264,7 @@ type SessionToolCallStartAction struct {
 }
 
 // Streaming partial parameters for a tool call.
-type SessionToolCallDeltaAction struct {
+type ChatToolCallDeltaAction struct {
 	// Turn identifier
 	TurnId string `json:"turnId"`
 	// Tool call identifier
@@ -241,12 +291,12 @@ type SessionToolCallDeltaAction struct {
 // When dispatched for a `running` tool call (e.g. mid-execution permission needed),
 // transitions back to `pending-confirmation`. The `invocationMessage` and `_meta`
 // SHOULD be updated to describe the specific confirmation needed. Clients use the
-// standard `session/toolCallConfirmed` flow to approve or deny.
+// standard `chat/toolCallConfirmed` flow to approve or deny.
 //
 // For client-provided tools, the server typically sets `confirmed` to
 // `'not-needed'` so the tool transitions directly to `running`, where the
 // owning client can begin execution immediately.
-type SessionToolCallReadyAction struct {
+type ChatToolCallReadyAction struct {
 	// Turn identifier
 	TurnId string `json:"turnId"`
 	// Tool call identifier
@@ -278,9 +328,9 @@ type SessionToolCallReadyAction struct {
 	Options []ConfirmationOption `json:"options,omitempty"`
 }
 
-// SessionToolCallConfirmedAction is the client approves or denies a
+// ChatToolCallConfirmedAction is the client approves or denies a
 // pending tool call (merged approved + denied variants on the wire).
-type SessionToolCallConfirmedAction struct {
+type ChatToolCallConfirmedAction struct {
 	Type             ActionType                  `json:"type"`
 	TurnId           string                      `json:"turnId"`
 	ToolCallId       string                      `json:"toolCallId"`
@@ -304,7 +354,7 @@ type SessionToolCallConfirmedAction struct {
 // Servers waiting on a client tool call MAY time out after a reasonable duration
 // if the implementing client disconnects or becomes unresponsive, and dispatch
 // this action with `result.success = false` and an appropriate error.
-type SessionToolCallCompleteAction struct {
+type ChatToolCallCompleteAction struct {
 	// Turn identifier
 	TurnId string `json:"turnId"`
 	// Tool call identifier
@@ -326,7 +376,7 @@ type SessionToolCallCompleteAction struct {
 // Client approves or denies a tool's result.
 //
 // If `approved` is `false`, the tool transitions to `cancelled` with reason `result-denied`.
-type SessionToolCallResultConfirmedAction struct {
+type ChatToolCallResultConfirmedAction struct {
 	// Turn identifier
 	TurnId string `json:"turnId"`
 	// Tool call identifier
@@ -343,22 +393,49 @@ type SessionToolCallResultConfirmedAction struct {
 	Approved bool `json:"approved"`
 }
 
+// Partial content produced while a tool is still executing.
+//
+// Replaces the `content` array on the running tool call state. Clients can
+// use this to display live feedback (e.g. a terminal reference) before the
+// tool completes.
+//
+// For client-provided tools (where `toolClientId` is set on the tool call state),
+// the owning client dispatches this action to stream intermediate content while
+// executing. The server SHOULD reject this action if the dispatching client does
+// not match `toolClientId`.
+type ChatToolCallContentChangedAction struct {
+	// Turn identifier
+	TurnId string `json:"turnId"`
+	// Tool call identifier
+	ToolCallId string `json:"toolCallId"`
+	// Additional provider-specific metadata for this tool call.
+	//
+	// Clients MAY look for well-known keys here to provide enhanced UI.
+	// For example, a `ptyTerminal` key with `{ input: string; output: string }`
+	// indicates the tool operated on a terminal (both `input` and `output` may
+	// contain escape sequences).
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	Type ActionType                 `json:"type"`
+	// The current partial content for the running tool call
+	Content []ToolResultContent `json:"content"`
+}
+
 // Turn finished — the assistant is idle.
-type SessionTurnCompleteAction struct {
+type ChatTurnCompleteAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
 }
 
 // Turn was aborted; server stops processing.
-type SessionTurnCancelledAction struct {
+type ChatTurnCancelledAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
 }
 
 // Error during turn processing.
-type SessionErrorAction struct {
+type ChatErrorAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
@@ -375,7 +452,7 @@ type SessionTitleChangedAction struct {
 }
 
 // Token usage report for a turn.
-type SessionUsageAction struct {
+type ChatUsageAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
@@ -385,9 +462,9 @@ type SessionUsageAction struct {
 
 // Reasoning/thinking text from the model, appended to a specific reasoning response part.
 //
-// The server MUST first emit a `session/responsePart` to create the target
+// The server MUST first emit a `chat/responsePart` to create the target
 // reasoning part, then use this action to append text to it.
-type SessionReasoningAction struct {
+type ChatReasoningAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
@@ -395,6 +472,104 @@ type SessionReasoningAction struct {
 	PartId string `json:"partId"`
 	// Reasoning text chunk
 	Content string `json:"content"`
+}
+
+// A pending message was set (upsert semantics: creates or replaces).
+//
+// For steering messages, this always replaces the single steering message.
+// For queued messages, if a message with the given `id` already exists it is
+// updated in place; otherwise it is appended to the queue. If the chat is
+// idle when a queued message is set, the server SHOULD immediately consume it
+// and start a new turn.
+//
+// A client is only allowed to send {@link MessageKind.User} messages.
+type ChatPendingMessageSetAction struct {
+	Type ActionType `json:"type"`
+	// Whether this is a steering or queued message
+	Kind PendingMessageKind `json:"kind"`
+	// Unique identifier for this pending message
+	Id string `json:"id"`
+	// The message content
+	Message Message `json:"message"`
+}
+
+// A pending message was removed (steering or queued).
+//
+// Dispatched by clients to cancel a pending message, or by the server when
+// it consumes a message (e.g. starting a turn from a queued message or
+// injecting a steering message into the current turn).
+type ChatPendingMessageRemovedAction struct {
+	Type ActionType `json:"type"`
+	// Whether this is a steering or queued message
+	Kind PendingMessageKind `json:"kind"`
+	// Identifier of the pending message to remove
+	Id string `json:"id"`
+}
+
+// Reorder the queued messages.
+//
+// The `order` array contains the IDs of queued messages in their new
+// desired order. IDs not present in the current queue are ignored.
+// Queued messages whose IDs are absent from `order` are appended at
+// the end in their original relative order (so a client with a stale
+// view of the queue never silently drops messages).
+type ChatQueuedMessagesReorderedAction struct {
+	Type ActionType `json:"type"`
+	// Queued message IDs in the desired order
+	Order []string `json:"order"`
+}
+
+// A session requested input from the user.
+//
+// Full-request upsert semantics: the `request` replaces any existing request
+// with the same `id`, or is appended if it is new. Answer drafts are preserved
+// unless `request.answers` is provided.
+type ChatInputRequestedAction struct {
+	Type ActionType `json:"type"`
+	// Input request to create or replace
+	Request ChatInputRequest `json:"request"`
+}
+
+// A client updated, submitted, skipped, or removed a single in-progress answer.
+//
+// Dispatching with `answer: undefined` removes that question's answer draft.
+type ChatInputAnswerChangedAction struct {
+	Type ActionType `json:"type"`
+	// Input request identifier
+	RequestId string `json:"requestId"`
+	// Question identifier within the input request
+	QuestionId string `json:"questionId"`
+	// Updated answer, or `undefined` to clear an answer draft
+	Answer *ChatInputAnswer `json:"answer,omitempty"`
+}
+
+// A client accepted, declined, or cancelled a session input request.
+//
+// If accepted, the server uses `answers` (when provided) plus the request's
+// synced answer state to resume the blocked operation.
+type ChatInputCompletedAction struct {
+	Type ActionType `json:"type"`
+	// Input request identifier
+	RequestId string `json:"requestId"`
+	// Completion outcome
+	Response ChatInputResponseKind `json:"response"`
+	// Optional final answer replacement, keyed by question ID
+	Answers map[string]ChatInputAnswer `json:"answers,omitempty"`
+}
+
+// Truncates a session's history. If `turnId` is provided, all turns after that
+// turn are removed and the specified turn is kept. If `turnId` is omitted, all
+// turns are removed.
+//
+// If there is an active turn it is silently dropped and the chat status
+// returns to `idle`.
+//
+// Common use-case: truncate old data then dispatch a new
+// `chat/turnStarted` with an edited message.
+type ChatTruncatedAction struct {
+	Type ActionType `json:"type"`
+	// Keep turns up to and including this turn. Omit to clear all turns.
+	TurnId *string `json:"turnId,omitempty"`
 }
 
 // Model changed for this session.
@@ -497,89 +672,6 @@ type SessionActiveClientToolsChangedAction struct {
 	Tools []ToolDefinition `json:"tools"`
 }
 
-// A pending message was set (upsert semantics: creates or replaces).
-//
-// For steering messages, this always replaces the single steering message.
-// For queued messages, if a message with the given `id` already exists it is
-// updated in place; otherwise it is appended to the queue. If the session is
-// idle when a queued message is set, the server SHOULD immediately consume it
-// and start a new turn.
-//
-// A client is only allowed to send {@link MessageKind.User} messages.
-type SessionPendingMessageSetAction struct {
-	Type ActionType `json:"type"`
-	// Whether this is a steering or queued message
-	Kind PendingMessageKind `json:"kind"`
-	// Unique identifier for this pending message
-	Id string `json:"id"`
-	// The message content
-	Message Message `json:"message"`
-}
-
-// A pending message was removed (steering or queued).
-//
-// Dispatched by clients to cancel a pending message, or by the server when
-// it consumes a message (e.g. starting a turn from a queued message or
-// injecting a steering message into the current turn).
-type SessionPendingMessageRemovedAction struct {
-	Type ActionType `json:"type"`
-	// Whether this is a steering or queued message
-	Kind PendingMessageKind `json:"kind"`
-	// Identifier of the pending message to remove
-	Id string `json:"id"`
-}
-
-// Reorder the queued messages.
-//
-// The `order` array contains the IDs of queued messages in their new
-// desired order. IDs not present in the current queue are ignored.
-// Queued messages whose IDs are absent from `order` are appended at
-// the end in their original relative order (so a client with a stale
-// view of the queue never silently drops messages).
-type SessionQueuedMessagesReorderedAction struct {
-	Type ActionType `json:"type"`
-	// Queued message IDs in the desired order
-	Order []string `json:"order"`
-}
-
-// A session requested input from the user.
-//
-// Full-request upsert semantics: the `request` replaces any existing request
-// with the same `id`, or is appended if it is new. Answer drafts are preserved
-// unless `request.answers` is provided.
-type SessionInputRequestedAction struct {
-	Type ActionType `json:"type"`
-	// Input request to create or replace
-	Request SessionInputRequest `json:"request"`
-}
-
-// A client updated, submitted, skipped, or removed a single in-progress answer.
-//
-// Dispatching with `answer: undefined` removes that question's answer draft.
-type SessionInputAnswerChangedAction struct {
-	Type ActionType `json:"type"`
-	// Input request identifier
-	RequestId string `json:"requestId"`
-	// Question identifier within the input request
-	QuestionId string `json:"questionId"`
-	// Updated answer, or `undefined` to clear an answer draft
-	Answer *SessionInputAnswer `json:"answer,omitempty"`
-}
-
-// A client accepted, declined, or cancelled a session input request.
-//
-// If accepted, the server uses `answers` (when provided) plus the request's
-// synced answer state to resume the blocked operation.
-type SessionInputCompletedAction struct {
-	Type ActionType `json:"type"`
-	// Input request identifier
-	RequestId string `json:"requestId"`
-	// Completion outcome
-	Response SessionInputResponseKind `json:"response"`
-	// Optional final answer replacement, keyed by question ID
-	Answers map[string]SessionInputAnswer `json:"answers,omitempty"`
-}
-
 // The session's customizations have changed.
 //
 // Full-replacement semantics: the `customizations` array replaces the
@@ -661,21 +753,6 @@ type SessionMcpServerStateChangedAction struct {
 	Channel *URI `json:"channel,omitempty"`
 }
 
-// Truncates a session's history. If `turnId` is provided, all turns after that
-// turn are removed and the specified turn is kept. If `turnId` is omitted, all
-// turns are removed.
-//
-// If there is an active turn it is silently dropped and the session status
-// returns to `idle`.
-//
-// Common use-case: truncate old data then dispatch a new
-// `session/turnStarted` with an edited message.
-type SessionTruncatedAction struct {
-	Type ActionType `json:"type"`
-	// Keep turns up to and including this turn. Omit to clear all turns.
-	TurnId *string `json:"turnId,omitempty"`
-}
-
 // Client changed a mutable config value mid-session.
 //
 // Only properties with `sessionMutable: true` in the config schema may be
@@ -696,33 +773,6 @@ type SessionMetaChangedAction struct {
 	Type ActionType `json:"type"`
 	// New `_meta` payload, or `undefined` to clear it
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-}
-
-// Partial content produced while a tool is still executing.
-//
-// Replaces the `content` array on the running tool call state. Clients can
-// use this to display live feedback (e.g. a terminal reference) before the
-// tool completes.
-//
-// For client-provided tools (where `toolClientId` is set on the tool call state),
-// the owning client dispatches this action to stream intermediate content while
-// executing. The server SHOULD reject this action if the dispatching client does
-// not match `toolClientId`.
-type SessionToolCallContentChangedAction struct {
-	// Turn identifier
-	TurnId string `json:"turnId"`
-	// Tool call identifier
-	ToolCallId string `json:"toolCallId"`
-	// Additional provider-specific metadata for this tool call.
-	//
-	// Clients MAY look for well-known keys here to provide enhanced UI.
-	// For example, a `ptyTerminal` key with `{ input: string; output: string }`
-	// indicates the tool operated on a terminal (both `input` and `output` may
-	// contain escape sequences).
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	Type ActionType                 `json:"type"`
-	// The current partial content for the running tool call
-	Content []ToolResultContent `json:"content"`
 }
 
 // The {@link ChangesetState.status} for this changeset transitioned (e.g.
@@ -1056,21 +1106,33 @@ func (*RootActiveSessionsChangedAction) isStateAction()         {}
 func (*RootConfigChangedAction) isStateAction()                 {}
 func (*SessionReadyAction) isStateAction()                      {}
 func (*SessionCreationFailedAction) isStateAction()             {}
-func (*SessionTurnStartedAction) isStateAction()                {}
-func (*SessionDeltaAction) isStateAction()                      {}
-func (*SessionResponsePartAction) isStateAction()               {}
-func (*SessionToolCallStartAction) isStateAction()              {}
-func (*SessionToolCallDeltaAction) isStateAction()              {}
-func (*SessionToolCallReadyAction) isStateAction()              {}
-func (*SessionToolCallConfirmedAction) isStateAction()          {}
-func (*SessionToolCallCompleteAction) isStateAction()           {}
-func (*SessionToolCallResultConfirmedAction) isStateAction()    {}
-func (*SessionTurnCompleteAction) isStateAction()               {}
-func (*SessionTurnCancelledAction) isStateAction()              {}
-func (*SessionErrorAction) isStateAction()                      {}
+func (*SessionChatAddedAction) isStateAction()                  {}
+func (*SessionChatRemovedAction) isStateAction()                {}
+func (*SessionChatUpdatedAction) isStateAction()                {}
+func (*SessionDefaultChatChangedAction) isStateAction()         {}
+func (*ChatTurnStartedAction) isStateAction()                   {}
+func (*ChatDeltaAction) isStateAction()                         {}
+func (*ChatResponsePartAction) isStateAction()                  {}
+func (*ChatToolCallStartAction) isStateAction()                 {}
+func (*ChatToolCallDeltaAction) isStateAction()                 {}
+func (*ChatToolCallReadyAction) isStateAction()                 {}
+func (*ChatToolCallConfirmedAction) isStateAction()             {}
+func (*ChatToolCallCompleteAction) isStateAction()              {}
+func (*ChatToolCallResultConfirmedAction) isStateAction()       {}
+func (*ChatToolCallContentChangedAction) isStateAction()        {}
+func (*ChatTurnCompleteAction) isStateAction()                  {}
+func (*ChatTurnCancelledAction) isStateAction()                 {}
+func (*ChatErrorAction) isStateAction()                         {}
 func (*SessionTitleChangedAction) isStateAction()               {}
-func (*SessionUsageAction) isStateAction()                      {}
-func (*SessionReasoningAction) isStateAction()                  {}
+func (*ChatUsageAction) isStateAction()                         {}
+func (*ChatReasoningAction) isStateAction()                     {}
+func (*ChatPendingMessageSetAction) isStateAction()             {}
+func (*ChatPendingMessageRemovedAction) isStateAction()         {}
+func (*ChatQueuedMessagesReorderedAction) isStateAction()       {}
+func (*ChatInputRequestedAction) isStateAction()                {}
+func (*ChatInputAnswerChangedAction) isStateAction()            {}
+func (*ChatInputCompletedAction) isStateAction()                {}
+func (*ChatTruncatedAction) isStateAction()                     {}
 func (*SessionModelChangedAction) isStateAction()               {}
 func (*SessionAgentChangedAction) isStateAction()               {}
 func (*SessionIsReadChangedAction) isStateAction()              {}
@@ -1080,21 +1142,13 @@ func (*SessionChangesetsChangedAction) isStateAction()          {}
 func (*SessionServerToolsChangedAction) isStateAction()         {}
 func (*SessionActiveClientChangedAction) isStateAction()        {}
 func (*SessionActiveClientToolsChangedAction) isStateAction()   {}
-func (*SessionPendingMessageSetAction) isStateAction()          {}
-func (*SessionPendingMessageRemovedAction) isStateAction()      {}
-func (*SessionQueuedMessagesReorderedAction) isStateAction()    {}
-func (*SessionInputRequestedAction) isStateAction()             {}
-func (*SessionInputAnswerChangedAction) isStateAction()         {}
-func (*SessionInputCompletedAction) isStateAction()             {}
 func (*SessionCustomizationsChangedAction) isStateAction()      {}
 func (*SessionCustomizationToggledAction) isStateAction()       {}
 func (*SessionCustomizationUpdatedAction) isStateAction()       {}
 func (*SessionCustomizationRemovedAction) isStateAction()       {}
 func (*SessionMcpServerStateChangedAction) isStateAction()      {}
-func (*SessionTruncatedAction) isStateAction()                  {}
 func (*SessionConfigChangedAction) isStateAction()              {}
 func (*SessionMetaChangedAction) isStateAction()                {}
-func (*SessionToolCallContentChangedAction) isStateAction()     {}
 func (*ChangesetStatusChangedAction) isStateAction()            {}
 func (*ChangesetFileSetAction) isStateAction()                  {}
 func (*ChangesetFileRemovedAction) isStateAction()              {}
@@ -1164,74 +1218,104 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
-	case "session/turnStarted":
-		var value SessionTurnStartedAction
+	case "session/chatAdded":
+		var value SessionChatAddedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/delta":
-		var value SessionDeltaAction
+	case "session/chatRemoved":
+		var value SessionChatRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/responsePart":
-		var value SessionResponsePartAction
+	case "session/chatUpdated":
+		var value SessionChatUpdatedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/toolCallStart":
-		var value SessionToolCallStartAction
+	case "session/defaultChatChanged":
+		var value SessionDefaultChatChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/toolCallDelta":
-		var value SessionToolCallDeltaAction
+	case "chat/turnStarted":
+		var value ChatTurnStartedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/toolCallReady":
-		var value SessionToolCallReadyAction
+	case "chat/delta":
+		var value ChatDeltaAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/toolCallConfirmed":
-		var value SessionToolCallConfirmedAction
+	case "chat/responsePart":
+		var value ChatResponsePartAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/toolCallComplete":
-		var value SessionToolCallCompleteAction
+	case "chat/toolCallStart":
+		var value ChatToolCallStartAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/toolCallResultConfirmed":
-		var value SessionToolCallResultConfirmedAction
+	case "chat/toolCallDelta":
+		var value ChatToolCallDeltaAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/turnComplete":
-		var value SessionTurnCompleteAction
+	case "chat/toolCallReady":
+		var value ChatToolCallReadyAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/turnCancelled":
-		var value SessionTurnCancelledAction
+	case "chat/toolCallConfirmed":
+		var value ChatToolCallConfirmedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/error":
-		var value SessionErrorAction
+	case "chat/toolCallComplete":
+		var value ChatToolCallCompleteAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/toolCallResultConfirmed":
+		var value ChatToolCallResultConfirmedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/toolCallContentChanged":
+		var value ChatToolCallContentChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/turnComplete":
+		var value ChatTurnCompleteAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/turnCancelled":
+		var value ChatTurnCancelledAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/error":
+		var value ChatErrorAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -1242,14 +1326,56 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
-	case "session/usage":
-		var value SessionUsageAction
+	case "chat/usage":
+		var value ChatUsageAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "session/reasoning":
-		var value SessionReasoningAction
+	case "chat/reasoning":
+		var value ChatReasoningAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/pendingMessageSet":
+		var value ChatPendingMessageSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/pendingMessageRemoved":
+		var value ChatPendingMessageRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/queuedMessagesReordered":
+		var value ChatQueuedMessagesReorderedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/inputRequested":
+		var value ChatInputRequestedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/inputAnswerChanged":
+		var value ChatInputAnswerChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/inputCompleted":
+		var value ChatInputCompletedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/truncated":
+		var value ChatTruncatedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -1308,42 +1434,6 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
-	case "session/pendingMessageSet":
-		var value SessionPendingMessageSetAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "session/pendingMessageRemoved":
-		var value SessionPendingMessageRemovedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "session/queuedMessagesReordered":
-		var value SessionQueuedMessagesReorderedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "session/inputRequested":
-		var value SessionInputRequestedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "session/inputAnswerChanged":
-		var value SessionInputAnswerChangedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "session/inputCompleted":
-		var value SessionInputCompletedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
 	case "session/customizationsChanged":
 		var value SessionCustomizationsChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -1374,12 +1464,6 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
-	case "session/truncated":
-		var value SessionTruncatedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
 	case "session/configChanged":
 		var value SessionConfigChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -1388,12 +1472,6 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "session/metaChanged":
 		var value SessionMetaChangedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "session/toolCallContentChanged":
-		var value SessionToolCallContentChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

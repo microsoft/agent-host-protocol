@@ -11,14 +11,14 @@
       "modifiedAt": 1000
     },
     "lifecycle": "ready",
-    "turns": [],
     "changesets": [
       {
         "label": "Session Changes",
         "uriTemplate": "copilot:/test-session/changeset/session",
         "changeKind": "session"
       }
-    ]
+    ],
+    "chats": []
   },
   "actions": [
     {
@@ -36,6 +36,6 @@
       "modifiedAt": 1000
     },
     "lifecycle": "ready",
-    "turns": []
+    "chats": []
   }
 }

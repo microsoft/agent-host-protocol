@@ -1,21 +1,16 @@
 {
   "description": "steering and queued messages are independent",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "creating",
-    "turns": []
+    "turns": [],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   },
   "actions": [
     {
-      "type": "session/pendingMessageSet",
+      "type": "chat/pendingMessageSet",
       "kind": "steering",
       "id": "s-1",
       "message": {
@@ -26,7 +21,7 @@
       }
     },
     {
-      "type": "session/pendingMessageSet",
+      "type": "chat/pendingMessageSet",
       "kind": "queued",
       "id": "q-1",
       "message": {
@@ -38,15 +33,6 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "creating",
     "turns": [],
     "steeringMessage": {
       "id": "s-1",
@@ -67,6 +53,10 @@
           }
         }
       }
-    ]
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   }
 }

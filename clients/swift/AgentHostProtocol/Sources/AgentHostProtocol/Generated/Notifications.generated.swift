@@ -162,7 +162,10 @@ public struct PartialSessionSummary: Codable, Sendable {
     /// Absent (`undefined`) means no custom agent is selected for this session
     /// — the session uses the provider's default behavior.
     public var agent: AgentSelection?
-    /// The working directory URI for this session
+    /// The default working directory URI for this session. Individual chats
+    /// MAY override via {@link ChatSummary.workingDirectory | their own
+    /// `workingDirectory`}; this field acts as the fallback for any chat that
+    /// does not.
     public var workingDirectory: String?
     /// Aggregate summary of file changes associated with this session. Servers
     /// may populate this to give clients a quick at-a-glance view of the

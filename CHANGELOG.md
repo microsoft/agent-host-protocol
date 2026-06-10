@@ -47,10 +47,25 @@ Spec version: `0.4.0`
   Resolving or re-anchoring an annotation no longer requires replacing the
   whole annotation via `annotations/set`. Omitted fields are left unchanged;
   the annotation's `entries`, `id`, and `_meta` are never touched.
+- `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` command.
+- `ChatSummary.workingDirectory?` — optional per-chat working directory. When absent, chats inherit the session's `workingDirectory`. Enables agent-swarm patterns where multiple chats in one session operate on independent worktrees.
+- Three discrete chat-catalog actions on the session channel — `session/chatAdded` (upsert by `summary.resource`), `session/chatRemoved`, and `session/chatUpdated` (partial-update with `Partial<ChatSummary>`) — mirroring the root-channel `root/sessionAdded` / `root/sessionRemoved` / `root/sessionSummaryChanged` pattern.
 - `RootState` now carries an optional `_meta` property bag for
   implementation-defined metadata about the agent host itself, mirroring the
   MCP `_meta` convention. A well-known `hostBuild` key may carry build
   information (version, commit, date) about the program hosting the agent host.
+
+### Changed
+
+- `fetchTurns` and `completions` now target an `ahp-chat:` channel; `PROTOCOL_VERSION` bumped to `0.4.0`.
+- `ChatState` is now **flat** — the previous `summary: ChatSummary` sub-object has been replaced by inlined `resource` / `title` / `status` / `activity` / `modifiedAt` / `model` / `agent` / `origin` / `workingDirectory` fields. `ChatSummary` remains as the standalone catalog entry on `SessionState.chats`.
+- `ChatSummary.modifiedAt` and `ChatState.modifiedAt` are now ISO 8601 strings instead of numeric milliseconds.
+- `SessionSummary` now documents how its aggregate fields (`status`, `activity`, `modifiedAt`) are derived from the session's chats, including `InputNeeded` / `Error` promotion when any chat raises the flag.
+
+### Removed
+
+- `SessionState.turns`, `SessionState.activeTurn`, `SessionState.steeringMessage`, `SessionState.queuedMessages`, `SessionState.inputRequests` (moved to `ChatState`).
+- `session/chatsChanged` full-replacement action (replaced by `session/chatAdded` / `session/chatRemoved` / `session/chatUpdated`).
 
 ## [0.3.0] — 2026-06-05
 

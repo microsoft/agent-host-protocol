@@ -128,29 +128,6 @@
         "config"
       ]
     },
-    "ToolCallActionBase": {
-      "type": "object",
-      "description": "Base interface for all tool-call-scoped actions, carrying the common turn\nand tool call identifiers. The owning session URI is identified by the\nenclosing {@link ActionEnvelope}'s `channel` field.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        }
-      },
-      "required": [
-        "turnId",
-        "toolCallId"
-      ]
-    },
     "SessionReadyAction": {
       "type": "object",
       "description": "Session backend initialized successfully.",
@@ -180,481 +157,114 @@
         "error"
       ]
     },
-    "SessionTurnStartedAction": {
+    "SessionChatAddedAction": {
       "type": "object",
-      "description": "A new message has been sent to the agent, and a new turn starts.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A chat was added to this session's catalog. Upsert semantics: if a chat\nwith the same `summary.resource` already exists, the existing entry is\nreplaced.\n\nMirrors the root-channel `root/sessionAdded` notification.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionTurnStarted"
+          "$ref": "#/$defs/ActionType.SessionChatAdded"
         },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "message": {
-          "$ref": "#/$defs/Message",
-          "description": "The new message"
-        },
-        "queuedMessageId": {
-          "type": "string",
-          "description": "If this turn was auto-started from a queued message, the ID of that message"
+        "summary": {
+          "$ref": "#/$defs/ChatSummary",
+          "description": "The full summary of the newly added (or upserted) chat."
         }
       },
       "required": [
         "type",
-        "turnId",
-        "message"
+        "summary"
       ]
     },
-    "SessionDeltaAction": {
+    "SessionChatRemovedAction": {
       "type": "object",
-      "description": "Streaming text chunk from the assistant, appended to a specific response part.\n\nThe server MUST first emit a `session/responsePart` to create the target\npart (markdown or reasoning), then use this action to append text to it.",
+      "description": "A chat was removed from this session's catalog. No-op when no entry matches.\n\nMirrors the root-channel `root/sessionRemoved` notification.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionDelta"
+          "$ref": "#/$defs/ActionType.SessionChatRemoved"
         },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "partId": {
-          "type": "string",
-          "description": "Identifier of the response part to append to"
-        },
-        "content": {
-          "type": "string",
-          "description": "Text chunk"
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the chat to remove."
         }
       },
       "required": [
         "type",
-        "turnId",
-        "partId",
-        "content"
+        "chat"
       ]
     },
-    "SessionResponsePartAction": {
+    "SessionChatUpdatedAction": {
       "type": "object",
-      "description": "Structured content appended to the response.",
+      "description": "One existing chat's summary fields changed.\n\nPartial-update semantics: only fields present in `changes` are written;\nomitted fields are preserved. Identity fields (`resource`) MUST NOT be\ncarried in `changes`. No-op when no entry with `chat` exists — clients\nSHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.\n\nMirrors the root-channel `root/sessionSummaryChanged` notification.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionResponsePart"
+          "$ref": "#/$defs/ActionType.SessionChatUpdated"
         },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The URI of the chat whose summary changed."
         },
-        "part": {
-          "$ref": "#/$defs/ResponsePart",
-          "description": "Response part (markdown or content ref)"
-        }
-      },
-      "required": [
-        "type",
-        "turnId",
-        "part"
-      ]
-    },
-    "SessionToolCallStartAction": {
-      "type": "object",
-      "description": "A tool call begins — parameters are streaming from the LM.\n\nThe server sets {@link ToolCallContributor | `contributor`} to identify\nthe origin of the tool. For client-provided tools, the named client is\nresponsible for executing the tool once it reaches the `running` state\nand dispatching `session/toolCallComplete`. For MCP-served tools, the\nserver executes the call against the named `McpServerCustomization`.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        },
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionToolCallStart"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Internal tool name (for debugging/logging)"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable tool name"
-        },
-        "contributor": {
-          "$ref": "#/$defs/ToolCallContributor",
-          "description": "Reference to the contributor of the tool being called. Absent for\nserver-side tools that are not contributed by a client or MCP server."
-        }
-      },
-      "required": [
-        "turnId",
-        "toolCallId",
-        "type",
-        "toolName",
-        "displayName"
-      ]
-    },
-    "SessionToolCallDeltaAction": {
-      "type": "object",
-      "description": "Streaming partial parameters for a tool call.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        },
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionToolCallDelta"
-        },
-        "content": {
-          "type": "string",
-          "description": "Partial parameter content to append"
-        },
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Updated progress message"
-        }
-      },
-      "required": [
-        "turnId",
-        "toolCallId",
-        "type",
-        "content"
-      ]
-    },
-    "SessionToolCallReadyAction": {
-      "type": "object",
-      "description": "Tool call parameters are complete, or a running tool requires re-confirmation.\n\nWhen dispatched for a `streaming` tool call, transitions to `pending-confirmation`\nor directly to `running` if `confirmed` is set.\n\nWhen dispatched for a `running` tool call (e.g. mid-execution permission needed),\ntransitions back to `pending-confirmation`. The `invocationMessage` and `_meta`\nSHOULD be updated to describe the specific confirmation needed. Clients use the\nstandard `session/toolCallConfirmed` flow to approve or deny.\n\nFor client-provided tools, the server typically sets `confirmed` to\n`'not-needed'` so the tool transitions directly to `running`, where the\nowning client can begin execution immediately.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        },
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionToolCallReady"
-        },
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Message describing what the tool will do or what confirmation is needed"
-        },
-        "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
-        },
-        "confirmationTitle": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Short title for the confirmation prompt (e.g. `\"Run in terminal\"`, `\"Write file\"`)"
-        },
-        "edits": {
+        "changes": {
           "type": "object",
           "properties": {
-            "items": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "items"
-          ],
-          "description": "File edits that this tool call will perform, for preview before confirmation"
-        },
-        "editable": {
-          "type": "boolean",
-          "description": "Whether the agent host allows the client to edit the tool's input parameters before confirming"
-        },
-        "confirmed": {
-          "$ref": "#/$defs/ToolCallConfirmationReason",
-          "description": "If set, the tool was auto-confirmed and transitions directly to `running`"
-        },
-        "options": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ConfirmationOption"
-          },
-          "description": "Options the server offers for this confirmation. When present, the client\nSHOULD render these instead of a plain approve/deny UI. Each option\nbelongs to a {@link ConfirmationOptionGroup} so the client can still\ncategorise the choices."
-        }
-      },
-      "required": [
-        "turnId",
-        "toolCallId",
-        "type",
-        "invocationMessage"
-      ]
-    },
-    "SessionToolCallApprovedAction": {
-      "type": "object",
-      "description": "Client approves a pending tool call. The tool transitions to `running`.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        },
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionToolCallConfirmed"
-        },
-        "approved": {
-          "description": "The tool call was approved"
-        },
-        "confirmed": {
-          "$ref": "#/$defs/ToolCallConfirmationReason",
-          "description": "How the tool was confirmed"
-        },
-        "editedToolInput": {
-          "type": "string",
-          "description": "Edited tool input parameters, if the client modified them before confirming"
-        },
-        "selectedOptionId": {
-          "type": "string",
-          "description": "ID of the selected confirmation option, if the server provided options"
-        }
-      },
-      "required": [
-        "turnId",
-        "toolCallId",
-        "type",
-        "approved",
-        "confirmed"
-      ]
-    },
-    "SessionToolCallDeniedAction": {
-      "type": "object",
-      "description": "Client denies a pending tool call. The tool transitions to `cancelled`.\n\nFor client-provided tools, the owning client MUST dispatch this if it does\nnot recognize the tool or cannot execute it.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        },
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionToolCallConfirmed"
-        },
-        "approved": {
-          "description": "The tool call was denied"
-        },
-        "reason": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/ToolCallCancellationReason.Denied"
+            "resource": {
+              "$ref": "#/$defs/URI",
+              "description": "Chat URI"
             },
-            {
-              "$ref": "#/$defs/ToolCallCancellationReason.Skipped"
+            "title": {
+              "type": "string",
+              "description": "Chat title"
+            },
+            "status": {
+              "$ref": "#/$defs/SessionStatus",
+              "description": "Current chat status (reuses SessionStatus shape)"
+            },
+            "activity": {
+              "type": "string",
+              "description": "Human-readable description of what the chat is currently doing"
+            },
+            "modifiedAt": {
+              "type": "string",
+              "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
+            },
+            "model": {
+              "$ref": "#/$defs/ModelSelection",
+              "description": "Optional per-chat model override (defaults to the session's model)"
+            },
+            "agent": {
+              "$ref": "#/$defs/AgentSelection",
+              "description": "Optional per-chat agent override (defaults to the session's agent)"
+            },
+            "origin": {
+              "$ref": "#/$defs/ChatOrigin",
+              "description": "How this chat came into existence"
+            },
+            "workingDirectory": {
+              "$ref": "#/$defs/URI",
+              "description": "Optional per-chat working directory.\n\nIf absent, the chat inherits\n{@link SessionSummary.workingDirectory | the session's working directory}.\nSee {@link ChatState.workingDirectory} for usage notes."
             }
-          ],
-          "description": "Why the tool was cancelled"
-        },
-        "userSuggestion": {
-          "$ref": "#/$defs/Message",
-          "description": "What the user suggested doing instead"
-        },
-        "reasonMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Optional explanation for the denial"
-        },
-        "selectedOptionId": {
-          "type": "string",
-          "description": "ID of the selected confirmation option, if the server provided options"
-        }
-      },
-      "required": [
-        "turnId",
-        "toolCallId",
-        "type",
-        "approved",
-        "reason"
-      ]
-    },
-    "SessionToolCallCompleteAction": {
-      "type": "object",
-      "description": "Tool execution finished. Transitions to `completed` or `pending-result-confirmation`\nif `requiresResultConfirmation` is `true`.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action with the execution result. The server\nSHOULD reject this action if the dispatching client does not match `toolClientId`.\n\nServers waiting on a client tool call MAY time out after a reasonable duration\nif the implementing client disconnects or becomes unresponsive, and dispatch\nthis action with `result.success = false` and an appropriate error.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        },
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionToolCallComplete"
-        },
-        "result": {
-          "$ref": "#/$defs/ToolCallResult",
-          "description": "Execution result"
-        },
-        "requiresResultConfirmation": {
-          "type": "boolean",
-          "description": "If true, the result requires client approval before finalizing"
-        }
-      },
-      "required": [
-        "turnId",
-        "toolCallId",
-        "type",
-        "result"
-      ]
-    },
-    "SessionToolCallResultConfirmedAction": {
-      "type": "object",
-      "description": "Client approves or denies a tool's result.\n\nIf `approved` is `false`, the tool transitions to `cancelled` with reason `result-denied`.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        },
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionToolCallResultConfirmed"
-        },
-        "approved": {
-          "type": "boolean",
-          "description": "Whether the result was approved"
-        }
-      },
-      "required": [
-        "turnId",
-        "toolCallId",
-        "type",
-        "approved"
-      ]
-    },
-    "SessionToolCallContentChangedAction": {
-      "type": "object",
-      "description": "Partial content produced while a tool is still executing.\n\nReplaces the `content` array on the running tool call state. Clients can\nuse this to display live feedback (e.g. a terminal reference) before the\ntool completes.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action to stream intermediate content while\nexecuting. The server SHOULD reject this action if the dispatching client does\nnot match `toolClientId`.",
-      "properties": {
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "toolCallId": {
-          "type": "string",
-          "description": "Tool call identifier"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
-        },
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionToolCallContentChanged"
-        },
-        "content": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ToolResultContent"
           },
-          "description": "The current partial content for the running tool call"
+          "description": "Mutable summary fields that changed; omitted fields are unchanged.\n\nIdentity fields (`resource`) never change and MUST be omitted by\nsenders; receivers SHOULD ignore them if present."
         }
       },
       "required": [
-        "turnId",
-        "toolCallId",
         "type",
-        "content"
+        "chat",
+        "changes"
       ]
     },
-    "SessionTurnCompleteAction": {
+    "SessionDefaultChatChangedAction": {
       "type": "object",
-      "description": "Turn finished — the assistant is idle.",
+      "description": "The default chat input-routing hint for this session changed.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionTurnComplete"
+          "$ref": "#/$defs/ActionType.SessionDefaultChatChanged"
         },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
+        "defaultChat": {
+          "$ref": "#/$defs/URI",
+          "description": "New default chat URI, or `undefined` to clear the hint."
         }
       },
       "required": [
-        "type",
-        "turnId"
-      ]
-    },
-    "SessionTurnCancelledAction": {
-      "type": "object",
-      "description": "Turn was aborted; server stops processing.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionTurnCancelled"
-        },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        }
-      },
-      "required": [
-        "type",
-        "turnId"
-      ]
-    },
-    "SessionErrorAction": {
-      "type": "object",
-      "description": "Error during turn processing.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionError"
-        },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "error": {
-          "$ref": "#/$defs/ErrorInfo",
-          "description": "Error details"
-        }
-      },
-      "required": [
-        "type",
-        "turnId",
-        "error"
+        "type"
       ]
     },
     "SessionTitleChangedAction": {
@@ -672,55 +282,6 @@
       "required": [
         "type",
         "title"
-      ]
-    },
-    "SessionUsageAction": {
-      "type": "object",
-      "description": "Token usage report for a turn.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionUsage"
-        },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "usage": {
-          "$ref": "#/$defs/UsageInfo",
-          "description": "Token usage data"
-        }
-      },
-      "required": [
-        "type",
-        "turnId",
-        "usage"
-      ]
-    },
-    "SessionReasoningAction": {
-      "type": "object",
-      "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `session/responsePart` to create the target\nreasoning part, then use this action to append text to it.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionReasoning"
-        },
-        "turnId": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "partId": {
-          "type": "string",
-          "description": "Identifier of the reasoning response part to append to"
-        },
-        "content": {
-          "type": "string",
-          "description": "Reasoning text chunk"
-        }
-      },
-      "required": [
-        "type",
-        "turnId",
-        "partId",
-        "content"
       ]
     },
     "SessionModelChangedAction": {
@@ -1031,12 +592,561 @@
         "_meta"
       ]
     },
-    "SessionTruncatedAction": {
+    "ToolCallActionBase": {
       "type": "object",
-      "description": "Truncates a session's history. If `turnId` is provided, all turns after that\nturn are removed and the specified turn is kept. If `turnId` is omitted, all\nturns are removed.\n\nIf there is an active turn it is silently dropped and the session status\nreturns to `idle`.\n\nCommon use-case: truncate old data then dispatch a new\n`session/turnStarted` with an edited message.",
+      "description": "Base interface for all tool-call-scoped actions, carrying the common turn\nand tool call identifiers. The owning chat URI is identified by the\nenclosing {@link ActionEnvelope}'s `channel` field.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId"
+      ]
+    },
+    "ChatTurnStartedAction": {
+      "type": "object",
+      "description": "A new message has been sent to the agent, and a new turn starts.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionTruncated"
+          "$ref": "#/$defs/ActionType.ChatTurnStarted"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The new message"
+        },
+        "queuedMessageId": {
+          "type": "string",
+          "description": "If this turn was auto-started from a queued message, the ID of that message"
+        }
+      },
+      "required": [
+        "type",
+        "turnId",
+        "message"
+      ]
+    },
+    "ChatDeltaAction": {
+      "type": "object",
+      "description": "Streaming text chunk from the assistant, appended to a specific response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\npart (markdown or reasoning), then use this action to append text to it.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatDelta"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "partId": {
+          "type": "string",
+          "description": "Identifier of the response part to append to"
+        },
+        "content": {
+          "type": "string",
+          "description": "Text chunk"
+        }
+      },
+      "required": [
+        "type",
+        "turnId",
+        "partId",
+        "content"
+      ]
+    },
+    "ChatResponsePartAction": {
+      "type": "object",
+      "description": "Structured content appended to the response.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatResponsePart"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "part": {
+          "$ref": "#/$defs/ResponsePart",
+          "description": "Response part (markdown or content ref)"
+        }
+      },
+      "required": [
+        "type",
+        "turnId",
+        "part"
+      ]
+    },
+    "ChatToolCallStartAction": {
+      "type": "object",
+      "description": "A tool call begins — parameters are streaming from the LM.\n\nThe server sets {@link ToolCallContributor | `contributor`} to identify\nthe origin of the tool. For client-provided tools, the named client is\nresponsible for executing the tool once it reaches the `running` state\nand dispatching `chat/toolCallComplete`. For MCP-served tools, the\nserver executes the call against the named `McpServerCustomization`.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatToolCallStart"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Reference to the contributor of the tool being called. Absent for\nserver-side tools that are not contributed by a client or MCP server."
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "toolName",
+        "displayName"
+      ]
+    },
+    "ChatToolCallDeltaAction": {
+      "type": "object",
+      "description": "Streaming partial parameters for a tool call.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatToolCallDelta"
+        },
+        "content": {
+          "type": "string",
+          "description": "Partial parameter content to append"
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Updated progress message"
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "content"
+      ]
+    },
+    "ChatToolCallReadyAction": {
+      "type": "object",
+      "description": "Tool call parameters are complete, or a running tool requires re-confirmation.\n\nWhen dispatched for a `streaming` tool call, transitions to `pending-confirmation`\nor directly to `running` if `confirmed` is set.\n\nWhen dispatched for a `running` tool call (e.g. mid-execution permission needed),\ntransitions back to `pending-confirmation`. The `invocationMessage` and `_meta`\nSHOULD be updated to describe the specific confirmation needed. Clients use the\nstandard `chat/toolCallConfirmed` flow to approve or deny.\n\nFor client-provided tools, the server typically sets `confirmed` to\n`'not-needed'` so the tool transitions directly to `running`, where the\nowning client can begin execution immediately.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatToolCallReady"
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do or what confirmation is needed"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "confirmationTitle": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Short title for the confirmation prompt (e.g. `\"Run in terminal\"`, `\"Write file\"`)"
+        },
+        "edits": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "description": "File edits that this tool call will perform, for preview before confirmation"
+        },
+        "editable": {
+          "type": "boolean",
+          "description": "Whether the agent host allows the client to edit the tool's input parameters before confirming"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/ToolCallConfirmationReason",
+          "description": "If set, the tool was auto-confirmed and transitions directly to `running`"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConfirmationOption"
+          },
+          "description": "Options the server offers for this confirmation. When present, the client\nSHOULD render these instead of a plain approve/deny UI. Each option\nbelongs to a {@link ConfirmationOptionGroup} so the client can still\ncategorise the choices."
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "invocationMessage"
+      ]
+    },
+    "ChatToolCallApprovedAction": {
+      "type": "object",
+      "description": "Client approves a pending tool call. The tool transitions to `running`.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatToolCallConfirmed"
+        },
+        "approved": {
+          "description": "The tool call was approved"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/ToolCallConfirmationReason",
+          "description": "How the tool was confirmed"
+        },
+        "editedToolInput": {
+          "type": "string",
+          "description": "Edited tool input parameters, if the client modified them before confirming"
+        },
+        "selectedOptionId": {
+          "type": "string",
+          "description": "ID of the selected confirmation option, if the server provided options"
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "approved",
+        "confirmed"
+      ]
+    },
+    "ChatToolCallDeniedAction": {
+      "type": "object",
+      "description": "Client denies a pending tool call. The tool transitions to `cancelled`.\n\nFor client-provided tools, the owning client MUST dispatch this if it does\nnot recognize the tool or cannot execute it.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatToolCallConfirmed"
+        },
+        "approved": {
+          "description": "The tool call was denied"
+        },
+        "reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ToolCallCancellationReason.Denied"
+            },
+            {
+              "$ref": "#/$defs/ToolCallCancellationReason.Skipped"
+            }
+          ],
+          "description": "Why the tool was cancelled"
+        },
+        "userSuggestion": {
+          "$ref": "#/$defs/Message",
+          "description": "What the user suggested doing instead"
+        },
+        "reasonMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Optional explanation for the denial"
+        },
+        "selectedOptionId": {
+          "type": "string",
+          "description": "ID of the selected confirmation option, if the server provided options"
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "approved",
+        "reason"
+      ]
+    },
+    "ChatToolCallCompleteAction": {
+      "type": "object",
+      "description": "Tool execution finished. Transitions to `completed` or `pending-result-confirmation`\nif `requiresResultConfirmation` is `true`.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action with the execution result. The server\nSHOULD reject this action if the dispatching client does not match `toolClientId`.\n\nServers waiting on a client tool call MAY time out after a reasonable duration\nif the implementing client disconnects or becomes unresponsive, and dispatch\nthis action with `result.success = false` and an appropriate error.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatToolCallComplete"
+        },
+        "result": {
+          "$ref": "#/$defs/ToolCallResult",
+          "description": "Execution result"
+        },
+        "requiresResultConfirmation": {
+          "type": "boolean",
+          "description": "If true, the result requires client approval before finalizing"
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "result"
+      ]
+    },
+    "ChatToolCallResultConfirmedAction": {
+      "type": "object",
+      "description": "Client approves or denies a tool's result.\n\nIf `approved` is `false`, the tool transitions to `cancelled` with reason `result-denied`.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatToolCallResultConfirmed"
+        },
+        "approved": {
+          "type": "boolean",
+          "description": "Whether the result was approved"
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "approved"
+      ]
+    },
+    "ChatToolCallContentChangedAction": {
+      "type": "object",
+      "description": "Partial content produced while a tool is still executing.\n\nReplaces the `content` array on the running tool call state. Clients can\nuse this to display live feedback (e.g. a terminal reference) before the\ntool completes.\n\nFor client-provided tools (where `toolClientId` is set on the tool call state),\nthe owning client dispatches this action to stream intermediate content while\nexecuting. The server SHOULD reject this action if the dispatching client does\nnot match `toolClientId`.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatToolCallContentChanged"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "The current partial content for the running tool call"
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "content"
+      ]
+    },
+    "ChatTurnCompleteAction": {
+      "type": "object",
+      "description": "Turn finished — the assistant is idle.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatTurnComplete"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        }
+      },
+      "required": [
+        "type",
+        "turnId"
+      ]
+    },
+    "ChatTurnCancelledAction": {
+      "type": "object",
+      "description": "Turn was aborted; server stops processing.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatTurnCancelled"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        }
+      },
+      "required": [
+        "type",
+        "turnId"
+      ]
+    },
+    "ChatErrorAction": {
+      "type": "object",
+      "description": "Error during turn processing.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatError"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Error details"
+        }
+      },
+      "required": [
+        "type",
+        "turnId",
+        "error"
+      ]
+    },
+    "ChatUsageAction": {
+      "type": "object",
+      "description": "Token usage report for a turn.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatUsage"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage data"
+        }
+      },
+      "required": [
+        "type",
+        "turnId",
+        "usage"
+      ]
+    },
+    "ChatReasoningAction": {
+      "type": "object",
+      "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\nreasoning part, then use this action to append text to it.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatReasoning"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "partId": {
+          "type": "string",
+          "description": "Identifier of the reasoning response part to append to"
+        },
+        "content": {
+          "type": "string",
+          "description": "Reasoning text chunk"
+        }
+      },
+      "required": [
+        "type",
+        "turnId",
+        "partId",
+        "content"
+      ]
+    },
+    "ChatTruncatedAction": {
+      "type": "object",
+      "description": "Truncates a session's history. If `turnId` is provided, all turns after that\nturn are removed and the specified turn is kept. If `turnId` is omitted, all\nturns are removed.\n\nIf there is an active turn it is silently dropped and the chat status\nreturns to `idle`.\n\nCommon use-case: truncate old data then dispatch a new\n`chat/turnStarted` with an edited message.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatTruncated"
         },
         "turnId": {
           "type": "string",
@@ -1047,12 +1157,12 @@
         "type"
       ]
     },
-    "SessionPendingMessageSetAction": {
+    "ChatPendingMessageSetAction": {
       "type": "object",
-      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the session is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
+      "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the chat is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionPendingMessageSet"
+          "$ref": "#/$defs/ActionType.ChatPendingMessageSet"
         },
         "kind": {
           "$ref": "#/$defs/PendingMessageKind",
@@ -1074,12 +1184,12 @@
         "message"
       ]
     },
-    "SessionPendingMessageRemovedAction": {
+    "ChatPendingMessageRemovedAction": {
       "type": "object",
       "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionPendingMessageRemoved"
+          "$ref": "#/$defs/ActionType.ChatPendingMessageRemoved"
         },
         "kind": {
           "$ref": "#/$defs/PendingMessageKind",
@@ -1096,12 +1206,12 @@
         "id"
       ]
     },
-    "SessionQueuedMessagesReorderedAction": {
+    "ChatQueuedMessagesReorderedAction": {
       "type": "object",
       "description": "Reorder the queued messages.\n\nThe `order` array contains the IDs of queued messages in their new\ndesired order. IDs not present in the current queue are ignored.\nQueued messages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the queue never silently drops messages).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionQueuedMessagesReordered"
+          "$ref": "#/$defs/ActionType.ChatQueuedMessagesReordered"
         },
         "order": {
           "type": "array",
@@ -1116,15 +1226,15 @@
         "order"
       ]
     },
-    "SessionInputRequestedAction": {
+    "ChatInputRequestedAction": {
       "type": "object",
       "description": "A session requested input from the user.\n\nFull-request upsert semantics: the `request` replaces any existing request\nwith the same `id`, or is appended if it is new. Answer drafts are preserved\nunless `request.answers` is provided.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionInputRequested"
+          "$ref": "#/$defs/ActionType.ChatInputRequested"
         },
         "request": {
-          "$ref": "#/$defs/SessionInputRequest",
+          "$ref": "#/$defs/ChatInputRequest",
           "description": "Input request to create or replace"
         }
       },
@@ -1133,12 +1243,12 @@
         "request"
       ]
     },
-    "SessionInputAnswerChangedAction": {
+    "ChatInputAnswerChangedAction": {
       "type": "object",
       "description": "A client updated, submitted, skipped, or removed a single in-progress answer.\n\nDispatching with `answer: undefined` removes that question's answer draft.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionInputAnswerChanged"
+          "$ref": "#/$defs/ActionType.ChatInputAnswerChanged"
         },
         "requestId": {
           "type": "string",
@@ -1149,7 +1259,7 @@
           "description": "Question identifier within the input request"
         },
         "answer": {
-          "$ref": "#/$defs/SessionInputAnswer",
+          "$ref": "#/$defs/ChatInputAnswer",
           "description": "Updated answer, or `undefined` to clear an answer draft"
         }
       },
@@ -1159,25 +1269,25 @@
         "questionId"
       ]
     },
-    "SessionInputCompletedAction": {
+    "ChatInputCompletedAction": {
       "type": "object",
       "description": "A client accepted, declined, or cancelled a session input request.\n\nIf accepted, the server uses `answers` (when provided) plus the request's\nsynced answer state to resume the blocked operation.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionInputCompleted"
+          "$ref": "#/$defs/ActionType.ChatInputCompleted"
         },
         "requestId": {
           "type": "string",
           "description": "Input request identifier"
         },
         "response": {
-          "$ref": "#/$defs/SessionInputResponseKind",
+          "$ref": "#/$defs/ChatInputResponseKind",
           "description": "Completion outcome"
         },
         "answers": {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/$defs/SessionInputAnswer"
+            "$ref": "#/$defs/ChatInputAnswer"
           },
           "description": "Optional final answer replacement, keyed by question ID"
         }
@@ -1636,17 +1746,88 @@
         "changes"
       ]
     },
-    "SessionToolCallConfirmedAction": {
+    "ChatToolCallConfirmedAction": {
       "oneOf": [
         {},
         {
-          "$ref": "#/$defs/SessionToolCallApprovedAction"
+          "$ref": "#/$defs/ChatToolCallApprovedAction"
         },
         {
-          "$ref": "#/$defs/SessionToolCallDeniedAction"
+          "$ref": "#/$defs/ChatToolCallDeniedAction"
         }
       ],
       "description": "Client confirms or denies a pending tool call."
+    },
+    "ChatAction": {
+      "oneOf": [
+        {},
+        {
+          "$ref": "#/$defs/ChatTurnStartedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatDeltaAction"
+        },
+        {
+          "$ref": "#/$defs/ChatResponsePartAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallStartAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallDeltaAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallReadyAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallConfirmedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallCompleteAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallResultConfirmedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallContentChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatTurnCompleteAction"
+        },
+        {
+          "$ref": "#/$defs/ChatTurnCancelledAction"
+        },
+        {
+          "$ref": "#/$defs/ChatErrorAction"
+        },
+        {
+          "$ref": "#/$defs/ChatUsageAction"
+        },
+        {
+          "$ref": "#/$defs/ChatReasoningAction"
+        },
+        {
+          "$ref": "#/$defs/ChatTruncatedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatPendingMessageSetAction"
+        },
+        {
+          "$ref": "#/$defs/ChatPendingMessageRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatQueuedMessagesReorderedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatInputRequestedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatInputAnswerChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatInputCompletedAction"
+        }
+      ]
     },
     "Icon": {
       "type": "object",
@@ -2038,7 +2219,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribed channel URI (e.g. `ahp-root://` or `ahp-session:/<uuid>`)"
+          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)"
         },
         "state": {
           "oneOf": [
@@ -2236,24 +2417,6 @@
         "values"
       ]
     },
-    "PendingMessage": {
-      "type": "object",
-      "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for this pending message"
-        },
-        "message": {
-          "$ref": "#/$defs/Message",
-          "description": "The message that will start the next turn"
-        }
-      },
-      "required": [
-        "id",
-        "message"
-      ]
-    },
     "SessionState": {
       "type": "object",
       "description": "Full state for a single session, loaded when a client subscribes to the session's URI.",
@@ -2281,34 +2444,16 @@
           "$ref": "#/$defs/SessionActiveClient",
           "description": "The client currently providing tools and interactive capabilities to this session"
         },
-        "turns": {
+        "chats": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/Turn"
+            "$ref": "#/$defs/ChatSummary"
           },
-          "description": "Completed turns"
+          "description": "Catalog of chats in this session."
         },
-        "activeTurn": {
-          "$ref": "#/$defs/ActiveTurn",
-          "description": "Currently in-progress turn"
-        },
-        "steeringMessage": {
-          "$ref": "#/$defs/PendingMessage",
-          "description": "Message to inject into the current turn at a convenient point"
-        },
-        "queuedMessages": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/PendingMessage"
-          },
-          "description": "Messages to send automatically as new turns after the current turn finishes"
-        },
-        "inputRequests": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SessionInputRequest"
-          },
-          "description": "Requests for user input that are currently blocking or informing session progress"
+        "defaultChat": {
+          "$ref": "#/$defs/URI",
+          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This is a UI routing hint, not a hierarchy\nmarker — chats remain equal peers at the protocol level. Hosts MAY change\nthis over the session's lifetime."
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
@@ -2337,7 +2482,7 @@
       "required": [
         "summary",
         "lifecycle",
-        "turns"
+        "chats"
       ]
     },
     "SessionActiveClient": {
@@ -2392,6 +2537,7 @@
     },
     "SessionSummary": {
       "type": "object",
+      "description": "Lightweight catalog entry summarizing one session. Surfaced via\n{@link RootChannelCommands.listSessions | `root/listSessions`} and\n`root/sessionAdded`/`root/sessionSummaryChanged` notifications.\n\n**Aggregation across chats.** Once a session contains more than one chat,\nseveral `SessionSummary` fields are derived from the underlying\n{@link SessionState.chats | chat catalog}. Producers SHOULD follow these\nrules so clients that only consume the session summary (e.g. a session\nlist) still see meaningful state:\n\n- `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /\n  `Error` — bits 0–4) from the\n  {@link SessionState.defaultChat | default chat} when present, else from\n  the most recently modified chat. **Promote** `InputNeeded` whenever any\n  chat in the session needs input, and **promote** `Error` whenever any\n  chat is in an error state — both override the default-chat bits. The\n  orthogonal flag bits (`IsRead`, `IsArchived`) remain session-scoped.\n- `activity`: mirror the activity string of the default chat, or of the\n  chat currently driving the promoted status bits when a non-default chat\n  wins (e.g. the chat that raised `InputNeeded`).\n- `modifiedAt`: the max of all chats' `modifiedAt`.\n- `model` / `agent`: the session-level selection. Per-chat overrides are\n  surfaced on individual {@link ChatSummary} entries, not aggregated up.\n- `workingDirectory`: the session-level **default**. Individual chats MAY\n  override via {@link ChatSummary.workingDirectory}; aggregating these up\n  is meaningless and SHOULD NOT be attempted.\n- `changes`: optional roll-up across all chats. Producers MAY sum the\n  per-chat changeset stats or report the most expensive chat's stats —\n  whichever is cheaper for the host to compute.\n\nSessions with a single chat trivially satisfy all of the above (the chat's\nvalues pass through unchanged). The rules only matter once a session\ncarries multiple chats.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -2435,7 +2581,7 @@
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
-          "description": "The working directory URI for this session"
+          "description": "The default working directory URI for this session. Individual chats\nMAY override via {@link ChatSummary.workingDirectory | their own\n`workingDirectory`}; this field acts as the fallback for any chat that\ndoes not."
         },
         "changes": {
           "$ref": "#/$defs/ChangesSummary",
@@ -2619,1436 +2765,6 @@
         "values"
       ]
     },
-    "SessionInputOption": {
-      "type": "object",
-      "description": "A choice in a select-style question.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable option identifier; for MCP enum values this is the enum string"
-        },
-        "label": {
-          "type": "string",
-          "description": "Display label"
-        },
-        "description": {
-          "type": "string",
-          "description": "Optional secondary text"
-        },
-        "recommended": {
-          "type": "boolean",
-          "description": "Whether this option is the recommended/default choice"
-        }
-      },
-      "required": [
-        "id",
-        "label"
-      ]
-    },
-    "SessionInputQuestionBase": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable question identifier used as the key in `answers`"
-        },
-        "title": {
-          "type": "string",
-          "description": "Short display title"
-        },
-        "message": {
-          "type": "string",
-          "description": "Prompt shown to the user"
-        },
-        "required": {
-          "type": "boolean",
-          "description": "Whether the user must answer this question to accept the request"
-        }
-      },
-      "required": [
-        "id",
-        "message"
-      ]
-    },
-    "SessionInputTextQuestion": {
-      "type": "object",
-      "description": "Text question within a session input request.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable question identifier used as the key in `answers`"
-        },
-        "title": {
-          "type": "string",
-          "description": "Short display title"
-        },
-        "message": {
-          "type": "string",
-          "description": "Prompt shown to the user"
-        },
-        "required": {
-          "type": "boolean",
-          "description": "Whether the user must answer this question to accept the request"
-        },
-        "kind": {
-          "$ref": "#/$defs/SessionInputQuestionKind.Text"
-        },
-        "format": {
-          "type": "string",
-          "description": "Format hint for text questions, such as `email`, `uri`, `date`, or `date-time`"
-        },
-        "min": {
-          "type": "number",
-          "description": "Minimum string length"
-        },
-        "max": {
-          "type": "number",
-          "description": "Maximum string length"
-        },
-        "defaultValue": {
-          "type": "string",
-          "description": "Default text"
-        }
-      },
-      "required": [
-        "id",
-        "message",
-        "kind"
-      ]
-    },
-    "SessionInputNumberQuestion": {
-      "type": "object",
-      "description": "Numeric question within a session input request.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable question identifier used as the key in `answers`"
-        },
-        "title": {
-          "type": "string",
-          "description": "Short display title"
-        },
-        "message": {
-          "type": "string",
-          "description": "Prompt shown to the user"
-        },
-        "required": {
-          "type": "boolean",
-          "description": "Whether the user must answer this question to accept the request"
-        },
-        "kind": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/SessionInputQuestionKind.Number"
-            },
-            {
-              "$ref": "#/$defs/SessionInputQuestionKind.Integer"
-            }
-          ]
-        },
-        "min": {
-          "type": "number",
-          "description": "Minimum value"
-        },
-        "max": {
-          "type": "number",
-          "description": "Maximum value"
-        },
-        "defaultValue": {
-          "type": "number",
-          "description": "Default numeric value"
-        }
-      },
-      "required": [
-        "id",
-        "message",
-        "kind"
-      ]
-    },
-    "SessionInputBooleanQuestion": {
-      "type": "object",
-      "description": "Boolean question within a session input request.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable question identifier used as the key in `answers`"
-        },
-        "title": {
-          "type": "string",
-          "description": "Short display title"
-        },
-        "message": {
-          "type": "string",
-          "description": "Prompt shown to the user"
-        },
-        "required": {
-          "type": "boolean",
-          "description": "Whether the user must answer this question to accept the request"
-        },
-        "kind": {
-          "$ref": "#/$defs/SessionInputQuestionKind.Boolean"
-        },
-        "defaultValue": {
-          "type": "boolean",
-          "description": "Default boolean value"
-        }
-      },
-      "required": [
-        "id",
-        "message",
-        "kind"
-      ]
-    },
-    "SessionInputSingleSelectQuestion": {
-      "type": "object",
-      "description": "Single-select question within a session input request.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable question identifier used as the key in `answers`"
-        },
-        "title": {
-          "type": "string",
-          "description": "Short display title"
-        },
-        "message": {
-          "type": "string",
-          "description": "Prompt shown to the user"
-        },
-        "required": {
-          "type": "boolean",
-          "description": "Whether the user must answer this question to accept the request"
-        },
-        "kind": {
-          "$ref": "#/$defs/SessionInputQuestionKind.SingleSelect"
-        },
-        "options": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SessionInputOption"
-          },
-          "description": "Options the user may select from"
-        },
-        "allowFreeformInput": {
-          "type": "boolean",
-          "description": "Whether the user may enter text instead of selecting an option"
-        }
-      },
-      "required": [
-        "id",
-        "message",
-        "kind",
-        "options"
-      ]
-    },
-    "SessionInputMultiSelectQuestion": {
-      "type": "object",
-      "description": "Multi-select question within a session input request.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable question identifier used as the key in `answers`"
-        },
-        "title": {
-          "type": "string",
-          "description": "Short display title"
-        },
-        "message": {
-          "type": "string",
-          "description": "Prompt shown to the user"
-        },
-        "required": {
-          "type": "boolean",
-          "description": "Whether the user must answer this question to accept the request"
-        },
-        "kind": {
-          "$ref": "#/$defs/SessionInputQuestionKind.MultiSelect"
-        },
-        "options": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SessionInputOption"
-          },
-          "description": "Options the user may select from"
-        },
-        "allowFreeformInput": {
-          "type": "boolean",
-          "description": "Whether the user may enter text in addition to selecting options"
-        },
-        "min": {
-          "type": "number",
-          "description": "Minimum selected item count"
-        },
-        "max": {
-          "type": "number",
-          "description": "Maximum selected item count"
-        }
-      },
-      "required": [
-        "id",
-        "message",
-        "kind",
-        "options"
-      ]
-    },
-    "SessionInputRequest": {
-      "type": "object",
-      "description": "A live request for user input.\n\nThe server creates or replaces requests with `session/inputRequested`.\nClients sync drafts with `session/inputAnswerChanged` and complete requests\nwith `session/inputCompleted`.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Stable request identifier"
-        },
-        "message": {
-          "type": "string",
-          "description": "Display message for the request as a whole"
-        },
-        "url": {
-          "$ref": "#/$defs/URI",
-          "description": "URL the user should review or open, for URL-style elicitations"
-        },
-        "questions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SessionInputQuestion"
-          },
-          "description": "Ordered questions to ask the user"
-        },
-        "answers": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/$defs/SessionInputAnswer"
-          },
-          "description": "Current draft or submitted answers, keyed by question ID"
-        }
-      },
-      "required": [
-        "id"
-      ]
-    },
-    "SessionInputTextAnswerValue": {
-      "type": "object",
-      "description": "Value captured for one answer.",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/SessionInputAnswerValueKind.Text"
-        },
-        "value": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "kind",
-        "value"
-      ]
-    },
-    "SessionInputNumberAnswerValue": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/SessionInputAnswerValueKind.Number"
-        },
-        "value": {
-          "type": "number"
-        }
-      },
-      "required": [
-        "kind",
-        "value"
-      ]
-    },
-    "SessionInputBooleanAnswerValue": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/SessionInputAnswerValueKind.Boolean"
-        },
-        "value": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "kind",
-        "value"
-      ]
-    },
-    "SessionInputSelectedAnswerValue": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/SessionInputAnswerValueKind.Selected"
-        },
-        "value": {
-          "type": "string"
-        },
-        "freeformValues": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Free-form text entered instead of selecting an option"
-        }
-      },
-      "required": [
-        "kind",
-        "value"
-      ]
-    },
-    "SessionInputSelectedManyAnswerValue": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/SessionInputAnswerValueKind.SelectedMany"
-        },
-        "value": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "freeformValues": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Free-form text entered in addition to selected options"
-        }
-      },
-      "required": [
-        "kind",
-        "value"
-      ]
-    },
-    "SessionInputAnswered": {
-      "type": "object",
-      "properties": {
-        "state": {
-          "oneOf": [
-            {
-              "$ref": "#/$defs/SessionInputAnswerState.Draft"
-            },
-            {
-              "$ref": "#/$defs/SessionInputAnswerState.Submitted"
-            }
-          ],
-          "description": "Answer state"
-        },
-        "value": {
-          "$ref": "#/$defs/SessionInputAnswerValue",
-          "description": "Answer value"
-        }
-      },
-      "required": [
-        "state",
-        "value"
-      ]
-    },
-    "SessionInputSkipped": {
-      "type": "object",
-      "properties": {
-        "state": {
-          "$ref": "#/$defs/SessionInputAnswerState.Skipped",
-          "description": "Answer state"
-        },
-        "freeformValues": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Free-form reason or value captured while skipping, if any"
-        }
-      },
-      "required": [
-        "state"
-      ]
-    },
-    "Turn": {
-      "type": "object",
-      "description": "A completed request/response cycle.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "message": {
-          "$ref": "#/$defs/Message",
-          "description": "The message that initiated the turn"
-        },
-        "responseParts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ResponsePart"
-          },
-          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
-        },
-        "usage": {
-          "$ref": "#/$defs/UsageInfo",
-          "description": "Token usage info"
-        },
-        "state": {
-          "$ref": "#/$defs/TurnState",
-          "description": "How the turn ended"
-        },
-        "error": {
-          "$ref": "#/$defs/ErrorInfo",
-          "description": "Error details if state is `'error'`"
-        }
-      },
-      "required": [
-        "id",
-        "message",
-        "responseParts",
-        "usage",
-        "state"
-      ]
-    },
-    "ActiveTurn": {
-      "type": "object",
-      "description": "An in-progress turn — the assistant is actively streaming.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Turn identifier"
-        },
-        "message": {
-          "$ref": "#/$defs/Message",
-          "description": "The message that initiated the turn"
-        },
-        "responseParts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ResponsePart"
-          },
-          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nTool call parts include `pendingPermissions` when permissions are awaiting user approval."
-        },
-        "usage": {
-          "$ref": "#/$defs/UsageInfo",
-          "description": "Token usage info"
-        }
-      },
-      "required": [
-        "id",
-        "message",
-        "responseParts",
-        "usage"
-      ]
-    },
-    "Message": {
-      "type": "object",
-      "description": "A message that initiates or steers a turn. Messages can originate from the\nuser or be system-generated (see {@link MessageKind}).\n\nAttachments MAY be referenced inside {@link Message.text} via their\n{@link MessageAttachmentBase.range} field. Attachments without a range are\nstill associated with the message but do not correspond to a specific span\nin the text.",
-      "properties": {
-        "text": {
-          "type": "string",
-          "description": "Message text"
-        },
-        "origin": {
-          "type": "object",
-          "properties": {
-            "kind": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind"
-          ],
-          "description": "The origin of the message"
-        },
-        "attachments": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/MessageAttachment"
-          },
-          "description": "File/selection attachments"
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this message.\n\nClients MAY look for well-known keys here to provide enhanced UI, and\nagent hosts MAY use it to carry context that does not fit any other\nfield. Mirrors the MCP `_meta` convention."
-        }
-      },
-      "required": [
-        "text",
-        "origin"
-      ]
-    },
-    "MessageAttachmentBase": {
-      "type": "object",
-      "description": "Common fields shared by all {@link MessageAttachment} variants.",
-      "properties": {
-        "label": {
-          "type": "string",
-          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
-        },
-        "range": {
-          "$ref": "#/$defs/TextRange",
-          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
-        },
-        "displayKind": {
-          "type": "string",
-          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
-        }
-      },
-      "required": [
-        "label"
-      ]
-    },
-    "SimpleMessageAttachment": {
-      "type": "object",
-      "description": "A simple, opaque attachment whose model representation is described by\nthe producer.",
-      "properties": {
-        "label": {
-          "type": "string",
-          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
-        },
-        "range": {
-          "$ref": "#/$defs/TextRange",
-          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
-        },
-        "displayKind": {
-          "type": "string",
-          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
-        },
-        "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Simple",
-          "description": "Discriminant"
-        },
-        "modelRepresentation": {
-          "type": "string",
-          "description": "Representation of the attachment as it should be shown to the model.\n\nIf the attachment was produced by the client, this property MUST be\ndefined so the agent host can correctly interpret the attachment. This\nproperty MAY be omitted when the attachment originated from a\n`completions` response."
-        }
-      },
-      "required": [
-        "label",
-        "type"
-      ]
-    },
-    "MessageEmbeddedResourceAttachment": {
-      "type": "object",
-      "description": "An attachment whose data is embedded inline as a base64 string.\n\nUse this for small binary payloads (e.g. a pasted image) that should be\ndelivered with the user message itself rather than fetched separately.",
-      "properties": {
-        "label": {
-          "type": "string",
-          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
-        },
-        "range": {
-          "$ref": "#/$defs/TextRange",
-          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
-        },
-        "displayKind": {
-          "type": "string",
-          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
-        },
-        "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.EmbeddedResource",
-          "description": "Discriminant"
-        },
-        "data": {
-          "type": "string",
-          "description": "Base64-encoded binary data"
-        },
-        "contentType": {
-          "type": "string",
-          "description": "Content MIME type (e.g. `\"image/png\"`, `\"application/pdf\"`)"
-        },
-        "selection": {
-          "$ref": "#/$defs/TextSelection",
-          "description": "Optional selection within the attached textual resource.\n\nOnly meaningful for textual resources."
-        }
-      },
-      "required": [
-        "label",
-        "type",
-        "data",
-        "contentType"
-      ]
-    },
-    "MessageResourceAttachment": {
-      "type": "object",
-      "description": "An attachment that references a resource by URI. The content is not\ndelivered inline; consumers can fetch it via `resourceRead` when needed.",
-      "properties": {
-        "label": {
-          "type": "string",
-          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
-        },
-        "range": {
-          "$ref": "#/$defs/TextRange",
-          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
-        },
-        "displayKind": {
-          "type": "string",
-          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
-        },
-        "uri": {
-          "$ref": "#/$defs/URI",
-          "description": "Content URI"
-        },
-        "sizeHint": {
-          "type": "number",
-          "description": "Approximate size in bytes"
-        },
-        "contentType": {
-          "type": "string",
-          "description": "Content MIME type"
-        },
-        "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Resource",
-          "description": "Discriminant"
-        },
-        "selection": {
-          "$ref": "#/$defs/TextSelection",
-          "description": "Optional selection within the referenced textual resource.\n\nOnly meaningful for textual resources."
-        }
-      },
-      "required": [
-        "label",
-        "uri",
-        "type"
-      ]
-    },
-    "MessageAnnotationsAttachment": {
-      "type": "object",
-      "description": "An attachment that references annotations on a session's annotations\nchannel (see {@link AnnotationsState}).\n\nWhen {@link annotationIds} is omitted the attachment references every\nannotation on the channel; when present it references only the listed\n{@link Annotation.id | annotation ids}.",
-      "properties": {
-        "label": {
-          "type": "string",
-          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
-        },
-        "range": {
-          "$ref": "#/$defs/TextRange",
-          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
-        },
-        "displayKind": {
-          "type": "string",
-          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
-        },
-        "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Annotations",
-          "description": "Discriminant"
-        },
-        "resource": {
-          "$ref": "#/$defs/URI",
-          "description": "The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).\nMatches {@link AnnotationsSummary.resource}."
-        },
-        "annotationIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Specific {@link Annotation.id | annotation ids} to reference. When\nomitted, the attachment references all annotations on the channel."
-        }
-      },
-      "required": [
-        "label",
-        "type",
-        "resource"
-      ]
-    },
-    "MarkdownResponsePart": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/ResponsePartKind.Markdown",
-          "description": "Discriminant"
-        },
-        "id": {
-          "type": "string",
-          "description": "Part identifier, used by `session/delta` to target this part for content appends"
-        },
-        "content": {
-          "type": "string",
-          "description": "Markdown content"
-        }
-      },
-      "required": [
-        "kind",
-        "id",
-        "content"
-      ]
-    },
-    "ResourceReponsePart": {
-      "type": "object",
-      "description": "A content part that's a reference to large content stored outside the state tree.",
-      "properties": {
-        "uri": {
-          "$ref": "#/$defs/URI",
-          "description": "Content URI"
-        },
-        "sizeHint": {
-          "type": "number",
-          "description": "Approximate size in bytes"
-        },
-        "contentType": {
-          "type": "string",
-          "description": "Content MIME type"
-        },
-        "kind": {
-          "$ref": "#/$defs/ResponsePartKind.ContentRef",
-          "description": "Discriminant"
-        }
-      },
-      "required": [
-        "uri",
-        "kind"
-      ]
-    },
-    "ToolCallResponsePart": {
-      "type": "object",
-      "description": "A tool call represented as a response part.\n\nTool calls are part of the response stream, interleaved with text and\nreasoning. The `toolCall.toolCallId` serves as the part identifier for\nactions that target this part.",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/ResponsePartKind.ToolCall",
-          "description": "Discriminant"
-        },
-        "toolCall": {
-          "$ref": "#/$defs/ToolCallState",
-          "description": "Full tool call lifecycle state"
-        }
-      },
-      "required": [
-        "kind",
-        "toolCall"
-      ]
-    },
-    "ReasoningResponsePart": {
-      "type": "object",
-      "description": "Reasoning/thinking content from the model.",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/ResponsePartKind.Reasoning",
-          "description": "Discriminant"
-        },
-        "id": {
-          "type": "string",
-          "description": "Part identifier, used by `session/reasoning` to target this part for content appends"
-        },
-        "content": {
-          "type": "string",
-          "description": "Accumulated reasoning text"
-        }
-      },
-      "required": [
-        "kind",
-        "id",
-        "content"
-      ]
-    },
-    "SystemNotificationResponsePart": {
-      "type": "object",
-      "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent harness\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/ResponsePartKind.SystemNotification",
-          "description": "Discriminant"
-        },
-        "content": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "The text of the system notification"
-        }
-      },
-      "required": [
-        "kind",
-        "content"
-      ]
-    },
-    "ConfirmationOption": {
-      "type": "object",
-      "description": "A confirmation option that the server offers for a tool call awaiting\napproval. Allows richer choices beyond simple approve/deny — for example,\n\"Approve in this Session\" or \"Deny with reason.\"",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the option, returned in the confirmed action"
-        },
-        "label": {
-          "type": "string",
-          "description": "Human-readable label displayed to the user"
-        },
-        "kind": {
-          "$ref": "#/$defs/ConfirmationOptionKind",
-          "description": "Whether this option represents an approval or denial"
-        },
-        "group": {
-          "type": "number",
-          "description": "Logical group number for visual categorisation.\n\nClients SHOULD display options in the order they are defined and MAY\nuse differing group numbers to insert dividers between logical clusters\nof options."
-        }
-      },
-      "required": [
-        "id",
-        "label",
-        "kind"
-      ]
-    },
-    "ToolCallClientContributor": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/ToolCallContributorKind.Client"
-        },
-        "clientId": {
-          "type": "string",
-          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `session/toolCallComplete` with the result."
-        }
-      },
-      "required": [
-        "kind",
-        "clientId"
-      ]
-    },
-    "ToolCallMcpContributor": {
-      "type": "object",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/ToolCallContributorKind.MCP"
-        },
-        "customizationId": {
-          "type": "string",
-          "description": "Customization ID of the corresponding MCP server in {@link SessionState.customizations}."
-        }
-      },
-      "required": [
-        "kind",
-        "customizationId"
-      ]
-    },
-    "ToolCallBase": {
-      "type": "object",
-      "description": "Metadata common to all tool call states.",
-      "properties": {
-        "toolCallId": {
-          "type": "string",
-          "description": "Unique tool call identifier"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Internal tool name (for debugging/logging)"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable tool name"
-        },
-        "contributor": {
-          "$ref": "#/$defs/ToolCallContributor",
-          "description": "Reference to the contributor of the tool being called."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
-        }
-      },
-      "required": [
-        "toolCallId",
-        "toolName",
-        "displayName"
-      ]
-    },
-    "ToolCallParameterFields": {
-      "type": "object",
-      "description": "Properties available once tool call parameters are fully received.",
-      "properties": {
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Message describing what the tool will do"
-        },
-        "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
-        }
-      },
-      "required": [
-        "invocationMessage"
-      ]
-    },
-    "ToolCallResult": {
-      "type": "object",
-      "description": "Tool execution result details, available after execution completes.",
-      "properties": {
-        "success": {
-          "type": "boolean",
-          "description": "Whether the tool succeeded"
-        },
-        "pastTenseMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Past-tense description of what the tool did"
-        },
-        "content": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ToolResultContent"
-          },
-          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
-        },
-        "structuredContent": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
-        },
-        "error": {
-          "type": "object",
-          "properties": {
-            "message": {
-              "type": "string"
-            },
-            "code": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "message"
-          ],
-          "description": "Error details if the tool failed"
-        }
-      },
-      "required": [
-        "success",
-        "pastTenseMessage"
-      ]
-    },
-    "ToolCallStreamingState": {
-      "type": "object",
-      "description": "LM is streaming the tool call parameters.",
-      "properties": {
-        "toolCallId": {
-          "type": "string",
-          "description": "Unique tool call identifier"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Internal tool name (for debugging/logging)"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable tool name"
-        },
-        "contributor": {
-          "$ref": "#/$defs/ToolCallContributor",
-          "description": "Reference to the contributor of the tool being called."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
-        },
-        "status": {
-          "$ref": "#/$defs/ToolCallStatus.Streaming"
-        },
-        "partialInput": {
-          "type": "string",
-          "description": "Partial parameters accumulated so far"
-        },
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Progress message shown while parameters are streaming"
-        }
-      },
-      "required": [
-        "toolCallId",
-        "toolName",
-        "displayName",
-        "status"
-      ]
-    },
-    "ToolCallPendingConfirmationState": {
-      "type": "object",
-      "description": "Parameters are complete, or a running tool requires re-confirmation\n(e.g. a mid-execution permission check).",
-      "properties": {
-        "toolCallId": {
-          "type": "string",
-          "description": "Unique tool call identifier"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Internal tool name (for debugging/logging)"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable tool name"
-        },
-        "contributor": {
-          "$ref": "#/$defs/ToolCallContributor",
-          "description": "Reference to the contributor of the tool being called."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
-        },
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Message describing what the tool will do"
-        },
-        "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
-        },
-        "status": {
-          "$ref": "#/$defs/ToolCallStatus.PendingConfirmation"
-        },
-        "confirmationTitle": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Short title for the confirmation prompt (e.g. `\"Run in terminal\"`, `\"Write file\"`)"
-        },
-        "edits": {
-          "type": "object",
-          "properties": {
-            "items": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "items"
-          ],
-          "description": "File edits that this tool call will perform, for preview before confirmation"
-        },
-        "editable": {
-          "type": "boolean",
-          "description": "Whether the agent host allows the client to edit the tool's input parameters before confirming"
-        },
-        "options": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ConfirmationOption"
-          },
-          "description": "Options the server offers for this confirmation. When present, the client\nSHOULD render these instead of a plain approve/deny UI. Each option\nbelongs to a {@link ConfirmationOptionGroup} so the client can still\ncategorise the choices."
-        }
-      },
-      "required": [
-        "toolCallId",
-        "toolName",
-        "displayName",
-        "invocationMessage",
-        "status"
-      ]
-    },
-    "ToolCallRunningState": {
-      "type": "object",
-      "description": "Tool is actively executing.",
-      "properties": {
-        "toolCallId": {
-          "type": "string",
-          "description": "Unique tool call identifier"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Internal tool name (for debugging/logging)"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable tool name"
-        },
-        "contributor": {
-          "$ref": "#/$defs/ToolCallContributor",
-          "description": "Reference to the contributor of the tool being called."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
-        },
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Message describing what the tool will do"
-        },
-        "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
-        },
-        "status": {
-          "$ref": "#/$defs/ToolCallStatus.Running"
-        },
-        "confirmed": {
-          "$ref": "#/$defs/ToolCallConfirmationReason",
-          "description": "How the tool was confirmed for execution"
-        },
-        "selectedOption": {
-          "$ref": "#/$defs/ConfirmationOption",
-          "description": "The confirmation option the user selected, if confirmation options were provided"
-        },
-        "content": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ToolResultContent"
-          },
-          "description": "Partial content produced while the tool is still executing.\n\nFor example, a terminal content block lets clients subscribe to live\noutput before the tool completes."
-        }
-      },
-      "required": [
-        "toolCallId",
-        "toolName",
-        "displayName",
-        "invocationMessage",
-        "status",
-        "confirmed"
-      ]
-    },
-    "ToolCallPendingResultConfirmationState": {
-      "type": "object",
-      "description": "Tool finished executing, waiting for client to approve the result.",
-      "properties": {
-        "toolCallId": {
-          "type": "string",
-          "description": "Unique tool call identifier"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Internal tool name (for debugging/logging)"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable tool name"
-        },
-        "contributor": {
-          "$ref": "#/$defs/ToolCallContributor",
-          "description": "Reference to the contributor of the tool being called."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
-        },
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Message describing what the tool will do"
-        },
-        "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
-        },
-        "success": {
-          "type": "boolean",
-          "description": "Whether the tool succeeded"
-        },
-        "pastTenseMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Past-tense description of what the tool did"
-        },
-        "content": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ToolResultContent"
-          },
-          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
-        },
-        "structuredContent": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
-        },
-        "error": {
-          "type": "object",
-          "properties": {
-            "message": {
-              "type": "string"
-            },
-            "code": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "message"
-          ],
-          "description": "Error details if the tool failed"
-        },
-        "status": {
-          "$ref": "#/$defs/ToolCallStatus.PendingResultConfirmation"
-        },
-        "confirmed": {
-          "$ref": "#/$defs/ToolCallConfirmationReason",
-          "description": "How the tool was confirmed for execution"
-        },
-        "selectedOption": {
-          "$ref": "#/$defs/ConfirmationOption",
-          "description": "The confirmation option the user selected, if confirmation options were provided"
-        }
-      },
-      "required": [
-        "toolCallId",
-        "toolName",
-        "displayName",
-        "invocationMessage",
-        "success",
-        "pastTenseMessage",
-        "status",
-        "confirmed"
-      ]
-    },
-    "ToolCallCompletedState": {
-      "type": "object",
-      "description": "Tool completed successfully or with an error.",
-      "properties": {
-        "toolCallId": {
-          "type": "string",
-          "description": "Unique tool call identifier"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Internal tool name (for debugging/logging)"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable tool name"
-        },
-        "contributor": {
-          "$ref": "#/$defs/ToolCallContributor",
-          "description": "Reference to the contributor of the tool being called."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
-        },
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Message describing what the tool will do"
-        },
-        "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
-        },
-        "success": {
-          "type": "boolean",
-          "description": "Whether the tool succeeded"
-        },
-        "pastTenseMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Past-tense description of what the tool did"
-        },
-        "content": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ToolResultContent"
-          },
-          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
-        },
-        "structuredContent": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
-        },
-        "error": {
-          "type": "object",
-          "properties": {
-            "message": {
-              "type": "string"
-            },
-            "code": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "message"
-          ],
-          "description": "Error details if the tool failed"
-        },
-        "status": {
-          "$ref": "#/$defs/ToolCallStatus.Completed"
-        },
-        "confirmed": {
-          "$ref": "#/$defs/ToolCallConfirmationReason",
-          "description": "How the tool was confirmed for execution"
-        },
-        "selectedOption": {
-          "$ref": "#/$defs/ConfirmationOption",
-          "description": "The confirmation option the user selected, if confirmation options were provided"
-        }
-      },
-      "required": [
-        "toolCallId",
-        "toolName",
-        "displayName",
-        "invocationMessage",
-        "success",
-        "pastTenseMessage",
-        "status",
-        "confirmed"
-      ]
-    },
-    "ToolCallCancelledState": {
-      "type": "object",
-      "description": "Tool call was cancelled before execution.",
-      "properties": {
-        "toolCallId": {
-          "type": "string",
-          "description": "Unique tool call identifier"
-        },
-        "toolName": {
-          "type": "string",
-          "description": "Internal tool name (for debugging/logging)"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable tool name"
-        },
-        "contributor": {
-          "$ref": "#/$defs/ToolCallContributor",
-          "description": "Reference to the contributor of the tool being called."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
-        },
-        "invocationMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Message describing what the tool will do"
-        },
-        "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
-        },
-        "status": {
-          "$ref": "#/$defs/ToolCallStatus.Cancelled"
-        },
-        "reason": {
-          "$ref": "#/$defs/ToolCallCancellationReason",
-          "description": "Why the tool was cancelled"
-        },
-        "reasonMessage": {
-          "$ref": "#/$defs/StringOrMarkdown",
-          "description": "Optional message explaining the cancellation"
-        },
-        "userSuggestion": {
-          "$ref": "#/$defs/Message",
-          "description": "What the user suggested doing instead"
-        },
-        "selectedOption": {
-          "$ref": "#/$defs/ConfirmationOption",
-          "description": "The confirmation option the user selected, if confirmation options were provided"
-        }
-      },
-      "required": [
-        "toolCallId",
-        "toolName",
-        "displayName",
-        "invocationMessage",
-        "status",
-        "reason"
-      ]
-    },
     "ToolDefinition": {
       "type": "object",
       "description": "Describes a tool available in a session, provided by either the server or the active client.",
@@ -4140,178 +2856,6 @@
           "description": "Tool may interact with external entities (default: true)"
         }
       }
-    },
-    "ToolResultTextContent": {
-      "type": "object",
-      "description": "Text content in a tool result.\n\nMirrors MCP `TextContent`.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ToolResultContentType.Text"
-        },
-        "text": {
-          "type": "string",
-          "description": "The text content"
-        }
-      },
-      "required": [
-        "type",
-        "text"
-      ]
-    },
-    "ToolResultEmbeddedResourceContent": {
-      "type": "object",
-      "description": "Base64-encoded binary content embedded in a tool result.\n\nMirrors MCP `EmbeddedResource` for inline binary data.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ToolResultContentType.EmbeddedResource"
-        },
-        "data": {
-          "type": "string",
-          "description": "Base64-encoded data"
-        },
-        "contentType": {
-          "type": "string",
-          "description": "Content type (e.g. `\"image/png\"`, `\"application/pdf\"`)"
-        }
-      },
-      "required": [
-        "type",
-        "data",
-        "contentType"
-      ]
-    },
-    "ToolResultResourceContent": {
-      "type": "object",
-      "description": "A reference to a resource stored outside the tool result.\n\nWraps {@link ContentRef} for lazy-loading large results.",
-      "properties": {
-        "uri": {
-          "$ref": "#/$defs/URI",
-          "description": "Content URI"
-        },
-        "sizeHint": {
-          "type": "number",
-          "description": "Approximate size in bytes"
-        },
-        "contentType": {
-          "type": "string",
-          "description": "Content MIME type"
-        },
-        "type": {
-          "$ref": "#/$defs/ToolResultContentType.Resource"
-        }
-      },
-      "required": [
-        "uri",
-        "type"
-      ]
-    },
-    "ToolResultFileEditContent": {
-      "type": "object",
-      "description": "Describes a file modification performed by a tool.",
-      "properties": {
-        "before": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "type": "string"
-            },
-            "content": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
-          "description": "The file state before the edit. Absent for file creations or for in-place file edits."
-        },
-        "after": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "type": "string"
-            },
-            "content": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
-          "description": "The file state after the edit. Absent for file deletions."
-        },
-        "diff": {
-          "type": "object",
-          "properties": {
-            "added": {
-              "type": "number"
-            },
-            "removed": {
-              "type": "number"
-            }
-          },
-          "description": "Optional diff display metadata"
-        },
-        "type": {
-          "$ref": "#/$defs/ToolResultContentType.FileEdit"
-        }
-      },
-      "required": [
-        "type"
-      ]
-    },
-    "ToolResultTerminalContent": {
-      "type": "object",
-      "description": "A reference to a terminal whose output is relevant to this tool result.\n\nClients can subscribe to the terminal's URI to stream its output in real\ntime, providing live feedback while a tool is executing.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ToolResultContentType.Terminal"
-        },
-        "resource": {
-          "$ref": "#/$defs/URI",
-          "description": "Terminal URI (subscribable for full terminal state)"
-        },
-        "title": {
-          "type": "string",
-          "description": "Display title for the terminal content"
-        }
-      },
-      "required": [
-        "type",
-        "resource",
-        "title"
-      ]
-    },
-    "ToolResultSubagentContent": {
-      "type": "object",
-      "description": "A reference to a subagent session spawned by a tool.\n\nClients can subscribe to the subagent's session URI to stream its\nprogress in real time, including inner tool calls and responses.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ToolResultContentType.Subagent"
-        },
-        "resource": {
-          "$ref": "#/$defs/URI",
-          "description": "Subagent session URI (subscribable for full session state)"
-        },
-        "title": {
-          "type": "string",
-          "description": "Display title for the subagent"
-        },
-        "agentName": {
-          "type": "string",
-          "description": "Internal agent name"
-        },
-        "description": {
-          "type": "string",
-          "description": "Human-readable description of the subagent's task"
-        }
-      },
-      "required": [
-        "type",
-        "resource",
-        "title"
-      ]
     },
     "CustomizationBase": {
       "type": "object",
@@ -5066,6 +3610,1757 @@
         "kind"
       ]
     },
+    "ChatState": {
+      "type": "object",
+      "description": "Full state for a single chat, loaded when a client subscribes to the chat's\nURI.\n\nThe lightweight catalog representation of a chat is {@link ChatSummary},\ncarried in {@link SessionState.chats | `SessionState.chats`}. `ChatState`\n**denormalizes** every {@link ChatSummary} field directly onto itself so\nsubscribers receive one flat object instead of having to merge a nested\n`summary` sub-object. Producers MUST keep the two representations\nconsistent: any change to the inlined fields below SHOULD also be\nannounced on the parent session via the matching\n{@link SessionChatUpdatedAction | `session/chatUpdated`} action.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI"
+        },
+        "title": {
+          "type": "string",
+          "description": "Chat title"
+        },
+        "status": {
+          "$ref": "#/$defs/SessionStatus",
+          "description": "Current chat status (reuses SessionStatus shape)"
+        },
+        "activity": {
+          "type": "string",
+          "description": "Human-readable description of what the chat is currently doing"
+        },
+        "modifiedAt": {
+          "type": "string",
+          "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelSelection",
+          "description": "Optional per-chat model override (defaults to the session's model)"
+        },
+        "agent": {
+          "$ref": "#/$defs/AgentSelection",
+          "description": "Optional per-chat agent override (defaults to the session's agent)"
+        },
+        "origin": {
+          "$ref": "#/$defs/ChatOrigin",
+          "description": "How this chat came into existence"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "Optional per-chat working directory.\n\nIf absent, the chat inherits\n{@link SessionSummary.workingDirectory | the session's working directory}.\nHosts MAY override this for individual chats — for example, to give a\nsubordinate chat its own git worktree so multiple chats in a session can\nmake independent edits that the orchestrator later merges back."
+        },
+        "turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Turn"
+          },
+          "description": "Completed turns"
+        },
+        "activeTurn": {
+          "$ref": "#/$defs/ActiveTurn",
+          "description": "Currently in-progress turn"
+        },
+        "steeringMessage": {
+          "$ref": "#/$defs/PendingMessage",
+          "description": "Message to inject into the current turn at a convenient point"
+        },
+        "queuedMessages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PendingMessage"
+          },
+          "description": "Messages to send automatically as new turns after the current turn finishes"
+        },
+        "inputRequests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChatInputRequest"
+          },
+          "description": "Requests for user input that are currently blocking or informing chat progress"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this chat."
+        }
+      },
+      "required": [
+        "resource",
+        "title",
+        "status",
+        "modifiedAt",
+        "turns"
+      ]
+    },
+    "ChatSummary": {
+      "type": "object",
+      "description": "Lightweight catalog entry for a chat, carried in\n{@link SessionState.chats | `SessionState.chats`}. The full conversation\nlives in {@link ChatState}, which inlines (denormalizes) every field below.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI"
+        },
+        "title": {
+          "type": "string",
+          "description": "Chat title"
+        },
+        "status": {
+          "$ref": "#/$defs/SessionStatus",
+          "description": "Current chat status (reuses SessionStatus shape)"
+        },
+        "activity": {
+          "type": "string",
+          "description": "Human-readable description of what the chat is currently doing"
+        },
+        "modifiedAt": {
+          "type": "string",
+          "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelSelection",
+          "description": "Optional per-chat model override (defaults to the session's model)"
+        },
+        "agent": {
+          "$ref": "#/$defs/AgentSelection",
+          "description": "Optional per-chat agent override (defaults to the session's agent)"
+        },
+        "origin": {
+          "$ref": "#/$defs/ChatOrigin",
+          "description": "How this chat came into existence"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "Optional per-chat working directory.\n\nIf absent, the chat inherits\n{@link SessionSummary.workingDirectory | the session's working directory}.\nSee {@link ChatState.workingDirectory} for usage notes."
+        }
+      },
+      "required": [
+        "resource",
+        "title",
+        "status",
+        "modifiedAt"
+      ]
+    },
+    "PendingMessage": {
+      "type": "object",
+      "description": "A message queued for future delivery to the agent.\n\nSteering messages are injected into the current turn mid-flight.\nQueued messages are automatically started as new turns after the\ncurrent turn naturally finishes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this pending message"
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that will start the next turn"
+        }
+      },
+      "required": [
+        "id",
+        "message"
+      ]
+    },
+    "ChatInputOption": {
+      "type": "object",
+      "description": "A choice in a select-style question.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable option identifier; for MCP enum values this is the enum string"
+        },
+        "label": {
+          "type": "string",
+          "description": "Display label"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional secondary text"
+        },
+        "recommended": {
+          "type": "boolean",
+          "description": "Whether this option is the recommended/default choice"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
+    "ChatInputQuestionBase": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        }
+      },
+      "required": [
+        "id",
+        "message"
+      ]
+    },
+    "ChatInputTextQuestion": {
+      "type": "object",
+      "description": "Text question within a chat input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChatInputQuestionKind.Text"
+        },
+        "format": {
+          "type": "string",
+          "description": "Format hint for text questions, such as `email`, `uri`, `date`, or `date-time`"
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum string length"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum string length"
+        },
+        "defaultValue": {
+          "type": "string",
+          "description": "Default text"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind"
+      ]
+    },
+    "ChatInputNumberQuestion": {
+      "type": "object",
+      "description": "Numeric question within a chat input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ChatInputQuestionKind.Number"
+            },
+            {
+              "$ref": "#/$defs/ChatInputQuestionKind.Integer"
+            }
+          ]
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value"
+        },
+        "defaultValue": {
+          "type": "number",
+          "description": "Default numeric value"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind"
+      ]
+    },
+    "ChatInputBooleanQuestion": {
+      "type": "object",
+      "description": "Boolean question within a chat input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChatInputQuestionKind.Boolean"
+        },
+        "defaultValue": {
+          "type": "boolean",
+          "description": "Default boolean value"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind"
+      ]
+    },
+    "ChatInputSingleSelectQuestion": {
+      "type": "object",
+      "description": "Single-select question within a chat input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChatInputQuestionKind.SingleSelect"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChatInputOption"
+          },
+          "description": "Options the user may select from"
+        },
+        "allowFreeformInput": {
+          "type": "boolean",
+          "description": "Whether the user may enter text instead of selecting an option"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind",
+        "options"
+      ]
+    },
+    "ChatInputMultiSelectQuestion": {
+      "type": "object",
+      "description": "Multi-select question within a chat input request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable question identifier used as the key in `answers`"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short display title"
+        },
+        "message": {
+          "type": "string",
+          "description": "Prompt shown to the user"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the user must answer this question to accept the request"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChatInputQuestionKind.MultiSelect"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChatInputOption"
+          },
+          "description": "Options the user may select from"
+        },
+        "allowFreeformInput": {
+          "type": "boolean",
+          "description": "Whether the user may enter text in addition to selecting options"
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum selected item count"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum selected item count"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "kind",
+        "options"
+      ]
+    },
+    "ChatInputRequest": {
+      "type": "object",
+      "description": "A live request for user input.\n\nThe server creates or replaces requests with `chat/inputRequested`.\nClients sync drafts with `chat/inputAnswerChanged` and complete requests\nwith `chat/inputCompleted`.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable request identifier"
+        },
+        "message": {
+          "type": "string",
+          "description": "Display message for the request as a whole"
+        },
+        "url": {
+          "$ref": "#/$defs/URI",
+          "description": "URL the user should review or open, for URL-style elicitations"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChatInputQuestion"
+          },
+          "description": "Ordered questions to ask the user"
+        },
+        "answers": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ChatInputAnswer"
+          },
+          "description": "Current draft or submitted answers, keyed by question ID"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ChatInputTextAnswerValue": {
+      "type": "object",
+      "description": "Value captured for one answer.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ChatInputAnswerValueKind.Text"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "ChatInputNumberAnswerValue": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ChatInputAnswerValueKind.Number"
+        },
+        "value": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "ChatInputBooleanAnswerValue": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ChatInputAnswerValueKind.Boolean"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "ChatInputSelectedAnswerValue": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ChatInputAnswerValueKind.Selected"
+        },
+        "value": {
+          "type": "string"
+        },
+        "freeformValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Free-form text entered instead of selecting an option"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "ChatInputSelectedManyAnswerValue": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ChatInputAnswerValueKind.SelectedMany"
+        },
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "freeformValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Free-form text entered in addition to selected options"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "ChatInputAnswered": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ChatInputAnswerState.Draft"
+            },
+            {
+              "$ref": "#/$defs/ChatInputAnswerState.Submitted"
+            }
+          ],
+          "description": "Answer state"
+        },
+        "value": {
+          "$ref": "#/$defs/ChatInputAnswerValue",
+          "description": "Answer value"
+        }
+      },
+      "required": [
+        "state",
+        "value"
+      ]
+    },
+    "ChatInputSkipped": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/ChatInputAnswerState.Skipped",
+          "description": "Answer state"
+        },
+        "freeformValues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Free-form reason or value captured while skipping, if any"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "Turn": {
+      "type": "object",
+      "description": "A completed request/response cycle.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that initiated the turn"
+        },
+        "responseParts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResponsePart"
+          },
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nConsumers should derive display text by concatenating markdown parts,\nand find tool calls by filtering for `ToolCall` parts."
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        },
+        "state": {
+          "$ref": "#/$defs/TurnState",
+          "description": "How the turn ended"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Error details if state is `'error'`"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "responseParts",
+        "usage",
+        "state"
+      ]
+    },
+    "ActiveTurn": {
+      "type": "object",
+      "description": "An in-progress turn — the assistant is actively streaming.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "The message that initiated the turn"
+        },
+        "responseParts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResponsePart"
+          },
+          "description": "All response content in stream order: text, tool calls, reasoning, and content refs.\n\nTool call parts include `pendingPermissions` when permissions are awaiting user approval."
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo",
+          "description": "Token usage info"
+        }
+      },
+      "required": [
+        "id",
+        "message",
+        "responseParts",
+        "usage"
+      ]
+    },
+    "Message": {
+      "type": "object",
+      "description": "A message that initiates or steers a turn. Messages can originate from the\nuser or be system-generated (see {@link MessageKind}).\n\nAttachments MAY be referenced inside {@link Message.text} via their\n{@link MessageAttachmentBase.range} field. Attachments without a range are\nstill associated with the message but do not correspond to a specific span\nin the text.",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Message text"
+        },
+        "origin": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "description": "The origin of the message"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MessageAttachment"
+          },
+          "description": "File/selection attachments"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this message.\n\nClients MAY look for well-known keys here to provide enhanced UI, and\nagent hosts MAY use it to carry context that does not fit any other\nfield. Mirrors the MCP `_meta` convention."
+        }
+      },
+      "required": [
+        "text",
+        "origin"
+      ]
+    },
+    "MessageAttachmentBase": {
+      "type": "object",
+      "description": "Common fields shared by all {@link MessageAttachment} variants.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "SimpleMessageAttachment": {
+      "type": "object",
+      "description": "A simple, opaque attachment whose model representation is described by\nthe producer.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
+        },
+        "type": {
+          "$ref": "#/$defs/MessageAttachmentKind.Simple",
+          "description": "Discriminant"
+        },
+        "modelRepresentation": {
+          "type": "string",
+          "description": "Representation of the attachment as it should be shown to the model.\n\nIf the attachment was produced by the client, this property MUST be\ndefined so the agent host can correctly interpret the attachment. This\nproperty MAY be omitted when the attachment originated from a\n`completions` response."
+        }
+      },
+      "required": [
+        "label",
+        "type"
+      ]
+    },
+    "MessageEmbeddedResourceAttachment": {
+      "type": "object",
+      "description": "An attachment whose data is embedded inline as a base64 string.\n\nUse this for small binary payloads (e.g. a pasted image) that should be\ndelivered with the user message itself rather than fetched separately.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
+        },
+        "type": {
+          "$ref": "#/$defs/MessageAttachmentKind.EmbeddedResource",
+          "description": "Discriminant"
+        },
+        "data": {
+          "type": "string",
+          "description": "Base64-encoded binary data"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type (e.g. `\"image/png\"`, `\"application/pdf\"`)"
+        },
+        "selection": {
+          "$ref": "#/$defs/TextSelection",
+          "description": "Optional selection within the attached textual resource.\n\nOnly meaningful for textual resources."
+        }
+      },
+      "required": [
+        "label",
+        "type",
+        "data",
+        "contentType"
+      ]
+    },
+    "MessageResourceAttachment": {
+      "type": "object",
+      "description": "An attachment that references a resource by URI. The content is not\ndelivered inline; consumers can fetch it via `resourceRead` when needed.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
+        },
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        },
+        "type": {
+          "$ref": "#/$defs/MessageAttachmentKind.Resource",
+          "description": "Discriminant"
+        },
+        "selection": {
+          "$ref": "#/$defs/TextSelection",
+          "description": "Optional selection within the referenced textual resource.\n\nOnly meaningful for textual resources."
+        }
+      },
+      "required": [
+        "label",
+        "uri",
+        "type"
+      ]
+    },
+    "MessageAnnotationsAttachment": {
+      "type": "object",
+      "description": "An attachment that references annotations on a session's annotations\nchannel (see {@link AnnotationsState}).\n\nWhen {@link annotationIds} is omitted the attachment references every\nannotation on the channel; when present it references only the listed\n{@link Annotation.id | annotation ids}.",
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "A human-readable label for the attachment (e.g. the filename of a file\nattachment). Used for display in UI."
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "If defined, the range in {@link Message.text} that references this\nattachment. This is a text range, not a byte range."
+        },
+        "displayKind": {
+          "type": "string",
+          "description": "Advisory display hint for clients rendering this attachment. Recognized\nvalues include:\n\n- `'image'`: the attachment is an image\n- `'document'`: the attachment is a textual document\n- `'symbol'`: the attachment is a code symbol (e.g. a function or class)\n- `'directory'`: the attachment is a folder\n- `'selection'`: the attachment is a selection within a document\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
+        },
+        "type": {
+          "$ref": "#/$defs/MessageAttachmentKind.Annotations",
+          "description": "Discriminant"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "The annotations channel URI (typically `ahp-session:/<uuid>/annotations`).\nMatches {@link AnnotationsSummary.resource}."
+        },
+        "annotationIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Specific {@link Annotation.id | annotation ids} to reference. When\nomitted, the attachment references all annotations on the channel."
+        }
+      },
+      "required": [
+        "label",
+        "type",
+        "resource"
+      ]
+    },
+    "MarkdownResponsePart": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.Markdown",
+          "description": "Discriminant"
+        },
+        "id": {
+          "type": "string",
+          "description": "Part identifier, used by `chat/delta` to target this part for content appends"
+        },
+        "content": {
+          "type": "string",
+          "description": "Markdown content"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "content"
+      ]
+    },
+    "ResourceReponsePart": {
+      "type": "object",
+      "description": "A content part that's a reference to large content stored outside the state tree.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        },
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.ContentRef",
+          "description": "Discriminant"
+        }
+      },
+      "required": [
+        "uri",
+        "kind"
+      ]
+    },
+    "ToolCallResponsePart": {
+      "type": "object",
+      "description": "A tool call represented as a response part.\n\nTool calls are part of the response stream, interleaved with text and\nreasoning. The `toolCall.toolCallId` serves as the part identifier for\nactions that target this part.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.ToolCall",
+          "description": "Discriminant"
+        },
+        "toolCall": {
+          "$ref": "#/$defs/ToolCallState",
+          "description": "Full tool call lifecycle state"
+        }
+      },
+      "required": [
+        "kind",
+        "toolCall"
+      ]
+    },
+    "ReasoningResponsePart": {
+      "type": "object",
+      "description": "Reasoning/thinking content from the model.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.Reasoning",
+          "description": "Discriminant"
+        },
+        "id": {
+          "type": "string",
+          "description": "Part identifier, used by `chat/reasoning` to target this part for content appends"
+        },
+        "content": {
+          "type": "string",
+          "description": "Accumulated reasoning text"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "content"
+      ]
+    },
+    "SystemNotificationResponsePart": {
+      "type": "object",
+      "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent harness\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ResponsePartKind.SystemNotification",
+          "description": "Discriminant"
+        },
+        "content": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "The text of the system notification"
+        }
+      },
+      "required": [
+        "kind",
+        "content"
+      ]
+    },
+    "ConfirmationOption": {
+      "type": "object",
+      "description": "A confirmation option that the server offers for a tool call awaiting\napproval. Allows richer choices beyond simple approve/deny — for example,\n\"Approve in this Session\" or \"Deny with reason.\"",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the option, returned in the confirmed action"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label displayed to the user"
+        },
+        "kind": {
+          "$ref": "#/$defs/ConfirmationOptionKind",
+          "description": "Whether this option represents an approval or denial"
+        },
+        "group": {
+          "type": "number",
+          "description": "Logical group number for visual categorisation.\n\nClients SHOULD display options in the order they are defined and MAY\nuse differing group numbers to insert dividers between logical clusters\nof options."
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "kind"
+      ]
+    },
+    "ToolCallClientContributor": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ToolCallContributorKind.Client"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "If this tool is provided by a client, the `clientId` of the owning client.\nAbsent for server-side tools.\n\nWhen set, the identified client is responsible for executing the tool and\ndispatching `chat/toolCallComplete` with the result."
+        }
+      },
+      "required": [
+        "kind",
+        "clientId"
+      ]
+    },
+    "ToolCallMcpContributor": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ToolCallContributorKind.MCP"
+        },
+        "customizationId": {
+          "type": "string",
+          "description": "Customization ID of the corresponding MCP server in {@link SessionState.customizations}."
+        }
+      },
+      "required": [
+        "kind",
+        "customizationId"
+      ]
+    },
+    "ToolCallBase": {
+      "type": "object",
+      "description": "Metadata common to all tool call states.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Reference to the contributor of the tool being called."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName"
+      ]
+    },
+    "ToolCallParameterFields": {
+      "type": "object",
+      "description": "Properties available once tool call parameters are fully received.",
+      "properties": {
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        }
+      },
+      "required": [
+        "invocationMessage"
+      ]
+    },
+    "ToolCallResult": {
+      "type": "object",
+      "description": "Tool execution result details, available after execution completes.",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the tool succeeded"
+        },
+        "pastTenseMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Past-tense description of what the tool did"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
+        },
+        "structuredContent": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message"
+          ],
+          "description": "Error details if the tool failed"
+        }
+      },
+      "required": [
+        "success",
+        "pastTenseMessage"
+      ]
+    },
+    "ToolCallStreamingState": {
+      "type": "object",
+      "description": "LM is streaming the tool call parameters.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Reference to the contributor of the tool being called."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.Streaming"
+        },
+        "partialInput": {
+          "type": "string",
+          "description": "Partial parameters accumulated so far"
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Progress message shown while parameters are streaming"
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "status"
+      ]
+    },
+    "ToolCallPendingConfirmationState": {
+      "type": "object",
+      "description": "Parameters are complete, or a running tool requires re-confirmation\n(e.g. a mid-execution permission check).",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Reference to the contributor of the tool being called."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.PendingConfirmation"
+        },
+        "confirmationTitle": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Short title for the confirmation prompt (e.g. `\"Run in terminal\"`, `\"Write file\"`)"
+        },
+        "edits": {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "items"
+          ],
+          "description": "File edits that this tool call will perform, for preview before confirmation"
+        },
+        "editable": {
+          "type": "boolean",
+          "description": "Whether the agent host allows the client to edit the tool's input parameters before confirming"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConfirmationOption"
+          },
+          "description": "Options the server offers for this confirmation. When present, the client\nSHOULD render these instead of a plain approve/deny UI. Each option\nbelongs to a {@link ConfirmationOptionGroup} so the client can still\ncategorise the choices."
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "status"
+      ]
+    },
+    "ToolCallRunningState": {
+      "type": "object",
+      "description": "Tool is actively executing.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Reference to the contributor of the tool being called."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.Running"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/ToolCallConfirmationReason",
+          "description": "How the tool was confirmed for execution"
+        },
+        "selectedOption": {
+          "$ref": "#/$defs/ConfirmationOption",
+          "description": "The confirmation option the user selected, if confirmation options were provided"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "Partial content produced while the tool is still executing.\n\nFor example, a terminal content block lets clients subscribe to live\noutput before the tool completes."
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "status",
+        "confirmed"
+      ]
+    },
+    "ToolCallPendingResultConfirmationState": {
+      "type": "object",
+      "description": "Tool finished executing, waiting for client to approve the result.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Reference to the contributor of the tool being called."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the tool succeeded"
+        },
+        "pastTenseMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Past-tense description of what the tool did"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
+        },
+        "structuredContent": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message"
+          ],
+          "description": "Error details if the tool failed"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.PendingResultConfirmation"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/ToolCallConfirmationReason",
+          "description": "How the tool was confirmed for execution"
+        },
+        "selectedOption": {
+          "$ref": "#/$defs/ConfirmationOption",
+          "description": "The confirmation option the user selected, if confirmation options were provided"
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "success",
+        "pastTenseMessage",
+        "status",
+        "confirmed"
+      ]
+    },
+    "ToolCallCompletedState": {
+      "type": "object",
+      "description": "Tool completed successfully or with an error.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Reference to the contributor of the tool being called."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the tool succeeded"
+        },
+        "pastTenseMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Past-tense description of what the tool did"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ToolResultContent"
+          },
+          "description": "Unstructured result content blocks.\n\nThis mirrors the `content` field of MCP `CallToolResult`."
+        },
+        "structuredContent": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional structured result object.\n\nThis mirrors the `structuredContent` field of MCP `CallToolResult`."
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "message"
+          ],
+          "description": "Error details if the tool failed"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.Completed"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/ToolCallConfirmationReason",
+          "description": "How the tool was confirmed for execution"
+        },
+        "selectedOption": {
+          "$ref": "#/$defs/ConfirmationOption",
+          "description": "The confirmation option the user selected, if confirmation options were provided"
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "success",
+        "pastTenseMessage",
+        "status",
+        "confirmed"
+      ]
+    },
+    "ToolCallCancelledState": {
+      "type": "object",
+      "description": "Tool call was cancelled before execution.",
+      "properties": {
+        "toolCallId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "toolName": {
+          "type": "string",
+          "description": "Internal tool name (for debugging/logging)"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable tool name"
+        },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Reference to the contributor of the tool being called."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
+        },
+        "invocationMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Message describing what the tool will do"
+        },
+        "toolInput": {
+          "type": "string",
+          "description": "Raw tool input"
+        },
+        "status": {
+          "$ref": "#/$defs/ToolCallStatus.Cancelled"
+        },
+        "reason": {
+          "$ref": "#/$defs/ToolCallCancellationReason",
+          "description": "Why the tool was cancelled"
+        },
+        "reasonMessage": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "Optional message explaining the cancellation"
+        },
+        "userSuggestion": {
+          "$ref": "#/$defs/Message",
+          "description": "What the user suggested doing instead"
+        },
+        "selectedOption": {
+          "$ref": "#/$defs/ConfirmationOption",
+          "description": "The confirmation option the user selected, if confirmation options were provided"
+        }
+      },
+      "required": [
+        "toolCallId",
+        "toolName",
+        "displayName",
+        "invocationMessage",
+        "status",
+        "reason"
+      ]
+    },
+    "ToolResultTextContent": {
+      "type": "object",
+      "description": "Text content in a tool result.\n\nMirrors MCP `TextContent`.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Text"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text content"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ]
+    },
+    "ToolResultEmbeddedResourceContent": {
+      "type": "object",
+      "description": "Base64-encoded binary content embedded in a tool result.\n\nMirrors MCP `EmbeddedResource` for inline binary data.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.EmbeddedResource"
+        },
+        "data": {
+          "type": "string",
+          "description": "Base64-encoded data"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content type (e.g. `\"image/png\"`, `\"application/pdf\"`)"
+        }
+      },
+      "required": [
+        "type",
+        "data",
+        "contentType"
+      ]
+    },
+    "ToolResultResourceContent": {
+      "type": "object",
+      "description": "A reference to a resource stored outside the tool result.\n\nWraps {@link ContentRef} for lazy-loading large results.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        },
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Resource"
+        }
+      },
+      "required": [
+        "uri",
+        "type"
+      ]
+    },
+    "ToolResultFileEditContent": {
+      "type": "object",
+      "description": "Describes a file modification performed by a tool.",
+      "properties": {
+        "before": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "uri",
+            "content"
+          ],
+          "description": "The file state before the edit. Absent for file creations or for in-place file edits."
+        },
+        "after": {
+          "type": "object",
+          "properties": {
+            "uri": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "uri",
+            "content"
+          ],
+          "description": "The file state after the edit. Absent for file deletions."
+        },
+        "diff": {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "number"
+            },
+            "removed": {
+              "type": "number"
+            }
+          },
+          "description": "Optional diff display metadata"
+        },
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.FileEdit"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "ToolResultTerminalContent": {
+      "type": "object",
+      "description": "A reference to a terminal whose output is relevant to this tool result.\n\nClients can subscribe to the terminal's URI to stream its output in real\ntime, providing live feedback while a tool is executing.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Terminal"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Terminal URI (subscribable for full terminal state)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title for the terminal content"
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "title"
+      ]
+    },
+    "ToolResultSubagentContent": {
+      "type": "object",
+      "description": "A reference to a subagent session spawned by a tool.\n\nClients can subscribe to the subagent's session URI to stream its\nprogress in real time, including inner tool calls and responses.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ToolResultContentType.Subagent"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Subagent session URI (subscribable for full session state)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title for the subagent"
+        },
+        "agentName": {
+          "type": "string",
+          "description": "Internal agent name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the subagent's task"
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "title"
+      ]
+    },
     "TerminalInfo": {
       "type": "object",
       "description": "Lightweight terminal metadata exposed on the root state.",
@@ -5584,152 +5879,6 @@
       ],
       "description": "A string that may optionally be rendered as Markdown.\n\n- A plain `string` is rendered as-is (no Markdown processing).\n- An object with `{ markdown: string }` is rendered with Markdown formatting."
     },
-    "SessionInputQuestion": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/SessionInputTextQuestion"
-        },
-        {
-          "$ref": "#/$defs/SessionInputNumberQuestion"
-        },
-        {
-          "$ref": "#/$defs/SessionInputBooleanQuestion"
-        },
-        {
-          "$ref": "#/$defs/SessionInputSingleSelectQuestion"
-        },
-        {
-          "$ref": "#/$defs/SessionInputMultiSelectQuestion"
-        }
-      ],
-      "description": "One question within a session input request."
-    },
-    "SessionInputAnswerValue": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/SessionInputTextAnswerValue"
-        },
-        {
-          "$ref": "#/$defs/SessionInputNumberAnswerValue"
-        },
-        {
-          "$ref": "#/$defs/SessionInputBooleanAnswerValue"
-        },
-        {
-          "$ref": "#/$defs/SessionInputSelectedAnswerValue"
-        },
-        {
-          "$ref": "#/$defs/SessionInputSelectedManyAnswerValue"
-        }
-      ]
-    },
-    "SessionInputAnswer": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/SessionInputAnswered"
-        },
-        {
-          "$ref": "#/$defs/SessionInputSkipped"
-        }
-      ],
-      "description": "Draft, submitted, or skipped answer for one question."
-    },
-    "MessageAttachment": {
-      "oneOf": [
-        {},
-        {
-          "$ref": "#/$defs/SimpleMessageAttachment"
-        },
-        {
-          "$ref": "#/$defs/MessageEmbeddedResourceAttachment"
-        },
-        {
-          "$ref": "#/$defs/MessageResourceAttachment"
-        },
-        {
-          "$ref": "#/$defs/MessageAnnotationsAttachment"
-        }
-      ],
-      "description": "An attachment associated with a {@link Message}."
-    },
-    "ResponsePart": {
-      "oneOf": [
-        {},
-        {
-          "$ref": "#/$defs/MarkdownResponsePart"
-        },
-        {
-          "$ref": "#/$defs/ResourceReponsePart"
-        },
-        {
-          "$ref": "#/$defs/ToolCallResponsePart"
-        },
-        {
-          "$ref": "#/$defs/ReasoningResponsePart"
-        },
-        {
-          "$ref": "#/$defs/SystemNotificationResponsePart"
-        }
-      ]
-    },
-    "ToolCallContributor": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/ToolCallClientContributor"
-        },
-        {
-          "$ref": "#/$defs/ToolCallMcpContributor"
-        }
-      ]
-    },
-    "ToolCallState": {
-      "oneOf": [
-        {},
-        {
-          "$ref": "#/$defs/ToolCallStreamingState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallPendingConfirmationState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallRunningState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallPendingResultConfirmationState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallCompletedState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallCancelledState"
-        }
-      ],
-      "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
-    },
-    "ToolResultContent": {
-      "oneOf": [
-        {},
-        {
-          "$ref": "#/$defs/ToolResultTextContent"
-        },
-        {
-          "$ref": "#/$defs/ToolResultEmbeddedResourceContent"
-        },
-        {
-          "$ref": "#/$defs/ToolResultResourceContent"
-        },
-        {
-          "$ref": "#/$defs/ToolResultFileEditContent"
-        },
-        {
-          "$ref": "#/$defs/ToolResultTerminalContent"
-        },
-        {
-          "$ref": "#/$defs/ToolResultSubagentContent"
-        }
-      ],
-      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`ToolResultResourceContent` for lazy-loading large results,\n`ToolResultFileEditContent` for file edit diffs,\n`ToolResultTerminalContent` for live terminal output, and\n`ToolResultSubagentContent` for subagent sessions (AHP extensions)."
-    },
     "ChildCustomizationType": {
       "oneOf": [
         {},
@@ -5832,6 +5981,206 @@
       ],
       "description": "Discriminated union of all MCP server lifecycle states.\nDiscriminated by `kind` (a {@link McpServerStatus} value)."
     },
+    "ChatOrigin": {
+      "oneOf": [
+        {},
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "chat": {
+              "type": "string"
+            },
+            "turnId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "chat",
+            "turnId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "chat": {
+              "type": "string"
+            },
+            "toolCallId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "chat",
+            "toolCallId"
+          ]
+        }
+      ]
+    },
+    "ChatInputQuestion": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatInputTextQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChatInputNumberQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChatInputBooleanQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChatInputSingleSelectQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChatInputMultiSelectQuestion"
+        }
+      ],
+      "description": "One question within a chat input request."
+    },
+    "ChatInputAnswerValue": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatInputTextAnswerValue"
+        },
+        {
+          "$ref": "#/$defs/ChatInputNumberAnswerValue"
+        },
+        {
+          "$ref": "#/$defs/ChatInputBooleanAnswerValue"
+        },
+        {
+          "$ref": "#/$defs/ChatInputSelectedAnswerValue"
+        },
+        {
+          "$ref": "#/$defs/ChatInputSelectedManyAnswerValue"
+        }
+      ]
+    },
+    "ChatInputAnswer": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatInputAnswered"
+        },
+        {
+          "$ref": "#/$defs/ChatInputSkipped"
+        }
+      ],
+      "description": "Draft, submitted, or skipped answer for one question."
+    },
+    "MessageAttachment": {
+      "oneOf": [
+        {},
+        {
+          "$ref": "#/$defs/SimpleMessageAttachment"
+        },
+        {
+          "$ref": "#/$defs/MessageEmbeddedResourceAttachment"
+        },
+        {
+          "$ref": "#/$defs/MessageResourceAttachment"
+        },
+        {
+          "$ref": "#/$defs/MessageAnnotationsAttachment"
+        }
+      ],
+      "description": "An attachment associated with a {@link Message}."
+    },
+    "ResponsePart": {
+      "oneOf": [
+        {},
+        {
+          "$ref": "#/$defs/MarkdownResponsePart"
+        },
+        {
+          "$ref": "#/$defs/ResourceReponsePart"
+        },
+        {
+          "$ref": "#/$defs/ToolCallResponsePart"
+        },
+        {
+          "$ref": "#/$defs/ReasoningResponsePart"
+        },
+        {
+          "$ref": "#/$defs/SystemNotificationResponsePart"
+        }
+      ]
+    },
+    "ToolCallContributor": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ToolCallClientContributor"
+        },
+        {
+          "$ref": "#/$defs/ToolCallMcpContributor"
+        }
+      ]
+    },
+    "ToolCallState": {
+      "oneOf": [
+        {},
+        {
+          "$ref": "#/$defs/ToolCallStreamingState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPendingConfirmationState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallRunningState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPendingResultConfirmationState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallCompletedState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallCancelledState"
+        }
+      ],
+      "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
+    },
+    "ToolResultContent": {
+      "oneOf": [
+        {},
+        {
+          "$ref": "#/$defs/ToolResultTextContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultEmbeddedResourceContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultResourceContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultFileEditContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultTerminalContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultSubagentContent"
+        }
+      ],
+      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`ToolResultResourceContent` for lazy-loading large results,\n`ToolResultFileEditContent` for file edit diffs,\n`ToolResultTerminalContent` for live terminal output, and\n`ToolResultSubagentContent` for subagent sessions (AHP extensions)."
+    },
     "TerminalClaim": {
       "oneOf": [
         {
@@ -5880,52 +6229,19 @@
           "$ref": "#/$defs/SessionCreationFailedAction"
         },
         {
-          "$ref": "#/$defs/SessionTurnStartedAction"
+          "$ref": "#/$defs/SessionChatAddedAction"
         },
         {
-          "$ref": "#/$defs/SessionDeltaAction"
+          "$ref": "#/$defs/SessionChatRemovedAction"
         },
         {
-          "$ref": "#/$defs/SessionResponsePartAction"
+          "$ref": "#/$defs/SessionChatUpdatedAction"
         },
         {
-          "$ref": "#/$defs/SessionToolCallStartAction"
-        },
-        {
-          "$ref": "#/$defs/SessionToolCallDeltaAction"
-        },
-        {
-          "$ref": "#/$defs/SessionToolCallReadyAction"
-        },
-        {
-          "$ref": "#/$defs/SessionToolCallConfirmedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionToolCallCompleteAction"
-        },
-        {
-          "$ref": "#/$defs/SessionToolCallResultConfirmedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionToolCallContentChangedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionTurnCompleteAction"
-        },
-        {
-          "$ref": "#/$defs/SessionTurnCancelledAction"
-        },
-        {
-          "$ref": "#/$defs/SessionErrorAction"
+          "$ref": "#/$defs/SessionDefaultChatChangedAction"
         },
         {
           "$ref": "#/$defs/SessionTitleChangedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionUsageAction"
-        },
-        {
-          "$ref": "#/$defs/SessionReasoningAction"
         },
         {
           "$ref": "#/$defs/SessionModelChangedAction"
@@ -5943,24 +6259,6 @@
           "$ref": "#/$defs/SessionActiveClientToolsChangedAction"
         },
         {
-          "$ref": "#/$defs/SessionPendingMessageSetAction"
-        },
-        {
-          "$ref": "#/$defs/SessionPendingMessageRemovedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionQueuedMessagesReorderedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionInputRequestedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionInputAnswerChangedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionInputCompletedAction"
-        },
-        {
           "$ref": "#/$defs/SessionCustomizationsChangedAction"
         },
         {
@@ -5974,9 +6272,6 @@
         },
         {
           "$ref": "#/$defs/SessionMcpServerStateChangedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionTruncatedAction"
         },
         {
           "$ref": "#/$defs/SessionIsReadChangedAction"
@@ -5995,6 +6290,72 @@
         },
         {
           "$ref": "#/$defs/SessionMetaChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatTurnStartedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatDeltaAction"
+        },
+        {
+          "$ref": "#/$defs/ChatResponsePartAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallStartAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallDeltaAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallReadyAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallConfirmedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallCompleteAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallResultConfirmedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatToolCallContentChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatTurnCompleteAction"
+        },
+        {
+          "$ref": "#/$defs/ChatTurnCancelledAction"
+        },
+        {
+          "$ref": "#/$defs/ChatErrorAction"
+        },
+        {
+          "$ref": "#/$defs/ChatUsageAction"
+        },
+        {
+          "$ref": "#/$defs/ChatReasoningAction"
+        },
+        {
+          "$ref": "#/$defs/ChatPendingMessageSetAction"
+        },
+        {
+          "$ref": "#/$defs/ChatPendingMessageRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatQueuedMessagesReorderedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatInputRequestedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatInputAnswerChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatInputCompletedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatTruncatedAction"
         },
         {
           "$ref": "#/$defs/ChangesetStatusChangedAction"

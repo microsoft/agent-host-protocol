@@ -67,6 +67,7 @@ export default withMermaid(defineConfig({
           items: [
             { text: 'Root Channel', link: '/specification/root-channel' },
             { text: 'Session Channel', link: '/specification/session-channel' },
+            { text: 'Chat Channel', link: '/specification/chat-channel' },
             { text: 'Terminal Channel', link: '/specification/terminal-channel' },
             { text: 'Resource Watch Channel', link: '/specification/resource-watch-channel' },
             { text: 'Telemetry Channel', link: '/specification/telemetry-channel' },
@@ -87,6 +88,7 @@ export default withMermaid(defineConfig({
           items: [
             { text: 'Root Channel', link: '/reference/root' },
             { text: 'Session Channel', link: '/reference/session' },
+            { text: 'Chat Channel', link: '/reference/chat' },
             { text: 'Terminal Channel', link: '/reference/terminal' },
             { text: 'Changeset Channel', link: '/reference/changeset' },
             { text: 'Annotations Channel', link: '/reference/annotations' },

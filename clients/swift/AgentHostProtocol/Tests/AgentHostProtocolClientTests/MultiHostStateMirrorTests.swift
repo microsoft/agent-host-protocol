@@ -39,14 +39,14 @@ final class MultiHostStateMirrorTests: XCTestCase {
                 resource: "ahp-session:/s1", provider: "x", title: "A title",
                 status: .idle, createdAt: 1, modifiedAt: 1
             ),
-            lifecycle: .ready, turns: []
+            lifecycle: .ready, chats: []
         )
         let sessionB = SessionState(
             summary: SessionSummary(
                 resource: "ahp-session:/s1", provider: "x", title: "B title",
                 status: .idle, createdAt: 1, modifiedAt: 1
             ),
-            lifecycle: .ready, turns: []
+            lifecycle: .ready, chats: []
         )
 
         await mirror.applySnapshot(
@@ -101,7 +101,7 @@ final class MultiHostStateMirrorTests: XCTestCase {
                 resource: "ahp-session:/s1", provider: "x", title: "Old",
                 status: .idle, createdAt: 1, modifiedAt: 1
             ),
-            lifecycle: .ready, turns: []
+            lifecycle: .ready, chats: []
         )
         await mirror.applySnapshot(
             host: "alpha",

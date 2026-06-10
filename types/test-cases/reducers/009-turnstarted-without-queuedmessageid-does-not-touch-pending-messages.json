@@ -1,60 +1,7 @@
 {
   "description": "turnStarted without queuedMessageId does not touch pending messages",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "ready",
-    "turns": [],
-    "steeringMessage": {
-      "id": "s-1",
-      "message": {
-        "text": "Steer",
-        "origin": {
-          "kind": "user"
-        }
-      }
-    },
-    "queuedMessages": [
-      {
-        "id": "q-1",
-        "message": {
-          "text": "Queued",
-          "origin": {
-            "kind": "user"
-          }
-        }
-      }
-    ]
-  },
-  "actions": [
-    {
-      "type": "session/turnStarted",
-      "turnId": "turn-1",
-      "message": {
-        "text": "Hello",
-        "origin": {
-          "kind": "user"
-        }
-      }
-    }
-  ],
-  "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 8,
-      "createdAt": 1000,
-      "modifiedAt": 9999
-    },
-    "lifecycle": "ready",
     "turns": [],
     "steeringMessage": {
       "id": "s-1",
@@ -76,6 +23,25 @@
         }
       }
     ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-1",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "turns": [],
     "activeTurn": {
       "id": "turn-1",
       "message": {
@@ -86,6 +52,30 @@
       },
       "responseParts": [],
       "usage": null
-    }
+    },
+    "steeringMessage": {
+      "id": "s-1",
+      "message": {
+        "text": "Steer",
+        "origin": {
+          "kind": "user"
+        }
+      }
+    },
+    "queuedMessages": [
+      {
+        "id": "q-1",
+        "message": {
+          "text": "Queued",
+          "origin": {
+            "kind": "user"
+          }
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:09.999Z"
   }
 }

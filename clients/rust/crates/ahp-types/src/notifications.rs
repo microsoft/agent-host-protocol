@@ -214,7 +214,10 @@ pub struct PartialSessionSummary {
     /// — the session uses the provider's default behavior.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<AgentSelection>,
-    /// The working directory URI for this session
+    /// The default working directory URI for this session. Individual chats
+    /// MAY override via {@link ChatSummary.workingDirectory | their own
+    /// `workingDirectory`}; this field acts as the fallback for any chat that
+    /// does not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
     /// Aggregate summary of file changes associated with this session. Servers

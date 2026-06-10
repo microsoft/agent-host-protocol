@@ -15,13 +15,15 @@ final class NativeReducerTests: XCTestCase {
 
     // MARK: - Constants
 
-    private let S = "copilot:/test-session"
+    private let S = "ahp-session:/test-session"
+    private let C = "ahp-chat:/test-session/default"
     private let T = "turn-1"
 
     // MARK: - Reducers under test
 
     private let rootR = AHPRootReducer()
     private let sessionR = AHPSessionReducer()
+    private let chatR = AHPChatReducer()
 
     // MARK: - Fixtures
 
@@ -39,21 +41,16 @@ final class NativeReducerTests: XCTestCase {
                 modifiedAt: 1000
             ),
             lifecycle: lifecycle,
-            turns: []
+            chats: []
         )
     }
 
-    private func makeSessionStateWithActiveTurn() -> SessionState {
-        SessionState(
-            summary: SessionSummary(
-                resource: S,
-                provider: "copilot",
-                title: "Test Session",
-                status: .inProgress,
-                createdAt: 1000,
-                modifiedAt: 2000
-            ),
-            lifecycle: .ready,
+    private func makeChatStateWithActiveTurn() -> ChatState {
+        ChatState(
+            resource: C,
+            title: "Test Chat",
+            status: .inProgress,
+            modifiedAt: "1970-01-01T00:00:02.000Z",
             turns: [],
             activeTurn: ActiveTurn(
                 id: T,
@@ -69,6 +66,7 @@ final class NativeReducerTests: XCTestCase {
     func testReducerProtocolConformance() {
         let _: any Reducer = AHPRootReducer()
         let _: any Reducer = AHPSessionReducer()
+        let _: any Reducer = AHPChatReducer()
     }
 
     func testTypeErasure() {
@@ -124,17 +122,17 @@ final class NativeReducerTests: XCTestCase {
     }
 
     func testInoutMutationEfficiency() {
-        var state = makeSessionStateWithActiveTurn()
+        var state = makeChatStateWithActiveTurn()
 
-        sessionR.reduce(into: &state, action: .sessionResponsePart(SessionResponsePartAction(
-            type: .sessionResponsePart, turnId: T,
+        chatR.reduce(into: &state, action: .chatResponsePart(ChatResponsePartAction(
+            type: .chatResponsePart, turnId: T,
             part: .markdown(MarkdownResponsePart(kind: .markdown, id: "md-1", content: ""))
         )))
-        sessionR.reduce(into: &state, action: .sessionDelta(SessionDeltaAction(
-            type: .sessionDelta, turnId: T, partId: "md-1", content: "Hello"
+        chatR.reduce(into: &state, action: .chatDelta(ChatDeltaAction(
+            type: .chatDelta, turnId: T, partId: "md-1", content: "Hello"
         )))
-        sessionR.reduce(into: &state, action: .sessionDelta(SessionDeltaAction(
-            type: .sessionDelta, turnId: T, partId: "md-1", content: " World"
+        chatR.reduce(into: &state, action: .chatDelta(ChatDeltaAction(
+            type: .chatDelta, turnId: T, partId: "md-1", content: " World"
         )))
 
         let text = state.activeTurn?.responseParts.compactMap { part in

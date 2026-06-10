@@ -1,16 +1,7 @@
 {
   "description": "turnStarted with queuedMessageId removes from queuedMessages",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "queuedMessages": [
       {
@@ -31,11 +22,15 @@
           }
         }
       }
-    ]
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   },
   "actions": [
     {
-      "type": "session/turnStarted",
+      "type": "chat/turnStarted",
       "turnId": "turn-1",
       "message": {
         "text": "First",
@@ -47,16 +42,18 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 8,
-      "createdAt": 1000,
-      "modifiedAt": 9999
-    },
-    "lifecycle": "ready",
     "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "message": {
+        "text": "First",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    },
     "queuedMessages": [
       {
         "id": "q-2",
@@ -68,16 +65,9 @@
         }
       }
     ],
-    "activeTurn": {
-      "id": "turn-1",
-      "message": {
-        "text": "First",
-        "origin": {
-          "kind": "user"
-        }
-      },
-      "responseParts": [],
-      "usage": null
-    }
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:09.999Z"
   }
 }

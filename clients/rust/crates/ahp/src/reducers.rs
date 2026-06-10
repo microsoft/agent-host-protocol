@@ -1,13 +1,13 @@
 //! Pure state reducers ported from `types/reducers.ts`.
 //!
 //! Reducers mutate state in place and return a [`ReduceOutcome`]. Use
-//! [`apply_action_to_root`], [`apply_action_to_session`], and
-//! [`apply_action_to_terminal`] to dispatch any [`StateAction`] against
-//! the matching scope; unrelated actions short-circuit as
-//! [`ReduceOutcome::OutOfScope`] so a client holding all three state
-//! trees can blindly fan every action out.
+//! [`apply_action_to_root`], [`apply_action_to_session`],
+//! [`apply_action_to_chat`], and [`apply_action_to_terminal`] to
+//! dispatch any [`StateAction`] against the matching scope; unrelated
+//! actions short-circuit as [`ReduceOutcome::OutOfScope`] so a client
+//! holding every state tree can blindly fan each action out.
 //!
-//! All three reducers are pure functions over `(state, action)` — no
+//! All reducers are pure functions over `(state, action)` — no
 //! I/O, no allocation beyond what the action itself carries — which
 //! makes them safe to run inside a UI render loop or a snapshot
 //! reconciler.
@@ -50,13 +50,13 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ahp_types::actions::{
-    SessionInputAnswerChangedAction, SessionToolCallCompleteAction, SessionToolCallConfirmedAction,
-    SessionToolCallContentChangedAction, SessionToolCallDeltaAction, SessionToolCallReadyAction,
-    SessionToolCallResultConfirmedAction, SessionTurnStartedAction, StateAction,
+    ChatInputAnswerChangedAction, ChatToolCallCompleteAction, ChatToolCallConfirmedAction,
+    ChatToolCallContentChangedAction, ChatToolCallDeltaAction, ChatToolCallReadyAction,
+    ChatToolCallResultConfirmedAction, ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, ChildCustomization, ConfirmationOption, Customization, ErrorInfo, PendingMessage,
-    PendingMessageKind, ResponsePart, RootState, SessionInputRequest, SessionLifecycle,
+    ActiveTurn, ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization,
+    ErrorInfo, PendingMessage, PendingMessageKind, ResponsePart, RootState, SessionLifecycle,
     SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart, TerminalState,
     TerminalUnclassifiedPart, ToolCallCancellationReason, ToolCallCancelledState,
     ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
@@ -93,6 +93,33 @@ fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
+}
+
+fn now_iso() -> String {
+    iso8601_from_unix_millis(now_ms())
+}
+
+fn iso8601_from_unix_millis(ms: i64) -> String {
+    let seconds = ms.div_euclid(1_000);
+    let millis = ms.rem_euclid(1_000);
+    let days = seconds.div_euclid(86_400);
+    let seconds_of_day = seconds.rem_euclid(86_400);
+    let hour = seconds_of_day / 3_600;
+    let minute = (seconds_of_day % 3_600) / 60;
+    let second = seconds_of_day % 60;
+
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 }.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + if month <= 2 { 1 } else { 0 };
+
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{millis:03}Z")
 }
 
 fn tool_call_meta(
@@ -163,7 +190,7 @@ fn tool_call_id(tc: &ToolCallState) -> &str {
     }
 }
 
-fn has_pending_tool_call_confirmation(state: &SessionState) -> bool {
+fn has_pending_tool_call_confirmation(state: &ChatState) -> bool {
     let Some(active) = &state.active_turn else {
         return false;
     };
@@ -189,7 +216,7 @@ fn with_status_flag(status: u32, flag: SessionStatus, set: bool) -> u32 {
     }
 }
 
-fn summary_status(state: &SessionState, terminal: Option<SessionStatus>) -> u32 {
+fn summary_status(state: &ChatState, terminal: Option<SessionStatus>) -> u32 {
     let activity: u32 = if let Some(t) = terminal {
         t as u32
     } else if state
@@ -205,19 +232,23 @@ fn summary_status(state: &SessionState, terminal: Option<SessionStatus>) -> u32 
     } else {
         SessionStatus::Idle as u32
     };
-    (state.summary.status & !STATUS_ACTIVITY_MASK) | activity
+    (state.status & !STATUS_ACTIVITY_MASK) | activity
 }
 
-fn refresh_summary_status(state: &mut SessionState) {
-    state.summary.status = summary_status(state, None);
+fn refresh_summary_status(state: &mut ChatState) {
+    state.status = summary_status(state, None);
 }
 
-fn touch_modified(state: &mut SessionState) {
+fn touch_chat_modified(state: &mut ChatState) {
+    state.modified_at = now_iso();
+}
+
+fn touch_session_modified(state: &mut SessionState) {
     state.summary.modified_at = now_ms();
 }
 
 fn end_turn(
-    state: &mut SessionState,
+    state: &mut ChatState,
     turn_id: &str,
     turn_state: TurnState,
     terminal_status: Option<SessionStatus>,
@@ -296,12 +327,12 @@ fn end_turn(
 
     state.turns.push(turn);
     state.input_requests = None;
-    touch_modified(state);
-    state.summary.status = summary_status(state, terminal_status);
+    touch_chat_modified(state);
+    state.status = summary_status(state, terminal_status);
     ReduceOutcome::Applied
 }
 
-fn upsert_input_request(state: &mut SessionState, request: SessionInputRequest) {
+fn upsert_input_request(state: &mut ChatState, request: ChatInputRequest) {
     let existing = state.input_requests.get_or_insert_with(Vec::new);
     if let Some(idx) = existing.iter().position(|r| r.id == request.id) {
         let answers = request
@@ -314,9 +345,9 @@ fn upsert_input_request(state: &mut SessionState, request: SessionInputRequest) 
     } else {
         existing.push(request);
     }
-    state.summary.status = summary_status(state, None);
-    touch_modified(state);
-    state.summary.status = with_status_flag(state.summary.status, SessionStatus::IsRead, false);
+    state.status = summary_status(state, None);
+    touch_chat_modified(state);
+    state.status = with_status_flag(state.status, SessionStatus::IsRead, false);
 }
 
 // ─── Customization Helpers ───────────────────────────────────────────────────
@@ -368,7 +399,7 @@ fn apply_toggle(list: &mut [Customization], id: &str, enabled: bool) -> bool {
 }
 
 fn update_tool_call<F>(
-    state: &mut SessionState,
+    state: &mut ChatState,
     turn_id: &str,
     tool_call_id_target: &str,
     updater: F,
@@ -410,7 +441,7 @@ where
 }
 
 fn update_response_part<F>(
-    state: &mut SessionState,
+    state: &mut ChatState,
     turn_id: &str,
     part_id: &str,
     updater: F,
@@ -491,117 +522,75 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             state.creation_error = Some(a.error.clone());
             ReduceOutcome::Applied
         }
-        StateAction::SessionTurnStarted(a) => apply_turn_started(state, a),
-        StateAction::SessionDelta(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
-            if let ResponsePart::Markdown(m) = p {
-                m.content.push_str(&a.content);
+        StateAction::SessionChatAdded(a) => {
+            if let Some(idx) = state
+                .chats
+                .iter()
+                .position(|chat| chat.resource == a.summary.resource)
+            {
+                state.chats[idx] = a.summary.clone();
+            } else {
+                state.chats.push(a.summary.clone());
             }
-        }),
-        StateAction::SessionResponsePart(a) => {
-            let Some(active) = state.active_turn.as_mut() else {
-                return ReduceOutcome::NoOp;
-            };
-            if active.id != a.turn_id {
-                return ReduceOutcome::NoOp;
-            }
-            active.response_parts.push(a.part.clone());
             ReduceOutcome::Applied
         }
-        StateAction::SessionTurnComplete(a) => {
-            end_turn(state, &a.turn_id, TurnState::Complete, None, None)
-        }
-        StateAction::SessionTurnCancelled(a) => {
-            end_turn(state, &a.turn_id, TurnState::Cancelled, None, None)
-        }
-        StateAction::SessionError(a) => end_turn(
-            state,
-            &a.turn_id,
-            TurnState::Error,
-            Some(SessionStatus::Error),
-            Some(a.error.clone()),
-        ),
-        StateAction::SessionToolCallStart(a) => {
-            let Some(active) = state.active_turn.as_mut() else {
+        StateAction::SessionChatRemoved(a) => {
+            let Some(idx) = state.chats.iter().position(|chat| chat.resource == a.chat) else {
                 return ReduceOutcome::NoOp;
             };
-            if active.id != a.turn_id {
-                return ReduceOutcome::NoOp;
+            state.chats.remove(idx);
+            if state.default_chat.as_ref() == Some(&a.chat) {
+                state.default_chat = None;
             }
-            active
-                .response_parts
-                .push(ResponsePart::ToolCall(Box::new(ToolCallResponsePart {
-                    tool_call: ToolCallState::Streaming(ToolCallStreamingState {
-                        tool_call_id: a.tool_call_id.clone(),
-                        tool_name: a.tool_name.clone(),
-                        display_name: a.display_name.clone(),
-                        contributor: a.contributor.clone(),
-                        meta: a.meta.clone(),
-                        partial_input: None,
-                        invocation_message: None,
-                    }),
-                })));
             ReduceOutcome::Applied
         }
-        StateAction::SessionToolCallDelta(a) => apply_tool_call_delta(state, a),
-        StateAction::SessionToolCallReady(a) => {
-            let res = apply_tool_call_ready(state, a);
-            if res == ReduceOutcome::Applied {
-                refresh_summary_status(state);
+        StateAction::SessionChatUpdated(a) => {
+            let Some(chat) = state.chats.iter_mut().find(|chat| chat.resource == a.chat) else {
+                return ReduceOutcome::NoOp;
+            };
+            if let Some(title) = &a.changes.title {
+                chat.title = title.clone();
             }
-            res
-        }
-        StateAction::SessionToolCallConfirmed(a) => {
-            let res = apply_tool_call_confirmed(state, a);
-            if res == ReduceOutcome::Applied {
-                refresh_summary_status(state);
+            if let Some(status) = a.changes.status {
+                chat.status = status;
             }
-            res
-        }
-        StateAction::SessionToolCallComplete(a) => {
-            let res = apply_tool_call_complete(state, a);
-            if res == ReduceOutcome::Applied {
-                refresh_summary_status(state);
+            if let Some(activity) = &a.changes.activity {
+                chat.activity = Some(activity.clone());
             }
-            res
-        }
-        StateAction::SessionToolCallResultConfirmed(a) => {
-            let res = apply_tool_call_result_confirmed(state, a);
-            if res == ReduceOutcome::Applied {
-                refresh_summary_status(state);
+            if let Some(modified_at) = &a.changes.modified_at {
+                chat.modified_at = modified_at.clone();
             }
-            res
+            if let Some(model) = &a.changes.model {
+                chat.model = Some(model.clone());
+            }
+            if let Some(agent) = &a.changes.agent {
+                chat.agent = Some(agent.clone());
+            }
+            if let Some(origin) = &a.changes.origin {
+                chat.origin = Some(origin.clone());
+            }
+            if let Some(working_directory) = &a.changes.working_directory {
+                chat.working_directory = Some(working_directory.clone());
+            }
+            ReduceOutcome::Applied
         }
-        StateAction::SessionToolCallContentChanged(a) => apply_tool_call_content_changed(state, a),
+        StateAction::SessionDefaultChatChanged(a) => {
+            state.default_chat = a.default_chat.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::SessionTitleChanged(a) => {
             state.summary.title = a.title.clone();
-            touch_modified(state);
+            touch_session_modified(state);
             ReduceOutcome::Applied
-        }
-        StateAction::SessionUsage(a) => {
-            let Some(active) = state.active_turn.as_mut() else {
-                return ReduceOutcome::NoOp;
-            };
-            if active.id != a.turn_id {
-                return ReduceOutcome::NoOp;
-            }
-            active.usage = Some(a.usage.clone());
-            ReduceOutcome::Applied
-        }
-        StateAction::SessionReasoning(a) => {
-            update_response_part(state, &a.turn_id, &a.part_id, |p| {
-                if let ResponsePart::Reasoning(r) = p {
-                    r.content.push_str(&a.content);
-                }
-            })
         }
         StateAction::SessionModelChanged(a) => {
             state.summary.model = Some(a.model.clone());
-            touch_modified(state);
+            touch_session_modified(state);
             ReduceOutcome::Applied
         }
         StateAction::SessionAgentChanged(a) => {
             state.summary.agent = a.agent.clone();
-            touch_modified(state);
+            touch_session_modified(state);
             ReduceOutcome::Applied
         }
         StateAction::SessionIsReadChanged(a) => {
@@ -636,7 +625,7 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                     config.values.insert(k.clone(), v.clone());
                 }
             }
-            touch_modified(state);
+            touch_session_modified(state);
             ReduceOutcome::Applied
         }
         StateAction::SessionMetaChanged(a) => {
@@ -751,13 +740,122 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             }
             ReduceOutcome::NoOp
         }
-        StateAction::SessionTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),
-        StateAction::SessionInputRequested(a) => {
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
+// ─── Chat Reducer ─────────────────────────────────────────────────────
+
+/// Apply a [`StateAction`] to a [`ChatState`] in place.
+///
+/// Handles all chat-scoped actions — turn lifecycle, tool calls, input
+/// requests, and pending/queued messages. Actions targeting a different
+/// scope short-circuit as [`ReduceOutcome::OutOfScope`].
+pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::ChatTurnStarted(a) => apply_turn_started(state, a),
+        StateAction::ChatDelta(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
+            if let ResponsePart::Markdown(m) = p {
+                m.content.push_str(&a.content);
+            }
+        }),
+        StateAction::ChatResponsePart(a) => {
+            let Some(active) = state.active_turn.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            if active.id != a.turn_id {
+                return ReduceOutcome::NoOp;
+            }
+            active.response_parts.push(a.part.clone());
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatTurnComplete(a) => {
+            end_turn(state, &a.turn_id, TurnState::Complete, None, None)
+        }
+        StateAction::ChatTurnCancelled(a) => {
+            end_turn(state, &a.turn_id, TurnState::Cancelled, None, None)
+        }
+        StateAction::ChatError(a) => end_turn(
+            state,
+            &a.turn_id,
+            TurnState::Error,
+            Some(SessionStatus::Error),
+            Some(a.error.clone()),
+        ),
+        StateAction::ChatToolCallStart(a) => {
+            let Some(active) = state.active_turn.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            if active.id != a.turn_id {
+                return ReduceOutcome::NoOp;
+            }
+            active
+                .response_parts
+                .push(ResponsePart::ToolCall(Box::new(ToolCallResponsePart {
+                    tool_call: ToolCallState::Streaming(ToolCallStreamingState {
+                        tool_call_id: a.tool_call_id.clone(),
+                        tool_name: a.tool_name.clone(),
+                        display_name: a.display_name.clone(),
+                        contributor: a.contributor.clone(),
+                        meta: a.meta.clone(),
+                        partial_input: None,
+                        invocation_message: None,
+                    }),
+                })));
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatToolCallDelta(a) => apply_tool_call_delta(state, a),
+        StateAction::ChatToolCallReady(a) => {
+            let res = apply_tool_call_ready(state, a);
+            if res == ReduceOutcome::Applied {
+                refresh_summary_status(state);
+            }
+            res
+        }
+        StateAction::ChatToolCallConfirmed(a) => {
+            let res = apply_tool_call_confirmed(state, a);
+            if res == ReduceOutcome::Applied {
+                refresh_summary_status(state);
+            }
+            res
+        }
+        StateAction::ChatToolCallComplete(a) => {
+            let res = apply_tool_call_complete(state, a);
+            if res == ReduceOutcome::Applied {
+                refresh_summary_status(state);
+            }
+            res
+        }
+        StateAction::ChatToolCallResultConfirmed(a) => {
+            let res = apply_tool_call_result_confirmed(state, a);
+            if res == ReduceOutcome::Applied {
+                refresh_summary_status(state);
+            }
+            res
+        }
+        StateAction::ChatToolCallContentChanged(a) => apply_tool_call_content_changed(state, a),
+        StateAction::ChatUsage(a) => {
+            let Some(active) = state.active_turn.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            if active.id != a.turn_id {
+                return ReduceOutcome::NoOp;
+            }
+            active.usage = Some(a.usage.clone());
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatReasoning(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
+            if let ResponsePart::Reasoning(r) = p {
+                r.content.push_str(&a.content);
+            }
+        }),
+        StateAction::ChatTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),
+        StateAction::ChatInputRequested(a) => {
             upsert_input_request(state, a.request.clone());
             ReduceOutcome::Applied
         }
-        StateAction::SessionInputAnswerChanged(a) => apply_input_answer_changed(state, a),
-        StateAction::SessionInputCompleted(a) => {
+        StateAction::ChatInputAnswerChanged(a) => apply_input_answer_changed(state, a),
+        StateAction::ChatInputCompleted(a) => {
             let Some(list) = state.input_requests.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
@@ -770,10 +868,10 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                 state.input_requests = None;
             }
             refresh_summary_status(state);
-            touch_modified(state);
+            touch_chat_modified(state);
             ReduceOutcome::Applied
         }
-        StateAction::SessionPendingMessageSet(a) => {
+        StateAction::ChatPendingMessageSet(a) => {
             let entry = PendingMessage {
                 id: a.id.clone(),
                 message: a.message.clone(),
@@ -793,7 +891,7 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             }
             ReduceOutcome::Applied
         }
-        StateAction::SessionPendingMessageRemoved(a) => match a.kind {
+        StateAction::ChatPendingMessageRemoved(a) => match a.kind {
             PendingMessageKind::Steering => match &state.steering_message {
                 Some(m) if m.id == a.id => {
                     state.steering_message = None;
@@ -816,7 +914,7 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                 ReduceOutcome::Applied
             }
         },
-        StateAction::SessionQueuedMessagesReordered(a) => {
+        StateAction::ChatQueuedMessagesReordered(a) => {
             let Some(list) = state.queued_messages.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
@@ -842,16 +940,16 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
     }
 }
 
-fn apply_turn_started(state: &mut SessionState, a: &SessionTurnStartedAction) -> ReduceOutcome {
+fn apply_turn_started(state: &mut ChatState, a: &ChatTurnStartedAction) -> ReduceOutcome {
     state.active_turn = Some(ActiveTurn {
         id: a.turn_id.clone(),
         message: a.message.clone(),
         response_parts: Vec::new(),
         usage: None,
     });
-    state.summary.status = summary_status(state, None);
-    touch_modified(state);
-    state.summary.status = with_status_flag(state.summary.status, SessionStatus::IsRead, false);
+    state.status = summary_status(state, None);
+    touch_chat_modified(state);
+    state.status = with_status_flag(state.status, SessionStatus::IsRead, false);
 
     if let Some(qmid) = &a.queued_message_id {
         if state.steering_message.as_ref().map(|m| m.id.as_str()) == Some(qmid.as_str()) {
@@ -867,10 +965,7 @@ fn apply_turn_started(state: &mut SessionState, a: &SessionTurnStartedAction) ->
     ReduceOutcome::Applied
 }
 
-fn apply_tool_call_delta(
-    state: &mut SessionState,
-    a: &SessionToolCallDeltaAction,
-) -> ReduceOutcome {
+fn apply_tool_call_delta(state: &mut ChatState, a: &ChatToolCallDeltaAction) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| match tc {
         ToolCallState::Streaming(mut s) => {
             let current = s.partial_input.unwrap_or_default();
@@ -887,10 +982,7 @@ fn apply_tool_call_delta(
     })
 }
 
-fn apply_tool_call_ready(
-    state: &mut SessionState,
-    a: &SessionToolCallReadyAction,
-) -> ReduceOutcome {
+fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
         let (tool_call_id, tool_name, display_name, contributor, meta) = tool_call_meta(&tc);
         let meta = a.meta.clone().or(meta);
@@ -940,8 +1032,8 @@ fn resolve_selected_option(
 }
 
 fn apply_tool_call_confirmed(
-    state: &mut SessionState,
-    a: &SessionToolCallConfirmedAction,
+    state: &mut ChatState,
+    a: &ChatToolCallConfirmedAction,
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
         let ToolCallState::PendingConfirmation(s) = tc else {
@@ -988,8 +1080,8 @@ fn apply_tool_call_confirmed(
 }
 
 fn apply_tool_call_complete(
-    state: &mut SessionState,
-    a: &SessionToolCallCompleteAction,
+    state: &mut ChatState,
+    a: &ChatToolCallCompleteAction,
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
         let (tool_call_id, tool_name, display_name, contributor, meta) = tool_call_meta(&tc);
@@ -1048,8 +1140,8 @@ fn apply_tool_call_complete(
 }
 
 fn apply_tool_call_result_confirmed(
-    state: &mut SessionState,
-    a: &SessionToolCallResultConfirmedAction,
+    state: &mut ChatState,
+    a: &ChatToolCallResultConfirmedAction,
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
         let ToolCallState::PendingResultConfirmation(s) = tc else {
@@ -1091,8 +1183,8 @@ fn apply_tool_call_result_confirmed(
 }
 
 fn apply_tool_call_content_changed(
-    state: &mut SessionState,
-    a: &SessionToolCallContentChangedAction,
+    state: &mut ChatState,
+    a: &ChatToolCallContentChangedAction,
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| match tc {
         ToolCallState::Running(mut s) => {
@@ -1106,7 +1198,7 @@ fn apply_tool_call_content_changed(
     })
 }
 
-fn apply_truncated(state: &mut SessionState, turn_id: Option<&str>) -> ReduceOutcome {
+fn apply_truncated(state: &mut ChatState, turn_id: Option<&str>) -> ReduceOutcome {
     match turn_id {
         None => {
             state.turns.clear();
@@ -1120,14 +1212,14 @@ fn apply_truncated(state: &mut SessionState, turn_id: Option<&str>) -> ReduceOut
     }
     state.active_turn = None;
     state.input_requests = None;
-    touch_modified(state);
-    state.summary.status = summary_status(state, None);
+    touch_chat_modified(state);
+    state.status = summary_status(state, None);
     ReduceOutcome::Applied
 }
 
 fn apply_input_answer_changed(
-    state: &mut SessionState,
-    a: &SessionInputAnswerChangedAction,
+    state: &mut ChatState,
+    a: &ChatInputAnswerChangedAction,
 ) -> ReduceOutcome {
     let Some(list) = state.input_requests.as_mut() else {
         return ReduceOutcome::NoOp;
@@ -1148,7 +1240,7 @@ fn apply_input_answer_changed(
     if answers.is_empty() {
         req.answers = None;
     }
-    touch_modified(state);
+    touch_chat_modified(state);
     ReduceOutcome::Applied
 }
 
@@ -1241,7 +1333,7 @@ pub fn apply_action_to_terminal(state: &mut TerminalState, action: &StateAction)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ahp_types::state::{MarkdownResponsePart, Message, SessionSummary};
+    use ahp_types::state::{ChatSummary, MarkdownResponsePart, Message, SessionSummary};
 
     fn user_message(text: &str) -> Message {
         Message {
@@ -1273,11 +1365,8 @@ mod tests {
             creation_error: None,
             server_tools: None,
             active_client: None,
-            turns: Vec::new(),
-            active_turn: None,
-            steering_message: None,
-            queued_messages: None,
-            input_requests: None,
+            chats: Vec::new(),
+            default_chat: None,
             config: None,
             customizations: None,
             changesets: None,
@@ -1285,25 +1374,45 @@ mod tests {
         }
     }
 
+    fn empty_chat(resource: &str) -> ChatState {
+        ChatState {
+            resource: resource.to_string(),
+            title: String::new(),
+            status: SessionStatus::Idle as u32,
+            activity: None,
+            modified_at: "1970-01-01T00:00:00.000Z".into(),
+            model: None,
+            agent: None,
+            origin: None,
+            working_directory: None,
+            turns: Vec::new(),
+            active_turn: None,
+            steering_message: None,
+            queued_messages: None,
+            input_requests: None,
+            meta: None,
+        }
+    }
+
     #[test]
     fn turn_started_creates_active_turn_and_sets_in_progress() {
-        let mut s = empty_session("copilot:/s1");
-        let action = StateAction::SessionTurnStarted(SessionTurnStartedAction {
+        let mut s = empty_chat("copilot:/s1/chat/1");
+        let action = StateAction::ChatTurnStarted(ChatTurnStartedAction {
             turn_id: "t1".into(),
             message: user_message("hi"),
             queued_message_id: None,
         });
         assert_eq!(
-            apply_action_to_session(&mut s, &action),
+            apply_action_to_chat(&mut s, &action),
             ReduceOutcome::Applied
         );
-        assert_eq!(s.summary.status, SessionStatus::InProgress as u32);
+        assert_eq!(s.status, SessionStatus::InProgress as u32);
         assert_eq!(s.active_turn.unwrap().id, "t1");
     }
 
     #[test]
     fn delta_appends_to_markdown_part() {
-        let mut s = empty_session("copilot:/s1");
+        let mut s = empty_chat("copilot:/s1/chat/1");
         s.active_turn = Some(ActiveTurn {
             id: "t1".into(),
             message: user_message("hi"),
@@ -1313,12 +1422,12 @@ mod tests {
             })],
             usage: None,
         });
-        let a = StateAction::SessionDelta(ahp_types::actions::SessionDeltaAction {
+        let a = StateAction::ChatDelta(ahp_types::actions::ChatDeltaAction {
             turn_id: "t1".into(),
             part_id: "p1".into(),
             content: ", world".into(),
         });
-        assert_eq!(apply_action_to_session(&mut s, &a), ReduceOutcome::Applied);
+        assert_eq!(apply_action_to_chat(&mut s, &a), ReduceOutcome::Applied);
         match &s.active_turn.unwrap().response_parts[0] {
             ResponsePart::Markdown(m) => assert_eq!(m.content, "Hello, world"),
             _ => panic!(),
@@ -1327,22 +1436,90 @@ mod tests {
 
     #[test]
     fn turn_complete_moves_active_to_turns_and_returns_idle() {
-        let mut s = empty_session("copilot:/s1");
+        let mut s = empty_chat("copilot:/s1/chat/1");
         s.active_turn = Some(ActiveTurn {
             id: "t1".into(),
             message: user_message("hi"),
             response_parts: Vec::new(),
             usage: None,
         });
-        s.summary.status = SessionStatus::InProgress as u32;
-        let a = StateAction::SessionTurnComplete(ahp_types::actions::SessionTurnCompleteAction {
+        s.status = SessionStatus::InProgress as u32;
+        let a = StateAction::ChatTurnComplete(ahp_types::actions::ChatTurnCompleteAction {
             turn_id: "t1".into(),
         });
-        assert_eq!(apply_action_to_session(&mut s, &a), ReduceOutcome::Applied);
+        assert_eq!(apply_action_to_chat(&mut s, &a), ReduceOutcome::Applied);
         assert!(s.active_turn.is_none());
         assert_eq!(s.turns.len(), 1);
         assert_eq!(s.turns[0].state, TurnState::Complete);
-        assert_eq!(s.summary.status, SessionStatus::Idle as u32);
+        assert_eq!(s.status, SessionStatus::Idle as u32);
+    }
+
+    #[test]
+    fn session_reducer_handles_ready_and_chat_catalog_actions() {
+        let mut s = empty_session("copilot:/s1");
+        let ready = StateAction::SessionReady(ahp_types::actions::SessionReadyAction {});
+        assert_eq!(
+            apply_action_to_session(&mut s, &ready),
+            ReduceOutcome::Applied
+        );
+        assert_eq!(s.lifecycle, SessionLifecycle::Ready);
+
+        let chat = ChatSummary {
+            resource: "copilot:/s1/chat/1".into(),
+            title: "c1".into(),
+            status: SessionStatus::Idle as u32,
+            activity: None,
+            modified_at: "1970-01-01T00:00:00.000Z".into(),
+            model: None,
+            agent: None,
+            origin: None,
+            working_directory: None,
+        };
+        let added = StateAction::SessionChatAdded(ahp_types::actions::SessionChatAddedAction {
+            summary: chat.clone(),
+        });
+        assert_eq!(
+            apply_action_to_session(&mut s, &added),
+            ReduceOutcome::Applied
+        );
+        assert_eq!(s.chats, vec![chat.clone()]);
+
+        let updated =
+            StateAction::SessionChatUpdated(ahp_types::actions::SessionChatUpdatedAction {
+                chat: chat.resource.clone(),
+                changes: ahp_types::actions::PartialChatSummary {
+                    title: Some("renamed".into()),
+                    modified_at: Some("1970-01-01T00:00:09.999Z".into()),
+                    ..Default::default()
+                },
+            });
+        assert_eq!(
+            apply_action_to_session(&mut s, &updated),
+            ReduceOutcome::Applied
+        );
+        assert_eq!(s.chats[0].title, "renamed");
+        assert_eq!(s.chats[0].modified_at, "1970-01-01T00:00:09.999Z");
+
+        s.default_chat = Some(chat.resource.clone());
+        let removed =
+            StateAction::SessionChatRemoved(ahp_types::actions::SessionChatRemovedAction {
+                chat: chat.resource.clone(),
+            });
+        assert_eq!(
+            apply_action_to_session(&mut s, &removed),
+            ReduceOutcome::Applied
+        );
+        assert!(s.chats.is_empty());
+        assert!(s.default_chat.is_none());
+
+        // A chat-scoped action is out of scope for the session reducer.
+        let turn = StateAction::ChatTurnComplete(ahp_types::actions::ChatTurnCompleteAction {
+            turn_id: "t1".into(),
+        });
+        assert_eq!(
+            apply_action_to_session(&mut s, &turn),
+            ReduceOutcome::OutOfScope
+        );
     }
 
     #[test]
@@ -1552,6 +1729,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_session,
+                    &file_name,
+                    description,
+                ),
+                "chat" => run_fixture::<ChatState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_chat,
                     &file_name,
                     description,
                 ),

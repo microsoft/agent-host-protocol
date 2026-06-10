@@ -1,6 +1,6 @@
 # Session Channel
 
-A session channel carries the full state of a single agent conversation: turns, streaming responses, tool calls, pending messages, input requests, customizations, and per-session configuration. One session channel exists per session for as long as the session is alive.
+A session channel carries session-level state and acts as the coordination scope for one or more chats. The session tracks lifecycle, model/agent defaults, customizations, per-session configuration, changesets, and the catalog of chats that belong to the session. The per-conversation state — turns, streaming responses, tool calls, pending messages, and input requests — lives on the [chat channel](./chat-channel).
 
 ## URI
 
@@ -14,7 +14,7 @@ Multiple session channels may be active simultaneously. Clients subscribe to eac
 
 ## State
 
-Subscribers receive a [`SessionState`](/reference/session#sessionstate) snapshot containing the session summary, lifecycle phase, history of completed turns, the active turn (if any), pending messages, outstanding input requests, model and active-client state, and other per-session fields. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`SessionState`](/reference/session#sessionstate) snapshot containing the session summary, lifecycle phase, the catalog of [`chats`](/reference/session#sessionstate) belonging to this session, the optional [`defaultChat`](/reference/session#sessionstate) routing hint, model and active-client state, customizations, changesets, and per-session configuration. Per-conversation state (turns, streaming, tool calls, pending messages, input requests) lives on the [chat channel](./chat-channel). Refer to the [State Model guide](/guide/state-model) for a structural overview.
 
 ## Lifecycle
 
@@ -35,15 +35,41 @@ Subscribers receive a [`SessionState`](/reference/session#sessionstate) snapshot
 
 ### Active session
 
-Once a session reaches `lifecycle: 'ready'`, it accepts turns:
+Once a session reaches `lifecycle: 'ready'`, clients may create chats on it with [`createChat`](/reference/chat#createchat). Each chat is independently subscribable at its own `ahp-chat:/<cid>` URI; see the [Chat Channel specification](./chat-channel) for the per-chat lifecycle, turn flow, tool calls, and input request handling.
 
-- The client dispatches `session/turnStarted` to begin a turn.
-- The server streams `session/delta`, `session/responsePart`, `session/toolCallStart`, `session/toolCallReady`, and related actions.
-- The client dispatches `session/toolCallConfirmed` / `session/toolCallResultConfirmed` to approve or deny tool calls, or `session/turnCancelled` to abort.
-- The server dispatches `session/turnComplete` or `session/error` when the turn ends.
-- The server MAY dispatch `session/inputRequested` while a turn is active. Clients sync answer drafts with `session/inputAnswerChanged` and finish the request with `session/inputCompleted`.
+Session-scoped actions dispatched on this channel are limited to:
+
+- Catalog mutations — `session/chatAdded`, `session/chatRemoved`, `session/chatUpdated`, and `session/defaultChatChanged`.
+- Session-wide configuration — model and agent defaults, active-client tracking, customizations, changesets, lifecycle transitions.
 
 All actions dispatched on this channel travel on `ActionEnvelope`s whose `channel` is the session URI. Action payloads do NOT carry their own session URI — the channel comes from the envelope.
+
+### Chat catalog mutations
+
+Three discrete actions keep `SessionState.chats` in sync as chats come and go. Sessions with a single chat trivially round-trip a `session/chatAdded` once at creation; multi-chat sessions exercise all three:
+
+| Action | Payload | Reducer behavior |
+|---|---|---|
+| `session/chatAdded` | `summary: ChatSummary` | Upsert by `summary.resource`. Appends when no entry has the same URI; otherwise replaces the existing entry. Mirrors `root/sessionAdded`. |
+| `session/chatRemoved` | `chat: URI` | Removes the matching entry. No-op when no entry matches. If `state.defaultChat` referenced the removed URI, the reducer clears it. Mirrors `root/sessionRemoved`. |
+| `session/chatUpdated` | `chat: URI, changes: Partial<ChatSummary>` | Merges the non-identity fields of `changes` onto the matching entry. No-op when no entry matches; clients SHOULD then wait for a `session/chatAdded`. Identity fields (`resource`) MUST NOT be carried in `changes`. Mirrors `root/sessionSummaryChanged`. |
+
+The producer of the chat's own [`ChatState`](./chat-channel#state) is responsible for emitting matching `session/chatUpdated` actions so the catalog and the per-chat channel stay consistent.
+
+### Chat aggregation
+
+[`SessionSummary`](/reference/session#sessionsummary) carries session-wide identity (`resource`, `provider`, `createdAt`, `workingDirectory`) but several of its mutable fields are aggregates derived from the session's chats. Producers SHOULD apply these rules so clients that only consume the session summary (a session list, for example) still see meaningful state:
+
+| Field | Derivation rule |
+|---|---|
+| `status` | Take the activity bits (`Idle` / `InProgress` / `InputNeeded` / `Error`) from the [`defaultChat`](#defaultchat) when set, else from the most recently modified chat. Promote `InputNeeded` if **any** chat needs input. Promote `Error` if **any** chat is in an error state. The orthogonal `IsRead` / `IsArchived` flags remain session-scoped and pass through unchanged. |
+| `activity` | Mirror the activity string of the chat that contributes the activity bits — usually the default chat, but the chat that raised `InputNeeded` / `Error` when a non-default chat wins the promotion. |
+| `modifiedAt` | The maximum of every chat's `modifiedAt`. |
+| `model` / `agent` | The session-level selection. Per-chat overrides are surfaced on individual [`ChatSummary`](/reference/chat#chatsummary) entries; do **not** aggregate them up. |
+| `workingDirectory` | The session-level **default**. Individual chats MAY override via [`ChatSummary.workingDirectory`](/reference/chat#chatsummary); aggregating per-chat overrides up is meaningless and SHOULD NOT be attempted. |
+| `changes` | Optional roll-up. Producers MAY sum per-chat changeset stats or report the most expensive chat's stats — whichever is cheaper to compute. |
+
+Sessions with a single chat satisfy all of the above trivially (the chat's values pass through). The rules only matter once a session carries multiple chats.
 
 ### Disposal
 
@@ -69,16 +95,14 @@ session URI (`ahp-session:/<uuid>`).
 | Method | Kind | Purpose |
 |---|---|---|
 | `createSession` | request | Create a session at the chosen URI. |
-| `disposeSession` | request | Dispose this session and its backend resources. |
-| `fetchTurns` | request | Page historical turns for this session. |
-| `completions` | request | Session-scoped inline completions (e.g. user-message mentions). |
+| `disposeSession` | request | Dispose this session and its backend resources (cascades to every chat in the session's catalog). |
 
 ### Notifications (`params.channel = "ahp-session:/<uuid>"`)
 
 | Method | Kind | Meaning |
 |---|---|---|
-| `action` | server → client notification | Session action envelope (`session/*` action payloads). |
-| `dispatchAction` | client → server notification | Dispatch client actions on this session (`session/turnStarted`, `session/toolCallConfirmed`, ...). |
+| `action` | server → client notification | Session action envelope (`session/*` action payloads — catalog updates, lifecycle, model/agent, customizations, changesets). |
+| `dispatchAction` | client → server notification | Dispatch client actions on this session (`session/modelChanged`, `session/defaultChatChanged`, ...). |
 | `unsubscribe` | client → server notification | Stop receiving messages for this session channel. |
 
 `auth/required` may also target a session URI when auth is required for an
@@ -92,37 +116,11 @@ When the server receives a client-dispatched action on this channel, it MUST val
 | Action                                        | Condition                                                                                                                  | Server Behavior                                                                                     |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Any action referencing a non-existent session | Channel URI not found                                                                                                      | Server MUST silently ignore the action (no echo)                                                    |
-| `session/toolCallConfirmed`                   | Tool call not in `pending-confirmation` state                                                                              | Server MUST reject the action                                                                       |
-| `session/turnCancelled`                       | No active turn                                                                                                             | Server MUST reject the action                                                                       |
-| `session/modelChanged`                        | A turn is currently active                                                                                                 | Server MUST defer the model change until the active turn completes, then apply it for the next turn |
-| `session/agentChanged`                        | A turn is currently active                                                                                                 | Server MUST defer the agent change until the active turn completes, then apply it for the next turn |
-| `session/inputAnswerChanged`                  | No input request with matching `requestId`                                                                                 | Server SHOULD reject the action                                                                     |
-| `session/inputAnswerChanged`                  | `answer.state` requires a value but `answer.value` is absent, or `answer.value.kind` is missing the matching payload field | Server SHOULD reject the action                                                                     |
-| `session/inputCompleted`                      | No input request with matching `requestId`                                                                                 | Server SHOULD reject the action                                                                     |
-| `session/inputCompleted`                      | `response` is `'accept'` but required questions do not have submitted answers                                              | Server SHOULD reject the action                                                                     |
-| `session/pendingMessageRemoved`               | No pending message with matching `id` and `kind`                                                                           | Server SHOULD reject the action                                                                     |
+| `session/modelChanged`                        | A turn is currently active in any chat in this session                                                                     | Server MUST defer the model change until every active turn completes, then apply it for next turns  |
+| `session/agentChanged`                        | A turn is currently active in any chat in this session                                                                     | Server MUST defer the agent change until every active turn completes, then apply it for next turns  |
+| `session/defaultChatChanged`                  | `defaultChat` URI does not match an entry in the session's chat catalog                                                    | Server MUST reject the action                                                                       |
 
-## Pending Message Consumption
-
-The server consumes pending messages according to their kind:
-
-### Queued Messages
-
-When a turn completes and `queuedMessages` is non-empty, the server SHOULD:
-
-1. Dispatch `session/pendingMessageRemoved` with `kind: 'queued'` for the first queued message.
-2. Dispatch `session/turnStarted` with the queued message's `message` and `queuedMessageId` set to the message's `id`.
-
-When a queued message is added while the session is idle (no active turn), the server SHOULD immediately consume it using the same two-step sequence.
-
-### Steering Messages
-
-When a turn is active and `steeringMessages` is non-empty, the server MAY consume steering messages at its discretion. To consume a steering message, the server:
-
-1. Dispatches `session/pendingMessageRemoved` with `kind: 'steering'`.
-2. Injects the message content into the model context (the injection mechanism is opaque to the protocol).
-
-Steering messages added while idle are silently stored and consumed when a turn becomes active.
+Turn-, tool-call-, input-request-, and pending-message-level validation lives on the [Chat Channel](./chat-channel#server-validation-of-client-actions).
 
 ## Actions
 

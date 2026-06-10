@@ -1,16 +1,7 @@
 {
   "description": "toolCallConfirmed denied with selectedOptionId resolves selectedOption in cancelled state",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 8,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -22,18 +13,22 @@
       },
       "responseParts": [],
       "usage": null
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   },
   "actions": [
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "toolName": "bash",
       "displayName": "Run Command"
     },
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run: rm -rf /",
@@ -59,7 +54,7 @@
       ]
     },
     {
-      "type": "session/toolCallConfirmed",
+      "type": "chat/toolCallConfirmed",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "approved": false,
@@ -69,15 +64,6 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 8,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -112,6 +98,10 @@
         }
       ],
       "usage": null
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   }
 }

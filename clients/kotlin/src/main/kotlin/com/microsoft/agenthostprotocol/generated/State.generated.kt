@@ -168,11 +168,21 @@ internal object SessionStatusSerializer : KSerializer<SessionStatus> {
         SessionStatus(decoder.decodeInt())
 }
 
+@Serializable
+enum class ChatOriginKind {
+    @SerialName("user")
+    USER,
+    @SerialName("fork")
+    FORK,
+    @SerialName("tool")
+    TOOL
+}
+
 /**
  * Answer lifecycle state.
  */
 @Serializable
-enum class SessionInputAnswerState {
+enum class ChatInputAnswerState {
     @SerialName("draft")
     DRAFT,
     @SerialName("submitted")
@@ -185,7 +195,7 @@ enum class SessionInputAnswerState {
  * Answer value kind.
  */
 @Serializable
-enum class SessionInputAnswerValueKind {
+enum class ChatInputAnswerValueKind {
     @SerialName("text")
     TEXT,
     @SerialName("number")
@@ -202,7 +212,7 @@ enum class SessionInputAnswerValueKind {
  * Question/input control kind.
  */
 @Serializable
-enum class SessionInputQuestionKind {
+enum class ChatInputQuestionKind {
     @SerialName("text")
     TEXT,
     @SerialName("number")
@@ -221,7 +231,7 @@ enum class SessionInputQuestionKind {
  * How a client completed an input request.
  */
 @Serializable
-enum class SessionInputResponseKind {
+enum class ChatInputResponseKind {
     @SerialName("accept")
     ACCEPT,
     @SerialName("decline")
@@ -939,6 +949,121 @@ data class PendingMessage(
 )
 
 @Serializable
+data class ChatState(
+    /**
+     * Chat URI
+     */
+    val resource: String,
+    /**
+     * Chat title
+     */
+    val title: String,
+    /**
+     * Current chat status (reuses SessionStatus shape)
+     */
+    val status: SessionStatus,
+    /**
+     * Human-readable description of what the chat is currently doing
+     */
+    val activity: String? = null,
+    /**
+     * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+     */
+    val modifiedAt: String,
+    /**
+     * Optional per-chat model override (defaults to the session's model)
+     */
+    val model: ModelSelection? = null,
+    /**
+     * Optional per-chat agent override (defaults to the session's agent)
+     */
+    val agent: AgentSelection? = null,
+    /**
+     * How this chat came into existence
+     */
+    val origin: ChatOrigin? = null,
+    /**
+     * Optional per-chat working directory.
+     *
+     * If absent, the chat inherits
+     * {@link SessionSummary.workingDirectory | the session's working directory}.
+     * Hosts MAY override this for individual chats — for example, to give a
+     * subordinate chat its own git worktree so multiple chats in a session can
+     * make independent edits that the orchestrator later merges back.
+     */
+    val workingDirectory: String? = null,
+    /**
+     * Completed turns
+     */
+    val turns: List<Turn>,
+    /**
+     * Currently in-progress turn
+     */
+    val activeTurn: ActiveTurn? = null,
+    /**
+     * Message to inject into the current turn at a convenient point
+     */
+    val steeringMessage: PendingMessage? = null,
+    /**
+     * Messages to send automatically as new turns after the current turn finishes
+     */
+    val queuedMessages: List<PendingMessage>? = null,
+    /**
+     * Requests for user input that are currently blocking or informing chat progress
+     */
+    val inputRequests: List<ChatInputRequest>? = null,
+    /**
+     * Additional provider-specific metadata for this chat.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class ChatSummary(
+    /**
+     * Chat URI
+     */
+    val resource: String,
+    /**
+     * Chat title
+     */
+    val title: String,
+    /**
+     * Current chat status (reuses SessionStatus shape)
+     */
+    val status: SessionStatus,
+    /**
+     * Human-readable description of what the chat is currently doing
+     */
+    val activity: String? = null,
+    /**
+     * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+     */
+    val modifiedAt: String,
+    /**
+     * Optional per-chat model override (defaults to the session's model)
+     */
+    val model: ModelSelection? = null,
+    /**
+     * Optional per-chat agent override (defaults to the session's agent)
+     */
+    val agent: AgentSelection? = null,
+    /**
+     * How this chat came into existence
+     */
+    val origin: ChatOrigin? = null,
+    /**
+     * Optional per-chat working directory.
+     *
+     * If absent, the chat inherits
+     * {@link SessionSummary.workingDirectory | the session's working directory}.
+     * See {@link ChatState.workingDirectory} for usage notes.
+     */
+    val workingDirectory: String? = null
+)
+
+@Serializable
 data class SessionState(
     /**
      * Lightweight session metadata
@@ -961,25 +1086,16 @@ data class SessionState(
      */
     val activeClient: SessionActiveClient? = null,
     /**
-     * Completed turns
+     * Catalog of chats in this session.
      */
-    val turns: List<Turn>,
+    val chats: List<ChatSummary>,
     /**
-     * Currently in-progress turn
+     * The chat that receives input when the user addresses the session without
+     * selecting a specific chat. This is a UI routing hint, not a hierarchy
+     * marker — chats remain equal peers at the protocol level. Hosts MAY change
+     * this over the session's lifetime.
      */
-    val activeTurn: ActiveTurn? = null,
-    /**
-     * Message to inject into the current turn at a convenient point
-     */
-    val steeringMessage: PendingMessage? = null,
-    /**
-     * Messages to send automatically as new turns after the current turn finishes
-     */
-    val queuedMessages: List<PendingMessage>? = null,
-    /**
-     * Requests for user input that are currently blocking or informing session progress
-     */
-    val inputRequests: List<SessionInputRequest>? = null,
+    val defaultChat: String? = null,
     /**
      * Session configuration schema and current values
      */
@@ -1096,7 +1212,10 @@ data class SessionSummary(
      */
     val agent: AgentSelection? = null,
     /**
-     * The working directory URI for this session
+     * The default working directory URI for this session. Individual chats
+     * MAY override via {@link ChatSummary.workingDirectory | their own
+     * `workingDirectory`}; this field acts as the fallback for any chat that
+     * does not.
      */
     val workingDirectory: String? = null,
     /**
@@ -1234,7 +1353,7 @@ data class Message(
 )
 
 @Serializable
-data class SessionInputOption(
+data class ChatInputOption(
     /**
      * Stable option identifier; for MCP enum values this is the enum string
      */
@@ -1254,26 +1373,26 @@ data class SessionInputOption(
 )
 
 @Serializable
-data class SessionInputTextAnswerValue(
-    val kind: SessionInputAnswerValueKind,
+data class ChatInputTextAnswerValue(
+    val kind: ChatInputAnswerValueKind,
     val value: String
 )
 
 @Serializable
-data class SessionInputNumberAnswerValue(
-    val kind: SessionInputAnswerValueKind,
+data class ChatInputNumberAnswerValue(
+    val kind: ChatInputAnswerValueKind,
     val value: Double
 )
 
 @Serializable
-data class SessionInputBooleanAnswerValue(
-    val kind: SessionInputAnswerValueKind,
+data class ChatInputBooleanAnswerValue(
+    val kind: ChatInputAnswerValueKind,
     val value: Boolean
 )
 
 @Serializable
-data class SessionInputSelectedAnswerValue(
-    val kind: SessionInputAnswerValueKind,
+data class ChatInputSelectedAnswerValue(
+    val kind: ChatInputAnswerValueKind,
     val value: String,
     /**
      * Free-form text entered instead of selecting an option
@@ -1282,8 +1401,8 @@ data class SessionInputSelectedAnswerValue(
 )
 
 @Serializable
-data class SessionInputSelectedManyAnswerValue(
-    val kind: SessionInputAnswerValueKind,
+data class ChatInputSelectedManyAnswerValue(
+    val kind: ChatInputAnswerValueKind,
     val value: List<String>,
     /**
      * Free-form text entered in addition to selected options
@@ -1292,23 +1411,23 @@ data class SessionInputSelectedManyAnswerValue(
 )
 
 @Serializable
-data class SessionInputAnswered(
+data class ChatInputAnswered(
     /**
      * Answer state
      */
-    val state: SessionInputAnswerState,
+    val state: ChatInputAnswerState,
     /**
      * Answer value
      */
-    val value: SessionInputAnswerValue
+    val value: ChatInputAnswerValue
 )
 
 @Serializable
-data class SessionInputSkipped(
+data class ChatInputSkipped(
     /**
      * Answer state
      */
-    val state: SessionInputAnswerState,
+    val state: ChatInputAnswerState,
     /**
      * Free-form reason or value captured while skipping, if any
      */
@@ -1316,7 +1435,7 @@ data class SessionInputSkipped(
 )
 
 @Serializable
-data class SessionInputTextQuestion(
+data class ChatInputTextQuestion(
     /**
      * Stable question identifier used as the key in `answers`
      */
@@ -1333,7 +1452,7 @@ data class SessionInputTextQuestion(
      * Whether the user must answer this question to accept the request
      */
     val required: Boolean? = null,
-    val kind: SessionInputQuestionKind,
+    val kind: ChatInputQuestionKind,
     /**
      * Format hint for text questions, such as `email`, `uri`, `date`, or `date-time`
      */
@@ -1353,7 +1472,7 @@ data class SessionInputTextQuestion(
 )
 
 @Serializable
-data class SessionInputNumberQuestion(
+data class ChatInputNumberQuestion(
     /**
      * Stable question identifier used as the key in `answers`
      */
@@ -1370,7 +1489,7 @@ data class SessionInputNumberQuestion(
      * Whether the user must answer this question to accept the request
      */
     val required: Boolean? = null,
-    val kind: SessionInputQuestionKind,
+    val kind: ChatInputQuestionKind,
     /**
      * Minimum value
      */
@@ -1386,7 +1505,7 @@ data class SessionInputNumberQuestion(
 )
 
 @Serializable
-data class SessionInputBooleanQuestion(
+data class ChatInputBooleanQuestion(
     /**
      * Stable question identifier used as the key in `answers`
      */
@@ -1403,7 +1522,7 @@ data class SessionInputBooleanQuestion(
      * Whether the user must answer this question to accept the request
      */
     val required: Boolean? = null,
-    val kind: SessionInputQuestionKind,
+    val kind: ChatInputQuestionKind,
     /**
      * Default boolean value
      */
@@ -1411,7 +1530,7 @@ data class SessionInputBooleanQuestion(
 )
 
 @Serializable
-data class SessionInputSingleSelectQuestion(
+data class ChatInputSingleSelectQuestion(
     /**
      * Stable question identifier used as the key in `answers`
      */
@@ -1428,11 +1547,11 @@ data class SessionInputSingleSelectQuestion(
      * Whether the user must answer this question to accept the request
      */
     val required: Boolean? = null,
-    val kind: SessionInputQuestionKind,
+    val kind: ChatInputQuestionKind,
     /**
      * Options the user may select from
      */
-    val options: List<SessionInputOption>,
+    val options: List<ChatInputOption>,
     /**
      * Whether the user may enter text instead of selecting an option
      */
@@ -1440,7 +1559,7 @@ data class SessionInputSingleSelectQuestion(
 )
 
 @Serializable
-data class SessionInputMultiSelectQuestion(
+data class ChatInputMultiSelectQuestion(
     /**
      * Stable question identifier used as the key in `answers`
      */
@@ -1457,11 +1576,11 @@ data class SessionInputMultiSelectQuestion(
      * Whether the user must answer this question to accept the request
      */
     val required: Boolean? = null,
-    val kind: SessionInputQuestionKind,
+    val kind: ChatInputQuestionKind,
     /**
      * Options the user may select from
      */
-    val options: List<SessionInputOption>,
+    val options: List<ChatInputOption>,
     /**
      * Whether the user may enter text in addition to selecting options
      */
@@ -1477,7 +1596,7 @@ data class SessionInputMultiSelectQuestion(
 )
 
 @Serializable
-data class SessionInputRequest(
+data class ChatInputRequest(
     /**
      * Stable request identifier
      */
@@ -1493,11 +1612,11 @@ data class SessionInputRequest(
     /**
      * Ordered questions to ask the user
      */
-    val questions: List<SessionInputQuestion>? = null,
+    val questions: List<ChatInputQuestion>? = null,
     /**
      * Current draft or submitted answers, keyed by question ID
      */
-    val answers: Map<String, SessionInputAnswer>? = null
+    val answers: Map<String, ChatInputAnswer>? = null
 )
 
 @Serializable
@@ -1754,7 +1873,7 @@ data class MarkdownResponsePart(
      */
     val kind: ResponsePartKind,
     /**
-     * Part identifier, used by `session/delta` to target this part for content appends
+     * Part identifier, used by `chat/delta` to target this part for content appends
      */
     val id: String,
     /**
@@ -1818,7 +1937,7 @@ data class ReasoningResponsePart(
      */
     val kind: ResponsePartKind,
     /**
-     * Part identifier, used by `session/reasoning` to target this part for content appends
+     * Part identifier, used by `chat/reasoning` to target this part for content appends
      */
     val id: String,
     /**
@@ -2982,7 +3101,7 @@ data class ToolCallClientContributor(
      * Absent for server-side tools.
      *
      * When set, the identified client is responsible for executing the tool and
-     * dispatching `session/toolCallComplete` with the result.
+     * dispatching `chat/toolCallComplete` with the result.
      */
     val clientId: String
 )
@@ -3199,7 +3318,7 @@ data class ErrorInfo(
 @Serializable
 data class Snapshot(
     /**
-     * The subscribed channel URI (e.g. `ahp-root://` or `ahp-session:/<uuid>`)
+     * The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)
      */
     val resource: String,
     /**
@@ -3521,6 +3640,60 @@ data class ResourceChange(
 
 // ─── Discriminated Unions ───────────────────────────────────────────────────
 
+@Serializable(with = ChatOriginSerializer::class)
+sealed interface ChatOrigin {
+    @JvmInline value class User(val value: ChatOriginUser) : ChatOrigin
+    @JvmInline value class Fork(val value: ChatOriginFork) : ChatOrigin
+    @JvmInline value class Tool(val value: ChatOriginTool) : ChatOrigin
+    @JvmInline value class Unknown(val raw: JsonObject) : ChatOrigin
+}
+
+@Serializable
+data class ChatOriginUser(
+    val kind: ChatOriginKind = ChatOriginKind.USER,
+)
+
+@Serializable
+data class ChatOriginFork(
+    val kind: ChatOriginKind = ChatOriginKind.FORK,
+    val chat: String,
+    val turnId: String,
+)
+
+@Serializable
+data class ChatOriginTool(
+    val kind: ChatOriginKind = ChatOriginKind.TOOL,
+    val chat: String,
+    val toolCallId: String,
+)
+
+internal object ChatOriginSerializer : KSerializer<ChatOrigin> {
+    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ChatOrigin")
+
+    override fun deserialize(decoder: Decoder): ChatOrigin {
+        val input = decoder as? JsonDecoder ?: error("ChatOrigin can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject ?: error("Expected JsonObject for ChatOrigin")
+        return when ((obj["kind"] as? JsonPrimitive)?.contentOrNull) {
+            "user" -> ChatOrigin.User(input.json.decodeFromJsonElement(ChatOriginUser.serializer(), element))
+            "fork" -> ChatOrigin.Fork(input.json.decodeFromJsonElement(ChatOriginFork.serializer(), element))
+            "tool" -> ChatOrigin.Tool(input.json.decodeFromJsonElement(ChatOriginTool.serializer(), element))
+            else -> ChatOrigin.Unknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ChatOrigin) {
+        val output = encoder as? JsonEncoder ?: error("ChatOrigin can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is ChatOrigin.User -> output.json.encodeToJsonElement(ChatOriginUser.serializer(), value.value)
+            is ChatOrigin.Fork -> output.json.encodeToJsonElement(ChatOriginFork.serializer(), value.value)
+            is ChatOrigin.Tool -> output.json.encodeToJsonElement(ChatOriginTool.serializer(), value.value)
+            is ChatOrigin.Unknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
 @Serializable(with = ResponsePartSerializer::class)
 sealed interface ResponsePart
 
@@ -3745,21 +3918,21 @@ internal object TerminalContentPartSerializer : KSerializer<TerminalContentPart>
     }
 }
 
-@Serializable(with = SessionInputQuestionSerializer::class)
-sealed interface SessionInputQuestion
+@Serializable(with = ChatInputQuestionSerializer::class)
+sealed interface ChatInputQuestion
 
 @JvmInline
-value class SessionInputQuestionText(val value: SessionInputTextQuestion) : SessionInputQuestion
+value class ChatInputQuestionText(val value: ChatInputTextQuestion) : ChatInputQuestion
 @JvmInline
-value class SessionInputQuestionNumber(val value: SessionInputNumberQuestion) : SessionInputQuestion
+value class ChatInputQuestionNumber(val value: ChatInputNumberQuestion) : ChatInputQuestion
 @JvmInline
-value class SessionInputQuestionBoolean(val value: SessionInputBooleanQuestion) : SessionInputQuestion
+value class ChatInputQuestionBoolean(val value: ChatInputBooleanQuestion) : ChatInputQuestion
 @JvmInline
-value class SessionInputQuestionSingleSelect(val value: SessionInputSingleSelectQuestion) : SessionInputQuestion
+value class ChatInputQuestionSingleSelect(val value: ChatInputSingleSelectQuestion) : ChatInputQuestion
 @JvmInline
-value class SessionInputQuestionMultiSelect(val value: SessionInputMultiSelectQuestion) : SessionInputQuestion
+value class ChatInputQuestionMultiSelect(val value: ChatInputMultiSelectQuestion) : ChatInputQuestion
 /**
- * Forward-compat catch-all for unknown SessionInputQuestion discriminators.
+ * Forward-compat catch-all for unknown ChatInputQuestion discriminators.
  *
  * Older clients may receive newer wire variants they don't recognise; capturing
  * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
@@ -3767,61 +3940,61 @@ value class SessionInputQuestionMultiSelect(val value: SessionInputMultiSelectQu
  * as a no-op, but see `Reducers.kt` for the exact treatment).
  */
 @JvmInline
-value class SessionInputQuestionUnknown(val raw: JsonObject) : SessionInputQuestion
+value class ChatInputQuestionUnknown(val raw: JsonObject) : ChatInputQuestion
 
-internal object SessionInputQuestionSerializer : KSerializer<SessionInputQuestion> {
+internal object ChatInputQuestionSerializer : KSerializer<ChatInputQuestion> {
     override val descriptor: SerialDescriptor =
-        buildClassSerialDescriptor("SessionInputQuestion")
+        buildClassSerialDescriptor("ChatInputQuestion")
 
-    override fun deserialize(decoder: Decoder): SessionInputQuestion {
+    override fun deserialize(decoder: Decoder): ChatInputQuestion {
         val input = decoder as? JsonDecoder
-            ?: error("SessionInputQuestion can only be deserialized from JSON")
+            ?: error("ChatInputQuestion can only be deserialized from JSON")
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
-            ?: error("Expected JsonObject for SessionInputQuestion")
+            ?: error("Expected JsonObject for ChatInputQuestion")
         val discriminant = (obj["kind"] as? JsonPrimitive)?.content
-            ?: return SessionInputQuestionUnknown(obj)
+            ?: return ChatInputQuestionUnknown(obj)
         return when (discriminant) {
-            "text" -> SessionInputQuestionText(input.json.decodeFromJsonElement(SessionInputTextQuestion.serializer(), element))
-            "number" -> SessionInputQuestionNumber(input.json.decodeFromJsonElement(SessionInputNumberQuestion.serializer(), element))
-            "integer" -> SessionInputQuestionNumber(input.json.decodeFromJsonElement(SessionInputNumberQuestion.serializer(), element))
-            "boolean" -> SessionInputQuestionBoolean(input.json.decodeFromJsonElement(SessionInputBooleanQuestion.serializer(), element))
-            "single-select" -> SessionInputQuestionSingleSelect(input.json.decodeFromJsonElement(SessionInputSingleSelectQuestion.serializer(), element))
-            "multi-select" -> SessionInputQuestionMultiSelect(input.json.decodeFromJsonElement(SessionInputMultiSelectQuestion.serializer(), element))
-            else -> SessionInputQuestionUnknown(obj)
+            "text" -> ChatInputQuestionText(input.json.decodeFromJsonElement(ChatInputTextQuestion.serializer(), element))
+            "number" -> ChatInputQuestionNumber(input.json.decodeFromJsonElement(ChatInputNumberQuestion.serializer(), element))
+            "integer" -> ChatInputQuestionNumber(input.json.decodeFromJsonElement(ChatInputNumberQuestion.serializer(), element))
+            "boolean" -> ChatInputQuestionBoolean(input.json.decodeFromJsonElement(ChatInputBooleanQuestion.serializer(), element))
+            "single-select" -> ChatInputQuestionSingleSelect(input.json.decodeFromJsonElement(ChatInputSingleSelectQuestion.serializer(), element))
+            "multi-select" -> ChatInputQuestionMultiSelect(input.json.decodeFromJsonElement(ChatInputMultiSelectQuestion.serializer(), element))
+            else -> ChatInputQuestionUnknown(obj)
         }
     }
 
-    override fun serialize(encoder: Encoder, value: SessionInputQuestion) {
+    override fun serialize(encoder: Encoder, value: ChatInputQuestion) {
         val output = encoder as? JsonEncoder
-            ?: error("SessionInputQuestion can only be serialized to JSON")
+            ?: error("ChatInputQuestion can only be serialized to JSON")
         val element: JsonElement = when (value) {
-            is SessionInputQuestionText -> output.json.encodeToJsonElement(SessionInputTextQuestion.serializer(), value.value)
-            is SessionInputQuestionNumber -> output.json.encodeToJsonElement(SessionInputNumberQuestion.serializer(), value.value)
-            is SessionInputQuestionBoolean -> output.json.encodeToJsonElement(SessionInputBooleanQuestion.serializer(), value.value)
-            is SessionInputQuestionSingleSelect -> output.json.encodeToJsonElement(SessionInputSingleSelectQuestion.serializer(), value.value)
-            is SessionInputQuestionMultiSelect -> output.json.encodeToJsonElement(SessionInputMultiSelectQuestion.serializer(), value.value)
-            is SessionInputQuestionUnknown -> value.raw
+            is ChatInputQuestionText -> output.json.encodeToJsonElement(ChatInputTextQuestion.serializer(), value.value)
+            is ChatInputQuestionNumber -> output.json.encodeToJsonElement(ChatInputNumberQuestion.serializer(), value.value)
+            is ChatInputQuestionBoolean -> output.json.encodeToJsonElement(ChatInputBooleanQuestion.serializer(), value.value)
+            is ChatInputQuestionSingleSelect -> output.json.encodeToJsonElement(ChatInputSingleSelectQuestion.serializer(), value.value)
+            is ChatInputQuestionMultiSelect -> output.json.encodeToJsonElement(ChatInputMultiSelectQuestion.serializer(), value.value)
+            is ChatInputQuestionUnknown -> value.raw
         }
         output.encodeJsonElement(element)
     }
 }
 
-@Serializable(with = SessionInputAnswerValueSerializer::class)
-sealed interface SessionInputAnswerValue
+@Serializable(with = ChatInputAnswerValueSerializer::class)
+sealed interface ChatInputAnswerValue
 
 @JvmInline
-value class SessionInputAnswerValueText(val value: SessionInputTextAnswerValue) : SessionInputAnswerValue
+value class ChatInputAnswerValueText(val value: ChatInputTextAnswerValue) : ChatInputAnswerValue
 @JvmInline
-value class SessionInputAnswerValueNumber(val value: SessionInputNumberAnswerValue) : SessionInputAnswerValue
+value class ChatInputAnswerValueNumber(val value: ChatInputNumberAnswerValue) : ChatInputAnswerValue
 @JvmInline
-value class SessionInputAnswerValueBoolean(val value: SessionInputBooleanAnswerValue) : SessionInputAnswerValue
+value class ChatInputAnswerValueBoolean(val value: ChatInputBooleanAnswerValue) : ChatInputAnswerValue
 @JvmInline
-value class SessionInputAnswerValueSelected(val value: SessionInputSelectedAnswerValue) : SessionInputAnswerValue
+value class ChatInputAnswerValueSelected(val value: ChatInputSelectedAnswerValue) : ChatInputAnswerValue
 @JvmInline
-value class SessionInputAnswerValueSelectedMany(val value: SessionInputSelectedManyAnswerValue) : SessionInputAnswerValue
+value class ChatInputAnswerValueSelectedMany(val value: ChatInputSelectedManyAnswerValue) : ChatInputAnswerValue
 /**
- * Forward-compat catch-all for unknown SessionInputAnswerValue discriminators.
+ * Forward-compat catch-all for unknown ChatInputAnswerValue discriminators.
  *
  * Older clients may receive newer wire variants they don't recognise; capturing
  * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
@@ -3829,54 +4002,54 @@ value class SessionInputAnswerValueSelectedMany(val value: SessionInputSelectedM
  * as a no-op, but see `Reducers.kt` for the exact treatment).
  */
 @JvmInline
-value class SessionInputAnswerValueUnknown(val raw: JsonObject) : SessionInputAnswerValue
+value class ChatInputAnswerValueUnknown(val raw: JsonObject) : ChatInputAnswerValue
 
-internal object SessionInputAnswerValueSerializer : KSerializer<SessionInputAnswerValue> {
+internal object ChatInputAnswerValueSerializer : KSerializer<ChatInputAnswerValue> {
     override val descriptor: SerialDescriptor =
-        buildClassSerialDescriptor("SessionInputAnswerValue")
+        buildClassSerialDescriptor("ChatInputAnswerValue")
 
-    override fun deserialize(decoder: Decoder): SessionInputAnswerValue {
+    override fun deserialize(decoder: Decoder): ChatInputAnswerValue {
         val input = decoder as? JsonDecoder
-            ?: error("SessionInputAnswerValue can only be deserialized from JSON")
+            ?: error("ChatInputAnswerValue can only be deserialized from JSON")
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
-            ?: error("Expected JsonObject for SessionInputAnswerValue")
+            ?: error("Expected JsonObject for ChatInputAnswerValue")
         val discriminant = (obj["kind"] as? JsonPrimitive)?.content
-            ?: return SessionInputAnswerValueUnknown(obj)
+            ?: return ChatInputAnswerValueUnknown(obj)
         return when (discriminant) {
-            "text" -> SessionInputAnswerValueText(input.json.decodeFromJsonElement(SessionInputTextAnswerValue.serializer(), element))
-            "number" -> SessionInputAnswerValueNumber(input.json.decodeFromJsonElement(SessionInputNumberAnswerValue.serializer(), element))
-            "boolean" -> SessionInputAnswerValueBoolean(input.json.decodeFromJsonElement(SessionInputBooleanAnswerValue.serializer(), element))
-            "selected" -> SessionInputAnswerValueSelected(input.json.decodeFromJsonElement(SessionInputSelectedAnswerValue.serializer(), element))
-            "selected-many" -> SessionInputAnswerValueSelectedMany(input.json.decodeFromJsonElement(SessionInputSelectedManyAnswerValue.serializer(), element))
-            else -> SessionInputAnswerValueUnknown(obj)
+            "text" -> ChatInputAnswerValueText(input.json.decodeFromJsonElement(ChatInputTextAnswerValue.serializer(), element))
+            "number" -> ChatInputAnswerValueNumber(input.json.decodeFromJsonElement(ChatInputNumberAnswerValue.serializer(), element))
+            "boolean" -> ChatInputAnswerValueBoolean(input.json.decodeFromJsonElement(ChatInputBooleanAnswerValue.serializer(), element))
+            "selected" -> ChatInputAnswerValueSelected(input.json.decodeFromJsonElement(ChatInputSelectedAnswerValue.serializer(), element))
+            "selected-many" -> ChatInputAnswerValueSelectedMany(input.json.decodeFromJsonElement(ChatInputSelectedManyAnswerValue.serializer(), element))
+            else -> ChatInputAnswerValueUnknown(obj)
         }
     }
 
-    override fun serialize(encoder: Encoder, value: SessionInputAnswerValue) {
+    override fun serialize(encoder: Encoder, value: ChatInputAnswerValue) {
         val output = encoder as? JsonEncoder
-            ?: error("SessionInputAnswerValue can only be serialized to JSON")
+            ?: error("ChatInputAnswerValue can only be serialized to JSON")
         val element: JsonElement = when (value) {
-            is SessionInputAnswerValueText -> output.json.encodeToJsonElement(SessionInputTextAnswerValue.serializer(), value.value)
-            is SessionInputAnswerValueNumber -> output.json.encodeToJsonElement(SessionInputNumberAnswerValue.serializer(), value.value)
-            is SessionInputAnswerValueBoolean -> output.json.encodeToJsonElement(SessionInputBooleanAnswerValue.serializer(), value.value)
-            is SessionInputAnswerValueSelected -> output.json.encodeToJsonElement(SessionInputSelectedAnswerValue.serializer(), value.value)
-            is SessionInputAnswerValueSelectedMany -> output.json.encodeToJsonElement(SessionInputSelectedManyAnswerValue.serializer(), value.value)
-            is SessionInputAnswerValueUnknown -> value.raw
+            is ChatInputAnswerValueText -> output.json.encodeToJsonElement(ChatInputTextAnswerValue.serializer(), value.value)
+            is ChatInputAnswerValueNumber -> output.json.encodeToJsonElement(ChatInputNumberAnswerValue.serializer(), value.value)
+            is ChatInputAnswerValueBoolean -> output.json.encodeToJsonElement(ChatInputBooleanAnswerValue.serializer(), value.value)
+            is ChatInputAnswerValueSelected -> output.json.encodeToJsonElement(ChatInputSelectedAnswerValue.serializer(), value.value)
+            is ChatInputAnswerValueSelectedMany -> output.json.encodeToJsonElement(ChatInputSelectedManyAnswerValue.serializer(), value.value)
+            is ChatInputAnswerValueUnknown -> value.raw
         }
         output.encodeJsonElement(element)
     }
 }
 
-@Serializable(with = SessionInputAnswerSerializer::class)
-sealed interface SessionInputAnswer
+@Serializable(with = ChatInputAnswerSerializer::class)
+sealed interface ChatInputAnswer
 
 @JvmInline
-value class SessionInputAnswerDraft(val value: SessionInputAnswered) : SessionInputAnswer
+value class ChatInputAnswerDraft(val value: ChatInputAnswered) : ChatInputAnswer
 @JvmInline
-value class SessionInputAnswerSkipped(val value: SessionInputSkipped) : SessionInputAnswer
+value class ChatInputAnswerSkipped(val value: ChatInputSkipped) : ChatInputAnswer
 /**
- * Forward-compat catch-all for unknown SessionInputAnswer discriminators.
+ * Forward-compat catch-all for unknown ChatInputAnswer discriminators.
  *
  * Older clients may receive newer wire variants they don't recognise; capturing
  * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
@@ -3884,35 +4057,35 @@ value class SessionInputAnswerSkipped(val value: SessionInputSkipped) : SessionI
  * as a no-op, but see `Reducers.kt` for the exact treatment).
  */
 @JvmInline
-value class SessionInputAnswerUnknown(val raw: JsonObject) : SessionInputAnswer
+value class ChatInputAnswerUnknown(val raw: JsonObject) : ChatInputAnswer
 
-internal object SessionInputAnswerSerializer : KSerializer<SessionInputAnswer> {
+internal object ChatInputAnswerSerializer : KSerializer<ChatInputAnswer> {
     override val descriptor: SerialDescriptor =
-        buildClassSerialDescriptor("SessionInputAnswer")
+        buildClassSerialDescriptor("ChatInputAnswer")
 
-    override fun deserialize(decoder: Decoder): SessionInputAnswer {
+    override fun deserialize(decoder: Decoder): ChatInputAnswer {
         val input = decoder as? JsonDecoder
-            ?: error("SessionInputAnswer can only be deserialized from JSON")
+            ?: error("ChatInputAnswer can only be deserialized from JSON")
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
-            ?: error("Expected JsonObject for SessionInputAnswer")
+            ?: error("Expected JsonObject for ChatInputAnswer")
         val discriminant = (obj["state"] as? JsonPrimitive)?.content
-            ?: return SessionInputAnswerUnknown(obj)
+            ?: return ChatInputAnswerUnknown(obj)
         return when (discriminant) {
-            "draft" -> SessionInputAnswerDraft(input.json.decodeFromJsonElement(SessionInputAnswered.serializer(), element))
-            "submitted" -> SessionInputAnswerDraft(input.json.decodeFromJsonElement(SessionInputAnswered.serializer(), element))
-            "skipped" -> SessionInputAnswerSkipped(input.json.decodeFromJsonElement(SessionInputSkipped.serializer(), element))
-            else -> SessionInputAnswerUnknown(obj)
+            "draft" -> ChatInputAnswerDraft(input.json.decodeFromJsonElement(ChatInputAnswered.serializer(), element))
+            "submitted" -> ChatInputAnswerDraft(input.json.decodeFromJsonElement(ChatInputAnswered.serializer(), element))
+            "skipped" -> ChatInputAnswerSkipped(input.json.decodeFromJsonElement(ChatInputSkipped.serializer(), element))
+            else -> ChatInputAnswerUnknown(obj)
         }
     }
 
-    override fun serialize(encoder: Encoder, value: SessionInputAnswer) {
+    override fun serialize(encoder: Encoder, value: ChatInputAnswer) {
         val output = encoder as? JsonEncoder
-            ?: error("SessionInputAnswer can only be serialized to JSON")
+            ?: error("ChatInputAnswer can only be serialized to JSON")
         val element: JsonElement = when (value) {
-            is SessionInputAnswerDraft -> output.json.encodeToJsonElement(SessionInputAnswered.serializer(), value.value)
-            is SessionInputAnswerSkipped -> output.json.encodeToJsonElement(SessionInputSkipped.serializer(), value.value)
-            is SessionInputAnswerUnknown -> value.raw
+            is ChatInputAnswerDraft -> output.json.encodeToJsonElement(ChatInputAnswered.serializer(), value.value)
+            is ChatInputAnswerSkipped -> output.json.encodeToJsonElement(ChatInputSkipped.serializer(), value.value)
+            is ChatInputAnswerUnknown -> value.raw
         }
         output.encodeJsonElement(element)
     }
@@ -4318,13 +4491,14 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 }
 
 /**
- * The state payload of a snapshot — root, session, terminal, changeset,
+ * The state payload of a snapshot — root, session, chat, terminal, changeset,
  * resource-watch, or annotations state.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
     @JvmInline value class Root(val value: RootState) : SnapshotState
     @JvmInline value class Session(val value: SessionState) : SnapshotState
+    @JvmInline value class Chat(val value: ChatState) : SnapshotState
     @JvmInline value class Terminal(val value: TerminalState) : SnapshotState
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
@@ -4366,6 +4540,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val element: JsonElement = when (value) {
             is SnapshotState.Root -> output.json.encodeToJsonElement(RootState.serializer(), value.value)
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
+            is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)
             is SnapshotState.Terminal -> output.json.encodeToJsonElement(TerminalState.serializer(), value.value)
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)

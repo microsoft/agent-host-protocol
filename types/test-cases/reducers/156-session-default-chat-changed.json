@@ -1,0 +1,36 @@
+{
+  "description": "session/defaultChatChanged updates input-routing hint",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "ahp-session:/s1",
+      "provider": "copilot",
+      "title": "Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "ready",
+    "chats": [],
+    "defaultChat": "ahp-chat:/old"
+  },
+  "actions": [
+    {
+      "type": "session/defaultChatChanged",
+      "defaultChat": "ahp-chat:/new"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "ahp-session:/s1",
+      "provider": "copilot",
+      "title": "Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "ready",
+    "chats": [],
+    "defaultChat": "ahp-chat:/new"
+  }
+}

@@ -225,6 +225,10 @@ final class FixtureDrivenReducerTests: XCTestCase {
             try compareFixture(file: file, fixture: fixture, stateType: ResourceWatchState.self) { state in
                 actions.reduce(state) { resourceWatchReducer(state: $0, action: $1) }
             }
+        case "chat":
+            try compareFixture(file: file, fixture: fixture, stateType: ChatState.self) { state in
+                actions.reduce(state) { chatReducer(state: $0, action: $1) }
+            }
         default:
             throw FixtureError.unsupportedReducer(fixture.reducer)
         }

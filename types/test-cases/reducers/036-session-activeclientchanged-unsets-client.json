@@ -11,11 +11,11 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": [],
     "activeClient": {
       "clientId": "vscode-1",
       "tools": []
-    }
+    },
+    "chats": []
   },
   "actions": [
     {
@@ -33,7 +33,7 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": [],
-    "activeClient": null
+    "activeClient": null,
+    "chats": []
   }
 }

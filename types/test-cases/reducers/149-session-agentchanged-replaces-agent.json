@@ -14,7 +14,7 @@
       }
     },
     "lifecycle": "creating",
-    "turns": []
+    "chats": []
   },
   "actions": [
     {
@@ -37,6 +37,6 @@
       }
     },
     "lifecycle": "creating",
-    "turns": []
+    "chats": []
   }
 }

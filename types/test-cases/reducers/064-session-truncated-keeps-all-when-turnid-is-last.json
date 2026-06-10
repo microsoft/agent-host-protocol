@@ -1,59 +1,7 @@
 {
   "description": "session/truncated keeps all when turnId is last",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "ready",
-    "turns": [
-      {
-        "id": "t1",
-        "message": {
-          "text": "First",
-          "origin": {
-            "kind": "user"
-          }
-        },
-        "responseParts": [],
-        "usage": null,
-        "state": "complete"
-      },
-      {
-        "id": "t2",
-        "message": {
-          "text": "Second",
-          "origin": {
-            "kind": "user"
-          }
-        },
-        "responseParts": [],
-        "usage": null,
-        "state": "complete"
-      }
-    ]
-  },
-  "actions": [
-    {
-      "type": "session/truncated",
-      "turnId": "t2"
-    }
-  ],
-  "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 9999
-    },
-    "lifecycle": "ready",
     "turns": [
       {
         "id": "t1",
@@ -80,6 +28,48 @@
         "state": "complete"
       }
     ],
-    "activeTurn": null
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/truncated",
+      "turnId": "t2"
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t2",
+        "message": {
+          "text": "Second",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "activeTurn": null,
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:09.999Z"
   }
 }

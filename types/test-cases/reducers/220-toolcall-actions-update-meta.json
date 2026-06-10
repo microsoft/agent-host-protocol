@@ -1,16 +1,7 @@
 {
   "description": "tool-call-scoped actions update tool call _meta",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 8,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -22,11 +13,15 @@
       },
       "responseParts": [],
       "usage": null
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   },
   "actions": [
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-delta",
       "toolName": "stream",
@@ -36,7 +31,7 @@
       }
     },
     {
-      "type": "session/toolCallDelta",
+      "type": "chat/toolCallDelta",
       "turnId": "turn-1",
       "toolCallId": "tc-delta",
       "content": "abc",
@@ -46,14 +41,14 @@
       }
     },
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-ready-running",
       "toolName": "run",
       "displayName": "Run Tool"
     },
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-ready-running",
       "invocationMessage": "Run now",
@@ -64,14 +59,14 @@
       }
     },
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-ready-pending",
       "toolName": "ask",
       "displayName": "Ask Tool"
     },
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-ready-pending",
       "invocationMessage": "Needs approval",
@@ -80,20 +75,20 @@
       }
     },
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-confirm-approved",
       "toolName": "approve",
       "displayName": "Approve Tool"
     },
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-confirm-approved",
       "invocationMessage": "Approve this"
     },
     {
-      "type": "session/toolCallConfirmed",
+      "type": "chat/toolCallConfirmed",
       "turnId": "turn-1",
       "toolCallId": "tc-confirm-approved",
       "approved": true,
@@ -103,20 +98,20 @@
       }
     },
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-confirm-denied",
       "toolName": "deny",
       "displayName": "Deny Tool"
     },
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-confirm-denied",
       "invocationMessage": "Deny this"
     },
     {
-      "type": "session/toolCallConfirmed",
+      "type": "chat/toolCallConfirmed",
       "turnId": "turn-1",
       "toolCallId": "tc-confirm-denied",
       "approved": false,
@@ -126,21 +121,21 @@
       }
     },
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-complete",
       "toolName": "complete",
       "displayName": "Complete Tool"
     },
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-complete",
       "invocationMessage": "Complete this",
       "confirmed": "not-needed"
     },
     {
-      "type": "session/toolCallComplete",
+      "type": "chat/toolCallComplete",
       "turnId": "turn-1",
       "toolCallId": "tc-complete",
       "result": {
@@ -152,21 +147,21 @@
       }
     },
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-result-confirmed",
       "toolName": "result",
       "displayName": "Result Tool"
     },
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-result-confirmed",
       "invocationMessage": "Result this",
       "confirmed": "not-needed"
     },
     {
-      "type": "session/toolCallComplete",
+      "type": "chat/toolCallComplete",
       "turnId": "turn-1",
       "toolCallId": "tc-result-confirmed",
       "result": {
@@ -179,7 +174,7 @@
       }
     },
     {
-      "type": "session/toolCallResultConfirmed",
+      "type": "chat/toolCallResultConfirmed",
       "turnId": "turn-1",
       "toolCallId": "tc-result-confirmed",
       "approved": true,
@@ -188,21 +183,21 @@
       }
     },
     {
-      "type": "session/toolCallStart",
+      "type": "chat/toolCallStart",
       "turnId": "turn-1",
       "toolCallId": "tc-content",
       "toolName": "content",
       "displayName": "Content Tool"
     },
     {
-      "type": "session/toolCallReady",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-content",
       "invocationMessage": "Content this",
       "confirmed": "not-needed"
     },
     {
-      "type": "session/toolCallContentChanged",
+      "type": "chat/toolCallContentChanged",
       "turnId": "turn-1",
       "toolCallId": "tc-content",
       "content": [
@@ -218,15 +213,6 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 24,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -240,7 +226,6 @@
         {
           "kind": "toolCall",
           "toolCall": {
-            "status": "streaming",
             "toolCallId": "tc-delta",
             "toolName": "stream",
             "displayName": "Stream Tool",
@@ -248,6 +233,7 @@
             "_meta": {
               "phase": "delta"
             },
+            "status": "streaming",
             "partialInput": "abc",
             "invocationMessage": "Streaming input"
           }
@@ -384,6 +370,10 @@
         }
       ],
       "usage": null
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   }
 }

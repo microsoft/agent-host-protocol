@@ -1,16 +1,7 @@
 {
   "description": "append queued message when ID is new",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "creating",
     "turns": [],
     "queuedMessages": [
       {
@@ -22,11 +13,15 @@
           }
         }
       }
-    ]
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   },
   "actions": [
     {
-      "type": "session/pendingMessageSet",
+      "type": "chat/pendingMessageSet",
       "kind": "queued",
       "id": "pm-2",
       "message": {
@@ -38,15 +33,6 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "creating",
     "turns": [],
     "queuedMessages": [
       {
@@ -67,6 +53,10 @@
           }
         }
       }
-    ]
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   }
 }

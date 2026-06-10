@@ -22,12 +22,13 @@ type HostedResourceKey struct {
 // The mirror has no opinion about how snapshots are kept in sync with
 // the server — that's the consumer's job, typically by feeding action
 // envelopes from a [HostSubscriptionEvent] stream through the matching
-// [ApplyActionToRoot] / [ApplyActionToSession] / [ApplyActionToTerminal]
-// reducer and re-storing the result.
+// [ApplyActionToRoot] / [ApplyActionToSession] / [ApplyActionToChat] /
+// [ApplyActionToTerminal] reducer and re-storing the result.
 type MultiHostStateMirror struct {
 	mu      sync.RWMutex
 	roots   map[string]ahptypes.RootState
 	session map[HostedResourceKey]ahptypes.SessionState
+	chat    map[HostedResourceKey]ahptypes.ChatState
 	term    map[HostedResourceKey]ahptypes.TerminalState
 	changes map[HostedResourceKey]ahptypes.ChangesetState
 }
@@ -37,6 +38,7 @@ func NewMultiHostStateMirror() *MultiHostStateMirror {
 	return &MultiHostStateMirror{
 		roots:   make(map[string]ahptypes.RootState),
 		session: make(map[HostedResourceKey]ahptypes.SessionState),
+		chat:    make(map[HostedResourceKey]ahptypes.ChatState),
 		term:    make(map[HostedResourceKey]ahptypes.TerminalState),
 		changes: make(map[HostedResourceKey]ahptypes.ChangesetState),
 	}
@@ -71,6 +73,22 @@ func (m *MultiHostStateMirror) Session(hostID string, uri ahptypes.URI) (ahptype
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	v, ok := m.session[HostedResourceKey{hostID, uri}]
+	return v, ok
+}
+
+// PutChat stores a chat snapshot under (hostID, uri).
+func (m *MultiHostStateMirror) PutChat(hostID string, uri ahptypes.URI, c ahptypes.ChatState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.chat[HostedResourceKey{hostID, uri}] = c
+}
+
+// Chat returns the chat snapshot at (hostID, uri), or
+// (zero, false) if none is recorded.
+func (m *MultiHostStateMirror) Chat(hostID string, uri ahptypes.URI) (ahptypes.ChatState, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.chat[HostedResourceKey{hostID, uri}]
 	return v, ok
 }
 
@@ -117,6 +135,11 @@ func (m *MultiHostStateMirror) DropHost(hostID string) {
 			delete(m.session, k)
 		}
 	}
+	for k := range m.chat {
+		if k.HostID == hostID {
+			delete(m.chat, k)
+		}
+	}
 	for k := range m.term {
 		if k.HostID == hostID {
 			delete(m.term, k)
@@ -136,6 +159,7 @@ func (m *MultiHostStateMirror) DropResource(hostID string, uri ahptypes.URI) {
 	defer m.mu.Unlock()
 	k := HostedResourceKey{hostID, uri}
 	delete(m.session, k)
+	delete(m.chat, k)
 	delete(m.term, k)
 	delete(m.changes, k)
 }

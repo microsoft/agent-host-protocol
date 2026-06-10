@@ -1,16 +1,7 @@
 {
   "description": "session input upsert preserves or replaces answers and answerChanged clears last draft",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 24,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -37,18 +28,22 @@
           }
         }
       }
-    ]
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   },
   "actions": [
     {
-      "type": "session/inputRequested",
+      "type": "chat/inputRequested",
       "request": {
         "id": "input-1",
         "message": "New message"
       }
     },
     {
-      "type": "session/inputRequested",
+      "type": "chat/inputRequested",
       "request": {
         "id": "input-1",
         "message": "New message",
@@ -60,21 +55,12 @@
       }
     },
     {
-      "type": "session/inputAnswerChanged",
+      "type": "chat/inputAnswerChanged",
       "requestId": "input-1",
       "questionId": "q2"
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 24,
-      "createdAt": 1000,
-      "modifiedAt": 9999
-    },
-    "lifecycle": "ready",
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
@@ -93,6 +79,10 @@
         "message": "New message",
         "answers": null
       }
-    ]
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:09.999Z"
   }
 }

@@ -13,6 +13,7 @@ import AgentHostProtocol
 public actor AHPStateMirror {
     public private(set) var rootState: RootState = RootState(agents: [])
     public private(set) var sessions: [String: SessionState] = [:]
+    public private(set) var chats: [String: ChatState] = [:]
     public private(set) var terminals: [String: TerminalState] = [:]
     public private(set) var changesets: [String: ChangesetState] = [:]
     public private(set) var annotations: [String: AnnotationsState] = [:]
@@ -33,16 +34,19 @@ public actor AHPStateMirror {
             rootState = rootReducer(state: rootState, action: action)
             return
         }
-        if var session = sessions[channel] {
+        if channel.hasPrefix("ahp-session:"), var session = sessions[channel] {
             session = sessionReducer(state: session, action: action)
             sessions[channel] = session
             return
         }
-        if terminals[channel] != nil {
-            // Terminals don't have a hand-written reducer in the Swift
-            // package today; just leave the slot as the latest snapshot.
-            // (Native reducer + state shape will be wired up when
-            // terminal lifecycle reducers ship.)
+        if channel.hasPrefix("ahp-chat:"), var chat = chats[channel] {
+            chat = chatReducer(state: chat, action: action)
+            chats[channel] = chat
+            return
+        }
+        if channel.hasPrefix("ahp-terminal:"), var terminal = terminals[channel] {
+            terminal = terminalReducer(state: terminal, action: action)
+            terminals[channel] = terminal
             return
         }
         if changesets[channel] != nil {
@@ -72,6 +76,8 @@ public actor AHPStateMirror {
             rootState = state
         case .session(let state):
             sessions[snapshot.resource] = state
+        case .chat(let state):
+            chats[snapshot.resource] = state
         case .terminal(let state):
             terminals[snapshot.resource] = state
         case .changeset(let state):
@@ -87,6 +93,7 @@ public actor AHPStateMirror {
     public func reset() {
         rootState = RootState(agents: [])
         sessions.removeAll()
+        chats.removeAll()
         terminals.removeAll()
         changesets.removeAll()
         annotations.removeAll()

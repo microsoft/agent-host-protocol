@@ -1,0 +1,60 @@
+/**
+ * Chat Channel Commands — `createChat` and `disposeChat`.
+ *
+ * @module channels-chat/commands
+ */
+
+import type { URI } from '../common/state.js';
+import type { BaseParams } from '../common/commands.js';
+import type { ModelSelection } from '../channels-root/state.js';
+import type { AgentSelection } from '../channels-session/state.js';
+import type { Message } from './state.js';
+
+// ─── createChat ──────────────────────────────────────────────────────────────
+
+/**
+ * Identifies a source chat and turn to fork from.
+ */
+export interface ChatForkSource {
+  /** URI of the existing chat to fork from */
+  chat: URI;
+  /** Turn ID in the source chat; content up to and including this turn's response is copied */
+  turnId: string;
+}
+
+/**
+ * Creates a new chat within a session.
+ *
+ * @category Commands
+ * @method createChat
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ */
+export interface CreateChatParams extends BaseParams {
+  /** Session URI containing the new chat. */
+  channel: URI;
+  /** Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`). */
+  chat: URI;
+  /** Optional initial message for the new chat. */
+  initialMessage?: Message;
+  /** Optional per-chat model override. */
+  model?: ModelSelection;
+  /** Optional per-chat agent override. */
+  agent?: AgentSelection;
+  /** Optional source chat and turn to fork from. */
+  source?: ChatForkSource;
+}
+
+// ─── disposeChat ─────────────────────────────────────────────────────────────
+
+/**
+ * Disposes a chat and cleans up server-side resources.
+ *
+ * @category Commands
+ * @method disposeChat
+ * @direction Client → Server
+ * @messageType Request
+ * @version 1
+ */
+export interface DisposeChatParams extends BaseParams {}

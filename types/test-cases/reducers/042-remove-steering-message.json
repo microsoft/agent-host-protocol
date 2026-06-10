@@ -1,16 +1,7 @@
 {
   "description": "remove steering message",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "creating",
     "turns": [],
     "steeringMessage": {
       "id": "sm-1",
@@ -20,26 +11,25 @@
           "kind": "user"
         }
       }
-    }
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   },
   "actions": [
     {
-      "type": "session/pendingMessageRemoved",
+      "type": "chat/pendingMessageRemoved",
       "kind": "steering",
       "id": "sm-1"
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "creating",
     "turns": [],
-    "steeringMessage": null
+    "steeringMessage": null,
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   }
 }

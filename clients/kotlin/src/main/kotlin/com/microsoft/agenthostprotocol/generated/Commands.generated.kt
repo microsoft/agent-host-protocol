@@ -331,6 +331,54 @@ data class DisposeSessionParams(
 )
 
 @Serializable
+data class ChatForkSource(
+    /**
+     * URI of the existing chat to fork from
+     */
+    val chat: String,
+    /**
+     * Turn ID in the source chat; content up to and including this turn's response is copied
+     */
+    val turnId: String
+)
+
+@Serializable
+data class CreateChatParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`).
+     */
+    val chat: String,
+    /**
+     * Optional initial message for the new chat.
+     */
+    val initialMessage: Message? = null,
+    /**
+     * Optional per-chat model override.
+     */
+    val model: ModelSelection? = null,
+    /**
+     * Optional per-chat agent override.
+     */
+    val agent: AgentSelection? = null,
+    /**
+     * Optional source chat and turn to fork from.
+     */
+    val source: ChatForkSource? = null
+)
+
+@Serializable
+data class DisposeChatParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String
+)
+
+@Serializable
 data class ListSessionsParams(
     /**
      * Channel URI this command targets.

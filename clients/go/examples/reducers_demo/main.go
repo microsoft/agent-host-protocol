@@ -1,5 +1,5 @@
-// Command reducers_demo applies a handful of session actions to an
-// empty SessionState to illustrate the public reducer API.
+// Command reducers_demo applies a handful of chat actions to an
+// empty ChatState to illustrate the public reducer API.
 package main
 
 import (
@@ -11,25 +11,21 @@ import (
 )
 
 func main() {
-	state := ahptypes.SessionState{
-		Summary: ahptypes.SessionSummary{
-			Resource:  "ahp-session:/demo",
-			Provider:  "demo",
-			Title:     "Demo",
-			Status:    ahptypes.SessionStatusIdle,
-			CreatedAt: 1,
-		},
-		Lifecycle: ahptypes.SessionLifecycleReady,
+	state := ahptypes.ChatState{
+		Resource:   "ahp-chat:/demo",
+		Title:      "Demo",
+		Status:     ahptypes.SessionStatusIdle,
+		ModifiedAt: "1970-01-01T00:00:00.001Z",
 	}
 
 	actions := []ahptypes.StateAction{
-		{Value: &ahptypes.SessionTurnStartedAction{
-			Type:    ahptypes.ActionTypeSessionTurnStarted,
+		{Value: &ahptypes.ChatTurnStartedAction{
+			Type:    ahptypes.ActionTypeChatTurnStarted,
 			TurnId:  "t1",
 			Message: ahptypes.Message{Text: "Hello!"},
 		}},
-		{Value: &ahptypes.SessionResponsePartAction{
-			Type:   ahptypes.ActionTypeSessionResponsePart,
+		{Value: &ahptypes.ChatResponsePartAction{
+			Type:   ahptypes.ActionTypeChatResponsePart,
 			TurnId: "t1",
 			Part: ahptypes.ResponsePart{Value: &ahptypes.MarkdownResponsePart{
 				Kind:    ahptypes.ResponsePartKindMarkdown,
@@ -37,20 +33,20 @@ func main() {
 				Content: "Hi ",
 			}},
 		}},
-		{Value: &ahptypes.SessionDeltaAction{
-			Type:    ahptypes.ActionTypeSessionDelta,
+		{Value: &ahptypes.ChatDeltaAction{
+			Type:    ahptypes.ActionTypeChatDelta,
 			TurnId:  "t1",
 			PartId:  "p1",
 			Content: "there!",
 		}},
-		{Value: &ahptypes.SessionTurnCompleteAction{
-			Type:   ahptypes.ActionTypeSessionTurnComplete,
+		{Value: &ahptypes.ChatTurnCompleteAction{
+			Type:   ahptypes.ActionTypeChatTurnComplete,
 			TurnId: "t1",
 		}},
 	}
 
 	for _, a := range actions {
-		outcome := ahp.ApplyActionToSession(&state, a)
+		outcome := ahp.ApplyActionToChat(&state, a)
 		fmt.Printf("applied %T → %v\n", a.Value, outcomeName(outcome))
 	}
 

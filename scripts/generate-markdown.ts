@@ -51,6 +51,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'common': 'common',
   'channels-root': 'root',
   'channels-session': 'session',
+  'channels-chat': 'chat',
   'channels-terminal': 'terminal',
   'channels-changeset': 'changeset',
   'channels-annotations': 'annotations',
@@ -946,6 +947,35 @@ function generateSessionChannelPage(project: Project): string {
   return lines.join('\n');
 }
 
+function generateChatChannelPage(project: Project): string {
+  currentPage = 'chat';
+  const stateSf = findChannelSourceFile(project, 'channels-chat', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-chat', 'actions.ts');
+  const commandsSf = findChannelSourceFile(project, 'channels-chat', 'commands.ts');
+
+  const lines: string[] = [GENERATED_HEADER];
+  lines.push('# Chat Channel\n');
+  lines.push('Reference for the `ahp-chat:/<uuid>` channel — per-chat state, the turn lifecycle, tool-call state machine, attachments, pending messages, and input requests. A chat belongs to a session (see [Session Channel](/reference/session)); a session may contain multiple chats. See [Chat Channel specification](/specification/chat-channel) for the wire-level overview.\n');
+  lines.push(schemaLink('state.schema.json'));
+
+  if (stateSf) {
+    lines.push('## State Types\n');
+    lines.push(emitStateTypesSection([stateSf]));
+  }
+  if (actionsSf) {
+    lines.push('## Actions\n');
+    lines.push('Mutate `ChatState`. Scoped to a chat URI via the enclosing `ActionEnvelope.channel`.\n');
+    lines.push(schemaLink('actions.schema.json'));
+    lines.push(emitActionsSection([actionsSf]));
+  }
+  if (commandsSf) {
+    lines.push('## Commands\n');
+    lines.push(schemaLink('commands.schema.json'));
+    lines.push(emitCommandsSection(project, [commandsSf]));
+  }
+  return lines.join('\n');
+}
+
 function generateTerminalChannelPage(project: Project): string {
   currentPage = 'terminal';
   const stateSf = findChannelSourceFile(project, 'channels-terminal', 'state.ts');
@@ -1271,6 +1301,7 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'common.md', generator: generateCommonPage },
     { filename: 'root.md', generator: generateRootChannelPage },
     { filename: 'session.md', generator: generateSessionChannelPage },
+    { filename: 'chat.md', generator: generateChatChannelPage },
     { filename: 'terminal.md', generator: generateTerminalChannelPage },
     { filename: 'changeset.md', generator: generateChangesetChannelPage },
     { filename: 'annotations.md', generator: generateAnnotationsChannelPage },

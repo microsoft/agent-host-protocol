@@ -69,6 +69,28 @@ type JSONObject = map[string]json.RawMessage
 // TypeScript `unknown` type).
 type AnyValue = json.RawMessage
 
+// PartialChatSummary is the partial equivalent of ChatSummary — every field is optional for delta updates.
+type PartialChatSummary struct {
+	// Chat URI. Ignored by session/chatUpdated reducers; chat identity never changes.
+	Resource *URI `json:"resource,omitempty"`
+	// Chat title
+	Title *string `json:"title,omitempty"`
+	// Current chat status (reuses SessionStatus shape)
+	Status *SessionStatus `json:"status,omitempty"`
+	// Human-readable description of what the chat is currently doing
+	Activity *string `json:"activity,omitempty"`
+	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+	ModifiedAt *string `json:"modifiedAt,omitempty"`
+	// Optional per-chat model override (defaults to the session's model)
+	Model *ModelSelection `json:"model,omitempty"`
+	// Optional per-chat agent override (defaults to the session's agent)
+	Agent *AgentSelection `json:"agent,omitempty"`
+	// How this chat came into existence
+	Origin *ChatOrigin `json:"origin,omitempty"`
+	// Optional per-chat working directory.
+	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+}
+
 // ─── StringOrMarkdown ────────────────────────────────────────────────────
 
 // StringOrMarkdown is a wire value that may be either a plain JSON

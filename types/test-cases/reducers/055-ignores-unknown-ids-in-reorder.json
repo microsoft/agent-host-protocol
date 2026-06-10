@@ -1,16 +1,7 @@
 {
   "description": "ignores unknown IDs in reorder",
-  "reducer": "session",
+  "reducer": "chat",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "creating",
     "turns": [],
     "queuedMessages": [
       {
@@ -31,11 +22,15 @@
           }
         }
       }
-    ]
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   },
   "actions": [
     {
-      "type": "session/queuedMessagesReordered",
+      "type": "chat/queuedMessagesReordered",
       "order": [
         "unknown",
         "b",
@@ -45,15 +40,6 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
-    "lifecycle": "creating",
     "turns": [],
     "queuedMessages": [
       {
@@ -74,6 +60,10 @@
           }
         }
       }
-    ]
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   }
 }

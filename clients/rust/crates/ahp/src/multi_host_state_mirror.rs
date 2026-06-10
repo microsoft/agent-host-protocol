@@ -37,12 +37,14 @@ use std::collections::HashMap;
 use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AnnotationsState, ChangesetState, ResourceWatchState, RootState, SessionState, SnapshotState,
-    TerminalState,
+    AnnotationsState, ChangesetState, ChatState, ResourceWatchState, RootState, SessionState,
+    SnapshotState, TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
-use crate::reducers::{apply_action_to_root, apply_action_to_session, apply_action_to_terminal};
+use crate::reducers::{
+    apply_action_to_chat, apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
+};
 use crate::SubscriptionEvent;
 
 /// Compound key tagging a channel URI with the host that produced it.
@@ -85,6 +87,7 @@ impl HostedResourceKey {
 pub struct MultiHostStateMirror {
     root_states: HashMap<HostId, RootState>,
     sessions: HashMap<HostedResourceKey, SessionState>,
+    chats: HashMap<HostedResourceKey, ChatState>,
     terminals: HashMap<HostedResourceKey, TerminalState>,
     changesets: HashMap<HostedResourceKey, ChangesetState>,
     annotations: HashMap<HostedResourceKey, AnnotationsState>,
@@ -105,6 +108,11 @@ impl MultiHostStateMirror {
     /// Borrow the session states map keyed by `(host_id, uri)`.
     pub fn sessions(&self) -> &HashMap<HostedResourceKey, SessionState> {
         &self.sessions
+    }
+
+    /// Borrow the chat states map keyed by `(host_id, uri)`.
+    pub fn chats(&self) -> &HashMap<HostedResourceKey, ChatState> {
+        &self.chats
     }
 
     /// Borrow the terminal states map keyed by `(host_id, uri)`.
@@ -162,6 +170,10 @@ impl MultiHostStateMirror {
             apply_action_to_session(session, &envelope.action);
             return;
         }
+        if let Some(chat) = self.chats.get_mut(&key) {
+            apply_action_to_chat(chat, &envelope.action);
+            return;
+        }
         if let Some(terminal) = self.terminals.get_mut(&key) {
             apply_action_to_terminal(terminal, &envelope.action);
         }
@@ -184,6 +196,9 @@ impl MultiHostStateMirror {
             SnapshotState::Session(state) => {
                 self.sessions.insert(key, state.as_ref().clone());
             }
+            SnapshotState::Chat(state) => {
+                self.chats.insert(key, state.as_ref().clone());
+            }
             SnapshotState::Terminal(state) => {
                 self.terminals.insert(key, state.as_ref().clone());
             }
@@ -204,6 +219,7 @@ impl MultiHostStateMirror {
     pub fn reset_host(&mut self, host: &HostId) {
         self.root_states.remove(host);
         self.sessions.retain(|key, _| &key.host_id != host);
+        self.chats.retain(|key, _| &key.host_id != host);
         self.terminals.retain(|key, _| &key.host_id != host);
         self.changesets.retain(|key, _| &key.host_id != host);
         self.annotations.retain(|key, _| &key.host_id != host);
@@ -214,6 +230,7 @@ impl MultiHostStateMirror {
     pub fn reset(&mut self) {
         self.root_states.clear();
         self.sessions.clear();
+        self.chats.clear();
         self.terminals.clear();
         self.changesets.clear();
         self.annotations.clear();

@@ -13,10 +13,10 @@ import com.microsoft.agenthostprotocol.generated.ResponsePartKind
 import com.microsoft.agenthostprotocol.generated.ResponsePartMarkdown
 import com.microsoft.agenthostprotocol.generated.ResponsePartReasoning
 import com.microsoft.agenthostprotocol.generated.ResponsePartUnknown
-import com.microsoft.agenthostprotocol.generated.SessionInputNumberQuestion
-import com.microsoft.agenthostprotocol.generated.SessionInputQuestion
-import com.microsoft.agenthostprotocol.generated.SessionInputQuestionNumber
-import com.microsoft.agenthostprotocol.generated.SessionInputQuestionKind
+import com.microsoft.agenthostprotocol.generated.ChatInputNumberQuestion
+import com.microsoft.agenthostprotocol.generated.ChatInputQuestion
+import com.microsoft.agenthostprotocol.generated.ChatInputQuestionNumber
+import com.microsoft.agenthostprotocol.generated.ChatInputQuestionKind
 import com.microsoft.agenthostprotocol.generated.StringOrMarkdown
 import com.microsoft.agenthostprotocol.generated.ToolResultContent
 import kotlinx.serialization.json.JsonObject
@@ -74,9 +74,9 @@ class DiscriminatedUnionTest {
     }
 
     @Test
-    fun `SessionInputQuestion accepts both number and integer wire kinds`() {
+    fun `ChatInputQuestion accepts both number and integer wire kinds`() {
         // Both "number" and "integer" wire values map to the same Kotlin
-        // data class (SessionInputNumberQuestion); the union serializer
+        // data class (ChatInputNumberQuestion); the union serializer
         // must dispatch on either.
         val numberWire = """{
             "kind": "number",
@@ -89,23 +89,23 @@ class DiscriminatedUnionTest {
             "message": "Pick an integer"
         }""".trimIndent()
 
-        val asNumber = json.decodeFromString(SessionInputQuestion.serializer(), numberWire)
-        val asInteger = json.decodeFromString(SessionInputQuestion.serializer(), integerWire)
+        val asNumber = json.decodeFromString(ChatInputQuestion.serializer(), numberWire)
+        val asInteger = json.decodeFromString(ChatInputQuestion.serializer(), integerWire)
 
-        val numberVariant = assertIs<SessionInputQuestionNumber>(asNumber)
-        val integerVariant = assertIs<SessionInputQuestionNumber>(asInteger)
+        val numberVariant = assertIs<ChatInputQuestionNumber>(asNumber)
+        val integerVariant = assertIs<ChatInputQuestionNumber>(asInteger)
         assertEquals("q1", numberVariant.value.id)
         assertEquals("q2", integerVariant.value.id)
-        assertEquals(SessionInputQuestionKind.NUMBER, numberVariant.value.kind)
-        assertEquals(SessionInputQuestionKind.INTEGER, integerVariant.value.kind)
+        assertEquals(ChatInputQuestionKind.NUMBER, numberVariant.value.kind)
+        assertEquals(ChatInputQuestionKind.INTEGER, integerVariant.value.kind)
 
         // Encode preserves whichever discriminator was originally set on
         // the data class.
         val reEncodedInteger = json.encodeToString(
-            SessionInputQuestion.serializer(),
-            SessionInputQuestionNumber(
-                SessionInputNumberQuestion(
-                    kind = SessionInputQuestionKind.INTEGER,
+            ChatInputQuestion.serializer(),
+            ChatInputQuestionNumber(
+                ChatInputNumberQuestion(
+                    kind = ChatInputQuestionKind.INTEGER,
                     id = "q3",
                     message = "Yet another integer",
                 ),

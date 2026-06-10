@@ -15,7 +15,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
-    AgentSelection, ContentRef, MessageAttachment, ModelSelection, SessionActiveClient,
+    AgentSelection, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient,
     SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TelemetryCapabilities,
     TerminalClaim, TextRange, Turn,
 };
@@ -308,6 +308,46 @@ pub struct CreateSessionParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisposeSessionParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+}
+
+/// Identifies a source chat and turn to fork from.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatForkSource {
+    /// URI of the existing chat to fork from
+    pub chat: Uri,
+    /// Turn ID in the source chat; content up to and including this turn's response is copied
+    pub turn_id: String,
+}
+
+/// Creates a new chat within a session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateChatParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`).
+    pub chat: Uri,
+    /// Optional initial message for the new chat.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_message: Option<Message>,
+    /// Optional per-chat model override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelSelection>,
+    /// Optional per-chat agent override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<AgentSelection>,
+    /// Optional source chat and turn to fork from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<ChatForkSource>,
+}
+
+/// Disposes a chat and cleans up server-side resources.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisposeChatParams {
     /// Channel URI this command targets.
     pub channel: Uri,
 }
@@ -730,7 +770,7 @@ pub struct CreateResourceWatchResult {
     pub channel: Uri,
 }
 
-/// Fetches historical turns for a session. Used for lazy loading of conversation
+/// Fetches historical turns for a chat. Used for lazy loading of conversation
 /// history.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

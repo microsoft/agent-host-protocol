@@ -152,7 +152,11 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState' || tsType === 'RootState | SessionState | TerminalState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState') {
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
+    || tsType === 'RootState | SessionState | ChatState'
+    || tsType === 'RootState | SessionState | ChatState | TerminalState'
+    || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
+    || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState') {
     return 'SnapshotState';
   }
 
@@ -527,8 +531,8 @@ function generateStructFromInterface(
 
 const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
-  'SessionInputAnswerState', 'SessionInputAnswerValueKind', 'SessionInputQuestionKind',
-  'SessionInputResponseKind',
+  'ChatOriginKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
+  'ChatInputResponseKind',
   'TurnState', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason',
   'ConfirmationOptionKind', 'ToolCallContributorKind',
@@ -554,6 +558,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'ConfigPropertySchema' },
   { name: 'ConfigSchema' },
   { name: 'PendingMessage' },
+  { name: 'ChatState' },
+  { name: 'ChatSummary' },
   { name: 'SessionState' },
   { name: 'SessionActiveClient' },
   { name: 'SessionSummary' },
@@ -565,20 +571,20 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'Turn' },
   { name: 'ActiveTurn' },
   { name: 'Message' },
-  { name: 'SessionInputOption' },
-  { name: 'SessionInputTextAnswerValue', omitDiscriminants: true },
-  { name: 'SessionInputNumberAnswerValue', omitDiscriminants: true },
-  { name: 'SessionInputBooleanAnswerValue', omitDiscriminants: true },
-  { name: 'SessionInputSelectedAnswerValue', omitDiscriminants: true },
-  { name: 'SessionInputSelectedManyAnswerValue', omitDiscriminants: true },
-  { name: 'SessionInputAnswered', omitDiscriminants: true },
-  { name: 'SessionInputSkipped', omitDiscriminants: true },
-  { name: 'SessionInputTextQuestion', omitDiscriminants: true },
-  { name: 'SessionInputNumberQuestion', omitDiscriminants: true },
-  { name: 'SessionInputBooleanQuestion', omitDiscriminants: true },
-  { name: 'SessionInputSingleSelectQuestion', omitDiscriminants: true },
-  { name: 'SessionInputMultiSelectQuestion', omitDiscriminants: true },
-  { name: 'SessionInputRequest' },
+  { name: 'ChatInputOption' },
+  { name: 'ChatInputTextAnswerValue', omitDiscriminants: true },
+  { name: 'ChatInputNumberAnswerValue', omitDiscriminants: true },
+  { name: 'ChatInputBooleanAnswerValue', omitDiscriminants: true },
+  { name: 'ChatInputSelectedAnswerValue', omitDiscriminants: true },
+  { name: 'ChatInputSelectedManyAnswerValue', omitDiscriminants: true },
+  { name: 'ChatInputAnswered', omitDiscriminants: true },
+  { name: 'ChatInputSkipped', omitDiscriminants: true },
+  { name: 'ChatInputTextQuestion', omitDiscriminants: true },
+  { name: 'ChatInputNumberQuestion', omitDiscriminants: true },
+  { name: 'ChatInputBooleanQuestion', omitDiscriminants: true },
+  { name: 'ChatInputSingleSelectQuestion', omitDiscriminants: true },
+  { name: 'ChatInputMultiSelectQuestion', omitDiscriminants: true },
+  { name: 'ChatInputRequest' },
   { name: 'TextPosition' },
   { name: 'TextRange' },
   { name: 'TextSelection' },
@@ -704,43 +710,43 @@ const TERMINAL_CONTENT_PART_UNION: UnionConfig = {
   unknown: true,
 };
 
-const SESSION_INPUT_QUESTION_UNION: UnionConfig = {
-  name: 'SessionInputQuestion',
+const CHAT_INPUT_QUESTION_UNION: UnionConfig = {
+  name: 'ChatInputQuestion',
   discriminantField: 'kind',
-  doc: 'One question within a session input request.',
+  doc: 'One question within a chat input request.',
   variants: [
-    { variantName: 'Text', innerType: 'SessionInputTextQuestion', wireValue: 'text' },
-    { variantName: 'Number', innerType: 'SessionInputNumberQuestion', wireValue: 'number' },
-    { variantName: 'Integer', innerType: 'SessionInputNumberQuestion', wireValue: 'integer' },
-    { variantName: 'Boolean', innerType: 'SessionInputBooleanQuestion', wireValue: 'boolean' },
-    { variantName: 'SingleSelect', innerType: 'SessionInputSingleSelectQuestion', wireValue: 'single-select' },
-    { variantName: 'MultiSelect', innerType: 'SessionInputMultiSelectQuestion', wireValue: 'multi-select' },
+    { variantName: 'Text', innerType: 'ChatInputTextQuestion', wireValue: 'text' },
+    { variantName: 'Number', innerType: 'ChatInputNumberQuestion', wireValue: 'number' },
+    { variantName: 'Integer', innerType: 'ChatInputNumberQuestion', wireValue: 'integer' },
+    { variantName: 'Boolean', innerType: 'ChatInputBooleanQuestion', wireValue: 'boolean' },
+    { variantName: 'SingleSelect', innerType: 'ChatInputSingleSelectQuestion', wireValue: 'single-select' },
+    { variantName: 'MultiSelect', innerType: 'ChatInputMultiSelectQuestion', wireValue: 'multi-select' },
   ],
   unknown: true,
 };
 
-const SESSION_INPUT_ANSWER_VALUE_UNION: UnionConfig = {
-  name: 'SessionInputAnswerValue',
+const CHAT_INPUT_ANSWER_VALUE_UNION: UnionConfig = {
+  name: 'ChatInputAnswerValue',
   discriminantField: 'kind',
   doc: 'Value captured for one answer.',
   variants: [
-    { variantName: 'Text', innerType: 'SessionInputTextAnswerValue', wireValue: 'text' },
-    { variantName: 'Number', innerType: 'SessionInputNumberAnswerValue', wireValue: 'number' },
-    { variantName: 'Boolean', innerType: 'SessionInputBooleanAnswerValue', wireValue: 'boolean' },
-    { variantName: 'Selected', innerType: 'SessionInputSelectedAnswerValue', wireValue: 'selected' },
-    { variantName: 'SelectedMany', innerType: 'SessionInputSelectedManyAnswerValue', wireValue: 'selected-many' },
+    { variantName: 'Text', innerType: 'ChatInputTextAnswerValue', wireValue: 'text' },
+    { variantName: 'Number', innerType: 'ChatInputNumberAnswerValue', wireValue: 'number' },
+    { variantName: 'Boolean', innerType: 'ChatInputBooleanAnswerValue', wireValue: 'boolean' },
+    { variantName: 'Selected', innerType: 'ChatInputSelectedAnswerValue', wireValue: 'selected' },
+    { variantName: 'SelectedMany', innerType: 'ChatInputSelectedManyAnswerValue', wireValue: 'selected-many' },
   ],
   unknown: true,
 };
 
-const SESSION_INPUT_ANSWER_UNION: UnionConfig = {
-  name: 'SessionInputAnswer',
+const CHAT_INPUT_ANSWER_UNION: UnionConfig = {
+  name: 'ChatInputAnswer',
   discriminantField: 'state',
   doc: 'Draft, submitted, or skipped answer for one question.',
   variants: [
-    { variantName: 'Draft', innerType: 'SessionInputAnswered', wireValue: 'draft' },
-    { variantName: 'Submitted', innerType: 'SessionInputAnswered', wireValue: 'submitted' },
-    { variantName: 'Skipped', innerType: 'SessionInputSkipped', wireValue: 'skipped' },
+    { variantName: 'Draft', innerType: 'ChatInputAnswered', wireValue: 'draft' },
+    { variantName: 'Submitted', innerType: 'ChatInputAnswered', wireValue: 'submitted' },
+    { variantName: 'Skipped', innerType: 'ChatInputSkipped', wireValue: 'skipped' },
   ],
   unknown: true,
 };
@@ -843,18 +849,53 @@ const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
   unknown: true,
 };
 
+function generateChatOrigin(): string {
+  return `/// How a chat came into existence.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum ChatOrigin {
+    /// Created directly by a user.
+    #[serde(rename = "user")]
+    User,
+    /// Forked from a specific turn of another chat.
+    #[serde(rename = "fork")]
+    Fork {
+        /// URI of the chat this one was forked from.
+        chat: Uri,
+        /// Turn the fork was taken from.
+        #[serde(rename = "turnId")]
+        turn_id: String,
+    },
+    /// Spawned by a tool call in another chat.
+    #[serde(rename = "tool")]
+    Tool {
+        /// URI of the chat whose tool call spawned this one.
+        chat: Uri,
+        /// Tool call that spawned this chat.
+        #[serde(rename = "toolCallId")]
+        tool_call_id: String,
+    },
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}`;
+}
+
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot — root, session, terminal,
+  return `/// The state payload of a snapshot — root, session, chat, terminal,
 /// changeset, resource-watch, or annotations state.
 ///
 /// Deserialized by trying session first (has required \`summary\`), then
-/// terminal (has required \`content\`), then changeset (has required
-/// \`status\` and \`files\`), then resource-watch (has required \`root\` and
-/// \`recursive\`), then annotations (has required \`annotations\`), then root.
+/// chat (has required \`turns\`), then terminal (has required \`content\`),
+/// then changeset (has required \`status\` and \`files\`), then resource-watch
+/// (has required \`root\` and \`recursive\`), then annotations (has required
+/// \`annotations\`), then root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
     Session(Box<SessionState>),
+    Chat(Box<ChatState>),
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
@@ -889,6 +930,8 @@ function generateStateFile(project: Project): string {
   }
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
+  lines.push(generateChatOrigin());
+  lines.push('');
   lines.push(generateDiscriminatedUnion(RESPONSE_PART_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_CALL_STATE_UNION));
@@ -897,11 +940,11 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(TERMINAL_CONTENT_PART_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(SESSION_INPUT_QUESTION_UNION));
+  lines.push(generateDiscriminatedUnion(CHAT_INPUT_QUESTION_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(SESSION_INPUT_ANSWER_VALUE_UNION));
+  lines.push(generateDiscriminatedUnion(CHAT_INPUT_ANSWER_VALUE_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(SESSION_INPUT_ANSWER_UNION));
+  lines.push(generateDiscriminatedUnion(CHAT_INPUT_ANSWER_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_RESULT_CONTENT_UNION));
   lines.push('');
@@ -938,21 +981,26 @@ const ACTION_VARIANTS: {
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
   { type: 'session/ready', variantName: 'SessionReady', tsInterface: 'SessionReadyAction' },
   { type: 'session/creationFailed', variantName: 'SessionCreationFailed', tsInterface: 'SessionCreationFailedAction' },
-  { type: 'session/turnStarted', variantName: 'SessionTurnStarted', tsInterface: 'SessionTurnStartedAction' },
-  { type: 'session/delta', variantName: 'SessionDelta', tsInterface: 'SessionDeltaAction' },
-  { type: 'session/responsePart', variantName: 'SessionResponsePart', tsInterface: 'SessionResponsePartAction' },
-  { type: 'session/toolCallStart', variantName: 'SessionToolCallStart', tsInterface: 'SessionToolCallStartAction' },
-  { type: 'session/toolCallDelta', variantName: 'SessionToolCallDelta', tsInterface: 'SessionToolCallDeltaAction' },
-  { type: 'session/toolCallReady', variantName: 'SessionToolCallReady', tsInterface: 'SessionToolCallReadyAction' },
-  { type: 'session/toolCallConfirmed', variantName: 'SessionToolCallConfirmed', tsInterface: '_merged_' },
-  { type: 'session/toolCallComplete', variantName: 'SessionToolCallComplete', tsInterface: 'SessionToolCallCompleteAction' },
-  { type: 'session/toolCallResultConfirmed', variantName: 'SessionToolCallResultConfirmed', tsInterface: 'SessionToolCallResultConfirmedAction' },
-  { type: 'session/turnComplete', variantName: 'SessionTurnComplete', tsInterface: 'SessionTurnCompleteAction' },
-  { type: 'session/turnCancelled', variantName: 'SessionTurnCancelled', tsInterface: 'SessionTurnCancelledAction' },
-  { type: 'session/error', variantName: 'SessionError', tsInterface: 'SessionErrorAction' },
+  { type: 'session/chatAdded', variantName: 'SessionChatAdded', tsInterface: 'SessionChatAddedAction' },
+  { type: 'session/chatRemoved', variantName: 'SessionChatRemoved', tsInterface: 'SessionChatRemovedAction' },
+  { type: 'session/chatUpdated', variantName: 'SessionChatUpdated', tsInterface: 'SessionChatUpdatedAction' },
+  { type: 'session/defaultChatChanged', variantName: 'SessionDefaultChatChanged', tsInterface: 'SessionDefaultChatChangedAction' },
+  { type: 'chat/turnStarted', variantName: 'ChatTurnStarted', tsInterface: 'ChatTurnStartedAction' },
+  { type: 'chat/delta', variantName: 'ChatDelta', tsInterface: 'ChatDeltaAction' },
+  { type: 'chat/responsePart', variantName: 'ChatResponsePart', tsInterface: 'ChatResponsePartAction' },
+  { type: 'chat/toolCallStart', variantName: 'ChatToolCallStart', tsInterface: 'ChatToolCallStartAction' },
+  { type: 'chat/toolCallDelta', variantName: 'ChatToolCallDelta', tsInterface: 'ChatToolCallDeltaAction' },
+  { type: 'chat/toolCallReady', variantName: 'ChatToolCallReady', tsInterface: 'ChatToolCallReadyAction' },
+  { type: 'chat/toolCallConfirmed', variantName: 'ChatToolCallConfirmed', tsInterface: '_merged_chat_' },
+  { type: 'chat/toolCallComplete', variantName: 'ChatToolCallComplete', tsInterface: 'ChatToolCallCompleteAction' },
+  { type: 'chat/toolCallResultConfirmed', variantName: 'ChatToolCallResultConfirmed', tsInterface: 'ChatToolCallResultConfirmedAction' },
+  { type: 'chat/toolCallContentChanged', variantName: 'ChatToolCallContentChanged', tsInterface: 'ChatToolCallContentChangedAction' },
+  { type: 'chat/turnComplete', variantName: 'ChatTurnComplete', tsInterface: 'ChatTurnCompleteAction' },
+  { type: 'chat/turnCancelled', variantName: 'ChatTurnCancelled', tsInterface: 'ChatTurnCancelledAction' },
+  { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
-  { type: 'session/usage', variantName: 'SessionUsage', tsInterface: 'SessionUsageAction' },
-  { type: 'session/reasoning', variantName: 'SessionReasoning', tsInterface: 'SessionReasoningAction' },
+  { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
+  { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
   { type: 'session/modelChanged', variantName: 'SessionModelChanged', tsInterface: 'SessionModelChangedAction' },
   { type: 'session/agentChanged', variantName: 'SessionAgentChanged', tsInterface: 'SessionAgentChangedAction' },
   { type: 'session/isReadChanged', variantName: 'SessionIsReadChanged', tsInterface: 'SessionIsReadChangedAction' },
@@ -962,21 +1010,20 @@ const ACTION_VARIANTS: {
   { type: 'session/serverToolsChanged', variantName: 'SessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
   { type: 'session/activeClientChanged', variantName: 'SessionActiveClientChanged', tsInterface: 'SessionActiveClientChangedAction' },
   { type: 'session/activeClientToolsChanged', variantName: 'SessionActiveClientToolsChanged', tsInterface: 'SessionActiveClientToolsChangedAction' },
-  { type: 'session/pendingMessageSet', variantName: 'SessionPendingMessageSet', tsInterface: 'SessionPendingMessageSetAction' },
-  { type: 'session/pendingMessageRemoved', variantName: 'SessionPendingMessageRemoved', tsInterface: 'SessionPendingMessageRemovedAction' },
-  { type: 'session/queuedMessagesReordered', variantName: 'SessionQueuedMessagesReordered', tsInterface: 'SessionQueuedMessagesReorderedAction' },
-  { type: 'session/inputRequested', variantName: 'SessionInputRequested', tsInterface: 'SessionInputRequestedAction' },
-  { type: 'session/inputAnswerChanged', variantName: 'SessionInputAnswerChanged', tsInterface: 'SessionInputAnswerChangedAction' },
-  { type: 'session/inputCompleted', variantName: 'SessionInputCompleted', tsInterface: 'SessionInputCompletedAction' },
+  { type: 'chat/pendingMessageSet', variantName: 'ChatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
+  { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
+  { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
+  { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
+  { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
+  { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
   { type: 'session/customizationsChanged', variantName: 'SessionCustomizationsChanged', tsInterface: 'SessionCustomizationsChangedAction' },
   { type: 'session/customizationToggled', variantName: 'SessionCustomizationToggled', tsInterface: 'SessionCustomizationToggledAction' },
   { type: 'session/customizationUpdated', variantName: 'SessionCustomizationUpdated', tsInterface: 'SessionCustomizationUpdatedAction', boxed: true },
   { type: 'session/customizationRemoved', variantName: 'SessionCustomizationRemoved', tsInterface: 'SessionCustomizationRemovedAction' },
   { type: 'session/mcpServerStateChanged', variantName: 'SessionMcpServerStateChanged', tsInterface: 'SessionMcpServerStateChangedAction', boxed: true },
-  { type: 'session/truncated', variantName: 'SessionTruncated', tsInterface: 'SessionTruncatedAction' },
+  { type: 'chat/truncated', variantName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'session/configChanged', variantName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', variantName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
-  { type: 'session/toolCallContentChanged', variantName: 'SessionToolCallContentChanged', tsInterface: 'SessionToolCallContentChangedAction' },
   { type: 'changeset/statusChanged', variantName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
   { type: 'changeset/fileSet', variantName: 'ChangesetFileSet', tsInterface: 'ChangesetFileSetAction' },
   { type: 'changeset/fileRemoved', variantName: 'ChangesetFileRemoved', tsInterface: 'ChangesetFileRemovedAction' },
@@ -1003,11 +1050,11 @@ const ACTION_VARIANTS: {
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
 ];
 
-function generateMergedToolCallConfirmedStruct(): string {
+function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Session'): string {
   return `/// Client approves or denies a pending tool call (merged approved + denied variants).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SessionToolCallConfirmedAction {
+pub struct ${scope}ToolCallConfirmedAction {
     pub turn_id: String,
     pub tool_call_id: String,
     /// Additional provider-specific metadata for this tool call.
@@ -1038,7 +1085,7 @@ pub struct SessionToolCallConfirmedAction {
 
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputAnswer, SessionInputRequest, SessionInputResponseKind, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1076,9 +1123,10 @@ pub struct ActionEnvelope {
 
   // Individual action structs (as variant inner types — omit the `type` field)
   lines.push('// ─── Action Payloads ─────────────────────────────────────────────────\n');
+  const priorPartials = new Set(requiredPartialStructs);
   for (const v of ACTION_VARIANTS) {
-    if (v.tsInterface === '_merged_') {
-      lines.push(generateMergedToolCallConfirmedStruct());
+    if (v.tsInterface === '_merged_' || v.tsInterface === '_merged_chat_') {
+      lines.push(generateMergedToolCallConfirmedStruct(v.tsInterface === '_merged_chat_' ? 'Chat' : 'Session'));
       lines.push('');
       continue;
     }
@@ -1093,11 +1141,31 @@ pub struct ActionEnvelope {
     }
   }
 
+  // Emit any Partial<T> structs referenced by action payloads (e.g. Partial<ChatSummary>
+  // on SessionChatUpdatedAction). Mirrors the notification-side emission.
+  const newPartials = [...requiredPartialStructs].filter(n => !priorPartials.has(n));
+  if (newPartials.length > 0) {
+    lines.push('// ─── Partial Summaries ────────────────────────────────────────────────\n');
+    for (const tsName of newPartials) {
+      try {
+        lines.push(generatePartialStruct(project, tsName));
+        lines.push('');
+      } catch (e) {
+        lines.push(`// TODO: could not generate Partial<${tsName}>: ${e}`);
+        lines.push('');
+      }
+    }
+  }
+
   // StateAction union
   lines.push('// ─── StateAction Union ───────────────────────────────────────────────\n');
   const variants: UnionVariant[] = ACTION_VARIANTS.map(v => ({
     variantName: v.variantName,
-    innerType: v.tsInterface === '_merged_' ? 'SessionToolCallConfirmedAction' : stripIPrefix(v.tsInterface),
+    innerType: v.tsInterface === '_merged_'
+      ? 'SessionToolCallConfirmedAction'
+      : v.tsInterface === '_merged_chat_'
+        ? 'ChatToolCallConfirmedAction'
+        : stripIPrefix(v.tsInterface),
     wireValue: v.type,
     boxed: v.boxed,
   }));
@@ -1126,6 +1194,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'SubscribeParams' }, { name: 'SubscribeResult' },
   { name: 'SessionForkSource' }, { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
+  { name: 'ChatForkSource' }, { name: 'CreateChatParams' },
+  { name: 'DisposeChatParams' },
   { name: 'ListSessionsParams' }, { name: 'ListSessionsResult' },
   { name: 'ResourceReadParams' }, { name: 'ResourceReadResult' },
   { name: 'ResourceWriteParams' }, { name: 'ResourceWriteResult' },
@@ -1165,7 +1235,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, ContentRef, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1524,12 +1594,17 @@ function checkExhaustiveness(project: Project): void {
     'SessionToolCallApprovedAction',
     'SessionToolCallDeniedAction',
     'SessionToolCallConfirmedAction',
+    'ChatToolCallApprovedAction',   // merged into ChatToolCallConfirmedAction
+    'ChatToolCallDeniedAction',     // merged into ChatToolCallConfirmedAction
+    'ChatToolCallConfirmedAction',  // emitted as merged variant
+    'ChatAction',                   // source-only union covered by StateAction
+    'ChatOrigin',                   // hand-generated union for inline variants
     'PingParams',
     'TerminalClaim',
     'TerminalContentPart',
-    'SessionInputQuestion',
-    'SessionInputAnswerValue',
-    'SessionInputAnswer',
+    'ChatInputQuestion',
+    'ChatInputAnswerValue',
+    'ChatInputAnswer',
     'MessageAttachment',
     'MessageAttachmentBase',
     'Customization',                // CUSTOMIZATION_UNION discriminated union

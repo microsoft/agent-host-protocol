@@ -318,6 +318,63 @@ public struct DisposeSessionParams: Codable, Sendable {
     }
 }
 
+public struct ChatForkSource: Codable, Sendable {
+    /// URI of the existing chat to fork from
+    public var chat: String
+    /// Turn ID in the source chat; content up to and including this turn's response is copied
+    public var turnId: String
+
+    public init(
+        chat: String,
+        turnId: String
+    ) {
+        self.chat = chat
+        self.turnId = turnId
+    }
+}
+
+public struct CreateChatParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`).
+    public var chat: String
+    /// Optional initial message for the new chat.
+    public var initialMessage: Message?
+    /// Optional per-chat model override.
+    public var model: ModelSelection?
+    /// Optional per-chat agent override.
+    public var agent: AgentSelection?
+    /// Optional source chat and turn to fork from.
+    public var source: ChatForkSource?
+
+    public init(
+        channel: String,
+        chat: String,
+        initialMessage: Message? = nil,
+        model: ModelSelection? = nil,
+        agent: AgentSelection? = nil,
+        source: ChatForkSource? = nil
+    ) {
+        self.channel = channel
+        self.chat = chat
+        self.initialMessage = initialMessage
+        self.model = model
+        self.agent = agent
+        self.source = source
+    }
+}
+
+public struct DisposeChatParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+
+    public init(
+        channel: String
+    ) {
+        self.channel = channel
+    }
+}
+
 public struct ListSessionsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String

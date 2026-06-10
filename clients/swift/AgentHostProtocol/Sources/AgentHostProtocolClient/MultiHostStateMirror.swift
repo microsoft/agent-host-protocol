@@ -45,6 +45,7 @@ public struct HostedResourceKey: Hashable, Sendable {
 public actor MultiHostStateMirror {
     public private(set) var rootStates: [HostId: RootState] = [:]
     public private(set) var sessions: [HostedResourceKey: SessionState] = [:]
+    public private(set) var chats: [HostedResourceKey: ChatState] = [:]
     public private(set) var terminals: [HostedResourceKey: TerminalState] = [:]
     public private(set) var changesets: [HostedResourceKey: ChangesetState] = [:]
     public private(set) var annotations: [HostedResourceKey: AnnotationsState] = [:]
@@ -74,14 +75,19 @@ public actor MultiHostStateMirror {
             return
         }
         let key = HostedResourceKey(hostId: host, uri: channel)
-        if var session = sessions[key] {
+        if channel.hasPrefix("ahp-session:"), var session = sessions[key] {
             session = sessionReducer(state: session, action: action)
             sessions[key] = session
             return
         }
-        if terminals[key] != nil {
-            // Terminals don't have a hand-written reducer in the Swift
-            // package today; just leave the slot as the latest snapshot.
+        if channel.hasPrefix("ahp-chat:"), var chat = chats[key] {
+            chat = chatReducer(state: chat, action: action)
+            chats[key] = chat
+            return
+        }
+        if channel.hasPrefix("ahp-terminal:"), var terminal = terminals[key] {
+            terminal = terminalReducer(state: terminal, action: action)
+            terminals[key] = terminal
             return
         }
         if changesets[key] != nil {
@@ -114,6 +120,8 @@ public actor MultiHostStateMirror {
             rootStates[host] = state
         case .session(let state):
             sessions[key] = state
+        case .chat(let state):
+            chats[key] = state
         case .terminal(let state):
             terminals[key] = state
         case .changeset(let state):
@@ -132,6 +140,7 @@ public actor MultiHostStateMirror {
     public func reset(host: HostId) {
         rootStates.removeValue(forKey: host)
         sessions = sessions.filter { $0.key.hostId != host }
+        chats = chats.filter { $0.key.hostId != host }
         terminals = terminals.filter { $0.key.hostId != host }
         changesets = changesets.filter { $0.key.hostId != host }
         annotations = annotations.filter { $0.key.hostId != host }
@@ -142,6 +151,7 @@ public actor MultiHostStateMirror {
     public func reset() {
         rootStates.removeAll()
         sessions.removeAll()
+        chats.removeAll()
         terminals.removeAll()
         changesets.removeAll()
         annotations.removeAll()

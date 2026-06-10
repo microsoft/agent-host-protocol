@@ -262,6 +262,36 @@ type DisposeSessionParams struct {
 	Channel URI `json:"channel"`
 }
 
+// Identifies a source chat and turn to fork from.
+type ChatForkSource struct {
+	// URI of the existing chat to fork from
+	Chat URI `json:"chat"`
+	// Turn ID in the source chat; content up to and including this turn's response is copied
+	TurnId string `json:"turnId"`
+}
+
+// Creates a new chat within a session.
+type CreateChatParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`).
+	Chat URI `json:"chat"`
+	// Optional initial message for the new chat.
+	InitialMessage *Message `json:"initialMessage,omitempty"`
+	// Optional per-chat model override.
+	Model *ModelSelection `json:"model,omitempty"`
+	// Optional per-chat agent override.
+	Agent *AgentSelection `json:"agent,omitempty"`
+	// Optional source chat and turn to fork from.
+	Source *ChatForkSource `json:"source,omitempty"`
+}
+
+// Disposes a chat and cleans up server-side resources.
+type DisposeChatParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+}
+
 // Returns a list of session summaries. Used to populate session lists and sidebars.
 //
 // The session list is **not** part of the state tree because it can be arbitrarily
@@ -618,7 +648,7 @@ type CreateResourceWatchResult struct {
 	Channel URI `json:"channel"`
 }
 
-// Fetches historical turns for a session. Used for lazy loading of conversation
+// Fetches historical turns for a chat. Used for lazy loading of conversation
 // history.
 type FetchTurnsParams struct {
 	// Channel URI this command targets.

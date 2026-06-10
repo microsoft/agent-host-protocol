@@ -11,7 +11,7 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": []
+    "chats": []
   },
   "actions": [
     {
@@ -33,11 +33,11 @@
       "modifiedAt": 1000
     },
     "lifecycle": "creating",
-    "turns": [],
     "activeClient": {
       "clientId": "vscode-1",
       "displayName": "VS Code",
       "tools": []
-    }
+    },
+    "chats": []
   }
 }

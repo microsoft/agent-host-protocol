@@ -1,5 +1,6 @@
 package com.microsoft.agenthostprotocol
 
+import com.microsoft.agenthostprotocol.generated.ChatState
 import com.microsoft.agenthostprotocol.generated.ChangesetState
 import com.microsoft.agenthostprotocol.generated.AnnotationsState
 import com.microsoft.agenthostprotocol.generated.ResourceWatchState
@@ -51,9 +52,8 @@ class FixtureDrivenReducerTest {
 
     @BeforeEach
     fun mockTimestamp() {
-        // Match the TypeScript test mock (`Date.now = () => 9999`) so any
-        // fixture that asserts a `modifiedAt: 9999` field aligns with our
-        // reducer-produced output.
+        // Match the TypeScript test mock (`Date.now = () => 9999`) so chat
+        // fixtures assert the corresponding ISO `modifiedAt` value.
         originalProvider = currentTimestampProvider
         currentTimestampProvider = { MOCK_NOW }
     }
@@ -152,6 +152,18 @@ class FixtureDrivenReducerTest {
                 run = { state ->
                     var s = state
                     for (action in actions) s = sessionReducer(s, action)
+                    s
+                },
+            )
+
+            "chat" -> compareFixture(
+                file = file,
+                initial = initial,
+                expected = expected,
+                serializer = ChatState.serializer(),
+                run = { state ->
+                    var s = state
+                    for (action in actions) s = chatReducer(s, action)
                     s
                 },
             )
