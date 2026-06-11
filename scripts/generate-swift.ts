@@ -909,6 +909,7 @@ function generateStateFile(project: Project): string {
 
   lines.push('// MARK: - Type Aliases\n');
   lines.push('public typealias URI = String\n');
+  lines.push('public typealias ChatInteractivity = String\n');
 
   lines.push('// MARK: - StringOrMarkdown\n');
   lines.push(generateStringOrMarkdown());
@@ -1745,6 +1746,7 @@ function checkExhaustiveness(project: Project): void {
     'URI',                          // type alias for string
     'BaseParams',                    // marker base interface; flattened into each command params struct
     'StringOrMarkdown',              // generateStringOrMarkdown()
+    'ChatInteractivity',            // type alias for string union
     'ToolCallState',                // TOOL_CALL_STATE_UNION discriminated union
     'StateAction',                  // StateAction enum in generateActionsFile()
     'ActionEnvelope',               // generateStructFromInterface() call in generateActionsFile()

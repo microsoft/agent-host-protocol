@@ -1196,6 +1196,17 @@ data class PartialChatSummary(
      */
     val origin: ChatOrigin? = null,
     /**
+     * How the user can interact with this chat.
+     *
+     * - `"full"` — user can send messages and watch (default when absent)
+     * - `"read-only"` — user can watch but not send messages
+     * - `"hidden"` — internal worker not shown in UI
+     *
+     * Supports agent-team patterns where worker chats are read-only or hidden.
+     * Absence defaults to `"full"` for backward compatibility.
+     */
+    val interactivity: ChatInteractivity? = null,
+    /**
      * Optional per-chat working directory.
      *
      * If absent, the chat inherits

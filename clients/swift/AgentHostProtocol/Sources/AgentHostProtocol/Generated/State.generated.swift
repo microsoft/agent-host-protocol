@@ -6,6 +6,8 @@ import Foundation
 
 public typealias URI = String
 
+public typealias ChatInteractivity = String
+
 // MARK: - StringOrMarkdown
 
 /// A value that is either a plain string or a markdown-formatted string.
@@ -745,6 +747,15 @@ public struct ChatState: Codable, Sendable {
     public var agent: AgentSelection?
     /// How this chat came into existence
     public var origin: ChatOrigin?
+    /// How the user can interact with this chat.
+    ///
+    /// - `"full"` — user can send messages and watch (default when absent)
+    /// - `"read-only"` — user can watch but not send messages
+    /// - `"hidden"` — internal worker not shown in UI
+    ///
+    /// Supports agent-team patterns where worker chats are read-only or hidden.
+    /// Absence defaults to `"full"` for backward compatibility.
+    public var interactivity: ChatInteractivity?
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits
@@ -775,6 +786,7 @@ public struct ChatState: Codable, Sendable {
         case model
         case agent
         case origin
+        case interactivity
         case workingDirectory
         case turns
         case activeTurn
@@ -793,6 +805,7 @@ public struct ChatState: Codable, Sendable {
         model: ModelSelection? = nil,
         agent: AgentSelection? = nil,
         origin: ChatOrigin? = nil,
+        interactivity: ChatInteractivity? = nil,
         workingDirectory: String? = nil,
         turns: [Turn],
         activeTurn: ActiveTurn? = nil,
@@ -809,6 +822,7 @@ public struct ChatState: Codable, Sendable {
         self.model = model
         self.agent = agent
         self.origin = origin
+        self.interactivity = interactivity
         self.workingDirectory = workingDirectory
         self.turns = turns
         self.activeTurn = activeTurn
@@ -836,6 +850,15 @@ public struct ChatSummary: Codable, Sendable {
     public var agent: AgentSelection?
     /// How this chat came into existence
     public var origin: ChatOrigin?
+    /// How the user can interact with this chat.
+    ///
+    /// - `"full"` — user can send messages and watch (default when absent)
+    /// - `"read-only"` — user can watch but not send messages
+    /// - `"hidden"` — internal worker not shown in UI
+    ///
+    /// Supports agent-team patterns where worker chats are read-only or hidden.
+    /// Absence defaults to `"full"` for backward compatibility.
+    public var interactivity: ChatInteractivity?
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits
@@ -852,6 +875,7 @@ public struct ChatSummary: Codable, Sendable {
         model: ModelSelection? = nil,
         agent: AgentSelection? = nil,
         origin: ChatOrigin? = nil,
+        interactivity: ChatInteractivity? = nil,
         workingDirectory: String? = nil
     ) {
         self.resource = resource
@@ -862,6 +886,7 @@ public struct ChatSummary: Codable, Sendable {
         self.model = model
         self.agent = agent
         self.origin = origin
+        self.interactivity = interactivity
         self.workingDirectory = workingDirectory
     }
 }

@@ -1852,6 +1852,7 @@ function checkExhaustiveness(project: Project): void {
     'URI',
     'BaseParams',
     'StringOrMarkdown',
+    'ChatInteractivity',
     'ToolCallState',
     'StateAction',
     'ActionEnvelope',

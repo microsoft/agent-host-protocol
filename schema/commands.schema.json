@@ -3059,6 +3059,10 @@
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
         },
+        "interactivity": {
+          "$ref": "#/$defs/ChatInteractivity",
+          "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
+        },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
           "description": "Optional per-chat working directory.\n\nIf absent, the chat inherits\n{@link SessionSummary.workingDirectory | the session's working directory}.\nHosts MAY override this for individual chats — for example, to give a\nsubordinate chat its own git worktree so multiple chats in a session can\nmake independent edits that the orchestrator later merges back."
@@ -3141,6 +3145,10 @@
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
+        },
+        "interactivity": {
+          "$ref": "#/$defs/ChatInteractivity",
+          "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
@@ -5504,6 +5512,10 @@
             "origin": {
               "$ref": "#/$defs/ChatOrigin",
               "description": "How this chat came into existence"
+            },
+            "interactivity": {
+              "$ref": "#/$defs/ChatInteractivity",
+              "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
             },
             "workingDirectory": {
               "$ref": "#/$defs/URI",
