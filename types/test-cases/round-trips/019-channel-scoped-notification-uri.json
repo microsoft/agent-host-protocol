@@ -1,0 +1,43 @@
+{
+  "name": "channel-scoped-notification-uri",
+  "group": "B",
+  "description": "SessionAddedParams carries a root channel URI, a required session summary, and an unknown wire key. Runtime-decoder clients (Go, Swift, Rust, Kotlin) drop the unknown key on re-encode — that is the intended canonical behavior expressed in acceptableOutputs[0]. TypeScript has no runtime decoder (JSON.parse/stringify preserves unknown keys verbatim), so it cannot produce the canonical dropped form; its expected output is the input preserved verbatim, expressed in preservedOutput. This is a documented structural exception, not a blessed divergence — TypeScript is asserted against preservedOutput, never skipped.",
+  "type": "SessionAddedParams",
+  "input": {
+    "channel": "ahp:/root",
+    "summary": {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "New session",
+      "status": 1,
+      "createdAt": 1,
+      "modifiedAt": 2
+    },
+    "unknownFutureKey": { "nested": true }
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp:/root",
+      "summary": {
+        "resource": "ahp-session:/s1",
+        "provider": "demo",
+        "title": "New session",
+        "status": 1,
+        "createdAt": 1,
+        "modifiedAt": 2
+      }
+    }
+  ],
+  "preservedOutput": {
+    "channel": "ahp:/root",
+    "summary": {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "New session",
+      "status": 1,
+      "createdAt": 1,
+      "modifiedAt": 2
+    },
+    "unknownFutureKey": { "nested": true }
+  }
+}

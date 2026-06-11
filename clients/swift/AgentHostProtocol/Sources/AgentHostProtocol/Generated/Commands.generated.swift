@@ -1318,30 +1318,44 @@ public struct ChangesetOperationResourceTarget: Codable, Sendable {
         self.side = side
     }
 
+    // kind is the union discriminant: a fixed constant for this variant (so it
+    // is NOT decoded from the wire — the union already dispatched on it), but it
+    // MUST be re-emitted on encode so the wire stays a decodable
+    // discriminated-union value. Hence the custom encode and the decode-only
+    // CodingKeys that omit kind.
     private enum CodingKeys: String, CodingKey { case resource, side }
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: EncodingKeys.self)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(resource, forKey: .resource)
+        try container.encodeIfPresent(side, forKey: .side)
+    }
 }
 
 public struct ChangesetOperationRangeTarget: Codable, Sendable {
     public var kind: String { "range" }
     public var resource: String
     public var side: String?
-    public var range: ChangesetOperationTargetRange
+    public var range: TextRange
 
-    public init(resource: String, side: String? = nil, range: ChangesetOperationTargetRange) {
+    public init(resource: String, side: String? = nil, range: TextRange) {
         self.resource = resource
         self.side = side
         self.range = range
     }
 
+    // See ChangesetOperationResourceTarget: kind is re-emitted on encode but
+    // not decoded (the union dispatches on it).
     private enum CodingKeys: String, CodingKey { case resource, side, range }
-}
+    private enum EncodingKeys: String, CodingKey { case kind, resource, side, range }
 
-public struct ChangesetOperationTargetRange: Codable, Sendable {
-    public var start: Int
-    public var end: Int
-
-    public init(start: Int, end: Int) {
-        self.start = start
-        self.end = end
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: EncodingKeys.self)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(resource, forKey: .resource)
+        try container.encodeIfPresent(side, forKey: .side)
+        try container.encode(range, forKey: .range)
     }
 }

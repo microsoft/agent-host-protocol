@@ -1,0 +1,18 @@
+{
+  "name": "jsonrpc-notification",
+  "group": "A",
+  "description": "A JsonRpcMessage with method+params but no id decodes as the notification variant and re-encodes all fields.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "method": "action",
+    "params": {}
+  },
+  "acceptableOutputs": [
+    {
+      "jsonrpc": "2.0",
+      "method": "action",
+      "params": {}
+    }
+  ]
+}

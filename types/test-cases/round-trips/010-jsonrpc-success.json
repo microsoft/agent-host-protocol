@@ -1,0 +1,18 @@
+{
+  "name": "jsonrpc-success",
+  "group": "A",
+  "description": "A JsonRpcMessage with id+result decodes as the success-response variant and re-encodes all fields.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {}
+  },
+  "acceptableOutputs": [
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "result": {}
+    }
+  ]
+}

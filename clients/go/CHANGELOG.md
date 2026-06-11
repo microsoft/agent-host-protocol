@@ -14,6 +14,17 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** `ChangesetOperationTargetRange` is now a nested `TextRange`
+  (`{start: {line, character}, end: {line, character}}`) instead of flat
+  `{start, end}` `int64` fields.
+
+### Fixed
+
+- `ActionEnvelope.Origin` is now omitted from JSON output when absent
+  (`json:"origin,omitempty"`) instead of serializing as `null`.
+
 ### Added
 
 - `SnapshotState.ResourceWatch` pointer field — the `Snapshot.state` union

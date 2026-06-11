@@ -1,0 +1,24 @@
+{
+  "name": "long-above-int32-max-preserved",
+  "group": "A",
+  "description": "ActionEnvelope.serverSeq is a 64-bit integer; a value above Int32.MaxValue (2147483647) round-trips without 32-bit truncation. Here serverSeq = Int32.MaxValue + 1234567 = 2148131814. Canonical input has no origin key (required-nullable, omitted when absent).",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-session:/s1",
+    "action": {
+      "type": "session/titleChanged",
+      "title": "x"
+    },
+    "serverSeq": 2148131814
+  },
+  "acceptableOutputs": [
+    {
+      "action": {
+        "title": "x",
+        "type": "session/titleChanged"
+      },
+      "channel": "ahp-session:/s1",
+      "serverSeq": 2148131814
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "jsonrpc-request",
+  "group": "A",
+  "description": "A JsonRpcMessage with id+method+params decodes as the request variant and re-encodes all fields.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {}
+  },
+  "acceptableOutputs": [
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "initialize",
+      "params": {}
+    }
+  ]
+}

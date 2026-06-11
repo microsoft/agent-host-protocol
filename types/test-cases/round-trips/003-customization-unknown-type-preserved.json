@@ -1,0 +1,18 @@
+{
+  "name": "customization-unknown-type-preserved",
+  "group": "A",
+  "description": "The Customization union opts into allowUnknown: an unrecognized `type` decodes to a raw JsonElement, does not throw, and re-encodes verbatim.",
+  "type": "Customization",
+  "input": {
+    "type": "future/unknownCustomization",
+    "path": "/x",
+    "extra": 7
+  },
+  "acceptableOutputs": [
+    {
+      "type": "future/unknownCustomization",
+      "path": "/x",
+      "extra": 7
+    }
+  ]
+}

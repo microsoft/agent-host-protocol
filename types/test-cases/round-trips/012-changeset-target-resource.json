@@ -1,0 +1,16 @@
+{
+  "name": "changeset-target-resource",
+  "group": "A",
+  "description": "ChangesetOperationTarget dispatches on its `kind` discriminator: kind=resource decodes the resource-target variant and re-encodes the discriminator and resource fields.",
+  "type": "ChangesetOperationTarget",
+  "input": {
+    "kind": "resource",
+    "resource": "file:///a.txt"
+  },
+  "acceptableOutputs": [
+    {
+      "kind": "resource",
+      "resource": "file:///a.txt"
+    }
+  ]
+}

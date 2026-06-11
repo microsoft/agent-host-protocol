@@ -51,21 +51,90 @@ pub enum SessionLifecycle {
 /// Use bitwise checks instead of equality for non-terminal activity. For example,
 /// `status & SessionStatus.InProgress` matches both ordinary in-progress turns
 /// and turns that are paused waiting for input.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize_repr, Deserialize_repr)]
-#[repr(u32)]
-pub enum SessionStatus {
+///
+/// Wire form: a bare `u32` bitset. Unknown/forward-compat bits are
+/// preserved across a decode→encode round-trip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(transparent)]
+pub struct SessionStatus(pub u32);
+
+#[allow(non_upper_case_globals)]
+impl SessionStatus {
     /// Session is idle — no turn is active.
-    Idle = 1,
+    pub const Idle: SessionStatus = SessionStatus(1);
     /// Session ended with an error.
-    Error = 2,
+    pub const Error: SessionStatus = SessionStatus(2);
     /// A turn is actively streaming.
-    InProgress = 8,
+    pub const InProgress: SessionStatus = SessionStatus(8);
     /// A turn is in progress but blocked waiting for user input or tool confirmation.
-    InputNeeded = 24,
+    pub const InputNeeded: SessionStatus = SessionStatus(24);
     /// The client has viewed this session since its last modification.
-    IsRead = 32,
+    pub const IsRead: SessionStatus = SessionStatus(32);
     /// The session has been archived by the client.
-    IsArchived = 64,
+    pub const IsArchived: SessionStatus = SessionStatus(64);
+
+    /// The raw `u32` bitset value (every set bit, known or not).
+    #[inline]
+    pub const fn bits(self) -> u32 {
+        self.0
+    }
+
+    /// Wrap a raw `u32` bitset value, preserving every bit verbatim.
+    #[inline]
+    pub const fn from_bits(bits: u32) -> Self {
+        SessionStatus(bits)
+    }
+
+    /// True when every bit set in `other` is also set in `self`.
+    #[inline]
+    pub const fn contains(self, other: SessionStatus) -> bool {
+        (self.0 & other.0) == other.0
+    }
+}
+
+impl From<u32> for SessionStatus {
+    #[inline]
+    fn from(value: u32) -> Self {
+        SessionStatus(value)
+    }
+}
+
+impl From<SessionStatus> for u32 {
+    #[inline]
+    fn from(value: SessionStatus) -> Self {
+        value.0
+    }
+}
+
+impl std::ops::BitOr for SessionStatus {
+    type Output = SessionStatus;
+    #[inline]
+    fn bitor(self, rhs: SessionStatus) -> SessionStatus {
+        SessionStatus(self.0 | rhs.0)
+    }
+}
+
+impl std::ops::BitOrAssign for SessionStatus {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: SessionStatus) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl std::ops::BitAnd for SessionStatus {
+    type Output = SessionStatus;
+    #[inline]
+    fn bitand(self, rhs: SessionStatus) -> SessionStatus {
+        SessionStatus(self.0 & rhs.0)
+    }
+}
+
+impl std::ops::Not for SessionStatus {
+    type Output = SessionStatus;
+    #[inline]
+    fn not(self) -> SessionStatus {
+        SessionStatus(!self.0)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -797,7 +866,7 @@ pub struct ChatState {
     /// Supports agent-team patterns where worker chats are read-only or hidden.
     /// Absence defaults to `"full"` for backward compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interactivity: Option<ChatInteractivity>,
+    pub interactivity: Option<String>,
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits
@@ -861,7 +930,7 @@ pub struct ChatSummary {
     /// Supports agent-team patterns where worker chats are read-only or hidden.
     /// Absence defaults to `"full"` for backward compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interactivity: Option<ChatInteractivity>,
+    pub interactivity: Option<String>,
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits

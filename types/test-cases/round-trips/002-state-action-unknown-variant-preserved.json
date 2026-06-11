@@ -1,0 +1,16 @@
+{
+  "name": "state-action-unknown-variant-preserved",
+  "group": "A",
+  "description": "An unknown StateAction discriminator decodes to a raw JsonElement (not an exception) and re-encodes verbatim.",
+  "type": "StateAction",
+  "input": {
+    "type": "future/newAction",
+    "foo": 42
+  },
+  "acceptableOutputs": [
+    {
+      "type": "future/newAction",
+      "foo": 42
+    }
+  ]
+}

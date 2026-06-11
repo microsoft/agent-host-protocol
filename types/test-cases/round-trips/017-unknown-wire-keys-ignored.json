@@ -1,0 +1,36 @@
+{
+  "name": "unknown-wire-keys-ignored",
+  "group": "B",
+  "description": "A known type (SessionSummary) carrying extra, unrecognized JSON keys. Runtime-decoder clients (Go, Swift, Rust, Kotlin) drop the unknown keys on re-encode — that is the intended canonical behavior expressed in acceptableOutputs[0]. TypeScript has no runtime decoder (JSON.parse/stringify preserves unknown keys verbatim), so it cannot produce the canonical dropped form; its expected output is the input preserved verbatim, expressed in preservedOutput. This is a documented structural exception, not a blessed divergence — TypeScript is asserted against preservedOutput, never skipped.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "provider": "demo",
+    "title": "Hello",
+    "status": 0,
+    "createdAt": 1,
+    "modifiedAt": 2,
+    "unknownFutureKey": { "nested": true },
+    "anotherUnknown": 42
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "Hello",
+      "status": 0,
+      "createdAt": 1,
+      "modifiedAt": 2
+    }
+  ],
+  "preservedOutput": {
+    "resource": "ahp-session:/s1",
+    "provider": "demo",
+    "title": "Hello",
+    "status": 0,
+    "createdAt": 1,
+    "modifiedAt": 2,
+    "unknownFutureKey": { "nested": true },
+    "anotherUnknown": 42
+  }
+}

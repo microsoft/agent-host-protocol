@@ -52,11 +52,29 @@ class BitsetEnumTest {
         // preserve it so subsequent re-encoding doesn't drop the unknown
         // capability.
         val withFutureBit = json.decodeFromString(SessionStatus.serializer(), "129")
-        assertEquals(129, withFutureBit.rawValue)
+        assertEquals(129u, withFutureBit.rawValue)
         assertTrue(SessionStatus.IDLE in withFutureBit)
 
         val reencoded = json.encodeToString(SessionStatus.serializer(), withFutureBit)
         assertEquals("129", reencoded)
+    }
+
+    @Test
+    fun `high bits above signed int32 range survive round trip`() {
+        // SessionStatus is an unsigned 32-bit bitset on the wire (the .NET
+        // reference models it as `uint`). A forward-compat unknown bit at or
+        // above the sign bit 2^31 (2147483648) is a positive value that does
+        // NOT fit a signed 32-bit Int — backing rawValue with UInt is what lets
+        // it round-trip. Mirrors the shared corpus fixture
+        // 005-session-status-unknown-bits-preserved: 8|64|2^31 = 2147483720.
+        val wire = "2147483720"
+        val status = json.decodeFromString(SessionStatus.serializer(), wire)
+        assertEquals(2147483720u, status.rawValue)
+        assertTrue(SessionStatus.IN_PROGRESS in status)
+        assertTrue(SessionStatus.IS_ARCHIVED in status)
+
+        val reencoded = json.encodeToString(SessionStatus.serializer(), status)
+        assertEquals(wire, reencoded)
     }
 
     @Test

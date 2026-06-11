@@ -163,6 +163,13 @@ func customizationId(_ c: Customization) -> String {
     case .plugin(let p): return p.id
     case .directory(let d): return d.id
     case .mcpServer(let m): return m.id
+    // Unknown/future customization: recover the `id` from the preserved raw
+    // payload if present (forward-compat), else an empty id.
+    case .unknown(let raw):
+        if let obj = raw.value as? [String: Any], let id = obj["id"] as? String {
+            return id
+        }
+        return ""
     }
 }
 
@@ -174,6 +181,13 @@ func childId(_ c: ChildCustomization) -> String {
     case .rule(let x): return x.id
     case .hook(let x): return x.id
     case .mcpServer(let x): return x.id
+    // Unknown/future child customization: recover `id` from the preserved raw
+    // payload if present (forward-compat), else an empty id.
+    case .unknown(let raw):
+        if let obj = raw.value as? [String: Any], let id = obj["id"] as? String {
+            return id
+        }
+        return ""
     }
 }
 
@@ -182,6 +196,8 @@ func customizationChildren(_ c: Customization) -> [ChildCustomization]? {
     case .plugin(let p): return p.children
     case .directory(let d): return d.children
     case .mcpServer: return nil
+    // Unknown/future customization: no typed children to expose.
+    case .unknown: return nil
     }
 }
 
@@ -193,7 +209,9 @@ func setCustomizationChildren(_ c: inout Customization, _ children: [ChildCustom
     case .directory(var d):
         d.children = children
         c = .directory(d)
-    case .mcpServer:
+    // mcpServer has no typed children; unknown/future customization is an
+    // opaque payload — nothing to mutate in either case.
+    case .mcpServer, .unknown:
         break
     }
 }
@@ -209,6 +227,9 @@ func setCustomizationEnabled(_ c: inout Customization, _ enabled: Bool) {
     case .mcpServer(var m):
         m.enabled = enabled
         c = .mcpServer(m)
+    // Unknown/future customization: opaque payload, nothing to mutate.
+    case .unknown:
+        break
     }
 }
 

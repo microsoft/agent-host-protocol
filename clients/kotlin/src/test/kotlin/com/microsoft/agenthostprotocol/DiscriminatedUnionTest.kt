@@ -3,7 +3,8 @@ package com.microsoft.agenthostprotocol
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationRangeTarget
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationResourceTarget
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
-import com.microsoft.agenthostprotocol.generated.ChangesetOperationTargetRange
+import com.microsoft.agenthostprotocol.generated.TextPosition
+import com.microsoft.agenthostprotocol.generated.TextRange
 import com.microsoft.agenthostprotocol.generated.Customization
 import com.microsoft.agenthostprotocol.generated.CustomizationUnknown
 import com.microsoft.agenthostprotocol.generated.MarkdownResponsePart
@@ -159,7 +160,7 @@ class DiscriminatedUnionTest {
             "kind": "range",
             "resource": "file:///a.ts",
             "side": "after",
-            "range": { "start": 10, "end": 42 }
+            "range": { "start": {"line": 10, "character": 0}, "end": {"line": 42, "character": 0} }
         }""".trimIndent()
 
         val res = json.decodeFromString(ChangesetOperationTarget.serializer(), resourceWire)
@@ -169,7 +170,7 @@ class DiscriminatedUnionTest {
 
         val rng = json.decodeFromString(ChangesetOperationTarget.serializer(), rangeWire)
         val rngVariant = assertIs<ChangesetOperationTarget.Range>(rng)
-        assertEquals(ChangesetOperationTargetRange(start = 10, end = 42), rngVariant.value.range)
+        assertEquals(TextRange(start = TextPosition(line = 10, character = 0), end = TextPosition(line = 42, character = 0)), rngVariant.value.range)
 
         // Encoding emits the correct discriminator wire value.
         val encoded = json.encodeToString(

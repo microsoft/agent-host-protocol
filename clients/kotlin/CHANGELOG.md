@@ -15,15 +15,21 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- `SnapshotState.ResourceWatch` value class — the `Snapshot.state` union now
-  accepts `ResourceWatchState`, so a snapshot of an `ahp-resource-watch:`
-  channel decodes via the existing `SnapshotStateSerializer` shape probe
-  (required `root` + `recursive` keys).
+- **BREAKING:** `SessionStatus.rawValue` is now a `UInt` (was `Int`), and the
+  named flag constants are `UInt` literals. `SessionStatus` is an unsigned
+  32-bit bitset on the wire; a signed `Int` could not hold a forward-compat bit
+  at or above `2^31` (`UInt` holds the full 32-bit range).
+- **BREAKING:** `ChangesetOperationTarget`'s range target now carries a nested
+  `TextRange` (`{start: {line, character}, end: {line, character}}`) instead of
+  a flat `{start, end}` integer pair.
 
 ### Fixed
 
+- `SessionStatus` decode fidelity: an unknown forward-compat bit at or above
+  `2^31` (e.g. `2147483720`) now round-trips as a plain JSON integer instead of
+  throwing `JsonDecodingException` and dropping the bit.
 - `sessionReducer` now applies `_meta` (`meta`) updates from every
   tool-call-scoped action, not only `session/toolCallStart`.
 
@@ -110,6 +116,7 @@ Implements AHP 0.3.0.
   with `Client(clientId)` and `Mcp(customizationId)` variants).
   `SessionToolCallStartAction` carries the new `contributor` field as
   well.
+
 ## [0.2.0] — 2026-05-28
 
 Implements AHP `0.2.0`.

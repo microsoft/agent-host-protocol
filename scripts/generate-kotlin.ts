@@ -353,9 +353,17 @@ function generateKotlinEnum(enumDecl: EnumDeclaration): string {
   }
 
   if (isBitset) {
+    // Backed by `UInt`: the spec models these bitsets as unsigned 32-bit on the
+    // wire (the .NET reference uses `uint`, e.g. `SessionStatus : uint`).
+    // UInt holds the full uint32 range (0..4294967295) including the former
+    // sign bit 2^31 (2147483648) as a positive value, so unknown forward-compat
+    // bits round-trip faithfully. The companion serializer uses PrimitiveKind.INT
+    // + toInt()/toUInt() to convert between the JSON number and UInt.
+    // Verified by the shared round-trip corpus fixture
+    // `005-session-status-unknown-bits-preserved` (numeric 2147483720).
     lines.push(`@Serializable(with = ${name}Serializer::class)`);
     lines.push('@JvmInline');
-    lines.push(`value class ${name}(val rawValue: Int) {`);
+    lines.push(`value class ${name}(val rawValue: UInt) {`);
     lines.push(`    operator fun contains(other: ${name}): Boolean =`);
     lines.push('        (rawValue and other.rawValue) == other.rawValue');
     lines.push('');
@@ -370,20 +378,25 @@ function generateKotlinEnum(enumDecl: EnumDeclaration): string {
       if (memberDoc) {
         lines.push(...emitKDoc(memberDoc, '        '));
       }
-      lines.push(`        val ${memberName}: ${name} = ${name}(${value})`);
+      lines.push(`        val ${memberName}: ${name} = ${name}(${value}u)`);
     }
     lines.push('    }');
     lines.push('}');
     lines.push('');
-    // Companion serializer. Bitset wire format is the raw int.
+    // Companion serializer. Bitset wire format is the raw unsigned 32-bit
+    // integer. Encode via toLong() so the JSON number is always positive (a
+    // UInt value ≥ 2^31 would serialize as a negative Int which is wrong).
+    // Decode via decodeLong().toUInt() — decodeLong() accepts any 64-bit
+    // integer from JSON, so values > Int.MAX_VALUE (e.g. 2147483720) parse
+    // correctly; toUInt() then truncates to the expected 32-bit range.
     lines.push(`internal object ${name}Serializer : KSerializer<${name}> {`);
     lines.push(`    override val descriptor: SerialDescriptor =`);
-    lines.push(`        PrimitiveSerialDescriptor("${name}", PrimitiveKind.INT)`);
+    lines.push(`        PrimitiveSerialDescriptor("${name}", PrimitiveKind.LONG)`);
     lines.push(`    override fun serialize(encoder: Encoder, value: ${name}) {`);
-    lines.push('        encoder.encodeInt(value.rawValue)');
+    lines.push('        encoder.encodeLong(value.rawValue.toLong())');
     lines.push('    }');
     lines.push(`    override fun deserialize(decoder: Decoder): ${name} =`);
-    lines.push(`        ${name}(decoder.decodeInt())`);
+    lines.push(`        ${name}(decoder.decodeLong().toUInt())`);
     lines.push('}');
     return lines.join('\n');
   }
@@ -1413,15 +1426,9 @@ data class ChangesetOperationResourceTarget(
 data class ChangesetOperationRangeTarget(
     val resource: String,
     val side: String? = null,
-    val range: ChangesetOperationTargetRange,
+    val range: TextRange,
     /** Discriminator. Always "range". */
     val kind: String = "range",
-)
-
-@Serializable
-data class ChangesetOperationTargetRange(
-    val start: Long,
-    val end: Long,
 )
 
 internal object ChangesetOperationTargetSerializer : KSerializer<ChangesetOperationTarget> {

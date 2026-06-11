@@ -1,0 +1,10 @@
+{
+  "name": "partial-summary-all-null",
+  "group": "A",
+  "description": "PartialSessionSummary has every field optional. An empty object decodes with every field null/absent and re-encodes back to an empty object — no exception.",
+  "type": "PartialSessionSummary",
+  "input": {},
+  "acceptableOutputs": [
+    {}
+  ]
+}

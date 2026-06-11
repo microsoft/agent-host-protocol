@@ -15,6 +15,27 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** `SessionStatus` is now a `u32` bitset newtype
+  (`struct SessionStatus(pub u32)` with named flag constants) instead of a
+  `#[repr(u32)]` enum. The wire form is a numeric bitset, so the enum could not
+  represent combined flags (e.g. `InProgress | IsArchived`) or preserve unknown
+  forward-compat bits. Combine flags with `|` and test with `contains(..)`.
+- **BREAKING:** `ChangesetOperationTarget`'s range target now carries a nested
+  `TextRange` (`{start: {line, character}, end: {line, character}}`) instead of
+  a flat `{start, end}` integer pair.
+
+### Fixed
+
+- `SessionStatus` encode/decode fidelity: combined and unknown bitset bits now
+  round-trip exactly instead of being dropped or rejected.
+- `ActionEnvelope.origin` is now omitted from serialized output when absent
+  (`#[serde(skip_serializing_if = "Option::is_none")]`) instead of serializing
+  as `null`.
+- Session reducers now apply `_meta` (`meta`) updates from every
+  tool-call-scoped action, not only `session/toolCallStart`.
+
 ### Added
 
 - `SnapshotState::ResourceWatch` variant and matching
@@ -23,11 +44,6 @@ matching `## [X.Y.Z]` heading is missing from this file.
   flag, optional includes/excludes) alongside the existing root / session /
   terminal / changeset / annotations slots. `reset_host` / `reset` clear the
   new slot.
-
-### Fixed
-
-- Session reducers now apply `_meta` (`meta`) updates from every
-  tool-call-scoped action, not only `session/toolCallStart`.
 
 ### Added
 
@@ -114,6 +130,7 @@ Implements AHP 0.3.0.
   `Client { client_id }` and `Mcp { customization_id }` variants).
   `SessionToolCallStartAction` carries the new `contributor` field as
   well. The reducer follows the rename.
+
 ## [0.2.0] — 2026-05-28
 
 Implements AHP `0.2.0`. Bumps the `ahp-types`, `ahp`, and `ahp-ws` crates

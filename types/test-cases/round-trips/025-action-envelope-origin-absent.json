@@ -1,0 +1,18 @@
+{
+  "name": "action-envelope-origin-absent",
+  "group": "A",
+  "description": "ActionEnvelope with no origin (server-originated): the `origin` field is required-nullable (T | undefined). When absent from the wire input it MUST re-encode absent — key omitted, never null. This fixture is the regression gate for the Rust serialization bug where `Option::is_none` was not skipped, causing `\"origin\": null` to be emitted instead of the key being omitted.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-session:/s1",
+    "action": { "type": "session/titleChanged", "title": "Hello" },
+    "serverSeq": 7
+  },
+  "acceptableOutputs": [
+    {
+      "action": { "title": "Hello", "type": "session/titleChanged" },
+      "channel": "ahp-session:/s1",
+      "serverSeq": 7
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "session-status-unknown-bits-preserved",
+  "group": "A",
+  "description": "Unknown/forward-compat bits in the SessionStatus bitset survive a round-trip. InProgress(8)|IsArchived(64)|bit31(2147483648)=2147483720.",
+  "type": "SessionStatus",
+  "input": 2147483720,
+  "acceptableOutputs": [
+    2147483720
+  ]
+}

@@ -779,7 +779,7 @@ type ChatState struct {
 	//
 	// Supports agent-team patterns where worker chats are read-only or hidden.
 	// Absence defaults to `"full"` for backward compatibility.
-	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
+	Interactivity *string `json:"interactivity,omitempty"`
 	// Optional per-chat working directory.
 	//
 	// If absent, the chat inherits
@@ -830,7 +830,7 @@ type ChatSummary struct {
 	//
 	// Supports agent-team patterns where worker chats are read-only or hidden.
 	// Absence defaults to `"full"` for backward compatibility.
-	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
+	Interactivity *string `json:"interactivity,omitempty"`
 	// Optional per-chat working directory.
 	//
 	// If absent, the chat inherits

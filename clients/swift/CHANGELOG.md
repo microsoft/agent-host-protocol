@@ -17,6 +17,16 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** `SessionStatus` is now an `OptionSet` with a `UInt32` rawValue
+  (was `Int`), an unsigned 32-bit bitset that preserves combined and unknown
+  forward-compat bits. Combine flags with set-union (`∪` / `union`) and test
+  membership with `contains(_:)`.
+- **BREAKING:** `ChangesetOperationTarget`'s range target now carries a nested
+  `TextRange` (`{start: {line, character}, end: {line, character}}`) instead of
+  a flat `{start, end}` integer pair.
+
 ### Added
 
 - `SnapshotState.resourceWatch` case and matching
@@ -59,9 +69,28 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 - `ChatState` is now flat — the previous embedded `summary` has been replaced with inlined `resource` / `title` / `status` / `activity` / `modifiedAt` / `model` / `agent` / `origin` / `workingDirectory` properties. `ChatSummary` remains as the standalone catalog entry on `SessionState.chats`.
 - `ChatSummary.modifiedAt` and `ChatState.modifiedAt` are now ISO 8601 `String` values instead of `Int64`/`UInt64` milliseconds.
 
+### Added
+
+- `ChatSummary.interactivity` / `ChatState.interactivity` (`"full" | "read-only" | "hidden"`) indicating how the user can interact with a chat. Absent defaults to `"full"`.
+
 ### Removed
 
 - `SessionChatsChangedAction` (replaced by the three discrete chat-catalog actions above).
+
+### Fixed
+
+- Encode-fidelity: an unknown `StateAction` variant no longer re-encodes to
+  `{}` (dropping its `type` discriminant and extra fields); the raw payload is
+  preserved on decode and re-emitted verbatim.
+- Forward-compatibility: unknown discriminants on wire-decoded discriminated
+  unions (`ResponsePart`, `ToolCallState`, `TerminalClaim`,
+  `TerminalContentPart`, `Customization`, and other evolvable unions) now decode
+  to a raw passthrough and re-encode verbatim instead of throwing
+  `DecodingError`, so a snapshot carrying an unknown variant still decodes and
+  subsequent actions fold correctly.
+- `ChangesetOperationResourceTarget` / `…RangeTarget` now encode their `kind`
+  discriminant (previously a computed property excluded from `CodingKeys`, so it
+  was dropped on encode).
 
 ## [0.3.0] — 2026-06-05
 
@@ -125,6 +154,7 @@ Implements AHP 0.3.0.
   cases). `SessionToolCallStartAction` carries the new `contributor`
   field as well. `Reducers.swift`, `NativeReducer.swift`, and
   `ToolCallStateExtensions.swift` follow the rename.
+
 ## [0.2.0] — 2026-05-28
 
 Implements AHP `0.2.0`.

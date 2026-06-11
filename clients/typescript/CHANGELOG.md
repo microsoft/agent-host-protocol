@@ -27,6 +27,12 @@ hotfix escape hatch.
   `ahp-resource-watch:` channel's descriptor alongside the existing root /
   session / terminal / changeset / annotations variants.
 
+### Added
+
+- Shared round-trip test corpus (`test/round-trips/*.json`) used by all
+  language clients to assert encode/decode fidelity; the TypeScript test harness
+  loads and verifies each fixture.
+
 ### Fixed
 
 - `sessionReducer` now applies `_meta` updates from every tool-call-scoped

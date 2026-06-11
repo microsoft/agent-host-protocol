@@ -1,0 +1,10 @@
+{
+  "name": "string-or-markdown-plain",
+  "group": "A",
+  "description": "StringOrMarkdown plain form is a bare JSON string and re-encodes verbatim to the same bare string.",
+  "type": "StringOrMarkdown",
+  "input": "hello",
+  "acceptableOutputs": [
+    "hello"
+  ]
+}

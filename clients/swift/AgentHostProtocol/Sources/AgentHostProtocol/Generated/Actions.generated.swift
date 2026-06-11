@@ -1661,7 +1661,10 @@ public enum StateAction: Codable, Sendable {
     case terminalCommandFinished(TerminalCommandFinishedAction)
     case resourceWatchChanged(ResourceWatchChangedAction)
     /// Unknown or future action type; reducers treat this as a no-op.
-    case unknown(type: String)
+    /// The raw payload (including its `type` discriminant) is preserved
+    /// as an `AnyCodable` so a decode→encode round-trip re-emits it
+    /// verbatim for forward-compatibility (mirrors .NET allowUnknown).
+    case unknown(AnyCodable)
 
     private enum TypeKey: String, CodingKey { case type }
 
@@ -1814,7 +1817,7 @@ public enum StateAction: Codable, Sendable {
         case "resourceWatch/changed":
             self = .resourceWatchChanged(try ResourceWatchChangedAction(from: decoder))
         default:
-            self = .unknown(type: type)
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -1892,7 +1895,7 @@ public enum StateAction: Codable, Sendable {
         case .terminalCommandExecuted(let v): try v.encode(to: encoder)
         case .terminalCommandFinished(let v): try v.encode(to: encoder)
         case .resourceWatchChanged(let v): try v.encode(to: encoder)
-        case .unknown: break
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }

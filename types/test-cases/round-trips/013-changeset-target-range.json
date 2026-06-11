@@ -1,0 +1,24 @@
+{
+  "name": "changeset-target-range",
+  "group": "A",
+  "description": "ChangesetOperationTarget with kind=range decodes the range-target variant including its nested start/end range; the discriminator and range survive a re-encode round-trip.",
+  "type": "ChangesetOperationTarget",
+  "input": {
+    "kind": "range",
+    "resource": "file:///a.txt",
+    "range": {
+      "start": {"line": 2, "character": 0},
+      "end": {"line": 5, "character": 10}
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "kind": "range",
+      "resource": "file:///a.txt",
+      "range": {
+        "start": {"line": 2, "character": 0},
+        "end": {"line": 5, "character": 10}
+      }
+    }
+  ]
+}

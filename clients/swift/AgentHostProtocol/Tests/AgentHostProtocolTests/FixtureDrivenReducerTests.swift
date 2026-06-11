@@ -94,25 +94,22 @@ final class FixtureDrivenReducerTests: XCTestCase {
     // no bare `continue` skip.
     //
     // Five of the six reducer arms are implemented (root / session / terminal /
-    // changeset / resourceWatch). Two kinds of gap remain:
+    // changeset / resourceWatch). One kind of gap remains:
     //
-    // 1. Representational gap — fixture 103 carries a response part with an
-    //    unknown `kind` (`unknownFuturePart`), and the generated `ResponsePart`
-    //    enum on this base throws on an unknown discriminant rather than
-    //    preserving it. When the generated types gain a `case unknown(AnyCodable)`
-    //    forward-compat fallback, this fixture will decode + assert and the
-    //    tripwire above will fire, forcing the entry to be removed.
+    // Unimplemented-channel gap — the `annotations` channel (fixtures 210–219)
+    //    has no Swift reducer yet; `runFixture` hits the `default` arm and throws
+    //    `unsupportedReducer("annotations")`. (The canonical fixture-driven test
+    //    on the base before this rewrite simply skipped the `annotations` reducer
+    //    family with a bare `continue`; here that skip is made explicit and
+    //    tripwired instead.) When `annotationsReducer` lands, these stems decode
+    //    + assert and the drift tripwire forces them out of this set.
     //
-    // 2. Unimplemented-channel gap — the `annotations` channel (fixtures
-    //    210–219) has no Swift reducer yet; `runFixture` hits the `default`
-    //    arm and throws `unsupportedReducer("annotations")`. (The canonical
-    //    fixture-driven test on the base before this rewrite simply skipped the
-    //    `annotations` reducer family with a bare `continue`; here that skip is
-    //    made explicit and tripwired instead.) When `annotationsReducer` lands,
-    //    these stems decode + assert and the drift tripwire forces them out of
-    //    this set.
+    // The former representational gap (fixture 103 — a delta carrying a part with
+    // an unknown `kind`) is now CLOSED: the generated types gained a forward-compat
+    // `unknown` fallback (the round-trip-corpus fidelity work), so 103 decodes +
+    // asserts for real and has been removed from the set below — exactly the
+    // outcome the tripwire above was written to force.
     private static let knownReducerGaps: Set<String> = [
-        "103-delta-skips-parts-without-id",
         "210-annotations-set-appends-new-annotation",
         "211-annotations-set-replaces-existing-annotation",
         "212-annotations-removed-drops-matching-annotation",

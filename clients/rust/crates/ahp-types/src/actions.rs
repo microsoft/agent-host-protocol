@@ -196,6 +196,7 @@ pub struct ActionEnvelope {
     pub channel: Uri,
     pub action: StateAction,
     pub server_seq: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ActionOrigin>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rejection_reason: Option<String>,
@@ -1338,7 +1339,7 @@ pub struct PartialChatSummary {
     /// Supports agent-team patterns where worker chats are read-only or hidden.
     /// Absence defaults to `"full"` for backward compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interactivity: Option<ChatInteractivity>,
+    pub interactivity: Option<String>,
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits

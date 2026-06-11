@@ -1,0 +1,22 @@
+{
+  "name": "session-input-question-number",
+  "group": "A",
+  "description": "ChatInputQuestion kind=number decodes the number-question variant; kind, id, and min/max survive the round-trip.",
+  "type": "ChatInputQuestion",
+  "input": {
+    "kind": "number",
+    "id": "q1",
+    "message": "How many?",
+    "min": 0,
+    "max": 10
+  },
+  "acceptableOutputs": [
+    {
+      "kind": "number",
+      "id": "q1",
+      "message": "How many?",
+      "min": 0,
+      "max": 10
+    }
+  ]
+}

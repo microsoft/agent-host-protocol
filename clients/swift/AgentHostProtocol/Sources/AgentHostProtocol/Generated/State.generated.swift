@@ -70,8 +70,8 @@ public enum SessionLifecycle: String, Codable, Sendable {
 /// `status & SessionStatus.InProgress` matches both ordinary in-progress turns
 /// and turns that are paused waiting for input.
 public struct SessionStatus: OptionSet, Codable, Sendable, Hashable {
-    public let rawValue: Int
-    public init(rawValue: Int) { self.rawValue = rawValue }
+    public let rawValue: UInt32
+    public init(rawValue: UInt32) { self.rawValue = rawValue }
 
     /// Session is idle — no turn is active.
     public static let idle = SessionStatus(rawValue: 1)
@@ -4104,6 +4104,9 @@ public enum ResponsePart: Codable, Sendable {
     case toolCall(ToolCallResponsePart)
     case reasoning(ReasoningResponsePart)
     case systemNotification(SystemNotificationResponsePart)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "kind"
@@ -4124,7 +4127,7 @@ public enum ResponsePart: Codable, Sendable {
         case "systemNotification":
             self = .systemNotification(try SystemNotificationResponsePart(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ResponsePart discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4135,6 +4138,7 @@ public enum ResponsePart: Codable, Sendable {
         case .toolCall(let value): try value.encode(to: encoder)
         case .reasoning(let value): try value.encode(to: encoder)
         case .systemNotification(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4146,6 +4150,9 @@ public enum ToolCallState: Codable, Sendable {
     case pendingResultConfirmation(ToolCallPendingResultConfirmationState)
     case completed(ToolCallCompletedState)
     case cancelled(ToolCallCancelledState)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "status"
@@ -4168,7 +4175,7 @@ public enum ToolCallState: Codable, Sendable {
         case "cancelled":
             self = .cancelled(try ToolCallCancelledState(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ToolCallState discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4180,6 +4187,7 @@ public enum ToolCallState: Codable, Sendable {
         case .pendingResultConfirmation(let value): try value.encode(to: encoder)
         case .completed(let value): try value.encode(to: encoder)
         case .cancelled(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4187,6 +4195,9 @@ public enum ToolCallState: Codable, Sendable {
 public enum TerminalClaim: Codable, Sendable {
     case client(TerminalClientClaim)
     case session(TerminalSessionClaim)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "kind"
@@ -4201,7 +4212,7 @@ public enum TerminalClaim: Codable, Sendable {
         case "session":
             self = .session(try TerminalSessionClaim(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown TerminalClaim discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4209,6 +4220,7 @@ public enum TerminalClaim: Codable, Sendable {
         switch self {
         case .client(let value): try value.encode(to: encoder)
         case .session(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4216,6 +4228,9 @@ public enum TerminalClaim: Codable, Sendable {
 public enum TerminalContentPart: Codable, Sendable {
     case unclassified(TerminalUnclassifiedPart)
     case command(TerminalCommandPart)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "type"
@@ -4230,7 +4245,7 @@ public enum TerminalContentPart: Codable, Sendable {
         case "command":
             self = .command(try TerminalCommandPart(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown TerminalContentPart discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4238,6 +4253,7 @@ public enum TerminalContentPart: Codable, Sendable {
         switch self {
         case .unclassified(let value): try value.encode(to: encoder)
         case .command(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4249,6 +4265,9 @@ public enum ChatInputQuestion: Codable, Sendable {
     case boolean(ChatInputBooleanQuestion)
     case singleSelect(ChatInputSingleSelectQuestion)
     case multiSelect(ChatInputMultiSelectQuestion)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "kind"
@@ -4271,7 +4290,7 @@ public enum ChatInputQuestion: Codable, Sendable {
         case "multi-select":
             self = .multiSelect(try ChatInputMultiSelectQuestion(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ChatInputQuestion discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4283,6 +4302,7 @@ public enum ChatInputQuestion: Codable, Sendable {
         case .boolean(let value): try value.encode(to: encoder)
         case .singleSelect(let value): try value.encode(to: encoder)
         case .multiSelect(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4293,6 +4313,9 @@ public enum ChatInputAnswerValue: Codable, Sendable {
     case boolean(ChatInputBooleanAnswerValue)
     case selected(ChatInputSelectedAnswerValue)
     case selectedMany(ChatInputSelectedManyAnswerValue)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "kind"
@@ -4313,7 +4336,7 @@ public enum ChatInputAnswerValue: Codable, Sendable {
         case "selected-many":
             self = .selectedMany(try ChatInputSelectedManyAnswerValue(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ChatInputAnswerValue discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4324,6 +4347,7 @@ public enum ChatInputAnswerValue: Codable, Sendable {
         case .boolean(let value): try value.encode(to: encoder)
         case .selected(let value): try value.encode(to: encoder)
         case .selectedMany(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4332,6 +4356,9 @@ public enum ChatInputAnswer: Codable, Sendable {
     case draft(ChatInputAnswered)
     case submitted(ChatInputAnswered)
     case skipped(ChatInputSkipped)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "state"
@@ -4348,7 +4375,7 @@ public enum ChatInputAnswer: Codable, Sendable {
         case "skipped":
             self = .skipped(try ChatInputSkipped(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ChatInputAnswer discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4357,6 +4384,7 @@ public enum ChatInputAnswer: Codable, Sendable {
         case .draft(let value): try value.encode(to: encoder)
         case .submitted(let value): try value.encode(to: encoder)
         case .skipped(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4366,6 +4394,9 @@ public enum MessageAttachment: Codable, Sendable {
     case embeddedResource(MessageEmbeddedResourceAttachment)
     case resource(MessageResourceAttachment)
     case annotations(MessageAnnotationsAttachment)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "type"
@@ -4384,7 +4415,7 @@ public enum MessageAttachment: Codable, Sendable {
         case "annotations":
             self = .annotations(try MessageAnnotationsAttachment(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown MessageAttachment discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4394,6 +4425,7 @@ public enum MessageAttachment: Codable, Sendable {
         case .embeddedResource(let value): try value.encode(to: encoder)
         case .resource(let value): try value.encode(to: encoder)
         case .annotations(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4402,6 +4434,9 @@ public enum Customization: Codable, Sendable {
     case plugin(PluginCustomization)
     case directory(DirectoryCustomization)
     case mcpServer(McpServerCustomization)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "type"
@@ -4418,7 +4453,7 @@ public enum Customization: Codable, Sendable {
         case "mcpServer":
             self = .mcpServer(try McpServerCustomization(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown Customization discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4427,6 +4462,7 @@ public enum Customization: Codable, Sendable {
         case .plugin(let value): try value.encode(to: encoder)
         case .directory(let value): try value.encode(to: encoder)
         case .mcpServer(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4438,6 +4474,9 @@ public enum ChildCustomization: Codable, Sendable {
     case rule(RuleCustomization)
     case hook(HookCustomization)
     case mcpServer(McpServerCustomization)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "type"
@@ -4460,7 +4499,7 @@ public enum ChildCustomization: Codable, Sendable {
         case "mcpServer":
             self = .mcpServer(try McpServerCustomization(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown ChildCustomization discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4472,6 +4511,7 @@ public enum ChildCustomization: Codable, Sendable {
         case .rule(let value): try value.encode(to: encoder)
         case .hook(let value): try value.encode(to: encoder)
         case .mcpServer(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4481,6 +4521,9 @@ public enum CustomizationLoadState: Codable, Sendable {
     case loaded(CustomizationLoadedState)
     case degraded(CustomizationDegradedState)
     case error(CustomizationErrorState)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum DiscriminantKey: String, CodingKey {
         case discriminant = "kind"
@@ -4499,7 +4542,7 @@ public enum CustomizationLoadState: Codable, Sendable {
         case "error":
             self = .error(try CustomizationErrorState(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown CustomizationLoadState discriminant: \(discriminant)")
+            self = .unknown(try AnyCodable(from: decoder))
         }
     }
 
@@ -4509,6 +4552,7 @@ public enum CustomizationLoadState: Codable, Sendable {
         case .loaded(let value): try value.encode(to: encoder)
         case .degraded(let value): try value.encode(to: encoder)
         case .error(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }
@@ -4590,6 +4634,9 @@ public enum ToolResultContent: Codable, Sendable {
     case fileEdit(ToolResultFileEditContent)
     case terminal(ToolResultTerminalContent)
     case subagent(ToolResultSubagentContent)
+    /// Unknown or future tool result content type; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
 
     private enum Keys: String, CodingKey {
         case type
@@ -4612,10 +4659,7 @@ public enum ToolResultContent: Codable, Sendable {
             case "subagent":
                 self = .subagent(try ToolResultSubagentContent(from: decoder))
             default:
-                throw DecodingError.dataCorruptedError(
-                    forKey: .type, in: container,
-                    debugDescription: "Unknown ToolResultContent type: \(type)"
-                )
+                self = .unknown(try AnyCodable(from: decoder))
             }
         } else {
             throw DecodingError.dataCorrupted(
@@ -4633,6 +4677,7 @@ public enum ToolResultContent: Codable, Sendable {
         case .fileEdit(let v): try v.encode(to: encoder)
         case .terminal(let v): try v.encode(to: encoder)
         case .subagent(let v): try v.encode(to: encoder)
+        case .unknown(let v): try v.encode(to: encoder)
         }
     }
 }

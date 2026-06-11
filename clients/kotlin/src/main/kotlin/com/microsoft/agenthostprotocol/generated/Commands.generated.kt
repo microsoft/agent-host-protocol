@@ -1147,15 +1147,9 @@ data class ChangesetOperationResourceTarget(
 data class ChangesetOperationRangeTarget(
     val resource: String,
     val side: String? = null,
-    val range: ChangesetOperationTargetRange,
+    val range: TextRange,
     /** Discriminator. Always "range". */
     val kind: String = "range",
-)
-
-@Serializable
-data class ChangesetOperationTargetRange(
-    val start: Long,
-    val end: Long,
 )
 
 internal object ChangesetOperationTargetSerializer : KSerializer<ChangesetOperationTarget> {

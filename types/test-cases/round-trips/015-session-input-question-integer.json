@@ -1,0 +1,20 @@
+{
+  "name": "session-input-question-integer",
+  "group": "A",
+  "description": "ChatInputQuestion kind=integer decodes the number-question variant, preserving the `integer` kind distinct from `number`; defaultValue survives the round-trip.",
+  "type": "ChatInputQuestion",
+  "input": {
+    "kind": "integer",
+    "id": "q2",
+    "message": "How many whole?",
+    "defaultValue": 3
+  },
+  "acceptableOutputs": [
+    {
+      "kind": "integer",
+      "id": "q2",
+      "message": "How many whole?",
+      "defaultValue": 3
+    }
+  ]
+}

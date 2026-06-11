@@ -1,0 +1,20 @@
+{
+  "name": "action-envelope-origin-present",
+  "group": "A",
+  "description": "ActionEnvelope with a concrete origin (client-originated): origin.clientId and origin.clientSeq survive the round-trip exactly.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-session:/s1",
+    "action": { "type": "session/titleChanged", "title": "Hello" },
+    "serverSeq": 12,
+    "origin": { "clientId": "my-client", "clientSeq": 3 }
+  },
+  "acceptableOutputs": [
+    {
+      "action": { "title": "Hello", "type": "session/titleChanged" },
+      "channel": "ahp-session:/s1",
+      "origin": { "clientId": "my-client", "clientSeq": 3 },
+      "serverSeq": 12
+    }
+  ]
+}

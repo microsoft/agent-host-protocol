@@ -1,0 +1,24 @@
+{
+  "name": "action-envelope-session-title-changed",
+  "group": "A",
+  "description": "ActionEnvelope carrying a session/titleChanged action decodes its scalar fields and its discriminated action variant; key fields survive a re-encode round-trip. The `origin` field is required-nullable (T | undefined, no ?:); when absent from the wire input it re-encodes absent — single canonical form.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-session:/s1",
+    "action": {
+      "type": "session/titleChanged",
+      "title": "Hello"
+    },
+    "serverSeq": 7
+  },
+  "acceptableOutputs": [
+    {
+      "action": {
+        "title": "Hello",
+        "type": "session/titleChanged"
+      },
+      "channel": "ahp-session:/s1",
+      "serverSeq": 7
+    }
+  ]
+}

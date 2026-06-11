@@ -1,0 +1,14 @@
+{
+  "name": "string-or-markdown-object",
+  "group": "A",
+  "description": "StringOrMarkdown object form carries a `markdown` field and re-encodes verbatim.",
+  "type": "StringOrMarkdown",
+  "input": {
+    "markdown": "# title"
+  },
+  "acceptableOutputs": [
+    {
+      "markdown": "# title"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "jsonrpc-error",
+  "group": "A",
+  "description": "A JsonRpcMessage with id+error decodes as the error-response variant and re-encodes all fields.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "error": {
+      "code": -32601,
+      "message": "x"
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "error": {
+        "code": -32601,
+        "message": "x"
+      }
+    }
+  ]
+}

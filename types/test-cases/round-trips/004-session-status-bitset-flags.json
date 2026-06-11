@@ -1,0 +1,10 @@
+{
+  "name": "session-status-bitset-flags",
+  "group": "A",
+  "description": "SessionStatus is a numeric bitset on the wire. InProgress(8)|IsArchived(64)=72 decodes and re-encodes as the same number.",
+  "type": "SessionStatus",
+  "input": 72,
+  "acceptableOutputs": [
+    72
+  ]
+}

@@ -108,7 +108,7 @@ type ActionEnvelope struct {
 	Channel         URI           `json:"channel"`
 	Action          StateAction   `json:"action"`
 	ServerSeq       int64         `json:"serverSeq"`
-	Origin          *ActionOrigin `json:"origin"`
+	Origin          *ActionOrigin `json:"origin,omitempty"`
 	RejectionReason *string       `json:"rejectionReason,omitempty"`
 }
 

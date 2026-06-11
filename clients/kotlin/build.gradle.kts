@@ -56,6 +56,15 @@ tasks.withType<Test>().configureEach {
             .resolve("../../types/test-cases/reducers")
             .canonicalPath,
     )
+    // Same wiring for the shared round-trip corpus consumed by
+    // `RoundTripCorpusTest` — the language-agnostic wire-fidelity
+    // fixtures shared with the .NET / Swift / Rust clients.
+    systemProperty(
+        "ahp.roundTripFixturesDir",
+        rootProject.projectDir
+            .resolve("../../types/test-cases/round-trips")
+            .canonicalPath,
+    )
 }
 
 mavenPublishing {

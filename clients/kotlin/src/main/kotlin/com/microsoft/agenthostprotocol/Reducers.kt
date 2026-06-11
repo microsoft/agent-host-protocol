@@ -86,7 +86,7 @@ private fun nowIsoString(): String = Instant.ofEpochMilli(currentTimestampProvid
 // ─── Status Bitset Helpers ──────────────────────────────────────────────────
 
 /** Bitmask covering the mutually-exclusive activity bits (bits 0–4). */
-private const val STATUS_ACTIVITY_MASK: Int = (1 shl 5) - 1
+private val STATUS_ACTIVITY_MASK: UInt = (1u shl 5) - 1u
 
 /** Sets or clears a metadata flag on a status value. */
 private fun withStatusFlag(status: SessionStatus, flag: SessionStatus, set: Boolean): SessionStatus =

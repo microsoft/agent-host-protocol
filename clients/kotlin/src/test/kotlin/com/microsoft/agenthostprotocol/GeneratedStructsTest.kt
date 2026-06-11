@@ -139,7 +139,7 @@ class GeneratedStructsTest {
         // Sanity check that Ahp object initializes lazily and produces the
         // SessionStatus reference (just to ensure the import graph compiles).
         assertNotNull(Ahp.json)
-        assertEquals(8, SessionStatus.IN_PROGRESS.rawValue)
+        assertEquals(8u, SessionStatus.IN_PROGRESS.rawValue)
     }
 
     @Test

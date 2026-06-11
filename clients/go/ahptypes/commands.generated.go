@@ -980,20 +980,13 @@ func (*ChangesetOperationResourceTarget) isChangesetOperationTarget() {}
 
 // ChangesetOperationRangeTarget targets a range within a resource.
 type ChangesetOperationRangeTarget struct {
-	Kind     string                        `json:"kind"`
-	Resource URI                           `json:"resource"`
-	Side     *string                       `json:"side,omitempty"`
-	Range    ChangesetOperationTargetRange `json:"range"`
+	Kind     string    `json:"kind"`
+	Resource URI       `json:"resource"`
+	Side     *string   `json:"side,omitempty"`
+	Range    TextRange `json:"range"`
 }
 
 func (*ChangesetOperationRangeTarget) isChangesetOperationTarget() {}
-
-// ChangesetOperationTargetRange is the [start, end] index pair for a
-// range target.
-type ChangesetOperationTargetRange struct {
-	Start int64 `json:"start"`
-	End   int64 `json:"end"`
-}
 
 // UnmarshalJSON dispatches on the `kind` discriminator.
 func (t *ChangesetOperationTarget) UnmarshalJSON(data []byte) error {
