@@ -2249,6 +2249,9 @@
             },
             {
               "$ref": "#/$defs/AnnotationsState"
+            },
+            {
+              "$ref": "#/$defs/ChatState"
             }
           ],
           "description": "The current state of the resource"
