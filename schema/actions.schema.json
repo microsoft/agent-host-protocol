@@ -239,7 +239,7 @@
             },
             "interactivity": {
               "$ref": "#/$defs/ChatInteractivity",
-              "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
+              "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
             },
             "workingDirectory": {
               "$ref": "#/$defs/URI",
@@ -3657,7 +3657,7 @@
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
-          "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
+          "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
@@ -3744,7 +3744,7 @@
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
-          "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
+          "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
@@ -6051,15 +6051,6 @@
           ]
         }
       ]
-    },
-    "ChatInteractivity": {
-      "type": "string",
-      "enum": [
-        "full",
-        "read-only",
-        "hidden"
-      ],
-      "description": "How a user can interact with a chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages (e.g. agent team workers)\n- `\"hidden\"` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
     },
     "ChatInputQuestion": {
       "oneOf": [

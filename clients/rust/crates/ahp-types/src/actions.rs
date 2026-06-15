@@ -14,9 +14,9 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, Changeset, ChangesetFile,
     ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
-    ChatInputRequest, ChatInputResponseKind, ChatOrigin, ChatSummary, ConfirmationOption,
-    Customization, ErrorInfo, McpServerState, Message, ModelSelection, PendingMessageKind,
-    ResponsePart, SessionActiveClient, TerminalClaim, TerminalInfo, TextRange,
+    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
+    ConfirmationOption, Customization, ErrorInfo, McpServerState, Message, ModelSelection,
+    PendingMessageKind, ResponsePart, SessionActiveClient, TerminalClaim, TerminalInfo, TextRange,
     ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
     ToolDefinition, ToolResultContent, UsageInfo,
 };
@@ -1330,16 +1330,13 @@ pub struct PartialChatSummary {
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
-    /// How the user can interact with this chat.
-    ///
-    /// - `"full"` — user can send messages and watch (default when absent)
-    /// - `"read-only"` — user can watch but not send messages
-    /// - `"hidden"` — internal worker not shown in UI
+    /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
-    /// Absence defaults to `"full"` for backward compatibility.
+    /// Absence defaults to {@link ChatInteractivity.Full} for backward
+    /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interactivity: Option<String>,
+    pub interactivity: Option<ChatInteractivity>,
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits

@@ -3066,7 +3066,7 @@
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
-          "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
+          "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
@@ -3153,7 +3153,7 @@
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
-          "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
+          "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
@@ -5520,7 +5520,7 @@
             },
             "interactivity": {
               "$ref": "#/$defs/ChatInteractivity",
-              "description": "How the user can interact with this chat.\n\n- `\"full\"` — user can send messages and watch (default when absent)\n- `\"read-only\"` — user can watch but not send messages\n- `\"hidden\"` — internal worker not shown in UI\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to `\"full\"` for backward compatibility."
+              "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
             },
             "workingDirectory": {
               "$ref": "#/$defs/URI",

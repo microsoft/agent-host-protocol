@@ -147,6 +147,29 @@ pub enum ChatOriginKind {
     Tool,
 }
 
+/// How a user can interact with a chat.
+///
+/// - `Full` — user can send messages and watch (default when absent)
+/// - `ReadOnly` — user can watch but not send messages (e.g. agent team workers)
+/// - `Hidden` — internal worker not shown in UI at all
+///
+/// Supports the agent-team pattern where a lead chat is fully interactive and
+/// worker chats are read-only (visible for observability) or hidden (internal
+/// implementation detail). The harness sets this based on the chat's role;
+/// the UI uses it to show appropriate controls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ChatInteractivity {
+    /// User can send messages and watch (default when absent)
+    #[serde(rename = "full")]
+    Full,
+    /// User can watch but not send messages
+    #[serde(rename = "read-only")]
+    ReadOnly,
+    /// Internal worker not shown in UI at all
+    #[serde(rename = "hidden")]
+    Hidden,
+}
+
 /// Answer lifecycle state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ChatInputAnswerState {
@@ -857,16 +880,13 @@ pub struct ChatState {
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
-    /// How the user can interact with this chat.
-    ///
-    /// - `"full"` — user can send messages and watch (default when absent)
-    /// - `"read-only"` — user can watch but not send messages
-    /// - `"hidden"` — internal worker not shown in UI
+    /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
-    /// Absence defaults to `"full"` for backward compatibility.
+    /// Absence defaults to {@link ChatInteractivity.Full} for backward
+    /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interactivity: Option<String>,
+    pub interactivity: Option<ChatInteractivity>,
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits
@@ -921,16 +941,13 @@ pub struct ChatSummary {
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
-    /// How the user can interact with this chat.
-    ///
-    /// - `"full"` — user can send messages and watch (default when absent)
-    /// - `"read-only"` — user can watch but not send messages
-    /// - `"hidden"` — internal worker not shown in UI
+    /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
-    /// Absence defaults to `"full"` for backward compatibility.
+    /// Absence defaults to {@link ChatInteractivity.Full} for backward
+    /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interactivity: Option<String>,
+    pub interactivity: Option<ChatInteractivity>,
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits

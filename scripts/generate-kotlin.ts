@@ -778,7 +778,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 
 const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
-  'ChatOriginKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
+  'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason', 'ConfirmationOptionKind',
@@ -1055,7 +1055,6 @@ function generateStateFile(project: Project): string {
   lines.push('// ─── Type Aliases ───────────────────────────────────────────────────────────');
   lines.push('');
   lines.push('typealias URI = String');
-  lines.push('typealias ChatInteractivity = String');
   lines.push('');
 
   lines.push('// ─── StringOrMarkdown ───────────────────────────────────────────────────────');
@@ -1841,7 +1840,6 @@ function checkExhaustiveness(project: Project): void {
     'ActionType',                   // emitted directly by generateActionsFile(), not via STATE_ENUMS
     'ChangesetOperationTargetKind', // discriminator enum embedded in the hand-rolled ChangesetOperationTarget union
     'StringOrMarkdown',              // generateStringOrMarkdown()
-    'ChatInteractivity',            // type alias for string union
     'ToolCallState',                // TOOL_CALL_STATE_UNION discriminated union
     'StateAction',                  // StateAction enum in generateActionsFile()
     'ActionEnvelope',               // generateDataClassFromInterface() call in generateActionsFile()

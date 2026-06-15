@@ -6,8 +6,6 @@ import Foundation
 
 public typealias URI = String
 
-public typealias ChatInteractivity = String
-
 // MARK: - StringOrMarkdown
 
 /// A value that is either a plain string or a markdown-formatted string.
@@ -91,6 +89,25 @@ public enum ChatOriginKind: String, Codable, Sendable {
     case user = "user"
     case fork = "fork"
     case tool = "tool"
+}
+
+/// How a user can interact with a chat.
+///
+/// - `Full` — user can send messages and watch (default when absent)
+/// - `ReadOnly` — user can watch but not send messages (e.g. agent team workers)
+/// - `Hidden` — internal worker not shown in UI at all
+///
+/// Supports the agent-team pattern where a lead chat is fully interactive and
+/// worker chats are read-only (visible for observability) or hidden (internal
+/// implementation detail). The harness sets this based on the chat's role;
+/// the UI uses it to show appropriate controls.
+public enum ChatInteractivity: String, Codable, Sendable {
+    /// User can send messages and watch (default when absent)
+    case full = "full"
+    /// User can watch but not send messages
+    case readOnly = "read-only"
+    /// Internal worker not shown in UI at all
+    case hidden = "hidden"
 }
 
 /// Answer lifecycle state.
@@ -747,14 +764,11 @@ public struct ChatState: Codable, Sendable {
     public var agent: AgentSelection?
     /// How this chat came into existence
     public var origin: ChatOrigin?
-    /// How the user can interact with this chat.
-    ///
-    /// - `"full"` — user can send messages and watch (default when absent)
-    /// - `"read-only"` — user can watch but not send messages
-    /// - `"hidden"` — internal worker not shown in UI
+    /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
-    /// Absence defaults to `"full"` for backward compatibility.
+    /// Absence defaults to {@link ChatInteractivity.Full} for backward
+    /// compatibility.
     public var interactivity: ChatInteractivity?
     /// Optional per-chat working directory.
     ///
@@ -850,14 +864,11 @@ public struct ChatSummary: Codable, Sendable {
     public var agent: AgentSelection?
     /// How this chat came into existence
     public var origin: ChatOrigin?
-    /// How the user can interact with this chat.
-    ///
-    /// - `"full"` — user can send messages and watch (default when absent)
-    /// - `"read-only"` — user can watch but not send messages
-    /// - `"hidden"` — internal worker not shown in UI
+    /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
-    /// Absence defaults to `"full"` for backward compatibility.
+    /// Absence defaults to {@link ChatInteractivity.Full} for backward
+    /// compatibility.
     public var interactivity: ChatInteractivity?
     /// Optional per-chat working directory.
     ///

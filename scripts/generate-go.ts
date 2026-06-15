@@ -151,7 +151,6 @@ function mapType(tsType: string): string {
 
   if (tsType === 'URI') return 'URI';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
-  if (tsType === 'ChatInteractivity') return 'string';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -637,7 +636,7 @@ function generateDiscriminatedUnion(cfg: UnionConfig): string {
 
 const STATE_ENUMS = [
   'PolicyState', 'SessionLifecycle', 'SessionStatus',
-  'ChatOriginKind', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
+  'ChatOriginKind', 'ChatInteractivity', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind',
   'TurnState', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason',
@@ -1849,7 +1848,6 @@ function checkExhaustiveness(project: Project): void {
     'URI',
     'BaseParams',
     'StringOrMarkdown',
-    'ChatInteractivity',
     'ToolCallState',
     'StateAction',
     'ActionEnvelope',

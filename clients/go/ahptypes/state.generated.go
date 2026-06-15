@@ -69,6 +69,27 @@ const (
 	ChatOriginKindTool ChatOriginKind = "tool"
 )
 
+// How a user can interact with a chat.
+//
+// - `Full` — user can send messages and watch (default when absent)
+// - `ReadOnly` — user can watch but not send messages (e.g. agent team workers)
+// - `Hidden` — internal worker not shown in UI at all
+//
+// Supports the agent-team pattern where a lead chat is fully interactive and
+// worker chats are read-only (visible for observability) or hidden (internal
+// implementation detail). The harness sets this based on the chat's role;
+// the UI uses it to show appropriate controls.
+type ChatInteractivity string
+
+const (
+	// User can send messages and watch (default when absent)
+	ChatInteractivityFull ChatInteractivity = "full"
+	// User can watch but not send messages
+	ChatInteractivityReadOnly ChatInteractivity = "read-only"
+	// Internal worker not shown in UI at all
+	ChatInteractivityHidden ChatInteractivity = "hidden"
+)
+
 // Discriminant for pending message kinds.
 type PendingMessageKind string
 
@@ -771,15 +792,12 @@ type ChatState struct {
 	Agent *AgentSelection `json:"agent,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
-	// How the user can interact with this chat.
-	//
-	// - `"full"` — user can send messages and watch (default when absent)
-	// - `"read-only"` — user can watch but not send messages
-	// - `"hidden"` — internal worker not shown in UI
+	// How the user can interact with this chat. See {@link ChatInteractivity}.
 	//
 	// Supports agent-team patterns where worker chats are read-only or hidden.
-	// Absence defaults to `"full"` for backward compatibility.
-	Interactivity *string `json:"interactivity,omitempty"`
+	// Absence defaults to {@link ChatInteractivity.Full} for backward
+	// compatibility.
+	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
 	// Optional per-chat working directory.
 	//
 	// If absent, the chat inherits
@@ -822,15 +840,12 @@ type ChatSummary struct {
 	Agent *AgentSelection `json:"agent,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
-	// How the user can interact with this chat.
-	//
-	// - `"full"` — user can send messages and watch (default when absent)
-	// - `"read-only"` — user can watch but not send messages
-	// - `"hidden"` — internal worker not shown in UI
+	// How the user can interact with this chat. See {@link ChatInteractivity}.
 	//
 	// Supports agent-team patterns where worker chats are read-only or hidden.
-	// Absence defaults to `"full"` for backward compatibility.
-	Interactivity *string `json:"interactivity,omitempty"`
+	// Absence defaults to {@link ChatInteractivity.Full} for backward
+	// compatibility.
+	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
 	// Optional per-chat working directory.
 	//
 	// If absent, the chat inherits

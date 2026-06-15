@@ -54,14 +54,11 @@ export interface ChatState {
   /** How this chat came into existence */
   origin?: ChatOrigin;
   /**
-   * How the user can interact with this chat.
-   *
-   * - `"full"` — user can send messages and watch (default when absent)
-   * - `"read-only"` — user can watch but not send messages
-   * - `"hidden"` — internal worker not shown in UI
+   * How the user can interact with this chat. See {@link ChatInteractivity}.
    *
    * Supports agent-team patterns where worker chats are read-only or hidden.
-   * Absence defaults to `"full"` for backward compatibility.
+   * Absence defaults to {@link ChatInteractivity.Full} for backward
+   * compatibility.
    */
   interactivity?: ChatInteractivity;
   /**
@@ -117,14 +114,11 @@ export interface ChatSummary {
   /** How this chat came into existence */
   origin?: ChatOrigin;
   /**
-   * How the user can interact with this chat.
-   *
-   * - `"full"` — user can send messages and watch (default when absent)
-   * - `"read-only"` — user can watch but not send messages
-   * - `"hidden"` — internal worker not shown in UI
+   * How the user can interact with this chat. See {@link ChatInteractivity}.
    *
    * Supports agent-team patterns where worker chats are read-only or hidden.
-   * Absence defaults to `"full"` for backward compatibility.
+   * Absence defaults to {@link ChatInteractivity.Full} for backward
+   * compatibility.
    */
   interactivity?: ChatInteractivity;
   /**
@@ -151,9 +145,9 @@ export type ChatOrigin =
 /**
  * How a user can interact with a chat.
  *
- * - `"full"` — user can send messages and watch (default when absent)
- * - `"read-only"` — user can watch but not send messages (e.g. agent team workers)
- * - `"hidden"` — internal worker not shown in UI at all
+ * - `Full` — user can send messages and watch (default when absent)
+ * - `ReadOnly` — user can watch but not send messages (e.g. agent team workers)
+ * - `Hidden` — internal worker not shown in UI at all
  *
  * Supports the agent-team pattern where a lead chat is fully interactive and
  * worker chats are read-only (visible for observability) or hidden (internal
@@ -162,7 +156,14 @@ export type ChatOrigin =
  *
  * @category Chat State
  */
-export type ChatInteractivity = 'full' | 'read-only' | 'hidden';
+export const enum ChatInteractivity {
+  /** User can send messages and watch (default when absent) */
+  Full = 'full',
+  /** User can watch but not send messages */
+  ReadOnly = 'read-only',
+  /** Internal worker not shown in UI at all */
+  Hidden = 'hidden',
+}
 
 // ─── Pending Message Types ───────────────────────────────────────────────────
 
