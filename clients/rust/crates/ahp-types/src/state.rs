@@ -2961,6 +2961,11 @@ pub struct ErrorInfo {
     /// Stack trace
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stack: Option<String>,
+    /// Additional provider-specific metadata for this error.
+    /// Clients MAY look for well-known optional keys here to provide enhanced UI
+    /// (e.g. a structured chat fetch error for richer, localized messaging).
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
 }
 
 /// A point-in-time snapshot of a subscribed resource's state, returned by

@@ -2404,6 +2404,10 @@ type ErrorInfo struct {
 	Message string `json:"message"`
 	// Stack trace
 	Stack *string `json:"stack,omitempty"`
+	// Additional provider-specific metadata for this error.
+	// Clients MAY look for well-known optional keys here to provide enhanced UI
+	// (e.g. a structured chat fetch error for richer, localized messaging).
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // A point-in-time snapshot of a subscribed resource's state, returned by

@@ -3335,7 +3335,14 @@ data class ErrorInfo(
     /**
      * Stack trace
      */
-    val stack: String? = null
+    val stack: String? = null,
+    /**
+     * Additional provider-specific metadata for this error.
+     * Clients MAY look for well-known optional keys here to provide enhanced UI
+     * (e.g. a structured chat fetch error for richer, localized messaging).
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable

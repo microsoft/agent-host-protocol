@@ -30,7 +30,7 @@ use ahp_types::{
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
     notifications::{PartialSessionSummary, SessionAddedParams},
-    state::{Customization, ChatInputQuestion, SessionStatus, SessionSummary},
+    state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary},
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
 };
 use serde_json::{Number, Value};

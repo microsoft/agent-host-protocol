@@ -3646,15 +3646,28 @@ public struct ErrorInfo: Codable, Sendable {
     public var message: String
     /// Stack trace
     public var stack: String?
+    /// Additional provider-specific metadata for this error.
+    /// Clients MAY look for well-known optional keys here to provide enhanced UI
+    /// (e.g. a structured chat fetch error for richer, localized messaging).
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case errorType
+        case message
+        case stack
+        case meta = "_meta"
+    }
 
     public init(
         errorType: String,
         message: String,
-        stack: String? = nil
+        stack: String? = nil,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.errorType = errorType
         self.message = message
         self.stack = stack
+        self.meta = meta
     }
 }
 

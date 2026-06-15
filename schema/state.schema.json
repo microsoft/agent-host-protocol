@@ -382,6 +382,11 @@
         "stack": {
           "type": "string",
           "description": "Stack trace"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this error.\nClients MAY look for well-known optional keys here to provide enhanced UI\n(e.g. a structured chat fetch error for richer, localized messaging)."
         }
       },
       "required": [
