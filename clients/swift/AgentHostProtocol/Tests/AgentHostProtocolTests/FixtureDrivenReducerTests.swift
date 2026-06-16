@@ -93,22 +93,17 @@ final class FixtureDrivenReducerTests: XCTestCase {
     // An UNLISTED fixture that fails to run lands in `failures` → loud. There is
     // no bare `continue` skip.
     //
-    // Five of the six reducer arms are implemented (root / session / terminal /
-    // changeset / resourceWatch). One kind of gap remains:
+    // All six reducer arms are now implemented (root / chat / session / terminal /
+    // changeset / annotations / resourceWatch) and every fixture family runs real
+    // assertions. The gap set is empty; any future unimplemented reducer family
+    // would need to add stems here explicitly so the skip is documented and
+    // tripwired rather than silent.
     //
-    // Unimplemented-channel gap — the `annotations` channel (fixtures 210–219)
-    //    has no Swift reducer yet; `runFixture` hits the `default` arm and throws
-    //    `unsupportedReducer("annotations")`. (The canonical fixture-driven test
-    //    on the base before this rewrite simply skipped the `annotations` reducer
-    //    family with a bare `continue`; here that skip is made explicit and
-    //    tripwired instead.) When `annotationsReducer` lands, these stems decode
-    //    + assert and the drift tripwire forces them out of this set.
-    //
-    // The former representational gap (fixture 103 — a delta carrying a part with
-    // an unknown `kind`) is now CLOSED: the generated types gained a forward-compat
-    // `unknown` fallback (the round-trip-corpus fidelity work), so 103 decodes +
-    // asserts for real and has been removed from the set below — exactly the
-    // outcome the tripwire above was written to force.
+    // History of closed gaps:
+    // - Representational gap (fixture 103 — delta with unknown `kind`): CLOSED
+    //   when generated types gained a forward-compat `unknown` fallback.
+    // - Unimplemented-channel gap (fixtures 210–219 / annotations): CLOSED when
+    //   `annotationsReducer` was implemented.
     private static let knownReducerGaps: Set<String> = []
 
     func testAllFixtures() throws {
