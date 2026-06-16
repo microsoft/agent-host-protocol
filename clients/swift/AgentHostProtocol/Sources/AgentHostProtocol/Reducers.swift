@@ -1072,6 +1072,73 @@ public func changesetReducer(state: ChangesetState, action: StateAction) -> Chan
     }
 }
 
+// MARK: - Annotations Reducer
+
+/// Pure reducer for annotations state. Handles all annotations-scoped actions.
+///
+/// Preserves dispatch order of annotations (and of entries within an annotation):
+/// new entries are appended; `*Set` actions with a matching id replace in place,
+/// while actions whose target id is unknown are no-ops.
+public func annotationsReducer(state: AnnotationsState, action: StateAction) -> AnnotationsState {
+    switch action {
+    case .annotationsSet(let a):
+        var next = state
+        if let idx = next.annotations.firstIndex(where: { $0.id == a.annotation.id }) {
+            next.annotations[idx] = a.annotation
+        } else {
+            next.annotations.append(a.annotation)
+        }
+        return next
+
+    case .annotationsUpdated(let a):
+        guard let idx = state.annotations.firstIndex(where: { $0.id == a.annotationId }) else {
+            return state
+        }
+        var next = state
+        var annotation = next.annotations[idx]
+        if let turnId = a.turnId { annotation.turnId = turnId }
+        if let resource = a.resource { annotation.resource = resource }
+        if let range = a.range { annotation.range = range }
+        if let resolved = a.resolved { annotation.resolved = resolved }
+        next.annotations[idx] = annotation
+        return next
+
+    case .annotationsRemoved(let a):
+        guard let idx = state.annotations.firstIndex(where: { $0.id == a.annotationId }) else {
+            return state
+        }
+        var next = state
+        next.annotations.remove(at: idx)
+        return next
+
+    case .annotationsEntrySet(let a):
+        guard let tIdx = state.annotations.firstIndex(where: { $0.id == a.annotationId }) else {
+            return state
+        }
+        var next = state
+        if let cIdx = next.annotations[tIdx].entries.firstIndex(where: { $0.id == a.entry.id }) {
+            next.annotations[tIdx].entries[cIdx] = a.entry
+        } else {
+            next.annotations[tIdx].entries.append(a.entry)
+        }
+        return next
+
+    case .annotationsEntryRemoved(let a):
+        guard let tIdx = state.annotations.firstIndex(where: { $0.id == a.annotationId }) else {
+            return state
+        }
+        guard let cIdx = state.annotations[tIdx].entries.firstIndex(where: { $0.id == a.entryId }) else {
+            return state
+        }
+        var next = state
+        next.annotations[tIdx].entries.remove(at: cIdx)
+        return next
+
+    default:
+        return state
+    }
+}
+
 // MARK: - Resource-Watch Reducer
 
 /// Pure reducer for resource-watch state. Handles every resource-watch action.

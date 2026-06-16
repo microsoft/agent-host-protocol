@@ -43,6 +43,8 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Added
 
+- `annotationsReducer` implemented; annotations conformance fixtures (210–219) now pass.
+
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
   existing annotation's `turnId` / `resource` / `range` / `resolved` without
   resending its entries. Handled by the annotations reducer (no-op on unknown

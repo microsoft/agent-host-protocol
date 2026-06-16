@@ -109,18 +109,7 @@ final class FixtureDrivenReducerTests: XCTestCase {
     // `unknown` fallback (the round-trip-corpus fidelity work), so 103 decodes +
     // asserts for real and has been removed from the set below — exactly the
     // outcome the tripwire above was written to force.
-    private static let knownReducerGaps: Set<String> = [
-        "210-annotations-set-appends-new-annotation",
-        "211-annotations-set-replaces-existing-annotation",
-        "212-annotations-removed-drops-matching-annotation",
-        "213-annotations-entryset-appends-and-replaces",
-        "214-annotations-entryset-unknown-annotation-is-no-op",
-        "215-annotations-entryremoved-drops-matching-entry",
-        "216-annotations-updated-resolves-and-preserves-entries",
-        "217-annotations-unknown-action-type-is-no-op",
-        "218-annotations-updated-reanchors-turn-and-range",
-        "219-annotations-updated-unknown-annotation-is-no-op",
-    ]
+    private static let knownReducerGaps: Set<String> = []
 
     func testAllFixtures() throws {
         var failures: [(file: String, description: String, message: String)] = []
@@ -225,6 +214,10 @@ final class FixtureDrivenReducerTests: XCTestCase {
         case "chat":
             try compareFixture(file: file, fixture: fixture, stateType: ChatState.self) { state in
                 actions.reduce(state) { chatReducer(state: $0, action: $1) }
+            }
+        case "annotations":
+            try compareFixture(file: file, fixture: fixture, stateType: AnnotationsState.self) { state in
+                actions.reduce(state) { annotationsReducer(state: $0, action: $1) }
             }
         default:
             throw FixtureError.unsupportedReducer(fixture.reducer)
