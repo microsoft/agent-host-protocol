@@ -484,6 +484,9 @@ pub enum ChangesetOperationStatus {
     /// {@link ChangesetOperation.error}.
     #[serde(rename = "error")]
     Error,
+    /// The operation is currently disabled and cannot be invoked.
+    #[serde(rename = "disabled")]
+    Disabled,
 }
 
 /// Where a {@link ChangesetOperation} can be invoked.
@@ -3117,6 +3120,9 @@ pub struct ChangesetOperation {
     /// Optional generic icon hint, e.g. `"check"`, `"trash"`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Optional group identifier, used to group related operations together.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// Current execution status. The server sets
     /// {@link ChangesetOperationStatus.Running | Running} while an invocation
     /// is in flight, {@link ChangesetOperationStatus.Error | Error} when the

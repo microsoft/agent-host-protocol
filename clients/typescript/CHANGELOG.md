@@ -22,6 +22,13 @@ hotfix escape hatch.
 
 ### Added
 
+- `ChangesetOperationStatus.Disabled` — new enum value for changeset
+  operations that are currently unavailable and cannot be invoked.
+- `ChangesetOperation.group` — optional identifier for grouping related
+  changeset operations together in the UI.
+
+### Added
+
 - `Snapshot.state` now accepts `ResourceWatchState`, so the existing
   `initialize` / `reconnect` / `subscribe` snapshot path can carry an
   `ahp-resource-watch:` channel's descriptor alongside the existing root /

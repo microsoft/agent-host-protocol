@@ -607,7 +607,12 @@ enum class ChangesetOperationStatus {
      * {@link ChangesetOperation.error}.
      */
     @SerialName("error")
-    ERROR
+    ERROR,
+    /**
+     * The operation is currently disabled and cannot be invoked.
+     */
+    @SerialName("disabled")
+    DISABLED
 }
 
 /**
@@ -3507,6 +3512,10 @@ data class ChangesetOperation(
      * Optional generic icon hint, e.g. `"check"`, `"trash"`.
      */
     val icon: String? = null,
+    /**
+     * Optional group identifier, used to group related operations together.
+     */
+    val group: String? = null,
     /**
      * Current execution status. The server sets
      * {@link ChangesetOperationStatus.Running | Running} while an invocation
