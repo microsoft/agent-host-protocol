@@ -44,6 +44,20 @@ public struct AnyCodable: Codable, @unchecked Sendable, Equatable {
         switch value {
         case is NSNull:
             try container.encodeNil()
+        case let n as NSNumber:
+            // NSNumber bridges to Bool, Int, and Double, so we must detect its
+            // true JSON type before falling through to the generic Swift arms.
+            if CFGetTypeID(n) == CFBooleanGetTypeID() {
+                try container.encode(n.boolValue)
+            } else {
+                let objCType = String(cString: n.objCType)
+                switch objCType {
+                case "f", "d":
+                    try container.encode(n.doubleValue)
+                default:
+                    try container.encode(n.int64Value)
+                }
+            }
         case let bool as Bool:
             try container.encode(bool)
         case let int as Int:

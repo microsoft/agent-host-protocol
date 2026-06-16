@@ -38,6 +38,7 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Fixed
 
+- `AnyCodable.encode` no longer corrupts `NSNumber`-backed `Int`/`Double` values to `Bool`/`Int`. `NSNumber` is now special-cased before the generic Swift type arms, using `CFBooleanGetTypeID()` to distinguish boolean from numeric `NSNumber` instances.
 - Session reducers now apply `_meta` (`meta`) updates from every
   tool-call-scoped action, not only `session/toolCallStart`.
 
