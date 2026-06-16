@@ -47,6 +47,8 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
 - `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` / `disposeChat` commands.
 - `ChatSummary.WorkingDirectory` — optional per-chat working directory. Falls back to the session's `WorkingDirectory` when absent.
 - Three discrete chat-catalog actions on the session channel — `SessionChatAddedAction` (upsert by `Summary.Resource`), `SessionChatRemovedAction`, and `SessionChatUpdatedAction` (partial-update payload).
+- `SessionDefaultChatChangedAction` (`session/defaultChatChanged`) — updates `SessionState.DefaultChat` to steer new input to the designated chat; absent value clears the hint.
+- `ErrorInfo.Meta map[string]json.RawMessage` — optional provider-specific metadata bag on error payloads (`_meta` on the wire), mirroring the existing `Meta` field on `UsageInfo` and other protocol types.
 - `RootState` now exposes an optional `_meta` property bag (`Meta
   map[string]json.RawMessage`) for implementation-defined agent-host metadata,
   such as a well-known `hostBuild` key carrying the host's build

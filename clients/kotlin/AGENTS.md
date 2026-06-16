@@ -23,7 +23,7 @@ CI verifies the committed generated files match the output of `npm run generate:
 ## Library structure
 
 - `src/main/kotlin/com/microsoft/agenthostprotocol/Ahp.kt` — Hand-maintained entry point. Exposes the configured `kotlinx.serialization.json.Json` instance (`Ahp.json`) that consumers MUST use to encode/decode protocol messages. The custom `KSerializer`s for discriminated unions require a JSON-aware encoder/decoder, so generic `Json` instances may not work.
-- `src/main/kotlin/com/microsoft/agenthostprotocol/Reducers.kt` — Hand-written pure reducers (`rootReducer`, `sessionReducer`, `terminalReducer`, `changesetReducer`) ported from `types/channels-*/reducer.ts`, plus a small `Reducer<S, A>` fun-interface and per-channel `object` wrappers. See [Reducers](#reducers) below.
+- `src/main/kotlin/com/microsoft/agenthostprotocol/Reducers.kt` — Hand-written pure reducers (`rootReducer`, `sessionReducer`, `chatReducer`, `terminalReducer`, `changesetReducer`, `annotationsReducer`, `resourceWatchReducer`) ported from `types/channels-*/reducer.ts`, plus a small `Reducer<S, A>` fun-interface and per-channel `object` wrappers. See [Reducers](#reducers) below.
 - `src/main/kotlin/com/microsoft/agenthostprotocol/generated/` — Auto-generated wire types.
 - `build.gradle.kts` — Gradle build config. Sets `jvmTarget = JVM_1_8` (Android-friendly) with a JDK 17 toolchain. Configures the Vanniktech `maven-publish` plugin for Sonatype Central Portal publishing. Also wires the absolute path of `types/test-cases/reducers/` into the test JVM as the `ahp.reducerFixturesDir` system property so `FixtureDrivenReducerTest` can load fixtures regardless of cwd.
 - `gradle.properties` — Source of truth for the artifact's Maven coordinates (`GROUP`, `VERSION_NAME`) and POM metadata.
@@ -137,14 +137,20 @@ This package currently ships **wire types and pure reducers**. The following are
 ```kotlin
 public fun rootReducer(state: RootState, action: StateAction): RootState
 public fun sessionReducer(state: SessionState, action: StateAction): SessionState
+public fun chatReducer(state: ChatState, action: StateAction): ChatState
 public fun terminalReducer(state: TerminalState, action: StateAction): TerminalState
 public fun changesetReducer(state: ChangesetState, action: StateAction): ChangesetState
+public fun annotationsReducer(state: AnnotationsState, action: StateAction): AnnotationsState
+public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction): ResourceWatchState
 
 public fun interface Reducer<S, A> { public fun reduce(state: S, action: A): S }
 public object RootReducer : Reducer<RootState, StateAction>      // delegates to rootReducer
 public object SessionReducer : Reducer<SessionState, StateAction>
+public object ChatReducer : Reducer<ChatState, StateAction>
 public object TerminalReducer : Reducer<TerminalState, StateAction>
 public object ChangesetReducer : Reducer<ChangesetState, StateAction>
+public object AnnotationsReducer : Reducer<AnnotationsState, StateAction>
+public object ResourceWatchReducer : Reducer<ResourceWatchState, StateAction>
 ```
 
 Each reducer dispatches on the [`StateAction`] sealed interface and handles the action variants that belong to its channel. Actions belonging to other channels (or unknown `StateActionUnknown` variants returned by the wire-types decoder when the server sends a newer action type than this version of the client knows about) fall through to an `else -> state` no-op — this matches the forward-compatibility semantics of the canonical TypeScript and Swift reducers.
