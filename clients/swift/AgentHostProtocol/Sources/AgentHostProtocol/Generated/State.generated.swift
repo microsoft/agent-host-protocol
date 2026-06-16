@@ -325,6 +325,8 @@ public enum ChangesetOperationStatus: String, Codable, Sendable {
     /// The most recent invocation failed. The cause is described by
     /// {@link ChangesetOperation.error}.
     case error = "error"
+    /// The operation is currently disabled and cannot be invoked.
+    case disabled = "disabled"
 }
 
 /// Where a {@link ChangesetOperation} can be invoked.
@@ -3824,6 +3826,8 @@ public struct ChangesetOperation: Codable, Sendable {
     public var confirmation: StringOrMarkdown?
     /// Optional generic icon hint, e.g. `"check"`, `"trash"`.
     public var icon: String?
+    /// Optional group identifier, used to group related operations together.
+    public var group: String?
     /// Current execution status. The server sets
     /// {@link ChangesetOperationStatus.Running | Running} while an invocation
     /// is in flight, {@link ChangesetOperationStatus.Error | Error} when the
@@ -3845,6 +3849,7 @@ public struct ChangesetOperation: Codable, Sendable {
         scopes: [ChangesetOperationScope],
         confirmation: StringOrMarkdown? = nil,
         icon: String? = nil,
+        group: String? = nil,
         status: ChangesetOperationStatus,
         error: ErrorInfo? = nil
     ) {
@@ -3854,6 +3859,7 @@ public struct ChangesetOperation: Codable, Sendable {
         self.scopes = scopes
         self.confirmation = confirmation
         self.icon = icon
+        self.group = group
         self.status = status
         self.error = error
     }

@@ -15,6 +15,13 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
+### Added
+
+- `ChangesetOperationStatus::Disabled` — new variant for changeset operations
+  that are currently unavailable and cannot be invoked.
+- `ChangesetOperation.group` — optional identifier for grouping related
+  changeset operations together in the UI.
+
 ### Changed
 
 - **BREAKING:** `SessionStatus` is now a `u32` bitset newtype

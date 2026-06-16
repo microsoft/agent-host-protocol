@@ -355,6 +355,8 @@ const (
 	// The most recent invocation failed. The cause is described by
 	// {@link ChangesetOperation.error}.
 	ChangesetOperationStatusError ChangesetOperationStatus = "error"
+	// The operation is currently disabled and cannot be invoked.
+	ChangesetOperationStatusDisabled ChangesetOperationStatus = "disabled"
 )
 
 // Where a {@link ChangesetOperation} can be invoked.
@@ -2540,6 +2542,8 @@ type ChangesetOperation struct {
 	Confirmation *StringOrMarkdown `json:"confirmation,omitempty"`
 	// Optional generic icon hint, e.g. `"check"`, `"trash"`.
 	Icon *string `json:"icon,omitempty"`
+	// Optional group identifier, used to group related operations together.
+	Group *string `json:"group,omitempty"`
 	// Current execution status. The server sets
 	// {@link ChangesetOperationStatus.Running | Running} while an invocation
 	// is in flight, {@link ChangesetOperationStatus.Error | Error} when the
