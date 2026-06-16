@@ -15,6 +15,13 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 
 ## [Unreleased]
 
+### Added
+
+- `ChangesetOperationStatus.Disabled` — new enum value for changeset
+  operations that are currently unavailable and cannot be invoked.
+- `ChangesetOperation.group` — optional identifier for grouping related
+  changeset operations together in the UI.
+
 ### Changed
 
 - **BREAKING:** `SessionStatus.rawValue` is now a `UInt` (was `Int`), and the

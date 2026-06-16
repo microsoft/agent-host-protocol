@@ -17,6 +17,13 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Added
+
+- `ChangesetOperationStatus.disabled` — new case for changeset operations
+  that are currently unavailable and cannot be invoked.
+- `ChangesetOperation.group` — optional identifier for grouping related
+  changeset operations together in the UI.
+
 ### Changed
 
 - **BREAKING:** `SessionStatus` is now an `OptionSet` with a `UInt32` rawValue

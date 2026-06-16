@@ -4069,6 +4069,10 @@
           "type": "string",
           "description": "Optional generic icon hint, e.g. `\"check\"`, `\"trash\"`."
         },
+        "group": {
+          "type": "string",
+          "description": "Optional group identifier, used to group related operations together."
+        },
         "status": {
           "$ref": "#/$defs/ChangesetOperationStatus",
           "description": "Current execution status. The server sets\n{@link ChangesetOperationStatus.Running | Running} while an invocation\nis in flight, {@link ChangesetOperationStatus.Error | Error} when the\nmost recent invocation failed, and\n{@link ChangesetOperationStatus.Idle | Idle} otherwise.\n\nClients SHOULD reflect this state in the UI — e.g. disabling the\ncontrol or showing a spinner while `Running`, and surfacing\n{@link error} while `Error`."
