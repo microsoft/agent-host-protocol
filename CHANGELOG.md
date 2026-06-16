@@ -23,6 +23,14 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+### Added
+
+- `ChangesetOperationStatus.Disabled` — signals that a changeset operation is
+  currently unavailable and cannot be invoked, so clients can render the
+  control as disabled rather than hiding it.
+- `ChangesetOperation.group` — optional identifier for grouping related
+  changeset operations together in the UI.
+
 ### Changed
 
 - `Snapshot.state` now accepts `ResourceWatchState`, so `initialize` /
