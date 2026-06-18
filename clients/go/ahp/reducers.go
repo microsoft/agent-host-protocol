@@ -1255,38 +1255,160 @@ func appendTerminalData(state *ahptypes.TerminalState, data string) {
 
 // ─── Changeset Reducer ─────────────────────────────────────────────────
 
-// ApplyActionToChangeset is the entry point for changeset actions.
-// Mirrors the Rust client's stub: every recognized changeset action
-// short-circuits as [ReduceOutcomeNoOp] until the full changeset
-// reducer is ported. Unrelated actions return [ReduceOutcomeOutOfScope].
+// ApplyActionToChangeset applies action to the [ahptypes.ChangesetState]
+// in place. Returns [ReduceOutcomeOutOfScope] for actions that target a
+// different state tree.
 func ApplyActionToChangeset(state *ahptypes.ChangesetState, action ahptypes.StateAction) ReduceOutcome {
-	_ = state
-	switch action.Value.(type) {
-	case *ahptypes.ChangesetStatusChangedAction,
-		*ahptypes.ChangesetFileSetAction,
-		*ahptypes.ChangesetFileRemovedAction,
-		*ahptypes.ChangesetOperationsChangedAction,
-		*ahptypes.ChangesetOperationStatusChangedAction,
-		*ahptypes.ChangesetClearedAction:
+	switch a := action.Value.(type) {
+	case *ahptypes.ChangesetStatusChangedAction:
+		state.Status = a.Status
+		if a.Status == ahptypes.ChangesetStatusError {
+			state.Error = a.Error
+		} else {
+			state.Error = nil
+		}
+		return ReduceOutcomeApplied
+
+	case *ahptypes.ChangesetFileSetAction:
+		for i := range state.Files {
+			if state.Files[i].Id == a.File.Id {
+				state.Files[i] = a.File
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Files = append(state.Files, a.File)
+		return ReduceOutcomeApplied
+
+	case *ahptypes.ChangesetFileRemovedAction:
+		for i := range state.Files {
+			if state.Files[i].Id == a.FileId {
+				state.Files = append(state.Files[:i], state.Files[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+
+	case *ahptypes.ChangesetOperationsChangedAction:
+		state.Operations = a.Operations
+		return ReduceOutcomeApplied
+
+	case *ahptypes.ChangesetOperationStatusChangedAction:
+		for i := range state.Operations {
+			if state.Operations[i].Id == a.OperationId {
+				state.Operations[i].Status = a.Status
+				if a.Status == ahptypes.ChangesetOperationStatusError {
+					state.Operations[i].Error = a.Error
+				} else {
+					state.Operations[i].Error = nil
+				}
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+
+	case *ahptypes.ChangesetClearedAction:
+		if len(state.Files) == 0 {
+			return ReduceOutcomeNoOp
+		}
+		state.Files = []ahptypes.ChangesetFile{}
+		return ReduceOutcomeApplied
+	}
+	return ReduceOutcomeOutOfScope
+}
+
+// ─── Annotations Reducer ──────────────────────────────────────────────
+
+// ApplyActionToAnnotations applies action to the [ahptypes.AnnotationsState]
+// in place. Returns [ReduceOutcomeOutOfScope] for actions that target a
+// different state tree.
+func ApplyActionToAnnotations(state *ahptypes.AnnotationsState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.AnnotationsSetAction:
+		for i := range state.Annotations {
+			if state.Annotations[i].Id == a.Annotation.Id {
+				state.Annotations[i] = a.Annotation
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Annotations = append(state.Annotations, a.Annotation)
+		return ReduceOutcomeApplied
+
+	case *ahptypes.AnnotationsUpdatedAction:
+		for i := range state.Annotations {
+			if state.Annotations[i].Id == a.AnnotationId {
+				if a.TurnId != nil {
+					state.Annotations[i].TurnId = *a.TurnId
+				}
+				if a.Resource != nil {
+					state.Annotations[i].Resource = *a.Resource
+				}
+				if a.Range != nil {
+					state.Annotations[i].Range = a.Range
+				}
+				if a.Resolved != nil {
+					state.Annotations[i].Resolved = *a.Resolved
+				}
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+
+	case *ahptypes.AnnotationsRemovedAction:
+		for i := range state.Annotations {
+			if state.Annotations[i].Id == a.AnnotationId {
+				state.Annotations = append(state.Annotations[:i], state.Annotations[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+
+	case *ahptypes.AnnotationsEntrySetAction:
+		for i := range state.Annotations {
+			if state.Annotations[i].Id != a.AnnotationId {
+				continue
+			}
+			entries := state.Annotations[i].Entries
+			for j := range entries {
+				if entries[j].Id == a.Entry.Id {
+					state.Annotations[i].Entries[j] = a.Entry
+					return ReduceOutcomeApplied
+				}
+			}
+			state.Annotations[i].Entries = append(state.Annotations[i].Entries, a.Entry)
+			return ReduceOutcomeApplied
+		}
+		return ReduceOutcomeNoOp
+
+	case *ahptypes.AnnotationsEntryRemovedAction:
+		for i := range state.Annotations {
+			if state.Annotations[i].Id != a.AnnotationId {
+				continue
+			}
+			entries := state.Annotations[i].Entries
+			for j := range entries {
+				if entries[j].Id == a.EntryId {
+					state.Annotations[i].Entries = append(entries[:j], entries[j+1:]...)
+					return ReduceOutcomeApplied
+				}
+			}
+			return ReduceOutcomeNoOp
+		}
 		return ReduceOutcomeNoOp
 	}
 	return ReduceOutcomeOutOfScope
 }
 
-// ─── Annotations Reducer ─────────────────────────────────────────
+// ─── Resource-Watch Reducer ────────────────────────────────────────────
 
-// ApplyActionToAnnotations is the entry point for annotations actions.
-// Mirrors the Rust client's stub: every recognized annotations action
-// short-circuits as [ReduceOutcomeNoOp] until the full annotations
-// reducer is ported. Unrelated actions return [ReduceOutcomeOutOfScope].
-func ApplyActionToAnnotations(state *ahptypes.AnnotationsState, action ahptypes.StateAction) ReduceOutcome {
-	_ = state
+// ApplyActionToResourceWatch applies action to the
+// [ahptypes.ResourceWatchState] in place. The state captures only the
+// watch descriptor set at subscription time; change events delivered
+// via [ahptypes.ResourceWatchChangedAction] are pass-through and leave
+// the state unchanged. Returns [ReduceOutcomeOutOfScope] for actions
+// that target a different state tree.
+func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahptypes.StateAction) ReduceOutcome {
 	switch action.Value.(type) {
-	case *ahptypes.AnnotationsSetAction,
-		*ahptypes.AnnotationsUpdatedAction,
-		*ahptypes.AnnotationsRemovedAction,
-		*ahptypes.AnnotationsEntrySetAction,
-		*ahptypes.AnnotationsEntryRemovedAction:
+	case *ahptypes.ResourceWatchChangedAction:
 		return ReduceOutcomeNoOp
 	}
 	return ReduceOutcomeOutOfScope

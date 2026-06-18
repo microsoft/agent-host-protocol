@@ -332,7 +332,7 @@ internal final class HostRuntime: Sendable {
                 if case .rpc = error {
                     let init1 = try await client.initialize(
                         clientId: clientId,
-                        protocolVersions: [supportedProtocolVersion],
+                        protocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
                         initialSubscriptions: priorSubscriptions
                     )
                     initResult = init1
@@ -344,7 +344,7 @@ internal final class HostRuntime: Sendable {
         } else {
             let init1 = try await client.initialize(
                 clientId: clientId,
-                protocolVersions: [supportedProtocolVersion],
+                protocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
                 initialSubscriptions: priorSubscriptions
             )
             initResult = init1
@@ -831,8 +831,3 @@ private func applySummaryChanges(
     if let v = changes.workingDirectory { existing.workingDirectory = v }
 }
 
-/// Protocol version offered on `initialize`. Mirrors the Rust SDK's use of
-/// the canonical `PROTOCOL_VERSION` constant; the Swift types library
-/// doesn't ship one yet, so this is a constant string co-located with the
-/// rest of the multi-host code. TODO(codegen): source from generated types.
-private let supportedProtocolVersion = "0.2.0"

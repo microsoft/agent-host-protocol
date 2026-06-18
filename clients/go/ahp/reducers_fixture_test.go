@@ -155,14 +155,11 @@ func TestFixtureDrivenReducerParity(t *testing.T) {
 			case "terminal":
 				runFixture[ahptypes.TerminalState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToTerminal)
 			case "changeset":
-				// Changeset reducer logic is deferred — skip.
-				tt.Skip("changeset reducer is a stub in this client (parity with Rust)")
+				runFixture[ahptypes.ChangesetState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToChangeset)
 			case "annotations":
-				// Annotations reducer logic is deferred — skip.
-				tt.Skip("annotations reducer is a stub in this client (parity with Rust)")
+				runFixture[ahptypes.AnnotationsState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAnnotations)
 			case "resourceWatch":
-				// Resource-watch reducer logic is deferred — skip.
-				tt.Skip("resourceWatch reducer is a stub in this client (parity with Rust)")
+				runFixture[ahptypes.ResourceWatchState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToResourceWatch)
 			default:
 				tt.Fatalf("unknown reducer kind %q", fixture.Reducer)
 			}

@@ -55,9 +55,11 @@ Spec version: `0.4.0`
   Resolving or re-anchoring an annotation no longer requires replacing the
   whole annotation via `annotations/set`. Omitted fields are left unchanged;
   the annotation's `entries`, `id`, and `_meta` are never touched.
-- `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` command.
+- `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` / `disposeChat` commands.
 - `ChatSummary.workingDirectory?` — optional per-chat working directory. When absent, chats inherit the session's `workingDirectory`. Enables agent-swarm patterns where multiple chats in one session operate on independent worktrees.
 - Three discrete chat-catalog actions on the session channel — `session/chatAdded` (upsert by `summary.resource`), `session/chatRemoved`, and `session/chatUpdated` (partial-update with `Partial<ChatSummary>`) — mirroring the root-channel `root/sessionAdded` / `root/sessionRemoved` / `root/sessionSummaryChanged` pattern.
+- `session/defaultChatChanged` action — updates `SessionState.defaultChat` to steer new input to the designated chat; absent value clears the hint.
+- `ErrorInfo._meta?: Record<string, unknown>` — optional provider-specific metadata bag on error payloads, mirroring the existing `_meta` convention on `UsageInfo` and other protocol types. Clients MAY inspect well-known keys here for richer, localised error UI.
 - `RootState` now carries an optional `_meta` property bag for
   implementation-defined metadata about the agent host itself, mirroring the
   MCP `_meta` convention. A well-known `hostBuild` key may carry build

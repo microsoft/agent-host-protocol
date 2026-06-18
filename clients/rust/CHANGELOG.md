@@ -17,6 +17,8 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Added
 
+- `ahp_error_codes::CONFLICT` constant (`-32011`) added to `ahp-types`; covers ETag-conflict failures from `ResourceWriteParams.if_match` checks.
+- `apply_action_to_changeset`, `apply_action_to_annotations`, and `apply_action_to_resource_watch` reducers in `ahp`; all previously-skipped conformance fixtures for the `changeset`, `annotations`, and `resourceWatch` reducer families now pass.
 - `ChangesetOperationStatus::Disabled` — new variant for changeset operations
   that are currently unavailable and cannot be invoked.
 - `ChangesetOperation.group` — optional identifier for grouping related
@@ -62,6 +64,8 @@ matching `## [X.Y.Z]` heading is missing from this file.
 - `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` / `disposeChat` commands.
 - `ChatSummary.working_directory` — optional per-chat working directory. Falls back to the session's `working_directory` when absent.
 - Three discrete chat-catalog actions on the session channel — `SessionChatAdded` (upsert by `summary.resource`), `SessionChatRemoved`, and `SessionChatUpdated` (partial-update payload).
+- `SessionDefaultChatChanged` (`session/defaultChatChanged`) — updates `SessionState.default_chat` to steer new input to the designated chat; absent value clears the hint.
+- `ErrorInfo.meta: Option<JsonObject>` — optional provider-specific metadata bag on error payloads (serialized as `_meta`), mirroring the existing `meta` field on `UsageInfo` and other protocol types.
 - `RootState` now exposes an optional `_meta` property bag (`meta:
   Option<JsonObject>`) for implementation-defined agent-host metadata, such as
   a well-known `hostBuild` key carrying the host's build version/commit/date.

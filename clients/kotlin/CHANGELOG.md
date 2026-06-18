@@ -47,9 +47,11 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
   resending its entries. Handled by the annotations reducer (no-op on unknown
   id).
 
-- `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` command.
+- `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` / `disposeChat` commands.
 - `ChatSummary.workingDirectory` — optional per-chat working directory. Falls back to the session's `workingDirectory` when absent.
 - Three discrete chat-catalog actions on the session channel — `SessionChatAddedAction` (upsert by `summary.resource`), `SessionChatRemovedAction`, and `SessionChatUpdatedAction` (partial-update payload).
+- `SessionDefaultChatChangedAction` (`session/defaultChatChanged`) — updates `SessionState.defaultChat` to steer new input to the designated chat; absent value clears the hint.
+- `ErrorInfo.meta: Map<String, JsonElement>?` — optional provider-specific metadata bag on error payloads (serialized as `_meta`), mirroring the existing `meta` field on `UsageInfo` and other protocol types. Clients MAY inspect well-known keys here for richer, localised error UI.
 - `RootState` now exposes an optional `_meta` property bag (`meta: Map<String,
   JsonElement>?`) for implementation-defined agent-host metadata, such as a
   well-known `hostBuild` key carrying the host's build version/commit/date.

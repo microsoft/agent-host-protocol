@@ -51,9 +51,11 @@ hotfix escape hatch.
   existing annotation's `turnId` / `resource` / `range` / `resolved` without
   resending its entries. Handled by `annotationsReducer` (no-op on unknown id).
 
-- `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` command.
+- `ahp-chat:` channel for per-chat conversation state; `SessionState.chats[]` catalog; `SessionState.defaultChat?` input-routing hint; `ChatOrigin` provenance union; `createChat` / `disposeChat` commands.
 - `ChatSummary.workingDirectory?` — optional per-chat working directory. Falls back to the session's `workingDirectory` when absent.
 - Three discrete chat-catalog actions on the session channel — `SessionChatAddedAction` (upsert by `summary.resource`), `SessionChatRemovedAction`, and `SessionChatUpdatedAction` (partial-update with `Partial<ChatSummary>`).
+- `SessionDefaultChatChangedAction` (`session/defaultChatChanged`) — updates `SessionState.defaultChat` to steer new input to the designated chat; absent value clears the hint.
+- `ErrorInfo._meta?: Record<string, unknown>` — optional provider-specific metadata bag on error payloads, mirroring the existing `_meta` convention on `UsageInfo` and other protocol types. Clients MAY inspect well-known keys here for richer, localised error UI.
 - `RootState` now exposes an optional `_meta` property bag (`_meta?:
   Record<string, unknown>`) for implementation-defined agent-host metadata, such
   as a well-known `hostBuild` key carrying the host's build version/commit/date.

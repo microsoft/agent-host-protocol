@@ -2,10 +2,12 @@
 //!
 //! Reducers mutate state in place and return a [`ReduceOutcome`]. Use
 //! [`apply_action_to_root`], [`apply_action_to_session`],
-//! [`apply_action_to_chat`], and [`apply_action_to_terminal`] to
-//! dispatch any [`StateAction`] against the matching scope; unrelated
-//! actions short-circuit as [`ReduceOutcome::OutOfScope`] so a client
-//! holding every state tree can blindly fan each action out.
+//! [`apply_action_to_chat`], [`apply_action_to_terminal`],
+//! [`apply_action_to_changeset`], [`apply_action_to_annotations`], and
+//! [`apply_action_to_resource_watch`] to dispatch any [`StateAction`]
+//! against the matching scope; unrelated actions short-circuit as
+//! [`ReduceOutcome::OutOfScope`] so a client holding every state tree can
+//! blindly fan each action out.
 //!
 //! All reducers are pure functions over `(state, action)` — no
 //! I/O, no allocation beyond what the action itself carries — which
@@ -55,10 +57,11 @@ use ahp_types::actions::{
     ChatToolCallResultConfirmedAction, ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization,
-    ErrorInfo, PendingMessage, PendingMessageKind, ResponsePart, RootState, SessionLifecycle,
-    SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart, TerminalState,
-    TerminalUnclassifiedPart, ToolCallCancellationReason, ToolCallCancelledState,
+    ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
+    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization, ErrorInfo,
+    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
+    SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart,
+    TerminalState, TerminalUnclassifiedPart, ToolCallCancellationReason, ToolCallCancelledState,
     ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
     ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
     ToolCallRunningState, ToolCallState, ToolCallStreamingState, Turn, TurnState,
@@ -1330,6 +1333,186 @@ pub fn apply_action_to_terminal(state: &mut TerminalState, action: &StateAction)
     }
 }
 
+// ─── Changeset Reducer ────────────────────────────────────────────
+
+/// Apply a [`StateAction`] to a [`ChangesetState`] in place.
+///
+/// Handles all changeset-channel actions. Actions targeting a different
+/// scope short-circuit as [`ReduceOutcome::OutOfScope`].
+pub fn apply_action_to_changeset(
+    state: &mut ChangesetState,
+    action: &StateAction,
+) -> ReduceOutcome {
+    match action {
+        StateAction::ChangesetStatusChanged(a) => {
+            // Carry `error` only when the new status is `Error` so we don't
+            // leave a stale error sitting on a recovered changeset.
+            if a.status == ChangesetStatus::Error {
+                state.status = a.status;
+                state.error = a.error.clone();
+            } else {
+                state.status = a.status;
+                state.error = None;
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChangesetFileSet(a) => {
+            if let Some(idx) = state.files.iter().position(|f| f.id == a.file.id) {
+                state.files[idx] = a.file.clone();
+            } else {
+                state.files.push(a.file.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChangesetFileRemoved(a) => {
+            let Some(idx) = state.files.iter().position(|f| f.id == a.file_id) else {
+                return ReduceOutcome::NoOp;
+            };
+            state.files.remove(idx);
+            ReduceOutcome::Applied
+        }
+        StateAction::ChangesetOperationsChanged(a) => {
+            state.operations = a.operations.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::ChangesetOperationStatusChanged(a) => {
+            let Some(ops) = state.operations.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = ops.iter().position(|o| o.id == a.operation_id) else {
+                return ReduceOutcome::NoOp;
+            };
+            // Carry `error` only when the new status is `Error` so we don't
+            // leave a stale error on an operation that recovered or started running.
+            if a.status == ChangesetOperationStatus::Error {
+                ops[idx].status = a.status;
+                ops[idx].error = a.error.clone();
+            } else {
+                ops[idx].status = a.status;
+                ops[idx].error = None;
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChangesetCleared(_) => {
+            if state.files.is_empty() {
+                return ReduceOutcome::NoOp;
+            }
+            state.files.clear();
+            ReduceOutcome::Applied
+        }
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
+// ─── Annotations Reducer ──────────────────────────────────────────
+
+/// Apply a [`StateAction`] to an [`AnnotationsState`] in place.
+///
+/// Handles all annotations-channel actions. Actions targeting a different
+/// scope short-circuit as [`ReduceOutcome::OutOfScope`].
+pub fn apply_action_to_annotations(
+    state: &mut AnnotationsState,
+    action: &StateAction,
+) -> ReduceOutcome {
+    match action {
+        StateAction::AnnotationsSet(a) => {
+            if let Some(idx) = state
+                .annotations
+                .iter()
+                .position(|t| t.id == a.annotation.id)
+            {
+                state.annotations[idx] = a.annotation.clone();
+            } else {
+                state.annotations.push(a.annotation.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::AnnotationsUpdated(a) => {
+            let Some(idx) = state
+                .annotations
+                .iter()
+                .position(|t| t.id == a.annotation_id)
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            let ann = &mut state.annotations[idx];
+            if let Some(turn_id) = &a.turn_id {
+                ann.turn_id = turn_id.clone();
+            }
+            if let Some(resource) = &a.resource {
+                ann.resource = resource.clone();
+            }
+            if let Some(range) = &a.range {
+                ann.range = Some(range.clone());
+            }
+            if let Some(resolved) = a.resolved {
+                ann.resolved = resolved;
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::AnnotationsRemoved(a) => {
+            let Some(idx) = state
+                .annotations
+                .iter()
+                .position(|t| t.id == a.annotation_id)
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            state.annotations.remove(idx);
+            ReduceOutcome::Applied
+        }
+        StateAction::AnnotationsEntrySet(a) => {
+            let Some(t_idx) = state
+                .annotations
+                .iter()
+                .position(|t| t.id == a.annotation_id)
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            let entries = &mut state.annotations[t_idx].entries;
+            if let Some(c_idx) = entries.iter().position(|e| e.id == a.entry.id) {
+                entries[c_idx] = a.entry.clone();
+            } else {
+                entries.push(a.entry.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::AnnotationsEntryRemoved(a) => {
+            let Some(t_idx) = state
+                .annotations
+                .iter()
+                .position(|t| t.id == a.annotation_id)
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            let entries = &mut state.annotations[t_idx].entries;
+            let Some(c_idx) = entries.iter().position(|e| e.id == a.entry_id) else {
+                return ReduceOutcome::NoOp;
+            };
+            entries.remove(c_idx);
+            ReduceOutcome::Applied
+        }
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
+// ─── Resource-Watch Reducer ───────────────────────────────────────
+
+/// Apply a [`StateAction`] to a [`ResourceWatchState`] in place.
+///
+/// `resourceWatch/changed` is intentionally a pass-through — the reducer
+/// keeps no history of change events. Actions targeting a different scope
+/// short-circuit as [`ReduceOutcome::OutOfScope`].
+pub fn apply_action_to_resource_watch(
+    _state: &mut ResourceWatchState,
+    action: &StateAction,
+) -> ReduceOutcome {
+    match action {
+        StateAction::ResourceWatchChanged(_) => ReduceOutcome::NoOp,
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1649,7 +1832,7 @@ mod tests {
         assert!(!entries.is_empty(), "no fixture files found");
 
         let mut passed = 0usize;
-        let mut skipped = 0usize;
+        let skipped = 0usize;
 
         set_mock_time();
 
@@ -1750,21 +1933,30 @@ mod tests {
                     &file_name,
                     description,
                 ),
-                "changeset" => {
-                    // changeset reducer not yet implemented in Rust; skip.
-                    skipped += 1;
-                    continue;
-                }
-                "annotations" => {
-                    // annotations reducer not yet implemented in Rust; skip.
-                    skipped += 1;
-                    continue;
-                }
-                "resourceWatch" => {
-                    // resourceWatch reducer not yet implemented in Rust; skip.
-                    skipped += 1;
-                    continue;
-                }
+                "changeset" => run_fixture::<ChangesetState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_changeset,
+                    &file_name,
+                    description,
+                ),
+                "annotations" => run_fixture::<AnnotationsState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_annotations,
+                    &file_name,
+                    description,
+                ),
+                "resourceWatch" => run_fixture::<ResourceWatchState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_resource_watch,
+                    &file_name,
+                    description,
+                ),
                 other => {
                     panic!("{file_name}: unknown reducer type '{other}'");
                 }

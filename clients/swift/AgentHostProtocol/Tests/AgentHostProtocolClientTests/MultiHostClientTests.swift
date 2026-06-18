@@ -1006,6 +1006,43 @@ final class MultiHostClientTests: XCTestCase {
         await multi.shutdown()
     }
 
+    // MARK: - host_runtime_advertises_supported_protocol_versions
+
+    /// Asserts that `HostRuntime` passes `SUPPORTED_PROTOCOL_VERSIONS` (from
+    /// the generated `AgentHostProtocol` module) as the `protocolVersions`
+    /// list in every `initialize` call, and never sends the old hard-coded
+    /// "0.2.0" string.
+    func testHostRuntimeAdvertisesSupportedProtocolVersionsOnInitialize() async throws {
+        let capture = InitVersionCapture()
+        let factory: HostTransportFactory = { _ in
+            let (clientSide, serverSide) = InMemoryTransport.pair()
+            _ = Task {
+                await driveCapturingFakeHost(transport: serverSide, capture: capture)
+            }
+            return clientSide
+        }
+
+        let multi = MultiHostClient()
+        _ = try await multi.add(HostConfig(id: "local", label: "Local", transportFactory: factory))
+        await waitForHostState(multi, id: "local") { $0.isConnected }
+
+        let versions = try await withThrowingTaskGroup(of: [String].self) { group in
+            group.addTask { await capture.wait() }
+            group.addTask {
+                try await Task.sleep(for: .seconds(2))
+                throw TestTimeoutError()
+            }
+            defer { group.cancelAll() }
+            return try await group.next()!
+        }
+        XCTAssertEqual(versions, SUPPORTED_PROTOCOL_VERSIONS,
+            "HostRuntime must advertise SUPPORTED_PROTOCOL_VERSIONS on initialize")
+        XCTAssertFalse(versions.contains("0.2.0"),
+            "HostRuntime must not send the stale hard-coded '0.2.0'")
+
+        await multi.shutdown()
+    }
+
     // MARK: - Helpers
 
     /// Like `nextWithTimeout` from `AHPClientTestHelpers` but typed for any
@@ -1371,4 +1408,76 @@ private actor ClosedObserver {
     private(set) var closeCount: Int = 0
     var isClosed: Bool { closeCount > 0 }
     func markClosed() { closeCount += 1 }
+}
+
+// MARK: - Protocol-version-capturing fake host
+
+/// Captures the `protocolVersions` list sent in the first `initialize` request.
+private actor InitVersionCapture {
+    private var captured: [String]? = nil
+    private var hasStored = false
+    private var waiter: CheckedContinuation<[String], Never>? = nil
+
+    func store(_ versions: [String]) {
+        guard !hasStored else { return }
+        hasStored = true
+        if let w = waiter {
+            waiter = nil
+            w.resume(returning: versions)
+        } else {
+            captured = versions
+        }
+    }
+
+    func wait() async -> [String] {
+        if let v = captured { return v }
+        return await withCheckedContinuation { c in
+            waiter = c
+        }
+    }
+}
+
+/// Server-side driver that records the `protocolVersions` from `initialize`
+/// and returns a minimal valid response so the runtime can reach `.connected`.
+private func driveCapturingFakeHost(
+    transport: InMemoryTransport,
+    capture: InitVersionCapture
+) async {
+    while !Task.isCancelled {
+        let frame: TransportMessage?
+        do { frame = try await transport.recv() } catch { return }
+        guard let frame else { return }
+        guard case .text(let text) = frame,
+              let data = text.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { continue }
+
+        guard let id = obj["id"] as? Int,
+              let method = obj["method"] as? String
+        else { continue }
+
+        let result: [String: Any]
+        switch method {
+        case "initialize":
+            if let params = obj["params"] as? [String: Any],
+               let versions = params["protocolVersions"] as? [String] {
+                await capture.store(versions)
+            }
+            result = [
+                "protocolVersion": PROTOCOL_VERSION,
+                "serverSeq": 0,
+                "snapshots": [] as [Any],
+            ]
+        case "listSessions":
+            result = ["items": [] as [Any]]
+        default:
+            result = [:]
+        }
+
+        let resp: [String: Any] = ["jsonrpc": "2.0", "id": id, "result": result]
+        guard let respData = try? JSONSerialization.data(withJSONObject: resp),
+              let respText = String(data: respData, encoding: .utf8)
+        else { continue }
+        try? await transport.send(.text(respText))
+    }
 }
