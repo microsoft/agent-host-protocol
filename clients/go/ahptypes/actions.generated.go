@@ -69,6 +69,7 @@ const (
 	ActionTypeChangesetStatusChanged            ActionType = "changeset/statusChanged"
 	ActionTypeChangesetFileSet                  ActionType = "changeset/fileSet"
 	ActionTypeChangesetFileRemoved              ActionType = "changeset/fileRemoved"
+	ActionTypeChangesetContentChanged           ActionType = "changeset/contentChanged"
 	ActionTypeChangesetOperationsChanged        ActionType = "changeset/operationsChanged"
 	ActionTypeChangesetOperationStatusChanged   ActionType = "changeset/operationStatusChanged"
 	ActionTypeChangesetCleared                  ActionType = "changeset/cleared"
@@ -868,6 +869,23 @@ type ChangesetFileRemovedAction struct {
 	FileId string `json:"fileId"`
 }
 
+// The changeset's full content changed. Full replacement semantics: `files`
+// replaces the previous file list, and `operations`, when present, replaces
+// the previous operation list.
+//
+// Producers SHOULD use this action for initial snapshots and bulk refreshes;
+// use {@link ChangesetFileSetAction}, {@link ChangesetFileRemovedAction}, and
+// {@link ChangesetOperationsChangedAction} for incremental updates.
+type ChangesetContentChangedAction struct {
+	Type ActionType `json:"type"`
+	// Full replacement file list.
+	Files []ChangesetFile `json:"files"`
+	// Full replacement operation list. Omit when operations are unchanged.
+	Operations []ChangesetOperation `json:"operations,omitempty"`
+	// Error information, if the changeset content change failed.
+	Error *ErrorInfo `json:"error,omitempty"`
+}
+
 // The set of operations available on this changeset changed. Full
 // replacement semantics: `operations` replaces the previous list (or
 // removes it entirely when `operations` is `undefined`).
@@ -1216,6 +1234,7 @@ func (*SessionMetaChangedAction) isStateAction()                {}
 func (*ChangesetStatusChangedAction) isStateAction()            {}
 func (*ChangesetFileSetAction) isStateAction()                  {}
 func (*ChangesetFileRemovedAction) isStateAction()              {}
+func (*ChangesetContentChangedAction) isStateAction()           {}
 func (*ChangesetOperationsChangedAction) isStateAction()        {}
 func (*ChangesetOperationStatusChangedAction) isStateAction()   {}
 func (*ChangesetClearedAction) isStateAction()                  {}
@@ -1554,6 +1573,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "changeset/fileRemoved":
 		var value ChangesetFileRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "changeset/contentChanged":
+		var value ChangesetContentChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

@@ -1,0 +1,127 @@
+{
+  "description": "changeset/contentChanged replaces files and can update operations",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/old.ts",
+        "edit": {
+          "after": {
+            "uri": "file:///src/old.ts",
+            "content": {
+              "uri": "content:/old"
+            }
+          },
+          "diff": {
+            "added": 1
+          }
+        }
+      }
+    ],
+    "operations": [
+      {
+        "id": "old-op",
+        "label": "Old Operation",
+        "scopes": [
+          "changeset"
+        ],
+        "status": "idle"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/contentChanged",
+      "files": [
+        {
+          "id": "file:///src/a.ts",
+          "edit": {
+            "after": {
+              "uri": "file:///src/a.ts",
+              "content": {
+                "uri": "content:/a"
+              }
+            },
+            "diff": {
+              "added": 5,
+              "removed": 2
+            }
+          }
+        },
+        {
+          "id": "file:///src/b.ts",
+          "edit": {
+            "after": {
+              "uri": "file:///src/b.ts",
+              "content": {
+                "uri": "content:/b"
+              }
+            },
+            "diff": {
+              "added": 3
+            }
+          }
+        }
+      ],
+      "operations": [
+        {
+          "id": "make-pr",
+          "label": "Create Pull Request",
+          "scopes": [
+            "changeset"
+          ],
+          "status": "idle"
+        }
+      ]
+    },
+    {
+      "type": "changeset/contentChanged",
+      "files": [
+        {
+          "id": "file:///src/c.ts",
+          "edit": {
+            "after": {
+              "uri": "file:///src/c.ts",
+              "content": {
+                "uri": "content:/c"
+              }
+            },
+            "diff": {
+              "added": 8
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/c.ts",
+        "edit": {
+          "after": {
+            "uri": "file:///src/c.ts",
+            "content": {
+              "uri": "content:/c"
+            }
+          },
+          "diff": {
+            "added": 8
+          }
+        }
+      }
+    ],
+    "operations": [
+      {
+        "id": "make-pr",
+        "label": "Create Pull Request",
+        "scopes": [
+          "changeset"
+        ],
+        "status": "idle"
+      }
+    ]
+  }
+}

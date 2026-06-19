@@ -1,0 +1,95 @@
+{
+  "description": "changeset/contentChanged updates error information",
+  "reducer": "changeset",
+  "initial": {
+    "status": "error",
+    "error": {
+      "errorType": "git",
+      "message": "old error"
+    },
+    "files": [
+      {
+        "id": "file:///src/old.ts",
+        "edit": {
+          "after": {
+            "uri": "file:///src/old.ts",
+            "content": {
+              "uri": "content:/old"
+            }
+          },
+          "diff": {
+            "added": 1
+          }
+        }
+      }
+    ],
+    "operations": [
+      {
+        "id": "make-pr",
+        "label": "Create Pull Request",
+        "scopes": [
+          "changeset"
+        ],
+        "status": "idle"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/contentChanged",
+      "files": [
+        {
+          "id": "file:///src/a.ts",
+          "edit": {
+            "after": {
+              "uri": "file:///src/a.ts",
+              "content": {
+                "uri": "content:/a"
+              }
+            },
+            "diff": {
+              "added": 5
+            }
+          }
+        }
+      ],
+      "error": {
+        "errorType": "git",
+        "message": "new error"
+      }
+    }
+  ],
+  "expected": {
+    "status": "error",
+    "error": {
+      "errorType": "git",
+      "message": "new error"
+    },
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": {
+          "after": {
+            "uri": "file:///src/a.ts",
+            "content": {
+              "uri": "content:/a"
+            }
+          },
+          "diff": {
+            "added": 5
+          }
+        }
+      }
+    ],
+    "operations": [
+      {
+        "id": "make-pr",
+        "label": "Create Pull Request",
+        "scopes": [
+          "changeset"
+        ],
+        "status": "idle"
+      }
+    ]
+  }
+}

@@ -28,6 +28,9 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 - `ConfigPropertySchema.additionalProperties` — optional JSON Schema field
   (`ConfigPropertySchema`) describing the schema for object-typed config
   properties beyond those listed in `properties`.
+- `changeset/contentChanged` — full-replacement changeset action for sending
+  batched files, optional operations, and error details on initial snapshots or
+  bulk refreshes.
 - `ChangesetOperationStatus.Disabled` — signals that a changeset operation is
   currently unavailable and cannot be invoked, so clients can render the
   control as disabled rather than hiding it.

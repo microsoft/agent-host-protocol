@@ -181,6 +181,7 @@ export type {
   ChangesetStatusChangedAction,
   ChangesetFileSetAction,
   ChangesetFileRemovedAction,
+  ChangesetContentChangedAction,
   ChangesetOperationsChangedAction,
   ChangesetOperationStatusChangedAction,
   ChangesetClearedAction,

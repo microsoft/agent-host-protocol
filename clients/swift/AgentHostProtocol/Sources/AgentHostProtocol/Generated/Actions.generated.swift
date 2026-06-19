@@ -56,6 +56,7 @@ public enum ActionType: String, Codable, Sendable {
     case changesetStatusChanged = "changeset/statusChanged"
     case changesetFileSet = "changeset/fileSet"
     case changesetFileRemoved = "changeset/fileRemoved"
+    case changesetContentChanged = "changeset/contentChanged"
     case changesetOperationsChanged = "changeset/operationsChanged"
     case changesetOperationStatusChanged = "changeset/operationStatusChanged"
     case changesetCleared = "changeset/cleared"
@@ -1299,6 +1300,28 @@ public struct ChangesetFileRemovedAction: Codable, Sendable {
     }
 }
 
+public struct ChangesetContentChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Full replacement file list.
+    public var files: [ChangesetFile]
+    /// Full replacement operation list. Omit when operations are unchanged.
+    public var operations: [ChangesetOperation]?
+    /// Error information, if the changeset content change failed.
+    public var error: ErrorInfo?
+
+    public init(
+        type: ActionType,
+        files: [ChangesetFile],
+        operations: [ChangesetOperation]? = nil,
+        error: ErrorInfo? = nil
+    ) {
+        self.type = type
+        self.files = files
+        self.operations = operations
+        self.error = error
+    }
+}
+
 public struct ChangesetOperationsChangedAction: Codable, Sendable {
     public var type: ActionType
     /// Updated operation list. Pass `undefined` to clear all operations.
@@ -1772,6 +1795,7 @@ public enum StateAction: Codable, Sendable {
     case changesetStatusChanged(ChangesetStatusChangedAction)
     case changesetFileSet(ChangesetFileSetAction)
     case changesetFileRemoved(ChangesetFileRemovedAction)
+    case changesetContentChanged(ChangesetContentChangedAction)
     case changesetOperationsChanged(ChangesetOperationsChangedAction)
     case changesetOperationStatusChanged(ChangesetOperationStatusChangedAction)
     case changesetCleared(ChangesetClearedAction)
@@ -1906,6 +1930,8 @@ public enum StateAction: Codable, Sendable {
             self = .changesetFileSet(try ChangesetFileSetAction(from: decoder))
         case "changeset/fileRemoved":
             self = .changesetFileRemoved(try ChangesetFileRemovedAction(from: decoder))
+        case "changeset/contentChanged":
+            self = .changesetContentChanged(try ChangesetContentChangedAction(from: decoder))
         case "changeset/operationsChanged":
             self = .changesetOperationsChanged(try ChangesetOperationsChangedAction(from: decoder))
         case "changeset/operationStatusChanged":
@@ -2007,6 +2033,7 @@ public enum StateAction: Codable, Sendable {
         case .changesetStatusChanged(let v): try v.encode(to: encoder)
         case .changesetFileSet(let v): try v.encode(to: encoder)
         case .changesetFileRemoved(let v): try v.encode(to: encoder)
+        case .changesetContentChanged(let v): try v.encode(to: encoder)
         case .changesetOperationsChanged(let v): try v.encode(to: encoder)
         case .changesetOperationStatusChanged(let v): try v.encode(to: encoder)
         case .changesetCleared(let v): try v.encode(to: encoder)

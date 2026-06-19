@@ -80,6 +80,7 @@ of the changeset URI:
 | `changeset/statusChanged`           | No                   | `status` transitioned (e.g. `computing → ready`).                            |
 | `changeset/fileSet`                 | No                   | Upsert a `ChangesetFile` (new or replacing existing by `id`).                |
 | `changeset/fileRemoved`             | No                   | A file is no longer in the changeset.                                        |
+| `changeset/contentChanged`          | No                   | Full replacement of files, optionally with operations or error details.      |
 | `changeset/operationsChanged`       | No                   | The set of available `operations` changed.                                   |
 | `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |
 | `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched).                                    |
@@ -158,8 +159,10 @@ a JSON-RPC error.
 2. The client picks catalogue entries whose template variables it can
    satisfy and subscribes to the resulting URIs.
 3. The server returns a `ChangesetState` snapshot (`status: 'computing'`
-   is allowed if scanning is async) and pushes `changeset/*` actions as
-   files become available.
+   is allowed if scanning is async) and can push `changeset/contentChanged`
+   for an initial batched file snapshot, optionally including operations or
+   error details, followed by narrower `changeset/*` actions as files or
+   operations change.
 4. The user invokes a `ChangesetOperation`. The client calls
    `invokeChangesetOperation`. The server applies the operation and
    emits any resulting changeset updates.

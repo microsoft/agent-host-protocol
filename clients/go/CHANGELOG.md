@@ -18,6 +18,8 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
 
 - `ConfigPropertySchema.AdditionalProperties` — optional field describing the
   schema for object-typed config properties beyond those in `Properties`.
+- `ChangesetContentChangedAction` for full-replacement changeset file
+  snapshots with optional operations and error details.
 - `ChangesetOperationStatusDisabled` — new `ChangesetOperationStatus` value for
   operations that are currently unavailable and cannot be invoked.
 - `ChangesetOperation.Group` — optional identifier for grouping related

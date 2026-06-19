@@ -1039,6 +1039,15 @@ public func changesetReducer(state: ChangesetState, action: StateAction) -> Chan
         next.files.remove(at: idx)
         return next
 
+    case .changesetContentChanged(let a):
+        var next = state
+        next.files = a.files
+        if let operations = a.operations {
+            next.operations = operations
+        }
+        next.error = a.error
+        return next
+
     case .changesetOperationsChanged(let a):
         // `operations` is nil when the action omits the field, which clears the
         // operation list.
