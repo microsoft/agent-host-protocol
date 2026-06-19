@@ -2044,9 +2044,16 @@
         "enum": {
           "type": "array",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
           },
-          "description": "JSON Schema: allowed values (typically used with `string` type)"
+          "description": "JSON Schema: allowed values (used with `string` or `number` type)"
         },
         "enumLabels": {
           "type": "array",
@@ -2748,9 +2755,16 @@
         "enum": {
           "type": "array",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
           },
-          "description": "JSON Schema: allowed values (typically used with `string` type)"
+          "description": "JSON Schema: allowed values (used with `string` or `number` type)"
         },
         "enumLabels": {
           "type": "array",

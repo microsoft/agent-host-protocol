@@ -5,20 +5,16 @@
 #![allow(missing_docs)]
 
 #[allow(unused_imports)]
-use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
-#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_repr::{Deserialize_repr, Serialize_repr};
+#[allow(unused_imports)]
+use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
 
 #[allow(unused_imports)]
 use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
-use crate::state::{
-    AgentSelection, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient,
-    SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TelemetryCapabilities,
-    TerminalClaim, TextRange, Turn,
-};
+use crate::state::{AgentSelection, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
@@ -62,9 +58,9 @@ pub enum ResourceType {
 }
 
 /// How {@link ResourceWriteParams.data} is placed within the target file.
-///
+/// 
 /// Each mode interprets {@link ResourceWriteParams.position} differently:
-///
+/// 
 /// - `truncate` (default): rooted at the **start** of the file. The file is
 ///   truncated at `position` (0 by default) and `data` is written from that
 ///   offset, so the resulting file is `existing[0..position] + data`. With
@@ -102,7 +98,7 @@ pub struct InitializeParams {
     /// Protocol versions the client is willing to speak, ordered from most
     /// preferred to least preferred. Each entry is a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
-    ///
+    /// 
     /// The server selects one entry and returns it as `InitializeResult.protocolVersion`.
     /// If the server cannot speak any of the offered versions, it MUST return
     /// error code `-32005` (`UnsupportedProtocolVersion`).
@@ -118,7 +114,7 @@ pub struct InitializeParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub locale: Option<String>,
     /// Optional client capability declarations.
-    ///
+    /// 
     /// Servers SHOULD only advertise features whose corresponding client
     /// capability is set here. Absent means "not declared" — the server
     /// MUST assume the client does not support the feature.
@@ -127,7 +123,7 @@ pub struct InitializeParams {
 }
 
 /// Result of the `initialize` command.
-///
+/// 
 /// `protocolVersion` is the version the server has selected from the client's
 /// `protocolVersions` list. The client and server MUST use this version for
 /// the rest of the connection. If the server cannot speak any of the offered
@@ -163,7 +159,7 @@ pub struct InitializeResult {
 }
 
 /// Optional capabilities a client declares during `initialize`.
-///
+/// 
 /// Each field is a presence flag: an empty object `{}` means "supported",
 /// absence means "not supported". Sub-fields on individual capabilities
 /// are reserved for future per-capability options.
@@ -174,7 +170,7 @@ pub struct ClientCapabilities {
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
     /// and forward `mcp://`-channel traffic on the App's behalf.
-    ///
+    /// 
     /// Hosts SHOULD only populate
     /// {@link McpServerCustomization.mcpApp | `McpServerCustomization.mcpApp`}
     /// (and expose the corresponding
@@ -201,7 +197,7 @@ pub struct ReconnectParams {
 }
 
 /// Reconnect result when the server can replay from the requested sequence.
-///
+/// 
 /// The server MUST include all replayed data in the response.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -224,7 +220,7 @@ pub struct ReconnectSnapshotResult {
 }
 
 /// Subscribe to a URI-identified channel.
-///
+/// 
 /// A channel MAY have state associated with it (e.g. root, sessions,
 /// terminals) or be stateless (pure pub/sub for streaming data). For
 /// state-bearing channels the result includes a snapshot; for stateless
@@ -237,7 +233,7 @@ pub struct SubscribeParams {
 }
 
 /// Result of the `subscribe` command.
-///
+/// 
 /// `snapshot` is present when the subscribed channel has associated state, and
 /// absent for stateless channels.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -249,10 +245,10 @@ pub struct SubscribeResult {
 }
 
 /// Creates a new session with the specified agent provider.
-///
+/// 
 /// If the session URI already exists, the server MUST return an error with code
 /// `-32003` (`SessionAlreadyExists`).
-///
+/// 
 /// After creation, the client should subscribe to the session URI to receive state
 /// updates. The server also broadcasts a `root/sessionAdded` notification to all
 /// clients.
@@ -277,7 +273,7 @@ pub struct CreateSessionParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelSelection>,
     /// Initial custom agent selection for the new session.
-    ///
+    /// 
     /// Omit to start the session with no custom agent selected (provider default).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<AgentSelection>,
@@ -293,7 +289,7 @@ pub struct CreateSessionParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
     /// Eagerly claim the active client role for the new session.
-    ///
+    /// 
     /// When provided, the server initializes the session with this client as the
     /// active client, equivalent to dispatching a `session/activeClientChanged`
     /// action immediately after creation. The `clientId` MUST match the
@@ -303,7 +299,7 @@ pub struct CreateSessionParams {
 }
 
 /// Disposes a session and cleans up server-side resources.
-///
+/// 
 /// The server broadcasts a `root/sessionRemoved` notification to all clients.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -353,7 +349,7 @@ pub struct DisposeChatParams {
 }
 
 /// Returns a list of session summaries. Used to populate session lists and sidebars.
-///
+/// 
 /// The session list is **not** part of the state tree because it can be arbitrarily
 /// large. Clients fetch it imperatively and maintain a local cache updated by
 /// `root/sessionAdded` and `root/sessionRemoved` notifications.
@@ -376,13 +372,13 @@ pub struct ListSessionsResult {
 }
 
 /// Reads the content of a resource by URI.
-///
+/// 
 /// Content references keep the state tree small by storing large data (images,
 /// long tool outputs) by reference rather than inline.
-///
+/// 
 /// Binary content (images, etc.) MUST use `base64` encoding. Text content MAY
 /// use `utf-8` encoding.
-///
+/// 
 /// Like all `resource*` methods, `resourceRead` is symmetrical and MAY be
 /// sent in either direction. Hosts use it to fetch content from a
 /// client-published URI (e.g. `virtual://my-client/...` plugins); clients
@@ -401,7 +397,7 @@ pub struct ResourceReadParams {
 }
 
 /// Result of the `resourceRead` command.
-///
+/// 
 /// The server SHOULD honor the `encoding` requested in the params. If the
 /// server cannot provide the requested encoding, it MUST fall back to either
 /// `base64` or `utf-8`.
@@ -418,17 +414,17 @@ pub struct ResourceReadResult {
 }
 
 /// Writes content to a file on the server's filesystem.
-///
+/// 
 /// Binary content (images, etc.) MUST use `base64` encoding. Text content MAY
 /// use `utf-8` encoding.
-///
+/// 
 /// If the file does not exist, it is created. If the file already exists, the
 /// effect on existing bytes depends on {@link ResourceWriteParams.mode}:
 /// `truncate` (default) overwrites from the chosen offset onward, `append`
 /// preserves all existing bytes and adds `data` at a position rooted at EOF,
 /// and `insert` preserves all existing bytes and splices `data` in at an
 /// offset rooted at the start of the file.
-///
+/// 
 /// Like all `resource*` methods, `resourceWrite` is symmetrical and MAY be
 /// sent in either direction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -471,21 +467,22 @@ pub struct ResourceWriteParams {
 }
 
 /// Result of the `resourceWrite` command.
-///
+/// 
 /// An empty object on success.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceWriteResult {}
+pub struct ResourceWriteResult {
+}
 
 /// Lists directory entries at a file URI on the server's filesystem.
-///
+/// 
 /// This is intended for remote folder pickers and similar UI that needs to let
 /// users navigate the server's local filesystem.
-///
+/// 
 /// The server MUST return success only if the target exists and is a directory.
 /// If the target does not exist, is not a directory, or cannot be accessed, the
 /// server MUST return a JSON-RPC error.
-///
+/// 
 /// Like all `resource*` methods, `resourceList` is symmetrical and MAY be
 /// sent in either direction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -516,10 +513,10 @@ pub struct DirectoryEntry {
 }
 
 /// Copies a resource from one URI to another on the server's filesystem.
-///
+/// 
 /// If the destination already exists, it is overwritten unless `failIfExists`
 /// is set.
-///
+/// 
 /// Like all `resource*` methods, `resourceCopy` is symmetrical and MAY be
 /// sent in either direction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -538,14 +535,15 @@ pub struct ResourceCopyParams {
 }
 
 /// Result of the `resourceCopy` command.
-///
+/// 
 /// An empty object on success.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceCopyResult {}
+pub struct ResourceCopyResult {
+}
 
 /// Deletes a resource at a URI on the server's filesystem.
-///
+/// 
 /// Like all `resource*` methods, `resourceDelete` is symmetrical and MAY be
 /// sent in either direction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -562,17 +560,18 @@ pub struct ResourceDeleteParams {
 }
 
 /// Result of the `resourceDelete` command.
-///
+/// 
 /// An empty object on success.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceDeleteResult {}
+pub struct ResourceDeleteResult {
+}
 
 /// Moves (renames) a resource from one URI to another on the server's filesystem.
-///
+/// 
 /// If the destination already exists, it is overwritten unless `failIfExists`
 /// is set.
-///
+/// 
 /// Like all `resource*` methods, `resourceMove` is symmetrical and MAY be
 /// sent in either direction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -591,21 +590,22 @@ pub struct ResourceMoveParams {
 }
 
 /// Result of the `resourceMove` command.
-///
+/// 
 /// An empty object on success.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceMoveResult {}
+pub struct ResourceMoveResult {
+}
 
 /// Resolves a resource — the combination of POSIX `stat` and `realpath`.
-///
+/// 
 /// `resourceResolve` returns metadata about the resource together with its
 /// canonical URI after symlink resolution. Use this in place of any
 /// `resourceExists` shim: a missing resource MUST surface as a `NotFound`
 /// JSON-RPC error rather than a success with a sentinel value. Callers that
 /// truly need a boolean check should attempt `resourceResolve` and treat
 /// `NotFound` as "does not exist".
-///
+/// 
 /// Like all `resource*` methods, `resourceResolve` is symmetrical and MAY be
 /// sent in either direction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -653,12 +653,12 @@ pub struct ResourceResolveResult {
 }
 
 /// Creates a directory on the server's filesystem with `mkdir -p` semantics.
-///
+/// 
 /// The server MUST create any missing parent directories. Creating a
 /// directory that already exists is a no-op success. If `uri` already
 /// exists but is **not** a directory, the server MUST fail with
 /// `AlreadyExists`.
-///
+/// 
 /// Like all `resource*` methods, `resourceMkdir` is symmetrical and MAY be
 /// sent in either direction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -671,31 +671,32 @@ pub struct ResourceMkdirParams {
 }
 
 /// Result of the `resourceMkdir` command.
-///
+/// 
 /// An empty object on success.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceMkdirResult {}
+pub struct ResourceMkdirResult {
+}
 
 /// Requests permission to access a resource on the receiver's filesystem.
-///
+/// 
 /// `resourceRequest` is symmetrical and MAY be sent in either direction: a
 /// client asks the server to grant access to a server-side resource, or a
 /// server asks the client to grant access to a client-side resource. The
 /// receiver decides whether to allow, deny, or prompt the user for the
 /// requested access.
-///
+/// 
 /// If the receiver denies access, it MUST respond with `PermissionDenied`
 /// (-32009). The error data MAY include a `ResourceRequestParams` value
 /// describing the access the caller would need to be granted for the
 /// operation to succeed; see `PermissionDeniedErrorData` in
 /// `types/errors.ts`.
-///
+/// 
 /// After a successful `resourceRequest`, the caller MAY use the corresponding
 /// `resource*` commands (e.g. `resourceRead`, `resourceWrite`) to perform the
 /// operation. Receivers MAY rescind access at any time by returning
 /// `PermissionDenied` on subsequent operations.
-///
+/// 
 /// Either `read`, `write`, or both SHOULD be set to `true`. A request with
 /// neither flag set is treated as `read: true` by receivers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -716,24 +717,25 @@ pub struct ResourceRequestParams {
 }
 
 /// Result of the `resourceRequest` command.
-///
+/// 
 /// An empty object on success.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceRequestResult {}
+pub struct ResourceRequestResult {
+}
 
 /// Creates a resource watcher on the receiver's filesystem.
-///
+/// 
 /// The receiver allocates an `ahp-resource-watch:/<id>` channel URI and
 /// returns it on {@link CreateResourceWatchResult.channel}. The caller then
 /// [`subscribe`](./subscriptions)s to that channel to receive
 /// `resourceWatch/changed` actions over the standard action envelope.
-///
+/// 
 /// The watch lifecycle is tied to subscription: when every subscriber has
 /// unsubscribed (or the underlying connection drops), the receiver MUST
 /// release the watcher. There is no explicit dispose command — `unsubscribe`
 /// is the only handle the caller needs.
-///
+/// 
 /// Like the rest of the `resource*` family, `createResourceWatch` is
 /// symmetrical and MAY be sent in either direction. Access is gated through
 /// the same permission flow as `resourceRead`/`resourceWrite`.
@@ -806,7 +808,7 @@ pub struct UnsubscribeParams {
 /// Fire-and-forget action dispatch (write-ahead). The client applies actions
 /// optimistically to local state and the server echoes them back as an
 /// {@link ActionEnvelope} once accepted.
-///
+/// 
 /// The client → server method is named `dispatchAction`; the server's reply
 /// arrives on the server → client `action` notification (params:
 /// {@link ActionEnvelope}).
@@ -824,7 +826,7 @@ pub struct DispatchActionParams {
 /// Pushes a Bearer token for a protected resource. The `resource` field MUST
 /// match a `ProtectedResourceMetadata.resource` value declared by an agent
 /// in `AgentInfo.protectedResources`.
-///
+/// 
 /// Tokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)
 /// (Bearer Token Usage) semantics. The client obtains the token from the
 /// authorization server(s) listed in the resource's metadata and pushes it
@@ -842,16 +844,17 @@ pub struct AuthenticateParams {
 }
 
 /// Result of the `authenticate` command.
-///
+/// 
 /// An empty object on success. If the token is invalid or the resource is
 /// unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`
 /// `-32007` or `InvalidParams` `-32602`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AuthenticateResult {}
+pub struct AuthenticateResult {
+}
 
 /// Creates a new terminal on the server.
-///
+/// 
 /// After creation, the client should subscribe to the terminal URI to receive
 /// state updates. The server dispatches `root/terminalsChanged` to update the
 /// root terminal list.
@@ -877,7 +880,7 @@ pub struct CreateTerminalParams {
 }
 
 /// Disposes a terminal and kills its process if still running.
-///
+/// 
 /// The server dispatches `root/terminalsChanged` to remove the terminal from
 /// the root terminal list.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -891,7 +894,7 @@ pub struct DisposeTerminalParams {
 /// current partial session config and any user-filled metadata values. The server
 /// returns a property schema describing what additional metadata is needed,
 /// contextual to the current selections.
-///
+/// 
 /// The client calls this command whenever the user changes a significant input
 /// (e.g. picks a working directory, toggles a property). Each response returns
 /// the full current property set (not a delta). The returned `values` contain
@@ -923,7 +926,7 @@ pub struct ResolveSessionConfigResult {
 }
 
 /// Queries the server for allowed values of a dynamic session config property.
-///
+/// 
 /// Used when a property in the schema returned by `resolveSessionConfig` has
 /// `enumDynamic: true`. The client sends a search query and receives matching
 /// values with display metadata.
@@ -972,7 +975,7 @@ pub struct SessionConfigValueItem {
 /// Requests completion items for a partially-typed input (e.g. a user message
 /// the user is currently composing). Used to power `@`-mention pickers,
 /// file/symbol references, and similar inline-completion experiences.
-///
+/// 
 /// Servers SHOULD treat this command as best-effort and return promptly. The
 /// client SHOULD debounce calls to avoid flooding the server with requests on
 /// every keystroke.
@@ -992,7 +995,7 @@ pub struct CompletionsParams {
 }
 
 /// A single completion item returned by the `completions` command.
-///
+/// 
 /// When the user accepts an item, the client SHOULD:
 /// 1. Replace the range `[rangeStart, rangeEnd)` in the input with `insertText`
 ///    (or insert `insertText` at the cursor when the range is omitted).
@@ -1006,9 +1009,9 @@ pub struct CompletionItem {
     /// by `insertText`. The range is the half-open interval
     /// `[rangeStart, rangeEnd)` of character offsets, measured in UTF-16 code
     /// units.
-    ///
+    /// 
     /// When omitted, the client SHOULD insert `insertText` at the cursor.
-    ///
+    /// 
     /// Note: this range refers to positions in the *current* input. The
     /// attachment's own `rangeStart`/`rangeEnd` (when present) refer to
     /// positions in the final {@link Message.text} after the item is
@@ -1033,12 +1036,12 @@ pub struct CompletionsResult {
 
 /// Invokes a server-defined {@link ChangesetOperation} against a changeset,
 /// a single file, or a line range.
-///
+/// 
 /// The server validates that `operationId` exists in the changeset's
 /// current `operations` list and that the requested `target.kind` is
 /// contained in the operation's `scopes`. Invalid combinations result in a
 /// JSON-RPC error.
-///
+/// 
 /// State changes resulting from invocation flow back through the normal
 /// `changeset/*` action stream on the relevant changeset URIs. Clients
 /// SHOULD NOT synthesise local optimistic changes for invocations unless
@@ -1058,7 +1061,7 @@ pub struct InvokeChangesetOperationParams {
 
 /// Result of the {@link InvokeChangesetOperationParams | `invokeChangesetOperation`}
 /// command.
-///
+/// 
 /// Success is implicit: the server returns this result when it accepted
 /// the operation. Failure is signalled by rejecting the JSON-RPC request
 /// with an appropriate error code, not by any field on this result. The
@@ -1077,7 +1080,7 @@ pub struct InvokeChangesetOperationResult {
 
 /// Optional follow-up surfaced by the server after an operation completes —
 /// a {@link ContentRef} the client can fetch and display.
-///
+/// 
 /// Set `external` to `true` to open the content in the user's preferred
 /// external handler (e.g. browser); otherwise the client is expected to
 /// surface it inline.

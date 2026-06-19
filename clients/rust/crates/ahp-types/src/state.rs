@@ -5,11 +5,11 @@
 #![allow(missing_docs)]
 
 #[allow(unused_imports)]
-use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
-#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_repr::{Deserialize_repr, Serialize_repr};
+#[allow(unused_imports)]
+use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ pub enum SessionLifecycle {
 }
 
 /// Bitset of summary-level session status flags.
-///
+/// 
 /// Use bitwise checks instead of equality for non-terminal activity. For example,
 /// `status & SessionStatus.InProgress` matches both ordinary in-progress turns
 /// and turns that are paused waiting for input.
@@ -152,11 +152,11 @@ pub enum ChatOriginKind {
 }
 
 /// How a user can interact with a chat.
-///
+/// 
 /// - `Full` — user can send messages and watch (default when absent)
 /// - `ReadOnly` — user can watch but not send messages (e.g. agent team workers)
 /// - `Hidden` — internal worker not shown in UI at all
-///
+/// 
 /// Supports the agent-team pattern where a lead chat is fully interactive and
 /// worker chats are read-only (visible for observability) or hidden (internal
 /// implementation detail). The harness sets this based on the chat's role;
@@ -308,7 +308,7 @@ pub enum ToolCallStatus {
 }
 
 /// How a tool call was confirmed for execution.
-///
+/// 
 /// - `NotNeeded` — No confirmation required (auto-approved)
 /// - `UserAction` — User explicitly approved
 /// - `Setting` — Approved by a persistent user setting
@@ -368,7 +368,7 @@ pub enum ToolResultContentType {
 }
 
 /// Discriminant for the kind of customization.
-///
+/// 
 /// Top-level entries in {@link SessionState.customizations} and
 /// {@link AgentInfo.customizations} are either container customizations
 /// ({@link CustomizationType.Plugin | `Plugin`} or
@@ -456,7 +456,7 @@ pub enum McpAuthRequiredReason {
     /// Step-up auth: a token is present but its scopes are insufficient for
     /// the requested operation (HTTP 403 with
     /// `WWW-Authenticate: Bearer error="insufficient_scope"`).
-    ///
+    /// 
     /// Unlike {@link Required} and {@link Expired} — which typically surface
     /// before any tool work is in flight — `InsufficientScope` is almost
     /// always triggered by an MCP request issued mid-turn (a `tools/call`,
@@ -489,7 +489,7 @@ pub enum ChangesetStatus {
 }
 
 /// Execution lifecycle of a {@link ChangesetOperation}.
-///
+/// 
 /// An operation is invoked imperatively via `invokeChangesetOperation`, but
 /// its progress and outcome are reflected back into changeset state so that
 /// every subscriber observes a consistent view (e.g. a spinner on a "Create
@@ -545,10 +545,10 @@ pub enum ResourceChangeType {
 pub struct Icon {
     /// A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a
     /// `data:` URI with Base64-encoded image data.
-    ///
+    /// 
     /// Consumers SHOULD take steps to ensure URLs serving icons are from the
     /// same domain as the client/server or a trusted domain.
-    ///
+    /// 
     /// Consumers SHOULD take appropriate precautions when consuming SVGs as they can contain
     /// executable JavaScript.
     pub src: Uri,
@@ -558,14 +558,14 @@ pub struct Icon {
     pub content_type: Option<String>,
     /// Optional array of strings that specify sizes at which the icon can be used.
     /// Each string should be in WxH format (e.g., `"48x48"`, `"96x96"`) or `"any"` for scalable formats like SVG.
-    ///
+    /// 
     /// If not provided, the client should assume that the icon can be used at any size.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sizes: Option<Vec<String>>,
     /// Optional specifier for the theme this icon is designed for. `"light"` indicates
     /// the icon is designed to be used with a light background, and `"dark"` indicates
     /// the icon is designed to be used with a dark background.
-    ///
+    /// 
     /// If not provided, the client should assume the icon can be used with any theme.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<String>,
@@ -574,7 +574,7 @@ pub struct Icon {
 /// Describes a protected resource's authentication requirements using
 /// [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0
 /// Protected Resource Metadata) semantics.
-///
+/// 
 /// Field names use snake_case to match the RFC 9728 JSON format.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -583,86 +583,46 @@ pub struct ProtectedResourceMetadata {
     /// `https` scheme with no fragment component (e.g. `"https://api.github.com"`).
     pub resource: String,
     /// OPTIONAL. Human-readable name of the protected resource.
-    #[serde(
-        rename = "resource_name",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "resource_name", default, skip_serializing_if = "Option::is_none")]
     pub resource_name: Option<String>,
     /// OPTIONAL. JSON array of OAuth authorization server identifier URLs.
-    #[serde(
-        rename = "authorization_servers",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "authorization_servers", default, skip_serializing_if = "Option::is_none")]
     pub authorization_servers: Option<Vec<String>>,
     /// OPTIONAL. URL of the protected resource's JWK Set document.
     #[serde(rename = "jwks_uri", default, skip_serializing_if = "Option::is_none")]
     pub jwks_uri: Option<String>,
     /// RECOMMENDED. JSON array of OAuth 2.0 scope values used in authorization requests.
-    #[serde(
-        rename = "scopes_supported",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "scopes_supported", default, skip_serializing_if = "Option::is_none")]
     pub scopes_supported: Option<Vec<String>>,
     /// OPTIONAL. JSON array of Bearer Token presentation methods supported.
-    #[serde(
-        rename = "bearer_methods_supported",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "bearer_methods_supported", default, skip_serializing_if = "Option::is_none")]
     pub bearer_methods_supported: Option<Vec<String>>,
     /// OPTIONAL. JSON array of JWS signing algorithms supported.
-    #[serde(
-        rename = "resource_signing_alg_values_supported",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "resource_signing_alg_values_supported", default, skip_serializing_if = "Option::is_none")]
     pub resource_signing_alg_values_supported: Option<Vec<String>>,
     /// OPTIONAL. JSON array of JWE encryption algorithms (alg) supported.
-    #[serde(
-        rename = "resource_encryption_alg_values_supported",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "resource_encryption_alg_values_supported", default, skip_serializing_if = "Option::is_none")]
     pub resource_encryption_alg_values_supported: Option<Vec<String>>,
     /// OPTIONAL. JSON array of JWE encryption algorithms (enc) supported.
-    #[serde(
-        rename = "resource_encryption_enc_values_supported",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "resource_encryption_enc_values_supported", default, skip_serializing_if = "Option::is_none")]
     pub resource_encryption_enc_values_supported: Option<Vec<String>>,
     /// OPTIONAL. URL of human-readable documentation for the resource.
-    #[serde(
-        rename = "resource_documentation",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "resource_documentation", default, skip_serializing_if = "Option::is_none")]
     pub resource_documentation: Option<String>,
     /// OPTIONAL. URL of the resource's data-usage policy.
-    #[serde(
-        rename = "resource_policy_uri",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "resource_policy_uri", default, skip_serializing_if = "Option::is_none")]
     pub resource_policy_uri: Option<String>,
     /// OPTIONAL. URL of the resource's terms of service.
-    #[serde(
-        rename = "resource_tos_uri",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "resource_tos_uri", default, skip_serializing_if = "Option::is_none")]
     pub resource_tos_uri: Option<String>,
     /// AHP extension. Whether authentication is required for this resource.
-    ///
+    /// 
     /// - `true` (default) — the agent cannot be used without a valid token.
     ///   The server SHOULD return `AuthRequired` (`-32007`) if the client
     ///   attempts to use the agent without authenticating.
     /// - `false` — the agent works without authentication but MAY offer
     ///   enhanced capabilities when a token is provided.
-    ///
+    /// 
     /// Clients SHOULD treat an absent field the same as `true`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub required: Option<bool>,
@@ -684,14 +644,14 @@ pub struct RootState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<RootConfigState>,
     /// Additional implementation-defined metadata about the agent host itself.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
 }
 
 /// Live agent-host configuration metadata.
-///
+/// 
 /// The schema describes the available configuration properties and the values
 /// contain the current value for each resolved property.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -715,7 +675,7 @@ pub struct AgentInfo {
     /// Available models for this agent
     pub models: Vec<SessionModelInfo>,
     /// Protected resources this agent requires authentication for.
-    ///
+    /// 
     /// Each entry describes an OAuth 2.0 protected resource using
     /// [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) semantics.
     /// Clients should obtain tokens from the declared `authorization_servers`
@@ -724,7 +684,7 @@ pub struct AgentInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub protected_resources: Option<Vec<ProtectedResourceMetadata>>,
     /// Customizations associated with this agent.
-    ///
+    /// 
     /// Either container customizations —
     /// {@link PluginCustomization | `PluginCustomization`} entries the agent
     /// bundles, plus {@link DirectoryCustomization | `DirectoryCustomization`}
@@ -762,7 +722,7 @@ pub struct SessionModelInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_schema: Option<ConfigSchema>,
     /// Additional provider-specific metadata for this model.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `pricing` key may carry model pricing metadata.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -783,12 +743,12 @@ pub struct ModelSelection {
 }
 
 /// A selected custom agent for a session.
-///
+/// 
 /// The `uri` identifies a specific custom agent (matching an
 /// {@link AgentCustomization.uri | `AgentCustomization.uri`} exposed via
 /// the session's effective customizations). Consumers resolve the agent's
 /// display name by looking up `uri` in the session's customization tree.
-///
+/// 
 /// A session with no `agent` selected uses the provider's default behavior.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -798,12 +758,12 @@ pub struct AgentSelection {
 }
 
 /// A JSON Schema-compatible property descriptor with display extensions.
-///
+/// 
 /// Standard JSON Schema fields (`type`, `title`, `description`, `default`,
 /// `enum`) allow validators to process the schema. Display extensions
 /// (`enumLabels`, `enumDescriptions`) are parallel arrays that provide UI
 /// metadata for each `enum` value.
-///
+/// 
 /// This is the generic base type. See {@link SessionConfigPropertySchema} for
 /// session-specific extensions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -819,9 +779,9 @@ pub struct ConfigPropertySchema {
     /// JSON Schema: default value
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<AnyValue>,
-    /// JSON Schema: allowed values (typically used with `string` type)
+    /// JSON Schema: allowed values (used with `string` or `number` type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub r#enum: Option<Vec<String>>,
+    pub r#enum: Option<Vec<string | number>>,
     /// Display extension: human-readable label per enum value (parallel array)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enum_labels: Option<Vec<String>>,
@@ -846,7 +806,7 @@ pub struct ConfigPropertySchema {
 }
 
 /// A JSON Schema object describing available configuration properties.
-///
+/// 
 /// This is the generic base type. See {@link SessionConfigSchema} for
 /// session-specific usage.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -862,7 +822,7 @@ pub struct ConfigSchema {
 }
 
 /// A message queued for future delivery to the agent.
-///
+/// 
 /// Steering messages are injected into the current turn mid-flight.
 /// Queued messages are automatically started as new turns after the
 /// current turn naturally finishes.
@@ -877,7 +837,7 @@ pub struct PendingMessage {
 
 /// Full state for a single chat, loaded when a client subscribes to the chat's
 /// URI.
-///
+/// 
 /// The lightweight catalog representation of a chat is {@link ChatSummary},
 /// carried in {@link SessionState.chats | `SessionState.chats`}. `ChatState`
 /// **denormalizes** every {@link ChatSummary} field directly onto itself so
@@ -910,14 +870,14 @@ pub struct ChatState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
-    ///
+    /// 
     /// Supports agent-team patterns where worker chats are read-only or hidden.
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
     /// Optional per-chat working directory.
-    ///
+    /// 
     /// If absent, the chat inherits
     /// {@link SessionSummary.workingDirectory | the session's working directory}.
     /// Hosts MAY override this for individual chats — for example, to give a
@@ -971,14 +931,14 @@ pub struct ChatSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
-    ///
+    /// 
     /// Supports agent-team patterns where worker chats are read-only or hidden.
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
     /// Optional per-chat working directory.
-    ///
+    /// 
     /// If absent, the chat inherits
     /// {@link SessionSummary.workingDirectory | the session's working directory}.
     /// See {@link ChatState.workingDirectory} for usage notes.
@@ -1015,9 +975,9 @@ pub struct SessionState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<SessionConfigState>,
     /// Top-level customizations active in this session.
-    ///
+    /// 
     /// Always one of the {@link Customization} variants:
-    ///
+    /// 
     /// - Container customizations ({@link PluginCustomization},
     ///   {@link DirectoryCustomization}) whose children — agents, skills,
     ///   prompts, rules, hooks, MCP servers — live in each container's
@@ -1026,7 +986,7 @@ pub struct SessionState {
     ///   surfaces directly (for example a globally-configured MCP server
     ///   that isn't bundled in a plugin or directory). MCP servers may
     ///   also appear as children of a container.
-    ///
+    /// 
     /// Client-published plugins arrive via
     /// {@link SessionActiveClient.customizations | `activeClient.customizations`}
     /// and the host propagates them into this list (typically with the
@@ -1043,7 +1003,7 @@ pub struct SessionState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changesets: Option<Vec<Changeset>>,
     /// Additional provider-specific metadata for this session.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `git` key may provide extra git metadata about the session's
     /// workingDirectory.
@@ -1052,7 +1012,7 @@ pub struct SessionState {
 }
 
 /// The client currently providing tools and interactive capabilities to a session.
-///
+/// 
 /// Only one client may be active per session at a time. The server SHOULD
 /// automatically unset the active client if that client disconnects.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1066,7 +1026,7 @@ pub struct SessionActiveClient {
     /// Tools this client provides to the session
     pub tools: Vec<ToolDefinition>,
     /// Plugin customizations this client contributes to the session.
-    ///
+    /// 
     /// Clients publish in [Open Plugins](https://open-plugins.com/) format
     /// — i.e. always container-shaped plugins. They MAY synthesize virtual
     /// plugins in memory and rely on the host to expand them into concrete
@@ -1078,13 +1038,13 @@ pub struct SessionActiveClient {
 /// Lightweight catalog entry summarizing one session. Surfaced via
 /// {@link RootChannelCommands.listSessions | `root/listSessions`} and
 /// `root/sessionAdded`/`root/sessionSummaryChanged` notifications.
-///
+/// 
 /// **Aggregation across chats.** Once a session contains more than one chat,
 /// several `SessionSummary` fields are derived from the underlying
 /// {@link SessionState.chats | chat catalog}. Producers SHOULD follow these
 /// rules so clients that only consume the session summary (e.g. a session
 /// list) still see meaningful state:
-///
+/// 
 /// - `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /
 ///   `Error` — bits 0–4) from the
 ///   {@link SessionState.defaultChat | default chat} when present, else from
@@ -1104,7 +1064,7 @@ pub struct SessionActiveClient {
 /// - `changes`: optional roll-up across all chats. Producers MAY sum the
 ///   per-chat changeset stats or report the most expensive chat's stats —
 ///   whichever is cheaper for the host to compute.
-///
+/// 
 /// Sessions with a single chat trivially satisfy all of the above (the chat's
 /// values pass through unchanged). The rules only matter once a session
 /// carries multiple chats.
@@ -1133,7 +1093,7 @@ pub struct SessionSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelSelection>,
     /// Currently selected custom agent.
-    ///
+    /// 
     /// Absent (`undefined`) means no custom agent is selected for this session
     /// — the session uses the provider's default behavior.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1159,7 +1119,7 @@ pub struct SessionSummary {
 }
 
 /// Aggregate counts describing the file changes associated with a session.
-///
+/// 
 /// All fields are optional so servers can populate only the metrics they
 /// cheaply have available.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -1187,7 +1147,7 @@ pub struct ProjectInfo {
 }
 
 /// A session configuration property descriptor.
-///
+/// 
 /// Extends the generic {@link ConfigPropertySchema} with session-specific
 /// display extensions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1203,9 +1163,9 @@ pub struct SessionConfigPropertySchema {
     /// JSON Schema: default value
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<AnyValue>,
-    /// JSON Schema: allowed values (typically used with `string` type)
+    /// JSON Schema: allowed values (used with `string` or `number` type)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub r#enum: Option<Vec<String>>,
+    pub r#enum: Option<Vec<string | number>>,
     /// Display extension: human-readable label per enum value (parallel array)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enum_labels: Option<Vec<String>>,
@@ -1252,7 +1212,7 @@ pub struct SessionConfigSchema {
 }
 
 /// Live session configuration metadata.
-///
+/// 
 /// The schema describes the available configuration properties and the values
 /// contain the current value for each resolved property.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1273,7 +1233,7 @@ pub struct Turn {
     /// The message that initiated the turn
     pub message: Message,
     /// All response content in stream order: text, tool calls, reasoning, and content refs.
-    ///
+    /// 
     /// Consumers should derive display text by concatenating markdown parts,
     /// and find tool calls by filtering for `ToolCall` parts.
     pub response_parts: Vec<ResponsePart>,
@@ -1296,7 +1256,7 @@ pub struct ActiveTurn {
     /// The message that initiated the turn
     pub message: Message,
     /// All response content in stream order: text, tool calls, reasoning, and content refs.
-    ///
+    /// 
     /// Tool call parts include `pendingPermissions` when permissions are awaiting user approval.
     pub response_parts: Vec<ResponsePart>,
     /// Token usage info
@@ -1306,7 +1266,7 @@ pub struct ActiveTurn {
 
 /// A message that initiates or steers a turn. Messages can originate from the
 /// user, the agent, a tool, or be system-generated (see {@link MessageOrigin}).
-///
+/// 
 /// Attachments MAY be referenced inside {@link Message.text} via their
 /// {@link MessageAttachmentBase.range} field. Attachments without a range are
 /// still associated with the message but do not correspond to a specific span
@@ -1322,7 +1282,7 @@ pub struct Message {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<MessageAttachment>>,
     /// Additional provider-specific metadata for this message.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry context that does not fit any other
     /// field. Mirrors the MCP `_meta` convention.
@@ -1529,7 +1489,7 @@ pub struct ChatInputMultiSelectQuestion {
 }
 
 /// A live request for user input.
-///
+/// 
 /// The server creates or replaces requests with `chat/inputRequested`.
 /// Clients sync drafts with `chat/inputAnswerChanged` and complete requests
 /// with `chat/inputCompleted`.
@@ -1573,7 +1533,7 @@ pub struct TextRange {
 }
 
 /// A selection within a textual resource.
-///
+/// 
 /// This is only meaningful for textual resources. Binary resources may still
 /// use resource or embedded resource attachments, but they should not use this
 /// text selection field.
@@ -1598,26 +1558,26 @@ pub struct SimpleMessageAttachment {
     pub range: Option<TextRange>,
     /// Advisory display hint for clients rendering this attachment. Recognized
     /// values include:
-    ///
+    /// 
     /// - `'image'`: the attachment is an image
     /// - `'document'`: the attachment is a textual document
     /// - `'symbol'`: the attachment is a code symbol (e.g. a function or class)
     /// - `'directory'`: the attachment is a folder
     /// - `'selection'`: the attachment is a selection within a document
-    ///
+    /// 
     /// Implementations MAY provide additional values; clients SHOULD fall back
     /// to a reasonable default when an unknown value is encountered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_kind: Option<String>,
     /// Additional implementation-defined metadata for the attachment.
-    ///
+    /// 
     /// If the attachment was produced by the `completions` command, the client
     /// MUST preserve every property of `_meta` originally returned by the agent
     /// host when sending the user message containing the accepted completion.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
     /// Representation of the attachment as it should be shown to the model.
-    ///
+    /// 
     /// If the attachment was produced by the client, this property MUST be
     /// defined so the agent host can correctly interpret the attachment. This
     /// property MAY be omitted when the attachment originated from a
@@ -1627,7 +1587,7 @@ pub struct SimpleMessageAttachment {
 }
 
 /// An attachment whose data is embedded inline as a base64 string.
-///
+/// 
 /// Use this for small binary payloads (e.g. a pasted image) that should be
 /// delivered with the user message itself rather than fetched separately.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1642,19 +1602,19 @@ pub struct MessageEmbeddedResourceAttachment {
     pub range: Option<TextRange>,
     /// Advisory display hint for clients rendering this attachment. Recognized
     /// values include:
-    ///
+    /// 
     /// - `'image'`: the attachment is an image
     /// - `'document'`: the attachment is a textual document
     /// - `'symbol'`: the attachment is a code symbol (e.g. a function or class)
     /// - `'directory'`: the attachment is a folder
     /// - `'selection'`: the attachment is a selection within a document
-    ///
+    /// 
     /// Implementations MAY provide additional values; clients SHOULD fall back
     /// to a reasonable default when an unknown value is encountered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_kind: Option<String>,
     /// Additional implementation-defined metadata for the attachment.
-    ///
+    /// 
     /// If the attachment was produced by the `completions` command, the client
     /// MUST preserve every property of `_meta` originally returned by the agent
     /// host when sending the user message containing the accepted completion.
@@ -1665,7 +1625,7 @@ pub struct MessageEmbeddedResourceAttachment {
     /// Content MIME type (e.g. `"image/png"`, `"application/pdf"`)
     pub content_type: String,
     /// Optional selection within the attached textual resource.
-    ///
+    /// 
     /// Only meaningful for textual resources.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection: Option<TextSelection>,
@@ -1685,19 +1645,19 @@ pub struct MessageResourceAttachment {
     pub range: Option<TextRange>,
     /// Advisory display hint for clients rendering this attachment. Recognized
     /// values include:
-    ///
+    /// 
     /// - `'image'`: the attachment is an image
     /// - `'document'`: the attachment is a textual document
     /// - `'symbol'`: the attachment is a code symbol (e.g. a function or class)
     /// - `'directory'`: the attachment is a folder
     /// - `'selection'`: the attachment is a selection within a document
-    ///
+    /// 
     /// Implementations MAY provide additional values; clients SHOULD fall back
     /// to a reasonable default when an unknown value is encountered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_kind: Option<String>,
     /// Additional implementation-defined metadata for the attachment.
-    ///
+    /// 
     /// If the attachment was produced by the `completions` command, the client
     /// MUST preserve every property of `_meta` originally returned by the agent
     /// host when sending the user message containing the accepted completion.
@@ -1712,7 +1672,7 @@ pub struct MessageResourceAttachment {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
     /// Optional selection within the referenced textual resource.
-    ///
+    /// 
     /// Only meaningful for textual resources.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selection: Option<TextSelection>,
@@ -1720,7 +1680,7 @@ pub struct MessageResourceAttachment {
 
 /// An attachment that references annotations on a session's annotations
 /// channel (see {@link AnnotationsState}).
-///
+/// 
 /// When {@link annotationIds} is omitted the attachment references every
 /// annotation on the channel; when present it references only the listed
 /// {@link Annotation.id | annotation ids}.
@@ -1736,19 +1696,19 @@ pub struct MessageAnnotationsAttachment {
     pub range: Option<TextRange>,
     /// Advisory display hint for clients rendering this attachment. Recognized
     /// values include:
-    ///
+    /// 
     /// - `'image'`: the attachment is an image
     /// - `'document'`: the attachment is a textual document
     /// - `'symbol'`: the attachment is a code symbol (e.g. a function or class)
     /// - `'directory'`: the attachment is a folder
     /// - `'selection'`: the attachment is a selection within a document
-    ///
+    /// 
     /// Implementations MAY provide additional values; clients SHOULD fall back
     /// to a reasonable default when an unknown value is encountered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_kind: Option<String>,
     /// Additional implementation-defined metadata for the attachment.
-    ///
+    /// 
     /// If the attachment was produced by the `completions` command, the client
     /// MUST preserve every property of `_meta` originally returned by the agent
     /// host when sending the user message containing the accepted completion.
@@ -1801,7 +1761,7 @@ pub struct ResourceResponsePart {
 }
 
 /// A tool call represented as a response part.
-///
+/// 
 /// Tool calls are part of the response stream, interleaved with text and
 /// reasoning. The `toolCall.toolCallId` serves as the part identifier for
 /// actions that target this part.
@@ -1823,7 +1783,7 @@ pub struct ReasoningResponsePart {
 }
 
 /// A system notification surfaced as part of the response stream.
-///
+/// 
 /// System notifications are messages authored by the agent harness
 /// that need to be visible to both the agent (for situational awareness) and
 /// the user (for transcript continuity). Examples include "background subagent
@@ -1844,12 +1804,12 @@ pub struct ToolCallResult {
     /// Past-tense description of what the tool did
     pub past_tense_message: StringOrMarkdown,
     /// Unstructured result content blocks.
-    ///
+    /// 
     /// This mirrors the `content` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<Vec<ToolResultContent>>,
     /// Optional structured result object.
-    ///
+    /// 
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
@@ -1871,7 +1831,7 @@ pub struct ConfirmationOption {
     /// Whether this option represents an approval or denial
     pub kind: ConfirmationOptionKind,
     /// Logical group number for visual categorisation.
-    ///
+    /// 
     /// Clients SHOULD display options in the order they are defined and MAY
     /// use differing group numbers to insert dividers between logical clusters
     /// of options.
@@ -1893,7 +1853,7 @@ pub struct ToolCallStreamingState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)
     /// `McpUiToolMeta` found in MCP tool calls, which may be used in combination
     /// with the {@link contributor} to serve MCP Apps.
@@ -1922,7 +1882,7 @@ pub struct ToolCallPendingConfirmationState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)
     /// `McpUiToolMeta` found in MCP tool calls, which may be used in combination
     /// with the {@link contributor} to serve MCP Apps.
@@ -1964,7 +1924,7 @@ pub struct ToolCallRunningState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)
     /// `McpUiToolMeta` found in MCP tool calls, which may be used in combination
     /// with the {@link contributor} to serve MCP Apps.
@@ -1981,7 +1941,7 @@ pub struct ToolCallRunningState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_option: Option<ConfirmationOption>,
     /// Partial content produced while the tool is still executing.
-    ///
+    /// 
     /// For example, a terminal content block lets clients subscribe to live
     /// output before the tool completes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2002,7 +1962,7 @@ pub struct ToolCallPendingResultConfirmationState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)
     /// `McpUiToolMeta` found in MCP tool calls, which may be used in combination
     /// with the {@link contributor} to serve MCP Apps.
@@ -2018,12 +1978,12 @@ pub struct ToolCallPendingResultConfirmationState {
     /// Past-tense description of what the tool did
     pub past_tense_message: StringOrMarkdown,
     /// Unstructured result content blocks.
-    ///
+    /// 
     /// This mirrors the `content` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<Vec<ToolResultContent>>,
     /// Optional structured result object.
-    ///
+    /// 
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
@@ -2051,7 +2011,7 @@ pub struct ToolCallCompletedState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)
     /// `McpUiToolMeta` found in MCP tool calls, which may be used in combination
     /// with the {@link contributor} to serve MCP Apps.
@@ -2067,12 +2027,12 @@ pub struct ToolCallCompletedState {
     /// Past-tense description of what the tool did
     pub past_tense_message: StringOrMarkdown,
     /// Unstructured result content blocks.
-    ///
+    /// 
     /// This mirrors the `content` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<Vec<ToolResultContent>>,
     /// Optional structured result object.
-    ///
+    /// 
     /// This mirrors the `structuredContent` field of MCP `CallToolResult`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_content: Option<JsonObject>,
@@ -2100,7 +2060,7 @@ pub struct ToolCallCancelledState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)
     /// `McpUiToolMeta` found in MCP tool calls, which may be used in combination
     /// with the {@link contributor} to serve MCP Apps.
@@ -2137,13 +2097,13 @@ pub struct ToolDefinition {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// JSON Schema defining the expected input parameters.
-    ///
+    /// 
     /// Optional because client-provided tools may not have formal schemas.
     /// Mirrors MCP `Tool.inputSchema`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_schema: Option<AnyValue>,
     /// JSON Schema defining the structure of the tool's output.
-    ///
+    /// 
     /// Mirrors MCP `Tool.outputSchema`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<AnyValue>,
@@ -2151,7 +2111,7 @@ pub struct ToolDefinition {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotations: Option<ToolAnnotations>,
     /// Additional provider-specific metadata.
-    ///
+    /// 
     /// Mirrors the MCP `_meta` convention.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
@@ -2159,7 +2119,7 @@ pub struct ToolDefinition {
 
 /// Behavioral hints about a tool. All properties are advisory and not
 /// guaranteed to faithfully describe tool behavior.
-///
+/// 
 /// Mirrors MCP `ToolAnnotations` from the Model Context Protocol specification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -2182,7 +2142,7 @@ pub struct ToolAnnotations {
 }
 
 /// Text content in a tool result.
-///
+/// 
 /// Mirrors MCP `TextContent`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2192,7 +2152,7 @@ pub struct ToolResultTextContent {
 }
 
 /// Base64-encoded binary content embedded in a tool result.
-///
+/// 
 /// Mirrors MCP `EmbeddedResource` for inline binary data.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2204,7 +2164,7 @@ pub struct ToolResultEmbeddedResourceContent {
 }
 
 /// A reference to a resource stored outside the tool result.
-///
+/// 
 /// Wraps {@link ContentRef} for lazy-loading large results.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2235,7 +2195,7 @@ pub struct ToolResultFileEditContent {
 }
 
 /// A reference to a terminal whose output is relevant to this tool result.
-///
+/// 
 /// Clients can subscribe to the terminal's URI to stream its output in real
 /// time, providing live feedback while a tool is executing.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2249,7 +2209,7 @@ pub struct ToolResultTerminalContent {
 
 /// A reference, embedded in a tool result, to a worker chat spawned by the tool
 /// call (a sub-agent delegation), referenced by a chat URI (`ahp-chat:/...`).
-///
+/// 
 /// This is the spawning tool call's forward view of the worker. The worker chat
 /// records the same edge in reverse via its {@link ChatOrigin} (`kind: 'tool'`),
 /// whose `toolCallId` identifies the tool call that emitted this content.
@@ -2271,12 +2231,14 @@ pub struct ToolResultSubagentContent {
 /// Container is being loaded by the host.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CustomizationLoadingState {}
+pub struct CustomizationLoadingState {
+}
 
 /// Container loaded successfully.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CustomizationLoadedState {}
+pub struct CustomizationLoadedState {
+}
 
 /// Container partially loaded but has warnings.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2304,7 +2266,7 @@ pub struct PluginCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2332,7 +2294,7 @@ pub struct PluginCustomization {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load: Option<CustomizationLoadState>,
     /// Children discovered inside this container.
-    ///
+    /// 
     /// Absent means the host has not parsed this container yet. An empty
     /// array means the host parsed the container and it contributes
     /// nothing.
@@ -2343,7 +2305,7 @@ pub struct PluginCustomization {
 /// A {@link PluginCustomization} as published by a client. Extends the
 /// server-facing shape with an opaque `nonce` so the host can detect when
 /// the client's view of a plugin has changed and re-parse only as needed.
-///
+/// 
 /// Clients SHOULD include a `nonce`. Server-side fields like
 /// {@link ContainerCustomizationBase.children | `children`} and
 /// {@link ContainerCustomizationBase.load | `load`} are typically left
@@ -2358,7 +2320,7 @@ pub struct ClientPluginCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2386,7 +2348,7 @@ pub struct ClientPluginCustomization {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load: Option<CustomizationLoadState>,
     /// Children discovered inside this container.
-    ///
+    /// 
     /// Absent means the host has not parsed this container yet. An empty
     /// array means the host parsed the container and it contributes
     /// nothing.
@@ -2398,13 +2360,13 @@ pub struct ClientPluginCustomization {
 }
 
 /// A directory the host watches for this session.
-///
+/// 
 /// Presence in the customization list signals that the host may discover
 /// customizations from this directory. When `writable` is `true`, clients
 /// MAY persist new customizations into the directory using
 /// [`resourceWrite`](/reference/common#resourcewrite); the host will
 /// then surface the resulting child via the customization actions.
-///
+/// 
 /// The directory may not yet exist on disk.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2415,7 +2377,7 @@ pub struct DirectoryCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2443,7 +2405,7 @@ pub struct DirectoryCustomization {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load: Option<CustomizationLoadState>,
     /// Children discovered inside this container.
-    ///
+    /// 
     /// Absent means the host has not parsed this container yet. An empty
     /// array means the host parsed the container and it contributes
     /// nothing.
@@ -2456,7 +2418,7 @@ pub struct DirectoryCustomization {
 }
 
 /// A custom agent contributed by a plugin or directory.
-///
+/// 
 /// Mirrors the [Open Plugins agent](https://open-plugins.com/agent-builders/components/agents)
 /// format: a markdown file with YAML frontmatter, where the body is the
 /// agent's system prompt.
@@ -2469,7 +2431,7 @@ pub struct AgentCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2491,14 +2453,14 @@ pub struct AgentCustomization {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Additional provider-specific metadata for this custom agent.
-    ///
+    /// 
     /// Mirrors the MCP `_meta` convention.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
 }
 
 /// A skill contributed by a plugin or directory.
-///
+/// 
 /// Covers both [Open Plugins skill formats](https://open-plugins.com/agent-builders/components/skills)
 /// — the `skills/` directory layout (one subdirectory per skill, each with
 /// a `SKILL.md`) and the flatter `commands/` directory of slash-command
@@ -2512,7 +2474,7 @@ pub struct SkillCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2550,7 +2512,7 @@ pub struct PromptCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2573,7 +2535,7 @@ pub struct PromptCustomization {
 }
 
 /// A rule contributed by a plugin or directory.
-///
+/// 
 /// Mirrors the [Open Plugins rule](https://open-plugins.com/agent-builders/components/rules)
 /// format: a markdown file (e.g. `.mdc`) whose body is injected into
 /// context while the rule is active. This type also covers tool-specific
@@ -2590,7 +2552,7 @@ pub struct RuleCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2631,7 +2593,7 @@ pub struct HookCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2651,12 +2613,12 @@ pub struct HookCustomization {
 }
 
 /// An MCP server contributed by a plugin or directory.
-///
+/// 
 /// When the server is declared inline in the containing plugin manifest,
 /// `uri` points at the manifest file and
 /// {@link CustomizationBase.range | `range`} narrows it to the
 /// declaration's span.
-///
+/// 
 /// The MCP server customization also reflects its current status.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2667,7 +2629,7 @@ pub struct McpServerCustomization {
     pub id: String,
     /// Source URI for this customization. A plugin URL, a file URI, or a
     /// directory URI.
-    ///
+    /// 
     /// For declarations that live inside a larger file — e.g. an MCP
     /// server declared inline in a `plugins.json` manifest — `uri` points
     /// to the containing file and {@link CustomizationBase.range | `range`}
@@ -2692,12 +2654,12 @@ pub struct McpServerCustomization {
     /// into the upstream MCP server itself. The channel is NOT a fresh raw MCP
     /// connection: it piggybacks on the AHP transport
     /// and skips the MCP `initialize` sequence.
-    ///
+    /// 
     /// The agent host MAY only serve a subset of MCP on this
     /// channel; the served subset is described by domain-specific
     /// capabilities such as those in
     /// {@link McpServerCustomizationApps.capabilities}.
-    ///
+    /// 
     /// The channel URI SHOULD be stable across the server's lifetime, but
     /// the agent host MAY change it (for example across a restart) and
     /// MAY only expose it while the server is in
@@ -2731,19 +2693,19 @@ pub struct McpServerCustomizationApps {
 /// {@link McpServerCustomizationApps.capabilities} so clients can pass it
 /// through into the `hostCapabilities` of the `ui/initialize` response
 /// delivered to an MCP App View.
-///
+/// 
 /// Field names mirror the MCP Apps spec exactly, so the AHP-side producer
 /// can pass them straight through into the `hostCapabilities` of the
 /// `ui/initialize` response delivered to the View.
-///
+/// 
 /// Capabilities outside this set (`openLinks`, `downloadFile`, `sandbox`,
 /// `experimental`) are decided locally by whichever AHP client renders the
 /// View and are NOT part of this AHP-level advertisement — only the
 /// server-derived subset is.
-///
+/// 
 /// An agent host MUST only advertise a capability when it actually accepts the
 /// corresponding methods/notifications on the `mcp://` channel:
-///
+/// 
 /// - {@link serverTools}: host proxies `tools/list` and `tools/call` to
 ///   the MCP server. When `listChanged` is `true`, the host also forwards
 ///   `notifications/tools/list_changed`.
@@ -2778,24 +2740,26 @@ pub struct AhpMcpUiHostCapabilities {
 /// Server is registered with the host but has not yet started.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct McpServerStartingState {}
+pub struct McpServerStartingState {
+}
 
 /// Server is running and serving requests.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct McpServerReadyState {}
+pub struct McpServerReadyState {
+}
 
 /// Server is reachable but cannot serve requests until the client
 /// authenticates. Mirrors the discovery flow defined by
 /// [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)
 /// (Protected Resource Metadata) and the OAuth 2.1 / RFC 6750 challenge
 /// semantics required by the MCP authorization spec.
-///
+/// 
 /// Clients react to this state by calling the existing `authenticate`
 /// command with the {@link ProtectedResourceMetadata.resource | resource}
 /// carried here. There is **no** `notify/authRequired` notification for
 /// MCP servers — the action stream is the single source of truth.
-///
+/// 
 /// When the transition is triggered by a request issued during a turn
 /// — most commonly
 /// {@link McpAuthRequiredReason.InsufficientScope | `InsufficientScope`}
@@ -2842,14 +2806,15 @@ pub struct McpServerErrorState {
 /// session entirely shortly after this state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct McpServerStoppedState {}
+pub struct McpServerStoppedState {
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolCallClientContributor {
     /// If this tool is provided by a client, the `clientId` of the owning client.
     /// Absent for server-side tools.
-    ///
+    /// 
     /// When set, the identified client is responsible for executing the tool and
     /// dispatching `chat/toolCallComplete` with the result.
     pub client_id: String,
@@ -2863,7 +2828,7 @@ pub struct ToolCallMcpContributor {
 }
 
 /// Describes a file modification with before/after state and diff metadata.
-///
+/// 
 /// Supports creates (only `after`), deletes (only `before`), renames/moves
 /// (different `uri` in `before` and `after`), and edits (same `uri`, different content).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -2933,10 +2898,10 @@ pub struct TerminalState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rows: Option<i64>,
     /// Typed content parts, replacing the flat `content: string`.
-    ///
+    /// 
     /// Naive consumers that only need the raw VT stream can reconstruct it with:
     ///   `content.map(p => p.type === 'command' ? p.output : p.value).join('')`
-    ///
+    /// 
     /// Consumers that need command boundaries can filter by part type.
     pub content: Vec<TerminalContentPart>,
     /// Process exit code, set when the terminal process exits
@@ -2946,7 +2911,7 @@ pub struct TerminalState {
     pub claim: TerminalClaim,
     /// Whether this terminal emits `terminal/commandExecuted` and
     /// `terminal/commandFinished` actions and populates `command`-typed parts.
-    ///
+    /// 
     /// Clients MUST check this flag before relying on command detection.
     /// Do NOT use the presence of a `command` part as a feature flag — parts
     /// are absent in the normal idle state.
@@ -2964,7 +2929,7 @@ pub struct TerminalUnclassifiedPart {
 }
 
 /// A single command: its command line and the output it produced.
-///
+/// 
 /// While `isComplete` is false the command is still executing; `output` grows
 /// as `terminal/data` actions arrive. At `terminal/commandFinished` the part
 /// is mutated in-place with `isComplete: true` and the completion metadata.
@@ -3044,7 +3009,7 @@ pub struct Snapshot {
 
 /// Catalogue entry describing one changeset the server can produce for a
 /// session.
-///
+/// 
 /// Catalogue entries are intentionally lightweight — just enough to render a
 /// chip or list row without subscribing. Full per-changeset detail
 /// ({@link ChangesetState}) lives on the subscribable URI obtained by
@@ -3057,17 +3022,17 @@ pub struct Changeset {
     /// RFC 6570 URI template. Clients parse the variables directly out of the
     /// template using the standard `{name}` syntax — they are not redeclared
     /// here.
-    ///
+    /// 
     /// Only the following template shapes are defined by this protocol; any
     /// other variable name MUST be ignored by clients (there is no
     /// protocol-defined way to obtain values for unknown variables):
-    ///
+    /// 
     /// | Variables in template                       | Meaning                                                                              |
     /// | ------------------------------------------- | ------------------------------------------------------------------------------------ |
     /// | _(none)_                                    | A static, session-wide changeset. The template is itself a subscribable URI.         |
     /// | `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the session.                            |
     /// | `{originalTurnId}` and `{modifiedTurnId}`   | Diff between two turns. Both variables MUST be present.                              |
-    ///
+    /// 
     /// Future protocol versions MAY add new well-known variables.
     pub uri_template: String,
     /// Optional longer description.
@@ -3076,7 +3041,7 @@ pub struct Changeset {
     /// Advisory hint describing what kind of changeset this is, so clients can
     /// group, sort, or render an appropriate icon without parsing
     /// {@link uriTemplate}. Recognized values include:
-    ///
+    /// 
     /// - `'session'`: a static, session-wide changeset covering all changes the
     ///   agent has produced in this session.
     /// - `'branch'`: changes relative to a base branch (e.g. a feature branch
@@ -3087,7 +3052,7 @@ pub struct Changeset {
     /// - `'compare-turns'`: a diff between two turns. Typically paired with
     ///   `{originalTurnId}` and `{modifiedTurnId}` variables in
     ///   {@link uriTemplate}.
-    ///
+    /// 
     /// Implementations MAY provide additional values; clients SHOULD fall back
     /// to a reasonable default when an unknown value is encountered.
     pub change_kind: String,
@@ -3095,7 +3060,7 @@ pub struct Changeset {
 
 /// Full state for a single changeset, returned when a client subscribes to
 /// an expanded changeset URI.
-///
+/// 
 /// The client already knows the URI it subscribed to, so this state does
 /// not redundantly carry it (or the catalogue's `id`, `label`, etc.).
 /// Aggregate counts (`additions`, `deletions`, `files`) are likewise
@@ -3135,7 +3100,7 @@ pub struct ChangesetFile {
 /// A server-declared invokable verb the client can run against a
 /// changeset, a file, or a range — `"stage"`, `"revert"`, `"create-pr"`,
 /// and so on.
-///
+/// 
 /// The term "operation" is used deliberately to avoid colliding with the
 /// protocol-level [Actions](/guide/actions) that mutate state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -3169,7 +3134,7 @@ pub struct ChangesetOperation {
     /// is in flight, {@link ChangesetOperationStatus.Error | Error} when the
     /// most recent invocation failed, and
     /// {@link ChangesetOperationStatus.Idle | Idle} otherwise.
-    ///
+    /// 
     /// Clients SHOULD reflect this state in the UI — e.g. disabling the
     /// control or showing a spinner while `Running`, and surfacing
     /// {@link error} while `Error`.
@@ -3208,13 +3173,13 @@ pub struct AnnotationsState {
 
 /// A conversation anchored to a specific file produced by a specific turn,
 /// optionally narrowed to a range within that file.
-///
+/// 
 /// {@link turnId} anchors the annotation to the file versions that turn
 /// produced, so a later turn that rewrites the same file does not silently
 /// invalidate the annotation's anchor — clients can resolve {@link resource}
 /// and {@link range} against the turn's changeset. When {@link range} is
 /// omitted the annotation is anchored to the entire file.
-///
+/// 
 /// Every annotation MUST contain at least one {@link AnnotationEntry}. An
 /// {@link AnnotationsSetAction} that creates an annotation therefore carries
 /// its mandatory first entry, and removing the last remaining entry collapses
@@ -3269,19 +3234,19 @@ pub struct AnnotationEntry {
 }
 
 /// OTLP telemetry channels the agent host emits.
-///
+/// 
 /// Each field, when present, is either a literal channel URI or an
 /// [RFC 6570](https://datatracker.ietf.org/doc/html/rfc6570) URI template
 /// a client expands and then subscribes to. Absent fields indicate the host
 /// does not emit that signal.
-///
+/// 
 /// Channel URIs use the `ahp-otlp:` scheme. The scheme identifies the
 /// protocol (OpenTelemetry over AHP) so clients can recognise the channel
 /// type by URI alone; the host is free to choose any authority/path that
 /// makes sense for its implementation. Clients MUST treat the URI as
 /// opaque (apart from expanding any well-known template variables defined
 /// below) and subscribe with the resulting concrete URI.
-///
+/// 
 /// Payloads delivered on these channels are OTLP/JSON values — see
 /// [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto)
 /// for the wire shapes (`ExportLogsServiceRequest`,
@@ -3291,20 +3256,20 @@ pub struct AnnotationEntry {
 pub struct TelemetryCapabilities {
     /// Channel URI (or RFC 6570 URI template) for OTLP log records
     /// (`otlp/exportLogs` notifications).
-    ///
+    /// 
     /// The following template variables are defined by this protocol; any
     /// other variable name MUST be ignored by clients (there is no
     /// protocol-defined way to obtain values for unknown variables):
-    ///
+    /// 
     /// | Variables in template | Meaning                                                                                                 |
     /// | --------------------- | ------------------------------------------------------------------------------------------------------- |
     /// | _(none)_              | The host does not support subscriber-side severity filtering. The template is itself a subscribable URI. |
     /// | `{level}`             | Minimum OTLP severity to deliver. Expand to one of the [OTLP `SeverityNumber`](https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-severitynumber) short names (case-insensitive): `trace`, `debug`, `info`, `warn`, `error`, `fatal`. The server delivers log records whose `severityNumber` falls in the corresponding band or above. |
-    ///
+    /// 
     /// Hosts SHOULD honour the expanded `{level}`; clients MUST still filter
     /// defensively in case a host ignores the parameter. Hosts that do not
     /// advertise `{level}` deliver all severities.
-    ///
+    /// 
     /// Future protocol versions MAY add new well-known variables (e.g. scope
     /// or attribute filters).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -3322,7 +3287,7 @@ pub struct TelemetryCapabilities {
 
 /// Full state for a single resource watch, returned when a client subscribes
 /// to an `ahp-resource-watch:` URI.
-///
+/// 
 /// Watches are otherwise stateless: the watcher exists to deliver
 /// {@link ResourceWatchChangedAction} events. The state carries only the
 /// descriptor of what is being watched so a re-subscribing client can

@@ -5,21 +5,13 @@
 #![allow(missing_docs)]
 
 #[allow(unused_imports)]
-use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
-#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_repr::{Deserialize_repr, Serialize_repr};
+#[allow(unused_imports)]
+use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
 
-use crate::state::{
-    AgentInfo, AgentSelection, Annotation, AnnotationEntry, Changeset, ChangesetFile,
-    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
-    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
-    ConfirmationOption, Customization, ErrorInfo, McpServerState, Message, ModelSelection,
-    PendingMessageKind, ResponsePart, SessionActiveClient, TerminalClaim, TerminalInfo, TextRange,
-    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolDefinition, ToolResultContent, UsageInfo,
-};
+use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};
 
 // ─── ActionType ──────────────────────────────────────────────────────
 
@@ -223,7 +215,7 @@ pub struct RootActiveSessionsChangedAction {
 }
 
 /// Fired when agent-host configuration values change.
-///
+/// 
 /// By default, the reducer merges the new values into `state.config.values`.
 /// Set `replace` to `true` to replace all values instead of merging.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -239,7 +231,8 @@ pub struct RootConfigChangedAction {
 /// Session backend initialized successfully.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SessionReadyAction {}
+pub struct SessionReadyAction {
+}
 
 /// Session backend failed to initialize.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -252,7 +245,7 @@ pub struct SessionCreationFailedAction {
 /// A chat was added to this session's catalog. Upsert semantics: if a chat
 /// with the same `summary.resource` already exists, the existing entry is
 /// replaced.
-///
+/// 
 /// Mirrors the root-channel `root/sessionAdded` notification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -262,7 +255,7 @@ pub struct SessionChatAddedAction {
 }
 
 /// A chat was removed from this session's catalog. No-op when no entry matches.
-///
+/// 
 /// Mirrors the root-channel `root/sessionRemoved` notification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -272,12 +265,12 @@ pub struct SessionChatRemovedAction {
 }
 
 /// One existing chat's summary fields changed.
-///
+/// 
 /// Partial-update semantics: only fields present in `changes` are written;
 /// omitted fields are preserved. Identity fields (`resource`) MUST NOT be
 /// carried in `changes`. No-op when no entry with `chat` exists — clients
 /// SHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.
-///
+/// 
 /// Mirrors the root-channel `root/sessionSummaryChanged` notification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -285,7 +278,7 @@ pub struct SessionChatUpdatedAction {
     /// The URI of the chat whose summary changed.
     pub chat: Uri,
     /// Mutable summary fields that changed; omitted fields are unchanged.
-    ///
+    /// 
     /// Identity fields (`resource`) never change and MUST be omitted by
     /// senders; receivers SHOULD ignore them if present.
     pub changes: PartialChatSummary,
@@ -301,7 +294,7 @@ pub struct SessionDefaultChatChangedAction {
 }
 
 /// A new message has been sent to the agent, and a new turn starts.
-///
+/// 
 /// A client is only allowed to send {@link MessageKind.User} messages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -314,7 +307,7 @@ pub struct ChatTurnStartedAction {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queued_message_id: Option<String>,
     /// Additional provider-specific metadata for this action.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry per-event context that does not fit any
     /// other field — for example, attributing the event to a specific agent
@@ -325,7 +318,7 @@ pub struct ChatTurnStartedAction {
 }
 
 /// Streaming text chunk from the assistant, appended to a specific response part.
-///
+/// 
 /// The server MUST first emit a `chat/responsePart` to create the target
 /// part (markdown or reasoning), then use this action to append text to it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -338,7 +331,7 @@ pub struct ChatDeltaAction {
     /// Text chunk
     pub content: String,
     /// Additional provider-specific metadata for this action.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry per-event context that does not fit any
     /// other field — for example, attributing the event to a specific agent
@@ -357,7 +350,7 @@ pub struct ChatResponsePartAction {
     /// Response part (markdown or content ref)
     pub part: ResponsePart,
     /// Additional provider-specific metadata for this action.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry per-event context that does not fit any
     /// other field — for example, attributing the event to a specific agent
@@ -368,7 +361,7 @@ pub struct ChatResponsePartAction {
 }
 
 /// A tool call begins — parameters are streaming from the LM.
-///
+/// 
 /// The server sets {@link ToolCallContributor | `contributor`} to identify
 /// the origin of the tool. For client-provided tools, the named client is
 /// responsible for executing the tool once it reaches the `running` state
@@ -382,7 +375,7 @@ pub struct ChatToolCallStartAction {
     /// Tool call identifier
     pub tool_call_id: String,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `ptyTerminal` key with `{ input: string; output: string }`
     /// indicates the tool operated on a terminal (both `input` and `output` may
@@ -408,7 +401,7 @@ pub struct ChatToolCallDeltaAction {
     /// Tool call identifier
     pub tool_call_id: String,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `ptyTerminal` key with `{ input: string; output: string }`
     /// indicates the tool operated on a terminal (both `input` and `output` may
@@ -423,15 +416,15 @@ pub struct ChatToolCallDeltaAction {
 }
 
 /// Tool call parameters are complete, or a running tool requires re-confirmation.
-///
+/// 
 /// When dispatched for a `streaming` tool call, transitions to `pending-confirmation`
 /// or directly to `running` if `confirmed` is set.
-///
+/// 
 /// When dispatched for a `running` tool call (e.g. mid-execution permission needed),
 /// transitions back to `pending-confirmation`. The `invocationMessage` and `_meta`
 /// SHOULD be updated to describe the specific confirmation needed. Clients use the
 /// standard `chat/toolCallConfirmed` flow to approve or deny.
-///
+/// 
 /// For client-provided tools, the server typically sets `confirmed` to
 /// `'not-needed'` so the tool transitions directly to `running`, where the
 /// owning client can begin execution immediately.
@@ -443,7 +436,7 @@ pub struct ChatToolCallReadyAction {
     /// Tool call identifier
     pub tool_call_id: String,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `ptyTerminal` key with `{ input: string; output: string }`
     /// indicates the tool operated on a terminal (both `input` and `output` may
@@ -508,11 +501,11 @@ pub struct ChatToolCallConfirmedAction {
 
 /// Tool execution finished. Transitions to `completed` or `pending-result-confirmation`
 /// if `requiresResultConfirmation` is `true`.
-///
+/// 
 /// For client-provided tools (where `toolClientId` is set on the tool call state),
 /// the owning client dispatches this action with the execution result. The server
 /// SHOULD reject this action if the dispatching client does not match `toolClientId`.
-///
+/// 
 /// Servers waiting on a client tool call MAY time out after a reasonable duration
 /// if the implementing client disconnects or becomes unresponsive, and dispatch
 /// this action with `result.success = false` and an appropriate error.
@@ -524,7 +517,7 @@ pub struct ChatToolCallCompleteAction {
     /// Tool call identifier
     pub tool_call_id: String,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `ptyTerminal` key with `{ input: string; output: string }`
     /// indicates the tool operated on a terminal (both `input` and `output` may
@@ -539,7 +532,7 @@ pub struct ChatToolCallCompleteAction {
 }
 
 /// Client approves or denies a tool's result.
-///
+/// 
 /// If `approved` is `false`, the tool transitions to `cancelled` with reason `result-denied`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -549,7 +542,7 @@ pub struct ChatToolCallResultConfirmedAction {
     /// Tool call identifier
     pub tool_call_id: String,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `ptyTerminal` key with `{ input: string; output: string }`
     /// indicates the tool operated on a terminal (both `input` and `output` may
@@ -561,11 +554,11 @@ pub struct ChatToolCallResultConfirmedAction {
 }
 
 /// Partial content produced while a tool is still executing.
-///
+/// 
 /// Replaces the `content` array on the running tool call state. Clients can
 /// use this to display live feedback (e.g. a terminal reference) before the
 /// tool completes.
-///
+/// 
 /// For client-provided tools (where `toolClientId` is set on the tool call state),
 /// the owning client dispatches this action to stream intermediate content while
 /// executing. The server SHOULD reject this action if the dispatching client does
@@ -578,7 +571,7 @@ pub struct ChatToolCallContentChangedAction {
     /// Tool call identifier
     pub tool_call_id: String,
     /// Additional provider-specific metadata for this tool call.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI.
     /// For example, a `ptyTerminal` key with `{ input: string; output: string }`
     /// indicates the tool operated on a terminal (both `input` and `output` may
@@ -596,7 +589,7 @@ pub struct ChatTurnCompleteAction {
     /// Turn identifier
     pub turn_id: String,
     /// Additional provider-specific metadata for this action.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry per-event context that does not fit any
     /// other field — for example, attributing the event to a specific agent
@@ -613,7 +606,7 @@ pub struct ChatTurnCancelledAction {
     /// Turn identifier
     pub turn_id: String,
     /// Additional provider-specific metadata for this action.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry per-event context that does not fit any
     /// other field — for example, attributing the event to a specific agent
@@ -632,7 +625,7 @@ pub struct ChatErrorAction {
     /// Error details
     pub error: ErrorInfo,
     /// Additional provider-specific metadata for this action.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry per-event context that does not fit any
     /// other field — for example, attributing the event to a specific agent
@@ -660,7 +653,7 @@ pub struct ChatUsageAction {
     /// Token usage data
     pub usage: UsageInfo,
     /// Additional provider-specific metadata for this action.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry per-event context that does not fit any
     /// other field — for example, attributing the event to a specific agent
@@ -671,7 +664,7 @@ pub struct ChatUsageAction {
 }
 
 /// Reasoning/thinking text from the model, appended to a specific reasoning response part.
-///
+/// 
 /// The server MUST first emit a `chat/responsePart` to create the target
 /// reasoning part, then use this action to append text to it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -684,7 +677,7 @@ pub struct ChatReasoningAction {
     /// Reasoning text chunk
     pub content: String,
     /// Additional provider-specific metadata for this action.
-    ///
+    /// 
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
     /// agent hosts MAY use it to carry per-event context that does not fit any
     /// other field — for example, attributing the event to a specific agent
@@ -703,10 +696,10 @@ pub struct SessionModelChangedAction {
 }
 
 /// Custom agent selection changed for this session.
-///
+/// 
 /// Omitting `agent` (or setting it to `undefined`) clears the selection and
 /// resets the session to no selected custom agent (provider default behavior).
-///
+/// 
 /// When a turn is currently active, the server MUST defer the change until
 /// the active turn completes, then apply it for the next turn (same rule as
 /// {@link SessionModelChangedAction | `session/modelChanged`}).
@@ -720,7 +713,7 @@ pub struct SessionAgentChangedAction {
 }
 
 /// The read state of the session changed.
-///
+/// 
 /// Dispatched by a client to mark a session as read (e.g. after viewing it)
 /// or unread (e.g. after new activity since the client last looked at it).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -731,7 +724,7 @@ pub struct SessionIsReadChangedAction {
 }
 
 /// The archived state of the session changed.
-///
+/// 
 /// Dispatched by a client to archive a session (e.g. the task is
 /// complete) or to unarchive it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -742,7 +735,7 @@ pub struct SessionIsArchivedChangedAction {
 }
 
 /// The activity description of the session changed.
-///
+/// 
 /// Dispatched by the server to indicate what the session is currently doing
 /// (e.g. running a tool, thinking). Clear activity by setting it to `undefined`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -758,7 +751,7 @@ pub struct SessionActivityChangedAction {
 /// {@link SessionState.changesets | `state.changesets`} entirely
 /// (full-replacement semantics) — set to `undefined` to clear the
 /// catalogue.
-///
+/// 
 /// Producers dispatch this whenever entries are added or removed. The
 /// fan-out happens through this action so observers see catalogue
 /// mutations in the same {@link ChangesetAction | per-changeset} action
@@ -772,7 +765,7 @@ pub struct SessionChangesetsChangedAction {
 }
 
 /// Server tools for this session have changed.
-///
+/// 
 /// Full-replacement semantics: the `tools` array replaces the previous `serverTools` entirely.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -782,7 +775,7 @@ pub struct SessionServerToolsChangedAction {
 }
 
 /// The active client for this session has changed.
-///
+/// 
 /// A client dispatches this action with its own `SessionActiveClient` to claim
 /// the active role, or with `null` to release it. The server SHOULD reject if
 /// another client is already active. The server SHOULD automatically dispatch
@@ -796,7 +789,7 @@ pub struct SessionActiveClientChangedAction {
 }
 
 /// The active client's tool list has changed.
-///
+/// 
 /// Full-replacement semantics: the `tools` array replaces the active client's
 /// previous tools entirely. The server SHOULD reject if the dispatching client
 /// is not the current active client.
@@ -808,13 +801,13 @@ pub struct SessionActiveClientToolsChangedAction {
 }
 
 /// A pending message was set (upsert semantics: creates or replaces).
-///
+/// 
 /// For steering messages, this always replaces the single steering message.
 /// For queued messages, if a message with the given `id` already exists it is
 /// updated in place; otherwise it is appended to the queue. If the chat is
 /// idle when a queued message is set, the server SHOULD immediately consume it
 /// and start a new turn.
-///
+/// 
 /// A client is only allowed to send {@link MessageKind.User} messages.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -828,7 +821,7 @@ pub struct ChatPendingMessageSetAction {
 }
 
 /// A pending message was removed (steering or queued).
-///
+/// 
 /// Dispatched by clients to cancel a pending message, or by the server when
 /// it consumes a message (e.g. starting a turn from a queued message or
 /// injecting a steering message into the current turn).
@@ -842,7 +835,7 @@ pub struct ChatPendingMessageRemovedAction {
 }
 
 /// Reorder the queued messages.
-///
+/// 
 /// The `order` array contains the IDs of queued messages in their new
 /// desired order. IDs not present in the current queue are ignored.
 /// Queued messages whose IDs are absent from `order` are appended at
@@ -856,7 +849,7 @@ pub struct ChatQueuedMessagesReorderedAction {
 }
 
 /// A session requested input from the user.
-///
+/// 
 /// Full-request upsert semantics: the `request` replaces any existing request
 /// with the same `id`, or is appended if it is new. Answer drafts are preserved
 /// unless `request.answers` is provided.
@@ -868,7 +861,7 @@ pub struct ChatInputRequestedAction {
 }
 
 /// A client updated, submitted, skipped, or removed a single in-progress answer.
-///
+/// 
 /// Dispatching with `answer: undefined` removes that question's answer draft.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -883,7 +876,7 @@ pub struct ChatInputAnswerChangedAction {
 }
 
 /// A client accepted, declined, or cancelled a session input request.
-///
+/// 
 /// If accepted, the server uses `answers` (when provided) plus the request's
 /// synced answer state to resume the blocked operation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -899,7 +892,7 @@ pub struct ChatInputCompletedAction {
 }
 
 /// The session's customizations have changed.
-///
+/// 
 /// Full-replacement semantics: the `customizations` array replaces the
 /// previous `customizations` entirely.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -910,7 +903,7 @@ pub struct SessionCustomizationsChangedAction {
 }
 
 /// A client toggled a container customization on or off.
-///
+/// 
 /// Targets a top-level container (plugin or directory) by `id`. Only
 /// containers have an `enabled` flag; children are always active when
 /// their container is enabled. Is a no-op when no matching container is
@@ -925,9 +918,9 @@ pub struct SessionCustomizationToggledAction {
 }
 
 /// Upserts a top-level customization (plugin or directory).
-///
+/// 
 /// The reducer locates the existing entry by `customization.id`:
-///
+/// 
 /// - If found, the entry is replaced entirely with `customization`,
 ///   including its `children` array. To preserve existing children, the
 ///   host must include them on the payload.
@@ -940,7 +933,7 @@ pub struct SessionCustomizationUpdatedAction {
 }
 
 /// Removes a customization by id.
-///
+/// 
 /// Searches every container and its children for the entry. If the entry
 /// is a container, its children are removed with it. Is a no-op when no
 /// matching id is found.
@@ -955,18 +948,18 @@ pub struct SessionCustomizationRemovedAction {
 /// {@link McpServerCustomization} — narrow alternative to
 /// {@link SessionCustomizationUpdatedAction} for the high-frequency
 /// `starting` ↔ `ready` ↔ `authRequired` transitions.
-///
+/// 
 /// Locates the target entry by `id`, searching both the top-level
 /// customization list and the `children` array of every container.
 /// Replaces the entry's {@link McpServerCustomization.state | `state`}
 /// and {@link McpServerCustomization.channel | `channel`}
 /// (full-replacement semantics: omit `channel` to clear an existing
 /// channel URI). Other fields of the customization are preserved.
-///
+/// 
 /// Is a no-op when no matching `McpServerCustomization` is found. To
 /// update any other field (name, icons, `mcpApp` capabilities, etc.) use
 /// {@link SessionCustomizationUpdatedAction} instead.
-///
+/// 
 /// When the transition is to {@link McpServerStatus.AuthRequired}
 /// because of a request issued mid-turn, the host SHOULD also raise
 /// {@link SessionStatus.InputNeeded} on the session — see
@@ -988,10 +981,10 @@ pub struct SessionMcpServerStateChangedAction {
 /// Truncates a session's history. If `turnId` is provided, all turns after that
 /// turn are removed and the specified turn is kept. If `turnId` is omitted, all
 /// turns are removed.
-///
+/// 
 /// If there is an active turn it is silently dropped and the chat status
 /// returns to `idle`.
-///
+/// 
 /// Common use-case: truncate old data then dispatch a new
 /// `chat/turnStarted` with an edited message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -1003,7 +996,7 @@ pub struct ChatTruncatedAction {
 }
 
 /// Client changed a mutable config value mid-session.
-///
+/// 
 /// Only properties with `sessionMutable: true` in the config schema may be
 /// changed. The server validates and broadcasts the action; the reducer merges
 /// the new values into `state.config.values`.
@@ -1051,7 +1044,7 @@ pub struct ChangesetFileSetAction {
 }
 
 /// Remove a {@link ChangesetFile} from the changeset by its id.
-///
+/// 
 /// Typically dispatched when a file is reverted, staged out, or otherwise
 /// no longer in scope (e.g. a renamed file is replaced by a new entry).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1064,7 +1057,7 @@ pub struct ChangesetFileRemovedAction {
 /// The changeset's full content changed. Full replacement semantics: `files`
 /// replaces the previous file list, and `operations`, when present, replaces
 /// the previous operation list.
-///
+/// 
 /// Producers SHOULD use this action for initial snapshots and bulk refreshes;
 /// use {@link ChangesetFileSetAction}, {@link ChangesetFileRemovedAction}, and
 /// {@link ChangesetOperationsChangedAction} for incremental updates.
@@ -1097,7 +1090,7 @@ pub struct ChangesetOperationsChangedAction {
 /// is set together with `status` whenever it transitions to
 /// {@link ChangesetOperationStatus.Error | Error}, and cleared on any other
 /// transition.
-///
+/// 
 /// Targets one operation by its {@link ChangesetOperation.id}. If no
 /// operation with that id is currently present in the changeset, the action
 /// is a no-op. Use {@link ChangesetOperationsChangedAction} to add, remove,
@@ -1115,7 +1108,7 @@ pub struct ChangesetOperationStatusChangedAction {
 }
 
 /// Drop every file from the changeset.
-///
+/// 
 /// Two cases use this:
 /// 1. The underlying source moved (branch switched, fork point invalidated,
 ///    …) and the server is recomputing from scratch — subsequent
@@ -1123,19 +1116,20 @@ pub struct ChangesetOperationStatusChangedAction {
 /// 2. The owning session has ended and the URI is becoming
 ///    un-subscribable — the server will unsubscribe all clients shortly
 ///    after dispatching this action.
-///
+/// 
 /// Clients SHOULD release any references on receipt and SHOULD NOT
 /// distinguish the two cases from the action alone — instead, react to
 /// the corresponding session-level lifecycle signal (e.g.
 /// `root/sessionRemoved`) for the "going away" case.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangesetClearedAction {}
+pub struct ChangesetClearedAction {
+}
 
 /// Upsert an {@link Annotation} in the annotations channel — adds a new
 /// annotation, or replaces an existing one identified by
 /// {@link Annotation.id}.
-///
+/// 
 /// Dispatched by a client to create an annotation (together with its
 /// mandatory first entry) or to re-anchor / resolve an existing one; the
 /// dispatching client assigns the {@link Annotation.id} and the id of any
@@ -1155,7 +1149,7 @@ pub struct AnnotationsSetAction {
 /// alternative to {@link AnnotationsSetAction} for the common case of resolving
 /// / re-opening or re-anchoring an annotation without resending its
 /// {@link Annotation.entries | entries}.
-///
+/// 
 /// Targets one annotation by its {@link annotationId}. Only the fields present
 /// on the action are written; omitted fields leave the corresponding
 /// {@link Annotation} property unchanged. The annotation's
@@ -1164,7 +1158,7 @@ pub struct AnnotationsSetAction {
 /// {@link AnnotationsSetAction} to replace those, to clear {@link range}
 /// (re-anchor to the whole file), or {@link AnnotationsEntrySetAction} /
 /// {@link AnnotationsEntryRemovedAction} to edit individual entries.
-///
+/// 
 /// If {@link annotationId} does not match any current annotation the action is
 /// a no-op.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1194,7 +1188,7 @@ pub struct AnnotationsUpdatedAction {
 }
 
 /// Remove an {@link Annotation} from the channel by its id.
-///
+/// 
 /// Dispatched to delete an entire annotation and every entry it contains.
 /// Because the protocol forbids empty annotations, a client that wants to
 /// remove the last remaining entry dispatches this action — collapsing the
@@ -1224,7 +1218,7 @@ pub struct AnnotationsEntrySetAction {
 /// collapsing the annotation itself. Used when more than one entry remains —
 /// to remove the last entry a client dispatches {@link AnnotationsRemovedAction}
 /// instead, since the protocol forbids empty annotations.
-///
+/// 
 /// If either {@link annotationId} or {@link entryId} does not match the
 /// current state the action is a no-op.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1237,7 +1231,7 @@ pub struct AnnotationsEntryRemovedAction {
 }
 
 /// Fired when the list of known terminals changes.
-///
+/// 
 /// Full-replacement semantics: the `terminals` array replaces the previous
 /// `terminals` entirely.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1248,9 +1242,9 @@ pub struct RootTerminalsChangedAction {
 }
 
 /// Terminal output data (pty → client direction).
-///
+/// 
 /// Appends `data` to the terminal's `content` in the reducer.
-///
+/// 
 /// `terminal/data` and `terminal/input` are intentionally separate actions
 /// because standard write-ahead reconciliation is not safe for terminal I/O.
 /// A pty is a stateful, mutable process — optimistically applying input or
@@ -1265,11 +1259,11 @@ pub struct TerminalDataAction {
 }
 
 /// Keyboard input sent to the terminal process (client → pty direction).
-///
+/// 
 /// This is a side-effect-only action: the server forwards the data to the
 /// terminal's pty. The reducer treats this as a no-op since `terminal/data`
 /// actions will reflect any resulting output.
-///
+/// 
 /// See `terminal/data` for why these two actions are kept separate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1279,7 +1273,7 @@ pub struct TerminalInputAction {
 }
 
 /// Terminal dimensions changed.
-///
+/// 
 /// Dispatchable by clients to request a resize, or by the server to inform
 /// clients of the actual terminal dimensions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1292,7 +1286,7 @@ pub struct TerminalResizedAction {
 }
 
 /// Terminal claim changed. A client or session transfers ownership of the terminal.
-///
+/// 
 /// The server SHOULD reject if the dispatching client does not currently hold
 /// the claim.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1303,7 +1297,7 @@ pub struct TerminalClaimedAction {
 }
 
 /// Terminal title changed.
-///
+/// 
 /// Fired by the server when the terminal process updates its title (e.g. via
 /// escape sequences), or dispatched by a client to rename a terminal.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1333,17 +1327,19 @@ pub struct TerminalExitedAction {
 /// Terminal scrollback buffer cleared.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TerminalClearedAction {}
+pub struct TerminalClearedAction {
+}
 
 /// Shell integration has loaded and the terminal now supports command
 /// detection. The server dispatches this when shell integration becomes
 /// available (which may happen asynchronously after the terminal is created).
-///
+/// 
 /// Clients MUST NOT assume command detection is available until this action
 /// (or `terminal/commandExecuted`) has been received.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TerminalCommandDetectionAvailableAction {}
+pub struct TerminalCommandDetectionAvailableAction {
+}
 
 /// A command has been submitted to the shell and is now executing.
 /// All subsequent `terminal/data` actions (until the matching
@@ -1362,7 +1358,7 @@ pub struct TerminalCommandExecutedAction {
 }
 
 /// A command has finished executing.
-///
+/// 
 /// The sequence of `terminal/data` actions between the preceding
 /// `terminal/commandExecuted` (same `commandId`) and this action constitutes
 /// the complete output of the command.
@@ -1381,7 +1377,7 @@ pub struct TerminalCommandFinishedAction {
 }
 
 /// A batch of resource changes observed by the watcher.
-///
+/// 
 /// Watch events are coalesced into batches by the server to keep the
 /// action stream tractable; an empty `changes.items` list MUST NOT be
 /// dispatched. The reducer does not retain change history — these
@@ -1425,14 +1421,14 @@ pub struct PartialChatSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
-    ///
+    /// 
     /// Supports agent-team patterns where worker chats are read-only or hidden.
     /// Absence defaults to {@link ChatInteractivity.Full} for backward
     /// compatibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interactivity: Option<ChatInteractivity>,
     /// Optional per-chat working directory.
-    ///
+    /// 
     /// If absent, the chat inherits
     /// {@link SessionSummary.workingDirectory | the session's working directory}.
     /// See {@link ChatState.workingDirectory} for usage notes.

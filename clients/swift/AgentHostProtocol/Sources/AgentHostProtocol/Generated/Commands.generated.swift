@@ -977,8 +977,8 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var description: String?
     /// JSON Schema: default value
     public var `default`: AnyCodable?
-    /// JSON Schema: allowed values (typically used with `string` type)
-    public var `enum`: [String]?
+    /// JSON Schema: allowed values (used with `string` or `number` type)
+    public var `enum`: [string | number]?
     /// Display extension: human-readable label per enum value (parallel array)
     public var enumLabels: [String]?
     /// Display extension: description per enum value (parallel array)
@@ -1023,7 +1023,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         title: String,
         description: String? = nil,
         `default`: AnyCodable? = nil,
-        `enum`: [String]? = nil,
+        `enum`: [string | number]? = nil,
         enumLabels: [String]? = nil,
         enumDescriptions: [String]? = nil,
         readOnly: Bool? = nil,

@@ -5,17 +5,14 @@
 #![allow(missing_docs)]
 
 #[allow(unused_imports)]
-use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
-#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_repr::{Deserialize_repr, Serialize_repr};
+#[allow(unused_imports)]
+use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
 
 #[allow(unused_imports)]
-use crate::state::{
-    AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
-    ProjectInfo, SessionStatus, SessionSummary,
-};
+use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, SessionStatus, SessionSummary};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
@@ -57,7 +54,7 @@ pub struct SessionRemovedParams {
 /// Broadcast to all clients subscribed to the root channel when an existing
 /// session's summary changes (title, status, `modifiedAt`, model, working
 /// directory, read/done state, or diff statistics).
-///
+/// 
 /// This notification lets clients that maintain a cached session list — for
 /// example, the result of a previous `listSessions()` call — stay in sync with
 /// in-flight sessions without having to subscribe to every session URI
@@ -65,9 +62,9 @@ pub struct SessionRemovedParams {
 /// `root/sessionAdded` and `root/sessionRemoved`: those signal lifecycle
 /// (creation/disposal), while this signals summary-level mutations on an
 /// already-known session.
-///
+/// 
 /// Semantics:
-///
+/// 
 /// - Only fields present in `changes` have new values; omitted fields are
 ///   unchanged on the client's cached summary.
 /// - Identity fields (`resource`, `provider`, `createdAt`) never change and
@@ -90,20 +87,20 @@ pub struct SessionSummaryChangedParams {
     /// URI of the session whose summary changed
     pub session: Uri,
     /// Mutable summary fields that changed; omitted fields are unchanged.
-    ///
+    /// 
     /// Identity fields (`resource`, `provider`, `createdAt`) never change and
     /// MUST be omitted by senders; receivers SHOULD ignore them if present.
     pub changes: PartialSessionSummary,
 }
 
 /// Sent by the server when a protected resource requires (re-)authentication.
-///
+/// 
 /// This notification MAY be associated with any channel — for example, an
 /// agent advertised on the root channel, or a per-session resource. The
 /// `channel` field identifies the subscription the auth requirement belongs
 /// to; the `resource` field carries the OAuth-protected resource identifier
 /// (per RFC 9728).
-///
+/// 
 /// Clients should obtain a fresh token and push it via the `authenticate`
 /// command.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -120,13 +117,13 @@ pub struct AuthRequiredParams {
 
 /// Delivers a batch of OTLP log records to a client subscribed to the host's
 /// logs channel (advertised on `TelemetryCapabilities.logs`).
-///
+/// 
 /// The `payload` field is an OTLP/JSON `ExportLogsServiceRequest` value
 /// verbatim — i.e. an object of shape `{ resourceLogs: ResourceLogs[] }` as
 /// defined by [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto).
 /// AHP does not redeclare the OTLP type system; clients SHOULD use an
 /// OpenTelemetry SDK or schema to parse it.
-///
+/// 
 /// Like all stateless-channel notifications, this is ephemeral: it is not
 /// replayed on reconnect. Subscribers receive only batches emitted after
 /// their `subscribe` succeeds.
@@ -143,7 +140,7 @@ pub struct OtlpExportLogsParams {
 
 /// Delivers a batch of OTLP spans to a client subscribed to the host's
 /// traces channel (advertised on `TelemetryCapabilities.traces`).
-///
+/// 
 /// The `payload` field is an OTLP/JSON `ExportTraceServiceRequest` value
 /// verbatim — i.e. an object of shape `{ resourceSpans: ResourceSpans[] }`
 /// as defined by [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/trace/v1/trace_service.proto).
@@ -160,7 +157,7 @@ pub struct OtlpExportTracesParams {
 
 /// Delivers a batch of OTLP metric data points to a client subscribed to
 /// the host's metrics channel (advertised on `TelemetryCapabilities.metrics`).
-///
+/// 
 /// The `payload` field is an OTLP/JSON `ExportMetricsServiceRequest` value
 /// verbatim — i.e. an object of shape `{ resourceMetrics: ResourceMetrics[] }`
 /// as defined by [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/metrics/v1/metrics_service.proto).
@@ -209,7 +206,7 @@ pub struct PartialSessionSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelSelection>,
     /// Currently selected custom agent.
-    ///
+    /// 
     /// Absent (`undefined`) means no custom agent is selected for this session
     /// — the session uses the provider's default behavior.
     #[serde(default, skip_serializing_if = "Option::is_none")]
