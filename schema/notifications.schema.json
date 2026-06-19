@@ -402,6 +402,10 @@
             "type": "string"
           },
           "description": "JSON Schema: list of required property ids (used when `type` is `'object'`)"
+        },
+        "additionalProperties": {
+          "$ref": "#/$defs/ConfigPropertySchema",
+          "description": "JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`)."
         }
       },
       "required": [
@@ -1102,6 +1106,10 @@
             "type": "string"
           },
           "description": "JSON Schema: list of required property ids (used when `type` is `'object'`)"
+        },
+        "additionalProperties": {
+          "$ref": "#/$defs/ConfigPropertySchema",
+          "description": "JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`)."
         },
         "enumDynamic": {
           "type": "boolean",

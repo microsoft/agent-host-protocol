@@ -22,6 +22,9 @@ hotfix escape hatch.
 
 ### Added
 
+- `ConfigPropertySchema.additionalProperties` — optional JSON Schema field
+  (`ConfigPropertySchema`) describing the schema for object-typed config
+  properties beyond those listed in `properties`.
 - `ChangesetOperationStatus.Disabled` — new enum value for changeset
   operations that are currently unavailable and cannot be invoked.
 - `ChangesetOperation.group` — optional identifier for grouping related

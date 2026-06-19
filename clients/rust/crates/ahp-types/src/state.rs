@@ -817,6 +817,9 @@ pub struct ConfigPropertySchema {
     /// JSON Schema: list of required property ids (used when `type` is `'object'`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub required: Option<Vec<String>>,
+    /// JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub additional_properties: Option<Box<ConfigPropertySchema>>,
 }
 
 /// A JSON Schema object describing available configuration properties.
@@ -1198,6 +1201,9 @@ pub struct SessionConfigPropertySchema {
     /// JSON Schema: list of required property ids (used when `type` is `'object'`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub required: Option<Vec<String>>,
+    /// JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub additional_properties: Option<ConfigPropertySchema>,
     /// Display extension: when `true`, the full set of allowed values is too large
     /// to enumerate statically. The client SHOULD use `sessionConfigCompletions`
     /// to fetch matching values based on user input. Any values in `enum` are

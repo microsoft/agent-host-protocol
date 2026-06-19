@@ -991,6 +991,8 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var properties: [String: ConfigPropertySchema]?
     /// JSON Schema: list of required property ids (used when `type` is `'object'`)
     public var required: [String]?
+    /// JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`).
+    public var additionalProperties: ConfigPropertySchema?
     /// Display extension: when `true`, the full set of allowed values is too large
     /// to enumerate statically. The client SHOULD use `sessionConfigCompletions`
     /// to fetch matching values based on user input. Any values in `enum` are
@@ -1011,6 +1013,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         case items
         case properties
         case required
+        case additionalProperties
         case enumDynamic
         case sessionMutable
     }
@@ -1027,6 +1030,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         items: ConfigPropertySchema? = nil,
         properties: [String: ConfigPropertySchema]? = nil,
         required: [String]? = nil,
+        additionalProperties: ConfigPropertySchema? = nil,
         enumDynamic: Bool? = nil,
         sessionMutable: Bool? = nil
     ) {
@@ -1041,6 +1045,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         self.items = items
         self.properties = properties
         self.required = required
+        self.additionalProperties = additionalProperties
         self.enumDynamic = enumDynamic
         self.sessionMutable = sessionMutable
     }

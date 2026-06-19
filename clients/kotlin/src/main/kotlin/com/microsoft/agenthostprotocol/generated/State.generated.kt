@@ -953,7 +953,11 @@ data class ConfigPropertySchema(
     /**
      * JSON Schema: list of required property ids (used when `type` is `'object'`)
      */
-    val required: List<String>? = null
+    val required: List<String>? = null,
+    /**
+     * JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`).
+     */
+    val additionalProperties: ConfigPropertySchema? = null
 )
 
 @Serializable

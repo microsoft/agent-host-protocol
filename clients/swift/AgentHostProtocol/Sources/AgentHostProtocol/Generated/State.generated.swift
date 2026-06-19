@@ -673,6 +673,8 @@ public final class ConfigPropertySchema: Codable, @unchecked Sendable {
     public var properties: [String: ConfigPropertySchema]?
     /// JSON Schema: list of required property ids (used when `type` is `'object'`)
     public var required: [String]?
+    /// JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`).
+    public var additionalProperties: ConfigPropertySchema?
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -686,6 +688,7 @@ public final class ConfigPropertySchema: Codable, @unchecked Sendable {
         case items
         case properties
         case required
+        case additionalProperties
     }
 
     public init(
@@ -699,7 +702,8 @@ public final class ConfigPropertySchema: Codable, @unchecked Sendable {
         readOnly: Bool? = nil,
         items: ConfigPropertySchema? = nil,
         properties: [String: ConfigPropertySchema]? = nil,
-        required: [String]? = nil
+        required: [String]? = nil,
+        additionalProperties: ConfigPropertySchema? = nil
     ) {
         self.type = type
         self.title = title
@@ -712,6 +716,7 @@ public final class ConfigPropertySchema: Codable, @unchecked Sendable {
         self.items = items
         self.properties = properties
         self.required = required
+        self.additionalProperties = additionalProperties
     }
 }
 

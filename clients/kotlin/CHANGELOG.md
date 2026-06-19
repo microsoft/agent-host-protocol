@@ -17,6 +17,8 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 
 ### Added
 
+- `ConfigPropertySchema.additionalProperties` — optional field describing the
+  schema for object-typed config properties beyond those in `properties`.
 - `ChangesetOperationStatus.Disabled` — new enum value for changeset
   operations that are currently unavailable and cannot be invoked.
 - `ChangesetOperation.group` — optional identifier for grouping related

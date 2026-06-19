@@ -19,6 +19,8 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Added
 
+- `ConfigPropertySchema.additionalProperties` — optional field describing the
+  schema for object-typed config properties beyond those in `properties`.
 - `ChangesetOperationStatus.disabled` — new case for changeset operations
   that are currently unavailable and cannot be invoked.
 - `ChangesetOperation.group` — optional identifier for grouping related

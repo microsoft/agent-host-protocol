@@ -589,6 +589,8 @@ type ConfigPropertySchema struct {
 	Properties map[string]ConfigPropertySchema `json:"properties,omitempty"`
 	// JSON Schema: list of required property ids (used when `type` is `'object'`)
 	Required []string `json:"required,omitempty"`
+	// JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`).
+	AdditionalProperties *ConfigPropertySchema `json:"additionalProperties,omitempty"`
 }
 
 // A JSON Schema object describing available configuration properties.
@@ -903,6 +905,8 @@ type SessionConfigPropertySchema struct {
 	Properties map[string]ConfigPropertySchema `json:"properties,omitempty"`
 	// JSON Schema: list of required property ids (used when `type` is `'object'`)
 	Required []string `json:"required,omitempty"`
+	// JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`).
+	AdditionalProperties *ConfigPropertySchema `json:"additionalProperties,omitempty"`
 	// Display extension: when `true`, the full set of allowed values is too large
 	// to enumerate statically. The client SHOULD use `sessionConfigCompletions`
 	// to fetch matching values based on user input. Any values in `enum` are

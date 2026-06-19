@@ -905,6 +905,10 @@ data class SessionConfigPropertySchema(
      */
     val required: List<String>? = null,
     /**
+     * JSON Schema: schema for additional properties not listed in `properties` (used when `type` is `'object'`).
+     */
+    val additionalProperties: ConfigPropertySchema? = null,
+    /**
      * Display extension: when `true`, the full set of allowed values is too large
      * to enumerate statically. The client SHOULD use `sessionConfigCompletions`
      * to fetch matching values based on user input. Any values in `enum` are
