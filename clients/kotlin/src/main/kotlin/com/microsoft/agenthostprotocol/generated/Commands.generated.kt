@@ -877,9 +877,9 @@ data class SessionConfigPropertySchema(
      */
     val default: JsonElement? = null,
     /**
-     * JSON Schema: allowed values (typically used with `string` type)
+     * JSON Schema: allowed values
      */
-    val enum: List<String>? = null,
+    val enum: List<JsonElement>? = null,
     /**
      * Display extension: human-readable label per enum value (parallel array)
      */

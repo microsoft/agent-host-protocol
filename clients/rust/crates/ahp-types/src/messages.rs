@@ -5,11 +5,11 @@
 #![allow(missing_docs)]
 
 #[allow(unused_imports)]
+use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
 #[allow(unused_imports)]
 use serde_repr::{Deserialize_repr, Serialize_repr};
-#[allow(unused_imports)]
-use crate::common::{AnyValue, JsonObject, StringOrMarkdown, Uri};
 
 use crate::actions::ActionEnvelope;
 

@@ -595,8 +595,8 @@ type ConfigPropertySchema struct {
 	Description *string `json:"description,omitempty"`
 	// JSON Schema: default value
 	Default *json.RawMessage `json:"default,omitempty"`
-	// JSON Schema: allowed values (typically used with `string` type)
-	Enum []string `json:"enum,omitempty"`
+	// JSON Schema: allowed values
+	Enum []json.RawMessage `json:"enum,omitempty"`
 	// Display extension: human-readable label per enum value (parallel array)
 	EnumLabels []string `json:"enumLabels,omitempty"`
 	// Display extension: description per enum value (parallel array)
@@ -911,8 +911,8 @@ type SessionConfigPropertySchema struct {
 	Description *string `json:"description,omitempty"`
 	// JSON Schema: default value
 	Default *json.RawMessage `json:"default,omitempty"`
-	// JSON Schema: allowed values (typically used with `string` type)
-	Enum []string `json:"enum,omitempty"`
+	// JSON Schema: allowed values
+	Enum []json.RawMessage `json:"enum,omitempty"`
 	// Display extension: human-readable label per enum value (parallel array)
 	EnumLabels []string `json:"enumLabels,omitempty"`
 	// Display extension: description per enum value (parallel array)

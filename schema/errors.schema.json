@@ -233,17 +233,8 @@
         },
         "enum": {
           "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              }
-            ]
-          },
-          "description": "JSON Schema: allowed values (used with `string` or `number` type)"
+          "items": {},
+          "description": "JSON Schema: allowed values"
         },
         "enumLabels": {
           "type": "array",
@@ -944,17 +935,8 @@
         },
         "enum": {
           "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "number"
-              }
-            ]
-          },
-          "description": "JSON Schema: allowed values (used with `string` or `number` type)"
+          "items": {},
+          "description": "JSON Schema: allowed values"
         },
         "enumLabels": {
           "type": "array",
