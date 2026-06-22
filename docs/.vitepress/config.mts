@@ -8,6 +8,7 @@ export default withMermaid(defineConfig({
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/agent-host-protocol/logo.svg' }],
+    ['link', { rel: 'stylesheet', href: 'https://unpkg.com/@vscode/codicons/dist/codicon.css' }],
   ],
 
   themeConfig: {
