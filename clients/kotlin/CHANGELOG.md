@@ -15,6 +15,11 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 
 ## [Unreleased]
 
+### Added
+
+- `SessionSummary.meta` (`_meta` on the wire) optional provider metadata field
+  for lightweight session-list presentation hints.
+
 ## [0.4.0] — 2026-06-19
 
 Implements AHP 0.4.0.

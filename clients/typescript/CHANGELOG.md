@@ -20,6 +20,16 @@ hotfix escape hatch.
 
 ## [Unreleased]
 
+### Added
+
+- `SessionSummary._meta` optional provider metadata field for lightweight
+  session-list presentation hints.
+
+### Fixed
+
+- Hosted session summary caches now apply `_meta` updates from
+  `root/sessionSummaryChanged` notifications.
+
 ## [0.4.0] — 2026-06-19
 
 Implements AHP 0.4.0.

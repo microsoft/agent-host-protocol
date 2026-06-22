@@ -208,5 +208,13 @@ data class PartialSessionSummary(
      * annotation / entry counts without subscribing. Absent when the session
      * does not expose an annotations channel.
      */
-    val annotations: AnnotationsSummary? = null
+    val annotations: AnnotationsSummary? = null,
+    /**
+     * Lightweight server-defined metadata clients may use for the session
+     * presentation. The protocol does not interpret these values; producers
+     * SHOULD keep the payload small because summaries appear in session lists
+     * and session notifications.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
 )

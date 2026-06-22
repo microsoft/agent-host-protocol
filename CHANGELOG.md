@@ -23,6 +23,11 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+### Added
+
+- `SessionSummary._meta` optional provider metadata field for lightweight
+  session-list presentation hints.
+
 ## [0.5.0] — Unreleased
 
 Spec version: `0.5.0`

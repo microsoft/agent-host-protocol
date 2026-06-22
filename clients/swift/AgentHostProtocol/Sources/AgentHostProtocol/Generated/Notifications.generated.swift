@@ -177,6 +177,28 @@ public struct PartialSessionSummary: Codable, Sendable {
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?
+    /// Lightweight server-defined metadata clients may use for the session
+    /// presentation. The protocol does not interpret these values; producers
+    /// SHOULD keep the payload small because summaries appear in session lists
+    /// and session notifications.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case provider
+        case title
+        case status
+        case activity
+        case createdAt
+        case modifiedAt
+        case project
+        case model
+        case agent
+        case workingDirectory
+        case changes
+        case annotations
+        case meta = "_meta"
+    }
 
     public init(
         resource: String? = nil,
@@ -191,7 +213,8 @@ public struct PartialSessionSummary: Codable, Sendable {
         agent: AgentSelection? = nil,
         workingDirectory: String? = nil,
         changes: ChangesSummary? = nil,
-        annotations: AnnotationsSummary? = nil
+        annotations: AnnotationsSummary? = nil,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.resource = resource
         self.provider = provider
@@ -206,5 +229,6 @@ public struct PartialSessionSummary: Codable, Sendable {
         self.workingDirectory = workingDirectory
         self.changes = changes
         self.annotations = annotations
+        self.meta = meta
     }
 }

@@ -773,6 +773,11 @@ type SessionSummary struct {
 	// annotation / entry counts without subscribing. Absent when the session
 	// does not expose an annotations channel.
 	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
+	// Lightweight server-defined metadata clients may use for the session
+	// presentation. The protocol does not interpret these values; producers
+	// SHOULD keep the payload small because summaries appear in session lists
+	// and session notifications.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // Aggregate counts describing the file changes associated with a session.

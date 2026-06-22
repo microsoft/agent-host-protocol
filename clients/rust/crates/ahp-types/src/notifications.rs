@@ -232,4 +232,10 @@ pub struct PartialSessionSummary {
     /// does not expose an annotations channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotations: Option<AnnotationsSummary>,
+    /// Lightweight server-defined metadata clients may use for the session
+    /// presentation. The protocol does not interpret these values; producers
+    /// SHOULD keep the payload small because summaries appear in session lists
+    /// and session notifications.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
 }

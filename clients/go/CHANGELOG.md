@@ -14,6 +14,11 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
+### Added
+
+- `SessionSummary.Meta` (wire `_meta`) optional provider metadata field for
+  lightweight session-list presentation hints.
+
 ## [0.4.0] — 2026-06-19
 
 Implements AHP 0.4.0.

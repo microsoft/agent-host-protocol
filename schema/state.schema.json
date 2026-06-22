@@ -778,6 +778,11 @@
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
           "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Lightweight server-defined metadata clients may use for the session\npresentation. The protocol does not interpret these values; producers\nSHOULD keep the payload small because summaries appear in session lists\nand session notifications."
         }
       },
       "required": [
