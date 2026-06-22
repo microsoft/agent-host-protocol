@@ -1555,6 +1555,7 @@ mod tests {
                 working_directory: None,
                 changes: None,
                 annotations: None,
+                meta: None,
             },
             lifecycle: SessionLifecycle::Creating,
             creation_error: None,

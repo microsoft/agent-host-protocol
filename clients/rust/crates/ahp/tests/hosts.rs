@@ -1034,6 +1034,7 @@ fn make_summary(uri: &str, title: &str, modified_at: i64) -> ahp_types::state::S
         working_directory: None,
         changes: None,
         annotations: None,
+        meta: None,
     }
 }
 
