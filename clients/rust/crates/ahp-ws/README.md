@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
 | `rustls-tls-webpki-roots` | rustls (pure Rust) | bundled Mozilla roots |
 | `native-tls` | platform (SChannel / Secure Transport / OpenSSL) | OS trust store |
 
-With no TLS feature enabled, only `ws://` works; `wss://` fails at connect time. The rustls backends use the `ring` crypto provider. If more than one backend ends up enabled (e.g. via Cargo feature unification across the dependency graph), `native-tls` takes precedence, since `tokio-tungstenite`'s automatic connector prefers it.
+With no TLS feature enabled, only `ws://` works; `wss://` fails at connect time. The rustls backends use the `ring` crypto provider. If more than one backend ends up enabled (e.g. via Cargo feature unification across the dependency graph), `native-tls` takes precedence, since `tokio-tungstenite`'s automatic connector prefers it. Because any crate in the graph can pull in `native-tls`, your own feature selection alone can't guarantee which backend `connect` uses; when you need a specific backend regardless of the final feature set, build a `tokio-tungstenite` connector yourself and wrap it with `WebSocketTransport::from_stream`.
 
 ## See also
 

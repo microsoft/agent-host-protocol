@@ -30,9 +30,12 @@
 //! If more than one backend ends up enabled — which Cargo feature
 //! unification can do when several crates in the graph request different
 //! ones — `native-tls` takes precedence over the rustls backends, because
-//! `tokio-tungstenite`'s automatic connector prefers it. Disable the
-//! default with `default-features = false` if you need to guarantee a
-//! rustls backend.
+//! `tokio-tungstenite`'s automatic connector prefers it. Because any crate
+//! in the graph can pull in `native-tls`, your own feature selection alone
+//! can't guarantee which backend [`WebSocketTransport::connect`] uses. When
+//! you need a specific backend regardless of the final feature set, build a
+//! `tokio-tungstenite` connector explicitly and wrap the result with
+//! [`WebSocketTransport::from_stream`].
 //!
 //! [rustls]: https://crates.io/crates/rustls
 //!
