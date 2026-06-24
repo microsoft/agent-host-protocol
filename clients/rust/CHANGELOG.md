@@ -116,6 +116,18 @@ Implements AHP 0.4.0.
 
 ### Added
 
+- New annotations channel wire types (`ahp-session:/<uuid>/annotations`):
+  `AnnotationsState`, `Annotation`, `AnnotationEntry`,
+  `AnnotationsSummary`; the client-dispatchable
+  `annotations/set` / `annotations/removed` / `annotations/entrySet`
+  / `annotations/entryRemoved` action variants — clients drive every annotation
+  mutation by dispatching these directly, assigning the `Annotation.id` /
+  `AnnotationEntry.id` themselves;
+  `MultiHostStateMirror.annotations()` and `SnapshotState::Annotations`.
+  Reducer logic is deferred (matches the changeset stub).
+- `MessageAnnotationsAttachment` (`annotations` `MessageAttachment` variant)
+  referencing annotations on a session's annotations channel by `resource`
+  URI, optionally narrowed to an `annotationIds` array.
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
   existing annotation's `turn_id` / `resource` / `range` / `resolved` without
   resending its entries. Handled by the annotations reducer (no-op on unknown
@@ -169,18 +181,6 @@ Implements AHP 0.3.0.
   `idle → running → error` lifecycle of a changeset operation.
 - `AgentCustomization._meta` provider metadata field.
 - Optional `changes` field on `SessionSummary` (`ChangesSummary` with optional `additions`, `deletions`, and `files` counts) summarising a session's file-change footprint.
-- New annotations channel wire types (`ahp-session:/<uuid>/annotations`):
-  `AnnotationsState`, `Annotation`, `AnnotationEntry`,
-  `AnnotationsSummary`; the client-dispatchable
-  `annotations/set` / `annotations/removed` / `annotations/entrySet`
-  / `annotations/entryRemoved` action variants — clients drive every annotation
-  mutation by dispatching these directly, assigning the `Annotation.id` /
-  `AnnotationEntry.id` themselves;
-  `MultiHostStateMirror.annotations()` and `SnapshotState::Annotations`.
-  Reducer logic is deferred (matches the changeset stub).
-- `MessageAnnotationsAttachment` (`annotations` `MessageAttachment` variant)
-  referencing annotations on a session's annotations channel by `resource`
-  URI, optionally narrowed to an `annotationIds` array.
 
 
 ### Changed

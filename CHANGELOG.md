@@ -49,6 +49,14 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 - `session/activeClientToolsChanged`. An active client now updates its published
   tools by re-dispatching `session/activeClientSet` with its full, updated entry.
 
+### Fixed
+
+- Corrected the `ACTION_INTRODUCED_IN` entries for `annotations/set`,
+  `annotations/removed`, `annotations/entrySet`, and `annotations/entryRemoved`
+  from `0.3.0` to `0.4.0`. The annotations channel first shipped in the
+  `0.4.0` spec release (it is absent from `spec/v0.3.0`), so version
+  negotiation must not advertise it to peers speaking `0.3.0`.
+
 ## [0.5.0] — Unreleased
 
 Spec version: `0.5.0`
@@ -82,6 +90,21 @@ Spec version: `0.4.0`
   event to a specific agent (e.g. a sub-agent acting within the turn). The
   tool-call actions already exposed `_meta`; this extends the same convention
   to the remaining turn-scoped actions.
+- Added a new annotations channel exposed on `ahp-session:/<uuid>/annotations`.
+  Annotations anchor to a `(turnId, resource)` pair with an optional `range`
+  (omitted to anchor to the entire file), carry a `resolved` flag (newly
+  created annotations start unresolved), and always carry at least one entry.
+  Clients drive every mutation by dispatching the client-dispatchable
+  `annotations/set`, `annotations/removed`, `annotations/entrySet`, and
+  `annotations/entryRemoved` state actions directly — assigning the
+  `Annotation.id` / `AnnotationEntry.id` themselves — rather than through RPC
+  commands, so annotations inherit write-ahead replay and conflict resolution.
+  `SessionSummary.annotations` advertises the per-session `AnnotationsSummary`
+  (`{ resource, annotationCount, entryCount }`) for badge UI.
+- Added an `annotations` `MessageAttachment` variant
+  (`MessageAnnotationsAttachment`) that references annotations on a
+  session's annotations channel by its `resource` URI, optionally narrowed to
+  an `annotationIds` array (omitted to reference every annotation).
 - `annotations/updated` (`AnnotationsUpdatedAction`) — a client-dispatchable
   action that partially updates an existing annotation's own properties
   (`turnId`, `resource`, `range`, `resolved`) without resending its entries.
@@ -177,21 +200,6 @@ Spec version: `0.3.0`
 - Added optional `changes` field of type `ChangesSummary` to `SessionSummary`,
   carrying optional `additions`, `deletions`, and `files` counts so servers
   can advertise an at-a-glance view of a session's file-change footprint.
-- Added a new annotations channel exposed on `ahp-session:/<uuid>/annotations`.
-  Annotations anchor to a `(turnId, resource)` pair with an optional `range`
-  (omitted to anchor to the entire file), carry a `resolved` flag (newly
-  created annotations start unresolved), and always carry at least one entry.
-  Clients drive every mutation by dispatching the client-dispatchable
-  `annotations/set`, `annotations/removed`, `annotations/entrySet`, and
-  `annotations/entryRemoved` state actions directly — assigning the
-  `Annotation.id` / `AnnotationEntry.id` themselves — rather than through RPC
-  commands, so annotations inherit write-ahead replay and conflict resolution.
-  `SessionSummary.annotations` advertises the per-session `AnnotationsSummary`
-  (`{ resource, annotationCount, entryCount }`) for badge UI.
-- Added an `annotations` `MessageAttachment` variant
-  (`MessageAnnotationsAttachment`) that references annotations on a
-  session's annotations channel by its `resource` URI, optionally narrowed to
-  an `annotationIds` array (omitted to reference every annotation).
 - Removed the `additions`, `deletions`, and `files` fields from
   `ChangesetSummary`. Aggregate counts now live on `SessionSummary.changes`;
   per-changeset views derive their own totals from `ChangesetState.files`.

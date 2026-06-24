@@ -99,6 +99,18 @@ Implements AHP 0.4.0.
 
 ### Added
 
+- New annotations channel wire types (`ahp-session:/<uuid>/annotations`):
+  `AnnotationsState`, `Annotation`, `AnnotationEntry`,
+  `AnnotationsSummary`; the client-dispatchable `AnnotationsSetAction`,
+  `AnnotationsRemovedAction`, `AnnotationsEntrySetAction`,
+  `AnnotationsEntryRemovedAction` variants — clients drive every annotation
+  mutation by dispatching these directly, assigning the `Annotation.Id` /
+  `AnnotationEntry.Id` themselves;
+  `ApplyActionToAnnotations` (stub mirroring `ApplyActionToChangeset`); and
+  `SnapshotState.Annotations`.
+- `MessageAnnotationsAttachment` (`annotations` `MessageAttachment` variant)
+  referencing annotations on a session's annotations channel by `Resource`
+  URI, optionally narrowed to an `AnnotationIds` array.
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
   existing annotation's `TurnID` / `Resource` / `Range` / `Resolved` without
   resending its entries. Handled by the annotations reducer (no-op on unknown
@@ -153,18 +165,6 @@ Implements AHP 0.3.0.
   `idle → running → error` lifecycle of a changeset operation.
 - `AgentCustomization._meta` provider metadata field.
 - Optional `changes` field on `SessionSummary` (`ChangesSummary` with optional `additions`, `deletions`, and `files` counts) summarising a session's file-change footprint.
-- New annotations channel wire types (`ahp-session:/<uuid>/annotations`):
-  `AnnotationsState`, `Annotation`, `AnnotationEntry`,
-  `AnnotationsSummary`; the client-dispatchable `AnnotationsSetAction`,
-  `AnnotationsRemovedAction`, `AnnotationsEntrySetAction`,
-  `AnnotationsEntryRemovedAction` variants — clients drive every annotation
-  mutation by dispatching these directly, assigning the `Annotation.Id` /
-  `AnnotationEntry.Id` themselves;
-  `ApplyActionToAnnotations` (stub mirroring `ApplyActionToChangeset`); and
-  `SnapshotState.Annotations`.
-- `MessageAnnotationsAttachment` (`annotations` `MessageAttachment` variant)
-  referencing annotations on a session's annotations channel by `Resource`
-  URI, optionally narrowed to an `AnnotationIds` array.
 
 
 ### Changed

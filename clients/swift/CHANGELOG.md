@@ -106,6 +106,17 @@ Implements AHP 0.4.0.
 
 ### Added
 
+- New annotations channel wire types (`ahp-session:/<uuid>/annotations`):
+  `AnnotationsState`, `Annotation`, `AnnotationEntry`,
+  `AnnotationsSummary`; and the client-dispatchable
+  `annotations/set` / `annotations/removed` / `annotations/entrySet`
+  / `annotations/entryRemoved` cases on `StateAction` — clients drive every
+  annotation mutation by dispatching these directly, assigning the
+  `Annotation.id` / `AnnotationEntry.id` themselves; and
+  `SnapshotState.annotations`.
+- `MessageAnnotationsAttachment` (`annotations` `MessageAttachment` variant)
+  referencing annotations on a session's annotations channel by `resource`
+  URI, optionally narrowed to an `annotationIds` array.
 - `annotationsReducer` implemented; annotations conformance fixtures (210–219) now pass.
 
 - `AnnotationsUpdatedAction` (`annotations/updated`) — partially updates an
@@ -188,18 +199,6 @@ Implements AHP 0.3.0.
   `idle → running → error` lifecycle of a changeset operation.
 - `AgentCustomization._meta` provider metadata field.
 - Optional `changes` field on `SessionSummary` (`ChangesSummary` with optional `additions`, `deletions`, and `files` counts) summarising a session's file-change footprint.
-- New annotations channel wire types (`ahp-session:/<uuid>/annotations`):
-  `AnnotationsState`, `Annotation`, `AnnotationEntry`,
-  `AnnotationsSummary`; and the client-dispatchable
-  `annotations/set` / `annotations/removed` / `annotations/entrySet`
-  / `annotations/entryRemoved` cases on `StateAction` — clients drive every
-  annotation mutation by dispatching these directly, assigning the
-  `Annotation.id` / `AnnotationEntry.id` themselves; and
-  `SnapshotState.annotations`.
-  Reducer logic is deferred (matches the changeset/resource-watch parity).
-- `MessageAnnotationsAttachment` (`annotations` `MessageAttachment` variant)
-  referencing annotations on a session's annotations channel by `resource`
-  URI, optionally narrowed to an `annotationIds` array.
 
 
 ### Changed
