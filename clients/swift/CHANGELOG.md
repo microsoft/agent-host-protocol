@@ -47,6 +47,12 @@ the tag matches the version pinned in [`VERSION`](VERSION).
   published tools by re-dispatching `StateAction.sessionActiveClientSet` with its
   full, updated entry.
 
+### Fixed
+
+- `chatReducer` now updates the matching turn in `turns` when a
+  `StateAction.chatUsage` targets a completed (non-active) turn, rather than
+  ignoring the action.
+
 ## [0.4.0] — 2026-06-19
 
 Implements AHP 0.4.0.

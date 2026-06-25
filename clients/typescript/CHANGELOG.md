@@ -51,6 +51,8 @@ hotfix escape hatch.
 
 ### Fixed
 
+- `chatReducer` now updates the matching turn in `turns` when a `chat/usage`
+  action targets a completed (non-active) turn, rather than ignoring the action.
 - Hosted session summary caches now apply `_meta` updates from
   `root/sessionSummaryChanged` notifications.
 - Corrected the `ACTION_INTRODUCED_IN` entries for `annotations/set`,
