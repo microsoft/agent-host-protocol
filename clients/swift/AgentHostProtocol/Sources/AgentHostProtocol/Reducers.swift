@@ -338,12 +338,17 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         }
 
     case .chatUsage(let a):
-        guard var activeTurn = state.activeTurn, activeTurn.id == a.turnId else {
+        if var activeTurn = state.activeTurn, activeTurn.id == a.turnId {
+            activeTurn.usage = a.usage
+            var next = state
+            next.activeTurn = activeTurn
+            return next
+        }
+        guard let idx = state.turns.firstIndex(where: { $0.id == a.turnId }) else {
             return state
         }
-        activeTurn.usage = a.usage
         var next = state
-        next.activeTurn = activeTurn
+        next.turns[idx].usage = a.usage
         return next
 
     case .chatReasoning(let a):
