@@ -1,0 +1,49 @@
+{
+  "description": "session/canvasInstanceOpened inserts the first open canvas",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": []
+  },
+  "actions": [
+    {
+      "type": "session/canvasInstanceOpened",
+      "instance": {
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "openCanvases": [
+      {
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready"
+      }
+    ]
+  }
+}

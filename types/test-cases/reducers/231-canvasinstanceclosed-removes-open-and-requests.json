@@ -1,0 +1,56 @@
+{
+  "description": "session/canvasInstanceClosed removes the instance from open canvases and its in-flight requests",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "openCanvases": [
+      {
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready"
+      }
+    ],
+    "canvasRequests": [
+      {
+        "requestId": "r-1",
+        "kind": "open",
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "target": {
+          "kind": "server"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/canvasInstanceClosed",
+      "instanceId": "i-1"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": []
+  }
+}

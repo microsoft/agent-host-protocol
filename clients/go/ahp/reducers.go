@@ -800,8 +800,139 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		return ReduceOutcomeNoOp
 	case *ahptypes.SessionMcpServerStateChangedAction:
 		return applyMcpServerStatusChanged(state, a)
+	case *ahptypes.SessionCanvasRegistryChangedAction:
+		state.CanvasRegistry = append([]ahptypes.SessionCanvasDeclaration(nil), a.Canvases...)
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionCanvasInstanceOpenedAction:
+		for i := range state.OpenCanvases {
+			if state.OpenCanvases[i].InstanceId == a.Instance.InstanceId {
+				state.OpenCanvases[i] = a.Instance
+				return ReduceOutcomeApplied
+			}
+		}
+		state.OpenCanvases = append(state.OpenCanvases, a.Instance)
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionCanvasInstanceUpdatedAction:
+		if state.OpenCanvases == nil {
+			return ReduceOutcomeNoOp
+		}
+		for i := range state.OpenCanvases {
+			if state.OpenCanvases[i].InstanceId == a.InstanceId {
+				if a.Title != nil {
+					state.OpenCanvases[i].Title = a.Title
+				}
+				if a.Status != nil {
+					state.OpenCanvases[i].Status = a.Status
+				}
+				if a.Url != nil {
+					state.OpenCanvases[i].Url = a.Url
+				}
+				if a.Availability != nil {
+					state.OpenCanvases[i].Availability = *a.Availability
+				}
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.SessionCanvasInstanceClosedAction:
+		hadOpen := false
+		for i := range state.OpenCanvases {
+			if state.OpenCanvases[i].InstanceId == a.InstanceId {
+				hadOpen = true
+				break
+			}
+		}
+		hadRequest := false
+		for i := range state.CanvasRequests {
+			if state.CanvasRequests[i].InstanceId == a.InstanceId {
+				hadRequest = true
+				break
+			}
+		}
+		if !hadOpen && !hadRequest {
+			return ReduceOutcomeNoOp
+		}
+		if hadOpen {
+			next := state.OpenCanvases[:0]
+			for _, c := range state.OpenCanvases {
+				if c.InstanceId == a.InstanceId {
+					continue
+				}
+				next = append(next, c)
+			}
+			if len(next) == 0 {
+				state.OpenCanvases = nil
+			} else {
+				state.OpenCanvases = next
+			}
+		}
+		if hadRequest {
+			next := state.CanvasRequests[:0]
+			for _, r := range state.CanvasRequests {
+				if r.InstanceId == a.InstanceId {
+					continue
+				}
+				next = append(next, r)
+			}
+			if len(next) == 0 {
+				state.CanvasRequests = nil
+			} else {
+				state.CanvasRequests = next
+			}
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionCanvasInstanceCloseRequestedAction:
+		// Pure client-to-host signal: the host drives the actual close and
+		// ultimately a `session/canvasInstanceClosed`.
+		return ReduceOutcomeNoOp
+	case *ahptypes.SessionCanvasRequestCreatedAction:
+		for i := range state.CanvasRequests {
+			if state.CanvasRequests[i].RequestId == a.Request.RequestId {
+				state.CanvasRequests[i] = a.Request
+				return ReduceOutcomeApplied
+			}
+		}
+		state.CanvasRequests = append(state.CanvasRequests, a.Request)
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionCanvasRequestCompletedAction:
+		if !removeCanvasRequest(state, a.RequestId) {
+			return ReduceOutcomeNoOp
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionCanvasRequestCancelledAction:
+		if !removeCanvasRequest(state, a.RequestId) {
+			return ReduceOutcomeNoOp
+		}
+		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
+}
+
+// removeCanvasRequest drops the request keyed by requestId from
+// state.CanvasRequests, clearing the slice to nil when it becomes empty so the
+// field serialises as absent. Reports whether a matching request was found.
+func removeCanvasRequest(state *ahptypes.SessionState, requestID string) bool {
+	if state.CanvasRequests == nil {
+		return false
+	}
+	found := false
+	next := state.CanvasRequests[:0]
+	for _, r := range state.CanvasRequests {
+		if r.RequestId == requestID {
+			found = true
+			continue
+		}
+		next = append(next, r)
+	}
+	if !found {
+		return false
+	}
+	if len(next) == 0 {
+		state.CanvasRequests = nil
+	} else {
+		state.CanvasRequests = next
+	}
+	return true
 }
 
 func applyTurnStarted(state *ahptypes.ChatState, a *ahptypes.ChatTurnStartedAction) ReduceOutcome {

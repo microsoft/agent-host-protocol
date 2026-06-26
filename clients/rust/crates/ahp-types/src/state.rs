@@ -537,6 +537,67 @@ pub enum ResourceChangeType {
     Deleted,
 }
 
+/// Where a canvas declaration came from. Used by the host for routing
+/// provider requests and for cleanup when a provider goes away.
+///
+/// Doubles as the discriminant for {@link CanvasRequestTarget}: a request
+/// either targets the host process itself ({@link CanvasProviderKind.Server})
+/// or a specific active client ({@link CanvasProviderKind.ActiveClient}).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CanvasProviderKind {
+    /// Declared by the host process (a server-side extension or builtin).
+    #[serde(rename = "server")]
+    Server,
+    /// Declared by a {@link SessionActiveClient} via `canvasProviders`.
+    #[serde(rename = "activeClient")]
+    ActiveClient,
+}
+
+/// Routing availability of an {@link SessionOpenCanvas}. Host-derived: the
+/// host sets {@link CanvasInstanceAvailability.Stale | `Stale`} when the
+/// owning provider becomes unreachable and
+/// {@link CanvasInstanceAvailability.Ready | `Ready`} once the instance is
+/// live again. A closed set rather than a free-form string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CanvasInstanceAvailability {
+    /// The owning provider is reachable; actions may be routed to it.
+    #[serde(rename = "ready")]
+    Ready,
+    /// The owning provider is unreachable; the entry is kept but not routable.
+    #[serde(rename = "stale")]
+    Stale,
+}
+
+/// What the host is asking a provider to do in a {@link SessionCanvasRequest}.
+/// Doubles as the discriminant for {@link CanvasRequestResult}.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CanvasRequestKind {
+    #[serde(rename = "open")]
+    Open,
+    #[serde(rename = "action")]
+    Action,
+    #[serde(rename = "close")]
+    Close,
+}
+
+/// Why the host abandoned an in-flight {@link SessionCanvasRequest}, carried by
+/// `session/canvasRequestCancelled`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CanvasRequestCancelReason {
+    /// The request's deadline elapsed before the provider answered.
+    #[serde(rename = "timeout")]
+    Timeout,
+    /// The targeted provider disconnected.
+    #[serde(rename = "providerDisconnected")]
+    ProviderDisconnected,
+    /// The instance was closed while the request was in flight.
+    #[serde(rename = "instanceClosed")]
+    InstanceClosed,
+    /// The host is shutting down.
+    #[serde(rename = "hostShutdown")]
+    HostShutdown,
+}
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 /// An optionally-sized icon that can be displayed in a user interface.
@@ -1057,6 +1118,36 @@ pub struct SessionState {
     /// {@link /guide/changesets | Changesets} for an overview of the model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changesets: Option<Vec<Changeset>>,
+    /// Aggregated registry of canvases currently exposed to the agent.
+    ///
+    /// Full-replacement: when this changes, the entire array is republished
+    /// via `session/canvasRegistryChanged`. The host derives it from every
+    /// active canvas provider attached to the session — server-side
+    /// ({@link CanvasProviderKind.Server}) and active-client
+    /// ({@link CanvasProviderKind.ActiveClient}, contributed via
+    /// {@link SessionActiveClient.canvasProviders}). See
+    /// {@link /guide/canvases | Canvases} for the model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_registry: Option<Vec<SessionCanvasDeclaration>>,
+    /// Snapshot of every canvas instance currently open for this session.
+    ///
+    /// Maintained via `session/canvasInstanceOpened` (upsert),
+    /// `session/canvasInstanceUpdated` (partial merge), and
+    /// `session/canvasInstanceClosed` (remove). Subscribers see open
+    /// instances in their initial snapshot and as live deltas thereafter,
+    /// so a reconnecting client can rebuild the open set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_canvases: Option<Vec<SessionOpenCanvas>>,
+    /// Canvas open / action / close requests the host is currently waiting
+    /// on a provider to complete.
+    ///
+    /// Lives in state — like the chat channel's input requests — so
+    /// subscribers can see what is in flight and reconnect/replay is
+    /// correct. Entries are added with `session/canvasRequestCreated` and
+    /// removed once a `session/canvasRequestCompleted` carries the matching
+    /// `requestId`, or via `session/canvasRequestCancelled`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_requests: Option<Vec<SessionCanvasRequest>>,
     /// Additional provider-specific metadata for this session.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1089,6 +1180,32 @@ pub struct SessionActiveClient {
     /// children inside {@link SessionState.customizations}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customizations: Option<Vec<ClientPluginCustomization>>,
+    /// Canvas providers this active client contributes to the session.
+    ///
+    /// Each entry is a single canvas declaration the client can host; a
+    /// client with multiple canvases publishes one entry per canvas. When
+    /// this field is populated, the host SHOULD register the client as a
+    /// canvas provider with its backend and aggregate the contributions
+    /// into {@link SessionState.canvasRegistry} with
+    /// {@link CanvasProviderKind.ActiveClient} and `clientId` set to this
+    /// client's `clientId`.
+    ///
+    /// Updated atomically via `session/activeClientSet` — there is no
+    /// separate "canvasProvidersChanged" action; clients re-publish their
+    /// full entry, identical to the {@link customizations} / {@link tools}
+    /// pattern.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas_providers: Option<Vec<ClientCanvasDeclaration>>,
+    /// Renderer-capability hint. When `true`, the host MAY route canvas open
+    /// requests targeting server-owned providers to this client (a
+    /// `session/canvasRequestCreated` whose `target.clientId` is this
+    /// client). Clients that do not render canvases SHOULD omit the field.
+    ///
+    /// Independent of {@link canvasProviders}: a client can render canvases
+    /// declared by other providers without declaring any of its own, and
+    /// vice versa.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub can_render_canvases: Option<bool>,
 }
 
 /// Lightweight catalog entry summarizing one session. Surfaced via
@@ -3381,6 +3498,209 @@ pub struct ResourceChange {
     pub r#type: ResourceChangeType,
 }
 
+/// A named operation a canvas exposes. Distinct from an AHP `StateAction`:
+/// the agent invokes it over the canvas action family, addressed by
+/// `(canvasId, name)`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasAction {
+    /// Action name. Provider-local; unique within `(extensionId, canvasId)`.
+    pub name: String,
+    /// Short description shown to the agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// JSON Schema for this action's input. Opaque to AHP — mirrors
+    /// {@link ToolDefinition.inputSchema}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<AnyValue>,
+}
+
+/// One entry in the aggregated {@link SessionState.canvasRegistry}. A canvas
+/// the agent can open, keyed by `(extensionId, canvasId)`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasDeclaration {
+    /// Owning provider identifier. Stable across declarations and instances.
+    pub extension_id: String,
+    /// Optional human-readable extension name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_name: Option<String>,
+    /// Provider-local canvas identifier. Unique within `extensionId`.
+    pub canvas_id: String,
+    /// Human-readable canvas name.
+    pub display_name: String,
+    /// Short description shown to the agent in canvas catalogs.
+    pub description: String,
+    /// JSON Schema for canvas open input. Opaque to AHP — mirrors
+    /// {@link ToolDefinition.inputSchema}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<AnyValue>,
+    /// Actions this canvas exposes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actions: Option<Vec<SessionCanvasAction>>,
+    /// Where the declaration came from. Used for routing and cleanup.
+    pub source: CanvasProviderKind,
+    /// When `source === {@link CanvasProviderKind.ActiveClient}`, the
+    /// contributing client's `clientId`. Absent for server-declared canvases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+}
+
+/// One entry in the {@link SessionState.openCanvases} snapshot — a single
+/// open canvas, keyed by its caller-supplied `instanceId`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionOpenCanvas {
+    /// Caller-supplied stable instance identifier (agent-minted).
+    pub instance_id: String,
+    /// Declaration this instance was opened from.
+    pub canvas_id: String,
+    /// Owning provider identifier.
+    pub extension_id: String,
+    /// Optional human-readable extension name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_name: Option<String>,
+    /// Routing availability — host-derived.
+    pub availability: CanvasInstanceAvailability,
+    /// Input the agent supplied when opening. Retained so a recovering host
+    /// can re-bind the instance without round-tripping the agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<JsonObject>,
+    /// Provider-supplied display title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Provider-supplied status text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// URL for rendered canvases. Subject to renderer policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Renderer-side binding once a client has accepted the open. Lets the
+    /// host route subsequent actions to the right renderer and authorise a
+    /// `session/canvasInstanceCloseRequested`. Optional — server-rendered
+    /// canvases may have no specific bound renderer, in which case any client
+    /// with {@link SessionActiveClient.canRenderCanvases} MAY render it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub renderer: Option<AnyValue>,
+}
+
+/// Live correlation state for an in-flight provider callback, surfaced in
+/// {@link SessionState.canvasRequests}. The host adds an entry when it routes
+/// an open / action / close to a provider and removes it when the provider
+/// reports completion (`session/canvasRequestCompleted`) or the host abandons
+/// it (`session/canvasRequestCancelled`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasRequest {
+    /// Stable correlation id minted by the host.
+    pub request_id: String,
+    /// What the host is asking the provider to do.
+    pub kind: CanvasRequestKind,
+    /// Instance the request acts on.
+    pub instance_id: String,
+    /// Declaration the instance belongs to.
+    pub canvas_id: String,
+    /// Owning provider identifier.
+    pub extension_id: String,
+    /// Who the host has routed this request to.
+    pub target: CanvasRequestTarget,
+    /// Action name when `kind === {@link CanvasRequestKind.Action}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_name: Option<String>,
+    /// Open-time input when `kind === {@link CanvasRequestKind.Open}`; action
+    /// input when `kind === {@link CanvasRequestKind.Action}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<JsonObject>,
+    /// Server-side deadline at which the host will give up and fail the
+    /// underlying provider callback. Milliseconds since the Unix epoch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deadline_ms: Option<i64>,
+}
+
+/// Who the host has routed a {@link SessionCanvasRequest} to. A request is
+/// fulfilled either by the host process itself
+/// ({@link CanvasProviderKind.Server}) or by a specific active client
+/// ({@link CanvasProviderKind.ActiveClient}). The `kind` determines which
+/// direction may dispatch the matching `session/canvasRequestCompleted`.
+///
+/// `clientId` is present exactly when `kind` is
+/// {@link CanvasProviderKind.ActiveClient} — the host populates it with the
+/// targeted client's `clientId` so a reconnecting client can tell whether a
+/// pending request is addressed to it. It is absent for
+/// {@link CanvasProviderKind.Server} targets.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRequestTarget {
+    /// Which provider direction owns the request.
+    pub kind: CanvasProviderKind,
+    /// Targeted client's `clientId`. Present iff
+    /// `kind === {@link CanvasProviderKind.ActiveClient}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+}
+
+/// A canvas declaration contributed by a {@link SessionActiveClient}. Lighter
+/// than {@link SessionCanvasDeclaration}: `extensionId` and `source` are
+/// derived by the host from the client's identity when it aggregates the
+/// contribution into {@link SessionState.canvasRegistry}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientCanvasDeclaration {
+    /// Provider-local canvas identifier.
+    pub canvas_id: String,
+    /// Human-readable canvas name.
+    pub display_name: String,
+    /// Short description shown to the agent.
+    pub description: String,
+    /// JSON Schema for canvas open input. Opaque to AHP.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<AnyValue>,
+    /// Actions this canvas exposes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actions: Option<Vec<SessionCanvasAction>>,
+}
+
+/// Error reported by a provider for a failed {@link SessionCanvasRequest}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasError {
+    /// Machine-readable code, e.g. `canvas_action_no_handler`,
+    /// `canvas_provider_unavailable`.
+    pub code: String,
+    /// Human-readable message.
+    pub message: String,
+}
+
+/// Successful result of a canvas open request. `kind` matches the originating
+/// {@link SessionCanvasRequest}'s {@link CanvasRequestKind.Open | `kind`}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasOpenResult {
+    /// Provider-supplied render URL. Subject to renderer policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Provider-supplied display title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Provider-supplied status text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+}
+
+/// Successful result of a canvas action invocation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasActionResult {
+    /// Opaque provider-defined value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<AnyValue>,
+}
+
+/// Successful result of a canvas close request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasCloseResult {}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 /// How a chat came into existence.
@@ -3670,6 +3990,18 @@ pub enum ToolCallContributor {
     /// Reducers treat this as a no-op.
     #[serde(untagged)]
     Unknown(serde_json::Value),
+}
+
+/// Successful result of a canvas open / action / close request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum CanvasRequestResult {
+    #[serde(rename = "open")]
+    Open(CanvasOpenResult),
+    #[serde(rename = "action")]
+    Action(CanvasActionResult),
+    #[serde(rename = "close")]
+    Close(CanvasCloseResult),
 }
 
 /// The state payload of a snapshot — root, session, chat, terminal,

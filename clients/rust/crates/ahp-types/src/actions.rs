@@ -12,11 +12,13 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::state::{
-    AgentInfo, AgentSelection, Annotation, AnnotationEntry, Changeset, ChangesetFile,
-    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
+    AgentInfo, AgentSelection, Annotation, AnnotationEntry, CanvasError,
+    CanvasInstanceAvailability, CanvasRequestCancelReason, CanvasRequestResult, Changeset,
+    ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, Customization, ErrorInfo, McpServerState, Message, ModelSelection,
-    PendingMessageKind, ResponsePart, SessionActiveClient, TerminalClaim, TerminalInfo, TextRange,
+    PendingMessageKind, ResponsePart, SessionActiveClient, SessionCanvasDeclaration,
+    SessionCanvasRequest, SessionOpenCanvas, TerminalClaim, TerminalInfo, TextRange,
     ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
     ToolDefinition, ToolResultContent, UsageInfo,
 };
@@ -120,6 +122,22 @@ pub enum ActionType {
     SessionConfigChanged,
     #[serde(rename = "session/metaChanged")]
     SessionMetaChanged,
+    #[serde(rename = "session/canvasRegistryChanged")]
+    SessionCanvasRegistryChanged,
+    #[serde(rename = "session/canvasInstanceOpened")]
+    SessionCanvasInstanceOpened,
+    #[serde(rename = "session/canvasInstanceUpdated")]
+    SessionCanvasInstanceUpdated,
+    #[serde(rename = "session/canvasInstanceClosed")]
+    SessionCanvasInstanceClosed,
+    #[serde(rename = "session/canvasInstanceCloseRequested")]
+    SessionCanvasInstanceCloseRequested,
+    #[serde(rename = "session/canvasRequestCreated")]
+    SessionCanvasRequestCreated,
+    #[serde(rename = "session/canvasRequestCompleted")]
+    SessionCanvasRequestCompleted,
+    #[serde(rename = "session/canvasRequestCancelled")]
+    SessionCanvasRequestCancelled,
     #[serde(rename = "changeset/statusChanged")]
     ChangesetStatusChanged,
     #[serde(rename = "changeset/fileSet")]
@@ -1044,6 +1062,130 @@ pub struct SessionMetaChangedAction {
     pub meta: Option<JsonObject>,
 }
 
+/// The aggregated {@link SessionCanvasDeclaration | canvas registry} for this
+/// session changed. Full-replacement semantics: `canvases` replaces
+/// {@link SessionState.canvasRegistry} entirely.
+///
+/// Emitted after a canvas provider joins or leaves — a server-side extension
+/// lifecycle change, or an `session/activeClientSet` /
+/// `session/activeClientRemoved` that adds or drops a client's
+/// {@link SessionActiveClient.canvasProviders}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasRegistryChangedAction {
+    /// Full replacement of `state.canvasRegistry`.
+    pub canvases: Vec<SessionCanvasDeclaration>,
+}
+
+/// A canvas instance was opened (or its full record was refreshed). Upsert
+/// semantics keyed by {@link SessionOpenCanvas.instanceId | `instanceId`}:
+/// the `instance` replaces any existing entry with the same `instanceId`, or
+/// is appended when new. Idempotent for reopen and for the host's durable
+/// resume replay (which carries no live `url`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasInstanceOpenedAction {
+    /// Full instance, upserted into `state.openCanvases` by `instanceId`.
+    pub instance: SessionOpenCanvas,
+}
+
+/// A provider pushed a status / title / url / availability update for an open
+/// canvas. Partial-merge by `instanceId`: present fields overwrite, absent
+/// fields are preserved. Only these mutable fields may change after open;
+/// identity (`instanceId`, `canvasId`, `extensionId`, `extensionName`) and the
+/// renderer binding are fixed at open time. To clear a value, re-upsert the
+/// whole instance with `session/canvasInstanceOpened`. A no-op when no open
+/// instance matches.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasInstanceUpdatedAction {
+    /// The instance to update.
+    pub instance_id: String,
+    /// New display title, when changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// New status text, when changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// New render URL, when changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// New routing availability, when changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub availability: Option<CanvasInstanceAvailability>,
+}
+
+/// An open canvas was closed. Removes it from {@link SessionState.openCanvases}
+/// by `instanceId` and cascade-removes any
+/// {@link SessionState.canvasRequests | pending requests} targeting it. A
+/// no-op when neither an open instance nor a pending request matches.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasInstanceClosedAction {
+    /// The instance to close.
+    pub instance_id: String,
+}
+
+/// A client (typically a renderer's close button) asks the host to close an
+/// instance. The host translates this into the provider-facing close and
+/// ultimately a `session/canvasInstanceClosed`. Pure client-to-host signal:
+/// the reducer does not mutate state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasInstanceCloseRequestedAction {
+    /// The instance the client wants closed.
+    pub instance_id: String,
+}
+
+/// The host routed an open / action / close request to a provider and is
+/// waiting on completion. Upsert into {@link SessionState.canvasRequests} keyed
+/// by {@link SessionCanvasRequest.requestId | `requestId`} (a duplicate
+/// `requestId` from a replay path replaces rather than duplicates). Visible to
+/// all subscribers so a recovering client can see what is mid-flight.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasRequestCreatedAction {
+    /// The in-flight request.
+    pub request: SessionCanvasRequest,
+}
+
+/// The targeted provider reported the outcome of a
+/// {@link SessionCanvasRequestCreatedAction}. Removes the matching entry from
+/// {@link SessionState.canvasRequests} by `requestId`; a no-op when none
+/// matches. Exactly one of `result` / `error` MUST be present, and a present
+/// `result.kind` MUST match the originating request's `kind`.
+///
+/// Direction depends on the request's `target`: for an
+/// {@link CanvasProviderKind.ActiveClient} target only the client whose
+/// `clientId` matches `target.clientId` may dispatch this; for a
+/// {@link CanvasProviderKind.Server} target the host emits it and the server
+/// SHOULD reject any client-dispatched completion.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasRequestCompletedAction {
+    /// The request being completed.
+    pub request_id: String,
+    /// Success payload. Mutually exclusive with `error`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result: Option<CanvasRequestResult>,
+    /// Failure payload. Mutually exclusive with `result`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<CanvasError>,
+}
+
+/// The host abandoned an in-flight request — typically because the targeted
+/// provider disconnected or the deadline elapsed. Removes the matching entry
+/// from {@link SessionState.canvasRequests} by `requestId`; a no-op when none
+/// matches. Server-dispatched only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasRequestCancelledAction {
+    /// The request being abandoned.
+    pub request_id: String,
+    /// Why the host gave up.
+    pub reason: CanvasRequestCancelReason,
+}
+
 /// The {@link ChangesetState.status} for this changeset transitioned (e.g.
 /// `computing → ready`). The error payload is set together with `status`
 /// whenever it transitions to {@link ChangesetStatus.Error | Error}.
@@ -1558,6 +1700,22 @@ pub enum StateAction {
     SessionConfigChanged(SessionConfigChangedAction),
     #[serde(rename = "session/metaChanged")]
     SessionMetaChanged(SessionMetaChangedAction),
+    #[serde(rename = "session/canvasRegistryChanged")]
+    SessionCanvasRegistryChanged(SessionCanvasRegistryChangedAction),
+    #[serde(rename = "session/canvasInstanceOpened")]
+    SessionCanvasInstanceOpened(Box<SessionCanvasInstanceOpenedAction>),
+    #[serde(rename = "session/canvasInstanceUpdated")]
+    SessionCanvasInstanceUpdated(SessionCanvasInstanceUpdatedAction),
+    #[serde(rename = "session/canvasInstanceClosed")]
+    SessionCanvasInstanceClosed(SessionCanvasInstanceClosedAction),
+    #[serde(rename = "session/canvasInstanceCloseRequested")]
+    SessionCanvasInstanceCloseRequested(SessionCanvasInstanceCloseRequestedAction),
+    #[serde(rename = "session/canvasRequestCreated")]
+    SessionCanvasRequestCreated(Box<SessionCanvasRequestCreatedAction>),
+    #[serde(rename = "session/canvasRequestCompleted")]
+    SessionCanvasRequestCompleted(SessionCanvasRequestCompletedAction),
+    #[serde(rename = "session/canvasRequestCancelled")]
+    SessionCanvasRequestCancelled(SessionCanvasRequestCancelledAction),
     #[serde(rename = "changeset/statusChanged")]
     ChangesetStatusChanged(ChangesetStatusChangedAction),
     #[serde(rename = "changeset/fileSet")]

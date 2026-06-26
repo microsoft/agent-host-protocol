@@ -490,5 +490,6 @@ The forked session is an independent copy — subsequent changes to either sessi
 - [Actions](/guide/actions) — How state is mutated.
 - [Elicitation](/guide/elicitation) — How sessions request user input.
 - [Customizations](/guide/customizations) — Extending sessions with Open Plugins.
+- [Canvases](/guide/canvases) — Declared, instanced, agent-openable UI surfaces.
 - [Write-Ahead Reconciliation](/guide/reconciliation) — How clients stay in sync.
 - [Channel Reference Pages](/reference/common) — Per-channel state, actions, commands, and notifications. The cross-cutting types live on the [Common](/reference/common) page; per-channel types live on [Root](/reference/root), [Session](/reference/session), [Terminal](/reference/terminal), and [Changeset](/reference/changeset).

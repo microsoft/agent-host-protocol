@@ -1,0 +1,57 @@
+{
+  "description": "session/canvasRequestCreated records the first in-flight request",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": []
+  },
+  "actions": [
+    {
+      "type": "session/canvasRequestCreated",
+      "request": {
+        "requestId": "r-1",
+        "kind": "open",
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "target": {
+          "kind": "server"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "canvasRequests": [
+      {
+        "requestId": "r-1",
+        "kind": "open",
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "target": {
+          "kind": "server"
+        }
+      }
+    ]
+  }
+}

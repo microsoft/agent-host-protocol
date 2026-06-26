@@ -24,6 +24,8 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 - `SessionActiveClientRemovedAction` (`StateActionSessionActiveClientRemoved`,
   wire `session/activeClientRemoved`) to release a single active client by
   `clientId`.
+- Canvas surface — `SessionState.canvasRegistry`, `SessionState.openCanvases`, and `SessionState.canvasRequests`, plus `SessionActiveClient.canvasProviders` and `SessionActiveClient.canRenderCanvases`, for declared, instanced, agent-openable UI surfaces.
+- Eight canvas actions (wire `session/canvas*`): `StateActionSessionCanvasRegistryChanged`, `StateActionSessionCanvasInstanceOpened`, `StateActionSessionCanvasInstanceUpdated`, `StateActionSessionCanvasInstanceClosed`, `StateActionSessionCanvasInstanceCloseRequested`, `StateActionSessionCanvasRequestCreated`, `StateActionSessionCanvasRequestCompleted`, and `StateActionSessionCanvasRequestCancelled`, applied by `sessionReducer`.
 
 ### Changed
 

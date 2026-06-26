@@ -1,0 +1,39 @@
+{
+  "description": "session/canvasRequestCompleted is a no-op when there are no in-flight requests",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": []
+  },
+  "actions": [
+    {
+      "type": "session/canvasRequestCompleted",
+      "requestId": "r-1",
+      "result": {
+        "kind": "open"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": []
+  }
+}

@@ -680,6 +680,91 @@ enum class ResourceChangeType {
     DELETED
 }
 
+/**
+ * Where a canvas declaration came from. Used by the host for routing
+ * provider requests and for cleanup when a provider goes away.
+ *
+ * Doubles as the discriminant for {@link CanvasRequestTarget}: a request
+ * either targets the host process itself ({@link CanvasProviderKind.Server})
+ * or a specific active client ({@link CanvasProviderKind.ActiveClient}).
+ */
+@Serializable
+enum class CanvasProviderKind {
+    /**
+     * Declared by the host process (a server-side extension or builtin).
+     */
+    @SerialName("server")
+    SERVER,
+    /**
+     * Declared by a {@link SessionActiveClient} via `canvasProviders`.
+     */
+    @SerialName("activeClient")
+    ACTIVE_CLIENT
+}
+
+/**
+ * Routing availability of an {@link SessionOpenCanvas}. Host-derived: the
+ * host sets {@link CanvasInstanceAvailability.Stale | `Stale`} when the
+ * owning provider becomes unreachable and
+ * {@link CanvasInstanceAvailability.Ready | `Ready`} once the instance is
+ * live again. A closed set rather than a free-form string.
+ */
+@Serializable
+enum class CanvasInstanceAvailability {
+    /**
+     * The owning provider is reachable; actions may be routed to it.
+     */
+    @SerialName("ready")
+    READY,
+    /**
+     * The owning provider is unreachable; the entry is kept but not routable.
+     */
+    @SerialName("stale")
+    STALE
+}
+
+/**
+ * What the host is asking a provider to do in a {@link SessionCanvasRequest}.
+ * Doubles as the discriminant for {@link CanvasRequestResult}.
+ */
+@Serializable
+enum class CanvasRequestKind {
+    @SerialName("open")
+    OPEN,
+    @SerialName("action")
+    ACTION,
+    @SerialName("close")
+    CLOSE
+}
+
+/**
+ * Why the host abandoned an in-flight {@link SessionCanvasRequest}, carried by
+ * `session/canvasRequestCancelled`.
+ */
+@Serializable
+enum class CanvasRequestCancelReason {
+    /**
+     * The request's deadline elapsed before the provider answered.
+     */
+    @SerialName("timeout")
+    TIMEOUT,
+    /**
+     * The targeted provider disconnected.
+     */
+    @SerialName("providerDisconnected")
+    PROVIDER_DISCONNECTED,
+    /**
+     * The instance was closed while the request was in flight.
+     */
+    @SerialName("instanceClosed")
+    INSTANCE_CLOSED,
+    /**
+     * The host is shutting down.
+     */
+    @SerialName("hostShutdown")
+    HOST_SHUTDOWN
+}
+
 // ─── State Types ────────────────────────────────────────────────────────────
 
 @Serializable
@@ -1235,6 +1320,39 @@ data class SessionState(
      */
     val changesets: List<Changeset>? = null,
     /**
+     * Aggregated registry of canvases currently exposed to the agent.
+     *
+     * Full-replacement: when this changes, the entire array is republished
+     * via `session/canvasRegistryChanged`. The host derives it from every
+     * active canvas provider attached to the session — server-side
+     * ({@link CanvasProviderKind.Server}) and active-client
+     * ({@link CanvasProviderKind.ActiveClient}, contributed via
+     * {@link SessionActiveClient.canvasProviders}). See
+     * {@link /guide/canvases | Canvases} for the model.
+     */
+    val canvasRegistry: List<SessionCanvasDeclaration>? = null,
+    /**
+     * Snapshot of every canvas instance currently open for this session.
+     *
+     * Maintained via `session/canvasInstanceOpened` (upsert),
+     * `session/canvasInstanceUpdated` (partial merge), and
+     * `session/canvasInstanceClosed` (remove). Subscribers see open
+     * instances in their initial snapshot and as live deltas thereafter,
+     * so a reconnecting client can rebuild the open set.
+     */
+    val openCanvases: List<SessionOpenCanvas>? = null,
+    /**
+     * Canvas open / action / close requests the host is currently waiting
+     * on a provider to complete.
+     *
+     * Lives in state — like the chat channel's input requests — so
+     * subscribers can see what is in flight and reconnect/replay is
+     * correct. Entries are added with `session/canvasRequestCreated` and
+     * removed once a `session/canvasRequestCompleted` carries the matching
+     * `requestId`, or via `session/canvasRequestCancelled`.
+     */
+    val canvasRequests: List<SessionCanvasRequest>? = null,
+    /**
      * Additional provider-specific metadata for this session.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1267,7 +1385,35 @@ data class SessionActiveClient(
      * plugins in memory and rely on the host to expand them into concrete
      * children inside {@link SessionState.customizations}.
      */
-    val customizations: List<ClientPluginCustomization>? = null
+    val customizations: List<ClientPluginCustomization>? = null,
+    /**
+     * Canvas providers this active client contributes to the session.
+     *
+     * Each entry is a single canvas declaration the client can host; a
+     * client with multiple canvases publishes one entry per canvas. When
+     * this field is populated, the host SHOULD register the client as a
+     * canvas provider with its backend and aggregate the contributions
+     * into {@link SessionState.canvasRegistry} with
+     * {@link CanvasProviderKind.ActiveClient} and `clientId` set to this
+     * client's `clientId`.
+     *
+     * Updated atomically via `session/activeClientSet` — there is no
+     * separate "canvasProvidersChanged" action; clients re-publish their
+     * full entry, identical to the {@link customizations} / {@link tools}
+     * pattern.
+     */
+    val canvasProviders: List<ClientCanvasDeclaration>? = null,
+    /**
+     * Renderer-capability hint. When `true`, the host MAY route canvas open
+     * requests targeting server-owned providers to this client (a
+     * `session/canvasRequestCreated` whose `target.clientId` is this
+     * client). Clients that do not render canvases SHOULD omit the field.
+     *
+     * Independent of {@link canvasProviders}: a client can render canvases
+     * declared by other providers without declaring any of its own, and
+     * vice versa.
+     */
+    val canRenderCanvases: Boolean? = null
 )
 
 @Serializable
@@ -3769,6 +3915,237 @@ data class ResourceChange(
     val type: ResourceChangeType
 )
 
+@Serializable
+data class SessionCanvasAction(
+    /**
+     * Action name. Provider-local; unique within `(extensionId, canvasId)`.
+     */
+    val name: String,
+    /**
+     * Short description shown to the agent.
+     */
+    val description: String? = null,
+    /**
+     * JSON Schema for this action's input. Opaque to AHP — mirrors
+     * {@link ToolDefinition.inputSchema}.
+     */
+    val inputSchema: JsonElement? = null
+)
+
+@Serializable
+data class SessionCanvasDeclaration(
+    /**
+     * Owning provider identifier. Stable across declarations and instances.
+     */
+    val extensionId: String,
+    /**
+     * Optional human-readable extension name.
+     */
+    val extensionName: String? = null,
+    /**
+     * Provider-local canvas identifier. Unique within `extensionId`.
+     */
+    val canvasId: String,
+    /**
+     * Human-readable canvas name.
+     */
+    val displayName: String,
+    /**
+     * Short description shown to the agent in canvas catalogs.
+     */
+    val description: String,
+    /**
+     * JSON Schema for canvas open input. Opaque to AHP — mirrors
+     * {@link ToolDefinition.inputSchema}.
+     */
+    val inputSchema: JsonElement? = null,
+    /**
+     * Actions this canvas exposes.
+     */
+    val actions: List<SessionCanvasAction>? = null,
+    /**
+     * Where the declaration came from. Used for routing and cleanup.
+     */
+    val source: CanvasProviderKind,
+    /**
+     * When `source === {@link CanvasProviderKind.ActiveClient}`, the
+     * contributing client's `clientId`. Absent for server-declared canvases.
+     */
+    val clientId: String? = null
+)
+
+@Serializable
+data class SessionOpenCanvas(
+    /**
+     * Caller-supplied stable instance identifier (agent-minted).
+     */
+    val instanceId: String,
+    /**
+     * Declaration this instance was opened from.
+     */
+    val canvasId: String,
+    /**
+     * Owning provider identifier.
+     */
+    val extensionId: String,
+    /**
+     * Optional human-readable extension name.
+     */
+    val extensionName: String? = null,
+    /**
+     * Routing availability — host-derived.
+     */
+    val availability: CanvasInstanceAvailability,
+    /**
+     * Input the agent supplied when opening. Retained so a recovering host
+     * can re-bind the instance without round-tripping the agent.
+     */
+    val input: Map<String, JsonElement>? = null,
+    /**
+     * Provider-supplied display title.
+     */
+    val title: String? = null,
+    /**
+     * Provider-supplied status text.
+     */
+    val status: String? = null,
+    /**
+     * URL for rendered canvases. Subject to renderer policy.
+     */
+    val url: String? = null,
+    /**
+     * Renderer-side binding once a client has accepted the open. Lets the
+     * host route subsequent actions to the right renderer and authorise a
+     * `session/canvasInstanceCloseRequested`. Optional — server-rendered
+     * canvases may have no specific bound renderer, in which case any client
+     * with {@link SessionActiveClient.canRenderCanvases} MAY render it.
+     */
+    val renderer: JsonElement? = null
+)
+
+@Serializable
+data class SessionCanvasRequest(
+    /**
+     * Stable correlation id minted by the host.
+     */
+    val requestId: String,
+    /**
+     * What the host is asking the provider to do.
+     */
+    val kind: CanvasRequestKind,
+    /**
+     * Instance the request acts on.
+     */
+    val instanceId: String,
+    /**
+     * Declaration the instance belongs to.
+     */
+    val canvasId: String,
+    /**
+     * Owning provider identifier.
+     */
+    val extensionId: String,
+    /**
+     * Who the host has routed this request to.
+     */
+    val target: CanvasRequestTarget,
+    /**
+     * Action name when `kind === {@link CanvasRequestKind.Action}`.
+     */
+    val actionName: String? = null,
+    /**
+     * Open-time input when `kind === {@link CanvasRequestKind.Open}`; action
+     * input when `kind === {@link CanvasRequestKind.Action}`.
+     */
+    val input: Map<String, JsonElement>? = null,
+    /**
+     * Server-side deadline at which the host will give up and fail the
+     * underlying provider callback. Milliseconds since the Unix epoch.
+     */
+    val deadlineMs: Long? = null
+)
+
+@Serializable
+data class CanvasRequestTarget(
+    /**
+     * Which provider direction owns the request.
+     */
+    val kind: CanvasProviderKind,
+    /**
+     * Targeted client's `clientId`. Present iff
+     * `kind === {@link CanvasProviderKind.ActiveClient}`.
+     */
+    val clientId: String? = null
+)
+
+@Serializable
+data class ClientCanvasDeclaration(
+    /**
+     * Provider-local canvas identifier.
+     */
+    val canvasId: String,
+    /**
+     * Human-readable canvas name.
+     */
+    val displayName: String,
+    /**
+     * Short description shown to the agent.
+     */
+    val description: String,
+    /**
+     * JSON Schema for canvas open input. Opaque to AHP.
+     */
+    val inputSchema: JsonElement? = null,
+    /**
+     * Actions this canvas exposes.
+     */
+    val actions: List<SessionCanvasAction>? = null
+)
+
+@Serializable
+data class CanvasError(
+    /**
+     * Machine-readable code, e.g. `canvas_action_no_handler`,
+     * `canvas_provider_unavailable`.
+     */
+    val code: String,
+    /**
+     * Human-readable message.
+     */
+    val message: String
+)
+
+@Serializable
+data class CanvasOpenResult(
+    val kind: CanvasRequestKind,
+    /**
+     * Provider-supplied render URL. Subject to renderer policy.
+     */
+    val url: String? = null,
+    /**
+     * Provider-supplied display title.
+     */
+    val title: String? = null,
+    /**
+     * Provider-supplied status text.
+     */
+    val status: String? = null
+)
+
+@Serializable
+data class CanvasActionResult(
+    val kind: CanvasRequestKind,
+    /**
+     * Opaque provider-defined value.
+     */
+    val value: JsonElement? = null
+)
+
+@Serializable
+data class CanvasCloseResult(
+    val kind: CanvasRequestKind
+)
+
 // ─── Discriminated Unions ───────────────────────────────────────────────────
 
 @Serializable(with = ChatOriginSerializer::class)
@@ -4559,6 +4936,48 @@ internal object ToolCallContributorSerializer : KSerializer<ToolCallContributor>
             is ToolCallContributorClient -> output.json.encodeToJsonElement(ToolCallClientContributor.serializer(), value.value)
             is ToolCallContributorMcp -> output.json.encodeToJsonElement(ToolCallMcpContributor.serializer(), value.value)
             is ToolCallContributorUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable(with = CanvasRequestResultSerializer::class)
+sealed interface CanvasRequestResult
+
+@JvmInline
+value class CanvasRequestResultOpen(val value: CanvasOpenResult) : CanvasRequestResult
+@JvmInline
+value class CanvasRequestResultAction(val value: CanvasActionResult) : CanvasRequestResult
+@JvmInline
+value class CanvasRequestResultClose(val value: CanvasCloseResult) : CanvasRequestResult
+
+internal object CanvasRequestResultSerializer : KSerializer<CanvasRequestResult> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CanvasRequestResult")
+
+    override fun deserialize(decoder: Decoder): CanvasRequestResult {
+        val input = decoder as? JsonDecoder
+            ?: error("CanvasRequestResult can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CanvasRequestResult")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on CanvasRequestResult")
+        return when (discriminant) {
+            "open" -> CanvasRequestResultOpen(input.json.decodeFromJsonElement(CanvasOpenResult.serializer(), element))
+            "action" -> CanvasRequestResultAction(input.json.decodeFromJsonElement(CanvasActionResult.serializer(), element))
+            "close" -> CanvasRequestResultClose(input.json.decodeFromJsonElement(CanvasCloseResult.serializer(), element))
+            else -> error("Unknown CanvasRequestResult discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CanvasRequestResult) {
+        val output = encoder as? JsonEncoder
+            ?: error("CanvasRequestResult can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CanvasRequestResultOpen -> output.json.encodeToJsonElement(CanvasOpenResult.serializer(), value.value)
+            is CanvasRequestResultAction -> output.json.encodeToJsonElement(CanvasActionResult.serializer(), value.value)
+            is CanvasRequestResultClose -> output.json.encodeToJsonElement(CanvasCloseResult.serializer(), value.value)
         }
         output.encodeJsonElement(element)
     }

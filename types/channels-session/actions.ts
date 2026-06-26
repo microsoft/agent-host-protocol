@@ -12,6 +12,13 @@ import type {
   Customization,
   McpServerState,
   AgentSelection,
+  SessionCanvasDeclaration,
+  SessionOpenCanvas,
+  SessionCanvasRequest,
+  CanvasInstanceAvailability,
+  CanvasRequestResult,
+  CanvasError,
+  CanvasRequestCancelReason,
 } from './state.js';
 import type { ModelSelection } from '../channels-root/state.js';
 import type { URI } from '../common/state.js';
@@ -436,4 +443,158 @@ export interface SessionMetaChangedAction {
   type: ActionType.SessionMetaChanged;
   /** New `_meta` payload, or `undefined` to clear it */
   _meta: Record<string, unknown> | undefined;
+}
+
+// ─── Canvas Actions ──────────────────────────────────────────────────────────
+
+/**
+ * The aggregated {@link SessionCanvasDeclaration | canvas registry} for this
+ * session changed. Full-replacement semantics: `canvases` replaces
+ * {@link SessionState.canvasRegistry} entirely.
+ *
+ * Emitted after a canvas provider joins or leaves — a server-side extension
+ * lifecycle change, or an `session/activeClientSet` /
+ * `session/activeClientRemoved` that adds or drops a client's
+ * {@link SessionActiveClient.canvasProviders}.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionCanvasRegistryChangedAction {
+  type: ActionType.SessionCanvasRegistryChanged;
+  /** Full replacement of `state.canvasRegistry`. */
+  canvases: SessionCanvasDeclaration[];
+}
+
+/**
+ * A canvas instance was opened (or its full record was refreshed). Upsert
+ * semantics keyed by {@link SessionOpenCanvas.instanceId | `instanceId`}:
+ * the `instance` replaces any existing entry with the same `instanceId`, or
+ * is appended when new. Idempotent for reopen and for the host's durable
+ * resume replay (which carries no live `url`).
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionCanvasInstanceOpenedAction {
+  type: ActionType.SessionCanvasInstanceOpened;
+  /** Full instance, upserted into `state.openCanvases` by `instanceId`. */
+  instance: SessionOpenCanvas;
+}
+
+/**
+ * A provider pushed a status / title / url / availability update for an open
+ * canvas. Partial-merge by `instanceId`: present fields overwrite, absent
+ * fields are preserved. Only these mutable fields may change after open;
+ * identity (`instanceId`, `canvasId`, `extensionId`, `extensionName`) and the
+ * renderer binding are fixed at open time. To clear a value, re-upsert the
+ * whole instance with `session/canvasInstanceOpened`. A no-op when no open
+ * instance matches.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionCanvasInstanceUpdatedAction {
+  type: ActionType.SessionCanvasInstanceUpdated;
+  /** The instance to update. */
+  instanceId: string;
+  /** New display title, when changed. */
+  title?: string;
+  /** New status text, when changed. */
+  status?: string;
+  /** New render URL, when changed. */
+  url?: string;
+  /** New routing availability, when changed. */
+  availability?: CanvasInstanceAvailability;
+}
+
+/**
+ * An open canvas was closed. Removes it from {@link SessionState.openCanvases}
+ * by `instanceId` and cascade-removes any
+ * {@link SessionState.canvasRequests | pending requests} targeting it. A
+ * no-op when neither an open instance nor a pending request matches.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionCanvasInstanceClosedAction {
+  type: ActionType.SessionCanvasInstanceClosed;
+  /** The instance to close. */
+  instanceId: string;
+}
+
+/**
+ * A client (typically a renderer's close button) asks the host to close an
+ * instance. The host translates this into the provider-facing close and
+ * ultimately a `session/canvasInstanceClosed`. Pure client-to-host signal:
+ * the reducer does not mutate state.
+ *
+ * @category Session Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface SessionCanvasInstanceCloseRequestedAction {
+  type: ActionType.SessionCanvasInstanceCloseRequested;
+  /** The instance the client wants closed. */
+  instanceId: string;
+}
+
+/**
+ * The host routed an open / action / close request to a provider and is
+ * waiting on completion. Upsert into {@link SessionState.canvasRequests} keyed
+ * by {@link SessionCanvasRequest.requestId | `requestId`} (a duplicate
+ * `requestId` from a replay path replaces rather than duplicates). Visible to
+ * all subscribers so a recovering client can see what is mid-flight.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionCanvasRequestCreatedAction {
+  type: ActionType.SessionCanvasRequestCreated;
+  /** The in-flight request. */
+  request: SessionCanvasRequest;
+}
+
+/**
+ * The targeted provider reported the outcome of a
+ * {@link SessionCanvasRequestCreatedAction}. Removes the matching entry from
+ * {@link SessionState.canvasRequests} by `requestId`; a no-op when none
+ * matches. Exactly one of `result` / `error` MUST be present, and a present
+ * `result.kind` MUST match the originating request's `kind`.
+ *
+ * Direction depends on the request's `target`: for an
+ * {@link CanvasProviderKind.ActiveClient} target only the client whose
+ * `clientId` matches `target.clientId` may dispatch this; for a
+ * {@link CanvasProviderKind.Server} target the host emits it and the server
+ * SHOULD reject any client-dispatched completion.
+ *
+ * @category Session Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface SessionCanvasRequestCompletedAction {
+  type: ActionType.SessionCanvasRequestCompleted;
+  /** The request being completed. */
+  requestId: string;
+  /** Success payload. Mutually exclusive with `error`. */
+  result?: CanvasRequestResult;
+  /** Failure payload. Mutually exclusive with `result`. */
+  error?: CanvasError;
+}
+
+/**
+ * The host abandoned an in-flight request — typically because the targeted
+ * provider disconnected or the deadline elapsed. Removes the matching entry
+ * from {@link SessionState.canvasRequests} by `requestId`; a no-op when none
+ * matches. Server-dispatched only.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionCanvasRequestCancelledAction {
+  type: ActionType.SessionCanvasRequestCancelled;
+  /** The request being abandoned. */
+  requestId: string;
+  /** Why the host gave up. */
+  reason: CanvasRequestCancelReason;
 }

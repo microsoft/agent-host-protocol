@@ -1909,6 +1909,27 @@
           },
           "description": "Catalogue of changesets the server can produce for this session. Each\nentry advertises a subscribable view of file changes (uncommitted,\nsession-wide, per-turn, etc.) and the URI template the client expands\nbefore subscribing. See {@link Changeset} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model."
         },
+        "canvasRegistry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionCanvasDeclaration"
+          },
+          "description": "Aggregated registry of canvases currently exposed to the agent.\n\nFull-replacement: when this changes, the entire array is republished\nvia `session/canvasRegistryChanged`. The host derives it from every\nactive canvas provider attached to the session — server-side\n({@link CanvasProviderKind.Server}) and active-client\n({@link CanvasProviderKind.ActiveClient}, contributed via\n{@link SessionActiveClient.canvasProviders}). See\n{@link /guide/canvases | Canvases} for the model."
+        },
+        "openCanvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionOpenCanvas"
+          },
+          "description": "Snapshot of every canvas instance currently open for this session.\n\nMaintained via `session/canvasInstanceOpened` (upsert),\n`session/canvasInstanceUpdated` (partial merge), and\n`session/canvasInstanceClosed` (remove). Subscribers see open\ninstances in their initial snapshot and as live deltas thereafter,\nso a reconnecting client can rebuild the open set."
+        },
+        "canvasRequests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionCanvasRequest"
+          },
+          "description": "Canvas open / action / close requests the host is currently waiting\non a provider to complete.\n\nLives in state — like the chat channel's input requests — so\nsubscribers can see what is in flight and reconnect/replay is\ncorrect. Entries are added with `session/canvasRequestCreated` and\nremoved once a `session/canvasRequestCompleted` carries the matching\n`requestId`, or via `session/canvasRequestCancelled`."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -1947,6 +1968,17 @@
             "$ref": "#/$defs/ClientPluginCustomization"
           },
           "description": "Plugin customizations this client contributes to the session.\n\nClients publish in [Open Plugins](https://open-plugins.com/) format\n— i.e. always container-shaped plugins. They MAY synthesize virtual\nplugins in memory and rely on the host to expand them into concrete\nchildren inside {@link SessionState.customizations}."
+        },
+        "canvasProviders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ClientCanvasDeclaration"
+          },
+          "description": "Canvas providers this active client contributes to the session.\n\nEach entry is a single canvas declaration the client can host; a\nclient with multiple canvases publishes one entry per canvas. When\nthis field is populated, the host SHOULD register the client as a\ncanvas provider with its backend and aggregate the contributions\ninto {@link SessionState.canvasRegistry} with\n{@link CanvasProviderKind.ActiveClient} and `clientId` set to this\nclient's `clientId`.\n\nUpdated atomically via `session/activeClientSet` — there is no\nseparate \"canvasProvidersChanged\" action; clients re-publish their\nfull entry, identical to the {@link customizations} / {@link tools}\npattern."
+        },
+        "canRenderCanvases": {
+          "type": "boolean",
+          "description": "Renderer-capability hint. When `true`, the host MAY route canvas open\nrequests targeting server-owned providers to this client (a\n`session/canvasRequestCreated` whose `target.clientId` is this\nclient). Clients that do not render canvases SHOULD omit the field.\n\nIndependent of {@link canvasProviders}: a client can render canvases\ndeclared by other providers without declaring any of its own, and\nvice versa."
         }
       },
       "required": [
@@ -3054,6 +3086,353 @@
       },
       "required": [
         "kind"
+      ]
+    },
+    "SessionCanvasAction": {
+      "type": "object",
+      "description": "A named operation a canvas exposes. Distinct from an AHP `StateAction`:\nthe agent invokes it over the canvas action family, addressed by\n`(canvasId, name)`.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Action name. Provider-local; unique within `(extensionId, canvasId)`."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description shown to the agent."
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "properties": {
+              "type": "string"
+            },
+            "required": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "JSON Schema for this action's input. Opaque to AHP — mirrors\n{@link ToolDefinition.inputSchema}."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "SessionCanvasDeclaration": {
+      "type": "object",
+      "description": "One entry in the aggregated {@link SessionState.canvasRegistry}. A canvas\nthe agent can open, keyed by `(extensionId, canvasId)`.",
+      "properties": {
+        "extensionId": {
+          "type": "string",
+          "description": "Owning provider identifier. Stable across declarations and instances."
+        },
+        "extensionName": {
+          "type": "string",
+          "description": "Optional human-readable extension name."
+        },
+        "canvasId": {
+          "type": "string",
+          "description": "Provider-local canvas identifier. Unique within `extensionId`."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable canvas name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description shown to the agent in canvas catalogs."
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "properties": {
+              "type": "string"
+            },
+            "required": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "JSON Schema for canvas open input. Opaque to AHP — mirrors\n{@link ToolDefinition.inputSchema}."
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionCanvasAction"
+          },
+          "description": "Actions this canvas exposes."
+        },
+        "source": {
+          "$ref": "#/$defs/CanvasProviderKind",
+          "description": "Where the declaration came from. Used for routing and cleanup."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "When `source === {@link CanvasProviderKind.ActiveClient}`, the\ncontributing client's `clientId`. Absent for server-declared canvases."
+        }
+      },
+      "required": [
+        "extensionId",
+        "canvasId",
+        "displayName",
+        "description",
+        "source"
+      ]
+    },
+    "SessionOpenCanvas": {
+      "type": "object",
+      "description": "One entry in the {@link SessionState.openCanvases} snapshot — a single\nopen canvas, keyed by its caller-supplied `instanceId`.",
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "description": "Caller-supplied stable instance identifier (agent-minted)."
+        },
+        "canvasId": {
+          "type": "string",
+          "description": "Declaration this instance was opened from."
+        },
+        "extensionId": {
+          "type": "string",
+          "description": "Owning provider identifier."
+        },
+        "extensionName": {
+          "type": "string",
+          "description": "Optional human-readable extension name."
+        },
+        "availability": {
+          "$ref": "#/$defs/CanvasInstanceAvailability",
+          "description": "Routing availability — host-derived."
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Input the agent supplied when opening. Retained so a recovering host\ncan re-bind the instance without round-tripping the agent."
+        },
+        "title": {
+          "type": "string",
+          "description": "Provider-supplied display title."
+        },
+        "status": {
+          "type": "string",
+          "description": "Provider-supplied status text."
+        },
+        "url": {
+          "type": "string",
+          "description": "URL for rendered canvases. Subject to renderer policy."
+        },
+        "renderer": {
+          "type": "object",
+          "properties": {
+            "clientId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "clientId"
+          ],
+          "description": "Renderer-side binding once a client has accepted the open. Lets the\nhost route subsequent actions to the right renderer and authorise a\n`session/canvasInstanceCloseRequested`. Optional — server-rendered\ncanvases may have no specific bound renderer, in which case any client\nwith {@link SessionActiveClient.canRenderCanvases} MAY render it."
+        }
+      },
+      "required": [
+        "instanceId",
+        "canvasId",
+        "extensionId",
+        "availability"
+      ]
+    },
+    "CanvasRequestTarget": {
+      "type": "object",
+      "description": "Who the host has routed a {@link SessionCanvasRequest} to. A request is\nfulfilled either by the host process itself\n({@link CanvasProviderKind.Server}) or by a specific active client\n({@link CanvasProviderKind.ActiveClient}). The `kind` determines which\ndirection may dispatch the matching `session/canvasRequestCompleted`.\n\n`clientId` is present exactly when `kind` is\n{@link CanvasProviderKind.ActiveClient} — the host populates it with the\ntargeted client's `clientId` so a reconnecting client can tell whether a\npending request is addressed to it. It is absent for\n{@link CanvasProviderKind.Server} targets.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CanvasProviderKind",
+          "description": "Which provider direction owns the request."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Targeted client's `clientId`. Present iff\n`kind === {@link CanvasProviderKind.ActiveClient}`."
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "SessionCanvasRequest": {
+      "type": "object",
+      "description": "Live correlation state for an in-flight provider callback, surfaced in\n{@link SessionState.canvasRequests}. The host adds an entry when it routes\nan open / action / close to a provider and removes it when the provider\nreports completion (`session/canvasRequestCompleted`) or the host abandons\nit (`session/canvasRequestCancelled`).",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Stable correlation id minted by the host."
+        },
+        "kind": {
+          "$ref": "#/$defs/CanvasRequestKind",
+          "description": "What the host is asking the provider to do."
+        },
+        "instanceId": {
+          "type": "string",
+          "description": "Instance the request acts on."
+        },
+        "canvasId": {
+          "type": "string",
+          "description": "Declaration the instance belongs to."
+        },
+        "extensionId": {
+          "type": "string",
+          "description": "Owning provider identifier."
+        },
+        "target": {
+          "$ref": "#/$defs/CanvasRequestTarget",
+          "description": "Who the host has routed this request to."
+        },
+        "actionName": {
+          "type": "string",
+          "description": "Action name when `kind === {@link CanvasRequestKind.Action}`."
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Open-time input when `kind === {@link CanvasRequestKind.Open}`; action\ninput when `kind === {@link CanvasRequestKind.Action}`."
+        },
+        "deadlineMs": {
+          "type": "number",
+          "description": "Server-side deadline at which the host will give up and fail the\nunderlying provider callback. Milliseconds since the Unix epoch."
+        }
+      },
+      "required": [
+        "requestId",
+        "kind",
+        "instanceId",
+        "canvasId",
+        "extensionId",
+        "target"
+      ]
+    },
+    "ClientCanvasDeclaration": {
+      "type": "object",
+      "description": "A canvas declaration contributed by a {@link SessionActiveClient}. Lighter\nthan {@link SessionCanvasDeclaration}: `extensionId` and `source` are\nderived by the host from the client's identity when it aggregates the\ncontribution into {@link SessionState.canvasRegistry}.",
+      "properties": {
+        "canvasId": {
+          "type": "string",
+          "description": "Provider-local canvas identifier."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable canvas name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description shown to the agent."
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "properties": {
+              "type": "string"
+            },
+            "required": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "JSON Schema for canvas open input. Opaque to AHP."
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionCanvasAction"
+          },
+          "description": "Actions this canvas exposes."
+        }
+      },
+      "required": [
+        "canvasId",
+        "displayName",
+        "description"
+      ]
+    },
+    "CanvasOpenResult": {
+      "type": "object",
+      "description": "Successful result of a canvas open request. `kind` matches the originating\n{@link SessionCanvasRequest}'s {@link CanvasRequestKind.Open | `kind`}.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CanvasRequestKind.Open"
+        },
+        "url": {
+          "type": "string",
+          "description": "Provider-supplied render URL. Subject to renderer policy."
+        },
+        "title": {
+          "type": "string",
+          "description": "Provider-supplied display title."
+        },
+        "status": {
+          "type": "string",
+          "description": "Provider-supplied status text."
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "CanvasActionResult": {
+      "type": "object",
+      "description": "Successful result of a canvas action invocation.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CanvasRequestKind.Action"
+        },
+        "value": {
+          "description": "Opaque provider-defined value."
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "CanvasCloseResult": {
+      "type": "object",
+      "description": "Successful result of a canvas close request.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CanvasRequestKind.Close"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "CanvasError": {
+      "type": "object",
+      "description": "Error reported by a provider for a failed {@link SessionCanvasRequest}.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Machine-readable code, e.g. `canvas_action_no_handler`,\n`canvas_provider_unavailable`."
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable message."
+        }
+      },
+      "required": [
+        "code",
+        "message"
       ]
     },
     "ChatState": {
@@ -5904,6 +6283,174 @@
       "required": [
         "type",
         "_meta"
+      ]
+    },
+    "SessionCanvasRegistryChangedAction": {
+      "type": "object",
+      "description": "The aggregated {@link SessionCanvasDeclaration | canvas registry} for this\nsession changed. Full-replacement semantics: `canvases` replaces\n{@link SessionState.canvasRegistry} entirely.\n\nEmitted after a canvas provider joins or leaves — a server-side extension\nlifecycle change, or an `session/activeClientSet` /\n`session/activeClientRemoved` that adds or drops a client's\n{@link SessionActiveClient.canvasProviders}.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionCanvasRegistryChanged"
+        },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionCanvasDeclaration"
+          },
+          "description": "Full replacement of `state.canvasRegistry`."
+        }
+      },
+      "required": [
+        "type",
+        "canvases"
+      ]
+    },
+    "SessionCanvasInstanceOpenedAction": {
+      "type": "object",
+      "description": "A canvas instance was opened (or its full record was refreshed). Upsert\nsemantics keyed by {@link SessionOpenCanvas.instanceId | `instanceId`}:\nthe `instance` replaces any existing entry with the same `instanceId`, or\nis appended when new. Idempotent for reopen and for the host's durable\nresume replay (which carries no live `url`).",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionCanvasInstanceOpened"
+        },
+        "instance": {
+          "$ref": "#/$defs/SessionOpenCanvas",
+          "description": "Full instance, upserted into `state.openCanvases` by `instanceId`."
+        }
+      },
+      "required": [
+        "type",
+        "instance"
+      ]
+    },
+    "SessionCanvasInstanceUpdatedAction": {
+      "type": "object",
+      "description": "A provider pushed a status / title / url / availability update for an open\ncanvas. Partial-merge by `instanceId`: present fields overwrite, absent\nfields are preserved. Only these mutable fields may change after open;\nidentity (`instanceId`, `canvasId`, `extensionId`, `extensionName`) and the\nrenderer binding are fixed at open time. To clear a value, re-upsert the\nwhole instance with `session/canvasInstanceOpened`. A no-op when no open\ninstance matches.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionCanvasInstanceUpdated"
+        },
+        "instanceId": {
+          "type": "string",
+          "description": "The instance to update."
+        },
+        "title": {
+          "type": "string",
+          "description": "New display title, when changed."
+        },
+        "status": {
+          "type": "string",
+          "description": "New status text, when changed."
+        },
+        "url": {
+          "type": "string",
+          "description": "New render URL, when changed."
+        },
+        "availability": {
+          "$ref": "#/$defs/CanvasInstanceAvailability",
+          "description": "New routing availability, when changed."
+        }
+      },
+      "required": [
+        "type",
+        "instanceId"
+      ]
+    },
+    "SessionCanvasInstanceClosedAction": {
+      "type": "object",
+      "description": "An open canvas was closed. Removes it from {@link SessionState.openCanvases}\nby `instanceId` and cascade-removes any\n{@link SessionState.canvasRequests | pending requests} targeting it. A\nno-op when neither an open instance nor a pending request matches.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionCanvasInstanceClosed"
+        },
+        "instanceId": {
+          "type": "string",
+          "description": "The instance to close."
+        }
+      },
+      "required": [
+        "type",
+        "instanceId"
+      ]
+    },
+    "SessionCanvasInstanceCloseRequestedAction": {
+      "type": "object",
+      "description": "A client (typically a renderer's close button) asks the host to close an\ninstance. The host translates this into the provider-facing close and\nultimately a `session/canvasInstanceClosed`. Pure client-to-host signal:\nthe reducer does not mutate state.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionCanvasInstanceCloseRequested"
+        },
+        "instanceId": {
+          "type": "string",
+          "description": "The instance the client wants closed."
+        }
+      },
+      "required": [
+        "type",
+        "instanceId"
+      ]
+    },
+    "SessionCanvasRequestCreatedAction": {
+      "type": "object",
+      "description": "The host routed an open / action / close request to a provider and is\nwaiting on completion. Upsert into {@link SessionState.canvasRequests} keyed\nby {@link SessionCanvasRequest.requestId | `requestId`} (a duplicate\n`requestId` from a replay path replaces rather than duplicates). Visible to\nall subscribers so a recovering client can see what is mid-flight.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionCanvasRequestCreated"
+        },
+        "request": {
+          "$ref": "#/$defs/SessionCanvasRequest",
+          "description": "The in-flight request."
+        }
+      },
+      "required": [
+        "type",
+        "request"
+      ]
+    },
+    "SessionCanvasRequestCompletedAction": {
+      "type": "object",
+      "description": "The targeted provider reported the outcome of a\n{@link SessionCanvasRequestCreatedAction}. Removes the matching entry from\n{@link SessionState.canvasRequests} by `requestId`; a no-op when none\nmatches. Exactly one of `result` / `error` MUST be present, and a present\n`result.kind` MUST match the originating request's `kind`.\n\nDirection depends on the request's `target`: for an\n{@link CanvasProviderKind.ActiveClient} target only the client whose\n`clientId` matches `target.clientId` may dispatch this; for a\n{@link CanvasProviderKind.Server} target the host emits it and the server\nSHOULD reject any client-dispatched completion.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionCanvasRequestCompleted"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "The request being completed."
+        },
+        "result": {
+          "$ref": "#/$defs/CanvasRequestResult",
+          "description": "Success payload. Mutually exclusive with `error`."
+        },
+        "error": {
+          "$ref": "#/$defs/CanvasError",
+          "description": "Failure payload. Mutually exclusive with `result`."
+        }
+      },
+      "required": [
+        "type",
+        "requestId"
+      ]
+    },
+    "SessionCanvasRequestCancelledAction": {
+      "type": "object",
+      "description": "The host abandoned an in-flight request — typically because the targeted\nprovider disconnected or the deadline elapsed. Removes the matching entry\nfrom {@link SessionState.canvasRequests} by `requestId`; a no-op when none\nmatches. Server-dispatched only.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionCanvasRequestCancelled"
+        },
+        "requestId": {
+          "type": "string",
+          "description": "The request being abandoned."
+        },
+        "reason": {
+          "$ref": "#/$defs/CanvasRequestCancelReason",
+          "description": "Why the host gave up."
+        }
+      },
+      "required": [
+        "type",
+        "requestId",
+        "reason"
       ]
     },
     "ToolCallActionBase": {

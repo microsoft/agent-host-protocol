@@ -1,0 +1,76 @@
+{
+  "description": "session/canvasRegistryChanged replaces the whole canvas registry",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "canvasRegistry": [
+      {
+        "extensionId": "ext.a",
+        "canvasId": "old",
+        "displayName": "Old",
+        "description": "old pane",
+        "source": "server"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/canvasRegistryChanged",
+      "canvases": [
+        {
+          "extensionId": "ext.a",
+          "canvasId": "preview",
+          "displayName": "Preview",
+          "description": "Preview pane",
+          "source": "server"
+        },
+        {
+          "extensionId": "ext.a",
+          "canvasId": "editor",
+          "displayName": "Editor",
+          "description": "Editor pane",
+          "source": "server"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "canvasRegistry": [
+      {
+        "extensionId": "ext.a",
+        "canvasId": "preview",
+        "displayName": "Preview",
+        "description": "Preview pane",
+        "source": "server"
+      },
+      {
+        "extensionId": "ext.a",
+        "canvasId": "editor",
+        "displayName": "Editor",
+        "description": "Editor pane",
+        "source": "server"
+      }
+    ]
+  }
+}

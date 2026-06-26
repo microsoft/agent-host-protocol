@@ -120,6 +120,22 @@ enum class ActionType {
     SESSION_CONFIG_CHANGED,
     @SerialName("session/metaChanged")
     SESSION_META_CHANGED,
+    @SerialName("session/canvasRegistryChanged")
+    SESSION_CANVAS_REGISTRY_CHANGED,
+    @SerialName("session/canvasInstanceOpened")
+    SESSION_CANVAS_INSTANCE_OPENED,
+    @SerialName("session/canvasInstanceUpdated")
+    SESSION_CANVAS_INSTANCE_UPDATED,
+    @SerialName("session/canvasInstanceClosed")
+    SESSION_CANVAS_INSTANCE_CLOSED,
+    @SerialName("session/canvasInstanceCloseRequested")
+    SESSION_CANVAS_INSTANCE_CLOSE_REQUESTED,
+    @SerialName("session/canvasRequestCreated")
+    SESSION_CANVAS_REQUEST_CREATED,
+    @SerialName("session/canvasRequestCompleted")
+    SESSION_CANVAS_REQUEST_COMPLETED,
+    @SerialName("session/canvasRequestCancelled")
+    SESSION_CANVAS_REQUEST_CANCELLED,
     @SerialName("changeset/statusChanged")
     CHANGESET_STATUS_CHANGED,
     @SerialName("changeset/fileSet")
@@ -967,6 +983,106 @@ data class SessionMetaChangedAction(
 )
 
 @Serializable
+data class SessionCanvasRegistryChangedAction(
+    val type: ActionType,
+    /**
+     * Full replacement of `state.canvasRegistry`.
+     */
+    val canvases: List<SessionCanvasDeclaration>
+)
+
+@Serializable
+data class SessionCanvasInstanceOpenedAction(
+    val type: ActionType,
+    /**
+     * Full instance, upserted into `state.openCanvases` by `instanceId`.
+     */
+    val instance: SessionOpenCanvas
+)
+
+@Serializable
+data class SessionCanvasInstanceUpdatedAction(
+    val type: ActionType,
+    /**
+     * The instance to update.
+     */
+    val instanceId: String,
+    /**
+     * New display title, when changed.
+     */
+    val title: String? = null,
+    /**
+     * New status text, when changed.
+     */
+    val status: String? = null,
+    /**
+     * New render URL, when changed.
+     */
+    val url: String? = null,
+    /**
+     * New routing availability, when changed.
+     */
+    val availability: CanvasInstanceAvailability? = null
+)
+
+@Serializable
+data class SessionCanvasInstanceClosedAction(
+    val type: ActionType,
+    /**
+     * The instance to close.
+     */
+    val instanceId: String
+)
+
+@Serializable
+data class SessionCanvasInstanceCloseRequestedAction(
+    val type: ActionType,
+    /**
+     * The instance the client wants closed.
+     */
+    val instanceId: String
+)
+
+@Serializable
+data class SessionCanvasRequestCreatedAction(
+    val type: ActionType,
+    /**
+     * The in-flight request.
+     */
+    val request: SessionCanvasRequest
+)
+
+@Serializable
+data class SessionCanvasRequestCompletedAction(
+    val type: ActionType,
+    /**
+     * The request being completed.
+     */
+    val requestId: String,
+    /**
+     * Success payload. Mutually exclusive with `error`.
+     */
+    val result: CanvasRequestResult? = null,
+    /**
+     * Failure payload. Mutually exclusive with `result`.
+     */
+    val error: CanvasError? = null
+)
+
+@Serializable
+data class SessionCanvasRequestCancelledAction(
+    val type: ActionType,
+    /**
+     * The request being abandoned.
+     */
+    val requestId: String,
+    /**
+     * Why the host gave up.
+     */
+    val reason: CanvasRequestCancelReason
+)
+
+@Serializable
 data class ChangesetStatusChangedAction(
     val type: ActionType,
     /**
@@ -1381,6 +1497,14 @@ sealed interface StateAction
 @JvmInline value class StateActionChatTruncated(val value: ChatTruncatedAction) : StateAction
 @JvmInline value class StateActionSessionConfigChanged(val value: SessionConfigChangedAction) : StateAction
 @JvmInline value class StateActionSessionMetaChanged(val value: SessionMetaChangedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasRegistryChanged(val value: SessionCanvasRegistryChangedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasInstanceOpened(val value: SessionCanvasInstanceOpenedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasInstanceUpdated(val value: SessionCanvasInstanceUpdatedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasInstanceClosed(val value: SessionCanvasInstanceClosedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasInstanceCloseRequested(val value: SessionCanvasInstanceCloseRequestedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasRequestCreated(val value: SessionCanvasRequestCreatedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasRequestCompleted(val value: SessionCanvasRequestCompletedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasRequestCancelled(val value: SessionCanvasRequestCancelledAction) : StateAction
 @JvmInline value class StateActionChangesetStatusChanged(val value: ChangesetStatusChangedAction) : StateAction
 @JvmInline value class StateActionChangesetFileSet(val value: ChangesetFileSetAction) : StateAction
 @JvmInline value class StateActionChangesetFileRemoved(val value: ChangesetFileRemovedAction) : StateAction
@@ -1469,6 +1593,14 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/truncated" -> StateActionChatTruncated(input.json.decodeFromJsonElement(ChatTruncatedAction.serializer(), element))
             "session/configChanged" -> StateActionSessionConfigChanged(input.json.decodeFromJsonElement(SessionConfigChangedAction.serializer(), element))
             "session/metaChanged" -> StateActionSessionMetaChanged(input.json.decodeFromJsonElement(SessionMetaChangedAction.serializer(), element))
+            "session/canvasRegistryChanged" -> StateActionSessionCanvasRegistryChanged(input.json.decodeFromJsonElement(SessionCanvasRegistryChangedAction.serializer(), element))
+            "session/canvasInstanceOpened" -> StateActionSessionCanvasInstanceOpened(input.json.decodeFromJsonElement(SessionCanvasInstanceOpenedAction.serializer(), element))
+            "session/canvasInstanceUpdated" -> StateActionSessionCanvasInstanceUpdated(input.json.decodeFromJsonElement(SessionCanvasInstanceUpdatedAction.serializer(), element))
+            "session/canvasInstanceClosed" -> StateActionSessionCanvasInstanceClosed(input.json.decodeFromJsonElement(SessionCanvasInstanceClosedAction.serializer(), element))
+            "session/canvasInstanceCloseRequested" -> StateActionSessionCanvasInstanceCloseRequested(input.json.decodeFromJsonElement(SessionCanvasInstanceCloseRequestedAction.serializer(), element))
+            "session/canvasRequestCreated" -> StateActionSessionCanvasRequestCreated(input.json.decodeFromJsonElement(SessionCanvasRequestCreatedAction.serializer(), element))
+            "session/canvasRequestCompleted" -> StateActionSessionCanvasRequestCompleted(input.json.decodeFromJsonElement(SessionCanvasRequestCompletedAction.serializer(), element))
+            "session/canvasRequestCancelled" -> StateActionSessionCanvasRequestCancelled(input.json.decodeFromJsonElement(SessionCanvasRequestCancelledAction.serializer(), element))
             "changeset/statusChanged" -> StateActionChangesetStatusChanged(input.json.decodeFromJsonElement(ChangesetStatusChangedAction.serializer(), element))
             "changeset/fileSet" -> StateActionChangesetFileSet(input.json.decodeFromJsonElement(ChangesetFileSetAction.serializer(), element))
             "changeset/fileRemoved" -> StateActionChangesetFileRemoved(input.json.decodeFromJsonElement(ChangesetFileRemovedAction.serializer(), element))
@@ -1550,6 +1682,14 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatTruncated -> output.json.encodeToJsonElement(ChatTruncatedAction.serializer(), value.value)
             is StateActionSessionConfigChanged -> output.json.encodeToJsonElement(SessionConfigChangedAction.serializer(), value.value)
             is StateActionSessionMetaChanged -> output.json.encodeToJsonElement(SessionMetaChangedAction.serializer(), value.value)
+            is StateActionSessionCanvasRegistryChanged -> output.json.encodeToJsonElement(SessionCanvasRegistryChangedAction.serializer(), value.value)
+            is StateActionSessionCanvasInstanceOpened -> output.json.encodeToJsonElement(SessionCanvasInstanceOpenedAction.serializer(), value.value)
+            is StateActionSessionCanvasInstanceUpdated -> output.json.encodeToJsonElement(SessionCanvasInstanceUpdatedAction.serializer(), value.value)
+            is StateActionSessionCanvasInstanceClosed -> output.json.encodeToJsonElement(SessionCanvasInstanceClosedAction.serializer(), value.value)
+            is StateActionSessionCanvasInstanceCloseRequested -> output.json.encodeToJsonElement(SessionCanvasInstanceCloseRequestedAction.serializer(), value.value)
+            is StateActionSessionCanvasRequestCreated -> output.json.encodeToJsonElement(SessionCanvasRequestCreatedAction.serializer(), value.value)
+            is StateActionSessionCanvasRequestCompleted -> output.json.encodeToJsonElement(SessionCanvasRequestCompletedAction.serializer(), value.value)
+            is StateActionSessionCanvasRequestCancelled -> output.json.encodeToJsonElement(SessionCanvasRequestCancelledAction.serializer(), value.value)
             is StateActionChangesetStatusChanged -> output.json.encodeToJsonElement(ChangesetStatusChangedAction.serializer(), value.value)
             is StateActionChangesetFileSet -> output.json.encodeToJsonElement(ChangesetFileSetAction.serializer(), value.value)
             is StateActionChangesetFileRemoved -> output.json.encodeToJsonElement(ChangesetFileRemovedAction.serializer(), value.value)

@@ -364,6 +364,52 @@ public enum ResourceChangeType: String, Codable, Sendable {
     case deleted = "deleted"
 }
 
+/// Where a canvas declaration came from. Used by the host for routing
+/// provider requests and for cleanup when a provider goes away.
+///
+/// Doubles as the discriminant for {@link CanvasRequestTarget}: a request
+/// either targets the host process itself ({@link CanvasProviderKind.Server})
+/// or a specific active client ({@link CanvasProviderKind.ActiveClient}).
+public enum CanvasProviderKind: String, Codable, Sendable {
+    /// Declared by the host process (a server-side extension or builtin).
+    case server = "server"
+    /// Declared by a {@link SessionActiveClient} via `canvasProviders`.
+    case activeClient = "activeClient"
+}
+
+/// Routing availability of an {@link SessionOpenCanvas}. Host-derived: the
+/// host sets {@link CanvasInstanceAvailability.Stale | `Stale`} when the
+/// owning provider becomes unreachable and
+/// {@link CanvasInstanceAvailability.Ready | `Ready`} once the instance is
+/// live again. A closed set rather than a free-form string.
+public enum CanvasInstanceAvailability: String, Codable, Sendable {
+    /// The owning provider is reachable; actions may be routed to it.
+    case ready = "ready"
+    /// The owning provider is unreachable; the entry is kept but not routable.
+    case stale = "stale"
+}
+
+/// What the host is asking a provider to do in a {@link SessionCanvasRequest}.
+/// Doubles as the discriminant for {@link CanvasRequestResult}.
+public enum CanvasRequestKind: String, Codable, Sendable {
+    case `open` = "open"
+    case action = "action"
+    case close = "close"
+}
+
+/// Why the host abandoned an in-flight {@link SessionCanvasRequest}, carried by
+/// `session/canvasRequestCancelled`.
+public enum CanvasRequestCancelReason: String, Codable, Sendable {
+    /// The request's deadline elapsed before the provider answered.
+    case timeout = "timeout"
+    /// The targeted provider disconnected.
+    case providerDisconnected = "providerDisconnected"
+    /// The instance was closed while the request was in flight.
+    case instanceClosed = "instanceClosed"
+    /// The host is shutting down.
+    case hostShutdown = "hostShutdown"
+}
+
 // MARK: - State Types
 
 public struct Icon: Codable, Sendable {
@@ -993,6 +1039,33 @@ public struct SessionState: Codable, Sendable {
     /// before subscribing. See {@link Changeset} for the full shape and
     /// {@link /guide/changesets | Changesets} for an overview of the model.
     public var changesets: [Changeset]?
+    /// Aggregated registry of canvases currently exposed to the agent.
+    ///
+    /// Full-replacement: when this changes, the entire array is republished
+    /// via `session/canvasRegistryChanged`. The host derives it from every
+    /// active canvas provider attached to the session — server-side
+    /// ({@link CanvasProviderKind.Server}) and active-client
+    /// ({@link CanvasProviderKind.ActiveClient}, contributed via
+    /// {@link SessionActiveClient.canvasProviders}). See
+    /// {@link /guide/canvases | Canvases} for the model.
+    public var canvasRegistry: [SessionCanvasDeclaration]?
+    /// Snapshot of every canvas instance currently open for this session.
+    ///
+    /// Maintained via `session/canvasInstanceOpened` (upsert),
+    /// `session/canvasInstanceUpdated` (partial merge), and
+    /// `session/canvasInstanceClosed` (remove). Subscribers see open
+    /// instances in their initial snapshot and as live deltas thereafter,
+    /// so a reconnecting client can rebuild the open set.
+    public var openCanvases: [SessionOpenCanvas]?
+    /// Canvas open / action / close requests the host is currently waiting
+    /// on a provider to complete.
+    ///
+    /// Lives in state — like the chat channel's input requests — so
+    /// subscribers can see what is in flight and reconnect/replay is
+    /// correct. Entries are added with `session/canvasRequestCreated` and
+    /// removed once a `session/canvasRequestCompleted` carries the matching
+    /// `requestId`, or via `session/canvasRequestCancelled`.
+    public var canvasRequests: [SessionCanvasRequest]?
     /// Additional provider-specific metadata for this session.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1011,6 +1084,9 @@ public struct SessionState: Codable, Sendable {
         case config
         case customizations
         case changesets
+        case canvasRegistry
+        case openCanvases
+        case canvasRequests
         case meta = "_meta"
     }
 
@@ -1025,6 +1101,9 @@ public struct SessionState: Codable, Sendable {
         config: SessionConfigState? = nil,
         customizations: [Customization]? = nil,
         changesets: [Changeset]? = nil,
+        canvasRegistry: [SessionCanvasDeclaration]? = nil,
+        openCanvases: [SessionOpenCanvas]? = nil,
+        canvasRequests: [SessionCanvasRequest]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.summary = summary
@@ -1037,6 +1116,9 @@ public struct SessionState: Codable, Sendable {
         self.config = config
         self.customizations = customizations
         self.changesets = changesets
+        self.canvasRegistry = canvasRegistry
+        self.openCanvases = openCanvases
+        self.canvasRequests = canvasRequests
         self.meta = meta
     }
 }
@@ -1055,17 +1137,45 @@ public struct SessionActiveClient: Codable, Sendable {
     /// plugins in memory and rely on the host to expand them into concrete
     /// children inside {@link SessionState.customizations}.
     public var customizations: [ClientPluginCustomization]?
+    /// Canvas providers this active client contributes to the session.
+    ///
+    /// Each entry is a single canvas declaration the client can host; a
+    /// client with multiple canvases publishes one entry per canvas. When
+    /// this field is populated, the host SHOULD register the client as a
+    /// canvas provider with its backend and aggregate the contributions
+    /// into {@link SessionState.canvasRegistry} with
+    /// {@link CanvasProviderKind.ActiveClient} and `clientId` set to this
+    /// client's `clientId`.
+    ///
+    /// Updated atomically via `session/activeClientSet` — there is no
+    /// separate "canvasProvidersChanged" action; clients re-publish their
+    /// full entry, identical to the {@link customizations} / {@link tools}
+    /// pattern.
+    public var canvasProviders: [ClientCanvasDeclaration]?
+    /// Renderer-capability hint. When `true`, the host MAY route canvas open
+    /// requests targeting server-owned providers to this client (a
+    /// `session/canvasRequestCreated` whose `target.clientId` is this
+    /// client). Clients that do not render canvases SHOULD omit the field.
+    ///
+    /// Independent of {@link canvasProviders}: a client can render canvases
+    /// declared by other providers without declaring any of its own, and
+    /// vice versa.
+    public var canRenderCanvases: Bool?
 
     public init(
         clientId: String,
         displayName: String? = nil,
         tools: [ToolDefinition],
-        customizations: [ClientPluginCustomization]? = nil
+        customizations: [ClientPluginCustomization]? = nil,
+        canvasProviders: [ClientCanvasDeclaration]? = nil,
+        canRenderCanvases: Bool? = nil
     ) {
         self.clientId = clientId
         self.displayName = displayName
         self.tools = tools
         self.customizations = customizations
+        self.canvasProviders = canvasProviders
+        self.canRenderCanvases = canRenderCanvases
     }
 }
 
@@ -4144,6 +4254,273 @@ public struct ResourceChange: Codable, Sendable {
     }
 }
 
+public struct SessionCanvasAction: Codable, Sendable {
+    /// Action name. Provider-local; unique within `(extensionId, canvasId)`.
+    public var name: String
+    /// Short description shown to the agent.
+    public var description: String?
+    /// JSON Schema for this action's input. Opaque to AHP — mirrors
+    /// {@link ToolDefinition.inputSchema}.
+    public var inputSchema: AnyCodable?
+
+    public init(
+        name: String,
+        description: String? = nil,
+        inputSchema: AnyCodable? = nil
+    ) {
+        self.name = name
+        self.description = description
+        self.inputSchema = inputSchema
+    }
+}
+
+public struct SessionCanvasDeclaration: Codable, Sendable {
+    /// Owning provider identifier. Stable across declarations and instances.
+    public var extensionId: String
+    /// Optional human-readable extension name.
+    public var extensionName: String?
+    /// Provider-local canvas identifier. Unique within `extensionId`.
+    public var canvasId: String
+    /// Human-readable canvas name.
+    public var displayName: String
+    /// Short description shown to the agent in canvas catalogs.
+    public var description: String
+    /// JSON Schema for canvas open input. Opaque to AHP — mirrors
+    /// {@link ToolDefinition.inputSchema}.
+    public var inputSchema: AnyCodable?
+    /// Actions this canvas exposes.
+    public var actions: [SessionCanvasAction]?
+    /// Where the declaration came from. Used for routing and cleanup.
+    public var source: CanvasProviderKind
+    /// When `source === {@link CanvasProviderKind.ActiveClient}`, the
+    /// contributing client's `clientId`. Absent for server-declared canvases.
+    public var clientId: String?
+
+    public init(
+        extensionId: String,
+        extensionName: String? = nil,
+        canvasId: String,
+        displayName: String,
+        description: String,
+        inputSchema: AnyCodable? = nil,
+        actions: [SessionCanvasAction]? = nil,
+        source: CanvasProviderKind,
+        clientId: String? = nil
+    ) {
+        self.extensionId = extensionId
+        self.extensionName = extensionName
+        self.canvasId = canvasId
+        self.displayName = displayName
+        self.description = description
+        self.inputSchema = inputSchema
+        self.actions = actions
+        self.source = source
+        self.clientId = clientId
+    }
+}
+
+public struct SessionOpenCanvas: Codable, Sendable {
+    /// Caller-supplied stable instance identifier (agent-minted).
+    public var instanceId: String
+    /// Declaration this instance was opened from.
+    public var canvasId: String
+    /// Owning provider identifier.
+    public var extensionId: String
+    /// Optional human-readable extension name.
+    public var extensionName: String?
+    /// Routing availability — host-derived.
+    public var availability: CanvasInstanceAvailability
+    /// Input the agent supplied when opening. Retained so a recovering host
+    /// can re-bind the instance without round-tripping the agent.
+    public var input: [String: AnyCodable]?
+    /// Provider-supplied display title.
+    public var title: String?
+    /// Provider-supplied status text.
+    public var status: String?
+    /// URL for rendered canvases. Subject to renderer policy.
+    public var url: String?
+    /// Renderer-side binding once a client has accepted the open. Lets the
+    /// host route subsequent actions to the right renderer and authorise a
+    /// `session/canvasInstanceCloseRequested`. Optional — server-rendered
+    /// canvases may have no specific bound renderer, in which case any client
+    /// with {@link SessionActiveClient.canRenderCanvases} MAY render it.
+    public var renderer: AnyCodable?
+
+    public init(
+        instanceId: String,
+        canvasId: String,
+        extensionId: String,
+        extensionName: String? = nil,
+        availability: CanvasInstanceAvailability,
+        input: [String: AnyCodable]? = nil,
+        title: String? = nil,
+        status: String? = nil,
+        url: String? = nil,
+        renderer: AnyCodable? = nil
+    ) {
+        self.instanceId = instanceId
+        self.canvasId = canvasId
+        self.extensionId = extensionId
+        self.extensionName = extensionName
+        self.availability = availability
+        self.input = input
+        self.title = title
+        self.status = status
+        self.url = url
+        self.renderer = renderer
+    }
+}
+
+public struct SessionCanvasRequest: Codable, Sendable {
+    /// Stable correlation id minted by the host.
+    public var requestId: String
+    /// What the host is asking the provider to do.
+    public var kind: CanvasRequestKind
+    /// Instance the request acts on.
+    public var instanceId: String
+    /// Declaration the instance belongs to.
+    public var canvasId: String
+    /// Owning provider identifier.
+    public var extensionId: String
+    /// Who the host has routed this request to.
+    public var target: CanvasRequestTarget
+    /// Action name when `kind === {@link CanvasRequestKind.Action}`.
+    public var actionName: String?
+    /// Open-time input when `kind === {@link CanvasRequestKind.Open}`; action
+    /// input when `kind === {@link CanvasRequestKind.Action}`.
+    public var input: [String: AnyCodable]?
+    /// Server-side deadline at which the host will give up and fail the
+    /// underlying provider callback. Milliseconds since the Unix epoch.
+    public var deadlineMs: Int?
+
+    public init(
+        requestId: String,
+        kind: CanvasRequestKind,
+        instanceId: String,
+        canvasId: String,
+        extensionId: String,
+        target: CanvasRequestTarget,
+        actionName: String? = nil,
+        input: [String: AnyCodable]? = nil,
+        deadlineMs: Int? = nil
+    ) {
+        self.requestId = requestId
+        self.kind = kind
+        self.instanceId = instanceId
+        self.canvasId = canvasId
+        self.extensionId = extensionId
+        self.target = target
+        self.actionName = actionName
+        self.input = input
+        self.deadlineMs = deadlineMs
+    }
+}
+
+public struct CanvasRequestTarget: Codable, Sendable {
+    /// Which provider direction owns the request.
+    public var kind: CanvasProviderKind
+    /// Targeted client's `clientId`. Present iff
+    /// `kind === {@link CanvasProviderKind.ActiveClient}`.
+    public var clientId: String?
+
+    public init(
+        kind: CanvasProviderKind,
+        clientId: String? = nil
+    ) {
+        self.kind = kind
+        self.clientId = clientId
+    }
+}
+
+public struct ClientCanvasDeclaration: Codable, Sendable {
+    /// Provider-local canvas identifier.
+    public var canvasId: String
+    /// Human-readable canvas name.
+    public var displayName: String
+    /// Short description shown to the agent.
+    public var description: String
+    /// JSON Schema for canvas open input. Opaque to AHP.
+    public var inputSchema: AnyCodable?
+    /// Actions this canvas exposes.
+    public var actions: [SessionCanvasAction]?
+
+    public init(
+        canvasId: String,
+        displayName: String,
+        description: String,
+        inputSchema: AnyCodable? = nil,
+        actions: [SessionCanvasAction]? = nil
+    ) {
+        self.canvasId = canvasId
+        self.displayName = displayName
+        self.description = description
+        self.inputSchema = inputSchema
+        self.actions = actions
+    }
+}
+
+public struct CanvasError: Codable, Sendable {
+    /// Machine-readable code, e.g. `canvas_action_no_handler`,
+    /// `canvas_provider_unavailable`.
+    public var code: String
+    /// Human-readable message.
+    public var message: String
+
+    public init(
+        code: String,
+        message: String
+    ) {
+        self.code = code
+        self.message = message
+    }
+}
+
+public struct CanvasOpenResult: Codable, Sendable {
+    public var kind: CanvasRequestKind
+    /// Provider-supplied render URL. Subject to renderer policy.
+    public var url: String?
+    /// Provider-supplied display title.
+    public var title: String?
+    /// Provider-supplied status text.
+    public var status: String?
+
+    public init(
+        kind: CanvasRequestKind,
+        url: String? = nil,
+        title: String? = nil,
+        status: String? = nil
+    ) {
+        self.kind = kind
+        self.url = url
+        self.title = title
+        self.status = status
+    }
+}
+
+public struct CanvasActionResult: Codable, Sendable {
+    public var kind: CanvasRequestKind
+    /// Opaque provider-defined value.
+    public var value: AnyCodable?
+
+    public init(
+        kind: CanvasRequestKind,
+        value: AnyCodable? = nil
+    ) {
+        self.kind = kind
+        self.value = value
+    }
+}
+
+public struct CanvasCloseResult: Codable, Sendable {
+    public var kind: CanvasRequestKind
+
+    public init(
+        kind: CanvasRequestKind
+    ) {
+        self.kind = kind
+    }
+}
+
 // MARK: - Discriminated Unions
 
 public struct ChatOriginUser: Codable, Sendable {
@@ -4731,6 +5108,39 @@ public enum ToolCallContributor: Codable, Sendable {
         switch self {
         case .client(let value): try value.encode(to: encoder)
         case .mcp(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum CanvasRequestResult: Codable, Sendable {
+    case open(CanvasOpenResult)
+    case action(CanvasActionResult)
+    case close(CanvasCloseResult)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "open":
+            self = .open(try CanvasOpenResult(from: decoder))
+        case "action":
+            self = .action(try CanvasActionResult(from: decoder))
+        case "close":
+            self = .close(try CanvasCloseResult(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown CanvasRequestResult discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .open(let value): try value.encode(to: encoder)
+        case .action(let value): try value.encode(to: encoder)
+        case .close(let value): try value.encode(to: encoder)
         }
     }
 }

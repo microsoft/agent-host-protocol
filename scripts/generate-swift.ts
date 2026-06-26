@@ -546,6 +546,8 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'CanvasProviderKind', 'CanvasInstanceAvailability', 'CanvasRequestKind',
+  'CanvasRequestCancelReason',
 ];
 
 const STATE_STRUCTS = [
@@ -593,6 +595,9 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
+  'SessionCanvasAction', 'SessionCanvasDeclaration', 'SessionOpenCanvas',
+  'SessionCanvasRequest', 'CanvasRequestTarget', 'ClientCanvasDeclaration',
+  'CanvasError', 'CanvasOpenResult', 'CanvasActionResult', 'CanvasCloseResult',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -766,6 +771,16 @@ const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
   variants: [
     { caseName: 'client', structName: 'ToolCallClientContributor', discriminantValue: 'client' },
     { caseName: 'mcp', structName: 'ToolCallMcpContributor', discriminantValue: 'mcp' },
+  ],
+};
+
+const CANVAS_REQUEST_RESULT_UNION: UnionConfig = {
+  name: 'CanvasRequestResult',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'open', structName: 'CanvasOpenResult', discriminantValue: 'open' },
+    { caseName: 'action', structName: 'CanvasActionResult', discriminantValue: 'action' },
+    { caseName: 'close', structName: 'CanvasCloseResult', discriminantValue: 'close' },
   ],
 };
 
@@ -1022,6 +1037,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
+  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1081,6 +1098,14 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/truncated', caseName: 'chatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'session/configChanged', caseName: 'sessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', caseName: 'sessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
+  { type: 'session/canvasRegistryChanged', caseName: 'sessionCanvasRegistryChanged', tsInterface: 'SessionCanvasRegistryChangedAction' },
+  { type: 'session/canvasInstanceOpened', caseName: 'sessionCanvasInstanceOpened', tsInterface: 'SessionCanvasInstanceOpenedAction' },
+  { type: 'session/canvasInstanceUpdated', caseName: 'sessionCanvasInstanceUpdated', tsInterface: 'SessionCanvasInstanceUpdatedAction' },
+  { type: 'session/canvasInstanceClosed', caseName: 'sessionCanvasInstanceClosed', tsInterface: 'SessionCanvasInstanceClosedAction' },
+  { type: 'session/canvasInstanceCloseRequested', caseName: 'sessionCanvasInstanceCloseRequested', tsInterface: 'SessionCanvasInstanceCloseRequestedAction' },
+  { type: 'session/canvasRequestCreated', caseName: 'sessionCanvasRequestCreated', tsInterface: 'SessionCanvasRequestCreatedAction' },
+  { type: 'session/canvasRequestCompleted', caseName: 'sessionCanvasRequestCompleted', tsInterface: 'SessionCanvasRequestCompletedAction' },
+  { type: 'session/canvasRequestCancelled', caseName: 'sessionCanvasRequestCancelled', tsInterface: 'SessionCanvasRequestCancelledAction' },
   { type: 'changeset/statusChanged', caseName: 'changesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
   { type: 'changeset/fileSet', caseName: 'changesetFileSet', tsInterface: 'ChangesetFileSetAction' },
   { type: 'changeset/fileRemoved', caseName: 'changesetFileRemoved', tsInterface: 'ChangesetFileRemovedAction' },
@@ -1890,6 +1915,7 @@ function checkExhaustiveness(project: Project): void {
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
+    'CanvasRequestResult',          // CANVAS_REQUEST_RESULT_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()

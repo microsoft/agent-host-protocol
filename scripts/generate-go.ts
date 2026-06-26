@@ -649,6 +649,8 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'CanvasProviderKind', 'CanvasInstanceAvailability', 'CanvasRequestKind',
+  'CanvasRequestCancelReason',
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
@@ -763,6 +765,16 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
   { name: 'ResourceChange' },
+  { name: 'SessionCanvasAction' },
+  { name: 'SessionCanvasDeclaration' },
+  { name: 'SessionOpenCanvas' },
+  { name: 'SessionCanvasRequest' },
+  { name: 'CanvasRequestTarget' },
+  { name: 'ClientCanvasDeclaration' },
+  { name: 'CanvasError' },
+  { name: 'CanvasOpenResult' },
+  { name: 'CanvasActionResult' },
+  { name: 'CanvasCloseResult' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -948,6 +960,17 @@ const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
     { variantName: 'Mcp', innerType: 'ToolCallMcpContributor', wireValue: 'mcp' },
   ],
   unknown: true,
+};
+
+const CANVAS_REQUEST_RESULT_UNION: UnionConfig = {
+  name: 'CanvasRequestResult',
+  discriminantField: 'kind',
+  doc: 'CanvasRequestResult is the successful result of a canvas open, action, or close request.',
+  variants: [
+    { variantName: 'Open', innerType: 'CanvasOpenResult', wireValue: 'open' },
+    { variantName: 'Action', innerType: 'CanvasActionResult', wireValue: 'action' },
+    { variantName: 'Close', innerType: 'CanvasCloseResult', wireValue: 'close' },
+  ],
 };
 
 function generateChatOriginGo(): string {
@@ -1192,6 +1215,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
+  lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1255,6 +1280,14 @@ const ACTION_VARIANTS: {
   { type: 'session/mcpServerStateChanged', variantName: 'SessionMcpServerStateChanged', tsInterface: 'SessionMcpServerStateChangedAction' },
   { type: 'session/configChanged', variantName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', variantName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
+  { type: 'session/canvasRegistryChanged', variantName: 'SessionCanvasRegistryChanged', tsInterface: 'SessionCanvasRegistryChangedAction' },
+  { type: 'session/canvasInstanceOpened', variantName: 'SessionCanvasInstanceOpened', tsInterface: 'SessionCanvasInstanceOpenedAction' },
+  { type: 'session/canvasInstanceUpdated', variantName: 'SessionCanvasInstanceUpdated', tsInterface: 'SessionCanvasInstanceUpdatedAction' },
+  { type: 'session/canvasInstanceClosed', variantName: 'SessionCanvasInstanceClosed', tsInterface: 'SessionCanvasInstanceClosedAction' },
+  { type: 'session/canvasInstanceCloseRequested', variantName: 'SessionCanvasInstanceCloseRequested', tsInterface: 'SessionCanvasInstanceCloseRequestedAction' },
+  { type: 'session/canvasRequestCreated', variantName: 'SessionCanvasRequestCreated', tsInterface: 'SessionCanvasRequestCreatedAction' },
+  { type: 'session/canvasRequestCompleted', variantName: 'SessionCanvasRequestCompleted', tsInterface: 'SessionCanvasRequestCompletedAction' },
+  { type: 'session/canvasRequestCancelled', variantName: 'SessionCanvasRequestCancelled', tsInterface: 'SessionCanvasRequestCancelledAction' },
   { type: 'changeset/statusChanged', variantName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
   { type: 'changeset/fileSet', variantName: 'ChangesetFileSet', tsInterface: 'ChangesetFileSetAction' },
   { type: 'changeset/fileRemoved', variantName: 'ChangesetFileRemoved', tsInterface: 'ChangesetFileRemovedAction' },
@@ -1884,6 +1917,7 @@ function checkExhaustiveness(project: Project): void {
     'CustomizationLoadState',
     'McpServerState',
     'ToolCallContributor',
+    'CanvasRequestResult',
     'ReconnectResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',

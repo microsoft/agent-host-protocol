@@ -69,6 +69,9 @@ fn session_state(title: &str, resource: &str) -> SessionState {
         default_chat: None,
         config: None,
         customizations: None,
+        canvas_registry: None,
+        open_canvases: None,
+        canvas_requests: None,
         changesets: None,
         meta: None,
     }

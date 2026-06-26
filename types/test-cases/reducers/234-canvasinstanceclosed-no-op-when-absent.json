@@ -1,0 +1,76 @@
+{
+  "description": "session/canvasInstanceClosed is a no-op when the instance is in neither list",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "openCanvases": [
+      {
+        "instanceId": "i-2",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready"
+      }
+    ],
+    "canvasRequests": [
+      {
+        "requestId": "r-2",
+        "kind": "open",
+        "instanceId": "i-2",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "target": {
+          "kind": "server"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/canvasInstanceClosed",
+      "instanceId": "i-1"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "openCanvases": [
+      {
+        "instanceId": "i-2",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready"
+      }
+    ],
+    "canvasRequests": [
+      {
+        "requestId": "r-2",
+        "kind": "open",
+        "instanceId": "i-2",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "target": {
+          "kind": "server"
+        }
+      }
+    ]
+  }
+}

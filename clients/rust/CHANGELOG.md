@@ -23,6 +23,8 @@ matching `## [X.Y.Z]` heading is missing from this file.
   for lightweight session-list presentation hints.
 - `StateAction::SessionActiveClientRemoved` (`SessionActiveClientRemovedAction`)
   to release a single active client by `client_id`.
+- Canvas surface — `SessionState::canvas_registry`, `SessionState::open_canvases`, and `SessionState::canvas_requests`, plus `SessionActiveClient::canvas_providers` and `SessionActiveClient::can_render_canvases`, for declared, instanced, agent-openable UI surfaces.
+- Eight `StateAction` canvas variants — `SessionCanvasRegistryChanged`, `SessionCanvasInstanceOpened`, `SessionCanvasInstanceUpdated`, `SessionCanvasInstanceClosed`, `SessionCanvasInstanceCloseRequested`, `SessionCanvasRequestCreated`, `SessionCanvasRequestCompleted`, and `SessionCanvasRequestCancelled` — with matching `session_reducer` arms.
 - `ahp-ws` TLS backend is now selectable via Cargo features: `native-tls`,
   `rustls-tls-native-roots` (default), and `rustls-tls-webpki-roots`. The crate
   no longer forces `tokio-tungstenite/native-tls` onto the dependency graph, so

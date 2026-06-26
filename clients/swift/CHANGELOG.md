@@ -26,6 +26,8 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 - `SessionActiveClientRemovedAction` (`StateAction.sessionActiveClientRemoved`,
   wire `session/activeClientRemoved`) to release a single active client by
   `clientId`.
+- Canvas surface — `SessionState.canvasRegistry`, `SessionState.openCanvases`, and `SessionState.canvasRequests`, plus `SessionActiveClient.canvasProviders` and `SessionActiveClient.canRenderCanvases`, for declared, instanced, agent-openable UI surfaces.
+- Eight canvas actions (wire `session/canvas*`): `StateAction.sessionCanvasRegistryChanged`, `.sessionCanvasInstanceOpened`, `.sessionCanvasInstanceUpdated`, `.sessionCanvasInstanceClosed`, `.sessionCanvasInstanceCloseRequested`, `.sessionCanvasRequestCreated`, `.sessionCanvasRequestCompleted`, and `.sessionCanvasRequestCancelled`, applied by the session reducer.
 
 ### Changed
 

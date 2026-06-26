@@ -1,0 +1,74 @@
+{
+  "description": "session/canvasRequestCompleted removes the correlated request",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "canvasRequests": [
+      {
+        "requestId": "r-1",
+        "kind": "open",
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "target": {
+          "kind": "server"
+        }
+      },
+      {
+        "requestId": "r-2",
+        "kind": "open",
+        "instanceId": "i-2",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "target": {
+          "kind": "server"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/canvasRequestCompleted",
+      "requestId": "r-1",
+      "result": {
+        "kind": "open",
+        "url": "https://example/report"
+      }
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "canvasRequests": [
+      {
+        "requestId": "r-2",
+        "kind": "open",
+        "instanceId": "i-2",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "target": {
+          "kind": "server"
+        }
+      }
+    ]
+  }
+}

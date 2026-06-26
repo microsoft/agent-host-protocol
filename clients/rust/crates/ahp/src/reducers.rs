@@ -755,6 +755,117 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             }
             ReduceOutcome::NoOp
         }
+        StateAction::SessionCanvasRegistryChanged(a) => {
+            state.canvas_registry = Some(a.canvases.clone());
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasInstanceOpened(a) => {
+            let list = state.open_canvases.get_or_insert_with(Vec::new);
+            if let Some(idx) = list
+                .iter()
+                .position(|c| c.instance_id == a.instance.instance_id)
+            {
+                list[idx] = a.instance.clone();
+            } else {
+                list.push(a.instance.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasInstanceUpdated(a) => {
+            let Some(list) = state.open_canvases.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = list.iter().position(|c| c.instance_id == a.instance_id) else {
+                return ReduceOutcome::NoOp;
+            };
+            let entry = &mut list[idx];
+            if let Some(title) = &a.title {
+                entry.title = Some(title.clone());
+            }
+            if let Some(status) = &a.status {
+                entry.status = Some(status.clone());
+            }
+            if let Some(url) = &a.url {
+                entry.url = Some(url.clone());
+            }
+            if let Some(availability) = &a.availability {
+                entry.availability = *availability;
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasInstanceClosed(a) => {
+            let had_open = state
+                .open_canvases
+                .as_ref()
+                .is_some_and(|list| list.iter().any(|c| c.instance_id == a.instance_id));
+            let had_request = state
+                .canvas_requests
+                .as_ref()
+                .is_some_and(|list| list.iter().any(|r| r.instance_id == a.instance_id));
+            if !had_open && !had_request {
+                return ReduceOutcome::NoOp;
+            }
+            if had_open {
+                if let Some(list) = state.open_canvases.as_mut() {
+                    list.retain(|c| c.instance_id != a.instance_id);
+                    if list.is_empty() {
+                        state.open_canvases = None;
+                    }
+                }
+            }
+            if had_request {
+                if let Some(list) = state.canvas_requests.as_mut() {
+                    list.retain(|r| r.instance_id != a.instance_id);
+                    if list.is_empty() {
+                        state.canvas_requests = None;
+                    }
+                }
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasInstanceCloseRequested(_a) => {
+            // Pure client-to-host signal: the host drives the actual close and
+            // ultimately a `session/canvasInstanceClosed`.
+            ReduceOutcome::NoOp
+        }
+        StateAction::SessionCanvasRequestCreated(a) => {
+            let list = state.canvas_requests.get_or_insert_with(Vec::new);
+            if let Some(idx) = list
+                .iter()
+                .position(|r| r.request_id == a.request.request_id)
+            {
+                list[idx] = a.request.clone();
+            } else {
+                list.push(a.request.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasRequestCompleted(a) => {
+            let Some(list) = state.canvas_requests.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            if !list.iter().any(|r| r.request_id == a.request_id) {
+                return ReduceOutcome::NoOp;
+            }
+            list.retain(|r| r.request_id != a.request_id);
+            if list.is_empty() {
+                state.canvas_requests = None;
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasRequestCancelled(a) => {
+            let Some(list) = state.canvas_requests.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            if !list.iter().any(|r| r.request_id == a.request_id) {
+                return ReduceOutcome::NoOp;
+            }
+            list.retain(|r| r.request_id != a.request_id);
+            if list.is_empty() {
+                state.canvas_requests = None;
+            }
+            ReduceOutcome::Applied
+        }
         _ => ReduceOutcome::OutOfScope,
     }
 }
@@ -1577,6 +1688,9 @@ mod tests {
             default_chat: None,
             config: None,
             customizations: None,
+            canvas_registry: None,
+            open_canvases: None,
+            canvas_requests: None,
             changesets: None,
             meta: None,
         }

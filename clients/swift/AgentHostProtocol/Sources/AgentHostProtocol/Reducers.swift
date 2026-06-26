@@ -661,6 +661,80 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         }
         return state
 
+    case .sessionCanvasRegistryChanged(let a):
+        var next = state
+        next.canvasRegistry = a.canvases
+        return next
+
+    case .sessionCanvasInstanceOpened(let a):
+        var list = state.openCanvases ?? []
+        if let idx = list.firstIndex(where: { $0.instanceId == a.instance.instanceId }) {
+            list[idx] = a.instance
+        } else {
+            list.append(a.instance)
+        }
+        var next = state
+        next.openCanvases = list
+        return next
+
+    case .sessionCanvasInstanceUpdated(let a):
+        guard var list = state.openCanvases else { return state }
+        guard let idx = list.firstIndex(where: { $0.instanceId == a.instanceId }) else { return state }
+        var inst = list[idx]
+        if let title = a.title { inst.title = title }
+        if let status = a.status { inst.status = status }
+        if let url = a.url { inst.url = url }
+        if let availability = a.availability { inst.availability = availability }
+        list[idx] = inst
+        var next = state
+        next.openCanvases = list
+        return next
+
+    case .sessionCanvasInstanceClosed(let a):
+        let hadOpen = state.openCanvases?.contains(where: { $0.instanceId == a.instanceId }) ?? false
+        let hadRequest = state.canvasRequests?.contains(where: { $0.instanceId == a.instanceId }) ?? false
+        guard hadOpen || hadRequest else { return state }
+        var next = state
+        if hadOpen, let list = state.openCanvases {
+            let remaining = list.filter { $0.instanceId != a.instanceId }
+            next.openCanvases = remaining.isEmpty ? nil : remaining
+        }
+        if hadRequest, let list = state.canvasRequests {
+            let remaining = list.filter { $0.instanceId != a.instanceId }
+            next.canvasRequests = remaining.isEmpty ? nil : remaining
+        }
+        return next
+
+    case .sessionCanvasInstanceCloseRequested:
+        return state
+
+    case .sessionCanvasRequestCreated(let a):
+        var list = state.canvasRequests ?? []
+        if let idx = list.firstIndex(where: { $0.requestId == a.request.requestId }) {
+            list[idx] = a.request
+        } else {
+            list.append(a.request)
+        }
+        var next = state
+        next.canvasRequests = list
+        return next
+
+    case .sessionCanvasRequestCompleted(let a):
+        guard var list = state.canvasRequests else { return state }
+        guard let idx = list.firstIndex(where: { $0.requestId == a.requestId }) else { return state }
+        list.remove(at: idx)
+        var next = state
+        next.canvasRequests = list.isEmpty ? nil : list
+        return next
+
+    case .sessionCanvasRequestCancelled(let a):
+        guard var list = state.canvasRequests else { return state }
+        guard let idx = list.firstIndex(where: { $0.requestId == a.requestId }) else { return state }
+        list.remove(at: idx)
+        var next = state
+        next.canvasRequests = list.isEmpty ? nil : list
+        return next
+
     default:
         return state
     }

@@ -53,6 +53,14 @@ public enum ActionType: String, Codable, Sendable {
     case sessionChangesetsChanged = "session/changesetsChanged"
     case sessionConfigChanged = "session/configChanged"
     case sessionMetaChanged = "session/metaChanged"
+    case sessionCanvasRegistryChanged = "session/canvasRegistryChanged"
+    case sessionCanvasInstanceOpened = "session/canvasInstanceOpened"
+    case sessionCanvasInstanceUpdated = "session/canvasInstanceUpdated"
+    case sessionCanvasInstanceClosed = "session/canvasInstanceClosed"
+    case sessionCanvasInstanceCloseRequested = "session/canvasInstanceCloseRequested"
+    case sessionCanvasRequestCreated = "session/canvasRequestCreated"
+    case sessionCanvasRequestCompleted = "session/canvasRequestCompleted"
+    case sessionCanvasRequestCancelled = "session/canvasRequestCancelled"
     case changesetStatusChanged = "changeset/statusChanged"
     case changesetFileSet = "changeset/fileSet"
     case changesetFileRemoved = "changeset/fileRemoved"
@@ -1254,6 +1262,146 @@ public struct SessionMetaChangedAction: Codable, Sendable {
     }
 }
 
+public struct SessionCanvasRegistryChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Full replacement of `state.canvasRegistry`.
+    public var canvases: [SessionCanvasDeclaration]
+
+    public init(
+        type: ActionType,
+        canvases: [SessionCanvasDeclaration]
+    ) {
+        self.type = type
+        self.canvases = canvases
+    }
+}
+
+public struct SessionCanvasInstanceOpenedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Full instance, upserted into `state.openCanvases` by `instanceId`.
+    public var instance: SessionOpenCanvas
+
+    public init(
+        type: ActionType,
+        instance: SessionOpenCanvas
+    ) {
+        self.type = type
+        self.instance = instance
+    }
+}
+
+public struct SessionCanvasInstanceUpdatedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The instance to update.
+    public var instanceId: String
+    /// New display title, when changed.
+    public var title: String?
+    /// New status text, when changed.
+    public var status: String?
+    /// New render URL, when changed.
+    public var url: String?
+    /// New routing availability, when changed.
+    public var availability: CanvasInstanceAvailability?
+
+    public init(
+        type: ActionType,
+        instanceId: String,
+        title: String? = nil,
+        status: String? = nil,
+        url: String? = nil,
+        availability: CanvasInstanceAvailability? = nil
+    ) {
+        self.type = type
+        self.instanceId = instanceId
+        self.title = title
+        self.status = status
+        self.url = url
+        self.availability = availability
+    }
+}
+
+public struct SessionCanvasInstanceClosedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The instance to close.
+    public var instanceId: String
+
+    public init(
+        type: ActionType,
+        instanceId: String
+    ) {
+        self.type = type
+        self.instanceId = instanceId
+    }
+}
+
+public struct SessionCanvasInstanceCloseRequestedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The instance the client wants closed.
+    public var instanceId: String
+
+    public init(
+        type: ActionType,
+        instanceId: String
+    ) {
+        self.type = type
+        self.instanceId = instanceId
+    }
+}
+
+public struct SessionCanvasRequestCreatedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The in-flight request.
+    public var request: SessionCanvasRequest
+
+    public init(
+        type: ActionType,
+        request: SessionCanvasRequest
+    ) {
+        self.type = type
+        self.request = request
+    }
+}
+
+public struct SessionCanvasRequestCompletedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The request being completed.
+    public var requestId: String
+    /// Success payload. Mutually exclusive with `error`.
+    public var result: CanvasRequestResult?
+    /// Failure payload. Mutually exclusive with `result`.
+    public var error: CanvasError?
+
+    public init(
+        type: ActionType,
+        requestId: String,
+        result: CanvasRequestResult? = nil,
+        error: CanvasError? = nil
+    ) {
+        self.type = type
+        self.requestId = requestId
+        self.result = result
+        self.error = error
+    }
+}
+
+public struct SessionCanvasRequestCancelledAction: Codable, Sendable {
+    public var type: ActionType
+    /// The request being abandoned.
+    public var requestId: String
+    /// Why the host gave up.
+    public var reason: CanvasRequestCancelReason
+
+    public init(
+        type: ActionType,
+        requestId: String,
+        reason: CanvasRequestCancelReason
+    ) {
+        self.type = type
+        self.requestId = requestId
+        self.reason = reason
+    }
+}
+
 public struct ChangesetStatusChangedAction: Codable, Sendable {
     public var type: ActionType
     /// New computation lifecycle status.
@@ -1792,6 +1940,14 @@ public enum StateAction: Codable, Sendable {
     case chatTruncated(ChatTruncatedAction)
     case sessionConfigChanged(SessionConfigChangedAction)
     case sessionMetaChanged(SessionMetaChangedAction)
+    case sessionCanvasRegistryChanged(SessionCanvasRegistryChangedAction)
+    case sessionCanvasInstanceOpened(SessionCanvasInstanceOpenedAction)
+    case sessionCanvasInstanceUpdated(SessionCanvasInstanceUpdatedAction)
+    case sessionCanvasInstanceClosed(SessionCanvasInstanceClosedAction)
+    case sessionCanvasInstanceCloseRequested(SessionCanvasInstanceCloseRequestedAction)
+    case sessionCanvasRequestCreated(SessionCanvasRequestCreatedAction)
+    case sessionCanvasRequestCompleted(SessionCanvasRequestCompletedAction)
+    case sessionCanvasRequestCancelled(SessionCanvasRequestCancelledAction)
     case changesetStatusChanged(ChangesetStatusChangedAction)
     case changesetFileSet(ChangesetFileSetAction)
     case changesetFileRemoved(ChangesetFileRemovedAction)
@@ -1924,6 +2080,22 @@ public enum StateAction: Codable, Sendable {
             self = .sessionConfigChanged(try SessionConfigChangedAction(from: decoder))
         case "session/metaChanged":
             self = .sessionMetaChanged(try SessionMetaChangedAction(from: decoder))
+        case "session/canvasRegistryChanged":
+            self = .sessionCanvasRegistryChanged(try SessionCanvasRegistryChangedAction(from: decoder))
+        case "session/canvasInstanceOpened":
+            self = .sessionCanvasInstanceOpened(try SessionCanvasInstanceOpenedAction(from: decoder))
+        case "session/canvasInstanceUpdated":
+            self = .sessionCanvasInstanceUpdated(try SessionCanvasInstanceUpdatedAction(from: decoder))
+        case "session/canvasInstanceClosed":
+            self = .sessionCanvasInstanceClosed(try SessionCanvasInstanceClosedAction(from: decoder))
+        case "session/canvasInstanceCloseRequested":
+            self = .sessionCanvasInstanceCloseRequested(try SessionCanvasInstanceCloseRequestedAction(from: decoder))
+        case "session/canvasRequestCreated":
+            self = .sessionCanvasRequestCreated(try SessionCanvasRequestCreatedAction(from: decoder))
+        case "session/canvasRequestCompleted":
+            self = .sessionCanvasRequestCompleted(try SessionCanvasRequestCompletedAction(from: decoder))
+        case "session/canvasRequestCancelled":
+            self = .sessionCanvasRequestCancelled(try SessionCanvasRequestCancelledAction(from: decoder))
         case "changeset/statusChanged":
             self = .changesetStatusChanged(try ChangesetStatusChangedAction(from: decoder))
         case "changeset/fileSet":
@@ -2030,6 +2202,14 @@ public enum StateAction: Codable, Sendable {
         case .chatTruncated(let v): try v.encode(to: encoder)
         case .sessionConfigChanged(let v): try v.encode(to: encoder)
         case .sessionMetaChanged(let v): try v.encode(to: encoder)
+        case .sessionCanvasRegistryChanged(let v): try v.encode(to: encoder)
+        case .sessionCanvasInstanceOpened(let v): try v.encode(to: encoder)
+        case .sessionCanvasInstanceUpdated(let v): try v.encode(to: encoder)
+        case .sessionCanvasInstanceClosed(let v): try v.encode(to: encoder)
+        case .sessionCanvasInstanceCloseRequested(let v): try v.encode(to: encoder)
+        case .sessionCanvasRequestCreated(let v): try v.encode(to: encoder)
+        case .sessionCanvasRequestCompleted(let v): try v.encode(to: encoder)
+        case .sessionCanvasRequestCancelled(let v): try v.encode(to: encoder)
         case .changesetStatusChanged(let v): try v.encode(to: encoder)
         case .changesetFileSet(let v): try v.encode(to: encoder)
         case .changesetFileRemoved(let v): try v.encode(to: encoder)

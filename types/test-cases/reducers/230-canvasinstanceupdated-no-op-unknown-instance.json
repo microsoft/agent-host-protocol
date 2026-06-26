@@ -1,0 +1,53 @@
+{
+  "description": "session/canvasInstanceUpdated for an unknown instanceId is a no-op",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "openCanvases": [
+      {
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/canvasInstanceUpdated",
+      "instanceId": "i-zzz",
+      "title": "x"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "openCanvases": [
+      {
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready"
+      }
+    ]
+  }
+}

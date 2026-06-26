@@ -30,6 +30,14 @@ import type {
   SessionChangesetsChangedAction,
   SessionConfigChangedAction,
   SessionMetaChangedAction,
+  SessionCanvasRegistryChangedAction,
+  SessionCanvasInstanceOpenedAction,
+  SessionCanvasInstanceUpdatedAction,
+  SessionCanvasInstanceClosedAction,
+  SessionCanvasInstanceCloseRequestedAction,
+  SessionCanvasRequestCreatedAction,
+  SessionCanvasRequestCompletedAction,
+  SessionCanvasRequestCancelledAction,
   ChatTurnStartedAction,
   ChatDeltaAction,
   ChatResponsePartAction,
@@ -127,6 +135,14 @@ export type SessionAction =
   | SessionChangesetsChangedAction
   | SessionConfigChangedAction
   | SessionMetaChangedAction
+  | SessionCanvasRegistryChangedAction
+  | SessionCanvasInstanceOpenedAction
+  | SessionCanvasInstanceUpdatedAction
+  | SessionCanvasInstanceClosedAction
+  | SessionCanvasInstanceCloseRequestedAction
+  | SessionCanvasRequestCreatedAction
+  | SessionCanvasRequestCompletedAction
+  | SessionCanvasRequestCancelledAction
 ;
 
 /** Union of session actions that clients may dispatch. */
@@ -140,6 +156,8 @@ export type ClientSessionAction =
   | SessionIsReadChangedAction
   | SessionIsArchivedChangedAction
   | SessionConfigChangedAction
+  | SessionCanvasInstanceCloseRequestedAction
+  | SessionCanvasRequestCompletedAction
 ;
 
 /** Union of session actions that only the server may produce. */
@@ -158,6 +176,12 @@ export type ServerSessionAction =
   | SessionActivityChangedAction
   | SessionChangesetsChangedAction
   | SessionMetaChangedAction
+  | SessionCanvasRegistryChangedAction
+  | SessionCanvasInstanceOpenedAction
+  | SessionCanvasInstanceUpdatedAction
+  | SessionCanvasInstanceClosedAction
+  | SessionCanvasRequestCreatedAction
+  | SessionCanvasRequestCancelledAction
 ;
 
 /** Union of all chat-scoped actions. */
@@ -349,6 +373,14 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionChangesetsChanged]: false,
   [ActionType.SessionConfigChanged]: true,
   [ActionType.SessionMetaChanged]: false,
+  [ActionType.SessionCanvasRegistryChanged]: false,
+  [ActionType.SessionCanvasInstanceOpened]: false,
+  [ActionType.SessionCanvasInstanceUpdated]: false,
+  [ActionType.SessionCanvasInstanceClosed]: false,
+  [ActionType.SessionCanvasInstanceCloseRequested]: true,
+  [ActionType.SessionCanvasRequestCreated]: false,
+  [ActionType.SessionCanvasRequestCompleted]: true,
+  [ActionType.SessionCanvasRequestCancelled]: false,
   [ActionType.ChatTurnStarted]: true,
   [ActionType.ChatDelta]: false,
   [ActionType.ChatResponsePart]: false,

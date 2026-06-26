@@ -14,7 +14,7 @@ Multiple session channels may be active simultaneously. Clients subscribe to eac
 
 ## State
 
-Subscribers receive a [`SessionState`](/reference/session#sessionstate) snapshot containing the session summary, lifecycle phase, the catalog of [`chats`](/reference/session#sessionstate) belonging to this session, the optional [`defaultChat`](/reference/session#sessionstate) routing hint, model and active-client state, customizations, changesets, and per-session configuration. Per-conversation state (turns, streaming, tool calls, pending messages, input requests) lives on the [chat channel](./chat-channel). Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`SessionState`](/reference/session#sessionstate) snapshot containing the session summary, lifecycle phase, the catalog of [`chats`](/reference/session#sessionstate) belonging to this session, the optional [`defaultChat`](/reference/session#sessionstate) routing hint, model and active-client state, customizations, changesets, [canvases](/guide/canvases) (the registry of declared surfaces, open instances, and in-flight provider requests), and per-session configuration. Per-conversation state (turns, streaming, tool calls, pending messages, input requests) lives on the [chat channel](./chat-channel). Refer to the [State Model guide](/guide/state-model) for a structural overview.
 
 ## Lifecycle
 
@@ -101,7 +101,7 @@ session URI (`ahp-session:/<uuid>`).
 
 | Method | Kind | Meaning |
 |---|---|---|
-| `action` | server → client notification | Session action envelope (`session/*` action payloads — catalog updates, lifecycle, model/agent, customizations, changesets). |
+| `action` | server → client notification | Session action envelope (`session/*` action payloads — catalog updates, lifecycle, model/agent, customizations, changesets, canvases). |
 | `dispatchAction` | client → server notification | Dispatch client actions on this session (`session/modelChanged`, `session/defaultChatChanged`, ...). |
 | `unsubscribe` | client → server notification | Stop receiving messages for this session channel. |
 
@@ -119,6 +119,8 @@ When the server receives a client-dispatched action on this channel, it MUST val
 | `session/modelChanged`                        | A turn is currently active in any chat in this session                                                                     | Server MUST defer the model change until every active turn completes, then apply it for next turns  |
 | `session/agentChanged`                        | A turn is currently active in any chat in this session                                                                     | Server MUST defer the agent change until every active turn completes, then apply it for next turns  |
 | `session/defaultChatChanged`                  | `defaultChat` URI does not match an entry in the session's chat catalog                                                    | Server MUST reject the action                                                                       |
+| `session/canvasInstanceCloseRequested`        | `instanceId` does not match an open canvas, or the dispatching client does not own the instance's `renderer` binding       | Server MUST reject the action                                                                       |
+| `session/canvasRequestCompleted`              | `requestId` does not match an in-flight request whose `target` is the dispatching client (`target.kind = 'activeClient'`, `target.clientId` = the client) | Server MUST reject the action                                              |
 
 Turn-, tool-call-, input-request-, and pending-message-level validation lives on the [Chat Channel](./chat-channel#server-validation-of-client-actions).
 

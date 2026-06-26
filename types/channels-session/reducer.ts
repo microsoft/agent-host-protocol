@@ -8,6 +8,7 @@ import { ActionType } from '../common/actions.js';
 import type {
   SessionState,
   McpServerCustomization,
+  SessionOpenCanvas,
 } from './state.js';
 import {
   SessionLifecycle,
@@ -297,6 +298,131 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
         return state;
       }
       return { ...state, customizations: updated };
+    }
+
+    // ── Canvases ─────────────────────────────────────────────────────────
+
+    case ActionType.SessionCanvasRegistryChanged:
+      return { ...state, canvasRegistry: action.canvases };
+
+    case ActionType.SessionCanvasInstanceOpened: {
+      const list = state.openCanvases ?? [];
+      const idx = list.findIndex(c => c.instanceId === action.instance.instanceId);
+      if (idx < 0) {
+        return { ...state, openCanvases: [...list, action.instance] };
+      }
+      const updated = list.slice();
+      updated[idx] = action.instance;
+      return { ...state, openCanvases: updated };
+    }
+
+    case ActionType.SessionCanvasInstanceUpdated: {
+      const list = state.openCanvases;
+      if (!list) {
+        return state;
+      }
+      const idx = list.findIndex(c => c.instanceId === action.instanceId);
+      if (idx < 0) {
+        return state;
+      }
+      const merged: SessionOpenCanvas = { ...list[idx] };
+      if (action.title !== undefined) {
+        merged.title = action.title;
+      }
+      if (action.status !== undefined) {
+        merged.status = action.status;
+      }
+      if (action.url !== undefined) {
+        merged.url = action.url;
+      }
+      if (action.availability !== undefined) {
+        merged.availability = action.availability;
+      }
+      const next = list.slice();
+      next[idx] = merged;
+      return { ...state, openCanvases: next };
+    }
+
+    case ActionType.SessionCanvasInstanceClosed: {
+      const openList = state.openCanvases;
+      const requestList = state.canvasRequests;
+      const hadOpen = openList?.some(c => c.instanceId === action.instanceId) ?? false;
+      const hadRequest = requestList?.some(r => r.instanceId === action.instanceId) ?? false;
+      if (!hadOpen && !hadRequest) {
+        return state;
+      }
+      const next: SessionState = { ...state };
+      if (openList && hadOpen) {
+        const remaining = openList.filter(c => c.instanceId !== action.instanceId);
+        if (remaining.length > 0) {
+          next.openCanvases = remaining;
+        } else {
+          delete next.openCanvases;
+        }
+      }
+      if (requestList && hadRequest) {
+        const remaining = requestList.filter(r => r.instanceId !== action.instanceId);
+        if (remaining.length > 0) {
+          next.canvasRequests = remaining;
+        } else {
+          delete next.canvasRequests;
+        }
+      }
+      return next;
+    }
+
+    case ActionType.SessionCanvasInstanceCloseRequested:
+      // Pure client-to-host signal: the host responds by driving the
+      // provider-facing close and ultimately a `canvasInstanceClosed`.
+      return state;
+
+    case ActionType.SessionCanvasRequestCreated: {
+      const list = state.canvasRequests ?? [];
+      const idx = list.findIndex(r => r.requestId === action.request.requestId);
+      if (idx < 0) {
+        return { ...state, canvasRequests: [...list, action.request] };
+      }
+      const updated = list.slice();
+      updated[idx] = action.request;
+      return { ...state, canvasRequests: updated };
+    }
+
+    case ActionType.SessionCanvasRequestCompleted: {
+      const list = state.canvasRequests;
+      if (!list) {
+        return state;
+      }
+      const idx = list.findIndex(r => r.requestId === action.requestId);
+      if (idx < 0) {
+        return state;
+      }
+      const remaining = list.filter(r => r.requestId !== action.requestId);
+      const next: SessionState = { ...state };
+      if (remaining.length > 0) {
+        next.canvasRequests = remaining;
+      } else {
+        delete next.canvasRequests;
+      }
+      return next;
+    }
+
+    case ActionType.SessionCanvasRequestCancelled: {
+      const list = state.canvasRequests;
+      if (!list) {
+        return state;
+      }
+      const idx = list.findIndex(r => r.requestId === action.requestId);
+      if (idx < 0) {
+        return state;
+      }
+      const remaining = list.filter(r => r.requestId !== action.requestId);
+      const next: SessionState = { ...state };
+      if (remaining.length > 0) {
+        next.canvasRequests = remaining;
+      } else {
+        delete next.canvasRequests;
+      }
+      return next;
     }
 
     default:

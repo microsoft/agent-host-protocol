@@ -1,0 +1,56 @@
+{
+  "description": "session/canvasInstanceUpdated with no optional fields preserves the instance",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "openCanvases": [
+      {
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready",
+        "title": "keep",
+        "status": "idle"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/canvasInstanceUpdated",
+      "instanceId": "i-1"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": [],
+    "openCanvases": [
+      {
+        "instanceId": "i-1",
+        "canvasId": "preview",
+        "extensionId": "ext.a",
+        "availability": "ready",
+        "title": "keep",
+        "status": "idle"
+      }
+    ]
+  }
+}

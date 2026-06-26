@@ -39,6 +39,14 @@ import type {
   SessionChangesetsChangedAction,
   SessionConfigChangedAction,
   SessionMetaChangedAction,
+  SessionCanvasRegistryChangedAction,
+  SessionCanvasInstanceOpenedAction,
+  SessionCanvasInstanceUpdatedAction,
+  SessionCanvasInstanceClosedAction,
+  SessionCanvasInstanceCloseRequestedAction,
+  SessionCanvasRequestCreatedAction,
+  SessionCanvasRequestCompletedAction,
+  SessionCanvasRequestCancelledAction,
 } from '../channels-session/actions.js';
 
 import type {
@@ -157,6 +165,14 @@ export const enum ActionType {
   SessionChangesetsChanged = 'session/changesetsChanged',
   SessionConfigChanged = 'session/configChanged',
   SessionMetaChanged = 'session/metaChanged',
+  SessionCanvasRegistryChanged = 'session/canvasRegistryChanged',
+  SessionCanvasInstanceOpened = 'session/canvasInstanceOpened',
+  SessionCanvasInstanceUpdated = 'session/canvasInstanceUpdated',
+  SessionCanvasInstanceClosed = 'session/canvasInstanceClosed',
+  SessionCanvasInstanceCloseRequested = 'session/canvasInstanceCloseRequested',
+  SessionCanvasRequestCreated = 'session/canvasRequestCreated',
+  SessionCanvasRequestCompleted = 'session/canvasRequestCompleted',
+  SessionCanvasRequestCancelled = 'session/canvasRequestCancelled',
   ChangesetStatusChanged = 'changeset/statusChanged',
   ChangesetFileSet = 'changeset/fileSet',
   ChangesetFileRemoved = 'changeset/fileRemoved',
@@ -246,6 +262,14 @@ export type StateAction =
   | SessionChangesetsChangedAction
   | SessionConfigChangedAction
   | SessionMetaChangedAction
+  | SessionCanvasRegistryChangedAction
+  | SessionCanvasInstanceOpenedAction
+  | SessionCanvasInstanceUpdatedAction
+  | SessionCanvasInstanceClosedAction
+  | SessionCanvasInstanceCloseRequestedAction
+  | SessionCanvasRequestCreatedAction
+  | SessionCanvasRequestCompletedAction
+  | SessionCanvasRequestCancelledAction
   | ChatTurnStartedAction
   | ChatDeltaAction
   | ChatResponsePartAction

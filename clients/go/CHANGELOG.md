@@ -22,6 +22,8 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
   lightweight session-list presentation hints.
 - `SessionActiveClientRemovedAction` (wire `session/activeClientRemoved`) to
   release a single active client by `ClientId`.
+- Canvas surface — `SessionState.CanvasRegistry`, `SessionState.OpenCanvases`, and `SessionState.CanvasRequests`, plus `SessionActiveClient.CanvasProviders` and `SessionActiveClient.CanRenderCanvases`, for declared, instanced, agent-openable UI surfaces.
+- Eight canvas actions (wire `session/canvas*`): `SessionCanvasRegistryChangedAction`, `SessionCanvasInstanceOpenedAction`, `SessionCanvasInstanceUpdatedAction`, `SessionCanvasInstanceClosedAction`, `SessionCanvasInstanceCloseRequestedAction`, `SessionCanvasRequestCreatedAction`, `SessionCanvasRequestCompletedAction`, and `SessionCanvasRequestCancelledAction`, applied by `ApplyActionToSession`.
 
 ### Changed
 

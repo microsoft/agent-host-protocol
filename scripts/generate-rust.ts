@@ -659,6 +659,8 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'CanvasProviderKind', 'CanvasInstanceAvailability', 'CanvasRequestKind',
+  'CanvasRequestCancelReason',
 ];
 
 /**
@@ -794,6 +796,16 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
   { name: 'ResourceChange' },
+  { name: 'SessionCanvasAction' },
+  { name: 'SessionCanvasDeclaration' },
+  { name: 'SessionOpenCanvas' },
+  { name: 'SessionCanvasRequest' },
+  { name: 'CanvasRequestTarget' },
+  { name: 'ClientCanvasDeclaration' },
+  { name: 'CanvasError' },
+  { name: 'CanvasOpenResult', omitDiscriminants: true },
+  { name: 'CanvasActionResult', omitDiscriminants: true },
+  { name: 'CanvasCloseResult', omitDiscriminants: true },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -986,6 +998,17 @@ const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
   unknown: true,
 };
 
+const CANVAS_REQUEST_RESULT_UNION: UnionConfig = {
+  name: 'CanvasRequestResult',
+  discriminantField: 'kind',
+  doc: 'Successful result of a canvas open / action / close request.',
+  variants: [
+    { variantName: 'Open', innerType: 'CanvasOpenResult', wireValue: 'open' },
+    { variantName: 'Action', innerType: 'CanvasActionResult', wireValue: 'action' },
+    { variantName: 'Close', innerType: 'CanvasCloseResult', wireValue: 'close' },
+  ],
+};
+
 function generateChatOrigin(): string {
   return `/// How a chat came into existence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1100,6 +1123,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
+  lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
 
@@ -1164,6 +1189,14 @@ const ACTION_VARIANTS: {
   { type: 'chat/truncated', variantName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'session/configChanged', variantName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', variantName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
+  { type: 'session/canvasRegistryChanged', variantName: 'SessionCanvasRegistryChanged', tsInterface: 'SessionCanvasRegistryChangedAction' },
+  { type: 'session/canvasInstanceOpened', variantName: 'SessionCanvasInstanceOpened', tsInterface: 'SessionCanvasInstanceOpenedAction', boxed: true },
+  { type: 'session/canvasInstanceUpdated', variantName: 'SessionCanvasInstanceUpdated', tsInterface: 'SessionCanvasInstanceUpdatedAction' },
+  { type: 'session/canvasInstanceClosed', variantName: 'SessionCanvasInstanceClosed', tsInterface: 'SessionCanvasInstanceClosedAction' },
+  { type: 'session/canvasInstanceCloseRequested', variantName: 'SessionCanvasInstanceCloseRequested', tsInterface: 'SessionCanvasInstanceCloseRequestedAction' },
+  { type: 'session/canvasRequestCreated', variantName: 'SessionCanvasRequestCreated', tsInterface: 'SessionCanvasRequestCreatedAction', boxed: true },
+  { type: 'session/canvasRequestCompleted', variantName: 'SessionCanvasRequestCompleted', tsInterface: 'SessionCanvasRequestCompletedAction' },
+  { type: 'session/canvasRequestCancelled', variantName: 'SessionCanvasRequestCancelled', tsInterface: 'SessionCanvasRequestCancelledAction' },
   { type: 'changeset/statusChanged', variantName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
   { type: 'changeset/fileSet', variantName: 'ChangesetFileSet', tsInterface: 'ChangesetFileSetAction' },
   { type: 'changeset/fileRemoved', variantName: 'ChangesetFileRemoved', tsInterface: 'ChangesetFileRemovedAction' },
@@ -1226,7 +1259,7 @@ pub struct ${scope}ToolCallConfirmedAction {
 
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, CanvasError, CanvasInstanceAvailability, CanvasRequestCancelReason, CanvasRequestResult, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionCanvasDeclaration, SessionCanvasRequest, SessionOpenCanvas, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1752,6 +1785,7 @@ function checkExhaustiveness(project: Project): void {
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
+    'CanvasRequestResult',          // CANVAS_REQUEST_RESULT_UNION discriminated union
     'ReconnectResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',

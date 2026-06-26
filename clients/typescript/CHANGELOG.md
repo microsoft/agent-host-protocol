@@ -29,6 +29,8 @@ hotfix escape hatch.
 - Exported `JsonPrimitive` type alias (`string | number | boolean | null`).
 - `SessionActiveClientRemovedAction` (`session/activeClientRemoved`) to release
   a single active client by `clientId`.
+- Canvas surface — `SessionState.canvasRegistry`, `SessionState.openCanvases`, and `SessionState.canvasRequests`, plus `SessionActiveClient.canvasProviders` and `SessionActiveClient.canRenderCanvases`, for declared, instanced, agent-openable UI surfaces.
+- Eight canvas actions (`session/canvas*`): `SessionCanvasRegistryChangedAction`, `SessionCanvasInstanceOpenedAction`, `SessionCanvasInstanceUpdatedAction`, `SessionCanvasInstanceClosedAction`, `SessionCanvasInstanceCloseRequestedAction`, `SessionCanvasRequestCreatedAction`, `SessionCanvasRequestCompletedAction`, and `SessionCanvasRequestCancelledAction`, applied by `sessionReducer`.
 
 ### Changed
 

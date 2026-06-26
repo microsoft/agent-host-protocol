@@ -122,6 +122,39 @@ export interface SessionState {
    */
   changesets?: Changeset[];
   /**
+   * Aggregated registry of canvases currently exposed to the agent.
+   *
+   * Full-replacement: when this changes, the entire array is republished
+   * via `session/canvasRegistryChanged`. The host derives it from every
+   * active canvas provider attached to the session — server-side
+   * ({@link CanvasProviderKind.Server}) and active-client
+   * ({@link CanvasProviderKind.ActiveClient}, contributed via
+   * {@link SessionActiveClient.canvasProviders}). See
+   * {@link /guide/canvases | Canvases} for the model.
+   */
+  canvasRegistry?: SessionCanvasDeclaration[];
+  /**
+   * Snapshot of every canvas instance currently open for this session.
+   *
+   * Maintained via `session/canvasInstanceOpened` (upsert),
+   * `session/canvasInstanceUpdated` (partial merge), and
+   * `session/canvasInstanceClosed` (remove). Subscribers see open
+   * instances in their initial snapshot and as live deltas thereafter,
+   * so a reconnecting client can rebuild the open set.
+   */
+  openCanvases?: SessionOpenCanvas[];
+  /**
+   * Canvas open / action / close requests the host is currently waiting
+   * on a provider to complete.
+   *
+   * Lives in state — like the chat channel's input requests — so
+   * subscribers can see what is in flight and reconnect/replay is
+   * correct. Entries are added with `session/canvasRequestCreated` and
+   * removed once a `session/canvasRequestCompleted` carries the matching
+   * `requestId`, or via `session/canvasRequestCancelled`.
+   */
+  canvasRequests?: SessionCanvasRequest[];
+  /**
    * Additional provider-specific metadata for this session.
    *
    * Clients MAY look for well-known keys here to provide enhanced UI.
@@ -156,6 +189,34 @@ export interface SessionActiveClient {
    * children inside {@link SessionState.customizations}.
    */
   customizations?: ClientPluginCustomization[];
+  /**
+   * Canvas providers this active client contributes to the session.
+   *
+   * Each entry is a single canvas declaration the client can host; a
+   * client with multiple canvases publishes one entry per canvas. When
+   * this field is populated, the host SHOULD register the client as a
+   * canvas provider with its backend and aggregate the contributions
+   * into {@link SessionState.canvasRegistry} with
+   * {@link CanvasProviderKind.ActiveClient} and `clientId` set to this
+   * client's `clientId`.
+   *
+   * Updated atomically via `session/activeClientSet` — there is no
+   * separate "canvasProvidersChanged" action; clients re-publish their
+   * full entry, identical to the {@link customizations} / {@link tools}
+   * pattern.
+   */
+  canvasProviders?: ClientCanvasDeclaration[];
+  /**
+   * Renderer-capability hint. When `true`, the host MAY route canvas open
+   * requests targeting server-owned providers to this client (a
+   * `session/canvasRequestCreated` whose `target.clientId` is this
+   * client). Clients that do not render canvases SHOULD omit the field.
+   *
+   * Independent of {@link canvasProviders}: a client can render canvases
+   * declared by other providers without declaring any of its own, and
+   * vice versa.
+   */
+  canRenderCanvases?: boolean;
 }
 
 /**
@@ -1052,3 +1113,314 @@ export type McpServerState =
   | McpServerAuthRequiredState
   | McpServerErrorState
   | McpServerStoppedState;
+
+// ─── Canvas Types ────────────────────────────────────────────────────────────
+
+/**
+ * Where a canvas declaration came from. Used by the host for routing
+ * provider requests and for cleanup when a provider goes away.
+ *
+ * Doubles as the discriminant for {@link CanvasRequestTarget}: a request
+ * either targets the host process itself ({@link CanvasProviderKind.Server})
+ * or a specific active client ({@link CanvasProviderKind.ActiveClient}).
+ *
+ * @category Canvas Types
+ */
+export const enum CanvasProviderKind {
+  /** Declared by the host process (a server-side extension or builtin). */
+  Server = 'server',
+  /** Declared by a {@link SessionActiveClient} via `canvasProviders`. */
+  ActiveClient = 'activeClient',
+}
+
+/**
+ * A named operation a canvas exposes. Distinct from an AHP `StateAction`:
+ * the agent invokes it over the canvas action family, addressed by
+ * `(canvasId, name)`.
+ *
+ * @category Canvas Types
+ */
+export interface SessionCanvasAction {
+  /** Action name. Provider-local; unique within `(extensionId, canvasId)`. */
+  name: string;
+  /** Short description shown to the agent. */
+  description?: string;
+  /**
+   * JSON Schema for this action's input. Opaque to AHP — mirrors
+   * {@link ToolDefinition.inputSchema}.
+   */
+  inputSchema?: {
+    type: 'object';
+    properties?: Record<string, object>;
+    required?: string[];
+  };
+}
+
+/**
+ * One entry in the aggregated {@link SessionState.canvasRegistry}. A canvas
+ * the agent can open, keyed by `(extensionId, canvasId)`.
+ *
+ * @category Canvas Types
+ */
+export interface SessionCanvasDeclaration {
+  /** Owning provider identifier. Stable across declarations and instances. */
+  extensionId: string;
+  /** Optional human-readable extension name. */
+  extensionName?: string;
+  /** Provider-local canvas identifier. Unique within `extensionId`. */
+  canvasId: string;
+  /** Human-readable canvas name. */
+  displayName: string;
+  /** Short description shown to the agent in canvas catalogs. */
+  description: string;
+  /**
+   * JSON Schema for canvas open input. Opaque to AHP — mirrors
+   * {@link ToolDefinition.inputSchema}.
+   */
+  inputSchema?: {
+    type: 'object';
+    properties?: Record<string, object>;
+    required?: string[];
+  };
+  /** Actions this canvas exposes. */
+  actions?: SessionCanvasAction[];
+  /** Where the declaration came from. Used for routing and cleanup. */
+  source: CanvasProviderKind;
+  /**
+   * When `source === {@link CanvasProviderKind.ActiveClient}`, the
+   * contributing client's `clientId`. Absent for server-declared canvases.
+   */
+  clientId?: string;
+}
+
+/**
+ * Routing availability of an {@link SessionOpenCanvas}. Host-derived: the
+ * host sets {@link CanvasInstanceAvailability.Stale | `Stale`} when the
+ * owning provider becomes unreachable and
+ * {@link CanvasInstanceAvailability.Ready | `Ready`} once the instance is
+ * live again. A closed set rather than a free-form string.
+ *
+ * @category Canvas Types
+ */
+export const enum CanvasInstanceAvailability {
+  /** The owning provider is reachable; actions may be routed to it. */
+  Ready = 'ready',
+  /** The owning provider is unreachable; the entry is kept but not routable. */
+  Stale = 'stale',
+}
+
+/**
+ * One entry in the {@link SessionState.openCanvases} snapshot — a single
+ * open canvas, keyed by its caller-supplied `instanceId`.
+ *
+ * @category Canvas Types
+ */
+export interface SessionOpenCanvas {
+  /** Caller-supplied stable instance identifier (agent-minted). */
+  instanceId: string;
+  /** Declaration this instance was opened from. */
+  canvasId: string;
+  /** Owning provider identifier. */
+  extensionId: string;
+  /** Optional human-readable extension name. */
+  extensionName?: string;
+  /** Routing availability — host-derived. */
+  availability: CanvasInstanceAvailability;
+  /**
+   * Input the agent supplied when opening. Retained so a recovering host
+   * can re-bind the instance without round-tripping the agent.
+   */
+  input?: Record<string, unknown>;
+  /** Provider-supplied display title. */
+  title?: string;
+  /** Provider-supplied status text. */
+  status?: string;
+  /** URL for rendered canvases. Subject to renderer policy. */
+  url?: string;
+  /**
+   * Renderer-side binding once a client has accepted the open. Lets the
+   * host route subsequent actions to the right renderer and authorise a
+   * `session/canvasInstanceCloseRequested`. Optional — server-rendered
+   * canvases may have no specific bound renderer, in which case any client
+   * with {@link SessionActiveClient.canRenderCanvases} MAY render it.
+   */
+  renderer?: { clientId: string };
+}
+
+/**
+ * What the host is asking a provider to do in a {@link SessionCanvasRequest}.
+ * Doubles as the discriminant for {@link CanvasRequestResult}.
+ *
+ * @category Canvas Types
+ */
+export const enum CanvasRequestKind {
+  Open = 'open',
+  Action = 'action',
+  Close = 'close',
+}
+
+/**
+ * Who the host has routed a {@link SessionCanvasRequest} to. A request is
+ * fulfilled either by the host process itself
+ * ({@link CanvasProviderKind.Server}) or by a specific active client
+ * ({@link CanvasProviderKind.ActiveClient}). The `kind` determines which
+ * direction may dispatch the matching `session/canvasRequestCompleted`.
+ *
+ * `clientId` is present exactly when `kind` is
+ * {@link CanvasProviderKind.ActiveClient} — the host populates it with the
+ * targeted client's `clientId` so a reconnecting client can tell whether a
+ * pending request is addressed to it. It is absent for
+ * {@link CanvasProviderKind.Server} targets.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasRequestTarget {
+  /** Which provider direction owns the request. */
+  kind: CanvasProviderKind;
+  /**
+   * Targeted client's `clientId`. Present iff
+   * `kind === {@link CanvasProviderKind.ActiveClient}`.
+   */
+  clientId?: string;
+}
+
+/**
+ * Live correlation state for an in-flight provider callback, surfaced in
+ * {@link SessionState.canvasRequests}. The host adds an entry when it routes
+ * an open / action / close to a provider and removes it when the provider
+ * reports completion (`session/canvasRequestCompleted`) or the host abandons
+ * it (`session/canvasRequestCancelled`).
+ *
+ * @category Canvas Types
+ */
+export interface SessionCanvasRequest {
+  /** Stable correlation id minted by the host. */
+  requestId: string;
+  /** What the host is asking the provider to do. */
+  kind: CanvasRequestKind;
+  /** Instance the request acts on. */
+  instanceId: string;
+  /** Declaration the instance belongs to. */
+  canvasId: string;
+  /** Owning provider identifier. */
+  extensionId: string;
+  /** Who the host has routed this request to. */
+  target: CanvasRequestTarget;
+  /** Action name when `kind === {@link CanvasRequestKind.Action}`. */
+  actionName?: string;
+  /**
+   * Open-time input when `kind === {@link CanvasRequestKind.Open}`; action
+   * input when `kind === {@link CanvasRequestKind.Action}`.
+   */
+  input?: Record<string, unknown>;
+  /**
+   * Server-side deadline at which the host will give up and fail the
+   * underlying provider callback. Milliseconds since the Unix epoch.
+   */
+  deadlineMs?: number;
+}
+
+/**
+ * A canvas declaration contributed by a {@link SessionActiveClient}. Lighter
+ * than {@link SessionCanvasDeclaration}: `extensionId` and `source` are
+ * derived by the host from the client's identity when it aggregates the
+ * contribution into {@link SessionState.canvasRegistry}.
+ *
+ * @category Canvas Types
+ */
+export interface ClientCanvasDeclaration {
+  /** Provider-local canvas identifier. */
+  canvasId: string;
+  /** Human-readable canvas name. */
+  displayName: string;
+  /** Short description shown to the agent. */
+  description: string;
+  /** JSON Schema for canvas open input. Opaque to AHP. */
+  inputSchema?: {
+    type: 'object';
+    properties?: Record<string, object>;
+    required?: string[];
+  };
+  /** Actions this canvas exposes. */
+  actions?: SessionCanvasAction[];
+}
+
+/**
+ * Successful result of a canvas open request. `kind` matches the originating
+ * {@link SessionCanvasRequest}'s {@link CanvasRequestKind.Open | `kind`}.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasOpenResult {
+  kind: CanvasRequestKind.Open;
+  /** Provider-supplied render URL. Subject to renderer policy. */
+  url?: string;
+  /** Provider-supplied display title. */
+  title?: string;
+  /** Provider-supplied status text. */
+  status?: string;
+}
+
+/**
+ * Successful result of a canvas action invocation.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasActionResult {
+  kind: CanvasRequestKind.Action;
+  /** Opaque provider-defined value. */
+  value?: unknown;
+}
+
+/**
+ * Successful result of a canvas close request.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasCloseResult {
+  kind: CanvasRequestKind.Close;
+}
+
+/**
+ * Successful result of a {@link SessionCanvasRequest}, discriminated by `kind`
+ * (a {@link CanvasRequestKind} value matching the originating request's
+ * `kind`). Carried by `session/canvasRequestCompleted`.
+ *
+ * @category Canvas Types
+ */
+export type CanvasRequestResult =
+  | CanvasOpenResult
+  | CanvasActionResult
+  | CanvasCloseResult;
+
+/**
+ * Error reported by a provider for a failed {@link SessionCanvasRequest}.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasError {
+  /**
+   * Machine-readable code, e.g. `canvas_action_no_handler`,
+   * `canvas_provider_unavailable`.
+   */
+  code: string;
+  /** Human-readable message. */
+  message: string;
+}
+
+/**
+ * Why the host abandoned an in-flight {@link SessionCanvasRequest}, carried by
+ * `session/canvasRequestCancelled`.
+ *
+ * @category Canvas Types
+ */
+export const enum CanvasRequestCancelReason {
+  /** The request's deadline elapsed before the provider answered. */
+  Timeout = 'timeout',
+  /** The targeted provider disconnected. */
+  ProviderDisconnected = 'providerDisconnected',
+  /** The instance was closed while the request was in flight. */
+  InstanceClosed = 'instanceClosed',
+  /** The host is shutting down. */
+  HostShutdown = 'hostShutdown',
+}

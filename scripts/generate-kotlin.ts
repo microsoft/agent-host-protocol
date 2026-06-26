@@ -790,6 +790,8 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'CanvasProviderKind', 'CanvasInstanceAvailability', 'CanvasRequestKind',
+  'CanvasRequestCancelReason',
 ];
 
 const STATE_STRUCTS = [
@@ -837,6 +839,9 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
+  'SessionCanvasAction', 'SessionCanvasDeclaration', 'SessionOpenCanvas',
+  'SessionCanvasRequest', 'CanvasRequestTarget', 'ClientCanvasDeclaration',
+  'CanvasError', 'CanvasOpenResult', 'CanvasActionResult', 'CanvasCloseResult',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1054,6 +1059,16 @@ const TOOL_CALL_CONTRIBUTOR_UNION: UnionConfig = {
   unknown: true,
 };
 
+const CANVAS_REQUEST_RESULT_UNION: UnionConfig = {
+  name: 'CanvasRequestResult',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Open', structName: 'CanvasOpenResult', discriminantValue: 'open' },
+    { caseName: 'Action', structName: 'CanvasActionResult', discriminantValue: 'action' },
+    { caseName: 'Close', structName: 'CanvasCloseResult', discriminantValue: 'close' },
+  ],
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1119,6 +1134,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
+  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1177,6 +1194,14 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/truncated', caseName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'session/configChanged', caseName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },
   { type: 'session/metaChanged', caseName: 'SessionMetaChanged', tsInterface: 'SessionMetaChangedAction' },
+  { type: 'session/canvasRegistryChanged', caseName: 'SessionCanvasRegistryChanged', tsInterface: 'SessionCanvasRegistryChangedAction' },
+  { type: 'session/canvasInstanceOpened', caseName: 'SessionCanvasInstanceOpened', tsInterface: 'SessionCanvasInstanceOpenedAction' },
+  { type: 'session/canvasInstanceUpdated', caseName: 'SessionCanvasInstanceUpdated', tsInterface: 'SessionCanvasInstanceUpdatedAction' },
+  { type: 'session/canvasInstanceClosed', caseName: 'SessionCanvasInstanceClosed', tsInterface: 'SessionCanvasInstanceClosedAction' },
+  { type: 'session/canvasInstanceCloseRequested', caseName: 'SessionCanvasInstanceCloseRequested', tsInterface: 'SessionCanvasInstanceCloseRequestedAction' },
+  { type: 'session/canvasRequestCreated', caseName: 'SessionCanvasRequestCreated', tsInterface: 'SessionCanvasRequestCreatedAction' },
+  { type: 'session/canvasRequestCompleted', caseName: 'SessionCanvasRequestCompleted', tsInterface: 'SessionCanvasRequestCompletedAction' },
+  { type: 'session/canvasRequestCancelled', caseName: 'SessionCanvasRequestCancelled', tsInterface: 'SessionCanvasRequestCancelledAction' },
   { type: 'changeset/statusChanged', caseName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
   { type: 'changeset/fileSet', caseName: 'ChangesetFileSet', tsInterface: 'ChangesetFileSetAction' },
   { type: 'changeset/fileRemoved', caseName: 'ChangesetFileRemoved', tsInterface: 'ChangesetFileRemovedAction' },
@@ -1872,6 +1897,7 @@ function checkExhaustiveness(project: Project): void {
     'ChildCustomization',           // CHILD_CUSTOMIZATION_UNION discriminated union
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
+    'CanvasRequestResult',          // CANVAS_REQUEST_RESULT_UNION discriminated union
     'ChildCustomizationType',       // TS subset alias of CustomizationType; consumers reuse CustomizationType
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()

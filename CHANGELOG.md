@@ -32,6 +32,8 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 - `JsonPrimitive` type alias (`string | number | boolean | null`) in `types/common/state.ts`.
 - `session/activeClientRemoved` action to release a single active client from a
   session by `clientId`.
+- Canvas surface — `SessionState.canvasRegistry`, `SessionState.openCanvases`, and `SessionState.canvasRequests` state slices, plus `SessionActiveClient.canvasProviders` and `SessionActiveClient.canRenderCanvases`, modelling declared, instanced, agent-openable UI surfaces. See the [Canvases guide](docs/guide/canvases.md).
+- Canvas actions (introduced in `0.5.0`): `session/canvasRegistryChanged`, `session/canvasInstanceOpened`, `session/canvasInstanceUpdated`, `session/canvasInstanceClosed`, `session/canvasInstanceCloseRequested`, `session/canvasRequestCreated`, `session/canvasRequestCompleted`, and `session/canvasRequestCancelled`.
 
 ### Changed
 

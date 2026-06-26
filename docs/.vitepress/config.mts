@@ -37,6 +37,7 @@ export default withMermaid(defineConfig({
             { text: 'Elicitation', link: '/guide/elicitation' },
             { text: 'Terminals', link: '/guide/terminals' },
             { text: 'Customizations', link: '/guide/customizations' },
+            { text: 'Canvases', link: '/guide/canvases' },
             { text: 'MCP Servers', link: '/guide/mcp' },
             { text: 'Write-Ahead Reconciliation', link: '/guide/reconciliation' },
           ],

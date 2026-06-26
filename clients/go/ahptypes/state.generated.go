@@ -400,6 +400,60 @@ const (
 	ResourceChangeTypeDeleted ResourceChangeType = "deleted"
 )
 
+// Where a canvas declaration came from. Used by the host for routing
+// provider requests and for cleanup when a provider goes away.
+//
+// Doubles as the discriminant for {@link CanvasRequestTarget}: a request
+// either targets the host process itself ({@link CanvasProviderKind.Server})
+// or a specific active client ({@link CanvasProviderKind.ActiveClient}).
+type CanvasProviderKind string
+
+const (
+	// Declared by the host process (a server-side extension or builtin).
+	CanvasProviderKindServer CanvasProviderKind = "server"
+	// Declared by a {@link SessionActiveClient} via `canvasProviders`.
+	CanvasProviderKindActiveClient CanvasProviderKind = "activeClient"
+)
+
+// Routing availability of an {@link SessionOpenCanvas}. Host-derived: the
+// host sets {@link CanvasInstanceAvailability.Stale | `Stale`} when the
+// owning provider becomes unreachable and
+// {@link CanvasInstanceAvailability.Ready | `Ready`} once the instance is
+// live again. A closed set rather than a free-form string.
+type CanvasInstanceAvailability string
+
+const (
+	// The owning provider is reachable; actions may be routed to it.
+	CanvasInstanceAvailabilityReady CanvasInstanceAvailability = "ready"
+	// The owning provider is unreachable; the entry is kept but not routable.
+	CanvasInstanceAvailabilityStale CanvasInstanceAvailability = "stale"
+)
+
+// What the host is asking a provider to do in a {@link SessionCanvasRequest}.
+// Doubles as the discriminant for {@link CanvasRequestResult}.
+type CanvasRequestKind string
+
+const (
+	CanvasRequestKindOpen   CanvasRequestKind = "open"
+	CanvasRequestKindAction CanvasRequestKind = "action"
+	CanvasRequestKindClose  CanvasRequestKind = "close"
+)
+
+// Why the host abandoned an in-flight {@link SessionCanvasRequest}, carried by
+// `session/canvasRequestCancelled`.
+type CanvasRequestCancelReason string
+
+const (
+	// The request's deadline elapsed before the provider answered.
+	CanvasRequestCancelReasonTimeout CanvasRequestCancelReason = "timeout"
+	// The targeted provider disconnected.
+	CanvasRequestCancelReasonProviderDisconnected CanvasRequestCancelReason = "providerDisconnected"
+	// The instance was closed while the request was in flight.
+	CanvasRequestCancelReasonInstanceClosed CanvasRequestCancelReason = "instanceClosed"
+	// The host is shutting down.
+	CanvasRequestCancelReasonHostShutdown CanvasRequestCancelReason = "hostShutdown"
+)
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 // An optionally-sized icon that can be displayed in a user interface.
@@ -687,6 +741,33 @@ type SessionState struct {
 	// before subscribing. See {@link Changeset} for the full shape and
 	// {@link /guide/changesets | Changesets} for an overview of the model.
 	Changesets []Changeset `json:"changesets,omitempty"`
+	// Aggregated registry of canvases currently exposed to the agent.
+	//
+	// Full-replacement: when this changes, the entire array is republished
+	// via `session/canvasRegistryChanged`. The host derives it from every
+	// active canvas provider attached to the session — server-side
+	// ({@link CanvasProviderKind.Server}) and active-client
+	// ({@link CanvasProviderKind.ActiveClient}, contributed via
+	// {@link SessionActiveClient.canvasProviders}). See
+	// {@link /guide/canvases | Canvases} for the model.
+	CanvasRegistry []SessionCanvasDeclaration `json:"canvasRegistry,omitempty"`
+	// Snapshot of every canvas instance currently open for this session.
+	//
+	// Maintained via `session/canvasInstanceOpened` (upsert),
+	// `session/canvasInstanceUpdated` (partial merge), and
+	// `session/canvasInstanceClosed` (remove). Subscribers see open
+	// instances in their initial snapshot and as live deltas thereafter,
+	// so a reconnecting client can rebuild the open set.
+	OpenCanvases []SessionOpenCanvas `json:"openCanvases,omitempty"`
+	// Canvas open / action / close requests the host is currently waiting
+	// on a provider to complete.
+	//
+	// Lives in state — like the chat channel's input requests — so
+	// subscribers can see what is in flight and reconnect/replay is
+	// correct. Entries are added with `session/canvasRequestCreated` and
+	// removed once a `session/canvasRequestCompleted` carries the matching
+	// `requestId`, or via `session/canvasRequestCancelled`.
+	CanvasRequests []SessionCanvasRequest `json:"canvasRequests,omitempty"`
 	// Additional provider-specific metadata for this session.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -714,6 +795,30 @@ type SessionActiveClient struct {
 	// plugins in memory and rely on the host to expand them into concrete
 	// children inside {@link SessionState.customizations}.
 	Customizations []ClientPluginCustomization `json:"customizations,omitempty"`
+	// Canvas providers this active client contributes to the session.
+	//
+	// Each entry is a single canvas declaration the client can host; a
+	// client with multiple canvases publishes one entry per canvas. When
+	// this field is populated, the host SHOULD register the client as a
+	// canvas provider with its backend and aggregate the contributions
+	// into {@link SessionState.canvasRegistry} with
+	// {@link CanvasProviderKind.ActiveClient} and `clientId` set to this
+	// client's `clientId`.
+	//
+	// Updated atomically via `session/activeClientSet` — there is no
+	// separate "canvasProvidersChanged" action; clients re-publish their
+	// full entry, identical to the {@link customizations} / {@link tools}
+	// pattern.
+	CanvasProviders []ClientCanvasDeclaration `json:"canvasProviders,omitempty"`
+	// Renderer-capability hint. When `true`, the host MAY route canvas open
+	// requests targeting server-owned providers to this client (a
+	// `session/canvasRequestCreated` whose `target.clientId` is this
+	// client). Clients that do not render canvases SHOULD omit the field.
+	//
+	// Independent of {@link canvasProviders}: a client can render canvases
+	// declared by other providers without declaring any of its own, and
+	// vice versa.
+	CanRenderCanvases *bool `json:"canRenderCanvases,omitempty"`
 }
 
 // Lightweight catalog entry summarizing one session. Surfaced via
@@ -2770,6 +2875,171 @@ type ResourceChange struct {
 	Type ResourceChangeType `json:"type"`
 }
 
+// A named operation a canvas exposes. Distinct from an AHP `StateAction`:
+// the agent invokes it over the canvas action family, addressed by
+// `(canvasId, name)`.
+type SessionCanvasAction struct {
+	// Action name. Provider-local; unique within `(extensionId, canvasId)`.
+	Name string `json:"name"`
+	// Short description shown to the agent.
+	Description *string `json:"description,omitempty"`
+	// JSON Schema for this action's input. Opaque to AHP — mirrors
+	// {@link ToolDefinition.inputSchema}.
+	InputSchema *json.RawMessage `json:"inputSchema,omitempty"`
+}
+
+// One entry in the aggregated {@link SessionState.canvasRegistry}. A canvas
+// the agent can open, keyed by `(extensionId, canvasId)`.
+type SessionCanvasDeclaration struct {
+	// Owning provider identifier. Stable across declarations and instances.
+	ExtensionId string `json:"extensionId"`
+	// Optional human-readable extension name.
+	ExtensionName *string `json:"extensionName,omitempty"`
+	// Provider-local canvas identifier. Unique within `extensionId`.
+	CanvasId string `json:"canvasId"`
+	// Human-readable canvas name.
+	DisplayName string `json:"displayName"`
+	// Short description shown to the agent in canvas catalogs.
+	Description string `json:"description"`
+	// JSON Schema for canvas open input. Opaque to AHP — mirrors
+	// {@link ToolDefinition.inputSchema}.
+	InputSchema *json.RawMessage `json:"inputSchema,omitempty"`
+	// Actions this canvas exposes.
+	Actions []SessionCanvasAction `json:"actions,omitempty"`
+	// Where the declaration came from. Used for routing and cleanup.
+	Source CanvasProviderKind `json:"source"`
+	// When `source === {@link CanvasProviderKind.ActiveClient}`, the
+	// contributing client's `clientId`. Absent for server-declared canvases.
+	ClientId *string `json:"clientId,omitempty"`
+}
+
+// One entry in the {@link SessionState.openCanvases} snapshot — a single
+// open canvas, keyed by its caller-supplied `instanceId`.
+type SessionOpenCanvas struct {
+	// Caller-supplied stable instance identifier (agent-minted).
+	InstanceId string `json:"instanceId"`
+	// Declaration this instance was opened from.
+	CanvasId string `json:"canvasId"`
+	// Owning provider identifier.
+	ExtensionId string `json:"extensionId"`
+	// Optional human-readable extension name.
+	ExtensionName *string `json:"extensionName,omitempty"`
+	// Routing availability — host-derived.
+	Availability CanvasInstanceAvailability `json:"availability"`
+	// Input the agent supplied when opening. Retained so a recovering host
+	// can re-bind the instance without round-tripping the agent.
+	Input map[string]json.RawMessage `json:"input,omitempty"`
+	// Provider-supplied display title.
+	Title *string `json:"title,omitempty"`
+	// Provider-supplied status text.
+	Status *string `json:"status,omitempty"`
+	// URL for rendered canvases. Subject to renderer policy.
+	Url *string `json:"url,omitempty"`
+	// Renderer-side binding once a client has accepted the open. Lets the
+	// host route subsequent actions to the right renderer and authorise a
+	// `session/canvasInstanceCloseRequested`. Optional — server-rendered
+	// canvases may have no specific bound renderer, in which case any client
+	// with {@link SessionActiveClient.canRenderCanvases} MAY render it.
+	Renderer *json.RawMessage `json:"renderer,omitempty"`
+}
+
+// Live correlation state for an in-flight provider callback, surfaced in
+// {@link SessionState.canvasRequests}. The host adds an entry when it routes
+// an open / action / close to a provider and removes it when the provider
+// reports completion (`session/canvasRequestCompleted`) or the host abandons
+// it (`session/canvasRequestCancelled`).
+type SessionCanvasRequest struct {
+	// Stable correlation id minted by the host.
+	RequestId string `json:"requestId"`
+	// What the host is asking the provider to do.
+	Kind CanvasRequestKind `json:"kind"`
+	// Instance the request acts on.
+	InstanceId string `json:"instanceId"`
+	// Declaration the instance belongs to.
+	CanvasId string `json:"canvasId"`
+	// Owning provider identifier.
+	ExtensionId string `json:"extensionId"`
+	// Who the host has routed this request to.
+	Target CanvasRequestTarget `json:"target"`
+	// Action name when `kind === {@link CanvasRequestKind.Action}`.
+	ActionName *string `json:"actionName,omitempty"`
+	// Open-time input when `kind === {@link CanvasRequestKind.Open}`; action
+	// input when `kind === {@link CanvasRequestKind.Action}`.
+	Input map[string]json.RawMessage `json:"input,omitempty"`
+	// Server-side deadline at which the host will give up and fail the
+	// underlying provider callback. Milliseconds since the Unix epoch.
+	DeadlineMs *int64 `json:"deadlineMs,omitempty"`
+}
+
+// Who the host has routed a {@link SessionCanvasRequest} to. A request is
+// fulfilled either by the host process itself
+// ({@link CanvasProviderKind.Server}) or by a specific active client
+// ({@link CanvasProviderKind.ActiveClient}). The `kind` determines which
+// direction may dispatch the matching `session/canvasRequestCompleted`.
+//
+// `clientId` is present exactly when `kind` is
+// {@link CanvasProviderKind.ActiveClient} — the host populates it with the
+// targeted client's `clientId` so a reconnecting client can tell whether a
+// pending request is addressed to it. It is absent for
+// {@link CanvasProviderKind.Server} targets.
+type CanvasRequestTarget struct {
+	// Which provider direction owns the request.
+	Kind CanvasProviderKind `json:"kind"`
+	// Targeted client's `clientId`. Present iff
+	// `kind === {@link CanvasProviderKind.ActiveClient}`.
+	ClientId *string `json:"clientId,omitempty"`
+}
+
+// A canvas declaration contributed by a {@link SessionActiveClient}. Lighter
+// than {@link SessionCanvasDeclaration}: `extensionId` and `source` are
+// derived by the host from the client's identity when it aggregates the
+// contribution into {@link SessionState.canvasRegistry}.
+type ClientCanvasDeclaration struct {
+	// Provider-local canvas identifier.
+	CanvasId string `json:"canvasId"`
+	// Human-readable canvas name.
+	DisplayName string `json:"displayName"`
+	// Short description shown to the agent.
+	Description string `json:"description"`
+	// JSON Schema for canvas open input. Opaque to AHP.
+	InputSchema *json.RawMessage `json:"inputSchema,omitempty"`
+	// Actions this canvas exposes.
+	Actions []SessionCanvasAction `json:"actions,omitempty"`
+}
+
+// Error reported by a provider for a failed {@link SessionCanvasRequest}.
+type CanvasError struct {
+	// Machine-readable code, e.g. `canvas_action_no_handler`,
+	// `canvas_provider_unavailable`.
+	Code string `json:"code"`
+	// Human-readable message.
+	Message string `json:"message"`
+}
+
+// Successful result of a canvas open request. `kind` matches the originating
+// {@link SessionCanvasRequest}'s {@link CanvasRequestKind.Open | `kind`}.
+type CanvasOpenResult struct {
+	Kind CanvasRequestKind `json:"kind"`
+	// Provider-supplied render URL. Subject to renderer policy.
+	Url *string `json:"url,omitempty"`
+	// Provider-supplied display title.
+	Title *string `json:"title,omitempty"`
+	// Provider-supplied status text.
+	Status *string `json:"status,omitempty"`
+}
+
+// Successful result of a canvas action invocation.
+type CanvasActionResult struct {
+	Kind CanvasRequestKind `json:"kind"`
+	// Opaque provider-defined value.
+	Value *json.RawMessage `json:"value,omitempty"`
+}
+
+// Successful result of a canvas close request.
+type CanvasCloseResult struct {
+	Kind CanvasRequestKind `json:"kind"`
+}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 // ResponsePart is a single part of a response stream (text, tool call, reasoning, content reference).
@@ -3821,6 +4091,58 @@ func (u ToolCallContributor) MarshalJSON() ([]byte, error) {
 		}
 		return unk.Raw, nil
 	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// CanvasRequestResult is the successful result of a canvas open, action, or close request.
+type CanvasRequestResult struct {
+	Value isCanvasRequestResult
+}
+
+// isCanvasRequestResult is the marker interface implemented by every
+// concrete variant of CanvasRequestResult.
+type isCanvasRequestResult interface{ isCanvasRequestResult() }
+
+func (*CanvasOpenResult) isCanvasRequestResult()   {}
+func (*CanvasActionResult) isCanvasRequestResult() {}
+func (*CanvasCloseResult) isCanvasRequestResult()  {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *CanvasRequestResult) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "open":
+		var value CanvasOpenResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "action":
+		var value CanvasActionResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "close":
+		var value CanvasCloseResult
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return &json.UnmarshalTypeError{Value: "CanvasRequestResult", Type: nil}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u CanvasRequestResult) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}

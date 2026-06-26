@@ -644,6 +644,100 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
+    is StateActionSessionCanvasRegistryChanged -> state.copy(canvasRegistry = action.value.canvases)
+
+    is StateActionSessionCanvasInstanceOpened -> {
+        val instance = action.value.instance
+        val list = state.openCanvases ?: emptyList()
+        val idx = list.indexOfFirst { it.instanceId == instance.instanceId }
+        if (idx < 0) {
+            state.copy(openCanvases = list + instance)
+        } else {
+            val updated = list.toMutableList()
+            updated[idx] = instance
+            state.copy(openCanvases = updated)
+        }
+    }
+
+    is StateActionSessionCanvasInstanceUpdated -> {
+        val a = action.value
+        val list = state.openCanvases
+        if (list == null) state else {
+            val idx = list.indexOfFirst { it.instanceId == a.instanceId }
+            if (idx < 0) state else {
+                val instance = list[idx]
+                val updatedInstance = instance.copy(
+                    title = a.title ?: instance.title,
+                    status = a.status ?: instance.status,
+                    url = a.url ?: instance.url,
+                    availability = a.availability ?: instance.availability,
+                )
+                val updated = list.toMutableList()
+                updated[idx] = updatedInstance
+                state.copy(openCanvases = updated)
+            }
+        }
+    }
+
+    is StateActionSessionCanvasInstanceClosed -> {
+        val instanceId = action.value.instanceId
+        val openList = state.openCanvases
+        val requestList = state.canvasRequests
+        val hadOpen = openList?.any { it.instanceId == instanceId } == true
+        val hadRequest = requestList?.any { it.instanceId == instanceId } == true
+        if (!hadOpen && !hadRequest) {
+            state
+        } else {
+            var next = state
+            if (hadOpen && openList != null) {
+                val remaining = openList.filter { it.instanceId != instanceId }
+                next = next.copy(openCanvases = if (remaining.isEmpty()) null else remaining)
+            }
+            if (hadRequest && requestList != null) {
+                val remaining = requestList.filter { it.instanceId != instanceId }
+                next = next.copy(canvasRequests = if (remaining.isEmpty()) null else remaining)
+            }
+            next
+        }
+    }
+
+    is StateActionSessionCanvasInstanceCloseRequested -> state
+
+    is StateActionSessionCanvasRequestCreated -> {
+        val request = action.value.request
+        val list = state.canvasRequests ?: emptyList()
+        val idx = list.indexOfFirst { it.requestId == request.requestId }
+        if (idx < 0) {
+            state.copy(canvasRequests = list + request)
+        } else {
+            val updated = list.toMutableList()
+            updated[idx] = request
+            state.copy(canvasRequests = updated)
+        }
+    }
+
+    is StateActionSessionCanvasRequestCompleted -> {
+        val list = state.canvasRequests
+        if (list == null) state else {
+            val idx = list.indexOfFirst { it.requestId == action.value.requestId }
+            if (idx < 0) state else {
+                val remaining = list.filter { it.requestId != action.value.requestId }
+                state.copy(canvasRequests = if (remaining.isEmpty()) null else remaining)
+            }
+        }
+    }
+
+    is StateActionSessionCanvasRequestCancelled -> {
+        val list = state.canvasRequests
+        if (list == null) state else {
+            val idx = list.indexOfFirst { it.requestId == action.value.requestId }
+            if (idx < 0) state else {
+                val remaining = list.filter { it.requestId != action.value.requestId }
+                state.copy(canvasRequests = if (remaining.isEmpty()) null else remaining)
+            }
+        }
+    }
+
     else -> state
 }
 

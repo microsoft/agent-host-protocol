@@ -1,0 +1,37 @@
+{
+  "description": "session/canvasRequestCancelled is a no-op when there are no in-flight requests",
+  "reducer": "session",
+  "initial": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": []
+  },
+  "actions": [
+    {
+      "type": "session/canvasRequestCancelled",
+      "requestId": "r-1",
+      "reason": "hostShutdown"
+    }
+  ],
+  "expected": {
+    "summary": {
+      "resource": "copilot:/test-session",
+      "provider": "copilot",
+      "title": "Test Session",
+      "status": 1,
+      "createdAt": 1000,
+      "modifiedAt": 1000
+    },
+    "lifecycle": "creating",
+    "chats": [],
+    "activeClients": []
+  }
+}
