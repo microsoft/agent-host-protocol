@@ -66,6 +66,7 @@ target channel instead.
 | `root/sessionAdded` | server → client notification | Session catalogue entry created. |
 | `root/sessionRemoved` | server → client notification | Session catalogue entry removed. |
 | `root/sessionSummaryChanged` | server → client notification | Session catalogue entry mutated. |
+| `root/progress` | server → client notification | Generic progress for a long-running operation a client opted into (e.g. an SDK download). |
 | `unsubscribe` | client → server notification | Stop receiving root-channel messages. |
 | `dispatchAction` | client → server notification | Dispatch a root-scoped client action (currently `root/configChanged`). |
 
@@ -148,6 +149,26 @@ Emitted when any mutable field on an existing [`SessionSummary`](/reference/sess
 Servers MAY coalesce or debounce this notification for noisy fields — for example, rapid `modifiedAt` bumps during a streaming turn, or frequent `diffs` updates during an edit burst. Clients that have no cached entry for `session` MAY ignore the notification.
 
 Like all protocol notifications, the `root/*` events are ephemeral and are **not** replayed on reconnect. After reconnecting, clients SHOULD re-fetch the catalogue via [`listSessions`](/reference/root#listsessions).
+
+## Progress
+
+The server MAY emit `root/progress` to report incremental progress on a long-running operation a client opted into — most notably the lazy, first-use download of an agent's native SDK. A client opts in by supplying a `progressToken` on the originating request (today the `progressToken` field of [`createSession`](/reference/session#createsession)); the server echoes that token on every frame so the client can correlate progress back to the call and the UI awaiting it. The notification is operation-agnostic — it names no domain object.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "root/progress",
+  "params": {
+    "channel": "ahp-root://",
+    "progressToken": "9b2c1f7e-4a0d-4e2b-8b1a-2f7e4a0d4e2b",
+    "progress": 18874368,
+    "total": 41957498,
+    "message": "Downloading Claude agent…"
+  }
+}
+```
+
+`progress` is monotonically non-decreasing for a given `progressToken`. `total` is present only when the magnitude is known up front (e.g. a `Content-Length`); when absent, clients SHOULD show an indeterminate indicator. The operation is complete when `progress === total` — the server MUST emit a final frame satisfying this, setting `total` to the final `progress` when the total was never known, after which no further frames reference the token. An optional `message` carries a human-readable description of the work in progress; a client that tracks the token renders its own (localized) label and MAY ignore it, while a generic client MAY display `message` verbatim. The server MAY emit no progress at all (for example when the work was already done), in which case the client simply never shows an indicator. Like the catalogue events, `root/progress` is ephemeral and is **not** replayed on reconnect.
 
 ## Authentication Events
 

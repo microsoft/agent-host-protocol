@@ -1466,7 +1466,7 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
-  'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams', 'AuthRequiredParams',
+  'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams', 'ProgressParams', 'AuthRequiredParams',
   'OtlpExportLogsParams', 'OtlpExportTracesParams', 'OtlpExportMetricsParams',
 ];
 

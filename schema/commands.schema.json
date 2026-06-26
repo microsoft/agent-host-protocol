@@ -886,6 +886,10 @@
         "activeClient": {
           "$ref": "#/$defs/SessionActiveClient",
           "description": "Eagerly claim an active client role for the new session.\n\nWhen provided, the server initializes the session with this client as an\nactive client, equivalent to dispatching a `session/activeClientSet`\naction immediately after creation. The `clientId` MUST match the\n`clientId` the creating client supplied in `initialize`."
+        },
+        "progressToken": {
+          "type": "string",
+          "description": "Opt-in progress token. When set, the client is offering to receive\n`progress` notifications (see `ProgressParams`) for any long-running work\nthe server does to bring this session up — most notably the lazy,\nfirst-use download of the provider's native SDK. The server echoes this\nexact token on every `progress` frame so the client can correlate it to\nthis `createSession` call (and the UI awaiting it).\n\nThe token MUST be unique across the client's active requests. The server\nMAY ignore it (e.g. when nothing long-running is needed), in which case no\n`progress` notifications are emitted."
         }
       },
       "required": [

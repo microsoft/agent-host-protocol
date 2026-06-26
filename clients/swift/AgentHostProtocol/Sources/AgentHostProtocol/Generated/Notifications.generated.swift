@@ -66,6 +66,39 @@ public struct SessionSummaryChangedParams: Codable, Sendable {
     }
 }
 
+public struct ProgressParams: Codable, Sendable {
+    /// Channel URI this notification belongs to (the root channel).
+    public var channel: String
+    /// Echoes the `progressToken` the client supplied on the originating request
+    /// (e.g. the `progressToken` field of `createSession`), correlating this frame
+    /// to that call. Unique across the client's active requests.
+    public var progressToken: String
+    /// Progress so far, in operation-defined units (e.g. bytes received).
+    /// Monotonically non-decreasing for a given `progressToken`.
+    public var progress: Int
+    /// Total when known up front (e.g. from a `Content-Length`); omitted ⇒
+    /// indeterminate. The operation is complete once `progress === total`.
+    public var total: Int?
+    /// Optional human-readable progress message. The client owns its own
+    /// (localized) presentation derived from the originating request; generic
+    /// clients that don't track the token MAY display this instead.
+    public var message: String?
+
+    public init(
+        channel: String,
+        progressToken: String,
+        progress: Int,
+        total: Int? = nil,
+        message: String? = nil
+    ) {
+        self.channel = channel
+        self.progressToken = progressToken
+        self.progress = progress
+        self.total = total
+        self.message = message
+    }
+}
+
 public struct AuthRequiredParams: Codable, Sendable {
     /// Channel URI this notification belongs to
     public var channel: String

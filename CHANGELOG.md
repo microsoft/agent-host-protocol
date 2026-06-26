@@ -25,6 +25,15 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 
 ### Added
 
+- `root/progress` (`ProgressParams`) generic host→client progress notification,
+  correlated by a `progressToken` the client supplies on the originating
+  request (today `createSession.progressToken`) rather than a domain object. Lets
+  the host report long-running work — e.g. the lazy first-use download of an
+  agent's native SDK — so clients can show an indicator instead of a silent
+  multi-second hang. Carries monotonic `progress` and optional `total`; complete
+  when `progress === total`.
+- `createSession.progressToken` optional opt-in token for receiving `root/progress`
+  notifications about a session's bring-up.
 - `SessionModelInfo.maxOutputTokens` and `SessionModelInfo.maxPromptTokens`
   optional fields for communicating model token limits.
 - `SessionSummary._meta` optional provider metadata field for lightweight

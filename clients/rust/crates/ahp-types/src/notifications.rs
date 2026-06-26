@@ -96,6 +96,58 @@ pub struct SessionSummaryChangedParams {
     pub changes: PartialSessionSummary,
 }
 
+/// Generic progress notification for a long-running operation.
+///
+/// A client opts in to progress for a request by including a `progressToken` in
+/// that request (today: the `progressToken` field on `createSession`). If the
+/// server does long-running work to service the request — e.g. lazily
+/// downloading an agent's native SDK the first time a session of that provider
+/// is materialized — it emits `progress` notifications carrying the same token.
+///
+/// The notification is operation-agnostic: it says nothing about *what* is
+/// progressing. The client correlates `progressToken` back to the request it
+/// originated from (and thus the UI surface awaiting it) and renders its own
+/// localized indicator. The same channel serves any future long-running
+/// operation without a new method.
+///
+/// Semantics:
+///
+/// - `progress` is monotonically non-decreasing for a given `progressToken`.
+/// - `total` is present only when the server knows the magnitude up front
+///   (e.g. a `Content-Length`); when absent the client SHOULD show an
+///   indeterminate indicator.
+/// - The operation is complete when `progress === total`. The server MUST emit a
+///   final frame satisfying `progress === total`; when the total was never
+///   known, it sets `total` to the final `progress` on that frame. No further
+///   frames reference the token afterwards.
+/// - The server MAY emit no progress at all (e.g. the work was already done);
+///   the client then never shows an indicator.
+/// - Like all notifications this is ephemeral and is **not** replayed on
+///   reconnect. A client that never receives the terminal frame SHOULD expire
+///   the indicator after an idle timeout.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProgressParams {
+    /// Channel URI this notification belongs to (the root channel).
+    pub channel: Uri,
+    /// Echoes the `progressToken` the client supplied on the originating request
+    /// (e.g. the `progressToken` field of `createSession`), correlating this frame
+    /// to that call. Unique across the client's active requests.
+    pub progress_token: String,
+    /// Progress so far, in operation-defined units (e.g. bytes received).
+    /// Monotonically non-decreasing for a given `progressToken`.
+    pub progress: i64,
+    /// Total when known up front (e.g. from a `Content-Length`); omitted ⇒
+    /// indeterminate. The operation is complete once `progress === total`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total: Option<i64>,
+    /// Optional human-readable progress message. The client owns its own
+    /// (localized) presentation derived from the originating request; generic
+    /// clients that don't track the token MAY display this instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
 /// Sent by the server when a protected resource requires (re-)authentication.
 ///
 /// This notification MAY be associated with any channel — for example, an

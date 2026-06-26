@@ -84,6 +84,36 @@ data class SessionSummaryChangedParams(
 )
 
 @Serializable
+data class ProgressParams(
+    /**
+     * Channel URI this notification belongs to (the root channel).
+     */
+    val channel: String,
+    /**
+     * Echoes the `progressToken` the client supplied on the originating request
+     * (e.g. the `progressToken` field of `createSession`), correlating this frame
+     * to that call. Unique across the client's active requests.
+     */
+    val progressToken: String,
+    /**
+     * Progress so far, in operation-defined units (e.g. bytes received).
+     * Monotonically non-decreasing for a given `progressToken`.
+     */
+    val progress: Long,
+    /**
+     * Total when known up front (e.g. from a `Content-Length`); omitted ⇒
+     * indeterminate. The operation is complete once `progress === total`.
+     */
+    val total: Long? = null,
+    /**
+     * Optional human-readable progress message. The client owns its own
+     * (localized) presentation derived from the originating request; generic
+     * clients that don't track the token MAY display this instead.
+     */
+    val message: String? = null
+)
+
+@Serializable
 data class AuthRequiredParams(
     /**
      * Channel URI this notification belongs to

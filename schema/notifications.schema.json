@@ -145,6 +145,37 @@
         "changes"
       ]
     },
+    "ProgressParams": {
+      "type": "object",
+      "description": "Generic progress notification for a long-running operation.\n\nA client opts in to progress for a request by including a `progressToken` in\nthat request (today: the `progressToken` field on `createSession`). If the\nserver does long-running work to service the request — e.g. lazily\ndownloading an agent's native SDK the first time a session of that provider\nis materialized — it emits `progress` notifications carrying the same token.\n\nThe notification is operation-agnostic: it says nothing about *what* is\nprogressing. The client correlates `progressToken` back to the request it\noriginated from (and thus the UI surface awaiting it) and renders its own\nlocalized indicator. The same channel serves any future long-running\noperation without a new method.\n\nSemantics:\n\n- `progress` is monotonically non-decreasing for a given `progressToken`.\n- `total` is present only when the server knows the magnitude up front\n  (e.g. a `Content-Length`); when absent the client SHOULD show an\n  indeterminate indicator.\n- The operation is complete when `progress === total`. The server MUST emit a\n  final frame satisfying `progress === total`; when the total was never\n  known, it sets `total` to the final `progress` on that frame. No further\n  frames reference the token afterwards.\n- The server MAY emit no progress at all (e.g. the work was already done);\n  the client then never shows an indicator.\n- Like all notifications this is ephemeral and is **not** replayed on\n  reconnect. A client that never receives the terminal frame SHOULD expire\n  the indicator after an idle timeout.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this notification belongs to (the root channel)."
+        },
+        "progressToken": {
+          "type": "string",
+          "description": "Echoes the `progressToken` the client supplied on the originating request\n(e.g. the `progressToken` field of `createSession`), correlating this frame\nto that call. Unique across the client's active requests."
+        },
+        "progress": {
+          "type": "number",
+          "description": "Progress so far, in operation-defined units (e.g. bytes received).\nMonotonically non-decreasing for a given `progressToken`."
+        },
+        "total": {
+          "type": "number",
+          "description": "Total when known up front (e.g. from a `Content-Length`); omitted ⇒\nindeterminate. The operation is complete once `progress === total`."
+        },
+        "message": {
+          "type": "string",
+          "description": "Optional human-readable progress message. The client owns its own\n(localized) presentation derived from the originating request; generic\nclients that don't track the token MAY display this instead."
+        }
+      },
+      "required": [
+        "channel",
+        "progressToken",
+        "progress"
+      ]
+    },
     "OtlpExportLogsParams": {
       "type": "object",
       "description": "Delivers a batch of OTLP log records to a client subscribed to the host's\nlogs channel (advertised on `TelemetryCapabilities.logs`).\n\nThe `payload` field is an OTLP/JSON `ExportLogsServiceRequest` value\nverbatim — i.e. an object of shape `{ resourceLogs: ResourceLogs[] }` as\ndefined by [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto).\nAHP does not redeclare the OTLP type system; clients SHOULD use an\nOpenTelemetry SDK or schema to parse it.\n\nLike all stateless-channel notifications, this is ephemeral: it is not\nreplayed on reconnect. Subscribers receive only batches emitted after\ntheir `subscribe` succeeds.",
@@ -216,6 +247,9 @@
         },
         {
           "$ref": "#/$defs/SessionSummaryChangedParams"
+        },
+        {
+          "$ref": "#/$defs/ProgressParams"
         },
         {
           "$ref": "#/$defs/OtlpExportLogsParams"

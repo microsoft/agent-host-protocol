@@ -285,6 +285,17 @@ public struct CreateSessionParams: Codable, Sendable {
     /// action immediately after creation. The `clientId` MUST match the
     /// `clientId` the creating client supplied in `initialize`.
     public var activeClient: SessionActiveClient?
+    /// Opt-in progress token. When set, the client is offering to receive
+    /// `progress` notifications (see `ProgressParams`) for any long-running work
+    /// the server does to bring this session up — most notably the lazy,
+    /// first-use download of the provider's native SDK. The server echoes this
+    /// exact token on every `progress` frame so the client can correlate it to
+    /// this `createSession` call (and the UI awaiting it).
+    ///
+    /// The token MUST be unique across the client's active requests. The server
+    /// MAY ignore it (e.g. when nothing long-running is needed), in which case no
+    /// `progress` notifications are emitted.
+    public var progressToken: String?
 
     public init(
         channel: String,
@@ -294,7 +305,8 @@ public struct CreateSessionParams: Codable, Sendable {
         workingDirectory: String? = nil,
         fork: SessionForkSource? = nil,
         config: [String: AnyCodable]? = nil,
-        activeClient: SessionActiveClient? = nil
+        activeClient: SessionActiveClient? = nil,
+        progressToken: String? = nil
     ) {
         self.channel = channel
         self.provider = provider
@@ -304,6 +316,7 @@ public struct CreateSessionParams: Codable, Sendable {
         self.fork = fork
         self.config = config
         self.activeClient = activeClient
+        self.progressToken = progressToken
     }
 }
 

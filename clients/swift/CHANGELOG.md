@@ -19,6 +19,9 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Added
 
+- `ProgressParams` struct (wire `root/progress`) — a generic progress notification
+  correlated by a `progressToken` (added on `CreateSessionParams`).
+  Used today for the lazy first-use download of an agent's native SDK.
 - `SessionModelInfo.maxOutputTokens` and `SessionModelInfo.maxPromptTokens`
   optional fields for communicating model token limits.
 - `SessionSummary.meta` (`_meta` on the wire) optional provider metadata field

@@ -76,6 +76,7 @@ import type {
   SessionAddedParams,
   SessionRemovedParams,
   SessionSummaryChangedParams,
+  ProgressParams,
 } from '../channels-root/notifications.js';
 import type { AuthRequiredParams } from './notifications.js';
 import type {
@@ -231,6 +232,7 @@ export interface ServerNotificationMap {
   'root/sessionAdded': { params: SessionAddedParams };
   'root/sessionRemoved': { params: SessionRemovedParams };
   'root/sessionSummaryChanged': { params: SessionSummaryChangedParams };
+  'root/progress': { params: ProgressParams };
   'auth/required': { params: AuthRequiredParams };
   'otlp/exportLogs': { params: OtlpExportLogsParams };
   'otlp/exportTraces': { params: OtlpExportTracesParams };

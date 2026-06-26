@@ -17,6 +17,9 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 
 ### Added
 
+- `ProgressParams` data class (wire `root/progress`) — a generic progress
+  notification correlated by a `progressToken` (added on `CreateSessionParams`).
+  Used today for the lazy first-use download of an agent's native SDK.
 - `SessionModelInfo.maxOutputTokens` and `SessionModelInfo.maxPromptTokens`
   optional fields for communicating model token limits.
 - `SessionSummary.meta` (`_meta` on the wire) optional provider metadata field

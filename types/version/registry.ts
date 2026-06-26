@@ -188,6 +188,7 @@ export const NOTIFICATION_INTRODUCED_IN: { readonly [K in ProtocolNotificationMe
   'root/sessionAdded': '0.1.0',
   'root/sessionRemoved': '0.1.0',
   'root/sessionSummaryChanged': '0.1.0',
+  'root/progress': '0.5.0',
   'auth/required': '0.1.0',
   'otlp/exportLogs': '0.2.0',
   'otlp/exportTraces': '0.2.0',

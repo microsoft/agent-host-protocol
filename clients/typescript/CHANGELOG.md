@@ -22,6 +22,10 @@ hotfix escape hatch.
 
 ### Added
 
+- `ProgressParams` (wire `root/progress`) generic progress notification correlated by
+  a `progressToken`, plus `createSession.progressToken` to opt in. Used today for
+  the lazy first-use download of an agent's native SDK, so clients can show an
+  indicator instead of a silent multi-second hang.
 - `SessionModelInfo.maxOutputTokens` and `SessionModelInfo.maxPromptTokens`
   optional fields for communicating model token limits.
 - `SessionSummary._meta` optional provider metadata field for lightweight
