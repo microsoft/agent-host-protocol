@@ -61,6 +61,8 @@ The client initiates the connection with an `initialize` **request**. The client
 
 If present, `defaultDirectory` provides a server-local starting location for remote filesystem browsing.
 
+The server MAY also include `featureStability` — a map advertising which emitted surfaces are `experimental` or `deprecated` rather than `stable`. This is connection-level metadata: it is negotiated once here and retained by the client across [reconnects](#reconnection). See [Stability Levels](/specification/versioning#stability-levels) for the semantics.
+
 If the server cannot accept the connection for any other reason, it MUST return a JSON-RPC error. See [Error Codes](/reference/error-codes) for defined codes.
 
 ## Authentication

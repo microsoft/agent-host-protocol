@@ -31,6 +31,32 @@ pub enum ReconnectResultType {
     Snapshot,
 }
 
+/// Wire/schema stability of a surface advertised in
+/// {@link InitializeResult.featureStability}.
+///
+/// Stability describes how settled a surface's shape is within a compatible
+/// SemVer range. It is deliberately **not** a product-gating, entitlement, or
+/// preview-access signal — a client uses it only to decide how defensively to
+/// code against the surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FeatureStabilityLevel {
+    /// Normal additive SemVer guarantees apply; clients MAY build on it freely.
+    /// This is the default for any surface absent from
+    /// {@link InitializeResult.featureStability}, so it never needs to be
+    /// advertised explicitly.
+    #[serde(rename = "stable")]
+    Stable,
+    /// On the wire, but its shape MAY change or be removed within an otherwise
+    /// compatible version range. Clients SHOULD parse it defensively, gate
+    /// adoption behind a flag, tolerate shape changes, and not assume longevity.
+    #[serde(rename = "experimental")]
+    Experimental,
+    /// Still emitted, but scheduled for removal in a future version. Clients
+    /// SHOULD migrate off it and SHOULD NOT adopt it anew.
+    #[serde(rename = "deprecated")]
+    Deprecated,
+}
+
 /// Encoding of fetched content data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ContentEncoding {
@@ -160,6 +186,29 @@ pub struct InitializeResult {
     /// filtering). Clients MAY ignore signals they cannot process.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub telemetry: Option<TelemetryCapabilities>,
+    /// Wire/schema stability of selected surfaces the host emits, keyed by a
+    /// surface identifier — a notification method (e.g. `"session/canvasOpened"`),
+    /// a command method (e.g. `"listSessions"`), a channel URI scheme (e.g.
+    /// `"ahp-otlp:"`), or a named capability.
+    ///
+    /// A surface absent from this map is {@link FeatureStabilityLevel.Stable |
+    /// `stable`} and carries the normal additive SemVer guarantees, so hosts list
+    /// **only** surfaces that are not stable. The signal is strictly about
+    /// wire/schema volatility ("may change or be removed within a compatible
+    /// version range") — **not** product gating, entitlement, or preview access.
+    /// Clients use it only to decide how defensively to code against a surface.
+    ///
+    /// This is connection-level metadata negotiated once at `initialize`. A
+    /// `reconnect` continues the same logical connection, so clients retain the
+    /// map across reconnects rather than re-requesting it, exactly as they retain
+    /// {@link InitializeResult.defaultDirectory | `defaultDirectory`} and
+    /// {@link InitializeResult.telemetry | `telemetry`}.
+    ///
+    /// Older clients that do not understand this field ignore it and treat every
+    /// surface as stable, consistent with the protocol's "ignore what you don't
+    /// understand" rule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feature_stability: Option<std::collections::HashMap<String, FeatureStabilityLevel>>,
 }
 
 /// Optional capabilities a client declares during `initialize`.

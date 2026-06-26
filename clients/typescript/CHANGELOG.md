@@ -22,6 +22,10 @@ hotfix escape hatch.
 
 ### Added
 
+- `InitializeResult.featureStability` — an optional
+  `Record<string, FeatureStabilityLevel>` advertising the wire/schema stability
+  (`stable` / `experimental` / `deprecated`) of selected surfaces a host emits,
+  keyed by surface identifier. Surfaces absent from the map are `stable`.
 - `SessionModelInfo.maxOutputTokens` and `SessionModelInfo.maxPromptTokens`
   optional fields for communicating model token limits.
 - `SessionSummary._meta` optional provider metadata field for lightweight

@@ -10,6 +10,28 @@ public enum ReconnectResultType: String, Codable, Sendable {
     case snapshot = "snapshot"
 }
 
+/// Wire/schema stability of a surface advertised in
+/// {@link InitializeResult.featureStability}.
+///
+/// Stability describes how settled a surface's shape is within a compatible
+/// SemVer range. It is deliberately **not** a product-gating, entitlement, or
+/// preview-access signal — a client uses it only to decide how defensively to
+/// code against the surface.
+public enum FeatureStabilityLevel: String, Codable, Sendable {
+    /// Normal additive SemVer guarantees apply; clients MAY build on it freely.
+    /// This is the default for any surface absent from
+    /// {@link InitializeResult.featureStability}, so it never needs to be
+    /// advertised explicitly.
+    case stable = "stable"
+    /// On the wire, but its shape MAY change or be removed within an otherwise
+    /// compatible version range. Clients SHOULD parse it defensively, gate
+    /// adoption behind a flag, tolerate shape changes, and not assume longevity.
+    case experimental = "experimental"
+    /// Still emitted, but scheduled for removal in a future version. Clients
+    /// SHOULD migrate off it and SHOULD NOT adopt it anew.
+    case deprecated = "deprecated"
+}
+
 /// Encoding of fetched content data.
 public enum ContentEncoding: String, Codable, Sendable {
     case base64 = "base64"
@@ -123,6 +145,28 @@ public struct InitializeResult: Codable, Sendable {
     /// defines a template variable, `{level}`, for subscriber-side severity
     /// filtering). Clients MAY ignore signals they cannot process.
     public var telemetry: TelemetryCapabilities?
+    /// Wire/schema stability of selected surfaces the host emits, keyed by a
+    /// surface identifier — a notification method (e.g. `"session/canvasOpened"`),
+    /// a command method (e.g. `"listSessions"`), a channel URI scheme (e.g.
+    /// `"ahp-otlp:"`), or a named capability.
+    ///
+    /// A surface absent from this map is {@link FeatureStabilityLevel.Stable |
+    /// `stable`} and carries the normal additive SemVer guarantees, so hosts list
+    /// **only** surfaces that are not stable. The signal is strictly about
+    /// wire/schema volatility ("may change or be removed within a compatible
+    /// version range") — **not** product gating, entitlement, or preview access.
+    /// Clients use it only to decide how defensively to code against a surface.
+    ///
+    /// This is connection-level metadata negotiated once at `initialize`. A
+    /// `reconnect` continues the same logical connection, so clients retain the
+    /// map across reconnects rather than re-requesting it, exactly as they retain
+    /// {@link InitializeResult.defaultDirectory | `defaultDirectory`} and
+    /// {@link InitializeResult.telemetry | `telemetry`}.
+    ///
+    /// Older clients that do not understand this field ignore it and treat every
+    /// surface as stable, consistent with the protocol's "ignore what you don't
+    /// understand" rule.
+    public var featureStability: [String: FeatureStabilityLevel]?
 
     public init(
         protocolVersion: String,
@@ -130,7 +174,8 @@ public struct InitializeResult: Codable, Sendable {
         snapshots: [Snapshot],
         defaultDirectory: String? = nil,
         completionTriggerCharacters: [String]? = nil,
-        telemetry: TelemetryCapabilities? = nil
+        telemetry: TelemetryCapabilities? = nil,
+        featureStability: [String: FeatureStabilityLevel]? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -138,6 +183,7 @@ public struct InitializeResult: Codable, Sendable {
         self.defaultDirectory = defaultDirectory
         self.completionTriggerCharacters = completionTriggerCharacters
         self.telemetry = telemetry
+        self.featureStability = featureStability
     }
 }
 

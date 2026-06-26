@@ -105,6 +105,13 @@
         "telemetry": {
           "$ref": "#/$defs/TelemetryCapabilities",
           "description": "OTLP telemetry channels the host emits, if any. Each populated field is\neither a literal `ahp-otlp:` channel URI or an RFC 6570 URI template a\nclient expands before subscribing (currently only the `logs` channel\ndefines a template variable, `{level}`, for subscriber-side severity\nfiltering). Clients MAY ignore signals they cannot process."
+        },
+        "featureStability": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/FeatureStabilityLevel"
+          },
+          "description": "Wire/schema stability of selected surfaces the host emits, keyed by a\nsurface identifier — a notification method (e.g. `\"session/canvasOpened\"`),\na command method (e.g. `\"listSessions\"`), a channel URI scheme (e.g.\n`\"ahp-otlp:\"`), or a named capability.\n\nA surface absent from this map is {@link FeatureStabilityLevel.Stable |\n`stable`} and carries the normal additive SemVer guarantees, so hosts list\n**only** surfaces that are not stable. The signal is strictly about\nwire/schema volatility (\"may change or be removed within a compatible\nversion range\") — **not** product gating, entitlement, or preview access.\nClients use it only to decide how defensively to code against a surface.\n\nThis is connection-level metadata negotiated once at `initialize`. A\n`reconnect` continues the same logical connection, so clients retain the\nmap across reconnects rather than re-requesting it, exactly as they retain\n{@link InitializeResult.defaultDirectory | `defaultDirectory`} and\n{@link InitializeResult.telemetry | `telemetry`}.\n\nOlder clients that do not understand this field ignore it and treat every\nsurface as stable, consistent with the protocol's \"ignore what you don't\nunderstand\" rule."
         }
       },
       "required": [

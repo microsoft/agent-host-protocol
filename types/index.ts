@@ -313,7 +313,7 @@ export type {
   ChangesetOperationFollowUp,
 } from './commands.js';
 
-export { ReconnectResultType, ContentEncoding, CompletionItemKind, ResourceType, ResourceWriteMode } from './commands.js';
+export { ReconnectResultType, FeatureStabilityLevel, ContentEncoding, CompletionItemKind, ResourceType, ResourceWriteMode } from './commands.js';
 
 // Notification types
 export type {

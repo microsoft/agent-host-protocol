@@ -33,6 +33,36 @@ New behavior generally lands in two stages:
 1. **Capability-gated.** A new feature is introduced as an opt-in capability advertised by a host or clients. Implementors check for the capability before exercising the feature. This lets hosts and clients adopt the feature on independent schedules without a version bump.
 2. **Required.** Once a capability has matured, a future protocol version may promote it to baseline behavior and remove the capability flag. This reduces long-term implementation complexity.
 
+## Stability Levels
+
+Capability advertisement is binary — a surface is either advertised or it isn't. But an agent host commonly wraps a fast-moving backend (a CLI, runtime, or remote service) that exposes **experimental** surfaces it reserves the right to reshape. Such a surface occupies a middle state: implemented and emitted on the wire, but with a shape that is not yet stable. A host that relays it has only two honest options without a standard signal — drop it (the client loses fidelity) or emit it silently (the client can't tell it's volatile).
+
+A stability level closes that gap. The host advertises the wire/schema stability of selected surfaces in [`InitializeResult.featureStability`](/reference/common#initializeresult) — an optional map keyed by a surface identifier (a notification method, a command method, a channel URI scheme, or a named capability):
+
+```jsonc
+{
+  "protocolVersion": "0.5.0",
+  "serverSeq": 42,
+  "snapshots": [ /* ... */ ],
+  "featureStability": {
+    "session/canvasOpened": "experimental",
+    "session/someOlderThing": "deprecated"
+  }
+}
+```
+
+| Level | Meaning | Client guidance |
+| --- | --- | --- |
+| `stable` (default / absent) | Normal SemVer additive guarantees apply. | Build on it freely. |
+| `experimental` | On the wire, but its shape may change or be removed within an otherwise-compatible version range. | Parse defensively, gate behind a flag, tolerate shape changes, don't assume longevity. |
+| `deprecated` | Still emitted, but scheduled for removal. | Migrate off; don't adopt anew. |
+
+A surface absent from the map is `stable`, so hosts list only the surfaces that are not stable. The signal is strictly about **wire/schema volatility** — *not* product gating, entitlement, or preview access; a client uses it only to decide how defensively to code against a surface.
+
+Stability is a static property of a surface, so it is advertised **once**, at the surface level, in the handshake — not stamped onto every message instance. It is connection-level metadata: a [`reconnect`](/specification/lifecycle#reconnection) continues the same logical connection, so clients retain the map rather than re-requesting it. Older clients that don't understand `featureStability` ignore it and treat every surface as stable, consistent with the [forward-compatibility](#forward-compatibility) rule.
+
+This adds a stability axis to the capability lifecycle above: a surface can be advertised **and** flagged `experimental`, giving an explicit path of `experimental → stable → (eventually) required`.
+
 ## Client and Host Update Cadence
 
 Agent hosts may be remote machines, cloud services, or other external APIs that the user does not control. Clients (IDEs, CLI tools, embedded UIs) are typically easier for a user to update than hosts.

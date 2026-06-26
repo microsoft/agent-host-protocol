@@ -19,6 +19,10 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Added
 
+- `InitializeResult.featureStability` — an optional
+  `[String: FeatureStabilityLevel]` advertising the wire/schema stability
+  (`.stable` / `.experimental` / `.deprecated`) of selected surfaces a host
+  emits, keyed by surface identifier. Surfaces absent from the map are stable.
 - `SessionModelInfo.maxOutputTokens` and `SessionModelInfo.maxPromptTokens`
   optional fields for communicating model token limits.
 - `SessionSummary.meta` (`_meta` on the wire) optional provider metadata field

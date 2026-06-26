@@ -25,11 +25,12 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 
 ### Added
 
+- `InitializeResult.featureStability` — an optional map advertising the
+  wire/schema stability (`FeatureStabilityLevel`: `stable` / `experimental` /
+  `deprecated`) of selected surfaces a host emits, keyed by surface identifier.
+  Surfaces absent from the map are `stable`.
 - `SessionModelInfo.maxOutputTokens` and `SessionModelInfo.maxPromptTokens`
   optional fields for communicating model token limits.
-- `SessionSummary._meta` optional provider metadata field for lightweight
-  session-list presentation hints.
-- `JsonPrimitive` type alias (`string | number | boolean | null`) in `types/common/state.ts`.
 - `session/activeClientRemoved` action to release a single active client from a
   session by `clientId`.
 
