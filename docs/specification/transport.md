@@ -15,6 +15,36 @@ A compliant transport MUST:
 
 Any mechanism that meets these requirements is acceptable — WebSocket, TCP with a framing layer, an in-process message channel, or anything else.
 
+## Restricted client authority
+
+Some transport bindings can grant different client-to-server publish
+permissions to the same logical connection. For example, a hosted relay might
+allow a client to observe an existing session but not steer the host that owns
+it.
+
+Transport bindings MAY enforce this distinction by classifying client-to-server
+messages into two authority classes:
+
+| Authority | Meaning | Examples |
+|---|---|---|
+| `protocol` | Connection management, liveness, and passive observation. These messages do not by themselves create work or mutate host state. | `initialize`, `ping`, `reconnect`, `subscribe`, `unsubscribe`, `listSessions`, `fetchTurns` |
+| `steering` | Messages that create, mutate, authenticate, or otherwise steer host behavior. | `createSession`, `createChat`, `dispose*`, `createTerminal`, `dispatchAction`, `authenticate`, resource writes/deletes/moves, changeset operations |
+
+A restricted client that only has `protocol` authority MUST still be able to
+complete the connection lifecycle. In particular, transports MUST NOT block
+`initialize` or `reconnect` solely because the client lacks steering authority.
+
+When a restricted client attempts a `steering` message, the transport binding or
+server SHOULD reject it with `PermissionDenied` (`-32009`) when a JSON-RPC
+response is possible. Fire-and-forget steering notifications MAY be dropped or
+echoed back as rejected actions according to the channel-specific validation
+rules.
+
+The TypeScript reference types expose `CLIENT_REQUEST_AUTHORITY` and
+`CLIENT_NOTIFICATION_AUTHORITY` as a conservative method classification. A
+transport binding MAY be stricter, but SHOULD NOT classify a listed `steering`
+message as `protocol` without a binding-specific security review.
+
 ## Common Transports
 
 While AHP does not mandate a transport, **WebSocket** is the most common choice for remote and cross-process connections, and is what the VS Code implementation uses.

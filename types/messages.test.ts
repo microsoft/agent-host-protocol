@@ -129,6 +129,26 @@ describe('CommandMap', () => {
     assert.deepStrictEqual(missing, [], `Missing from CommandMap: ${missing.join(', ')}`);
   });
 
+  describe('client message authority maps', () => {
+    const commandKeys = parseMapKeys(messagesSrc, 'CommandMap');
+    const notificationKeys = parseMapKeys(messagesSrc, 'ClientNotificationMap');
+
+    it('CLIENT_REQUEST_AUTHORITY lists exactly the CommandMap keys', () => {
+      const authorityKeys = [...messagesSrc.matchAll(/'([^']+)': ClientMessageAuthority\.(?:Protocol|Steering)/g)]
+        .map(match => match[1])
+        .filter(key => commandKeys.includes(key));
+      assert.deepStrictEqual([...new Set(authorityKeys)].sort(), commandKeys.sort());
+    });
+
+    it('CLIENT_NOTIFICATION_AUTHORITY lists exactly the ClientNotificationMap keys', () => {
+      const match = /CLIENT_NOTIFICATION_AUTHORITY[\s\S]*?= \{([\s\S]*?)\};/.exec(messagesSrc);
+      assert.ok(match, 'CLIENT_NOTIFICATION_AUTHORITY map not found');
+      const authorityKeys = [...match[1].matchAll(/'([^']+)': ClientMessageAuthority\.(?:Protocol|Steering)/g)]
+        .map(match => match[1]);
+      assert.deepStrictEqual(authorityKeys.sort(), notificationKeys.sort());
+    });
+  });
+
   it('contains no extra methods beyond commands.ts', () => {
     const extra = mapKeys.filter(m => !requests.includes(m));
     assert.deepStrictEqual(extra, [], `Extra in CommandMap: ${extra.join(', ')}`);

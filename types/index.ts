@@ -353,6 +353,12 @@ export type {
   ProtocolMessage,
 } from './messages.js';
 
+export {
+  ClientMessageAuthority,
+  CLIENT_REQUEST_AUTHORITY,
+  CLIENT_NOTIFICATION_AUTHORITY,
+} from './messages.js';
+
 // Error codes
 export {
   JsonRpcErrorCodes,

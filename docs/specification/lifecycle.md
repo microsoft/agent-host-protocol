@@ -36,6 +36,12 @@ The client initiates the connection with an `initialize` **request**. The client
 
 `locale` is an optional IETF BCP 47 language tag (e.g. `"en-US"`, `"ja"`) indicating the client's preferred language. The server SHOULD use this to localise user-facing strings such as confirmation option labels.
 
+`initialize` is a protocol-authority message. Transport bindings that support
+restricted or observe-only clients MUST still allow `initialize` so the client
+and server can negotiate the protocol version, establish the client id, and
+install any permitted initial subscriptions before the server rejects
+steering-authority messages.
+
 ### Initialize Response (Server → Client)
 
 ```json
@@ -125,6 +131,11 @@ If the gap exceeds the replay buffer, the server sends fresh snapshots instead:
 ```
 
 Protocol notifications are **not** replayed — the client SHOULD re-fetch the session list via [`listSessions`](/reference/root#listsessions). Stateless channels are simply re-subscribed; missed messages are dropped.
+
+Like `initialize`, `reconnect` is a protocol-authority message. Observe-only
+clients can use it to resume passive subscriptions without regaining authority
+to create sessions, dispatch actions, authenticate resources, or mutate host
+state.
 
 ## Unexpected Disconnection
 

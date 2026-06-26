@@ -220,6 +220,64 @@ export interface ClientNotificationMap {
 }
 
 /**
+ * Authority class for client → server messages.
+ *
+ * Transport bindings MAY use this classification to enforce restricted
+ * connections. For example, a relay can allow `protocol` messages for an
+ * observe-only client while requiring full steering authority for `steering`
+ * messages.
+ */
+export const enum ClientMessageAuthority {
+  /** Connection management, liveness, and passive observation. */
+  Protocol = 'protocol',
+  /** Messages that create, mutate, authenticate, or otherwise steer the host. */
+  Steering = 'steering',
+}
+
+/**
+ * Conservative classification of client → server request methods by the
+ * minimum authority a transport binding should require.
+ */
+export const CLIENT_REQUEST_AUTHORITY: { readonly [K in keyof CommandMap]: ClientMessageAuthority } = {
+  'initialize': ClientMessageAuthority.Protocol,
+  'ping': ClientMessageAuthority.Protocol,
+  'reconnect': ClientMessageAuthority.Protocol,
+  'subscribe': ClientMessageAuthority.Protocol,
+  'listSessions': ClientMessageAuthority.Protocol,
+  'fetchTurns': ClientMessageAuthority.Protocol,
+  'completions': ClientMessageAuthority.Protocol,
+  'resourceRead': ClientMessageAuthority.Protocol,
+  'resourceList': ClientMessageAuthority.Protocol,
+  'resourceResolve': ClientMessageAuthority.Protocol,
+  'createSession': ClientMessageAuthority.Steering,
+  'disposeSession': ClientMessageAuthority.Steering,
+  'createChat': ClientMessageAuthority.Steering,
+  'disposeChat': ClientMessageAuthority.Steering,
+  'createTerminal': ClientMessageAuthority.Steering,
+  'disposeTerminal': ClientMessageAuthority.Steering,
+  'createResourceWatch': ClientMessageAuthority.Steering,
+  'resourceWrite': ClientMessageAuthority.Steering,
+  'resourceCopy': ClientMessageAuthority.Steering,
+  'resourceDelete': ClientMessageAuthority.Steering,
+  'resourceMove': ClientMessageAuthority.Steering,
+  'resourceMkdir': ClientMessageAuthority.Steering,
+  'resourceRequest': ClientMessageAuthority.Steering,
+  'authenticate': ClientMessageAuthority.Steering,
+  'resolveSessionConfig': ClientMessageAuthority.Steering,
+  'sessionConfigCompletions': ClientMessageAuthority.Steering,
+  'invokeChangesetOperation': ClientMessageAuthority.Steering,
+};
+
+/**
+ * Conservative classification of client → server notification methods by the
+ * minimum authority a transport binding should require.
+ */
+export const CLIENT_NOTIFICATION_AUTHORITY: { readonly [K in keyof ClientNotificationMap]: ClientMessageAuthority } = {
+  'unsubscribe': ClientMessageAuthority.Protocol,
+  'dispatchAction': ClientMessageAuthority.Steering,
+};
+
+/**
  * Registry mapping each server → client notification method to its params type.
  *
  * Every notification's params MUST carry a top-level `channel: URI` so that

@@ -36,6 +36,12 @@ Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes
 
 `subscribe` is a JSON-RPC **request**. The result includes a snapshot for state-bearing channels and omits it for stateless ones.
 
+`subscribe` is a protocol-authority message: a client that is permitted to
+observe a channel can request the current snapshot and subsequent updates
+without also being permitted to steer the host. Servers MUST still apply the
+normal per-channel authorization checks and reject subscriptions to resources
+the client may not observe.
+
 ```jsonc
 // Client → Server
 {
@@ -76,6 +82,9 @@ After subscribing, the client receives all messages scoped to that channel — b
 ## Unsubscribe (Notification)
 
 `unsubscribe` is a fire-and-forget client → server notification. Like every wire message, its params carry the channel URI being released.
+
+`unsubscribe` is also a protocol-authority message. Restricted clients can
+release subscriptions even when they lack steering authority.
 
 ```json
 {
@@ -125,6 +134,12 @@ The client → server dispatch path uses a different method, `dispatchAction`, w
 ```
 
 See [Actions](/guide/actions) for the full list of client-dispatchable actions.
+
+`dispatchAction` requires steering authority. Even when an individual action
+looks presentation-oriented, the server treats client-dispatched actions as
+potential host mutations and MUST NOT accept them from an observe-only
+transport binding unless that binding has explicitly granted steering
+authority.
 
 ## Initial Subscriptions
 
