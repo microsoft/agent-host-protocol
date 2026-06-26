@@ -660,7 +660,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'CanvasProviderKind', 'CanvasInstanceAvailability', 'CanvasRequestKind',
-  'CanvasRequestCancelReason',
+  'CanvasRequestCancelReason', 'CanvasRequestOutcomeKind',
 ];
 
 /**
@@ -806,6 +806,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'CanvasOpenResult', omitDiscriminants: true },
   { name: 'CanvasActionResult', omitDiscriminants: true },
   { name: 'CanvasCloseResult', omitDiscriminants: true },
+  { name: 'CanvasRequestSuccessOutcome', omitDiscriminants: true },
+  { name: 'CanvasRequestErrorOutcome', omitDiscriminants: true },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1009,6 +1011,16 @@ const CANVAS_REQUEST_RESULT_UNION: UnionConfig = {
   ],
 };
 
+const CANVAS_REQUEST_OUTCOME_UNION: UnionConfig = {
+  name: 'CanvasRequestOutcome',
+  discriminantField: 'kind',
+  doc: 'Outcome of a canvas request: a success result or a failure error.',
+  variants: [
+    { variantName: 'Success', innerType: 'CanvasRequestSuccessOutcome', wireValue: 'success' },
+    { variantName: 'Error', innerType: 'CanvasRequestErrorOutcome', wireValue: 'error' },
+  ],
+};
+
 function generateChatOrigin(): string {
   return `/// How a chat came into existence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1124,6 +1136,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_OUTCOME_UNION));
   lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
@@ -1259,7 +1273,7 @@ pub struct ${scope}ToolCallConfirmedAction {
 
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, CanvasError, CanvasInstanceAvailability, CanvasRequestCancelReason, CanvasRequestResult, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionCanvasDeclaration, SessionCanvasRequest, SessionOpenCanvas, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, CanvasInstanceAvailability, CanvasRequestCancelReason, CanvasRequestOutcome, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionCanvasDeclaration, SessionCanvasRequest, SessionOpenCanvas, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1787,6 +1801,7 @@ function checkExhaustiveness(project: Project): void {
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
     'CanvasRequestResult',          // CANVAS_REQUEST_RESULT_UNION discriminated union
+    'CanvasRequestOutcome',         // CANVAS_REQUEST_OUTCOME_UNION discriminated union
     'ReconnectResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',

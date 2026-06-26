@@ -454,6 +454,17 @@ const (
 	CanvasRequestCancelReasonHostShutdown CanvasRequestCancelReason = "hostShutdown"
 )
 
+// Whether a {@link SessionCanvasRequest} succeeded or failed — the discriminant
+// for {@link CanvasRequestOutcome}.
+type CanvasRequestOutcomeKind string
+
+const (
+	// The provider fulfilled the request; a {@link CanvasRequestResult} follows.
+	CanvasRequestOutcomeKindSuccess CanvasRequestOutcomeKind = "success"
+	// The provider could not fulfil the request; a {@link CanvasError} follows.
+	CanvasRequestOutcomeKindError CanvasRequestOutcomeKind = "error"
+)
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 // An optionally-sized icon that can be displayed in a user interface.
@@ -3040,6 +3051,22 @@ type CanvasCloseResult struct {
 	Kind CanvasRequestKind `json:"kind"`
 }
 
+// Successful {@link CanvasRequestOutcome}, carrying the provider's
+// {@link CanvasRequestResult}.
+type CanvasRequestSuccessOutcome struct {
+	Kind CanvasRequestOutcomeKind `json:"kind"`
+	// Provider result; its `kind` matches the originating request's `kind`.
+	Result CanvasRequestResult `json:"result"`
+}
+
+// Failed {@link CanvasRequestOutcome}, carrying the provider's
+// {@link CanvasError}.
+type CanvasRequestErrorOutcome struct {
+	Kind CanvasRequestOutcomeKind `json:"kind"`
+	// Why the provider could not fulfil the request.
+	Error CanvasError `json:"error"`
+}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 // ResponsePart is a single part of a response stream (text, tool call, reasoning, content reference).
@@ -4143,6 +4170,51 @@ func (u *CanvasRequestResult) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON encodes the active variant back to JSON.
 func (u CanvasRequestResult) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// CanvasRequestOutcome is the outcome of a canvas request: a success result or a failure error.
+type CanvasRequestOutcome struct {
+	Value isCanvasRequestOutcome
+}
+
+// isCanvasRequestOutcome is the marker interface implemented by every
+// concrete variant of CanvasRequestOutcome.
+type isCanvasRequestOutcome interface{ isCanvasRequestOutcome() }
+
+func (*CanvasRequestSuccessOutcome) isCanvasRequestOutcome() {}
+func (*CanvasRequestErrorOutcome) isCanvasRequestOutcome()   {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *CanvasRequestOutcome) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "success":
+		var value CanvasRequestSuccessOutcome
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "error":
+		var value CanvasRequestErrorOutcome
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return &json.UnmarshalTypeError{Value: "CanvasRequestOutcome", Type: nil}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u CanvasRequestOutcome) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}

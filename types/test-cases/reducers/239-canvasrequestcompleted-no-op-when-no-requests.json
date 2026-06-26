@@ -18,8 +18,11 @@
     {
       "type": "session/canvasRequestCompleted",
       "requestId": "r-1",
-      "result": {
-        "kind": "open"
+      "outcome": {
+        "kind": "success",
+        "result": {
+          "kind": "open"
+        }
       }
     }
   ],

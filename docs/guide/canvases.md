@@ -107,7 +107,7 @@ CanvasRequestTarget {
 Three actions drive the lifecycle:
 
 - **`session/canvasRequestCreated`** carries a full `SessionCanvasRequest` and **upserts** it by `requestId`.
-- **`session/canvasRequestCompleted`** carries `requestId` plus a `result?` (a `CanvasRequestResult`) or an `error?` (a `CanvasError`) and **removes** the request. It is a no-op when no request matches.
+- **`session/canvasRequestCompleted`** carries `requestId` plus an `outcome` (a `CanvasRequestOutcome` — either a success carrying a `CanvasRequestResult` or a failure carrying a `CanvasError`) and **removes** the request. It is a no-op when no request matches.
 - **`session/canvasRequestCancelled`** carries `requestId` and a `reason` (`CanvasRequestCancelReason` — `timeout`, `providerDisconnected`, `instanceClosed`, or `hostShutdown`) and **removes** the request when the host abandons it.
 
 `CanvasRequestResult` is a discriminated union keyed by `kind`, matching the originating request:
@@ -117,6 +117,14 @@ type CanvasRequestResult =
   | { kind: 'open';   url?: string; title?: string; status?: string }
   | { kind: 'action'; value?: unknown }
   | { kind: 'close' }
+```
+
+The completion wraps that result in a `CanvasRequestOutcome` — a discriminated union over `kind` that is **either** a success (carrying `result`) **or** a failure (carrying `error`), never both and never neither:
+
+```typescript
+type CanvasRequestOutcome =
+  | { kind: 'success'; result: CanvasRequestResult }
+  | { kind: 'error';   error: CanvasError }
 ```
 
 A typical action invocation routed to a server-side provider:
@@ -133,7 +141,7 @@ sequenceDiagram
     Host-->>Agent: canvasRequestCreated (kind: 'action')
 
     Provider-->>Host: result
-    Host-->>Agent: canvasRequestCompleted (requestId, result.kind: 'action')
+    Host-->>Agent: canvasRequestCompleted (requestId, outcome.kind: 'success')
     Note over Host: request removed from canvasRequests
 ```
 
@@ -160,7 +168,7 @@ When an instance has no specific `renderer` binding, any active client with `can
 | `session/canvasInstanceClosed` | `instanceId` | Remove the instance from `openCanvases` and drop its `canvasRequests`. No-op when absent. |
 | `session/canvasInstanceCloseRequested` | `instanceId` | Client-dispatched signal; no state change. |
 | `session/canvasRequestCreated` | `request: SessionCanvasRequest` | Upsert into `canvasRequests` by `requestId`. |
-| `session/canvasRequestCompleted` | `requestId`, `result?`, `error?` | Remove the request. No-op when absent. Client-dispatched for active-client targets. |
+| `session/canvasRequestCompleted` | `requestId`, `outcome` | Remove the request. No-op when absent. Client-dispatched for active-client targets. |
 | `session/canvasRequestCancelled` | `requestId`, `reason` | Remove the request when the host abandons it. |
 
 `session/canvasInstanceCloseRequested` and `session/canvasRequestCompleted` are client-dispatchable; the rest are server-authored. See [Server Validation of Client Actions](/specification/session-channel#server-validation-of-client-actions) for the host's validation duties.

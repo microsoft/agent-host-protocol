@@ -547,7 +547,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'CanvasProviderKind', 'CanvasInstanceAvailability', 'CanvasRequestKind',
-  'CanvasRequestCancelReason',
+  'CanvasRequestCancelReason', 'CanvasRequestOutcomeKind',
 ];
 
 const STATE_STRUCTS = [
@@ -598,6 +598,7 @@ const STATE_STRUCTS = [
   'SessionCanvasAction', 'SessionCanvasDeclaration', 'SessionOpenCanvas',
   'SessionCanvasRequest', 'CanvasRequestTarget', 'ClientCanvasDeclaration',
   'CanvasError', 'CanvasOpenResult', 'CanvasActionResult', 'CanvasCloseResult',
+  'CanvasRequestSuccessOutcome', 'CanvasRequestErrorOutcome',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -781,6 +782,15 @@ const CANVAS_REQUEST_RESULT_UNION: UnionConfig = {
     { caseName: 'open', structName: 'CanvasOpenResult', discriminantValue: 'open' },
     { caseName: 'action', structName: 'CanvasActionResult', discriminantValue: 'action' },
     { caseName: 'close', structName: 'CanvasCloseResult', discriminantValue: 'close' },
+  ],
+};
+
+const CANVAS_REQUEST_OUTCOME_UNION: UnionConfig = {
+  name: 'CanvasRequestOutcome',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'success', structName: 'CanvasRequestSuccessOutcome', discriminantValue: 'success' },
+    { caseName: 'error', structName: 'CanvasRequestErrorOutcome', discriminantValue: 'error' },
   ],
 };
 
@@ -1038,6 +1048,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_OUTCOME_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -1916,6 +1928,7 @@ function checkExhaustiveness(project: Project): void {
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
     'CanvasRequestResult',          // CANVAS_REQUEST_RESULT_UNION discriminated union
+    'CanvasRequestOutcome',         // CANVAS_REQUEST_OUTCOME_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()

@@ -650,7 +650,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'CanvasProviderKind', 'CanvasInstanceAvailability', 'CanvasRequestKind',
-  'CanvasRequestCancelReason',
+  'CanvasRequestCancelReason', 'CanvasRequestOutcomeKind',
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
@@ -775,6 +775,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'CanvasOpenResult' },
   { name: 'CanvasActionResult' },
   { name: 'CanvasCloseResult' },
+  { name: 'CanvasRequestSuccessOutcome' },
+  { name: 'CanvasRequestErrorOutcome' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -970,6 +972,16 @@ const CANVAS_REQUEST_RESULT_UNION: UnionConfig = {
     { variantName: 'Open', innerType: 'CanvasOpenResult', wireValue: 'open' },
     { variantName: 'Action', innerType: 'CanvasActionResult', wireValue: 'action' },
     { variantName: 'Close', innerType: 'CanvasCloseResult', wireValue: 'close' },
+  ],
+};
+
+const CANVAS_REQUEST_OUTCOME_UNION: UnionConfig = {
+  name: 'CanvasRequestOutcome',
+  discriminantField: 'kind',
+  doc: 'CanvasRequestOutcome is the outcome of a canvas request: a success result or a failure error.',
+  variants: [
+    { variantName: 'Success', innerType: 'CanvasRequestSuccessOutcome', wireValue: 'success' },
+    { variantName: 'Error', innerType: 'CanvasRequestErrorOutcome', wireValue: 'error' },
   ],
 };
 
@@ -1216,6 +1228,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_OUTCOME_UNION));
   lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
@@ -1919,6 +1933,7 @@ function checkExhaustiveness(project: Project): void {
     'McpServerState',
     'ToolCallContributor',
     'CanvasRequestResult',
+    'CanvasRequestOutcome',
     'ReconnectResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',

@@ -3439,6 +3439,40 @@
         "message"
       ]
     },
+    "CanvasRequestSuccessOutcome": {
+      "type": "object",
+      "description": "Successful {@link CanvasRequestOutcome}, carrying the provider's\n{@link CanvasRequestResult}.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CanvasRequestOutcomeKind.Success"
+        },
+        "result": {
+          "$ref": "#/$defs/CanvasRequestResult",
+          "description": "Provider result; its `kind` matches the originating request's `kind`."
+        }
+      },
+      "required": [
+        "kind",
+        "result"
+      ]
+    },
+    "CanvasRequestErrorOutcome": {
+      "type": "object",
+      "description": "Failed {@link CanvasRequestOutcome}, carrying the provider's\n{@link CanvasError}.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CanvasRequestOutcomeKind.Error"
+        },
+        "error": {
+          "$ref": "#/$defs/CanvasError",
+          "description": "Why the provider could not fulfil the request."
+        }
+      },
+      "required": [
+        "kind",
+        "error"
+      ]
+    },
     "ChatState": {
       "type": "object",
       "description": "Full state for a single chat, loaded when a client subscribes to the chat's\nURI.\n\nThe lightweight catalog representation of a chat is {@link ChatSummary},\ncarried in {@link SessionState.chats | `SessionState.chats`}. `ChatState`\n**denormalizes** every {@link ChatSummary} field directly onto itself so\nsubscribers receive one flat object instead of having to merge a nested\n`summary` sub-object. Producers MUST keep the two representations\nconsistent: any change to the inlined fields below SHOULD also be\nannounced on the parent session via the matching\n{@link SessionChatUpdatedAction | `session/chatUpdated`} action.",
@@ -6412,7 +6446,7 @@
     },
     "SessionCanvasRequestCompletedAction": {
       "type": "object",
-      "description": "The targeted provider reported the outcome of a\n{@link SessionCanvasRequestCreatedAction}. Removes the matching entry from\n{@link SessionState.canvasRequests} by `requestId`; a no-op when none\nmatches. Exactly one of `result` / `error` MUST be present, and a present\n`result.kind` MUST match the originating request's `kind`.\n\nDirection depends on the request's `target`: for an\n{@link CanvasProviderKind.ActiveClient} target only the client whose\n`clientId` matches `target.clientId` may dispatch this; for a\n{@link CanvasProviderKind.Server} target the host emits it and the server\nSHOULD reject any client-dispatched completion.",
+      "description": "The targeted provider reported the outcome of a\n{@link SessionCanvasRequestCreatedAction}. Removes the matching entry from\n{@link SessionState.canvasRequests} by `requestId`; a no-op when none\nmatches. The {@link CanvasRequestOutcome | `outcome`} is either a success\n(carrying a {@link CanvasRequestResult} whose `kind` matches the originating\nrequest's `kind`) or a failure (carrying a {@link CanvasError}).\n\nDirection depends on the request's `target`: for an\n{@link CanvasProviderKind.ActiveClient} target only the client whose\n`clientId` matches `target.clientId` may dispatch this; for a\n{@link CanvasProviderKind.Server} target the host emits it and the server\nSHOULD reject any client-dispatched completion.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.SessionCanvasRequestCompleted"
@@ -6421,18 +6455,15 @@
           "type": "string",
           "description": "The request being completed."
         },
-        "result": {
-          "$ref": "#/$defs/CanvasRequestResult",
-          "description": "Success payload. Mutually exclusive with `error`."
-        },
-        "error": {
-          "$ref": "#/$defs/CanvasError",
-          "description": "Failure payload. Mutually exclusive with `result`."
+        "outcome": {
+          "$ref": "#/$defs/CanvasRequestOutcome",
+          "description": "Success result or failure error — exactly one, by construction."
         }
       },
       "required": [
         "type",
-        "requestId"
+        "requestId",
+        "outcome"
       ]
     },
     "SessionCanvasRequestCancelledAction": {

@@ -945,8 +945,9 @@ type SessionCanvasRequestCreatedAction struct {
 // The targeted provider reported the outcome of a
 // {@link SessionCanvasRequestCreatedAction}. Removes the matching entry from
 // {@link SessionState.canvasRequests} by `requestId`; a no-op when none
-// matches. Exactly one of `result` / `error` MUST be present, and a present
-// `result.kind` MUST match the originating request's `kind`.
+// matches. The {@link CanvasRequestOutcome | `outcome`} is either a success
+// (carrying a {@link CanvasRequestResult} whose `kind` matches the originating
+// request's `kind`) or a failure (carrying a {@link CanvasError}).
 //
 // Direction depends on the request's `target`: for an
 // {@link CanvasProviderKind.ActiveClient} target only the client whose
@@ -957,10 +958,8 @@ type SessionCanvasRequestCompletedAction struct {
 	Type ActionType `json:"type"`
 	// The request being completed.
 	RequestId string `json:"requestId"`
-	// Success payload. Mutually exclusive with `error`.
-	Result *CanvasRequestResult `json:"result,omitempty"`
-	// Failure payload. Mutually exclusive with `result`.
-	Error *CanvasError `json:"error,omitempty"`
+	// Success result or failure error — exactly one, by construction.
+	Outcome CanvasRequestOutcome `json:"outcome"`
 }
 
 // The host abandoned an in-flight request — typically because the targeted

@@ -12,15 +12,15 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::state::{
-    AgentInfo, AgentSelection, Annotation, AnnotationEntry, CanvasError,
-    CanvasInstanceAvailability, CanvasRequestCancelReason, CanvasRequestResult, Changeset,
-    ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
-    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
-    ConfirmationOption, Customization, ErrorInfo, McpServerState, Message, ModelSelection,
-    PendingMessageKind, ResponsePart, SessionActiveClient, SessionCanvasDeclaration,
-    SessionCanvasRequest, SessionOpenCanvas, TerminalClaim, TerminalInfo, TextRange,
-    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolDefinition, ToolResultContent, UsageInfo,
+    AgentInfo, AgentSelection, Annotation, AnnotationEntry, CanvasInstanceAvailability,
+    CanvasRequestCancelReason, CanvasRequestOutcome, Changeset, ChangesetFile, ChangesetOperation,
+    ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer, ChatInputRequest,
+    ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary, ConfirmationOption,
+    Customization, ErrorInfo, McpServerState, Message, ModelSelection, PendingMessageKind,
+    ResponsePart, SessionActiveClient, SessionCanvasDeclaration, SessionCanvasRequest,
+    SessionOpenCanvas, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolDefinition,
+    ToolResultContent, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -1152,8 +1152,9 @@ pub struct SessionCanvasRequestCreatedAction {
 /// The targeted provider reported the outcome of a
 /// {@link SessionCanvasRequestCreatedAction}. Removes the matching entry from
 /// {@link SessionState.canvasRequests} by `requestId`; a no-op when none
-/// matches. Exactly one of `result` / `error` MUST be present, and a present
-/// `result.kind` MUST match the originating request's `kind`.
+/// matches. The {@link CanvasRequestOutcome | `outcome`} is either a success
+/// (carrying a {@link CanvasRequestResult} whose `kind` matches the originating
+/// request's `kind`) or a failure (carrying a {@link CanvasError}).
 ///
 /// Direction depends on the request's `target`: for an
 /// {@link CanvasProviderKind.ActiveClient} target only the client whose
@@ -1165,12 +1166,8 @@ pub struct SessionCanvasRequestCreatedAction {
 pub struct SessionCanvasRequestCompletedAction {
     /// The request being completed.
     pub request_id: String,
-    /// Success payload. Mutually exclusive with `error`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub result: Option<CanvasRequestResult>,
-    /// Failure payload. Mutually exclusive with `result`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<CanvasError>,
+    /// Success result or failure error — exactly one, by construction.
+    pub outcome: CanvasRequestOutcome,
 }
 
 /// The host abandoned an in-flight request — typically because the targeted

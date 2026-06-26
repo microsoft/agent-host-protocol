@@ -1060,13 +1060,9 @@ data class SessionCanvasRequestCompletedAction(
      */
     val requestId: String,
     /**
-     * Success payload. Mutually exclusive with `error`.
+     * Success result or failure error — exactly one, by construction.
      */
-    val result: CanvasRequestResult? = null,
-    /**
-     * Failure payload. Mutually exclusive with `result`.
-     */
-    val error: CanvasError? = null
+    val outcome: CanvasRequestOutcome
 )
 
 @Serializable

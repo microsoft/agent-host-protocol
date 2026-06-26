@@ -1409,6 +1409,56 @@ export interface CanvasError {
 }
 
 /**
+ * Whether a {@link SessionCanvasRequest} succeeded or failed — the discriminant
+ * for {@link CanvasRequestOutcome}.
+ *
+ * @category Canvas Types
+ */
+export const enum CanvasRequestOutcomeKind {
+  /** The provider fulfilled the request; a {@link CanvasRequestResult} follows. */
+  Success = 'success',
+  /** The provider could not fulfil the request; a {@link CanvasError} follows. */
+  Error = 'error',
+}
+
+/**
+ * Successful {@link CanvasRequestOutcome}, carrying the provider's
+ * {@link CanvasRequestResult}.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasRequestSuccessOutcome {
+  kind: CanvasRequestOutcomeKind.Success;
+  /** Provider result; its `kind` matches the originating request's `kind`. */
+  result: CanvasRequestResult;
+}
+
+/**
+ * Failed {@link CanvasRequestOutcome}, carrying the provider's
+ * {@link CanvasError}.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasRequestErrorOutcome {
+  kind: CanvasRequestOutcomeKind.Error;
+  /** Why the provider could not fulfil the request. */
+  error: CanvasError;
+}
+
+/**
+ * Outcome of a {@link SessionCanvasRequest}, carried by
+ * `session/canvasRequestCompleted`. A discriminated union over
+ * {@link CanvasRequestOutcomeKind} so a completion carries either a success
+ * {@link CanvasRequestResult | result} or a failure {@link CanvasError | error}
+ * — never both and never neither.
+ *
+ * @category Canvas Types
+ */
+export type CanvasRequestOutcome =
+  | CanvasRequestSuccessOutcome
+  | CanvasRequestErrorOutcome;
+
+/**
  * Why the host abandoned an in-flight {@link SessionCanvasRequest}, carried by
  * `session/canvasRequestCancelled`.
  *

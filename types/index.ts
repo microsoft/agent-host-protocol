@@ -105,6 +105,20 @@ export type {
   TelemetryCapabilities,
   ResourceWatchState,
   ResourceChange,
+  SessionCanvasAction,
+  SessionCanvasDeclaration,
+  SessionOpenCanvas,
+  CanvasRequestTarget,
+  SessionCanvasRequest,
+  ClientCanvasDeclaration,
+  CanvasOpenResult,
+  CanvasActionResult,
+  CanvasCloseResult,
+  CanvasRequestResult,
+  CanvasError,
+  CanvasRequestSuccessOutcome,
+  CanvasRequestErrorOutcome,
+  CanvasRequestOutcome,
 } from './state.js';
 
 export {
@@ -131,6 +145,11 @@ export {
   ChangesetOperationStatus,
   ChangesetOperationScope,
   ResourceChangeType,
+  CanvasProviderKind,
+  CanvasInstanceAvailability,
+  CanvasRequestKind,
+  CanvasRequestCancelReason,
+  CanvasRequestOutcomeKind,
 } from './state.js';
 
 // Action types
@@ -205,6 +224,14 @@ export type {
   TerminalCommandFinishedAction,
   TerminalCommandDetectionAvailableAction,
   ResourceWatchChangedAction,
+  SessionCanvasRegistryChangedAction,
+  SessionCanvasInstanceOpenedAction,
+  SessionCanvasInstanceUpdatedAction,
+  SessionCanvasInstanceClosedAction,
+  SessionCanvasInstanceCloseRequestedAction,
+  SessionCanvasRequestCreatedAction,
+  SessionCanvasRequestCompletedAction,
+  SessionCanvasRequestCancelledAction,
 } from './actions.js';
 
 export { ActionType } from './actions.js';

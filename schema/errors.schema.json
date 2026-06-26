@@ -2287,6 +2287,40 @@
         "message"
       ]
     },
+    "CanvasRequestSuccessOutcome": {
+      "type": "object",
+      "description": "Successful {@link CanvasRequestOutcome}, carrying the provider's\n{@link CanvasRequestResult}.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CanvasRequestOutcomeKind.Success"
+        },
+        "result": {
+          "$ref": "#/$defs/CanvasRequestResult",
+          "description": "Provider result; its `kind` matches the originating request's `kind`."
+        }
+      },
+      "required": [
+        "kind",
+        "result"
+      ]
+    },
+    "CanvasRequestErrorOutcome": {
+      "type": "object",
+      "description": "Failed {@link CanvasRequestOutcome}, carrying the provider's\n{@link CanvasError}.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CanvasRequestOutcomeKind.Error"
+        },
+        "error": {
+          "$ref": "#/$defs/CanvasError",
+          "description": "Why the provider could not fulfil the request."
+        }
+      },
+      "required": [
+        "kind",
+        "error"
+      ]
+    },
     "ChatState": {
       "type": "object",
       "description": "Full state for a single chat, loaded when a client subscribes to the chat's\nURI.\n\nThe lightweight catalog representation of a chat is {@link ChatSummary},\ncarried in {@link SessionState.chats | `SessionState.chats`}. `ChatState`\n**denormalizes** every {@link ChatSummary} field directly onto itself so\nsubscribers receive one flat object instead of having to merge a nested\n`summary` sub-object. Producers MUST keep the two representations\nconsistent: any change to the inlined fields below SHOULD also be\nannounced on the parent session via the matching\n{@link SessionChatUpdatedAction | `session/chatUpdated`} action.",

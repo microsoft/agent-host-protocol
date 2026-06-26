@@ -410,6 +410,15 @@ public enum CanvasRequestCancelReason: String, Codable, Sendable {
     case hostShutdown = "hostShutdown"
 }
 
+/// Whether a {@link SessionCanvasRequest} succeeded or failed — the discriminant
+/// for {@link CanvasRequestOutcome}.
+public enum CanvasRequestOutcomeKind: String, Codable, Sendable {
+    /// The provider fulfilled the request; a {@link CanvasRequestResult} follows.
+    case success = "success"
+    /// The provider could not fulfil the request; a {@link CanvasError} follows.
+    case error = "error"
+}
+
 // MARK: - State Types
 
 public struct Icon: Codable, Sendable {
@@ -4521,6 +4530,34 @@ public struct CanvasCloseResult: Codable, Sendable {
     }
 }
 
+public struct CanvasRequestSuccessOutcome: Codable, Sendable {
+    public var kind: CanvasRequestOutcomeKind
+    /// Provider result; its `kind` matches the originating request's `kind`.
+    public var result: CanvasRequestResult
+
+    public init(
+        kind: CanvasRequestOutcomeKind,
+        result: CanvasRequestResult
+    ) {
+        self.kind = kind
+        self.result = result
+    }
+}
+
+public struct CanvasRequestErrorOutcome: Codable, Sendable {
+    public var kind: CanvasRequestOutcomeKind
+    /// Why the provider could not fulfil the request.
+    public var error: CanvasError
+
+    public init(
+        kind: CanvasRequestOutcomeKind,
+        error: CanvasError
+    ) {
+        self.kind = kind
+        self.error = error
+    }
+}
+
 // MARK: - Discriminated Unions
 
 public struct ChatOriginUser: Codable, Sendable {
@@ -5141,6 +5178,35 @@ public enum CanvasRequestResult: Codable, Sendable {
         case .open(let value): try value.encode(to: encoder)
         case .action(let value): try value.encode(to: encoder)
         case .close(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum CanvasRequestOutcome: Codable, Sendable {
+    case success(CanvasRequestSuccessOutcome)
+    case error(CanvasRequestErrorOutcome)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "success":
+            self = .success(try CanvasRequestSuccessOutcome(from: decoder))
+        case "error":
+            self = .error(try CanvasRequestErrorOutcome(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown CanvasRequestOutcome discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .success(let value): try value.encode(to: encoder)
+        case .error(let value): try value.encode(to: encoder)
         }
     }
 }

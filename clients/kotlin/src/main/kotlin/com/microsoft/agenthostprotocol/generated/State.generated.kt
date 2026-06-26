@@ -765,6 +765,24 @@ enum class CanvasRequestCancelReason {
     HOST_SHUTDOWN
 }
 
+/**
+ * Whether a {@link SessionCanvasRequest} succeeded or failed — the discriminant
+ * for {@link CanvasRequestOutcome}.
+ */
+@Serializable
+enum class CanvasRequestOutcomeKind {
+    /**
+     * The provider fulfilled the request; a {@link CanvasRequestResult} follows.
+     */
+    @SerialName("success")
+    SUCCESS,
+    /**
+     * The provider could not fulfil the request; a {@link CanvasError} follows.
+     */
+    @SerialName("error")
+    ERROR
+}
+
 // ─── State Types ────────────────────────────────────────────────────────────
 
 @Serializable
@@ -4146,6 +4164,24 @@ data class CanvasCloseResult(
     val kind: CanvasRequestKind
 )
 
+@Serializable
+data class CanvasRequestSuccessOutcome(
+    val kind: CanvasRequestOutcomeKind,
+    /**
+     * Provider result; its `kind` matches the originating request's `kind`.
+     */
+    val result: CanvasRequestResult
+)
+
+@Serializable
+data class CanvasRequestErrorOutcome(
+    val kind: CanvasRequestOutcomeKind,
+    /**
+     * Why the provider could not fulfil the request.
+     */
+    val error: CanvasError
+)
+
 // ─── Discriminated Unions ───────────────────────────────────────────────────
 
 @Serializable(with = ChatOriginSerializer::class)
@@ -4978,6 +5014,44 @@ internal object CanvasRequestResultSerializer : KSerializer<CanvasRequestResult>
             is CanvasRequestResultOpen -> output.json.encodeToJsonElement(CanvasOpenResult.serializer(), value.value)
             is CanvasRequestResultAction -> output.json.encodeToJsonElement(CanvasActionResult.serializer(), value.value)
             is CanvasRequestResultClose -> output.json.encodeToJsonElement(CanvasCloseResult.serializer(), value.value)
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable(with = CanvasRequestOutcomeSerializer::class)
+sealed interface CanvasRequestOutcome
+
+@JvmInline
+value class CanvasRequestOutcomeSuccess(val value: CanvasRequestSuccessOutcome) : CanvasRequestOutcome
+@JvmInline
+value class CanvasRequestOutcomeError(val value: CanvasRequestErrorOutcome) : CanvasRequestOutcome
+
+internal object CanvasRequestOutcomeSerializer : KSerializer<CanvasRequestOutcome> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CanvasRequestOutcome")
+
+    override fun deserialize(decoder: Decoder): CanvasRequestOutcome {
+        val input = decoder as? JsonDecoder
+            ?: error("CanvasRequestOutcome can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CanvasRequestOutcome")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on CanvasRequestOutcome")
+        return when (discriminant) {
+            "success" -> CanvasRequestOutcomeSuccess(input.json.decodeFromJsonElement(CanvasRequestSuccessOutcome.serializer(), element))
+            "error" -> CanvasRequestOutcomeError(input.json.decodeFromJsonElement(CanvasRequestErrorOutcome.serializer(), element))
+            else -> error("Unknown CanvasRequestOutcome discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CanvasRequestOutcome) {
+        val output = encoder as? JsonEncoder
+            ?: error("CanvasRequestOutcome can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CanvasRequestOutcomeSuccess -> output.json.encodeToJsonElement(CanvasRequestSuccessOutcome.serializer(), value.value)
+            is CanvasRequestOutcomeError -> output.json.encodeToJsonElement(CanvasRequestErrorOutcome.serializer(), value.value)
         }
         output.encodeJsonElement(element)
     }

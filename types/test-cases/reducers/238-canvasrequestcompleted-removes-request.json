@@ -40,9 +40,12 @@
     {
       "type": "session/canvasRequestCompleted",
       "requestId": "r-1",
-      "result": {
-        "kind": "open",
-        "url": "https://example/report"
+      "outcome": {
+        "kind": "success",
+        "result": {
+          "kind": "open",
+          "url": "https://example/report"
+        }
       }
     }
   ],

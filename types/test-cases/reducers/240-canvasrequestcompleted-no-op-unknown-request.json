@@ -30,9 +30,12 @@
     {
       "type": "session/canvasRequestCompleted",
       "requestId": "r-zzz",
-      "error": {
-        "code": "canvas_provider_unavailable",
-        "message": "gone"
+      "outcome": {
+        "kind": "error",
+        "error": {
+          "code": "canvas_provider_unavailable",
+          "message": "gone"
+        }
       }
     }
   ],

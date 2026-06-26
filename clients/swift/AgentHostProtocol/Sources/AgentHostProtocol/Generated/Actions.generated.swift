@@ -1366,21 +1366,17 @@ public struct SessionCanvasRequestCompletedAction: Codable, Sendable {
     public var type: ActionType
     /// The request being completed.
     public var requestId: String
-    /// Success payload. Mutually exclusive with `error`.
-    public var result: CanvasRequestResult?
-    /// Failure payload. Mutually exclusive with `result`.
-    public var error: CanvasError?
+    /// Success result or failure error — exactly one, by construction.
+    public var outcome: CanvasRequestOutcome
 
     public init(
         type: ActionType,
         requestId: String,
-        result: CanvasRequestResult? = nil,
-        error: CanvasError? = nil
+        outcome: CanvasRequestOutcome
     ) {
         self.type = type
         self.requestId = requestId
-        self.result = result
-        self.error = error
+        self.outcome = outcome
     }
 }
 

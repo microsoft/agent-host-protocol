@@ -598,6 +598,18 @@ pub enum CanvasRequestCancelReason {
     HostShutdown,
 }
 
+/// Whether a {@link SessionCanvasRequest} succeeded or failed — the discriminant
+/// for {@link CanvasRequestOutcome}.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CanvasRequestOutcomeKind {
+    /// The provider fulfilled the request; a {@link CanvasRequestResult} follows.
+    #[serde(rename = "success")]
+    Success,
+    /// The provider could not fulfil the request; a {@link CanvasError} follows.
+    #[serde(rename = "error")]
+    Error,
+}
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 /// An optionally-sized icon that can be displayed in a user interface.
@@ -3701,6 +3713,24 @@ pub struct CanvasActionResult {
 #[serde(rename_all = "camelCase")]
 pub struct CanvasCloseResult {}
 
+/// Successful {@link CanvasRequestOutcome}, carrying the provider's
+/// {@link CanvasRequestResult}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRequestSuccessOutcome {
+    /// Provider result; its `kind` matches the originating request's `kind`.
+    pub result: CanvasRequestResult,
+}
+
+/// Failed {@link CanvasRequestOutcome}, carrying the provider's
+/// {@link CanvasError}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasRequestErrorOutcome {
+    /// Why the provider could not fulfil the request.
+    pub error: CanvasError,
+}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 /// How a chat came into existence.
@@ -4002,6 +4032,16 @@ pub enum CanvasRequestResult {
     Action(CanvasActionResult),
     #[serde(rename = "close")]
     Close(CanvasCloseResult),
+}
+
+/// Outcome of a canvas request: a success result or a failure error.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum CanvasRequestOutcome {
+    #[serde(rename = "success")]
+    Success(CanvasRequestSuccessOutcome),
+    #[serde(rename = "error")]
+    Error(CanvasRequestErrorOutcome),
 }
 
 /// The state payload of a snapshot — root, session, chat, terminal,
