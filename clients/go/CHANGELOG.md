@@ -21,6 +21,8 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
   sets or clears `state.Draft` without stamping `ModifiedAt`.
 - `Message.Model` and `Message.Agent` optional fields recording the model /
   agent selection a message was composed with.
+- `ChatActivityChangedAction` (wire `chat/activityChanged`) for updating a chat's
+  current activity description independently of the session summary.
 - `ProgressParams` struct (wire `root/progress`) — a generic progress notification
   correlated by a `ProgressToken` (added on `CreateSessionParams`).
   Used today for the lazy first-use download of an agent's native SDK.

@@ -1,0 +1,26 @@
+{
+  "description": "chat/activityChanged clears activity with null",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "copilot:/test-session/chat/main",
+    "title": "Test Chat",
+    "status": 1,
+    "activity": "Thinking",
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/activityChanged",
+      "activity": null
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "copilot:/test-session/chat/main",
+    "title": "Test Chat",
+    "status": 1,
+    "activity": null,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

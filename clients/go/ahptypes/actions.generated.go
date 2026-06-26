@@ -40,6 +40,7 @@ const (
 	ActionTypeChatTurnComplete                  ActionType = "chat/turnComplete"
 	ActionTypeChatTurnCancelled                 ActionType = "chat/turnCancelled"
 	ActionTypeChatError                         ActionType = "chat/error"
+	ActionTypeChatActivityChanged               ActionType = "chat/activityChanged"
 	ActionTypeSessionTitleChanged               ActionType = "session/titleChanged"
 	ActionTypeChatUsage                         ActionType = "chat/usage"
 	ActionTypeChatReasoning                     ActionType = "chat/reasoning"
@@ -491,6 +492,19 @@ type ChatErrorAction struct {
 	// (such as a sub-agent acting within the turn). Mirrors the MCP `_meta`
 	// convention.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// The activity description of this chat changed.
+//
+// Dispatched by the server to indicate what the chat is currently doing
+// (e.g. running a tool, thinking). Clear activity by omitting it or setting it
+// to `undefined`.
+// Producers SHOULD also update the parent session's chat catalog with
+// `session/chatUpdated` so `ChatSummary.activity` stays in sync.
+type ChatActivityChangedAction struct {
+	Type ActionType `json:"type"`
+	// Human-readable description of current activity; omit or set `undefined` to clear
+	Activity *string `json:"activity,omitempty"`
 }
 
 // Session title updated. Fired by the server when the title is auto-generated
@@ -1216,6 +1230,7 @@ func (*ChatToolCallContentChangedAction) isStateAction()        {}
 func (*ChatTurnCompleteAction) isStateAction()                  {}
 func (*ChatTurnCancelledAction) isStateAction()                 {}
 func (*ChatErrorAction) isStateAction()                         {}
+func (*ChatActivityChangedAction) isStateAction()               {}
 func (*SessionTitleChangedAction) isStateAction()               {}
 func (*ChatUsageAction) isStateAction()                         {}
 func (*ChatReasoningAction) isStateAction()                     {}
@@ -1409,6 +1424,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/error":
 		var value ChatErrorAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/activityChanged":
+		var value ChatActivityChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

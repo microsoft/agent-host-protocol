@@ -697,6 +697,9 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatError ->
         endTurn(state, action.value.turnId, TurnState.ERROR, SessionStatus.ERROR, action.value.error)
 
+    is StateActionChatActivityChanged ->
+        state.copy(activity = action.value.activity)
+
     // ── Tool Call State Machine ───────────────────────────────────────────
 
     is StateActionChatToolCallStart -> {

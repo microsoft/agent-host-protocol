@@ -69,6 +69,8 @@ pub enum ActionType {
     ChatTurnCancelled,
     #[serde(rename = "chat/error")]
     ChatError,
+    #[serde(rename = "chat/activityChanged")]
+    ChatActivityChanged,
     #[serde(rename = "session/titleChanged")]
     SessionTitleChanged,
     #[serde(rename = "chat/usage")]
@@ -641,6 +643,21 @@ pub struct ChatErrorAction {
     /// convention.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+/// The activity description of this chat changed.
+///
+/// Dispatched by the server to indicate what the chat is currently doing
+/// (e.g. running a tool, thinking). Clear activity by omitting it or setting it
+/// to `undefined`.
+/// Producers SHOULD also update the parent session's chat catalog with
+/// `session/chatUpdated` so `ChatSummary.activity` stays in sync.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatActivityChangedAction {
+    /// Human-readable description of current activity; omit or set `undefined` to clear
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activity: Option<String>,
 }
 
 /// Session title updated. Fired by the server when the title is auto-generated
@@ -1493,6 +1510,8 @@ pub enum StateAction {
     ChatTurnCancelled(ChatTurnCancelledAction),
     #[serde(rename = "chat/error")]
     ChatError(ChatErrorAction),
+    #[serde(rename = "chat/activityChanged")]
+    ChatActivityChanged(ChatActivityChangedAction),
     #[serde(rename = "session/titleChanged")]
     SessionTitleChanged(SessionTitleChangedAction),
     #[serde(rename = "chat/usage")]

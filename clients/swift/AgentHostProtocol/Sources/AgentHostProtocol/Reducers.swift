@@ -124,6 +124,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatError(let a):
         return endTurn(state: state, turnId: a.turnId, turnState: .error, terminalStatus: .error, error: a.error)
 
+    case .chatActivityChanged(let a):
+        var next = state
+        next.activity = a.activity
+        return next
+
     // ── Tool Call State Machine ───────────────────────────────────────────
 
     case .chatToolCallStart(let a):

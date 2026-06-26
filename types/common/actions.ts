@@ -53,6 +53,7 @@ import type {
   ChatTurnCompleteAction,
   ChatTurnCancelledAction,
   ChatErrorAction,
+  ChatActivityChangedAction,
   ChatUsageAction,
   ChatReasoningAction,
   ChatPendingMessageSetAction,
@@ -130,6 +131,7 @@ export const enum ActionType {
   ChatTurnComplete = 'chat/turnComplete',
   ChatTurnCancelled = 'chat/turnCancelled',
   ChatError = 'chat/error',
+  ChatActivityChanged = 'chat/activityChanged',
   SessionTitleChanged = 'session/titleChanged',
   ChatUsage = 'chat/usage',
   ChatReasoning = 'chat/reasoning',
@@ -255,6 +257,7 @@ export type StateAction =
   | ChatTurnCompleteAction
   | ChatTurnCancelledAction
   | ChatErrorAction
+  | ChatActivityChangedAction
   | ChatUsageAction
   | ChatReasoningAction
   | ChatPendingMessageSetAction

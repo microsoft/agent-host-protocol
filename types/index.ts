@@ -160,6 +160,7 @@ export type {
   ChatTurnCompleteAction,
   ChatTurnCancelledAction,
   ChatErrorAction,
+  ChatActivityChangedAction,
   SessionTitleChangedAction,
   ChatUsageAction,
   ChatReasoningAction,

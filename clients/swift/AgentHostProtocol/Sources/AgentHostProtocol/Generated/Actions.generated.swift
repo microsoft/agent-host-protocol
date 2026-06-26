@@ -27,6 +27,7 @@ public enum ActionType: String, Codable, Sendable {
     case chatTurnComplete = "chat/turnComplete"
     case chatTurnCancelled = "chat/turnCancelled"
     case chatError = "chat/error"
+    case chatActivityChanged = "chat/activityChanged"
     case sessionTitleChanged = "session/titleChanged"
     case chatUsage = "chat/usage"
     case chatReasoning = "chat/reasoning"
@@ -787,6 +788,20 @@ public struct ChatErrorAction: Codable, Sendable {
         self.turnId = turnId
         self.error = error
         self.meta = meta
+    }
+}
+
+public struct ChatActivityChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Human-readable description of current activity; omit or set `undefined` to clear
+    public var activity: String?
+
+    public init(
+        type: ActionType,
+        activity: String? = nil
+    ) {
+        self.type = type
+        self.activity = activity
     }
 }
 
@@ -1742,6 +1757,7 @@ public enum StateAction: Codable, Sendable {
     case chatTurnComplete(ChatTurnCompleteAction)
     case chatTurnCancelled(ChatTurnCancelledAction)
     case chatError(ChatErrorAction)
+    case chatActivityChanged(ChatActivityChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
     case chatUsage(ChatUsageAction)
     case chatReasoning(ChatReasoningAction)
@@ -1847,6 +1863,8 @@ public enum StateAction: Codable, Sendable {
             self = .chatTurnCancelled(try ChatTurnCancelledAction(from: decoder))
         case "chat/error":
             self = .chatError(try ChatErrorAction(from: decoder))
+        case "chat/activityChanged":
+            self = .chatActivityChanged(try ChatActivityChangedAction(from: decoder))
         case "session/titleChanged":
             self = .sessionTitleChanged(try SessionTitleChangedAction(from: decoder))
         case "chat/usage":
@@ -1977,6 +1995,7 @@ public enum StateAction: Codable, Sendable {
         case .chatTurnComplete(let v): try v.encode(to: encoder)
         case .chatTurnCancelled(let v): try v.encode(to: encoder)
         case .chatError(let v): try v.encode(to: encoder)
+        case .chatActivityChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)
         case .chatUsage(let v): try v.encode(to: encoder)
         case .chatReasoning(let v): try v.encode(to: encoder)

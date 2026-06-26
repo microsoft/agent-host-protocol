@@ -41,6 +41,7 @@ import type {
   ChatTurnCompleteAction,
   ChatTurnCancelledAction,
   ChatErrorAction,
+  ChatActivityChangedAction,
   ChatUsageAction,
   ChatReasoningAction,
   ChatPendingMessageSetAction,
@@ -170,6 +171,7 @@ export type ChatAction =
   | ChatTurnCompleteAction
   | ChatTurnCancelledAction
   | ChatErrorAction
+  | ChatActivityChangedAction
   | ChatUsageAction
   | ChatReasoningAction
   | ChatPendingMessageSetAction
@@ -208,6 +210,7 @@ export type ServerChatAction =
   | ChatToolCallReadyAction
   | ChatTurnCompleteAction
   | ChatErrorAction
+  | ChatActivityChangedAction
   | ChatUsageAction
   | ChatReasoningAction
   | ChatInputRequestedAction
@@ -357,6 +360,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatTurnComplete]: false,
   [ActionType.ChatTurnCancelled]: true,
   [ActionType.ChatError]: false,
+  [ActionType.ChatActivityChanged]: false,
   [ActionType.ChatUsage]: false,
   [ActionType.ChatReasoning]: false,
   [ActionType.ChatPendingMessageSet]: true,

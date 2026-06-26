@@ -25,6 +25,8 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 
 ### Added
 
+- `chat/activityChanged` action for updating a chat's current activity
+  description independently of the session summary.
 - `root/progress` (`ProgressParams`) generic host→client progress notification,
   correlated by a `progressToken` the client supplies on the originating
   request (today `createSession.progressToken`) rather than a domain object. Lets

@@ -770,6 +770,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             Some(SessionStatus::Error),
             Some(a.error.clone()),
         ),
+        StateAction::ChatActivityChanged(a) => {
+            state.activity = a.activity.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::ChatToolCallStart(a) => {
             let Some(active) = state.active_turn.as_mut() else {
                 return ReduceOutcome::NoOp;

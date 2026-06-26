@@ -1229,6 +1229,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/turnComplete', variantName: 'ChatTurnComplete', tsInterface: 'ChatTurnCompleteAction' },
   { type: 'chat/turnCancelled', variantName: 'ChatTurnCancelled', tsInterface: 'ChatTurnCancelledAction' },
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
+  { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
   { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },

@@ -415,6 +415,9 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		errCopy := a.Error
 		errStatus := ahptypes.SessionStatusError
 		return endTurn(state, a.TurnId, ahptypes.TurnStateError, &errStatus, &errCopy)
+	case *ahptypes.ChatActivityChangedAction:
+		state.Activity = a.Activity
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatToolCallStartAction:
 		if state.ActiveTurn == nil || state.ActiveTurn.Id != a.TurnId {
 			return ReduceOutcomeNoOp

@@ -27,6 +27,8 @@ hotfix escape hatch.
   or clears `draft` without stamping `modifiedAt`.
 - `Message.model` and `Message.agent` optional fields recording the model /
   agent selection a message was composed with.
+- `ChatActivityChangedAction` (`chat/activityChanged`) for updating a chat's
+  current activity description independently of the session summary.
 - `ProgressParams` (wire `root/progress`) generic progress notification correlated by
   a `progressToken`, plus `createSession.progressToken` to opt in. Used today for
   the lazy first-use download of an agent's native SDK, so clients can show an

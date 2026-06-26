@@ -81,6 +81,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 |---|---|---|
 | `session/titleChanged` | **Yes** | Session title updated (auto-generated or client rename) |
 | `session/activityChanged` | No | Server updated the session's current activity description |
+| `chat/activityChanged` | No | Server updated a chat's current activity description |
 | `session/diffsChanged` | No | File diffs in the session summary changed (full replacement) |
 | `session/isReadChanged` | **Yes** | Client marked session as read or unread |
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |

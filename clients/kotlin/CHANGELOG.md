@@ -23,6 +23,9 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
   `modifiedAt`.
 - `Message.model` and `Message.agent` optional fields recording the model /
   agent selection a message was composed with.
+- `ChatActivityChangedAction` (`StateActionChatActivityChanged`, wire
+  `chat/activityChanged`) for updating a chat's current activity description
+  independently of the session summary.
 - `ProgressParams` data class (wire `root/progress`) — a generic progress
   notification correlated by a `progressToken` (added on `CreateSessionParams`).
   Used today for the lazy first-use download of an agent's native SDK.
