@@ -15,6 +15,11 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
+### Added
+
+- Optional `intention` field on `ChatToolCallStartAction` and every tool-call
+  lifecycle state.
+
 ## [0.5.0] — 2026-06-26
 
 Implements AHP 0.5.0.

@@ -2150,6 +2150,8 @@ public struct ToolCallStreamingState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2168,6 +2170,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case status
@@ -2179,6 +2182,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         status: ToolCallStatus,
@@ -2188,6 +2192,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.status = status
@@ -2203,6 +2208,8 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2232,6 +2239,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2247,6 +2255,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2260,6 +2269,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -2279,6 +2289,8 @@ public struct ToolCallRunningState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2306,6 +2318,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2320,6 +2333,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2332,6 +2346,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -2350,6 +2365,8 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2386,6 +2403,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2404,6 +2422,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2420,6 +2439,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -2442,6 +2462,8 @@ public struct ToolCallCompletedState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2478,6 +2500,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2496,6 +2519,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2512,6 +2536,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -2534,6 +2559,8 @@ public struct ToolCallCancelledState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2560,6 +2587,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2575,6 +2603,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2588,6 +2617,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage

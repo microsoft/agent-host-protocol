@@ -967,6 +967,8 @@ interface ToolCallBase {
   toolName: string;
   /** Human-readable tool name */
   displayName: string;
+  /** Human-readable description of what the tool invocation intends to do */
+  intention?: string;
   /**
    * Reference to the contributor of the tool being called.
    */
@@ -1255,4 +1257,3 @@ export type ToolResultContent =
   | ToolResultFileEditContent
   | ToolResultTerminalContent
   | ToolResultSubagentContent;
-

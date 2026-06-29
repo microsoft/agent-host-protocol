@@ -78,6 +78,7 @@ type toolCallCommon struct {
 	id          string
 	name        string
 	displayName string
+	intention   *string
 	contributor *ahptypes.ToolCallContributor
 	meta        ahptypes.JSONObject
 }
@@ -85,17 +86,17 @@ type toolCallCommon struct {
 func toolCallMeta(tc ahptypes.ToolCallState) toolCallCommon {
 	switch v := tc.Value.(type) {
 	case *ahptypes.ToolCallStreamingState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallPendingConfirmationState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallRunningState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallPendingResultConfirmationState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallCompletedState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallCancelledState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	}
 	return toolCallCommon{}
 }
@@ -194,6 +195,7 @@ func endTurn(state *ahptypes.ChatState, turnID string, turnState ahptypes.TurnSt
 			ToolCallId:        common.id,
 			ToolName:          common.name,
 			DisplayName:       common.displayName,
+			Intention:         common.intention,
 			Contributor:       common.contributor,
 			Meta:              common.meta,
 			InvocationMessage: invocation,
@@ -429,6 +431,7 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 				ToolCallId:  a.ToolCallId,
 				ToolName:    a.ToolName,
 				DisplayName: a.DisplayName,
+				Intention:   a.Intention,
 				Contributor: a.Contributor,
 				Meta:        a.Meta,
 			}},
@@ -859,6 +862,7 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 					ToolCallId:        common.id,
 					ToolName:          common.name,
 					DisplayName:       common.displayName,
+					Intention:         common.intention,
 					Contributor:       common.contributor,
 					Meta:              common.meta,
 					InvocationMessage: a.InvocationMessage,
@@ -871,6 +875,7 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 				ToolCallId:        common.id,
 				ToolName:          common.name,
 				DisplayName:       common.displayName,
+				Intention:         common.intention,
 				Contributor:       common.contributor,
 				Meta:              common.meta,
 				InvocationMessage: a.InvocationMessage,
@@ -923,6 +928,7 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 				ToolCallId:        s.ToolCallId,
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
+				Intention:         s.Intention,
 				Contributor:       s.Contributor,
 				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
@@ -944,6 +950,7 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 			ToolCallId:        s.ToolCallId,
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
+			Intention:         s.Intention,
 			Contributor:       s.Contributor,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
@@ -987,6 +994,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 				ToolCallId:        common.id,
 				ToolName:          common.name,
 				DisplayName:       common.displayName,
+				Intention:         common.intention,
 				Contributor:       common.contributor,
 				Meta:              common.meta,
 				InvocationMessage: invocation,
@@ -1005,6 +1013,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			ToolCallId:        common.id,
 			ToolName:          common.name,
 			DisplayName:       common.displayName,
+			Intention:         common.intention,
 			Contributor:       common.contributor,
 			Meta:              common.meta,
 			InvocationMessage: invocation,
@@ -1036,6 +1045,7 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 				ToolCallId:        s.ToolCallId,
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
+				Intention:         s.Intention,
 				Contributor:       s.Contributor,
 				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
@@ -1058,6 +1068,7 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 			ToolCallId:        s.ToolCallId,
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
+			Intention:         s.Intention,
 			Contributor:       s.Contributor,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,

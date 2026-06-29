@@ -23,6 +23,12 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+### Added
+
+- Optional `intention` field on `chat/toolCallStart` and every `ToolCallState`
+  variant, providing a human-readable description of what the invocation intends
+  to do.
+
 ## [0.5.1] — Unreleased
 
 Spec version: `0.5.1`

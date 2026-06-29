@@ -368,6 +368,8 @@ public struct ChatToolCallStartAction: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called. Absent for
     /// server-side tools that are not contributed by a client or MCP server.
     public var contributor: ToolCallContributor?
@@ -379,6 +381,7 @@ public struct ChatToolCallStartAction: Codable, Sendable {
         case type
         case toolName
         case displayName
+        case intention
         case contributor
     }
 
@@ -389,6 +392,7 @@ public struct ChatToolCallStartAction: Codable, Sendable {
         type: ActionType,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil
     ) {
         self.turnId = turnId
@@ -397,6 +401,7 @@ public struct ChatToolCallStartAction: Codable, Sendable {
         self.type = type
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
     }
 }

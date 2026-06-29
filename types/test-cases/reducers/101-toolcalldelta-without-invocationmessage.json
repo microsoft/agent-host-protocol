@@ -19,6 +19,7 @@
             "toolCallId": "tc-1",
             "toolName": "bash",
             "displayName": "Run Command",
+            "intention": null,
             "invocationMessage": "Original message"
           }
         }
@@ -56,6 +57,7 @@
             "toolCallId": "tc-1",
             "toolName": "bash",
             "displayName": "Run Command",
+            "intention": null,
             "invocationMessage": "Original message",
             "partialInput": "data"
           }

@@ -1945,6 +1945,9 @@ pub struct ToolCallStreamingState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -1974,6 +1977,9 @@ pub struct ToolCallPendingConfirmationState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2016,6 +2022,9 @@ pub struct ToolCallRunningState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2054,6 +2063,9 @@ pub struct ToolCallPendingResultConfirmationState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2103,6 +2115,9 @@ pub struct ToolCallCompletedState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2152,6 +2167,9 @@ pub struct ToolCallCancelledState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,

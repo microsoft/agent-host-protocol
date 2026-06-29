@@ -2156,6 +2156,10 @@ data class ToolCallStreamingState(
      */
     val displayName: String,
     /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
+    /**
      * Reference to the contributor of the tool being called.
      */
     val contributor: ToolCallContributor? = null,
@@ -2193,6 +2197,10 @@ data class ToolCallPendingConfirmationState(
      * Human-readable tool name
      */
     val displayName: String,
+    /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
     /**
      * Reference to the contributor of the tool being called.
      */
@@ -2251,6 +2259,10 @@ data class ToolCallRunningState(
      */
     val displayName: String,
     /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
+    /**
      * Reference to the contributor of the tool being called.
      */
     val contributor: ToolCallContributor? = null,
@@ -2303,6 +2315,10 @@ data class ToolCallPendingResultConfirmationState(
      * Human-readable tool name
      */
     val displayName: String,
+    /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
     /**
      * Reference to the contributor of the tool being called.
      */
@@ -2374,6 +2390,10 @@ data class ToolCallCompletedState(
      */
     val displayName: String,
     /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
+    /**
      * Reference to the contributor of the tool being called.
      */
     val contributor: ToolCallContributor? = null,
@@ -2443,6 +2463,10 @@ data class ToolCallCancelledState(
      * Human-readable tool name
      */
     val displayName: String,
+    /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
     /**
      * Reference to the contributor of the tool being called.
      */

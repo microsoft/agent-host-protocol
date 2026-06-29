@@ -3054,6 +3054,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called."
@@ -3148,6 +3152,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called."
@@ -3191,6 +3199,10 @@
         "displayName": {
           "type": "string",
           "description": "Human-readable tool name"
+        },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
         },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
@@ -3264,6 +3276,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called."
@@ -3324,6 +3340,10 @@
         "displayName": {
           "type": "string",
           "description": "Human-readable tool name"
+        },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
         },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
@@ -3416,6 +3436,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called."
@@ -3506,6 +3530,10 @@
         "displayName": {
           "type": "string",
           "description": "Human-readable tool name"
+        },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
         },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",

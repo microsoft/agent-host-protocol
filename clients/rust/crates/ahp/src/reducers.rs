@@ -125,59 +125,73 @@ fn iso8601_from_unix_millis(ms: i64) -> String {
     format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{millis:03}Z")
 }
 
-fn tool_call_meta(
-    tc: &ToolCallState,
-) -> (
-    String,
-    String,
-    String,
-    Option<ToolCallContributor>,
-    Option<serde_json::Map<String, serde_json::Value>>,
-) {
+struct ToolCallBase {
+    tool_call_id: String,
+    tool_name: String,
+    display_name: String,
+    intention: Option<String>,
+    contributor: Option<ToolCallContributor>,
+    meta: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
+fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
     match tc {
-        ToolCallState::Streaming(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::PendingConfirmation(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::Running(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::PendingResultConfirmation(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::Completed(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::Cancelled(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::Unknown(_) => (String::new(), String::new(), String::new(), None, None),
+        ToolCallState::Streaming(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::PendingConfirmation(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::Running(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::PendingResultConfirmation(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::Completed(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::Cancelled(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::Unknown(_) => ToolCallBase {
+            tool_call_id: String::new(),
+            tool_name: String::new(),
+            display_name: String::new(),
+            intention: None,
+            contributor: None,
+            meta: None,
+        },
     }
 }
 
@@ -272,8 +286,7 @@ fn end_turn(
                         ResponsePart::ToolCall(Box::new(ToolCallResponsePart { tool_call: tc }))
                     }
                     _ => {
-                        let (tool_call_id, tool_name, display_name, contributor, meta) =
-                            tool_call_meta(&tc);
+                        let base = tool_call_meta(&tc);
                         let invocation_message = match &tc {
                             ToolCallState::Streaming(s) => {
                                 s.invocation_message.clone().unwrap_or_default()
@@ -293,11 +306,12 @@ fn end_turn(
                             _ => None,
                         };
                         let cancelled = ToolCallCancelledState {
-                            tool_call_id,
-                            tool_name,
-                            display_name,
-                            contributor,
-                            meta,
+                            tool_call_id: base.tool_call_id,
+                            tool_name: base.tool_name,
+                            display_name: base.display_name,
+                            intention: base.intention,
+                            contributor: base.contributor,
+                            meta: base.meta,
                             invocation_message,
                             tool_input,
                             reason: ToolCallCancellationReason::Skipped,
@@ -421,6 +435,7 @@ where
                         tool_call_id: String::new(),
                         tool_name: String::new(),
                         display_name: String::new(),
+                        intention: None,
                         contributor: None,
                         meta: None,
                         invocation_message: Default::default(),
@@ -788,6 +803,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                         tool_call_id: a.tool_call_id.clone(),
                         tool_name: a.tool_name.clone(),
                         display_name: a.display_name.clone(),
+                        intention: a.intention.clone(),
                         contributor: a.contributor.clone(),
                         meta: a.meta.clone(),
                         partial_input: None,
@@ -980,16 +996,17 @@ fn apply_tool_call_delta(state: &mut ChatState, a: &ChatToolCallDeltaAction) -> 
 
 fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
-        let (tool_call_id, tool_name, display_name, contributor, meta) = tool_call_meta(&tc);
-        let meta = a.meta.clone().or(meta);
+        let base = tool_call_meta(&tc);
+        let meta = a.meta.clone().or(base.meta);
         match tc {
             ToolCallState::Streaming(_) | ToolCallState::Running(_) => {
                 if let Some(confirmed) = a.confirmed {
                     ToolCallState::Running(ToolCallRunningState {
-                        tool_call_id,
-                        tool_name,
-                        display_name,
-                        contributor,
+                        tool_call_id: base.tool_call_id,
+                        tool_name: base.tool_name,
+                        display_name: base.display_name,
+                        intention: base.intention,
+                        contributor: base.contributor,
                         meta,
                         invocation_message: a.invocation_message.clone(),
                         tool_input: a.tool_input.clone(),
@@ -999,10 +1016,11 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
                     })
                 } else {
                     ToolCallState::PendingConfirmation(ToolCallPendingConfirmationState {
-                        tool_call_id,
-                        tool_name,
-                        display_name,
-                        contributor,
+                        tool_call_id: base.tool_call_id,
+                        tool_name: base.tool_name,
+                        display_name: base.display_name,
+                        intention: base.intention,
+                        contributor: base.contributor,
                         meta,
                         invocation_message: a.invocation_message.clone(),
                         tool_input: a.tool_input.clone(),
@@ -1040,6 +1058,7 @@ fn apply_tool_call_confirmed(
         let tool_call_id = s.tool_call_id;
         let tool_name = s.tool_name;
         let display_name = s.display_name;
+        let intention = s.intention;
         let contributor = s.contributor;
         let meta = a.meta.clone().or(s.meta);
         let invocation_message = s.invocation_message;
@@ -1049,6 +1068,7 @@ fn apply_tool_call_confirmed(
                 tool_call_id,
                 tool_name,
                 display_name,
+                intention,
                 contributor,
                 meta,
                 invocation_message,
@@ -1062,6 +1082,7 @@ fn apply_tool_call_confirmed(
                 tool_call_id,
                 tool_name,
                 display_name,
+                intention,
                 contributor,
                 meta,
                 invocation_message,
@@ -1080,8 +1101,8 @@ fn apply_tool_call_complete(
     a: &ChatToolCallCompleteAction,
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
-        let (tool_call_id, tool_name, display_name, contributor, meta) = tool_call_meta(&tc);
-        let meta = a.meta.clone().or(meta);
+        let base = tool_call_meta(&tc);
+        let meta = a.meta.clone().or(base.meta);
         let (invocation_message, tool_input, confirmed, selected_option) = match tc {
             ToolCallState::Running(s) => (
                 s.invocation_message,
@@ -1099,10 +1120,11 @@ fn apply_tool_call_complete(
         };
         if a.requires_result_confirmation.unwrap_or(false) {
             ToolCallState::PendingResultConfirmation(ToolCallPendingResultConfirmationState {
-                tool_call_id,
-                tool_name,
-                display_name,
-                contributor,
+                tool_call_id: base.tool_call_id,
+                tool_name: base.tool_name,
+                display_name: base.display_name,
+                intention: base.intention,
+                contributor: base.contributor,
                 meta,
                 invocation_message,
                 tool_input,
@@ -1116,10 +1138,11 @@ fn apply_tool_call_complete(
             })
         } else {
             ToolCallState::Completed(ToolCallCompletedState {
-                tool_call_id,
-                tool_name,
-                display_name,
-                contributor,
+                tool_call_id: base.tool_call_id,
+                tool_name: base.tool_name,
+                display_name: base.display_name,
+                intention: base.intention,
+                contributor: base.contributor,
                 meta,
                 invocation_message,
                 tool_input,
@@ -1148,6 +1171,7 @@ fn apply_tool_call_result_confirmed(
                 tool_call_id: s.tool_call_id,
                 tool_name: s.tool_name,
                 display_name: s.display_name,
+                intention: s.intention,
                 contributor: s.contributor,
                 meta: a.meta.clone().or(s.meta),
                 invocation_message: s.invocation_message,
@@ -1165,6 +1189,7 @@ fn apply_tool_call_result_confirmed(
                 tool_call_id: s.tool_call_id,
                 tool_name: s.tool_name,
                 display_name: s.display_name,
+                intention: s.intention,
                 contributor: s.contributor,
                 meta: a.meta.clone().or(s.meta),
                 invocation_message: s.invocation_message,

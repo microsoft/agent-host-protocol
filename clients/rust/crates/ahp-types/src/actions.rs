@@ -394,6 +394,9 @@ pub struct ChatToolCallStartAction {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called. Absent for
     /// server-side tools that are not contributed by a client or MCP server.
     #[serde(default, skip_serializing_if = "Option::is_none")]

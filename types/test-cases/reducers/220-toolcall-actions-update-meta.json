@@ -229,6 +229,7 @@
             "toolCallId": "tc-delta",
             "toolName": "stream",
             "displayName": "Stream Tool",
+            "intention": null,
             "contributor": null,
             "_meta": {
               "phase": "delta"
@@ -245,6 +246,7 @@
             "toolCallId": "tc-ready-running",
             "toolName": "run",
             "displayName": "Run Tool",
+            "intention": null,
             "contributor": null,
             "_meta": {
               "phase": "ready-running"
@@ -261,6 +263,7 @@
             "toolCallId": "tc-ready-pending",
             "toolName": "ask",
             "displayName": "Ask Tool",
+            "intention": null,
             "contributor": null,
             "_meta": {
               "phase": "ready-pending"
@@ -279,6 +282,7 @@
             "toolCallId": "tc-confirm-approved",
             "toolName": "approve",
             "displayName": "Approve Tool",
+            "intention": null,
             "contributor": null,
             "_meta": {
               "phase": "confirmed-approved"
@@ -295,6 +299,7 @@
             "toolCallId": "tc-confirm-denied",
             "toolName": "deny",
             "displayName": "Deny Tool",
+            "intention": null,
             "contributor": null,
             "_meta": {
               "phase": "confirmed-denied"
@@ -313,6 +318,7 @@
             "toolCallId": "tc-complete",
             "toolName": "complete",
             "displayName": "Complete Tool",
+            "intention": null,
             "contributor": null,
             "_meta": {
               "phase": "complete"
@@ -331,6 +337,7 @@
             "toolCallId": "tc-result-confirmed",
             "toolName": "result",
             "displayName": "Result Tool",
+            "intention": null,
             "contributor": null,
             "_meta": {
               "phase": "result-confirmed"
@@ -352,6 +359,7 @@
             "toolCallId": "tc-content",
             "toolName": "content",
             "displayName": "Content Tool",
+            "intention": null,
             "contributor": null,
             "_meta": {
               "phase": "content-changed"

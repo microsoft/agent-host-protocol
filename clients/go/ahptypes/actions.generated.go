@@ -283,6 +283,8 @@ type ChatToolCallStartAction struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called. Absent for
 	// server-side tools that are not contributed by a client or MCP server.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`

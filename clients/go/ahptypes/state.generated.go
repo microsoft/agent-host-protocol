@@ -1537,6 +1537,8 @@ type ToolCallStreamingState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1561,6 +1563,8 @@ type ToolCallPendingConfirmationState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1595,6 +1599,8 @@ type ToolCallRunningState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1627,6 +1633,8 @@ type ToolCallPendingResultConfirmationState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1668,6 +1676,8 @@ type ToolCallCompletedState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1709,6 +1719,8 @@ type ToolCallCancelledState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.

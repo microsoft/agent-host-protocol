@@ -19,6 +19,7 @@
             "toolCallId": "tc-1",
             "toolName": "bash",
             "displayName": "Run Command",
+            "intention": null,
             "invocationMessage": "Running",
             "toolInput": "ls",
             "confirmed": "user-action"
@@ -59,6 +60,7 @@
             "toolCallId": "tc-1",
             "toolName": "bash",
             "displayName": "Run Command",
+            "intention": null,
             "invocationMessage": "Running",
             "toolInput": "ls",
             "confirmed": "user-action"

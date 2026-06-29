@@ -381,6 +381,10 @@ data class ChatToolCallStartAction(
      */
     val displayName: String,
     /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
+    /**
      * Reference to the contributor of the tool being called. Absent for
      * server-side tools that are not contributed by a client or MCP server.
      */

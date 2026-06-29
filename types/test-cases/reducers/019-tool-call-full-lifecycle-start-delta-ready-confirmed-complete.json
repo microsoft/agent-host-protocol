@@ -25,7 +25,8 @@
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "toolName": "bash",
-      "displayName": "Run Command"
+      "displayName": "Run Command",
+      "intention": "List the files in the current directory"
     },
     {
       "type": "chat/toolCallDelta",
@@ -76,6 +77,7 @@
             "toolCallId": "tc-1",
             "toolName": "bash",
             "displayName": "Run Command",
+            "intention": "List the files in the current directory",
             "contributor": null,
             "_meta": null,
             "invocationMessage": "Run: ls -la",
