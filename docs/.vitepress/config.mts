@@ -7,13 +7,10 @@ export default withMermaid(defineConfig({
   base: '/agent-host-protocol/',
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/agent-host-protocol/logo.svg' }],
     ['link', { rel: 'stylesheet', href: 'https://unpkg.com/@vscode/codicons/dist/codicon.css' }],
   ],
 
   themeConfig: {
-    logo: '/logo.svg',
-
     nav: [
       { text: 'Guide', link: '/guide/what-is-ahp', activeMatch: '^/guide/' },
       { text: 'Specification', link: '/specification/overview', activeMatch: '^/specification/' },
