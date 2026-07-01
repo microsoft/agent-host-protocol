@@ -514,6 +514,10 @@
             "$ref": "#/$defs/Customization"
           },
           "description": "Customizations associated with this agent.\n\nEither container customizations —\n{@link PluginCustomization | `PluginCustomization`} entries the agent\nbundles, plus {@link DirectoryCustomization | `DirectoryCustomization`}\nentries it watches in any workspace it's used with — or top-level\n{@link McpServerCustomization | `McpServerCustomization`} entries\nthe agent host declares directly. When a session is created with\nthis agent, these entries are augmented (e.g. directory URIs are\nresolved against the workspace, children are parsed) and propagated\ninto the session's `customizations` list."
+        },
+        "capabilities": {
+          "$ref": "#/$defs/AgentCapabilities",
+          "description": "Static capability flags the agent advertises about itself. Clients use\nthese to gate features (multi-chat, fork, sub-agent teams) instead of\nswitching on the provider id. Absent flags default to unsupported."
         }
       },
       "required": [
@@ -522,6 +526,20 @@
         "description",
         "models"
       ]
+    },
+    "AgentCapabilities": {
+      "type": "object",
+      "description": "Static capability flags an {@link AgentInfo} advertises. Each flag is opt-in\n(absent -> unsupported).",
+      "properties": {
+        "supportsMultipleChats": {
+          "type": "boolean",
+          "description": "Agent can host more than one concurrent chat per session."
+        },
+        "supportsFork": {
+          "type": "boolean",
+          "description": "Agent can fork a chat from a turn."
+        }
+      }
     },
     "SessionModelInfo": {
       "type": "object",

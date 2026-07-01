@@ -17,6 +17,10 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Added
 
+- Optional `capabilities` field on `AgentInfo` (`AgentCapabilities` with
+  `supportsMultipleChats` / `supportsFork`) so clients gate multi-chat and fork
+  via advertised flags instead of provider-id switches.
+
 - `SessionState.input_needed` — a session-level aggregate of outstanding input
   requests across all chats (`SessionInputRequest` enum with
   `SessionChatInputRequest`, `SessionToolConfirmationRequest`, and

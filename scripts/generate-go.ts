@@ -657,6 +657,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'RootState' },
   { name: 'RootConfigState' },
   { name: 'AgentInfo' },
+  { name: 'AgentCapabilities' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
   { name: 'AgentSelection' },

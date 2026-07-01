@@ -754,6 +754,24 @@ pub struct AgentInfo {
     /// into the session's `customizations` list.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customizations: Option<Vec<Customization>>,
+    /// Static capability flags the agent advertises about itself. Clients use
+    /// these to gate features (multi-chat, fork, sub-agent teams) instead of
+    /// switching on the provider id. Absent flags default to unsupported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<AgentCapabilities>,
+}
+
+/// Static capability flags an {@link AgentInfo} advertises. Each flag is opt-in
+/// (absent -> unsupported).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCapabilities {
+    /// Agent can host more than one concurrent chat per session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_multiple_chats: Option<bool>,
+    /// Agent can fork a chat from a turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_fork: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

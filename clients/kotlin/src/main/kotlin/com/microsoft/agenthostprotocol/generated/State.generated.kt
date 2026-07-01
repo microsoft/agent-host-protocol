@@ -899,7 +899,25 @@ data class AgentInfo(
      * resolved against the workspace, children are parsed) and propagated
      * into the session's `customizations` list.
      */
-    val customizations: List<Customization>? = null
+    val customizations: List<Customization>? = null,
+    /**
+     * Static capability flags the agent advertises about itself. Clients use
+     * these to gate features (multi-chat, fork, sub-agent teams) instead of
+     * switching on the provider id. Absent flags default to unsupported.
+     */
+    val capabilities: AgentCapabilities? = null
+)
+
+@Serializable
+data class AgentCapabilities(
+    /**
+     * Agent can host more than one concurrent chat per session.
+     */
+    val supportsMultipleChats: Boolean? = null,
+    /**
+     * Agent can fork a chat from a turn.
+     */
+    val supportsFork: Boolean? = null
 )
 
 @Serializable

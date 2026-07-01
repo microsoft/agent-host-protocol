@@ -30,6 +30,9 @@ changes accumulate. Track in-flight protocol changes via PRs touching
   to do.
 - Optional `model` and `tools` fields on `AgentCustomization`, giving a custom
   agent's pinned model and tool allowlist a first-class home instead of `_meta`.
+- Optional `capabilities` field on `AgentInfo` (`AgentCapabilities` with
+  `supportsMultipleChats` / `supportsFork`) so clients gate multi-chat and fork
+  via advertised flags instead of provider-id switches.
 
 ## [0.5.1] — Unreleased
 

@@ -544,6 +544,19 @@ type AgentInfo struct {
 	// resolved against the workspace, children are parsed) and propagated
 	// into the session's `customizations` list.
 	Customizations []Customization `json:"customizations,omitempty"`
+	// Static capability flags the agent advertises about itself. Clients use
+	// these to gate features (multi-chat, fork, sub-agent teams) instead of
+	// switching on the provider id. Absent flags default to unsupported.
+	Capabilities *AgentCapabilities `json:"capabilities,omitempty"`
+}
+
+// Static capability flags an {@link AgentInfo} advertises. Each flag is opt-in
+// (absent -> unsupported).
+type AgentCapabilities struct {
+	// Agent can host more than one concurrent chat per session.
+	SupportsMultipleChats *bool `json:"supportsMultipleChats,omitempty"`
+	// Agent can fork a chat from a turn.
+	SupportsFork *bool `json:"supportsFork,omitempty"`
 }
 
 type SessionModelInfo struct {

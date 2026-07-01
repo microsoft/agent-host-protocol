@@ -583,6 +583,10 @@ public struct AgentInfo: Codable, Sendable {
     /// resolved against the workspace, children are parsed) and propagated
     /// into the session's `customizations` list.
     public var customizations: [Customization]?
+    /// Static capability flags the agent advertises about itself. Clients use
+    /// these to gate features (multi-chat, fork, sub-agent teams) instead of
+    /// switching on the provider id. Absent flags default to unsupported.
+    public var capabilities: AgentCapabilities?
 
     public init(
         provider: String,
@@ -590,7 +594,8 @@ public struct AgentInfo: Codable, Sendable {
         description: String,
         models: [SessionModelInfo],
         protectedResources: [ProtectedResourceMetadata]? = nil,
-        customizations: [Customization]? = nil
+        customizations: [Customization]? = nil,
+        capabilities: AgentCapabilities? = nil
     ) {
         self.provider = provider
         self.displayName = displayName
@@ -598,6 +603,22 @@ public struct AgentInfo: Codable, Sendable {
         self.models = models
         self.protectedResources = protectedResources
         self.customizations = customizations
+        self.capabilities = capabilities
+    }
+}
+
+public struct AgentCapabilities: Codable, Sendable {
+    /// Agent can host more than one concurrent chat per session.
+    public var supportsMultipleChats: Bool?
+    /// Agent can fork a chat from a turn.
+    public var supportsFork: Bool?
+
+    public init(
+        supportsMultipleChats: Bool? = nil,
+        supportsFork: Bool? = nil
+    ) {
+        self.supportsMultipleChats = supportsMultipleChats
+        self.supportsFork = supportsFork
     }
 }
 

@@ -19,6 +19,10 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Added
 
+- Optional `capabilities` field on `AgentInfo` (`AgentCapabilities` with
+  `supportsMultipleChats` / `supportsFork`) so clients gate multi-chat and fork
+  via advertised flags instead of provider-id switches.
+
 - `SessionState.inputNeeded` — a session-level aggregate of outstanding input
   requests across all chats (`SessionInputRequest` enum with
   `SessionChatInputRequest`, `SessionToolConfirmationRequest`, and
