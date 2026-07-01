@@ -8,23 +8,23 @@ A synchronized, multi-client state protocol for AI agent sessions.
 
 The Agent Host Protocol (AHP) defines how a portable, standalone sessions server communicates with its clients. Multiple clients can connect to the server and see a synchronized view of AI agent sessions through immutable state, pure reducers, and write-ahead reconciliation.
 
-## Implementations
+## Client libraries
 
-### Clients
+| Language | Package | Version | Source |
+| --- | --- | --- | --- |
+| **Rust** | [`ahp`](https://crates.io/crates/ahp) · [`ahp-types`](https://crates.io/crates/ahp-types) · [`ahp-ws`](https://crates.io/crates/ahp-ws) | [![crates.io](https://img.shields.io/crates/v/ahp.svg?logo=rust)](https://crates.io/crates/ahp) | [`clients/rust/`](clients/rust/) · [CHANGELOG](clients/rust/CHANGELOG.md) |
+| **TypeScript** | [`@microsoft/agent-host-protocol`](https://www.npmjs.com/package/@microsoft/agent-host-protocol) | [![npm](https://img.shields.io/npm/v/@microsoft/agent-host-protocol.svg?logo=npm)](https://www.npmjs.com/package/@microsoft/agent-host-protocol) | [`clients/typescript/`](clients/typescript/) · [CHANGELOG](clients/typescript/CHANGELOG.md) |
+| **Kotlin** | [`com.microsoft.agenthostprotocol:agent-host-protocol`](https://central.sonatype.com/artifact/com.microsoft.agenthostprotocol/agent-host-protocol) | [![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.agenthostprotocol/agent-host-protocol.svg?logo=apachemaven)](https://central.sonatype.com/artifact/com.microsoft.agenthostprotocol/agent-host-protocol) | [`clients/kotlin/`](clients/kotlin/) · [CHANGELOG](clients/kotlin/CHANGELOG.md) |
+| **Go** | [`github.com/microsoft/agent-host-protocol/clients/go`](https://pkg.go.dev/github.com/microsoft/agent-host-protocol/clients/go) | [![Go Reference](https://pkg.go.dev/badge/github.com/microsoft/agent-host-protocol/clients/go.svg)](https://pkg.go.dev/github.com/microsoft/agent-host-protocol/clients/go) | [`clients/go/`](clients/go/) · [CHANGELOG](clients/go/CHANGELOG.md) |
+| **Swift** | [SwiftPM: `microsoft/agent-host-protocol`](https://github.com/microsoft/agent-host-protocol) | [![Tag](https://img.shields.io/github/v/tag/microsoft/agent-host-protocol?filter=v*&label=SwiftPM&logo=swift)](https://github.com/microsoft/agent-host-protocol/tags) | [package README](clients/swift/AgentHostProtocol/README.md) · [CHANGELOG](clients/swift/CHANGELOG.md) |
 
-- **Swift** — Add `https://github.com/microsoft/agent-host-protocol` as a Swift Package Manager dependency (resolves bare `vX.Y.Z` tags at the repo root) to use the `AgentHostProtocol` types/reducers library or the `AgentHostProtocolClient` single-host and multi-host client library. See the [Swift package README](clients/swift/AgentHostProtocol/README.md), [`clients/swift/CHANGELOG.md`](clients/swift/CHANGELOG.md), and [`clients/swift/`](clients/swift/) for the example iOS client. The `Package.swift` manifest lives at the repository root because SwiftPM only resolves manifests at the root of a remote git repo; the actual Swift sources live under `clients/swift/AgentHostProtocol/`.
-- **Rust** — See [`clients/rust/`](clients/rust/) for the `ahp`, `ahp-types`, and `ahp-ws` crates. Released to crates.io via `rust/vX.Y.Z` tags ([`CHANGELOG`](clients/rust/CHANGELOG.md)).
-- **Kotlin** — Add `com.microsoft.agenthostprotocol:agent-host-protocol` from Maven Central to use from Android or any JVM project. See [`clients/kotlin/`](clients/kotlin/) for the source and [`CHANGELOG`](clients/kotlin/CHANGELOG.md). Released via `kotlin/vX.Y.Z` tags.
-- **TypeScript** — Install `@microsoft/agent-host-protocol` to use the wire types, reducers, `AhpClient`, and the `WebSocketTransport`. See [`clients/typescript/`](clients/typescript/) and [`CHANGELOG`](clients/typescript/CHANGELOG.md). Released via `typescript/vX.Y.Z` tags; the Azure DevOps publish pipeline at [`clients/typescript/pipeline.yml`](clients/typescript/pipeline.yml) picks up the tag, validates it, and publishes to npm.
-- **Go** — `go get github.com/microsoft/agent-host-protocol/clients/go` to use the `ahptypes` wire types, the `ahp` async client (client + pure reducers + pluggable `Transport`), and the `ahpws` WebSocket transport. See [`clients/go/`](clients/go/) and [`CHANGELOG`](clients/go/CHANGELOG.md). Released via `clients/go/vX.Y.Z` tags — the Go module proxy indexes the directory-prefixed tag directly from this repo, so there is no separate package registry.
-- **[AHPX](https://github.com/TylerLeonhardt/ahpx)** — A command-line and Node.js client for connecting to AHP servers, managing sessions, and sending prompts.
-- **[VS Code](https://github.com/microsoft/vscode)** — VS Code includes Agent Sessions client code for working with AHP hosts.
+Other clients: [**AHPX**](https://github.com/TylerLeonhardt/ahpx) (CLI + Node.js client) and [**VS Code**](https://github.com/microsoft/vscode) (built-in Agent Sessions client).
 
-### Servers
+The Rust, Swift, and Go SDKs ship a `MultiHostClient` for talking to two or more hosts at once (single-host consumers use the same API via `MultiHostClient::single` / `.single(...)` / `hosts.Single(...)`). See [Connecting to Multiple Hosts](https://microsoft.github.io/agent-host-protocol/guide/clients-multi-host).
 
-- **[VS Code agent host](https://github.com/microsoft/vscode)** — The reference AHP server implementation. Start in [`src/vs/platform/agentHost/node/`](https://github.com/microsoft/vscode/tree/main/src/vs/platform/agentHost/node) when browsing the repository.
+## Servers
 
-For consumers that need to talk to two or more hosts at once, the Rust SDK ships a `MultiHostClient` abstraction in [`ahp::hosts`](https://docs.rs/ahp/latest/ahp/hosts/), the Swift SDK ships `MultiHostClient` in `AgentHostProtocolClient`, and the Go SDK ships `MultiHostClient` in [`ahp/hosts`](clients/go/ahp/hosts/). Single-host consumers use the same API via `MultiHostClient::single` in Rust, `MultiHostClient.single(...)` in Swift, or `hosts.Single(...)` in Go. See [Connecting to Multiple Hosts](https://microsoft.github.io/agent-host-protocol/guide/clients-multi-host) for the design and surface.
+- **[VS Code agent host](https://github.com/microsoft/vscode)** — The reference AHP server implementation ([`src/vs/platform/agentHost/node/`](https://github.com/microsoft/vscode/tree/main/src/vs/platform/agentHost/node)).
 
 ## Versioning and releases
 
