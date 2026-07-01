@@ -225,14 +225,6 @@
               "type": "string",
               "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
             },
-            "model": {
-              "$ref": "#/$defs/ModelSelection",
-              "description": "Optional per-chat model override (defaults to the session's model)"
-            },
-            "agent": {
-              "$ref": "#/$defs/AgentSelection",
-              "description": "Optional per-chat agent override (defaults to the session's agent)"
-            },
             "origin": {
               "$ref": "#/$defs/ChatOrigin",
               "description": "How this chat came into existence"
@@ -286,39 +278,6 @@
       "required": [
         "type",
         "title"
-      ]
-    },
-    "SessionModelChangedAction": {
-      "type": "object",
-      "description": "Model changed for this session.",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionModelChanged"
-        },
-        "model": {
-          "$ref": "#/$defs/ModelSelection",
-          "description": "New model selection"
-        }
-      },
-      "required": [
-        "type",
-        "model"
-      ]
-    },
-    "SessionAgentChangedAction": {
-      "type": "object",
-      "description": "Custom agent selection changed for this session.\n\nOmitting `agent` (or setting it to `undefined`) clears the selection and\nresets the session to no selected custom agent (provider default behavior).\n\nWhen a turn is currently active, the server MUST defer the change until\nthe active turn completes, then apply it for the next turn (same rule as\n{@link SessionModelChangedAction | `session/modelChanged`}).",
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/ActionType.SessionAgentChanged"
-        },
-        "agent": {
-          "$ref": "#/$defs/AgentSelection",
-          "description": "New agent selection, or `undefined` to clear the selection and reset the\nsession to no selected custom agent."
-        }
-      },
-      "required": [
-        "type"
       ]
     },
     "SessionIsReadChangedAction": {
@@ -444,6 +403,40 @@
       "required": [
         "type",
         "clientId"
+      ]
+    },
+    "SessionInputNeededSetAction": {
+      "type": "object",
+      "description": "A session-level input request was added or updated.\n\nUpsert semantics keyed by {@link SessionInputRequest.id | `request.id`}: the\nhost dispatches this with the full {@link SessionInputRequest} to append a new\nentry to {@link SessionState.inputNeeded} or replace the existing entry with\nthe same `id`.\n\nServer-originated: the host mirrors chat-level requests (elicitations, tool\nconfirmations, client-tool executions) into the session aggregate so clients\nsubscribed only to the session channel can discover them. Clients respond by\ndispatching the ordinary `chat/*` action to the entry's `chat` channel — see\n{@link SessionInputRequest}.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionInputNeededSet"
+        },
+        "request": {
+          "$ref": "#/$defs/SessionInputRequest",
+          "description": "The input request to add or update, matched by `id`."
+        }
+      },
+      "required": [
+        "type",
+        "request"
+      ]
+    },
+    "SessionInputNeededRemovedAction": {
+      "type": "object",
+      "description": "A session-level input request was removed.\n\nRemoves the entry identified by `id` from\n{@link SessionState.inputNeeded}; a no-op when no entry matches.\n\nServer-originated: the host dispatches this once the underlying request\nresolves (the user answers, the tool call is confirmed, or the client\nreports its result).",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.SessionInputNeededRemoved"
+        },
+        "id": {
+          "type": "string",
+          "description": "The `id` of the input request to remove."
+        }
+      },
+      "required": [
+        "type",
+        "id"
       ]
     },
     "SessionCustomizationsChangedAction": {
@@ -894,6 +887,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called. Absent for\nserver-side tools that are not contributed by a client or MCP server."
@@ -1283,6 +1280,22 @@
         "error"
       ]
     },
+    "ChatActivityChangedAction": {
+      "type": "object",
+      "description": "The activity description of this chat changed.\n\nDispatched by the server to indicate what the chat is currently doing\n(e.g. running a tool, thinking). Clear activity by omitting it or setting it\nto `undefined`.\nProducers SHOULD also update the parent session's chat catalog with\n`session/chatUpdated` so `ChatSummary.activity` stays in sync.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatActivityChanged"
+        },
+        "activity": {
+          "type": "string",
+          "description": "Human-readable description of current activity; omit or set `undefined` to clear"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
     "ChatUsageAction": {
       "type": "object",
       "description": "Token usage report for a turn.",
@@ -1425,6 +1438,22 @@
       "required": [
         "type",
         "order"
+      ]
+    },
+    "ChatDraftChangedAction": {
+      "type": "object",
+      "description": "The chat's draft input changed.\n\nClients MAY periodically sync their local input state — the message the user\nis composing, including its {@link Message.model | model} /\n{@link Message.agent | agent} selection and attachments — into the chat's\n{@link ChatState.draft | `draft`} so it survives reloads and is visible to\nother clients viewing the same chat. Eager syncing is **not** required;\nclients SHOULD debounce and MAY sync only at convenient points. Set `draft`\nto `undefined` to clear it (e.g. once the message is sent).\n\nA client is only allowed to draft {@link MessageKind.User} messages.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChatDraftChanged"
+        },
+        "draft": {
+          "$ref": "#/$defs/Message",
+          "description": "New draft message, or `undefined` to clear it"
+        }
+      },
+      "required": [
+        "type"
       ]
     },
     "ChatInputRequestedAction": {
@@ -2033,6 +2062,9 @@
           "$ref": "#/$defs/ChatErrorAction"
         },
         {
+          "$ref": "#/$defs/ChatActivityChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatUsageAction"
         },
         {
@@ -2049,6 +2081,9 @@
         },
         {
           "$ref": "#/$defs/ChatQueuedMessagesReorderedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatDraftChangedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"
@@ -2570,6 +2605,10 @@
             "$ref": "#/$defs/Customization"
           },
           "description": "Customizations associated with this agent.\n\nEither container customizations —\n{@link PluginCustomization | `PluginCustomization`} entries the agent\nbundles, plus {@link DirectoryCustomization | `DirectoryCustomization`}\nentries it watches in any workspace it's used with — or top-level\n{@link McpServerCustomization | `McpServerCustomization`} entries\nthe agent host declares directly. When a session is created with\nthis agent, these entries are augmented (e.g. directory URIs are\nresolved against the workspace, children are parsed) and propagated\ninto the session's `customizations` list."
+        },
+        "capabilities": {
+          "$ref": "#/$defs/AgentCapabilities",
+          "description": "Static capabilities the agent advertises about itself. Clients use these\nto gate features (multi-chat, fork) instead of switching on the provider\nid."
         }
       },
       "required": [
@@ -2578,6 +2617,26 @@
         "description",
         "models"
       ]
+    },
+    "AgentCapabilities": {
+      "type": "object",
+      "description": "Static capabilities an {@link AgentInfo} advertises. Modelled after MCP\ncapabilities: each field is opt-in and its presence (an empty object `{}`)\nsignals support, while absence means the feature is unsupported and the\ncorresponding client commands MUST NOT be used. Sub-fields carry\nper-capability options.",
+      "properties": {
+        "multipleChats": {
+          "$ref": "#/$defs/MultipleChatsCapability",
+          "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nforking; set {@link MultipleChatsCapability.fork} to also allow forking."
+        }
+      }
+    },
+    "MultipleChatsCapability": {
+      "type": "object",
+      "description": "Options for the {@link AgentCapabilities.multipleChats} capability.",
+      "properties": {
+        "fork": {
+          "type": "boolean",
+          "description": "The agent can fork a chat from a specific turn. When absent or `false`,\nclients MUST NOT pass a {@link ChatForkSource} (`source`) to `createChat`.\nForking always implies multi-chat support."
+        }
+      }
     },
     "SessionModelInfo": {
       "type": "object",
@@ -2669,13 +2728,76 @@
         "values"
       ]
     },
+    "SessionMetadata": {
+      "type": "object",
+      "description": "Metadata shared between the full {@link SessionState} (delivered when a\nclient subscribes to a session's URI) and the lightweight\n{@link SessionSummary} (carried in the root-channel session catalog).\n\nThese fields describe the session at a glance and appear in both places.\n`SessionState` owns the authoritative values for a subscribed session;\n`SessionSummary` mirrors them into the catalog so clients that only render a\nsession list don't have to subscribe to every session URI. The host keeps\nthe catalog in sync via `root/sessionSummaryChanged`.",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Session title"
+        },
+        "status": {
+          "$ref": "#/$defs/SessionStatus",
+          "description": "Current session status"
+        },
+        "activity": {
+          "type": "string",
+          "description": "Human-readable description of what the session is currently doing"
+        },
+        "project": {
+          "$ref": "#/$defs/ProjectInfo",
+          "description": "Server-owned project for this session"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "The default working directory URI for this session. Individual chats\nMAY override via {@link ChatSummary.workingDirectory | their own\n`workingDirectory`}; this field acts as the fallback for any chat that\ndoes not."
+        },
+        "annotations": {
+          "$ref": "#/$defs/AnnotationsSummary",
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+        }
+      },
+      "required": [
+        "provider",
+        "title",
+        "status"
+      ]
+    },
     "SessionState": {
       "type": "object",
-      "description": "Full state for a single session, loaded when a client subscribes to the session's URI.",
+      "description": "Full state for a single session, loaded when a client subscribes to the session's URI.\n\nInlines (denormalizes) every {@link SessionMetadata} field directly onto\nitself so subscribers receive one flat object instead of a nested summary.\nThe lightweight catalog representation is {@link SessionSummary}, surfaced on\nthe root channel; the host keeps the two in sync via\n`root/sessionSummaryChanged`.",
       "properties": {
-        "summary": {
-          "$ref": "#/$defs/SessionSummary",
-          "description": "Lightweight session metadata"
+        "provider": {
+          "type": "string",
+          "description": "Agent provider ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Session title"
+        },
+        "status": {
+          "$ref": "#/$defs/SessionStatus",
+          "description": "Current session status"
+        },
+        "activity": {
+          "type": "string",
+          "description": "Human-readable description of what the session is currently doing"
+        },
+        "project": {
+          "$ref": "#/$defs/ProjectInfo",
+          "description": "Server-owned project for this session"
+        },
+        "workingDirectory": {
+          "$ref": "#/$defs/URI",
+          "description": "The default working directory URI for this session. Individual chats\nMAY override via {@link ChatSummary.workingDirectory | their own\n`workingDirectory`}; this field acts as the fallback for any chat that\ndoes not."
+        },
+        "annotations": {
+          "$ref": "#/$defs/AnnotationsSummary",
+          "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
         },
         "lifecycle": {
           "$ref": "#/$defs/SessionLifecycle",
@@ -2749,6 +2871,13 @@
           },
           "description": "Canvas open / action / close requests the host is currently waiting\non a provider to complete.\n\nLives in state — like the chat channel's input requests — so\nsubscribers can see what is in flight and reconnect/replay is\ncorrect. Entries are added with `session/canvasRequestCreated` and\nremoved once a `session/canvasRequestCompleted` carries the matching\n`requestId`, or via `session/canvasRequestCancelled`."
         },
+        "inputNeeded": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionInputRequest"
+          },
+          "description": "Outstanding input the session is blocked on, aggregated across every chat\nso a client can discover and answer it from the session channel alone,\nwithout subscribing to individual chats.\n\nEach entry is self-sufficient: it carries the owning chat's URI plus every\nidentifier the client needs to respond. A client answers by dispatching the\nordinary `chat/*` action to that chat's channel — see\n{@link SessionInputRequest} for the per-variant response path. A present,\nnon-empty list implies {@link SessionStatus.InputNeeded} on\n{@link SessionSummary.status}.\n\nHost-managed: the host upserts entries with `session/inputNeededSet` as\nchats raise requests and removes them with `session/inputNeededRemoved`\nonce the underlying request resolves."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -2756,7 +2885,9 @@
         }
       },
       "required": [
-        "summary",
+        "provider",
+        "title",
+        "status",
         "lifecycle",
         "activeClients",
         "chats"
@@ -2805,6 +2936,120 @@
         "tools"
       ]
     },
+    "SessionInputRequestBase": {
+      "type": "object",
+      "description": "Fields common to every {@link SessionInputRequest} variant.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable key for this entry, unique within the session's\n{@link SessionState.inputNeeded} list. The host derives it however it likes\n(for example from the chat URI plus the underlying request or tool-call\nid); consumers MUST treat it as opaque. It is the key for the\n`session/inputNeededSet` / `session/inputNeededRemoved` upsert convention."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
+        }
+      },
+      "required": [
+        "id",
+        "chat"
+      ]
+    },
+    "SessionChatInputRequest": {
+      "type": "object",
+      "description": "A user-input elicitation surfaced at the session level, mirroring one entry\nof the owning chat's {@link ChatState.inputRequests}.\n\nRespond by dispatching `chat/inputCompleted` (or syncing drafts with\n`chat/inputAnswerChanged`) to {@link SessionInputRequestBase.chat | `chat`},\nkeyed by {@link ChatInputRequest.id | `request.id`}.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable key for this entry, unique within the session's\n{@link SessionState.inputNeeded} list. The host derives it however it likes\n(for example from the chat URI plus the underlying request or tool-call\nid); consumers MUST treat it as opaque. It is the key for the\n`session/inputNeededSet` / `session/inputNeededRemoved` upsert convention."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
+        },
+        "kind": {
+          "$ref": "#/$defs/SessionInputRequestKind.ChatInput"
+        },
+        "request": {
+          "$ref": "#/$defs/ChatInputRequest",
+          "description": "The mirrored chat input request."
+        }
+      },
+      "required": [
+        "id",
+        "chat",
+        "kind",
+        "request"
+      ]
+    },
+    "SessionToolConfirmationRequest": {
+      "type": "object",
+      "description": "A tool call blocked on confirmation — either parameter confirmation before\nexecution or result confirmation after — surfaced at the session level.\n\nRespond by dispatching `chat/toolCallConfirmed` (for\n{@link ToolCallPendingConfirmationState}) or `chat/toolCallResultConfirmed`\n(for {@link ToolCallPendingResultConfirmationState}) to\n{@link SessionInputRequestBase.chat | `chat`}, keyed by `turnId` and\n`toolCall.toolCallId`.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable key for this entry, unique within the session's\n{@link SessionState.inputNeeded} list. The host derives it however it likes\n(for example from the chat URI plus the underlying request or tool-call\nid); consumers MUST treat it as opaque. It is the key for the\n`session/inputNeededSet` / `session/inputNeededRemoved` upsert convention."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
+        },
+        "kind": {
+          "$ref": "#/$defs/SessionInputRequestKind.ToolConfirmation"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "The turn the tool call belongs to."
+        },
+        "toolCall": {
+          "$ref": "#/$defs/ToolCallConfirmationState",
+          "description": "The tool call awaiting confirmation."
+        }
+      },
+      "required": [
+        "id",
+        "chat",
+        "kind",
+        "turnId",
+        "toolCall"
+      ]
+    },
+    "SessionToolClientExecutionRequest": {
+      "type": "object",
+      "description": "A running tool whose execution is delegated to an active client. Surfaced so\na client that provides the tool can pick up the work without subscribing to\nthe owning chat.\n\nThe {@link toolCall} is always a {@link ToolCallRunningState} (a\n{@link ToolCallState} in `running` status) whose\n{@link ToolCallRunningState.contributor | `contributor`} is a client\n{@link ToolCallClientContributor} whose `clientId` matches the denormalized\n{@link clientId} here. Execute and report the result by dispatching\n`chat/toolCallComplete` (and optionally streaming with\n`chat/toolCallContentChanged`) to {@link SessionInputRequestBase.chat |\n`chat`}, keyed by `turnId` and `toolCall.toolCallId`.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable key for this entry, unique within the session's\n{@link SessionState.inputNeeded} list. The host derives it however it likes\n(for example from the chat URI plus the underlying request or tool-call\nid); consumers MUST treat it as opaque. It is the key for the\n`session/inputNeededSet` / `session/inputNeededRemoved` upsert convention."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
+        },
+        "kind": {
+          "$ref": "#/$defs/SessionInputRequestKind.ToolClientExecution"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "The turn the tool call belongs to."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "The `clientId` expected to execute the tool. Matches the `clientId` of the\ntool call's client {@link ToolCallContributor}."
+        },
+        "toolCall": {
+          "$ref": "#/$defs/ToolCallState",
+          "description": "The running tool call the session wants the owning client to execute. The\nhost only ever populates this with a {@link ToolCallRunningState} (i.e. a\n{@link ToolCallState} in `running` status)."
+        }
+      },
+      "required": [
+        "id",
+        "chat",
+        "kind",
+        "turnId",
+        "clientId",
+        "toolCall"
+      ]
+    },
     "ProjectInfo": {
       "type": "object",
       "description": "Server-owned project metadata for a session.",
@@ -2825,12 +3070,8 @@
     },
     "SessionSummary": {
       "type": "object",
-      "description": "Lightweight catalog entry summarizing one session. Surfaced via\n{@link RootChannelCommands.listSessions | `root/listSessions`} and\n`root/sessionAdded`/`root/sessionSummaryChanged` notifications.\n\n**Aggregation across chats.** Once a session contains more than one chat,\nseveral `SessionSummary` fields are derived from the underlying\n{@link SessionState.chats | chat catalog}. Producers SHOULD follow these\nrules so clients that only consume the session summary (e.g. a session\nlist) still see meaningful state:\n\n- `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /\n  `Error` — bits 0–4) from the\n  {@link SessionState.defaultChat | default chat} when present, else from\n  the most recently modified chat. **Promote** `InputNeeded` whenever any\n  chat in the session needs input, and **promote** `Error` whenever any\n  chat is in an error state — both override the default-chat bits. The\n  orthogonal flag bits (`IsRead`, `IsArchived`) remain session-scoped.\n- `activity`: mirror the activity string of the default chat, or of the\n  chat currently driving the promoted status bits when a non-default chat\n  wins (e.g. the chat that raised `InputNeeded`).\n- `modifiedAt`: the max of all chats' `modifiedAt`.\n- `model` / `agent`: the session-level selection. Per-chat overrides are\n  surfaced on individual {@link ChatSummary} entries, not aggregated up.\n- `workingDirectory`: the session-level **default**. Individual chats MAY\n  override via {@link ChatSummary.workingDirectory}; aggregating these up\n  is meaningless and SHOULD NOT be attempted.\n- `changes`: optional roll-up across all chats. Producers MAY sum the\n  per-chat changeset stats or report the most expensive chat's stats —\n  whichever is cheaper for the host to compute.\n\nSessions with a single chat trivially satisfy all of the above (the chat's\nvalues pass through unchanged). The rules only matter once a session\ncarries multiple chats.",
+      "description": "Lightweight catalog entry summarizing one session. Surfaced via\n{@link RootChannelCommands.listSessions | `root/listSessions`} and\n`root/sessionAdded`/`root/sessionSummaryChanged` notifications.\n\n**Aggregation across chats.** Once a session contains more than one chat,\nseveral `SessionSummary` fields are derived from the underlying\n{@link SessionState.chats | chat catalog}. Producers SHOULD follow these\nrules so clients that only consume the session summary (e.g. a session\nlist) still see meaningful state:\n\n- `status`: take the activity bits (`Idle` / `InProgress` / `InputNeeded` /\n  `Error` — bits 0–4) from the\n  {@link SessionState.defaultChat | default chat} when present, else from\n  the most recently modified chat. **Promote** `InputNeeded` whenever any\n  chat in the session needs input, and **promote** `Error` whenever any\n  chat is in an error state — both override the default-chat bits. The\n  orthogonal flag bits (`IsRead`, `IsArchived`) remain session-scoped.\n- `activity`: mirror the activity string of the default chat, or of the\n  chat currently driving the promoted status bits when a non-default chat\n  wins (e.g. the chat that raised `InputNeeded`).\n- `modifiedAt`: the max of all chats' `modifiedAt`.\n- `workingDirectory`: the session-level **default**. Individual chats MAY\n  override via {@link ChatSummary.workingDirectory}; aggregating these up\n  is meaningless and SHOULD NOT be attempted.\n- `changes`: optional roll-up across all chats. Producers MAY sum the\n  per-chat changeset stats or report the most expensive chat's stats —\n  whichever is cheaper for the host to compute.\n\nSessions with a single chat trivially satisfy all of the above (the chat's\nvalues pass through unchanged). The rules only matter once a session\ncarries multiple chats.",
       "properties": {
-        "resource": {
-          "$ref": "#/$defs/URI",
-          "description": "Session URI"
-        },
         "provider": {
           "type": "string",
           "description": "Agent provider ID"
@@ -2847,37 +3088,33 @@
           "type": "string",
           "description": "Human-readable description of what the session is currently doing"
         },
-        "createdAt": {
-          "type": "number",
-          "description": "Creation timestamp"
-        },
-        "modifiedAt": {
-          "type": "number",
-          "description": "Last modification timestamp"
-        },
         "project": {
           "$ref": "#/$defs/ProjectInfo",
           "description": "Server-owned project for this session"
-        },
-        "model": {
-          "$ref": "#/$defs/ModelSelection",
-          "description": "Currently selected model"
-        },
-        "agent": {
-          "$ref": "#/$defs/AgentSelection",
-          "description": "Currently selected custom agent.\n\nAbsent (`undefined`) means no custom agent is selected for this session\n— the session uses the provider's default behavior."
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
           "description": "The default working directory URI for this session. Individual chats\nMAY override via {@link ChatSummary.workingDirectory | their own\n`workingDirectory`}; this field acts as the fallback for any chat that\ndoes not."
         },
-        "changes": {
-          "$ref": "#/$defs/ChangesSummary",
-          "description": "Aggregate summary of file changes associated with this session. Servers\nmay populate this to give clients a quick at-a-glance view of the\nsession's footprint (e.g., for list rendering) without requiring the\nclient to subscribe to a changeset."
-        },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
           "description": "Lightweight summary of this session's inline annotations channel\n(`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render\nannotation / entry counts without subscribing. Absent when the session\ndoes not expose an annotations channel."
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
+        },
+        "modifiedAt": {
+          "type": "string",
+          "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
+        },
+        "changes": {
+          "$ref": "#/$defs/ChangesSummary",
+          "description": "Aggregate summary of file changes associated with this session. Servers\nmay populate this to give clients a quick at-a-glance view of the\nsession's footprint (e.g., for list rendering) without requiring the\nclient to subscribe to a changeset."
         },
         "_meta": {
           "type": "object",
@@ -2886,10 +3123,10 @@
         }
       },
       "required": [
-        "resource",
         "provider",
         "title",
         "status",
+        "resource",
         "createdAt",
         "modifiedAt"
       ]
@@ -2914,7 +3151,7 @@
     },
     "AgentSelection": {
       "type": "object",
-      "description": "A selected custom agent for a session.\n\nThe `uri` identifies a specific custom agent (matching an\n{@link AgentCustomization.uri | `AgentCustomization.uri`} exposed via\nthe session's effective customizations). Consumers resolve the agent's\ndisplay name by looking up `uri` in the session's customization tree.\n\nA session with no `agent` selected uses the provider's default behavior.",
+      "description": "A selected custom agent for a session.\n\nThe `uri` identifies a specific custom agent (matching an\n{@link AgentCustomization.uri | `AgentCustomization.uri`} exposed via\nthe session's effective customizations). Consumers resolve the agent's\ndisplay name by looking up `uri` in the session's customization tree.\n\nA message with no `agent` selected uses the provider's default behavior.",
       "properties": {
         "uri": {
           "$ref": "#/$defs/URI",
@@ -3521,6 +3758,17 @@
         "description": {
           "type": "string",
           "description": "Short description of what the agent specializes in and when to\ninvoke it. Sourced from the agent file's frontmatter `description`."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model the agent is pinned to, sourced from the agent file's\nfrontmatter `model`. Absent means the agent inherits the session's\ndefault model."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowlist of tool names the agent is scoped to, sourced from the\nagent file's frontmatter `tools`. A non-empty list restricts the\nagent to exactly those tools. Absent — or an empty list — imposes no\nrestriction beyond the session default: the agent may use any\navailable tool. Producers express \"no restriction\" by omitting the\nfield rather than sending an empty array, so an empty list carries no\nmeaning distinct from absence."
         },
         "_meta": {
           "type": "object",
@@ -4312,14 +4560,6 @@
           "type": "string",
           "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
         },
-        "model": {
-          "$ref": "#/$defs/ModelSelection",
-          "description": "Optional per-chat model override (defaults to the session's model)"
-        },
-        "agent": {
-          "$ref": "#/$defs/AgentSelection",
-          "description": "Optional per-chat agent override (defaults to the session's agent)"
-        },
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
@@ -4330,7 +4570,7 @@
         },
         "workingDirectory": {
           "$ref": "#/$defs/URI",
-          "description": "Optional per-chat working directory.\n\nIf absent, the chat inherits\n{@link SessionSummary.workingDirectory | the session's working directory}.\nHosts MAY override this for individual chats — for example, to give a\nsubordinate chat its own git worktree so multiple chats in a session can\nmake independent edits that the orchestrator later merges back."
+          "description": "Optional per-chat working directory.\n\nIf absent, the chat inherits\n{@link SessionState.workingDirectory | the session's working directory}.\nHosts MAY override this for individual chats — for example, to give a\nsubordinate chat its own git worktree so multiple chats in a session can\nmake independent edits that the orchestrator later merges back."
         },
         "turns": {
           "type": "array",
@@ -4360,6 +4600,10 @@
             "$ref": "#/$defs/ChatInputRequest"
           },
           "description": "Requests for user input that are currently blocking or informing chat progress"
+        },
+        "draft": {
+          "$ref": "#/$defs/Message",
+          "description": "The user's in-progress draft input for this chat — the message they are\ncomposing but have not sent yet, including its\n{@link Message.model | model} / {@link Message.agent | agent} selection\nand attachments.\n\nClients MAY periodically sync their local input state into this field so\na draft survives reloads and is visible to other clients viewing the same\nchat. Eager syncing is **not** required — clients SHOULD debounce and MAY\nsync only at convenient points. When presenting input UI for an existing\nchat, clients SHOULD use any `draft` to initialize their input state.\nCleared (set to `undefined`) once the message is sent."
         },
         "_meta": {
           "type": "object",
@@ -4398,14 +4642,6 @@
         "modifiedAt": {
           "type": "string",
           "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
-        },
-        "model": {
-          "$ref": "#/$defs/ModelSelection",
-          "description": "Optional per-chat model override (defaults to the session's model)"
-        },
-        "agent": {
-          "$ref": "#/$defs/AgentSelection",
-          "description": "Optional per-chat agent override (defaults to the session's agent)"
         },
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
@@ -4991,6 +5227,14 @@
           },
           "description": "File/selection attachments"
         },
+        "model": {
+          "$ref": "#/$defs/ModelSelection",
+          "description": "The model this message was, or will be, sent with.\n\nFor historic user/agent messages this records the model actually used, so\na client editing or resending the message can retain that selection. For a\n{@link ChatState.draft | draft} it carries the model the user picked for\nthe message they are composing. Absent means the agent host's default\nmodel applies."
+        },
+        "agent": {
+          "$ref": "#/$defs/AgentSelection",
+          "description": "The custom agent this message was, or will be, sent with.\n\nFor historic messages this records the agent actually used; for a\n{@link ChatState.draft | draft} it carries the agent the user picked.\nAbsent means no custom agent — the provider's default behavior applies."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -5381,6 +5625,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called."
@@ -5475,6 +5723,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called."
@@ -5518,6 +5770,10 @@
         "displayName": {
           "type": "string",
           "description": "Human-readable tool name"
+        },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
         },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
@@ -5591,6 +5847,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called."
@@ -5651,6 +5911,10 @@
         "displayName": {
           "type": "string",
           "description": "Human-readable tool name"
+        },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
         },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
@@ -5743,6 +6007,10 @@
           "type": "string",
           "description": "Human-readable tool name"
         },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
+        },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
           "description": "Reference to the contributor of the tool being called."
@@ -5833,6 +6101,10 @@
         "displayName": {
           "type": "string",
           "description": "Human-readable tool name"
+        },
+        "intention": {
+          "type": "string",
+          "description": "Human-readable description of what the tool invocation intends to do"
         },
         "contributor": {
           "$ref": "#/$defs/ToolCallContributor",
@@ -6589,6 +6861,21 @@
       ],
       "description": "A primitive JSON value: a string, number, boolean, or `null`."
     },
+    "SessionInputRequest": {
+      "oneOf": [
+        {},
+        {
+          "$ref": "#/$defs/SessionChatInputRequest"
+        },
+        {
+          "$ref": "#/$defs/SessionToolConfirmationRequest"
+        },
+        {
+          "$ref": "#/$defs/SessionToolClientExecutionRequest"
+        }
+      ],
+      "description": "One outstanding piece of input a session is blocked on, aggregated across all\nchats in {@link SessionState.inputNeeded}.\n\nEach entry is self-sufficient: it carries the owning\n{@link SessionInputRequestBase.chat | `chat`} URI plus every identifier needed\nto construct the response, so a client can answer by dispatching the ordinary\n`chat/*` action (`chat/inputCompleted`, `chat/toolCallConfirmed`,\n`chat/toolCallComplete`, …) to that chat's channel **without having subscribed\nto the chat**. The host removes the entry with `session/inputNeededRemoved`\nonce the underlying request resolves."
+    },
     "ChildCustomizationType": {
       "oneOf": [
         {},
@@ -6895,6 +7182,18 @@
       ],
       "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
     },
+    "ToolCallConfirmationState": {
+      "oneOf": [
+        {},
+        {
+          "$ref": "#/$defs/ToolCallPendingConfirmationState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPendingResultConfirmationState"
+        }
+      ],
+      "description": "The two tool-call states that block on a client confirmation: parameter\nconfirmation before execution ({@link ToolCallPendingConfirmationState}) and\nresult confirmation after execution\n({@link ToolCallPendingResultConfirmationState}).\n\nSurfaced at the session level by {@link SessionToolConfirmationRequest}."
+    },
     "ToolResultContent": {
       "oneOf": [
         {},
@@ -6982,12 +7281,6 @@
           "$ref": "#/$defs/SessionTitleChangedAction"
         },
         {
-          "$ref": "#/$defs/SessionModelChangedAction"
-        },
-        {
-          "$ref": "#/$defs/SessionAgentChangedAction"
-        },
-        {
           "$ref": "#/$defs/SessionServerToolsChangedAction"
         },
         {
@@ -6995,6 +7288,12 @@
         },
         {
           "$ref": "#/$defs/SessionActiveClientRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionInputNeededSetAction"
+        },
+        {
+          "$ref": "#/$defs/SessionInputNeededRemovedAction"
         },
         {
           "$ref": "#/$defs/SessionCustomizationsChangedAction"
@@ -7093,6 +7392,9 @@
           "$ref": "#/$defs/ChatErrorAction"
         },
         {
+          "$ref": "#/$defs/ChatActivityChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatUsageAction"
         },
         {
@@ -7106,6 +7408,9 @@
         },
         {
           "$ref": "#/$defs/ChatQueuedMessagesReorderedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatDraftChangedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"

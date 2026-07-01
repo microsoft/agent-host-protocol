@@ -658,9 +658,16 @@ func (c *Client) Reconnect(ctx context.Context, clientID string, lastSeenServerS
 // Subscribe sends a `subscribe` request and returns the initial snapshot
 // together with a per-URI [Subscription] handle.
 func (c *Client) Subscribe(ctx context.Context, uri string) (*ahptypes.SubscribeResult, *Subscription, error) {
+	return c.SubscribeWithDelivery(ctx, uri, nil)
+}
+
+// SubscribeWithDelivery sends a `subscribe` request with advisory delivery
+// preferences and returns the initial snapshot together with a per-URI
+// [Subscription] handle.
+func (c *Client) SubscribeWithDelivery(ctx context.Context, uri string, delivery *ahptypes.SubscriptionDeliveryOptions) (*ahptypes.SubscribeResult, *Subscription, error) {
 	sub := c.AttachSubscription(uri)
 	var out ahptypes.SubscribeResult
-	if err := c.Request(ctx, "subscribe", ahptypes.SubscribeParams{Channel: uri}, &out); err != nil {
+	if err := c.Request(ctx, "subscribe", ahptypes.SubscribeParams{Channel: uri, Delivery: delivery}, &out); err != nil {
 		sub.Close()
 		return nil, nil, err
 	}

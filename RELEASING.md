@@ -76,10 +76,11 @@ and a checked-in `clients/<lang>/release-metadata.json`.
 4. Merge to `main`.
 5. Tag: `git tag kotlin/v0.X.Y && git push origin kotlin/v0.X.Y`.
 6. `clients/kotlin/pipeline.yml` (Azure DevOps) validates the tag,
-   re-runs the generator + Gradle `check`, stages a Maven repository
-   layout under `clients/kotlin/build/maven-staging/`, and hands it to
-   ESRP (`contenttype: maven`). ESRP signs the artifacts and releases
-   them to Maven Central via the Sonatype Central Portal. No manual
+   re-runs the generator + Gradle `check`, fetches the GPG signing key
+   from the `vscode` Key Vault, stages **and GPG-signs** a Maven
+   repository layout under `clients/kotlin/build/maven-staging/`, and
+   hands it to ESRP (`contenttype: maven`). ESRP uploads the signed
+   artifacts to Maven Central via the Sonatype Central Portal. No manual
    Sonatype UI interaction is required.
 7. Bump `VERSION_NAME` back to the next `-SNAPSHOT` for ongoing development.
 
@@ -180,6 +181,7 @@ function. They are set per-repo by a maintainer with admin access.
 | Environment / secret | Used by | Purpose |
 | --- | --- | --- |
 | `crates-io` environment, `CARGO_REGISTRY_TOKEN` secret | `publish-rust.yml` | Authenticates `cargo publish` for `ahp-types` / `ahp` / `ahp-ws`. |
-| Azure DevOps Service Connection to ESRP + Maven Central provisioning | `clients/kotlin/pipeline.yml` (vscode-engineering `maven-package` template) | ESRP signs and uploads the staged Maven layout to Maven Central via the Sonatype Central Portal. Provisioned inside the Microsoft ADO tenant; no GitHub secret required. |
+| Azure DevOps Service Connection to ESRP + Maven Central provisioning | `clients/kotlin/pipeline.yml` (vscode-engineering `maven-package` template) | Uploads the GPG-signed staged Maven layout to Maven Central via the Sonatype Central Portal. Provisioned inside the Microsoft ADO tenant; no GitHub secret required. |
+| `vscode` Key Vault secrets `maven-gpg-private-key` + `maven-gpg-passphrase` | vscode-engineering `maven-package` template (`AzureKeyVault@2`), consumed by `clients/kotlin/pipeline.yml` | GPG key used to sign the Kotlin Maven artifacts (`.asc`) — Maven Central requires PGP signatures and ESRP does not generate them. The matching public key must be published to a keyserver. Provisioned inside the Microsoft ADO tenant; no GitHub secret required. |
 | Azure DevOps Service Connection to ESRP + npm publish creds | `clients/typescript/pipeline.yml` (vscode-engineering `npm-package` template) | Authenticates `npm publish` for `@microsoft/agent-host-protocol`. Provisioned inside the Microsoft ADO tenant; no GitHub secret required. |
 | (none required) | `publish-swift.yml`, `publish-spec.yml`, `publish-go.yml` | All three use the default `GITHUB_TOKEN` to create GitHub Releases. No external registry credentials needed — SwiftPM and the Go module proxy index tags directly. |

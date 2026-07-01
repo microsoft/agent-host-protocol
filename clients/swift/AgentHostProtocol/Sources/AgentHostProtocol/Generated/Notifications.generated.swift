@@ -172,8 +172,6 @@ public struct OtlpExportMetricsParams: Codable, Sendable {
 // MARK: - Partial Summary Types
 
 public struct PartialSessionSummary: Codable, Sendable {
-    /// Session URI
-    public var resource: String?
     /// Agent provider ID
     public var provider: String?
     /// Session title
@@ -182,34 +180,29 @@ public struct PartialSessionSummary: Codable, Sendable {
     public var status: SessionStatus?
     /// Human-readable description of what the session is currently doing
     public var activity: String?
-    /// Creation timestamp
-    public var createdAt: Int?
-    /// Last modification timestamp
-    public var modifiedAt: Int?
     /// Server-owned project for this session
     public var project: ProjectInfo?
-    /// Currently selected model
-    public var model: ModelSelection?
-    /// Currently selected custom agent.
-    ///
-    /// Absent (`undefined`) means no custom agent is selected for this session
-    /// — the session uses the provider's default behavior.
-    public var agent: AgentSelection?
     /// The default working directory URI for this session. Individual chats
     /// MAY override via {@link ChatSummary.workingDirectory | their own
     /// `workingDirectory`}; this field acts as the fallback for any chat that
     /// does not.
     public var workingDirectory: String?
-    /// Aggregate summary of file changes associated with this session. Servers
-    /// may populate this to give clients a quick at-a-glance view of the
-    /// session's footprint (e.g., for list rendering) without requiring the
-    /// client to subscribe to a changeset.
-    public var changes: ChangesSummary?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?
+    /// Session URI
+    public var resource: String?
+    /// Creation timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+    public var createdAt: String?
+    /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+    public var modifiedAt: String?
+    /// Aggregate summary of file changes associated with this session. Servers
+    /// may populate this to give clients a quick at-a-glance view of the
+    /// session's footprint (e.g., for list rendering) without requiring the
+    /// client to subscribe to a changeset.
+    public var changes: ChangesSummary?
     /// Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
     /// SHOULD keep the payload small because summaries appear in session lists
@@ -217,51 +210,45 @@ public struct PartialSessionSummary: Codable, Sendable {
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
-        case resource
         case provider
         case title
         case status
         case activity
+        case project
+        case workingDirectory
+        case annotations
+        case resource
         case createdAt
         case modifiedAt
-        case project
-        case model
-        case agent
-        case workingDirectory
         case changes
-        case annotations
         case meta = "_meta"
     }
 
     public init(
-        resource: String? = nil,
         provider: String? = nil,
         title: String? = nil,
         status: SessionStatus? = nil,
         activity: String? = nil,
-        createdAt: Int? = nil,
-        modifiedAt: Int? = nil,
         project: ProjectInfo? = nil,
-        model: ModelSelection? = nil,
-        agent: AgentSelection? = nil,
         workingDirectory: String? = nil,
-        changes: ChangesSummary? = nil,
         annotations: AnnotationsSummary? = nil,
+        resource: String? = nil,
+        createdAt: String? = nil,
+        modifiedAt: String? = nil,
+        changes: ChangesSummary? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
-        self.resource = resource
         self.provider = provider
         self.title = title
         self.status = status
         self.activity = activity
+        self.project = project
+        self.workingDirectory = workingDirectory
+        self.annotations = annotations
+        self.resource = resource
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
-        self.project = project
-        self.model = model
-        self.agent = agent
-        self.workingDirectory = workingDirectory
         self.changes = changes
-        self.annotations = annotations
         self.meta = meta
     }
 }

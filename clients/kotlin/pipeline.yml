@@ -10,10 +10,12 @@ name: $(Date:yyyyMMdd)$(Rev:.r)
 #
 #   1. Push a `kotlin/vX.Y.Z` tag from the repo root.
 #   2. ADO picks up the tag, runs the full validation + build + test
-#      sequence, stages a Maven repository layout under
-#      `clients/kotlin/build/maven-staging/`, and hands it to ESRP
-#      (`contenttype: maven`) for upload + sign + release to Maven
-#      Central via the Sonatype Central Portal.
+#      sequence, then the `maven-package` template stages **and
+#      GPG-signs** a Maven repository layout under
+#      `clients/kotlin/build/maven-staging/` (the GPG key comes from the
+#      `vscode` Key Vault) and hands it to ESRP (`contenttype: maven`)
+#      for upload + release to Maven Central via the Sonatype Central
+#      Portal.
 #
 # The pipeline can also be triggered manually from the ADO UI as a
 # hotfix escape hatch — manual runs publish too by default. Untick
@@ -42,7 +44,7 @@ resources:
     - repository: templates
       type: github
       name: microsoft/vscode-engineering
-      ref: connor4312/maven-pipeline # temporary to validate
+      ref: main
       endpoint: Monaco
 
 extends:
@@ -51,10 +53,6 @@ extends:
     packageName: agent-host-protocol
     projectRootDirectory: $(Build.SourcesDirectory)/clients/kotlin
     artifactStagingDirectory: $(Build.SourcesDirectory)/clients/kotlin/build/maven-staging
-    # Driven by the top-level `publish` parameter so manual queue-time
-    # runs can opt out of the ESRP upload for testing while still
-    # exercising the full validation + build + staging path. Tag-driven
-    # runs use the default (true).
     publishPackage: ${{ parameters.publish }}
     # The GitHub tag is what triggers this pipeline, so there's no
     # need for the pipeline to also push a tag back.
@@ -102,11 +100,6 @@ extends:
           esac
         displayName: ✅ Verify tag matches Gradle version
 
-      # Defense-in-depth checks before producing the publish artifact.
-      # These also run on every commit via the GitHub Actions
-      # `ci.yml` workflow, but re-running them here means the Maven
-      # artifact can't ship from a branch state that would have
-      # failed the GHA check.
       - script: npm run verify:release-metadata
         displayName: ✅ Verify release metadata
 
@@ -135,15 +128,3 @@ extends:
       - script: ./gradlew check --stacktrace
         workingDirectory: clients/kotlin
         displayName: 🧪 Run Gradle check (tests + lint)
-
-      # Stage the publish artifact. The `Staging` Maven repository is
-      # declared in `clients/kotlin/build.gradle.kts` and points at
-      # `build/maven-staging/`. ESRP picks up that folder (with the
-      # standard Maven layout `<groupId>/<artifactId>/<version>/...`)
-      # and uploads it to Maven Central. Signing is performed by
-      # ESRP, so we pass `-Pahp.signPublications=false` to skip the
-      # Vanniktech `signAllPublications()` call (which would otherwise
-      # require PGP key configuration here).
-      - script: ./gradlew -Pahp.signPublications=false publishAllPublicationsToStagingRepository --no-configuration-cache --stacktrace
-        workingDirectory: clients/kotlin
-        displayName: 📦 Stage Maven artifacts for ESRP

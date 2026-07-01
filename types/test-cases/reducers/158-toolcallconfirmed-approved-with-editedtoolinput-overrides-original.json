@@ -70,6 +70,7 @@
             "toolCallId": "tc-1",
             "toolName": "bash",
             "displayName": "Run Command",
+            "intention": null,
             "contributor": null,
             "_meta": null,
             "invocationMessage": "Run: ls -la",

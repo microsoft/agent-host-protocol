@@ -18,7 +18,8 @@
             "status": "streaming",
             "toolCallId": "tc-1",
             "toolName": "bash",
-            "displayName": "Run Command"
+            "displayName": "Run Command",
+            "intention": null
           }
         }
       ],
@@ -54,7 +55,8 @@
             "status": "streaming",
             "toolCallId": "tc-1",
             "toolName": "bash",
-            "displayName": "Run Command"
+            "displayName": "Run Command",
+            "intention": null
           }
         }
       ],

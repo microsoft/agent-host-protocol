@@ -80,8 +80,8 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `session/titleChanged` | **Yes** | Session title updated (auto-generated or client rename) |
-| `session/modelChanged` | **Yes** | Model changed for this session |
 | `session/activityChanged` | No | Server updated the session's current activity description |
+| `chat/activityChanged` | No | Server updated a chat's current activity description |
 | `session/diffsChanged` | No | File diffs in the session summary changed (full replacement) |
 | `session/isReadChanged` | **Yes** | Client marked session as read or unread |
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |
@@ -188,7 +188,6 @@ The client applies the action **optimistically** to its local state before sendi
 | `chat/toolCallConfirmed` | Approves or denies a pending tool call; unblocks or cancels tool execution |
 | `session/turnCancelled` | Aborts the in-progress turn |
 | `session/titleChanged` | Updates the session title (rename) |
-| `session/modelChanged` | Changes the model for subsequent turns |
 | `session/pendingMessageSet` | Stores a steering or queued message (upsert); if queued and idle, auto-starts a turn |
 | `session/pendingMessageRemoved` | Cancels a pending message before it is consumed |
 | `session/queuedMessagesReordered` | Reorders queued messages; unknown IDs ignored, unmentioned messages kept at end |

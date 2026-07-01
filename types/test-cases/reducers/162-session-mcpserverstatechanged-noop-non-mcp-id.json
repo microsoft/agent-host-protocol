@@ -2,14 +2,9 @@
   "description": "session/mcpServerStateChanged is a no-op when the targeted id belongs to a non-McpServer customization (a top-level container or one of its non-MCP children)",
   "reducer": "session",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
     "lifecycle": "ready",
     "activeClients": [],
     "chats": [],
@@ -50,14 +45,9 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
     "lifecycle": "ready",
     "activeClients": [],
     "chats": [],

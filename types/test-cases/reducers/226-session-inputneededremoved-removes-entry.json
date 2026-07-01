@@ -1,0 +1,48 @@
+{
+  "description": "session/inputNeededRemoved removes the entry with the matching id and keeps status InputNeeded while entries remain",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
+        "chat": "copilot:/test-session/chat-1",
+        "request": { "id": "req-1", "message": "Which environment?" }
+      },
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-2",
+        "chat": "copilot:/test-session/chat-1",
+        "request": { "id": "req-2", "message": "Confirm name?" }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededRemoved",
+      "id": "copilot:/test-session/chat-1#req-1"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-2",
+        "chat": "copilot:/test-session/chat-1",
+        "request": { "id": "req-2", "message": "Confirm name?" }
+      }
+    ]
+  }
+}

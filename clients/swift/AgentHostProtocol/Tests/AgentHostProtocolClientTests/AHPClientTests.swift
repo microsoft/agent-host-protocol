@@ -50,13 +50,9 @@ final class AHPClientTests: XCTestCase {
             let snap = SubscribeResult(snapshot: Snapshot(
                 resource: "ahp-session:/s1",
                 state: .session(SessionState(
-                    summary: SessionSummary(
-                        resource: "ahp-session:/s1",
-                        provider: "test",
-                        title: "T",
-                        status: .idle,
-                        createdAt: 1, modifiedAt: 1
-                    ),
+                    provider: "test",
+                    title: "T",
+                    status: .idle,
                     lifecycle: .ready,
                     activeClients: [],
                     chats: []
@@ -128,11 +124,12 @@ final class AHPClientTests: XCTestCase {
             let params = SessionAddedParams(
                 channel: RootResourceURI,
                 summary: SessionSummary(
-                    resource: "ahp-session:/s1",
                     provider: "test",
                     title: "T",
                     status: .idle,
-                    createdAt: 1, modifiedAt: 1
+                    resource: "ahp-session:/s1",
+                    createdAt: "1970-01-01T00:00:00.001Z",
+                    modifiedAt: "1970-01-01T00:00:00.001Z"
                 )
             )
             try await pushNotification(

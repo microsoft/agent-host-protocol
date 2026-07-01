@@ -1,0 +1,42 @@
+{
+  "description": "session/inputNeededRemoved is a no-op for an unknown id",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
+        "chat": "copilot:/test-session/chat-1",
+        "request": { "id": "req-1", "message": "Which environment?" }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededRemoved",
+      "id": "copilot:/test-session/chat-1#unknown"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
+        "chat": "copilot:/test-session/chat-1",
+        "request": { "id": "req-1", "message": "Which environment?" }
+      }
+    ]
+  }
+}

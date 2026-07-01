@@ -184,13 +184,22 @@ func makeSummary(
     createdAt: Int = 0
 ) -> SessionSummary {
     SessionSummary(
-        resource: uri,
         provider: "copilot",
         title: title,
         status: .idle,
-        createdAt: createdAt,
-        modifiedAt: modifiedAt
+        resource: uri,
+        createdAt: isoTimestamp(millis: createdAt),
+        modifiedAt: isoTimestamp(millis: modifiedAt)
     )
+}
+
+/// Formats a millisecond epoch value as an ISO-8601 timestamp with fixed
+/// millisecond precision so lexicographic ordering matches chronological order.
+private func isoTimestamp(millis: Int) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    formatter.timeZone = TimeZone(identifier: "UTC")
+    return formatter.string(from: Date(timeIntervalSince1970: Double(millis) / 1000))
 }
 
 /// Build an `AgentInfo` with the minimal required fields.

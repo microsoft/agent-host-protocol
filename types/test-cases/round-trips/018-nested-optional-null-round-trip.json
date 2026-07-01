@@ -8,8 +8,8 @@
     "provider": "demo",
     "title": "No project",
     "status": 1,
-    "createdAt": 1,
-    "modifiedAt": 2
+    "createdAt": "2024-01-01T00:00:00.001Z",
+    "modifiedAt": "2024-01-01T00:00:00.002Z"
   },
   "acceptableOutputs": [
     {
@@ -17,8 +17,8 @@
       "provider": "demo",
       "title": "No project",
       "status": 1,
-      "createdAt": 1,
-      "modifiedAt": 2
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z"
     }
   ]
 }

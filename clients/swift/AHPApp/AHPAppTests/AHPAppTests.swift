@@ -130,32 +130,24 @@ struct ReconnectResultTests {
         // Simulate having a session already subscribed.
         let sessionURI = "ahp-session:/test-session-id"
         let initialSessionState = SessionState(
-            summary: SessionSummary(
-                resource: sessionURI,
-                provider: "copilot",
-                title: "",
-                status: .idle,
-                createdAt: 0,
-                modifiedAt: 0
-            ),
+            provider: "copilot",
+            title: "",
+            status: .idle,
             lifecycle: .ready,
-            turns: []
+            activeClients: [],
+            chats: []
         )
         store.sessions[sessionURI] = initialSessionState
 
         // A snapshot reconnect carries fresh root + session snapshots.
         let freshRoot = RootState(agents: [Self.makeAgent(provider: "copilot")])
         let freshSession = SessionState(
-            summary: SessionSummary(
-                resource: sessionURI,
-                provider: "copilot",
-                title: "Restored session",
-                status: .idle,
-                createdAt: 0,
-                modifiedAt: 1
-            ),
+            provider: "copilot",
+            title: "Restored session",
+            status: .idle,
             lifecycle: .ready,
-            turns: []
+            activeClients: [],
+            chats: []
         )
         let result = ReconnectResult.snapshot(ReconnectSnapshotResult(
             type: .snapshot,
@@ -168,7 +160,7 @@ struct ReconnectResultTests {
         store.applyReconnectResult(result)
 
         #expect(store.rootState.agents[0].provider == "copilot")
-        #expect(store.sessions[sessionURI]?.summary.title == "Restored session")
+        #expect(store.sessions[sessionURI]?.title == "Restored session")
     }
 
     // MARK: - serverSeq tracking
@@ -631,7 +623,7 @@ struct InjectedTransportTests {
         } catch TestHarnessError.sentMessageTimeout {}
 
         #expect(store.selectedSessionURI == sessionURI)
-        #expect(store.sessions[sessionURI]?.summary.title == "Fresh session")
+        #expect(store.sessions[sessionURI]?.title == "Fresh session")
 
         await connection.disconnect()
     }
@@ -728,7 +720,7 @@ struct InjectedTransportTests {
         await selectTask.value
 
         #expect(store.selectedSessionURI == sessionURI)
-        #expect(store.sessions[sessionURI]?.summary.title == "Recovered session")
+        #expect(store.sessions[sessionURI]?.title == "Recovered session")
         #expect(store.errorMessage == nil)
 
         await connection.disconnect()
@@ -773,7 +765,7 @@ struct InjectedTransportTests {
 
         await connectTask.value
 
-        #expect(store.sessions[sessionURI]?.summary.title == "Fresh session")
+        #expect(store.sessions[sessionURI]?.title == "Fresh session")
         #expect(store.selectedSessionURI == sessionURI)
 
         await connection.disconnect()
@@ -805,7 +797,7 @@ struct InjectedTransportTests {
         await selectTask.value
 
         #expect(store.selectedSessionURI == sessionURI)
-        #expect(store.sessions[sessionURI]?.summary.title == "Fresh session")
+        #expect(store.sessions[sessionURI]?.title == "Fresh session")
 
         await connection.disconnect()
     }
@@ -1524,9 +1516,12 @@ private func makeSessionSnapshot(resource: String, title: String, fromSeq: Int) 
 
 private func makeSessionState(resource: String, title: String, modifiedAt: Int) -> SessionState {
     SessionState(
-        summary: makeSessionSummary(resource: resource, title: title, modifiedAt: modifiedAt),
+        provider: "copilot",
+        title: title,
+        status: .idle,
         lifecycle: .ready,
-        turns: []
+        activeClients: [],
+        chats: []
     )
 }
 
@@ -1537,13 +1532,22 @@ private func makeSessionSummary(
     modifiedAt: Int
 ) -> SessionSummary {
     SessionSummary(
-        resource: resource,
         provider: "copilot",
         title: title,
         status: status,
-        createdAt: 0,
-        modifiedAt: modifiedAt
+        resource: resource,
+        createdAt: isoTimestamp(millis: 0),
+        modifiedAt: isoTimestamp(millis: modifiedAt)
     )
+}
+
+/// Formats a millisecond epoch value as an ISO-8601 timestamp with fixed
+/// millisecond precision so lexicographic ordering matches chronological order.
+private func isoTimestamp(millis: Int) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    formatter.timeZone = TimeZone(identifier: "UTC")
+    return formatter.string(from: Date(timeIntervalSince1970: Double(millis) / 1000))
 }
 
 private func timestampMilliseconds(_ date: Date) -> Int {

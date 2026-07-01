@@ -81,10 +81,6 @@ type PartialChatSummary struct {
 	Activity *string `json:"activity,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt *string `json:"modifiedAt,omitempty"`
-	// Optional per-chat model override (defaults to the session's model)
-	Model *ModelSelection `json:"model,omitempty"`
-	// Optional per-chat agent override (defaults to the session's agent)
-	Agent *AgentSelection `json:"agent,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
 	// Optional per-chat working directory.

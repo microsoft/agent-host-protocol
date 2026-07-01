@@ -315,9 +315,10 @@ export class MultiHostClient {
         out.push({ hostId: id, hostLabel: label, summary });
       }
     }
-    // Sort modifiedAt descending. Stable across ties because Array.sort
-    // in modern engines (Node ≥ 12, modern browsers) is stable.
-    out.sort((a, b) => b.summary.modifiedAt - a.summary.modifiedAt);
+    // Sort modifiedAt descending. `modifiedAt` is an ISO 8601 timestamp, which
+    // sorts chronologically under lexicographic comparison. Stable across ties
+    // because Array.sort in modern engines (Node ≥ 12, modern browsers) is stable.
+    out.sort((a, b) => (a.summary.modifiedAt < b.summary.modifiedAt ? 1 : a.summary.modifiedAt > b.summary.modifiedAt ? -1 : 0));
     return out;
   }
 

@@ -25,7 +25,8 @@ struct ChatView: View {
     }
     private var sessionModelPickerModel: SessionModelPickerModel? {
         guard let session = store.currentSession else { return nil }
-        return SessionModelPickerModel(session: session, agents: store.agents)
+        let selectedModelId = store.selectedSessionURI.flatMap { store.selectedModelId(for: $0) }
+        return SessionModelPickerModel(session: session, agents: store.agents, selectedModelId: selectedModelId)
     }
 
     /// True when the active turn has at least one streaming or running tool
@@ -239,7 +240,7 @@ struct ChatView: View {
                 }
             }
         }
-        .navigationTitle(store.currentSession?.summary.title.isEmpty == false ? store.currentSession!.summary.title : "New Chat")
+        .navigationTitle(store.currentSession?.title.isEmpty == false ? store.currentSession!.title : "New Chat")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -602,8 +603,8 @@ private struct SessionModelPickerModel {
     let selectedValue: String?
     let selectedLabel: String
 
-    init?(session: SessionState, agents: [AgentInfo]) {
-        guard let agent = agents.first(where: { $0.provider == session.summary.provider }),
+    init?(session: SessionState, agents: [AgentInfo], selectedModelId: String?) {
+        guard let agent = agents.first(where: { $0.provider == session.provider }),
               !agent.models.isEmpty else {
             return nil
         }
@@ -611,7 +612,7 @@ private struct SessionModelPickerModel {
         let options = agent.models.map { model in
             SessionModelOption(id: model.id, label: model.name)
         }
-        let currentModelId = session.summary.model?.id
+        let currentModelId = selectedModelId
         let selectedOption = currentModelId.flatMap { id in
             options.first(where: { $0.id == id })
         }
@@ -942,7 +943,7 @@ private struct AuthRequiredPanel: View {
     @FocusState private var tokenFocused: Bool
 
     private var providerLabel: String {
-        if let provider = session?.summary.provider, !provider.isEmpty {
+        if let provider = session?.provider, !provider.isEmpty {
             return provider
         }
         return "this agent"

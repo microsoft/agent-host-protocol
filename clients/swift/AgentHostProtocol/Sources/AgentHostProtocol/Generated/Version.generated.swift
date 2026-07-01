@@ -3,7 +3,7 @@
 import Foundation
 
 /// Current protocol version (SemVer `MAJOR.MINOR.PATCH`).
-public let PROTOCOL_VERSION: String = "0.5.0"
+public let PROTOCOL_VERSION: String = "0.5.1"
 
 /// Every protocol version this package is willing to negotiate,
 /// ordered most-preferred-first. The first entry equals
@@ -13,7 +13,6 @@ public let PROTOCOL_VERSION: String = "0.5.0"
 /// `InitializeParams` so the same client binary can fall back to older
 /// protocol versions if the host doesn't accept the newest one.
 public let SUPPORTED_PROTOCOL_VERSIONS: [String] = [
+    "0.5.1",
     "0.5.0",
-    "0.4.0",
-    "0.3.0",
 ]

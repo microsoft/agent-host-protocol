@@ -87,16 +87,6 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
-      - name: Dry-run publish every crate
-        run: |
-          set -euo pipefail
-          for crate in ahp-types ahp ahp-ws; do
-            echo "::group::cargo publish -p $crate --dry-run"
-            cargo publish -p "$crate" --dry-run
-            echo "::endgroup::"
-          done
-
-
   publish:
     needs: validate
     runs-on: ubuntu-latest

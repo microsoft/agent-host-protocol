@@ -37,6 +37,7 @@ fn main() {
                     models: vec![],
                     protected_resources: None,
                     customizations: None,
+                    capabilities: None,
                 }],
             }),
             server_seq: 1,

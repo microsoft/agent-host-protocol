@@ -10,10 +10,12 @@
       "provider": "demo",
       "title": "New session",
       "status": 1,
-      "createdAt": 1,
-      "modifiedAt": 2
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z"
     },
-    "unknownFutureKey": { "nested": true }
+    "unknownFutureKey": {
+      "nested": true
+    }
   },
   "acceptableOutputs": [
     {
@@ -23,8 +25,8 @@
         "provider": "demo",
         "title": "New session",
         "status": 1,
-        "createdAt": 1,
-        "modifiedAt": 2
+        "createdAt": "2024-01-01T00:00:00.001Z",
+        "modifiedAt": "2024-01-01T00:00:00.002Z"
       }
     }
   ],
@@ -35,9 +37,11 @@
       "provider": "demo",
       "title": "New session",
       "status": 1,
-      "createdAt": 1,
-      "modifiedAt": 2
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z"
     },
-    "unknownFutureKey": { "nested": true }
+    "unknownFutureKey": {
+      "nested": true
+    }
   }
 }

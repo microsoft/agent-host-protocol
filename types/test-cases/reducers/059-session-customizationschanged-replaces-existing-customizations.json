@@ -2,14 +2,9 @@
   "description": "session/customizationsChanged replaces existing customizations",
   "reducer": "session",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
     "lifecycle": "creating",
     "customizations": [
       {
@@ -38,14 +33,9 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
     "lifecycle": "creating",
     "customizations": [
       {

@@ -145,6 +145,22 @@ const (
 	ChatInputResponseKindCancel  ChatInputResponseKind = "cancel"
 )
 
+// Discriminant for the kinds of outstanding input a session can surface in
+// {@link SessionState.inputNeeded}.
+//
+// This is a general/typological union (not a lifecycle), so the discriminant is
+// a `*Kind`.
+type SessionInputRequestKind string
+
+const (
+	// A user-facing elicitation mirrored from a chat's `inputRequests`.
+	SessionInputRequestKindChatInput SessionInputRequestKind = "chatInput"
+	// A tool call awaiting parameter- or result-confirmation.
+	SessionInputRequestKindToolConfirmation SessionInputRequestKind = "toolConfirmation"
+	// A running tool the session wants an active client to execute.
+	SessionInputRequestKindToolClientExecution SessionInputRequestKind = "toolClientExecution"
+)
+
 // How a turn ended.
 type TurnState string
 
@@ -593,6 +609,31 @@ type AgentInfo struct {
 	// resolved against the workspace, children are parsed) and propagated
 	// into the session's `customizations` list.
 	Customizations []Customization `json:"customizations,omitempty"`
+	// Static capabilities the agent advertises about itself. Clients use these
+	// to gate features (multi-chat, fork) instead of switching on the provider
+	// id.
+	Capabilities *AgentCapabilities `json:"capabilities,omitempty"`
+}
+
+// Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
+// capabilities: each field is opt-in and its presence (an empty object `{}`)
+// signals support, while absence means the feature is unsupported and the
+// corresponding client commands MUST NOT be used. Sub-fields carry
+// per-capability options.
+type AgentCapabilities struct {
+	// The agent can host more than one concurrent chat per session. When absent,
+	// clients MUST NOT call `createChat` to open chats beyond the default one the
+	// session starts with. An empty object `{}` advertises multi-chat without
+	// forking; set {@link MultipleChatsCapability.fork} to also allow forking.
+	MultipleChats *MultipleChatsCapability `json:"multipleChats,omitempty"`
+}
+
+// Options for the {@link AgentCapabilities.multipleChats} capability.
+type MultipleChatsCapability struct {
+	// The agent can fork a chat from a specific turn. When absent or `false`,
+	// clients MUST NOT pass a {@link ChatForkSource} (`source`) to `createChat`.
+	// Forking always implies multi-chat support.
+	Fork *bool `json:"fork,omitempty"`
 }
 
 type SessionModelInfo struct {
@@ -642,7 +683,7 @@ type ModelSelection struct {
 // the session's effective customizations). Consumers resolve the agent's
 // display name by looking up `uri` in the session's customization tree.
 //
-// A session with no `agent` selected uses the provider's default behavior.
+// A message with no `agent` selected uses the provider's default behavior.
 type AgentSelection struct {
 	// Stable agent URI (matches an {@link AgentCustomization.uri}).
 	Uri URI `json:"uri"`
@@ -698,9 +739,33 @@ type ConfigSchema struct {
 }
 
 // Full state for a single session, loaded when a client subscribes to the session's URI.
+//
+// Inlines (denormalizes) every {@link SessionMetadata} field directly onto
+// itself so subscribers receive one flat object instead of a nested summary.
+// The lightweight catalog representation is {@link SessionSummary}, surfaced on
+// the root channel; the host keeps the two in sync via
+// `root/sessionSummaryChanged`.
 type SessionState struct {
-	// Lightweight session metadata
-	Summary SessionSummary `json:"summary"`
+	// Agent provider ID
+	Provider string `json:"provider"`
+	// Session title
+	Title string `json:"title"`
+	// Current session status
+	Status SessionStatus `json:"status"`
+	// Human-readable description of what the session is currently doing
+	Activity *string `json:"activity,omitempty"`
+	// Server-owned project for this session
+	Project *ProjectInfo `json:"project,omitempty"`
+	// The default working directory URI for this session. Individual chats
+	// MAY override via {@link ChatSummary.workingDirectory | their own
+	// `workingDirectory`}; this field acts as the fallback for any chat that
+	// does not.
+	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+	// Lightweight summary of this session's inline annotations channel
+	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+	// annotation / entry counts without subscribing. Absent when the session
+	// does not expose an annotations channel.
+	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
 	// Session initialization state
 	Lifecycle SessionLifecycle `json:"lifecycle"`
 	// Error details if creation failed
@@ -779,6 +844,21 @@ type SessionState struct {
 	// removed once a `session/canvasRequestCompleted` carries the matching
 	// `requestId`, or via `session/canvasRequestCancelled`.
 	CanvasRequests []SessionCanvasRequest `json:"canvasRequests,omitempty"`
+	// Outstanding input the session is blocked on, aggregated across every chat
+	// so a client can discover and answer it from the session channel alone,
+	// without subscribing to individual chats.
+	//
+	// Each entry is self-sufficient: it carries the owning chat's URI plus every
+	// identifier the client needs to respond. A client answers by dispatching the
+	// ordinary `chat/*` action to that chat's channel — see
+	// {@link SessionInputRequest} for the per-variant response path. A present,
+	// non-empty list implies {@link SessionStatus.InputNeeded} on
+	// {@link SessionSummary.status}.
+	//
+	// Host-managed: the host upserts entries with `session/inputNeededSet` as
+	// chats raise requests and removes them with `session/inputNeededRemoved`
+	// once the underlying request resolves.
+	InputNeeded []SessionInputRequest `json:"inputNeeded,omitempty"`
 	// Additional provider-specific metadata for this session.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -832,6 +912,89 @@ type SessionActiveClient struct {
 	CanRenderCanvases *bool `json:"canRenderCanvases,omitempty"`
 }
 
+// A user-input elicitation surfaced at the session level, mirroring one entry
+// of the owning chat's {@link ChatState.inputRequests}.
+//
+// Respond by dispatching `chat/inputCompleted` (or syncing drafts with
+// `chat/inputAnswerChanged`) to {@link SessionInputRequestBase.chat | `chat`},
+// keyed by {@link ChatInputRequest.id | `request.id`}.
+type SessionChatInputRequest struct {
+	// Stable key for this entry, unique within the session's
+	// {@link SessionState.inputNeeded} list. The host derives it however it likes
+	// (for example from the chat URI plus the underlying request or tool-call
+	// id); consumers MUST treat it as opaque. It is the key for the
+	// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+	Id string `json:"id"`
+	// The chat the underlying request lives in. This is the channel a client
+	// dispatches its response to — it does not need to have subscribed to that
+	// chat first.
+	Chat URI                     `json:"chat"`
+	Kind SessionInputRequestKind `json:"kind"`
+	// The mirrored chat input request.
+	Request ChatInputRequest `json:"request"`
+}
+
+// A tool call blocked on confirmation — either parameter confirmation before
+// execution or result confirmation after — surfaced at the session level.
+//
+// Respond by dispatching `chat/toolCallConfirmed` (for
+// {@link ToolCallPendingConfirmationState}) or `chat/toolCallResultConfirmed`
+// (for {@link ToolCallPendingResultConfirmationState}) to
+// {@link SessionInputRequestBase.chat | `chat`}, keyed by `turnId` and
+// `toolCall.toolCallId`.
+type SessionToolConfirmationRequest struct {
+	// Stable key for this entry, unique within the session's
+	// {@link SessionState.inputNeeded} list. The host derives it however it likes
+	// (for example from the chat URI plus the underlying request or tool-call
+	// id); consumers MUST treat it as opaque. It is the key for the
+	// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+	Id string `json:"id"`
+	// The chat the underlying request lives in. This is the channel a client
+	// dispatches its response to — it does not need to have subscribed to that
+	// chat first.
+	Chat URI                     `json:"chat"`
+	Kind SessionInputRequestKind `json:"kind"`
+	// The turn the tool call belongs to.
+	TurnId string `json:"turnId"`
+	// The tool call awaiting confirmation.
+	ToolCall ToolCallConfirmationState `json:"toolCall"`
+}
+
+// A running tool whose execution is delegated to an active client. Surfaced so
+// a client that provides the tool can pick up the work without subscribing to
+// the owning chat.
+//
+// The {@link toolCall} is always a {@link ToolCallRunningState} (a
+// {@link ToolCallState} in `running` status) whose
+// {@link ToolCallRunningState.contributor | `contributor`} is a client
+// {@link ToolCallClientContributor} whose `clientId` matches the denormalized
+// {@link clientId} here. Execute and report the result by dispatching
+// `chat/toolCallComplete` (and optionally streaming with
+// `chat/toolCallContentChanged`) to {@link SessionInputRequestBase.chat |
+// `chat`}, keyed by `turnId` and `toolCall.toolCallId`.
+type SessionToolClientExecutionRequest struct {
+	// Stable key for this entry, unique within the session's
+	// {@link SessionState.inputNeeded} list. The host derives it however it likes
+	// (for example from the chat URI plus the underlying request or tool-call
+	// id); consumers MUST treat it as opaque. It is the key for the
+	// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+	Id string `json:"id"`
+	// The chat the underlying request lives in. This is the channel a client
+	// dispatches its response to — it does not need to have subscribed to that
+	// chat first.
+	Chat URI                     `json:"chat"`
+	Kind SessionInputRequestKind `json:"kind"`
+	// The turn the tool call belongs to.
+	TurnId string `json:"turnId"`
+	// The `clientId` expected to execute the tool. Matches the `clientId` of the
+	// tool call's client {@link ToolCallContributor}.
+	ClientId string `json:"clientId"`
+	// The running tool call the session wants the owning client to execute. The
+	// host only ever populates this with a {@link ToolCallRunningState} (i.e. a
+	// {@link ToolCallState} in `running` status).
+	ToolCall ToolCallState `json:"toolCall"`
+}
+
 // Lightweight catalog entry summarizing one session. Surfaced via
 // {@link RootChannelCommands.listSessions | `root/listSessions`} and
 // `root/sessionAdded`/`root/sessionSummaryChanged` notifications.
@@ -853,8 +1016,6 @@ type SessionActiveClient struct {
 //     chat currently driving the promoted status bits when a non-default chat
 //     wins (e.g. the chat that raised `InputNeeded`).
 //   - `modifiedAt`: the max of all chats' `modifiedAt`.
-//   - `model` / `agent`: the session-level selection. Per-chat overrides are
-//     surfaced on individual {@link ChatSummary} entries, not aggregated up.
 //   - `workingDirectory`: the session-level **default**. Individual chats MAY
 //     override via {@link ChatSummary.workingDirectory}; aggregating these up
 //     is meaningless and SHOULD NOT be attempted.
@@ -866,8 +1027,6 @@ type SessionActiveClient struct {
 // values pass through unchanged). The rules only matter once a session
 // carries multiple chats.
 type SessionSummary struct {
-	// Session URI
-	Resource URI `json:"resource"`
 	// Agent provider ID
 	Provider string `json:"provider"`
 	// Session title
@@ -876,34 +1035,29 @@ type SessionSummary struct {
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the session is currently doing
 	Activity *string `json:"activity,omitempty"`
-	// Creation timestamp
-	CreatedAt int64 `json:"createdAt"`
-	// Last modification timestamp
-	ModifiedAt int64 `json:"modifiedAt"`
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
-	// Currently selected model
-	Model *ModelSelection `json:"model,omitempty"`
-	// Currently selected custom agent.
-	//
-	// Absent (`undefined`) means no custom agent is selected for this session
-	// — the session uses the provider's default behavior.
-	Agent *AgentSelection `json:"agent,omitempty"`
 	// The default working directory URI for this session. Individual chats
 	// MAY override via {@link ChatSummary.workingDirectory | their own
 	// `workingDirectory`}; this field acts as the fallback for any chat that
 	// does not.
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
-	// Aggregate summary of file changes associated with this session. Servers
-	// may populate this to give clients a quick at-a-glance view of the
-	// session's footprint (e.g., for list rendering) without requiring the
-	// client to subscribe to a changeset.
-	Changes *ChangesSummary `json:"changes,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
 	// does not expose an annotations channel.
 	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
+	// Session URI
+	Resource URI `json:"resource"`
+	// Creation timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+	CreatedAt string `json:"createdAt"`
+	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+	ModifiedAt string `json:"modifiedAt"`
+	// Aggregate summary of file changes associated with this session. Servers
+	// may populate this to give clients a quick at-a-glance view of the
+	// session's footprint (e.g., for list rendering) without requiring the
+	// client to subscribe to a changeset.
+	Changes *ChangesSummary `json:"changes,omitempty"`
 	// Lightweight server-defined metadata clients may use for the session
 	// presentation. The protocol does not interpret these values; producers
 	// SHOULD keep the payload small because summaries appear in session lists
@@ -946,10 +1100,6 @@ type ChatState struct {
 	Activity *string `json:"activity,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt string `json:"modifiedAt"`
-	// Optional per-chat model override (defaults to the session's model)
-	Model *ModelSelection `json:"model,omitempty"`
-	// Optional per-chat agent override (defaults to the session's agent)
-	Agent *AgentSelection `json:"agent,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
 	// How the user can interact with this chat. See {@link ChatInteractivity}.
@@ -961,7 +1111,7 @@ type ChatState struct {
 	// Optional per-chat working directory.
 	//
 	// If absent, the chat inherits
-	// {@link SessionSummary.workingDirectory | the session's working directory}.
+	// {@link SessionState.workingDirectory | the session's working directory}.
 	// Hosts MAY override this for individual chats — for example, to give a
 	// subordinate chat its own git worktree so multiple chats in a session can
 	// make independent edits that the orchestrator later merges back.
@@ -976,6 +1126,18 @@ type ChatState struct {
 	QueuedMessages []PendingMessage `json:"queuedMessages,omitempty"`
 	// Requests for user input that are currently blocking or informing chat progress
 	InputRequests []ChatInputRequest `json:"inputRequests,omitempty"`
+	// The user's in-progress draft input for this chat — the message they are
+	// composing but have not sent yet, including its
+	// {@link Message.model | model} / {@link Message.agent | agent} selection
+	// and attachments.
+	//
+	// Clients MAY periodically sync their local input state into this field so
+	// a draft survives reloads and is visible to other clients viewing the same
+	// chat. Eager syncing is **not** required — clients SHOULD debounce and MAY
+	// sync only at convenient points. When presenting input UI for an existing
+	// chat, clients SHOULD use any `draft` to initialize their input state.
+	// Cleared (set to `undefined`) once the message is sent.
+	Draft *Message `json:"draft,omitempty"`
 	// Additional provider-specific metadata for this chat.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
@@ -994,10 +1156,6 @@ type ChatSummary struct {
 	Activity *string `json:"activity,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt string `json:"modifiedAt"`
-	// Optional per-chat model override (defaults to the session's model)
-	Model *ModelSelection `json:"model,omitempty"`
-	// Optional per-chat agent override (defaults to the session's agent)
-	Agent *AgentSelection `json:"agent,omitempty"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
 	// How the user can interact with this chat. See {@link ChatInteractivity}.
@@ -1140,6 +1298,20 @@ type Message struct {
 	Origin MessageOrigin `json:"origin"`
 	// File/selection attachments
 	Attachments []MessageAttachment `json:"attachments,omitempty"`
+	// The model this message was, or will be, sent with.
+	//
+	// For historic user/agent messages this records the model actually used, so
+	// a client editing or resending the message can retain that selection. For a
+	// {@link ChatState.draft | draft} it carries the model the user picked for
+	// the message they are composing. Absent means the agent host's default
+	// model applies.
+	Model *ModelSelection `json:"model,omitempty"`
+	// The custom agent this message was, or will be, sent with.
+	//
+	// For historic messages this records the agent actually used; for a
+	// {@link ChatState.draft | draft} it carries the agent the user picked.
+	// Absent means no custom agent — the provider's default behavior applies.
+	Agent *AgentSelection `json:"agent,omitempty"`
 	// Additional provider-specific metadata for this message.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -1620,6 +1792,8 @@ type ToolCallStreamingState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1644,6 +1818,8 @@ type ToolCallPendingConfirmationState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1678,6 +1854,8 @@ type ToolCallRunningState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1710,6 +1888,8 @@ type ToolCallPendingResultConfirmationState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1751,6 +1931,8 @@ type ToolCallCompletedState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -1792,6 +1974,8 @@ type ToolCallCancelledState struct {
 	ToolName string `json:"toolName"`
 	// Human-readable tool name
 	DisplayName string `json:"displayName"`
+	// Human-readable description of what the tool invocation intends to do
+	Intention *string `json:"intention,omitempty"`
 	// Reference to the contributor of the tool being called.
 	Contributor *ToolCallContributor `json:"contributor,omitempty"`
 	// Additional provider-specific metadata for this tool call.
@@ -2128,6 +2312,18 @@ type AgentCustomization struct {
 	// Short description of what the agent specializes in and when to
 	// invoke it. Sourced from the agent file's frontmatter `description`.
 	Description *string `json:"description,omitempty"`
+	// Model the agent is pinned to, sourced from the agent file's
+	// frontmatter `model`. Absent means the agent inherits the session's
+	// default model.
+	Model *string `json:"model,omitempty"`
+	// Allowlist of tool names the agent is scoped to, sourced from the
+	// agent file's frontmatter `tools`. A non-empty list restricts the
+	// agent to exactly those tools. Absent — or an empty list — imposes no
+	// restriction beyond the session default: the agent may use any
+	// available tool. Producers express "no restriction" by omitting the
+	// field rather than sending an empty array, so an empty list carries no
+	// meaning distinct from absence.
+	Tools []string `json:"tools,omitempty"`
 	// Additional provider-specific metadata for this custom agent.
 	//
 	// Mirrors the MCP `_meta` convention.
@@ -3238,6 +3434,66 @@ func (u ToolCallState) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
+// ToolCallConfirmationState is a tool call blocked on parameter- or result-confirmation.
+type ToolCallConfirmationState struct {
+	Value isToolCallConfirmationState
+}
+
+// isToolCallConfirmationState is the marker interface implemented by every
+// concrete variant of ToolCallConfirmationState.
+type isToolCallConfirmationState interface{ isToolCallConfirmationState() }
+
+func (*ToolCallPendingConfirmationState) isToolCallConfirmationState()       {}
+func (*ToolCallPendingResultConfirmationState) isToolCallConfirmationState() {}
+
+// ToolCallConfirmationStateUnknown carries an unrecognized ToolCallConfirmationState variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ToolCallConfirmationStateUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*ToolCallConfirmationStateUnknown) isToolCallConfirmationState() {}
+
+// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
+func (u *ToolCallConfirmationState) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "status")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "pending-confirmation":
+		var value ToolCallPendingConfirmationState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "pending-result-confirmation":
+		var value ToolCallPendingResultConfirmationState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &ToolCallConfirmationStateUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u ToolCallConfirmationState) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ToolCallConfirmationStateUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
 // TerminalClaim identifies who currently holds a terminal.
 type TerminalClaim struct {
 	Value isTerminalClaim
@@ -4221,6 +4477,73 @@ func (u CanvasRequestOutcome) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
+// SessionInputRequest is one outstanding piece of input a session is blocked on, aggregated across all chats.
+type SessionInputRequest struct {
+	Value isSessionInputRequest
+}
+
+// isSessionInputRequest is the marker interface implemented by every
+// concrete variant of SessionInputRequest.
+type isSessionInputRequest interface{ isSessionInputRequest() }
+
+func (*SessionChatInputRequest) isSessionInputRequest()           {}
+func (*SessionToolConfirmationRequest) isSessionInputRequest()    {}
+func (*SessionToolClientExecutionRequest) isSessionInputRequest() {}
+
+// SessionInputRequestUnknown carries an unrecognized SessionInputRequest variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type SessionInputRequestUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*SessionInputRequestUnknown) isSessionInputRequest() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *SessionInputRequest) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "chatInput":
+		var value SessionChatInputRequest
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "toolConfirmation":
+		var value SessionToolConfirmationRequest
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "toolClientExecution":
+		var value SessionToolClientExecutionRequest
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &SessionInputRequestUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u SessionInputRequest) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*SessionInputRequestUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
 // ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
 	Value isChatOrigin
@@ -4348,13 +4671,13 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch {
-	case containsAll(probe, "summary", "lifecycle"):
+	case containsAll(probe, "lifecycle"):
 		var v SessionState
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		s.Session = &v
-	case containsAll(probe, "summary", "turns"):
+	case containsAll(probe, "turns"):
 		var v ChatState
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err

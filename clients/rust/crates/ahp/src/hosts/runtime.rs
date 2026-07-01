@@ -622,6 +622,7 @@ impl HostRuntime {
                 "subscribe",
                 SubscribeParams {
                     channel: uri.clone(),
+                    delivery: None,
                 },
             )
             .await
@@ -700,6 +701,9 @@ fn apply_summary_changes(
     existing: &mut SessionSummary,
     changes: &ahp_types::notifications::PartialSessionSummary,
 ) {
+    if let Some(v) = &changes.provider {
+        existing.provider = v.clone();
+    }
     if let Some(v) = &changes.title {
         existing.title = v.clone();
     }
@@ -709,17 +713,23 @@ fn apply_summary_changes(
     if let Some(v) = &changes.activity {
         existing.activity = Some(v.clone());
     }
-    if let Some(v) = changes.modified_at {
-        existing.modified_at = v;
+    if let Some(v) = &changes.modified_at {
+        existing.modified_at = v.clone();
+    }
+    if let Some(v) = &changes.created_at {
+        existing.created_at = v.clone();
     }
     if let Some(v) = &changes.project {
         existing.project = Some(v.clone());
     }
-    if let Some(v) = &changes.model {
-        existing.model = Some(v.clone());
-    }
     if let Some(v) = &changes.working_directory {
         existing.working_directory = Some(v.clone());
+    }
+    if let Some(v) = &changes.annotations {
+        existing.annotations = Some(v.clone());
+    }
+    if let Some(v) = &changes.changes {
+        existing.changes = Some(v.clone());
     }
 }
 

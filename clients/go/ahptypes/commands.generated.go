@@ -200,6 +200,21 @@ type ReconnectSnapshotResult struct {
 type SubscribeParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
+	// Optional delivery preferences for this subscription.
+	//
+	// Servers MAY use these preferences to buffer and coalesce high-frequency
+	// updates while preserving the same reduced state. Omit this field for the
+	// server's default delivery behavior.
+	Delivery *SubscriptionDeliveryOptions `json:"delivery,omitempty"`
+}
+
+// Advisory delivery preferences for a single subscription.
+type SubscriptionDeliveryOptions struct {
+	// Maximum time, in milliseconds, that the server may intentionally delay
+	// delivery while buffering/coalescing updates for this subscription.
+	//
+	// A value of `0` requests immediate delivery with no intentional coalescing.
+	MaxLatencyMs *int64 `json:"maxLatencyMs,omitempty"`
 }
 
 // Result of the `subscribe` command.
@@ -231,12 +246,6 @@ type CreateSessionParams struct {
 	Channel URI `json:"channel"`
 	// Agent provider ID
 	Provider *string `json:"provider,omitempty"`
-	// Model selection (ID and optional model-specific configuration)
-	Model *ModelSelection `json:"model,omitempty"`
-	// Initial custom agent selection for the new session.
-	//
-	// Omit to start the session with no custom agent selected (provider default).
-	Agent *AgentSelection `json:"agent,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
 	// Fork from an existing session. The new session is populated with content
@@ -289,10 +298,6 @@ type CreateChatParams struct {
 	Chat URI `json:"chat"`
 	// Optional initial message for the new chat.
 	InitialMessage *Message `json:"initialMessage,omitempty"`
-	// Optional per-chat model override.
-	Model *ModelSelection `json:"model,omitempty"`
-	// Optional per-chat agent override.
-	Agent *AgentSelection `json:"agent,omitempty"`
 	// Optional source chat and turn to fork from.
 	Source *ChatForkSource `json:"source,omitempty"`
 }

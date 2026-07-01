@@ -1,0 +1,26 @@
+{
+  "description": "session/inputNeededRemoved is a no-op when inputNeeded is absent",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededRemoved",
+      "id": "copilot:/test-session/chat-1#req-1"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  }
+}

@@ -2,14 +2,9 @@
   "description": "session/customizationUpdated replaces an existing container by id",
   "reducer": "session",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
     "lifecycle": "creating",
     "customizations": [
       {
@@ -53,14 +48,9 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
     "lifecycle": "creating",
     "customizations": [
       {

@@ -2,14 +2,9 @@
   "description": "session/configChanged with replace replaces all config values",
   "reducer": "session",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test",
-      "provider": "copilot",
-      "title": "Test",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 2000
-    },
+    "provider": "copilot",
+    "title": "Test",
+    "status": 1,
     "config": {
       "schema": {
         "type": "object",
@@ -51,14 +46,9 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test",
-      "provider": "copilot",
-      "title": "Test",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 9999
-    },
+    "provider": "copilot",
+    "title": "Test",
+    "status": 1,
     "config": {
       "schema": {
         "type": "object",

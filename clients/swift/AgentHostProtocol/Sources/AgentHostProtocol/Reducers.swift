@@ -27,12 +27,34 @@ private func withStatusFlag(_ status: SessionStatus, _ flag: SessionStatus, _ se
     set ? status.union(flag) : status.subtracting(flag)
 }
 
+/// Reflects the session-level input queue into the activity bits of `status`.
+/// A non-empty queue promotes the activity to `.inputNeeded`; emptying it clears
+/// the input-needed-specific bit. Since `.inputNeeded` implies `.inProgress`, an
+/// unblocked turn falls back to `.inProgress` while an already-idle session stays
+/// idle. Orthogonal flags (`.isRead` / `.isArchived`) are preserved.
+private func withInputNeededStatus(_ status: SessionStatus, _ inputNeeded: [SessionInputRequest]) -> SessionStatus {
+    if inputNeeded.isEmpty {
+        return status.subtracting(SessionStatus.inputNeeded.subtracting(.inProgress))
+    }
+    return status.subtracting(statusActivityMask).union(.inputNeeded)
+}
+
 /// Resolves a selected confirmation option by ID from a pending-confirmation state.
 private func resolveSelectedOption(_ options: [ConfirmationOption]?, id: String?) -> ConfirmationOption? {
     guard let id, let options else {
         return nil
     }
     return options.first { $0.id == id }
+}
+
+/// Extracts the stable `id` of a session input request, or `nil` for unknown variants.
+private func sessionInputRequestID(_ r: SessionInputRequest) -> String? {
+    switch r {
+    case .chatInput(let x): return x.id
+    case .toolConfirmation(let x): return x.id
+    case .toolClientExecution(let x): return x.id
+    case .unknown: return nil
+    }
 }
 
 // MARK: - Root Reducer
@@ -124,6 +146,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatError(let a):
         return endTurn(state: state, turnId: a.turnId, turnState: .error, terminalStatus: .error, error: a.error)
 
+    case .chatActivityChanged(let a):
+        var next = state
+        next.activity = a.activity
+        return next
+
     // ── Tool Call State Machine ───────────────────────────────────────────
 
     case .chatToolCallStart(let a):
@@ -136,6 +163,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolCallId: a.toolCallId,
                 toolName: a.toolName,
                 displayName: a.displayName,
+                intention: a.intention,
                 contributor: a.contributor,
                 meta: a.meta,
                 status: .streaming
@@ -170,6 +198,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
                     displayName: base.displayName,
+                    intention: base.intention,
                     contributor: base.contributor,
                     meta: meta,
                     invocationMessage: a.invocationMessage,
@@ -182,6 +211,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolCallId: base.toolCallId,
                 toolName: base.toolName,
                 displayName: base.displayName,
+                intention: base.intention,
                 contributor: base.contributor,
                 meta: meta,
                 invocationMessage: a.invocationMessage,
@@ -205,6 +235,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
                     displayName: base.displayName,
+                    intention: base.intention,
                     contributor: base.contributor,
                     meta: meta,
                     invocationMessage: pending.invocationMessage,
@@ -218,6 +249,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolCallId: base.toolCallId,
                 toolName: base.toolName,
                 displayName: base.displayName,
+                intention: base.intention,
                 contributor: base.contributor,
                 meta: meta,
                 invocationMessage: pending.invocationMessage,
@@ -258,6 +290,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
                     displayName: base.displayName,
+                    intention: base.intention,
                     contributor: base.contributor,
                     meta: meta,
                     invocationMessage: invocationMessage,
@@ -276,6 +309,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolCallId: base.toolCallId,
                 toolName: base.toolName,
                 displayName: base.displayName,
+                intention: base.intention,
                 contributor: base.contributor,
                 meta: meta,
                 invocationMessage: invocationMessage,
@@ -301,6 +335,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
                     displayName: base.displayName,
+                    intention: base.intention,
                     contributor: base.contributor,
                     meta: meta,
                     invocationMessage: prc.invocationMessage,
@@ -319,6 +354,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolCallId: base.toolCallId,
                 toolName: base.toolName,
                 displayName: base.displayName,
+                intention: base.intention,
                 contributor: base.contributor,
                 meta: meta,
                 invocationMessage: prc.invocationMessage,
@@ -457,6 +493,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.queuedMessages = reordered
         return next
 
+    case .chatDraftChanged(let a):
+        var next = state
+        next.draft = a.draft
+        return next
+
     default:
         return state
     }
@@ -518,35 +559,22 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
 
     case .sessionTitleChanged(let a):
         var next = state
-        next.summary.title = a.title
-        next.summary.modifiedAt = currentTimestampMillis()
-        return next
-
-    case .sessionModelChanged(let a):
-        var next = state
-        next.summary.model = a.model
-        next.summary.modifiedAt = currentTimestampMillis()
-        return next
-
-    case .sessionAgentChanged(let a):
-        var next = state
-        next.summary.agent = a.agent
-        next.summary.modifiedAt = currentTimestampMillis()
+        next.title = a.title
         return next
 
     case .sessionIsReadChanged(let a):
         var next = state
-        next.summary.status = withStatusFlag(next.summary.status, .isRead, a.isRead)
+        next.status = withStatusFlag(next.status, .isRead, a.isRead)
         return next
 
     case .sessionIsArchivedChanged(let a):
         var next = state
-        next.summary.status = withStatusFlag(next.summary.status, .isArchived, a.isArchived)
+        next.status = withStatusFlag(next.status, .isArchived, a.isArchived)
         return next
 
     case .sessionActivityChanged(let a):
         var next = state
-        next.summary.activity = a.activity
+        next.activity = a.activity
         return next
 
     case .sessionChangesetsChanged(let a):
@@ -559,7 +587,6 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         config.values = a.replace == true ? a.config : config.values.merging(a.config) { _, new in new }
         var next = state
         next.config = config
-        next.summary.modifiedAt = currentTimestampMillis()
         return next
 
     case .sessionMetaChanged(let a):
@@ -585,6 +612,28 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         guard let idx = state.activeClients.firstIndex(where: { $0.clientId == a.clientId }) else { return state }
         var next = state
         next.activeClients.remove(at: idx)
+        return next
+
+    case .sessionInputNeededSet(let a):
+        guard let id = sessionInputRequestID(a.request) else { return state }
+        var next = state
+        var list = next.inputNeeded ?? []
+        if let idx = list.firstIndex(where: { sessionInputRequestID($0) == id }) {
+            list[idx] = a.request
+        } else {
+            list.append(a.request)
+        }
+        next.inputNeeded = list
+        next.status = withInputNeededStatus(next.status, list)
+        return next
+
+    case .sessionInputNeededRemoved(let a):
+        guard var list = state.inputNeeded,
+              let idx = list.firstIndex(where: { sessionInputRequestID($0) == a.id }) else { return state }
+        var next = state
+        list.remove(at: idx)
+        next.inputNeeded = list.isEmpty ? nil : list
+        next.status = withInputNeededStatus(next.status, list)
         return next
 
     // ── Customizations ──────────────────────────────────────────────────
@@ -749,8 +798,6 @@ public let clientDispatchableActions: Set<String> = [
     "chat/toolCallComplete",
     "chat/toolCallResultConfirmed",
     "chat/turnCancelled",
-    "session/modelChanged",
-    "session/agentChanged",
     "session/activeClientSet",
     "session/activeClientRemoved",
     "chat/pendingMessageSet",
@@ -768,7 +815,7 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
     switch action {
     case .chatTurnStarted, .chatToolCallConfirmed, .chatToolCallComplete,
          .chatToolCallResultConfirmed, .chatTurnCancelled,
-         .sessionModelChanged, .sessionAgentChanged, .sessionActiveClientSet,
+         .sessionActiveClientSet,
          .sessionActiveClientRemoved,
          .chatPendingMessageSet,
          .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
@@ -783,10 +830,6 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
 
 // MARK: - Helpers
 
-private func currentTimestampMillis() -> Int {
-    currentTimestampProvider()
-}
-
 private func currentTimestamp() -> String {
     let date = Date(timeIntervalSince1970: Double(currentTimestampProvider()) / 1000)
     return iso8601TimestampFormatter.string(from: date)
@@ -797,8 +840,6 @@ private func mergeChatSummaryChanges(_ summary: inout ChatSummary, changes: Part
     if let status = changes.status { summary.status = status }
     if let activity = changes.activity { summary.activity = activity }
     if let modifiedAt = changes.modifiedAt { summary.modifiedAt = modifiedAt }
-    if let model = changes.model { summary.model = model }
-    if let agent = changes.agent { summary.agent = agent }
     if let origin = changes.origin { summary.origin = origin }
     if let workingDirectory = changes.workingDirectory { summary.workingDirectory = workingDirectory }
 }
@@ -902,6 +943,7 @@ private func endTurn(
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
                     displayName: base.displayName,
+                    intention: base.intention,
                     contributor: base.contributor,
                     meta: base.meta,
                     invocationMessage: invocationMessage,

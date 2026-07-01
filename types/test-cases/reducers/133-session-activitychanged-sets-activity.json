@@ -2,14 +2,9 @@
   "description": "session/activityChanged sets activity on summary",
   "reducer": "session",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
     "lifecycle": "ready",
     "activeClients": [],
     "chats": []
@@ -21,15 +16,10 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "activity": "Running terminal command",
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "activity": "Running terminal command",
     "lifecycle": "ready",
     "activeClients": [],
     "chats": []

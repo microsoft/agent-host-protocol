@@ -1,0 +1,67 @@
+{
+  "description": "session/inputNeededSet appends a chat-input request when inputNeeded is absent and promotes status to InputNeeded",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 8,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededSet",
+      "request": {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
+        "chat": "copilot:/test-session/chat-1",
+        "request": {
+          "id": "req-1",
+          "message": "Which environment?",
+          "questions": [
+            {
+              "kind": "single-select",
+              "id": "env",
+              "message": "Pick an environment",
+              "options": [
+                { "id": "dev", "label": "Dev" },
+                { "id": "prod", "label": "Prod" }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
+        "chat": "copilot:/test-session/chat-1",
+        "request": {
+          "id": "req-1",
+          "message": "Which environment?",
+          "questions": [
+            {
+              "kind": "single-select",
+              "id": "env",
+              "message": "Pick an environment",
+              "options": [
+                { "id": "dev", "label": "Dev" },
+                { "id": "prod", "label": "Prod" }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

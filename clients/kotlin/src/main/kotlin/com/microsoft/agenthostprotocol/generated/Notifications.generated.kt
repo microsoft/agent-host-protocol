@@ -176,10 +176,6 @@ data class OtlpExportMetricsParams(
 @Serializable
 data class PartialSessionSummary(
     /**
-     * Session URI
-     */
-    val resource: String? = null,
-    /**
      * Agent provider ID
      */
     val provider: String? = null,
@@ -196,28 +192,9 @@ data class PartialSessionSummary(
      */
     val activity: String? = null,
     /**
-     * Creation timestamp
-     */
-    val createdAt: Long? = null,
-    /**
-     * Last modification timestamp
-     */
-    val modifiedAt: Long? = null,
-    /**
      * Server-owned project for this session
      */
     val project: ProjectInfo? = null,
-    /**
-     * Currently selected model
-     */
-    val model: ModelSelection? = null,
-    /**
-     * Currently selected custom agent.
-     *
-     * Absent (`undefined`) means no custom agent is selected for this session
-     * — the session uses the provider's default behavior.
-     */
-    val agent: AgentSelection? = null,
     /**
      * The default working directory URI for this session. Individual chats
      * MAY override via {@link ChatSummary.workingDirectory | their own
@@ -226,19 +203,31 @@ data class PartialSessionSummary(
      */
     val workingDirectory: String? = null,
     /**
-     * Aggregate summary of file changes associated with this session. Servers
-     * may populate this to give clients a quick at-a-glance view of the
-     * session's footprint (e.g., for list rendering) without requiring the
-     * client to subscribe to a changeset.
-     */
-    val changes: ChangesSummary? = null,
-    /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
      * annotation / entry counts without subscribing. Absent when the session
      * does not expose an annotations channel.
      */
     val annotations: AnnotationsSummary? = null,
+    /**
+     * Session URI
+     */
+    val resource: String? = null,
+    /**
+     * Creation timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+     */
+    val createdAt: String? = null,
+    /**
+     * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+     */
+    val modifiedAt: String? = null,
+    /**
+     * Aggregate summary of file changes associated with this session. Servers
+     * may populate this to give clients a quick at-a-glance view of the
+     * session's footprint (e.g., for list rendering) without requiring the
+     * client to subscribe to a changeset.
+     */
+    val changes: ChangesSummary? = null,
     /**
      * Lightweight server-defined metadata clients may use for the session
      * presentation. The protocol does not interpret these values; producers

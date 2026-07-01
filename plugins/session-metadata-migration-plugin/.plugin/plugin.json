@@ -1,0 +1,8 @@
+{
+  "name": "ahp-session-metadata-migration",
+  "version": "0.1.0",
+  "description": "Migration assistant skill for upgrading an Agent Host Protocol consumer to the flattened SessionState model: SessionSummary is now root-only, session/chat model and agent selection moves onto Message (plus a per-chat draft), createdAt/modifiedAt become ISO-8601 strings, and session/modelChanged + session/agentChanged are removed.",
+  "author": "Microsoft",
+  "repository": "https://github.com/microsoft/agent-host-protocol",
+  "license": "MIT"
+}

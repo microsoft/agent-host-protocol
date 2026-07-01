@@ -17,6 +17,40 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Added
 
+- `SubscribeParams.delivery.max_latency_ms` and
+  `Client::subscribe_with_delivery` for clients to request a maximum
+  subscription delivery latency, including `0` for no intentional coalescing.
+- Optional `capabilities` field on `AgentInfo` (`AgentCapabilities` with a
+  nested `multipleChats` capability carrying `fork`) so clients gate multi-chat
+  and fork via advertised capabilities instead of provider-id switches.
+- `SessionState.input_needed` — a session-level aggregate of outstanding input
+  requests across all chats (`SessionInputRequest` enum with
+  `SessionChatInputRequest`, `SessionToolConfirmationRequest`, and
+  `SessionToolClientExecutionRequest` variants), plus the
+  `StateAction::SessionInputNeededSet` / `StateAction::SessionInputNeededRemoved`
+  actions and the `ToolCallConfirmationState` union. The session reducer
+  maintains the `SessionStatus::InputNeeded` activity bit from the queue,
+  clearing it (falling back to `InProgress`) when the last entry is removed.
+- Optional `intention` field on `ChatToolCallStartAction` and every tool-call
+  lifecycle state.
+- Optional `model` and `tools` fields on `AgentCustomization` for a custom
+  agent's pinned model and tool allowlist.
+
+### Changed
+
+- Direct Rust struct literals for `SubscribeParams` must now include
+  `delivery: None`; use `SubscribeParams::new(channel)` or
+  `Client::subscribe` to keep the default delivery behavior.
+
+## [0.5.0] — 2026-06-26
+
+Implements AHP 0.5.0.
+
+### Added
+
+- `StateAction::ChatActivityChanged` (`ChatActivityChangedAction`, wire
+  `chat/activityChanged`) for updating a chat's current activity description
+  independently of the session summary.
 - `ProgressParams` struct (wire `root/progress`) — a generic progress notification
   correlated by a `progressToken` (added on `CreateSessionParams`).
   Used today for the lazy first-use download of an agent's native SDK.
@@ -28,6 +62,11 @@ matching `## [X.Y.Z]` heading is missing from this file.
   to release a single active client by `client_id`.
 - Canvas surface — `SessionState::canvas_registry`, `SessionState::open_canvases`, and `SessionState::canvas_requests`, plus `SessionActiveClient::canvas_providers` and `SessionActiveClient::can_render_canvases`, for declared, instanced, agent-openable UI surfaces.
 - Eight `StateAction` canvas variants — `SessionCanvasRegistryChanged`, `SessionCanvasInstanceOpened`, `SessionCanvasInstanceUpdated`, `SessionCanvasInstanceClosed`, `SessionCanvasInstanceCloseRequested`, `SessionCanvasRequestCreated`, `SessionCanvasRequestCompleted`, and `SessionCanvasRequestCancelled` — with matching `session_reducer` arms.
+- `StateAction::ChatDraftChanged` (`ChatDraftChangedAction`) and the chat-reducer
+  arm that sets or clears `ChatState.draft`.
+- `ChatState.draft` (`Option<Message>`) holding an in-progress, unsent message.
+- `Message.model` and `Message.agent` optional fields recording the model and
+  agent selected for a message.
 - `ahp-ws` TLS backend is now selectable via Cargo features: `native-tls`,
   `rustls-tls-native-roots` (default), and `rustls-tls-webpki-roots`. The crate
   no longer forces `tokio-tungstenite/native-tls` onto the dependency graph, so
@@ -35,6 +74,15 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Changed
 
+- `SessionState` no longer embeds a `summary` sub-struct; its metadata fields
+  (`provider`, `title`, `status`, `activity`, `project`, `working_directory`,
+  `annotations`) are now inlined directly on `SessionState`, which no longer
+  carries `model`, `agent`, `created_at`, or `modified_at`. The session reducer
+  reads and writes these flat fields and no longer stamps `modified_at`.
+- `SessionSummary.created_at` and `SessionSummary.modified_at` are now ISO-8601
+  `String`s (previously numeric); `SessionSummary` no longer has `model` or
+  `agent`.
+- `ChatState` and `ChatSummary` no longer carry `model` or `agent`.
 - `ahp-ws` now defaults to rustls (`rustls-tls-native-roots`, `ring` provider)
   instead of `native-tls`, dropping the OpenSSL link on Linux while still
   validating against the OS trust store. To keep the previous behaviour, depend
@@ -53,6 +101,9 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Removed
 
+- `StateAction::SessionModelChanged` (`SessionModelChangedAction`) and
+  `StateAction::SessionAgentChanged` (`SessionAgentChangedAction`), along with
+  their session-reducer arms.
 - `SessionActiveClientToolsChangedAction`. An active client now updates its
   published tools by re-dispatching `SessionActiveClientSet` with its full,
   updated entry.

@@ -155,8 +155,8 @@ class GeneratedStructsTest {
                 "provider": "copilot",
                 "title": "New",
                 "status": 1,
-                "createdAt": 0,
-                "modifiedAt": 0
+                "createdAt": "2024-03-09T16:00:00.000Z",
+                "modifiedAt": "2024-03-09T16:00:00.000Z"
             }
         }""".trimIndent()
         val sessionAdded = json.decodeFromString(SessionAddedParams.serializer(), sessionAddedWire)

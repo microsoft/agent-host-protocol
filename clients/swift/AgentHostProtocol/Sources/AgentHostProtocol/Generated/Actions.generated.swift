@@ -27,17 +27,19 @@ public enum ActionType: String, Codable, Sendable {
     case chatTurnComplete = "chat/turnComplete"
     case chatTurnCancelled = "chat/turnCancelled"
     case chatError = "chat/error"
+    case chatActivityChanged = "chat/activityChanged"
     case sessionTitleChanged = "session/titleChanged"
     case chatUsage = "chat/usage"
     case chatReasoning = "chat/reasoning"
-    case sessionModelChanged = "session/modelChanged"
-    case sessionAgentChanged = "session/agentChanged"
     case sessionServerToolsChanged = "session/serverToolsChanged"
     case sessionActiveClientSet = "session/activeClientSet"
     case sessionActiveClientRemoved = "session/activeClientRemoved"
+    case sessionInputNeededSet = "session/inputNeededSet"
+    case sessionInputNeededRemoved = "session/inputNeededRemoved"
     case chatPendingMessageSet = "chat/pendingMessageSet"
     case chatPendingMessageRemoved = "chat/pendingMessageRemoved"
     case chatQueuedMessagesReordered = "chat/queuedMessagesReordered"
+    case chatDraftChanged = "chat/draftChanged"
     case chatInputRequested = "chat/inputRequested"
     case chatInputAnswerChanged = "chat/inputAnswerChanged"
     case chatInputCompleted = "chat/inputCompleted"
@@ -376,6 +378,8 @@ public struct ChatToolCallStartAction: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called. Absent for
     /// server-side tools that are not contributed by a client or MCP server.
     public var contributor: ToolCallContributor?
@@ -387,6 +391,7 @@ public struct ChatToolCallStartAction: Codable, Sendable {
         case type
         case toolName
         case displayName
+        case intention
         case contributor
     }
 
@@ -397,6 +402,7 @@ public struct ChatToolCallStartAction: Codable, Sendable {
         type: ActionType,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil
     ) {
         self.turnId = turnId
@@ -405,6 +411,7 @@ public struct ChatToolCallStartAction: Codable, Sendable {
         self.type = type
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
     }
 }
@@ -799,6 +806,20 @@ public struct ChatErrorAction: Codable, Sendable {
     }
 }
 
+public struct ChatActivityChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Human-readable description of current activity; omit or set `undefined` to clear
+    public var activity: String?
+
+    public init(
+        type: ActionType,
+        activity: String? = nil
+    ) {
+        self.type = type
+        self.activity = activity
+    }
+}
+
 public struct SessionTitleChangedAction: Codable, Sendable {
     public var type: ActionType
     /// New title
@@ -885,35 +906,6 @@ public struct ChatReasoningAction: Codable, Sendable {
         self.partId = partId
         self.content = content
         self.meta = meta
-    }
-}
-
-public struct SessionModelChangedAction: Codable, Sendable {
-    public var type: ActionType
-    /// New model selection
-    public var model: ModelSelection
-
-    public init(
-        type: ActionType,
-        model: ModelSelection
-    ) {
-        self.type = type
-        self.model = model
-    }
-}
-
-public struct SessionAgentChangedAction: Codable, Sendable {
-    public var type: ActionType
-    /// New agent selection, or `undefined` to clear the selection and reset the
-    /// session to no selected custom agent.
-    public var agent: AgentSelection?
-
-    public init(
-        type: ActionType,
-        agent: AgentSelection? = nil
-    ) {
-        self.type = type
-        self.agent = agent
     }
 }
 
@@ -1015,6 +1007,34 @@ public struct SessionActiveClientRemovedAction: Codable, Sendable {
     }
 }
 
+public struct SessionInputNeededSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// The input request to add or update, matched by `id`.
+    public var request: SessionInputRequest
+
+    public init(
+        type: ActionType,
+        request: SessionInputRequest
+    ) {
+        self.type = type
+        self.request = request
+    }
+}
+
+public struct SessionInputNeededRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The `id` of the input request to remove.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
+    }
+}
+
 public struct ChatPendingMessageSetAction: Codable, Sendable {
     public var type: ActionType
     /// Whether this is a steering or queued message
@@ -1066,6 +1086,20 @@ public struct ChatQueuedMessagesReorderedAction: Codable, Sendable {
     ) {
         self.type = type
         self.order = order
+    }
+}
+
+public struct ChatDraftChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New draft message, or `undefined` to clear it
+    public var draft: Message?
+
+    public init(
+        type: ActionType,
+        draft: Message? = nil
+    ) {
+        self.type = type
+        self.draft = draft
     }
 }
 
@@ -1841,10 +1875,6 @@ public struct PartialChatSummary: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String?
-    /// Optional per-chat model override (defaults to the session's model)
-    public var model: ModelSelection?
-    /// Optional per-chat agent override (defaults to the session's agent)
-    public var agent: AgentSelection?
     /// How this chat came into existence
     public var origin: ChatOrigin?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
@@ -1866,8 +1896,6 @@ public struct PartialChatSummary: Codable, Sendable {
         status: SessionStatus? = nil,
         activity: String? = nil,
         modifiedAt: String? = nil,
-        model: ModelSelection? = nil,
-        agent: AgentSelection? = nil,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectory: String? = nil
@@ -1877,8 +1905,6 @@ public struct PartialChatSummary: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
-        self.model = model
-        self.agent = agent
         self.origin = origin
         self.interactivity = interactivity
         self.workingDirectory = workingDirectory
@@ -1910,11 +1936,10 @@ public enum StateAction: Codable, Sendable {
     case chatTurnComplete(ChatTurnCompleteAction)
     case chatTurnCancelled(ChatTurnCancelledAction)
     case chatError(ChatErrorAction)
+    case chatActivityChanged(ChatActivityChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
     case chatUsage(ChatUsageAction)
     case chatReasoning(ChatReasoningAction)
-    case sessionModelChanged(SessionModelChangedAction)
-    case sessionAgentChanged(SessionAgentChangedAction)
     case sessionIsReadChanged(SessionIsReadChangedAction)
     case sessionIsArchivedChanged(SessionIsArchivedChangedAction)
     case sessionActivityChanged(SessionActivityChangedAction)
@@ -1922,9 +1947,12 @@ public enum StateAction: Codable, Sendable {
     case sessionServerToolsChanged(SessionServerToolsChangedAction)
     case sessionActiveClientSet(SessionActiveClientSetAction)
     case sessionActiveClientRemoved(SessionActiveClientRemovedAction)
+    case sessionInputNeededSet(SessionInputNeededSetAction)
+    case sessionInputNeededRemoved(SessionInputNeededRemovedAction)
     case chatPendingMessageSet(ChatPendingMessageSetAction)
     case chatPendingMessageRemoved(ChatPendingMessageRemovedAction)
     case chatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction)
+    case chatDraftChanged(ChatDraftChangedAction)
     case chatInputRequested(ChatInputRequestedAction)
     case chatInputAnswerChanged(ChatInputAnswerChangedAction)
     case chatInputCompleted(ChatInputCompletedAction)
@@ -2024,16 +2052,14 @@ public enum StateAction: Codable, Sendable {
             self = .chatTurnCancelled(try ChatTurnCancelledAction(from: decoder))
         case "chat/error":
             self = .chatError(try ChatErrorAction(from: decoder))
+        case "chat/activityChanged":
+            self = .chatActivityChanged(try ChatActivityChangedAction(from: decoder))
         case "session/titleChanged":
             self = .sessionTitleChanged(try SessionTitleChangedAction(from: decoder))
         case "chat/usage":
             self = .chatUsage(try ChatUsageAction(from: decoder))
         case "chat/reasoning":
             self = .chatReasoning(try ChatReasoningAction(from: decoder))
-        case "session/modelChanged":
-            self = .sessionModelChanged(try SessionModelChangedAction(from: decoder))
-        case "session/agentChanged":
-            self = .sessionAgentChanged(try SessionAgentChangedAction(from: decoder))
         case "session/isReadChanged":
             self = .sessionIsReadChanged(try SessionIsReadChangedAction(from: decoder))
         case "session/isArchivedChanged":
@@ -2048,12 +2074,18 @@ public enum StateAction: Codable, Sendable {
             self = .sessionActiveClientSet(try SessionActiveClientSetAction(from: decoder))
         case "session/activeClientRemoved":
             self = .sessionActiveClientRemoved(try SessionActiveClientRemovedAction(from: decoder))
+        case "session/inputNeededSet":
+            self = .sessionInputNeededSet(try SessionInputNeededSetAction(from: decoder))
+        case "session/inputNeededRemoved":
+            self = .sessionInputNeededRemoved(try SessionInputNeededRemovedAction(from: decoder))
         case "chat/pendingMessageSet":
             self = .chatPendingMessageSet(try ChatPendingMessageSetAction(from: decoder))
         case "chat/pendingMessageRemoved":
             self = .chatPendingMessageRemoved(try ChatPendingMessageRemovedAction(from: decoder))
         case "chat/queuedMessagesReordered":
             self = .chatQueuedMessagesReordered(try ChatQueuedMessagesReorderedAction(from: decoder))
+        case "chat/draftChanged":
+            self = .chatDraftChanged(try ChatDraftChangedAction(from: decoder))
         case "chat/inputRequested":
             self = .chatInputRequested(try ChatInputRequestedAction(from: decoder))
         case "chat/inputAnswerChanged":
@@ -2172,11 +2204,10 @@ public enum StateAction: Codable, Sendable {
         case .chatTurnComplete(let v): try v.encode(to: encoder)
         case .chatTurnCancelled(let v): try v.encode(to: encoder)
         case .chatError(let v): try v.encode(to: encoder)
+        case .chatActivityChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)
         case .chatUsage(let v): try v.encode(to: encoder)
         case .chatReasoning(let v): try v.encode(to: encoder)
-        case .sessionModelChanged(let v): try v.encode(to: encoder)
-        case .sessionAgentChanged(let v): try v.encode(to: encoder)
         case .sessionIsReadChanged(let v): try v.encode(to: encoder)
         case .sessionIsArchivedChanged(let v): try v.encode(to: encoder)
         case .sessionActivityChanged(let v): try v.encode(to: encoder)
@@ -2184,9 +2215,12 @@ public enum StateAction: Codable, Sendable {
         case .sessionServerToolsChanged(let v): try v.encode(to: encoder)
         case .sessionActiveClientSet(let v): try v.encode(to: encoder)
         case .sessionActiveClientRemoved(let v): try v.encode(to: encoder)
+        case .sessionInputNeededSet(let v): try v.encode(to: encoder)
+        case .sessionInputNeededRemoved(let v): try v.encode(to: encoder)
         case .chatPendingMessageSet(let v): try v.encode(to: encoder)
         case .chatPendingMessageRemoved(let v): try v.encode(to: encoder)
         case .chatQueuedMessagesReordered(let v): try v.encode(to: encoder)
+        case .chatDraftChanged(let v): try v.encode(to: encoder)
         case .chatInputRequested(let v): try v.encode(to: encoder)
         case .chatInputAnswerChanged(let v): try v.encode(to: encoder)
         case .chatInputCompleted(let v): try v.encode(to: encoder)

@@ -52,6 +52,11 @@ final class AppStore {
     /// hundreds of sessions don't require hundreds of `subscribe` round-trips.
     var sessionSummariesCache: [String: SessionSummary] = [:]
 
+    /// Per-session model selection chosen in the UI. The protocol no longer
+    /// tracks a session-level model — model is selected per `Message` — so the
+    /// app keeps the user's choice locally and stamps it onto outgoing messages.
+    var selectedModelIds: [String: String] = [:]
+
     /// Per-terminal state keyed by terminal URI. Populated lazily when a tool
     /// result references a terminal resource.
     var terminals: [String: TerminalState] = [:]
@@ -158,7 +163,18 @@ final class AppStore {
     var sessionSummaries: [SessionSummary] {
         var merged = sessionSummariesCache
         for (uri, state) in sessions {
-            merged[uri] = state.summary
+            // `SessionState` no longer embeds a `SessionSummary`; overlay its
+            // live, inlined metadata fields onto the cached catalog summary
+            // (which still owns the identity fields: resource/createdAt/modifiedAt).
+            guard var summary = merged[uri] else { continue }
+            summary.provider = state.provider
+            summary.title = state.title
+            summary.status = state.status
+            summary.activity = state.activity
+            summary.project = state.project
+            summary.workingDirectory = state.workingDirectory
+            summary.annotations = state.annotations
+            merged[uri] = summary
         }
         return merged.values.sorted { $0.modifiedAt > $1.modifiedAt }
     }
@@ -973,7 +989,13 @@ final class AppStore {
     ///   `session/turnStarted` with `queuedMessageId` linking back to the entry.
     func sendMessage(_ text: String, attachments: [MessageAttachment]? = nil) async {
         guard let uri = selectedSessionURI else { return }
-        let message = Message(text: text, origin: MessageOrigin(kind: .user), attachments: attachments)
+        let modelSelection = selectedModelIds[uri].map { ModelSelection(id: $0) }
+        let message = Message(
+            text: text,
+            origin: MessageOrigin(kind: .user),
+            attachments: attachments,
+            model: modelSelection
+        )
         let hasActiveTurn = sessions[uri]?.activeTurn != nil
 
         let action: StateAction
@@ -1154,18 +1176,18 @@ final class AppStore {
     }
 
     /// Change the model for the current session.
+    ///
+    /// The protocol no longer tracks a session-level model — model is now chosen
+    /// per {@link Message} — so the app records the user's choice locally and
+    /// stamps it onto outgoing messages via ``sendMessage(_:attachments:)``.
     func changeModel(_ modelId: String) async {
         guard let uri = selectedSessionURI else { return }
-        let action = StateAction.sessionModelChanged(SessionModelChangedAction(
-            type: .sessionModelChanged,
-            model: ModelSelection(id: modelId)
-        ))
-        applySessionAction(action, sessionURI: uri)
-        do {
-            try await connection.dispatchAction(action, channel: uri)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        selectedModelIds[uri] = modelId
+    }
+
+    /// The model id the user has selected for `uri`, if any.
+    func selectedModelId(for uri: String) -> String? {
+        selectedModelIds[uri]
     }
 
     // MARK: - Private: State Management
@@ -1281,7 +1303,7 @@ final class AppStore {
         // listSessions() would correct it anyway.
         if let v = changes.activity { summary.activity = v }
         if let v = changes.project { summary.project = v }
-        if let v = changes.model { summary.model = v }
+        if let v = changes.annotations { summary.annotations = v }
         if let v = changes.workingDirectory { summary.workingDirectory = v }
         sessionSummariesCache[uri] = summary
     }

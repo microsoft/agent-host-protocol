@@ -85,6 +85,64 @@ func TestStateActionUnknownVariant(t *testing.T) {
 	}
 }
 
+// TestSnapshotStateVariants confirms the SnapshotState discriminator picks the
+// right variant for each state shape — in particular that a chat snapshot
+// resolves to Chat (and not the Root catch-all) and a flattened session
+// snapshot resolves to Session.
+func TestSnapshotStateVariants(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		wire string
+		want func(SnapshotState) bool
+	}{
+		{
+			"session",
+			`{"provider":"p","title":"S","status":0,"lifecycle":"ready","activeClients":[],"chats":[]}`,
+			func(s SnapshotState) bool { return s.Session != nil },
+		},
+		{
+			"chat",
+			`{"resource":"ahp-chat:/c1","title":"C","status":0,"modifiedAt":"2025-03-10T18:42:03.123Z","turns":[]}`,
+			func(s SnapshotState) bool { return s.Chat != nil },
+		},
+		{
+			"terminal",
+			`{"title":"T","content":[],"claim":{"kind":"client","clientId":"x"}}`,
+			func(s SnapshotState) bool { return s.Terminal != nil },
+		},
+		{
+			"changeset",
+			`{"status":"open","files":[]}`,
+			func(s SnapshotState) bool { return s.Changeset != nil },
+		},
+		{
+			"resourceWatch",
+			`{"root":"file:///r","recursive":true}`,
+			func(s SnapshotState) bool { return s.ResourceWatch != nil },
+		},
+		{
+			"annotations",
+			`{"annotations":[]}`,
+			func(s SnapshotState) bool { return s.Annotations != nil },
+		},
+		{
+			"root",
+			`{"agents":[]}`,
+			func(s SnapshotState) bool { return s.Root != nil },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var s SnapshotState
+			if err := json.Unmarshal([]byte(tc.wire), &s); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if !tc.want(s) {
+				t.Fatalf("wrong variant for %s snapshot: %+v", tc.name, s)
+			}
+		})
+	}
+}
+
 // TestSessionStatusBitset confirms the typed-uint32 Has/Or helpers
 // match the canonical bitset semantics.
 func TestSessionStatusBitset(t *testing.T) {

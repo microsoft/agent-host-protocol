@@ -53,3 +53,24 @@ applyTo: 'types/**/*.ts'
 ## Finalizing changes
 
 Before declaring a protocol repo change complete, run `npm run generate` and `npm run test` from the repo root. Resolve any generated-output, typecheck, lint, test, or generator issues those commands expose before handing the change back.
+
+## Running toolchains you don't have locally
+
+A spec change ripples into every `clients/<lang>/` mirror, so you often need to build/test a client whose toolchain isn't installed on your machine. **Don't skip verification** — run it in a container with `podman`. Use these pinned images so every agent verifies against the same environment (add a row when you containerize another toolchain so the images stay consistent):
+
+| Toolchain | Image | Notes |
+| --- | --- | --- |
+| JDK 17 (Kotlin client) | `docker.io/library/eclipse-temurin:17-jdk` | Gradle comes from the repo's `./gradlew` wrapper. |
+
+Mount the **repo root** (the shared conformance fixtures under `types/test-cases/` are resolved by walking up from the working directory, so a client-dir-only mount fails) and keep build caches out of `$HOME`. Example — run the Kotlin client's tests:
+
+```sh
+podman run --rm \
+  -e GRADLE_USER_HOME=/tmp/gradle-home \
+  -v "$PWD":/workspace \
+  -w /workspace/clients/kotlin \
+  docker.io/library/eclipse-temurin:17-jdk \
+  ./gradlew test --no-daemon --console=plain
+```
+
+On macOS this needs a running `podman machine` (`podman machine start`). Build artifacts (`clients/kotlin/build/`, `.gradle/`) are git-ignored.

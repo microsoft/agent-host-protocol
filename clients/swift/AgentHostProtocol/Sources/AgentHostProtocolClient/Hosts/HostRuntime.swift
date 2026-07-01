@@ -822,12 +822,13 @@ private func applySummaryChanges(
     _ existing: inout SessionSummary,
     changes: PartialSessionSummary
 ) {
+    if let v = changes.provider { existing.provider = v }
     if let v = changes.title { existing.title = v }
     if let v = changes.status { existing.status = v }
     if let v = changes.activity { existing.activity = v }
     if let v = changes.modifiedAt { existing.modifiedAt = v }
     if let v = changes.project { existing.project = v }
-    if let v = changes.model { existing.model = v }
+    if let v = changes.annotations { existing.annotations = v }
     if let v = changes.workingDirectory { existing.workingDirectory = v }
 }
 

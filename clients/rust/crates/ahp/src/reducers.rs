@@ -60,11 +60,12 @@ use ahp_types::state::{
     ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
     ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization, ErrorInfo,
     PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart, TerminalContentPart,
-    TerminalState, TerminalUnclassifiedPart, ToolCallCancellationReason, ToolCallCancelledState,
-    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
-    ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
-    ToolCallRunningState, ToolCallState, ToolCallStreamingState, Turn, TurnState,
+    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
+    TerminalContentPart, TerminalState, TerminalUnclassifiedPart, ToolCallCancellationReason,
+    ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
+    ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
+    ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStreamingState, Turn,
+    TurnState,
 };
 
 /// What happened when an action was applied.
@@ -125,59 +126,73 @@ fn iso8601_from_unix_millis(ms: i64) -> String {
     format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{millis:03}Z")
 }
 
-fn tool_call_meta(
-    tc: &ToolCallState,
-) -> (
-    String,
-    String,
-    String,
-    Option<ToolCallContributor>,
-    Option<serde_json::Map<String, serde_json::Value>>,
-) {
+struct ToolCallBase {
+    tool_call_id: String,
+    tool_name: String,
+    display_name: String,
+    intention: Option<String>,
+    contributor: Option<ToolCallContributor>,
+    meta: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
+fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
     match tc {
-        ToolCallState::Streaming(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::PendingConfirmation(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::Running(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::PendingResultConfirmation(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::Completed(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::Cancelled(s) => (
-            s.tool_call_id.clone(),
-            s.tool_name.clone(),
-            s.display_name.clone(),
-            s.contributor.clone(),
-            s.meta.clone(),
-        ),
-        ToolCallState::Unknown(_) => (String::new(), String::new(), String::new(), None, None),
+        ToolCallState::Streaming(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::PendingConfirmation(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::Running(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::PendingResultConfirmation(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::Completed(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::Cancelled(s) => ToolCallBase {
+            tool_call_id: s.tool_call_id.clone(),
+            tool_name: s.tool_name.clone(),
+            display_name: s.display_name.clone(),
+            intention: s.intention.clone(),
+            contributor: s.contributor.clone(),
+            meta: s.meta.clone(),
+        },
+        ToolCallState::Unknown(_) => ToolCallBase {
+            tool_call_id: String::new(),
+            tool_name: String::new(),
+            display_name: String::new(),
+            intention: None,
+            contributor: None,
+            meta: None,
+        },
     }
 }
 
@@ -219,6 +234,19 @@ fn with_status_flag(status: u32, flag: SessionStatus, set: bool) -> u32 {
     }
 }
 
+/// Reflects the session-level input queue into the activity bits of `status`.
+/// A non-empty queue promotes the activity to `InputNeeded`; emptying it clears
+/// the input-needed-specific bit. Since `InputNeeded` implies `InProgress`, an
+/// unblocked turn falls back to `InProgress` while an already-idle session stays
+/// idle. Orthogonal flags (`IsRead` / `IsArchived`) are preserved.
+fn with_input_needed_status(status: u32, input_needed: &[SessionInputRequest]) -> u32 {
+    if input_needed.is_empty() {
+        status & !(SessionStatus::InputNeeded.bits() & !SessionStatus::InProgress.bits())
+    } else {
+        (status & !STATUS_ACTIVITY_MASK) | SessionStatus::InputNeeded.bits()
+    }
+}
+
 fn summary_status(state: &ChatState, terminal: Option<SessionStatus>) -> u32 {
     let activity: u32 = if let Some(t) = terminal {
         t.bits()
@@ -244,10 +272,6 @@ fn refresh_summary_status(state: &mut ChatState) {
 
 fn touch_chat_modified(state: &mut ChatState) {
     state.modified_at = now_iso();
-}
-
-fn touch_session_modified(state: &mut SessionState) {
-    state.summary.modified_at = now_ms();
 }
 
 fn end_turn(
@@ -276,8 +300,7 @@ fn end_turn(
                         ResponsePart::ToolCall(Box::new(ToolCallResponsePart { tool_call: tc }))
                     }
                     _ => {
-                        let (tool_call_id, tool_name, display_name, contributor, meta) =
-                            tool_call_meta(&tc);
+                        let base = tool_call_meta(&tc);
                         let invocation_message = match &tc {
                             ToolCallState::Streaming(s) => {
                                 s.invocation_message.clone().unwrap_or_default()
@@ -297,11 +320,12 @@ fn end_turn(
                             _ => None,
                         };
                         let cancelled = ToolCallCancelledState {
-                            tool_call_id,
-                            tool_name,
-                            display_name,
-                            contributor,
-                            meta,
+                            tool_call_id: base.tool_call_id,
+                            tool_name: base.tool_name,
+                            display_name: base.display_name,
+                            intention: base.intention,
+                            contributor: base.contributor,
+                            meta: base.meta,
                             invocation_message,
                             tool_input,
                             reason: ToolCallCancellationReason::Skipped,
@@ -361,6 +385,15 @@ fn customization_id(c: &Customization) -> Option<&str> {
         Customization::Directory(d) => Some(d.id.as_str()),
         Customization::McpServer(m) => Some(m.id.as_str()),
         Customization::Unknown(_) => None,
+    }
+}
+
+fn session_input_request_id(r: &SessionInputRequest) -> Option<&str> {
+    match r {
+        SessionInputRequest::ChatInput(x) => Some(x.id.as_str()),
+        SessionInputRequest::ToolConfirmation(x) => Some(x.id.as_str()),
+        SessionInputRequest::ToolClientExecution(x) => Some(x.id.as_str()),
+        SessionInputRequest::Unknown(_) => None,
     }
 }
 
@@ -425,6 +458,7 @@ where
                         tool_call_id: String::new(),
                         tool_name: String::new(),
                         display_name: String::new(),
+                        intention: None,
                         contributor: None,
                         meta: None,
                         invocation_message: Default::default(),
@@ -515,7 +549,7 @@ pub fn apply_action_to_root(state: &mut RootState, action: &StateAction) -> Redu
 pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -> ReduceOutcome {
     match action {
         StateAction::SessionReady(_) => {
-            // Lifecycle-only transition. Must not touch `summary.status`: see
+            // Lifecycle-only transition. Must not touch `status`: see
             // the equivalent TypeScript reducer for the rationale.
             state.lifecycle = SessionLifecycle::Ready;
             ReduceOutcome::Applied
@@ -563,12 +597,6 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             if let Some(modified_at) = &a.changes.modified_at {
                 chat.modified_at = modified_at.clone();
             }
-            if let Some(model) = &a.changes.model {
-                chat.model = Some(model.clone());
-            }
-            if let Some(agent) = &a.changes.agent {
-                chat.agent = Some(agent.clone());
-            }
             if let Some(origin) = &a.changes.origin {
                 chat.origin = Some(origin.clone());
             }
@@ -582,35 +610,19 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             ReduceOutcome::Applied
         }
         StateAction::SessionTitleChanged(a) => {
-            state.summary.title = a.title.clone();
-            touch_session_modified(state);
-            ReduceOutcome::Applied
-        }
-        StateAction::SessionModelChanged(a) => {
-            state.summary.model = Some(a.model.clone());
-            touch_session_modified(state);
-            ReduceOutcome::Applied
-        }
-        StateAction::SessionAgentChanged(a) => {
-            state.summary.agent = a.agent.clone();
-            touch_session_modified(state);
+            state.title = a.title.clone();
             ReduceOutcome::Applied
         }
         StateAction::SessionIsReadChanged(a) => {
-            state.summary.status =
-                with_status_flag(state.summary.status, SessionStatus::IsRead, a.is_read);
+            state.status = with_status_flag(state.status, SessionStatus::IsRead, a.is_read);
             ReduceOutcome::Applied
         }
         StateAction::SessionIsArchivedChanged(a) => {
-            state.summary.status = with_status_flag(
-                state.summary.status,
-                SessionStatus::IsArchived,
-                a.is_archived,
-            );
+            state.status = with_status_flag(state.status, SessionStatus::IsArchived, a.is_archived);
             ReduceOutcome::Applied
         }
         StateAction::SessionActivityChanged(a) => {
-            state.summary.activity = a.activity.clone();
+            state.activity = a.activity.clone();
             ReduceOutcome::Applied
         }
         StateAction::SessionChangesetsChanged(a) => {
@@ -628,7 +640,6 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                     config.values.insert(k.clone(), v.clone());
                 }
             }
-            touch_session_modified(state);
             ReduceOutcome::Applied
         }
         StateAction::SessionMetaChanged(a) => {
@@ -660,6 +671,48 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                 return ReduceOutcome::NoOp;
             };
             state.active_clients.remove(idx);
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionInputNeededSet(a) => {
+            let Some(action_id) = session_input_request_id(&a.request) else {
+                return ReduceOutcome::NoOp;
+            };
+            let list = state.input_needed.get_or_insert_with(Vec::new);
+            if let Some(idx) = list
+                .iter()
+                .position(|r| session_input_request_id(r) == Some(action_id))
+            {
+                list[idx] = a.request.clone();
+            } else {
+                list.push(a.request.clone());
+            }
+            let new_status = with_input_needed_status(
+                state.status,
+                state.input_needed.as_deref().unwrap_or(&[]),
+            );
+            state.status = new_status;
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionInputNeededRemoved(a) => {
+            let Some(list) = state.input_needed.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = list
+                .iter()
+                .position(|r| session_input_request_id(r) == Some(a.id.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            list.remove(idx);
+            let empty = list.is_empty();
+            if empty {
+                state.input_needed = None;
+            }
+            let new_status = with_input_needed_status(
+                state.status,
+                state.input_needed.as_deref().unwrap_or(&[]),
+            );
+            state.status = new_status;
             ReduceOutcome::Applied
         }
         StateAction::SessionCustomizationsChanged(a) => {
@@ -908,6 +961,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             Some(SessionStatus::Error),
             Some(a.error.clone()),
         ),
+        StateAction::ChatActivityChanged(a) => {
+            state.activity = a.activity.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::ChatToolCallStart(a) => {
             let Some(active) = state.active_turn.as_mut() else {
                 return ReduceOutcome::NoOp;
@@ -922,6 +979,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                         tool_call_id: a.tool_call_id.clone(),
                         tool_name: a.tool_name.clone(),
                         display_name: a.display_name.clone(),
+                        intention: a.intention.clone(),
                         contributor: a.contributor.clone(),
                         meta: a.meta.clone(),
                         partial_input: None,
@@ -1062,6 +1120,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             *list = reordered;
             ReduceOutcome::Applied
         }
+        StateAction::ChatDraftChanged(a) => {
+            state.draft = a.draft.clone();
+            ReduceOutcome::Applied
+        }
         _ => ReduceOutcome::OutOfScope,
     }
 }
@@ -1110,16 +1172,17 @@ fn apply_tool_call_delta(state: &mut ChatState, a: &ChatToolCallDeltaAction) -> 
 
 fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
-        let (tool_call_id, tool_name, display_name, contributor, meta) = tool_call_meta(&tc);
-        let meta = a.meta.clone().or(meta);
+        let base = tool_call_meta(&tc);
+        let meta = a.meta.clone().or(base.meta);
         match tc {
             ToolCallState::Streaming(_) | ToolCallState::Running(_) => {
                 if let Some(confirmed) = a.confirmed {
                     ToolCallState::Running(ToolCallRunningState {
-                        tool_call_id,
-                        tool_name,
-                        display_name,
-                        contributor,
+                        tool_call_id: base.tool_call_id,
+                        tool_name: base.tool_name,
+                        display_name: base.display_name,
+                        intention: base.intention,
+                        contributor: base.contributor,
                         meta,
                         invocation_message: a.invocation_message.clone(),
                         tool_input: a.tool_input.clone(),
@@ -1129,10 +1192,11 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
                     })
                 } else {
                     ToolCallState::PendingConfirmation(ToolCallPendingConfirmationState {
-                        tool_call_id,
-                        tool_name,
-                        display_name,
-                        contributor,
+                        tool_call_id: base.tool_call_id,
+                        tool_name: base.tool_name,
+                        display_name: base.display_name,
+                        intention: base.intention,
+                        contributor: base.contributor,
                         meta,
                         invocation_message: a.invocation_message.clone(),
                         tool_input: a.tool_input.clone(),
@@ -1170,6 +1234,7 @@ fn apply_tool_call_confirmed(
         let tool_call_id = s.tool_call_id;
         let tool_name = s.tool_name;
         let display_name = s.display_name;
+        let intention = s.intention;
         let contributor = s.contributor;
         let meta = a.meta.clone().or(s.meta);
         let invocation_message = s.invocation_message;
@@ -1179,6 +1244,7 @@ fn apply_tool_call_confirmed(
                 tool_call_id,
                 tool_name,
                 display_name,
+                intention,
                 contributor,
                 meta,
                 invocation_message,
@@ -1192,6 +1258,7 @@ fn apply_tool_call_confirmed(
                 tool_call_id,
                 tool_name,
                 display_name,
+                intention,
                 contributor,
                 meta,
                 invocation_message,
@@ -1210,8 +1277,8 @@ fn apply_tool_call_complete(
     a: &ChatToolCallCompleteAction,
 ) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
-        let (tool_call_id, tool_name, display_name, contributor, meta) = tool_call_meta(&tc);
-        let meta = a.meta.clone().or(meta);
+        let base = tool_call_meta(&tc);
+        let meta = a.meta.clone().or(base.meta);
         let (invocation_message, tool_input, confirmed, selected_option) = match tc {
             ToolCallState::Running(s) => (
                 s.invocation_message,
@@ -1229,10 +1296,11 @@ fn apply_tool_call_complete(
         };
         if a.requires_result_confirmation.unwrap_or(false) {
             ToolCallState::PendingResultConfirmation(ToolCallPendingResultConfirmationState {
-                tool_call_id,
-                tool_name,
-                display_name,
-                contributor,
+                tool_call_id: base.tool_call_id,
+                tool_name: base.tool_name,
+                display_name: base.display_name,
+                intention: base.intention,
+                contributor: base.contributor,
                 meta,
                 invocation_message,
                 tool_input,
@@ -1246,10 +1314,11 @@ fn apply_tool_call_complete(
             })
         } else {
             ToolCallState::Completed(ToolCallCompletedState {
-                tool_call_id,
-                tool_name,
-                display_name,
-                contributor,
+                tool_call_id: base.tool_call_id,
+                tool_name: base.tool_name,
+                display_name: base.display_name,
+                intention: base.intention,
+                contributor: base.contributor,
                 meta,
                 invocation_message,
                 tool_input,
@@ -1278,6 +1347,7 @@ fn apply_tool_call_result_confirmed(
                 tool_call_id: s.tool_call_id,
                 tool_name: s.tool_name,
                 display_name: s.display_name,
+                intention: s.intention,
                 contributor: s.contributor,
                 meta: a.meta.clone().or(s.meta),
                 invocation_message: s.invocation_message,
@@ -1295,6 +1365,7 @@ fn apply_tool_call_result_confirmed(
                 tool_call_id: s.tool_call_id,
                 tool_name: s.tool_name,
                 display_name: s.display_name,
+                intention: s.intention,
                 contributor: s.contributor,
                 meta: a.meta.clone().or(s.meta),
                 invocation_message: s.invocation_message,
@@ -1648,7 +1719,7 @@ pub fn apply_action_to_resource_watch(
 mod tests {
     use super::*;
     use ahp_types::state::{
-        ChatSummary, MarkdownResponsePart, Message, MessageKind, MessageOrigin, SessionSummary,
+        ChatSummary, MarkdownResponsePart, Message, MessageKind, MessageOrigin,
     };
 
     fn user_message(text: &str) -> Message {
@@ -1658,28 +1729,21 @@ mod tests {
                 kind: MessageKind::User,
             },
             attachments: None,
+            model: None,
+            agent: None,
             meta: None,
         }
     }
 
-    fn empty_session(resource: &str) -> SessionState {
+    fn empty_session(_resource: &str) -> SessionState {
         SessionState {
-            summary: SessionSummary {
-                resource: resource.to_string(),
-                provider: "test".to_string(),
-                title: String::new(),
-                status: SessionStatus::Idle.bits(),
-                activity: None,
-                created_at: 0,
-                modified_at: 0,
-                project: None,
-                model: None,
-                agent: None,
-                working_directory: None,
-                changes: None,
-                annotations: None,
-                meta: None,
-            },
+            provider: "test".to_string(),
+            title: String::new(),
+            status: SessionStatus::Idle.bits(),
+            activity: None,
+            project: None,
+            working_directory: None,
+            annotations: None,
             lifecycle: SessionLifecycle::Creating,
             creation_error: None,
             server_tools: None,
@@ -1692,6 +1756,7 @@ mod tests {
             open_canvases: None,
             canvas_requests: None,
             changesets: None,
+            input_needed: None,
             meta: None,
         }
     }
@@ -1703,8 +1768,6 @@ mod tests {
             status: SessionStatus::Idle.bits(),
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
-            model: None,
-            agent: None,
             origin: None,
             interactivity: None,
             working_directory: None,
@@ -1713,6 +1776,7 @@ mod tests {
             steering_message: None,
             queued_messages: None,
             input_requests: None,
+            draft: None,
             meta: None,
         }
     }
@@ -1796,8 +1860,6 @@ mod tests {
             status: SessionStatus::Idle.bits(),
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
-            model: None,
-            agent: None,
             origin: None,
             interactivity: None,
             working_directory: None,

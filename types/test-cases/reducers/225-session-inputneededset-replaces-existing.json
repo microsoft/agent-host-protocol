@@ -1,0 +1,74 @@
+{
+  "description": "session/inputNeededSet replaces an existing entry with the same id and keeps status InputNeeded",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "toolConfirmation",
+        "id": "copilot:/test-session/chat-1#call-9",
+        "chat": "copilot:/test-session/chat-1",
+        "turnId": "turn-1",
+        "toolCall": {
+          "status": "pending-confirmation",
+          "toolCallId": "call-9",
+          "toolName": "run_tool",
+          "displayName": "Run Tool",
+          "invocationMessage": "Run the client tool"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededSet",
+      "request": {
+        "kind": "toolClientExecution",
+        "id": "copilot:/test-session/chat-1#call-9",
+        "chat": "copilot:/test-session/chat-1",
+        "turnId": "turn-1",
+        "clientId": "vscode-1",
+        "toolCall": {
+          "status": "running",
+          "toolCallId": "call-9",
+          "toolName": "run_tool",
+          "displayName": "Run Tool",
+          "invocationMessage": "Run the client tool",
+          "confirmed": "not-needed",
+          "contributor": { "kind": "client", "clientId": "vscode-1" }
+        }
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "toolClientExecution",
+        "id": "copilot:/test-session/chat-1#call-9",
+        "chat": "copilot:/test-session/chat-1",
+        "turnId": "turn-1",
+        "clientId": "vscode-1",
+        "toolCall": {
+          "status": "running",
+          "toolCallId": "call-9",
+          "toolName": "run_tool",
+          "displayName": "Run Tool",
+          "invocationMessage": "Run the client tool",
+          "confirmed": "not-needed",
+          "contributor": { "kind": "client", "clientId": "vscode-1" }
+        }
+      }
+    ]
+  }
+}

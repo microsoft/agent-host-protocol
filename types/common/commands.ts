@@ -251,7 +251,31 @@ export type ReconnectResult = ReconnectReplayResult | ReconnectSnapshotResult;
  * @version 1
  * @see {@link /specification/subscriptions | Subscriptions}
  */
-export interface SubscribeParams extends BaseParams {}
+export interface SubscribeParams extends BaseParams {
+  /**
+   * Optional delivery preferences for this subscription.
+   *
+   * Servers MAY use these preferences to buffer and coalesce high-frequency
+   * updates while preserving the same reduced state. Omit this field for the
+   * server's default delivery behavior.
+   */
+  delivery?: SubscriptionDeliveryOptions;
+}
+
+/**
+ * Advisory delivery preferences for a single subscription.
+ *
+ * @category Commands
+ */
+export interface SubscriptionDeliveryOptions {
+  /**
+   * Maximum time, in milliseconds, that the server may intentionally delay
+   * delivery while buffering/coalescing updates for this subscription.
+   *
+   * A value of `0` requests immediate delivery with no intentional coalescing.
+   */
+  maxLatencyMs?: number;
+}
 
 /**
  * Result of the `subscribe` command.

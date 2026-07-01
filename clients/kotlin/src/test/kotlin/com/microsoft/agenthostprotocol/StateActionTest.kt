@@ -3,7 +3,6 @@ package com.microsoft.agenthostprotocol
 import com.microsoft.agenthostprotocol.generated.ActionEnvelope
 import com.microsoft.agenthostprotocol.generated.ActionOrigin
 import com.microsoft.agenthostprotocol.generated.ActionType
-import com.microsoft.agenthostprotocol.generated.AgentSelection
 import com.microsoft.agenthostprotocol.generated.ChangesetStatus
 import com.microsoft.agenthostprotocol.generated.PartialSessionSummary
 import com.microsoft.agenthostprotocol.generated.RootAgentsChangedAction
@@ -11,7 +10,6 @@ import com.microsoft.agenthostprotocol.generated.SessionStatus
 import com.microsoft.agenthostprotocol.generated.StateAction
 import com.microsoft.agenthostprotocol.generated.StateActionChangesetStatusChanged
 import com.microsoft.agenthostprotocol.generated.StateActionRootAgentsChanged
-import com.microsoft.agenthostprotocol.generated.StateActionSessionAgentChanged
 import com.microsoft.agenthostprotocol.generated.StateActionSessionTitleChanged
 import com.microsoft.agenthostprotocol.generated.StateActionUnknown
 import kotlinx.serialization.json.JsonPrimitive
@@ -124,23 +122,6 @@ class StateActionTest {
         val partial = json.decodeFromString(PartialSessionSummary.serializer(), partialJson)
         assertEquals("Renamed", partial.title)
         assertEquals(SessionStatus.IDLE, partial.status)
-    }
-
-    @Test
-    fun `session agentChanged action carries an AgentSelection`() {
-        // Verifies the v0.2 channels reorg added the session/agentChanged
-        // action and that AgentSelection round-trips through ActionEnvelope.
-        val wire = """{
-            "channel": "ahp-session:/abc",
-            "action": {
-                "type": "session/agentChanged",
-                "agent": { "uri": "ahp-customization:/my-agent" }
-            },
-            "serverSeq": 1
-        }""".trimIndent()
-        val envelope = json.decodeFromString(ActionEnvelope.serializer(), wire)
-        val change = assertIs<StateActionSessionAgentChanged>(envelope.action)
-        assertEquals(AgentSelection(uri = "ahp-customization:/my-agent"), change.value.agent)
     }
 
     @Test

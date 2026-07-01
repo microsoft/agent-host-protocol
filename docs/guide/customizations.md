@@ -109,7 +109,7 @@ Every child carries the same base fields (`id`, `uri`, `name`, optional `icons`)
 Each child type carries optional metadata sourced from its [Open Plugins](https://open-plugins.com/plugin-builders/specification.md) component definition (typically the file's YAML frontmatter):
 
 ```typescript
-AgentCustomization        { type: 'agent';       description? }
+AgentCustomization        { type: 'agent';       description?, model?, tools? }
 SkillCustomization        { type: 'skill';       description?, disableModelInvocation? }
 PromptCustomization       { type: 'prompt';      description? }
 RuleCustomization         { type: 'rule';        description?, alwaysApply?, globs? }    // covers "instruction" formats too

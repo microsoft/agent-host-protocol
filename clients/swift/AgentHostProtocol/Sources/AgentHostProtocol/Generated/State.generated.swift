@@ -147,6 +147,20 @@ public enum ChatInputResponseKind: String, Codable, Sendable {
     case cancel = "cancel"
 }
 
+/// Discriminant for the kinds of outstanding input a session can surface in
+/// {@link SessionState.inputNeeded}.
+///
+/// This is a general/typological union (not a lifecycle), so the discriminant is
+/// a `*Kind`.
+public enum SessionInputRequestKind: String, Codable, Sendable {
+    /// A user-facing elicitation mirrored from a chat's `inputRequests`.
+    case chatInput = "chatInput"
+    /// A tool call awaiting parameter- or result-confirmation.
+    case toolConfirmation = "toolConfirmation"
+    /// A running tool the session wants an active client to execute.
+    case toolClientExecution = "toolClientExecution"
+}
+
 /// How a turn ended.
 public enum TurnState: String, Codable, Sendable {
     case complete = "complete"
@@ -624,6 +638,10 @@ public struct AgentInfo: Codable, Sendable {
     /// resolved against the workspace, children are parsed) and propagated
     /// into the session's `customizations` list.
     public var customizations: [Customization]?
+    /// Static capabilities the agent advertises about itself. Clients use these
+    /// to gate features (multi-chat, fork) instead of switching on the provider
+    /// id.
+    public var capabilities: AgentCapabilities?
 
     public init(
         provider: String,
@@ -631,7 +649,8 @@ public struct AgentInfo: Codable, Sendable {
         description: String,
         models: [SessionModelInfo],
         protectedResources: [ProtectedResourceMetadata]? = nil,
-        customizations: [Customization]? = nil
+        customizations: [Customization]? = nil,
+        capabilities: AgentCapabilities? = nil
     ) {
         self.provider = provider
         self.displayName = displayName
@@ -639,6 +658,34 @@ public struct AgentInfo: Codable, Sendable {
         self.models = models
         self.protectedResources = protectedResources
         self.customizations = customizations
+        self.capabilities = capabilities
+    }
+}
+
+public struct AgentCapabilities: Codable, Sendable {
+    /// The agent can host more than one concurrent chat per session. When absent,
+    /// clients MUST NOT call `createChat` to open chats beyond the default one the
+    /// session starts with. An empty object `{}` advertises multi-chat without
+    /// forking; set {@link MultipleChatsCapability.fork} to also allow forking.
+    public var multipleChats: MultipleChatsCapability?
+
+    public init(
+        multipleChats: MultipleChatsCapability? = nil
+    ) {
+        self.multipleChats = multipleChats
+    }
+}
+
+public struct MultipleChatsCapability: Codable, Sendable {
+    /// The agent can fork a chat from a specific turn. When absent or `false`,
+    /// clients MUST NOT pass a {@link ChatForkSource} (`source`) to `createChat`.
+    /// Forking always implies multi-chat support.
+    public var fork: Bool?
+
+    public init(
+        fork: Bool? = nil
+    ) {
+        self.fork = fork
     }
 }
 
@@ -850,10 +897,6 @@ public struct ChatState: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String
-    /// Optional per-chat model override (defaults to the session's model)
-    public var model: ModelSelection?
-    /// Optional per-chat agent override (defaults to the session's agent)
-    public var agent: AgentSelection?
     /// How this chat came into existence
     public var origin: ChatOrigin?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
@@ -865,7 +908,7 @@ public struct ChatState: Codable, Sendable {
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits
-    /// {@link SessionSummary.workingDirectory | the session's working directory}.
+    /// {@link SessionState.workingDirectory | the session's working directory}.
     /// Hosts MAY override this for individual chats — for example, to give a
     /// subordinate chat its own git worktree so multiple chats in a session can
     /// make independent edits that the orchestrator later merges back.
@@ -880,6 +923,18 @@ public struct ChatState: Codable, Sendable {
     public var queuedMessages: [PendingMessage]?
     /// Requests for user input that are currently blocking or informing chat progress
     public var inputRequests: [ChatInputRequest]?
+    /// The user's in-progress draft input for this chat — the message they are
+    /// composing but have not sent yet, including its
+    /// {@link Message.model | model} / {@link Message.agent | agent} selection
+    /// and attachments.
+    ///
+    /// Clients MAY periodically sync their local input state into this field so
+    /// a draft survives reloads and is visible to other clients viewing the same
+    /// chat. Eager syncing is **not** required — clients SHOULD debounce and MAY
+    /// sync only at convenient points. When presenting input UI for an existing
+    /// chat, clients SHOULD use any `draft` to initialize their input state.
+    /// Cleared (set to `undefined`) once the message is sent.
+    public var draft: Message?
     /// Additional provider-specific metadata for this chat.
     public var meta: [String: AnyCodable]?
 
@@ -889,8 +944,6 @@ public struct ChatState: Codable, Sendable {
         case status
         case activity
         case modifiedAt
-        case model
-        case agent
         case origin
         case interactivity
         case workingDirectory
@@ -899,6 +952,7 @@ public struct ChatState: Codable, Sendable {
         case steeringMessage
         case queuedMessages
         case inputRequests
+        case draft
         case meta = "_meta"
     }
 
@@ -908,8 +962,6 @@ public struct ChatState: Codable, Sendable {
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
-        model: ModelSelection? = nil,
-        agent: AgentSelection? = nil,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectory: String? = nil,
@@ -918,6 +970,7 @@ public struct ChatState: Codable, Sendable {
         steeringMessage: PendingMessage? = nil,
         queuedMessages: [PendingMessage]? = nil,
         inputRequests: [ChatInputRequest]? = nil,
+        draft: Message? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.resource = resource
@@ -925,8 +978,6 @@ public struct ChatState: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
-        self.model = model
-        self.agent = agent
         self.origin = origin
         self.interactivity = interactivity
         self.workingDirectory = workingDirectory
@@ -935,6 +986,7 @@ public struct ChatState: Codable, Sendable {
         self.steeringMessage = steeringMessage
         self.queuedMessages = queuedMessages
         self.inputRequests = inputRequests
+        self.draft = draft
         self.meta = meta
     }
 }
@@ -950,10 +1002,6 @@ public struct ChatSummary: Codable, Sendable {
     public var activity: String?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String
-    /// Optional per-chat model override (defaults to the session's model)
-    public var model: ModelSelection?
-    /// Optional per-chat agent override (defaults to the session's agent)
-    public var agent: AgentSelection?
     /// How this chat came into existence
     public var origin: ChatOrigin?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
@@ -975,8 +1023,6 @@ public struct ChatSummary: Codable, Sendable {
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
-        model: ModelSelection? = nil,
-        agent: AgentSelection? = nil,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectory: String? = nil
@@ -986,8 +1032,6 @@ public struct ChatSummary: Codable, Sendable {
         self.status = status
         self.activity = activity
         self.modifiedAt = modifiedAt
-        self.model = model
-        self.agent = agent
         self.origin = origin
         self.interactivity = interactivity
         self.workingDirectory = workingDirectory
@@ -995,8 +1039,26 @@ public struct ChatSummary: Codable, Sendable {
 }
 
 public struct SessionState: Codable, Sendable {
-    /// Lightweight session metadata
-    public var summary: SessionSummary
+    /// Agent provider ID
+    public var provider: String
+    /// Session title
+    public var title: String
+    /// Current session status
+    public var status: SessionStatus
+    /// Human-readable description of what the session is currently doing
+    public var activity: String?
+    /// Server-owned project for this session
+    public var project: ProjectInfo?
+    /// The default working directory URI for this session. Individual chats
+    /// MAY override via {@link ChatSummary.workingDirectory | their own
+    /// `workingDirectory`}; this field acts as the fallback for any chat that
+    /// does not.
+    public var workingDirectory: String?
+    /// Lightweight summary of this session's inline annotations channel
+    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// annotation / entry counts without subscribing. Absent when the session
+    /// does not expose an annotations channel.
+    public var annotations: AnnotationsSummary?
     /// Session initialization state
     public var lifecycle: SessionLifecycle
     /// Error details if creation failed
@@ -1075,6 +1137,21 @@ public struct SessionState: Codable, Sendable {
     /// removed once a `session/canvasRequestCompleted` carries the matching
     /// `requestId`, or via `session/canvasRequestCancelled`.
     public var canvasRequests: [SessionCanvasRequest]?
+    /// Outstanding input the session is blocked on, aggregated across every chat
+    /// so a client can discover and answer it from the session channel alone,
+    /// without subscribing to individual chats.
+    ///
+    /// Each entry is self-sufficient: it carries the owning chat's URI plus every
+    /// identifier the client needs to respond. A client answers by dispatching the
+    /// ordinary `chat/*` action to that chat's channel — see
+    /// {@link SessionInputRequest} for the per-variant response path. A present,
+    /// non-empty list implies {@link SessionStatus.InputNeeded} on
+    /// {@link SessionSummary.status}.
+    ///
+    /// Host-managed: the host upserts entries with `session/inputNeededSet` as
+    /// chats raise requests and removes them with `session/inputNeededRemoved`
+    /// once the underlying request resolves.
+    public var inputNeeded: [SessionInputRequest]?
     /// Additional provider-specific metadata for this session.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1083,7 +1160,13 @@ public struct SessionState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
-        case summary
+        case provider
+        case title
+        case status
+        case activity
+        case project
+        case workingDirectory
+        case annotations
         case lifecycle
         case creationError
         case serverTools
@@ -1096,11 +1179,18 @@ public struct SessionState: Codable, Sendable {
         case canvasRegistry
         case openCanvases
         case canvasRequests
+        case inputNeeded
         case meta = "_meta"
     }
 
     public init(
-        summary: SessionSummary,
+        provider: String,
+        title: String,
+        status: SessionStatus,
+        activity: String? = nil,
+        project: ProjectInfo? = nil,
+        workingDirectory: String? = nil,
+        annotations: AnnotationsSummary? = nil,
         lifecycle: SessionLifecycle,
         creationError: ErrorInfo? = nil,
         serverTools: [ToolDefinition]? = nil,
@@ -1113,9 +1203,16 @@ public struct SessionState: Codable, Sendable {
         canvasRegistry: [SessionCanvasDeclaration]? = nil,
         openCanvases: [SessionOpenCanvas]? = nil,
         canvasRequests: [SessionCanvasRequest]? = nil,
+        inputNeeded: [SessionInputRequest]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
-        self.summary = summary
+        self.provider = provider
+        self.title = title
+        self.status = status
+        self.activity = activity
+        self.project = project
+        self.workingDirectory = workingDirectory
+        self.annotations = annotations
         self.lifecycle = lifecycle
         self.creationError = creationError
         self.serverTools = serverTools
@@ -1128,6 +1225,7 @@ public struct SessionState: Codable, Sendable {
         self.canvasRegistry = canvasRegistry
         self.openCanvases = openCanvases
         self.canvasRequests = canvasRequests
+        self.inputNeeded = inputNeeded
         self.meta = meta
     }
 }
@@ -1188,9 +1286,106 @@ public struct SessionActiveClient: Codable, Sendable {
     }
 }
 
+public struct SessionChatInputRequest: Codable, Sendable {
+    /// Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+    public var id: String
+    /// The chat the underlying request lives in. This is the channel a client
+    /// dispatches its response to — it does not need to have subscribed to that
+    /// chat first.
+    public var chat: String
+    public var kind: SessionInputRequestKind
+    /// The mirrored chat input request.
+    public var request: ChatInputRequest
+
+    public init(
+        id: String,
+        chat: String,
+        kind: SessionInputRequestKind,
+        request: ChatInputRequest
+    ) {
+        self.id = id
+        self.chat = chat
+        self.kind = kind
+        self.request = request
+    }
+}
+
+public struct SessionToolConfirmationRequest: Codable, Sendable {
+    /// Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+    public var id: String
+    /// The chat the underlying request lives in. This is the channel a client
+    /// dispatches its response to — it does not need to have subscribed to that
+    /// chat first.
+    public var chat: String
+    public var kind: SessionInputRequestKind
+    /// The turn the tool call belongs to.
+    public var turnId: String
+    /// The tool call awaiting confirmation.
+    public var toolCall: ToolCallConfirmationState
+
+    public init(
+        id: String,
+        chat: String,
+        kind: SessionInputRequestKind,
+        turnId: String,
+        toolCall: ToolCallConfirmationState
+    ) {
+        self.id = id
+        self.chat = chat
+        self.kind = kind
+        self.turnId = turnId
+        self.toolCall = toolCall
+    }
+}
+
+public struct SessionToolClientExecutionRequest: Codable, Sendable {
+    /// Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+    public var id: String
+    /// The chat the underlying request lives in. This is the channel a client
+    /// dispatches its response to — it does not need to have subscribed to that
+    /// chat first.
+    public var chat: String
+    public var kind: SessionInputRequestKind
+    /// The turn the tool call belongs to.
+    public var turnId: String
+    /// The `clientId` expected to execute the tool. Matches the `clientId` of the
+    /// tool call's client {@link ToolCallContributor}.
+    public var clientId: String
+    /// The running tool call the session wants the owning client to execute. The
+    /// host only ever populates this with a {@link ToolCallRunningState} (i.e. a
+    /// {@link ToolCallState} in `running` status).
+    public var toolCall: ToolCallState
+
+    public init(
+        id: String,
+        chat: String,
+        kind: SessionInputRequestKind,
+        turnId: String,
+        clientId: String,
+        toolCall: ToolCallState
+    ) {
+        self.id = id
+        self.chat = chat
+        self.kind = kind
+        self.turnId = turnId
+        self.clientId = clientId
+        self.toolCall = toolCall
+    }
+}
+
 public struct SessionSummary: Codable, Sendable {
-    /// Session URI
-    public var resource: String
     /// Agent provider ID
     public var provider: String
     /// Session title
@@ -1199,34 +1394,29 @@ public struct SessionSummary: Codable, Sendable {
     public var status: SessionStatus
     /// Human-readable description of what the session is currently doing
     public var activity: String?
-    /// Creation timestamp
-    public var createdAt: Int
-    /// Last modification timestamp
-    public var modifiedAt: Int
     /// Server-owned project for this session
     public var project: ProjectInfo?
-    /// Currently selected model
-    public var model: ModelSelection?
-    /// Currently selected custom agent.
-    ///
-    /// Absent (`undefined`) means no custom agent is selected for this session
-    /// — the session uses the provider's default behavior.
-    public var agent: AgentSelection?
     /// The default working directory URI for this session. Individual chats
     /// MAY override via {@link ChatSummary.workingDirectory | their own
     /// `workingDirectory`}; this field acts as the fallback for any chat that
     /// does not.
     public var workingDirectory: String?
-    /// Aggregate summary of file changes associated with this session. Servers
-    /// may populate this to give clients a quick at-a-glance view of the
-    /// session's footprint (e.g., for list rendering) without requiring the
-    /// client to subscribe to a changeset.
-    public var changes: ChangesSummary?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     public var annotations: AnnotationsSummary?
+    /// Session URI
+    public var resource: String
+    /// Creation timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+    public var createdAt: String
+    /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+    public var modifiedAt: String
+    /// Aggregate summary of file changes associated with this session. Servers
+    /// may populate this to give clients a quick at-a-glance view of the
+    /// session's footprint (e.g., for list rendering) without requiring the
+    /// client to subscribe to a changeset.
+    public var changes: ChangesSummary?
     /// Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
     /// SHOULD keep the payload small because summaries appear in session lists
@@ -1234,51 +1424,45 @@ public struct SessionSummary: Codable, Sendable {
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
-        case resource
         case provider
         case title
         case status
         case activity
+        case project
+        case workingDirectory
+        case annotations
+        case resource
         case createdAt
         case modifiedAt
-        case project
-        case model
-        case agent
-        case workingDirectory
         case changes
-        case annotations
         case meta = "_meta"
     }
 
     public init(
-        resource: String,
         provider: String,
         title: String,
         status: SessionStatus,
         activity: String? = nil,
-        createdAt: Int,
-        modifiedAt: Int,
         project: ProjectInfo? = nil,
-        model: ModelSelection? = nil,
-        agent: AgentSelection? = nil,
         workingDirectory: String? = nil,
-        changes: ChangesSummary? = nil,
         annotations: AnnotationsSummary? = nil,
+        resource: String,
+        createdAt: String,
+        modifiedAt: String,
+        changes: ChangesSummary? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
-        self.resource = resource
         self.provider = provider
         self.title = title
         self.status = status
         self.activity = activity
+        self.project = project
+        self.workingDirectory = workingDirectory
+        self.annotations = annotations
+        self.resource = resource
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
-        self.project = project
-        self.model = model
-        self.agent = agent
-        self.workingDirectory = workingDirectory
         self.changes = changes
-        self.annotations = annotations
         self.meta = meta
     }
 }
@@ -1398,6 +1582,20 @@ public struct Message: Codable, Sendable {
     public var origin: MessageOrigin
     /// File/selection attachments
     public var attachments: [MessageAttachment]?
+    /// The model this message was, or will be, sent with.
+    ///
+    /// For historic user/agent messages this records the model actually used, so
+    /// a client editing or resending the message can retain that selection. For a
+    /// {@link ChatState.draft | draft} it carries the model the user picked for
+    /// the message they are composing. Absent means the agent host's default
+    /// model applies.
+    public var model: ModelSelection?
+    /// The custom agent this message was, or will be, sent with.
+    ///
+    /// For historic messages this records the agent actually used; for a
+    /// {@link ChatState.draft | draft} it carries the agent the user picked.
+    /// Absent means no custom agent — the provider's default behavior applies.
+    public var agent: AgentSelection?
     /// Additional provider-specific metadata for this message.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -1409,6 +1607,8 @@ public struct Message: Codable, Sendable {
         case text
         case origin
         case attachments
+        case model
+        case agent
         case meta = "_meta"
     }
 
@@ -1416,11 +1616,15 @@ public struct Message: Codable, Sendable {
         text: String,
         origin: MessageOrigin,
         attachments: [MessageAttachment]? = nil,
+        model: ModelSelection? = nil,
+        agent: AgentSelection? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.text = text
         self.origin = origin
         self.attachments = attachments
+        self.model = model
+        self.agent = agent
         self.meta = meta
     }
 }
@@ -2229,6 +2433,8 @@ public struct ToolCallStreamingState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2247,6 +2453,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case status
@@ -2258,6 +2465,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         status: ToolCallStatus,
@@ -2267,6 +2475,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.status = status
@@ -2282,6 +2491,8 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2311,6 +2522,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2326,6 +2538,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2339,6 +2552,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -2358,6 +2572,8 @@ public struct ToolCallRunningState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2385,6 +2601,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2399,6 +2616,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2411,6 +2629,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -2429,6 +2648,8 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2465,6 +2686,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2483,6 +2705,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2499,6 +2722,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -2521,6 +2745,8 @@ public struct ToolCallCompletedState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2557,6 +2783,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2575,6 +2802,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2591,6 +2819,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -2613,6 +2842,8 @@ public struct ToolCallCancelledState: Codable, Sendable {
     public var toolName: String
     /// Human-readable tool name
     public var displayName: String
+    /// Human-readable description of what the tool invocation intends to do
+    public var intention: String?
     /// Reference to the contributor of the tool being called.
     public var contributor: ToolCallContributor?
     /// Additional provider-specific metadata for this tool call.
@@ -2639,6 +2870,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
         case toolCallId
         case toolName
         case displayName
+        case intention
         case contributor
         case meta = "_meta"
         case invocationMessage
@@ -2654,6 +2886,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
         toolCallId: String,
         toolName: String,
         displayName: String,
+        intention: String? = nil,
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
@@ -2667,6 +2900,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
         self.toolCallId = toolCallId
         self.toolName = toolName
         self.displayName = displayName
+        self.intention = intention
         self.contributor = contributor
         self.meta = meta
         self.invocationMessage = invocationMessage
@@ -3180,6 +3414,18 @@ public struct AgentCustomization: Codable, Sendable {
     /// Short description of what the agent specializes in and when to
     /// invoke it. Sourced from the agent file's frontmatter `description`.
     public var description: String?
+    /// Model the agent is pinned to, sourced from the agent file's
+    /// frontmatter `model`. Absent means the agent inherits the session's
+    /// default model.
+    public var model: String?
+    /// Allowlist of tool names the agent is scoped to, sourced from the
+    /// agent file's frontmatter `tools`. A non-empty list restricts the
+    /// agent to exactly those tools. Absent — or an empty list — imposes no
+    /// restriction beyond the session default: the agent may use any
+    /// available tool. Producers express "no restriction" by omitting the
+    /// field rather than sending an empty array, so an empty list carries no
+    /// meaning distinct from absence.
+    public var tools: [String]?
     /// Additional provider-specific metadata for this custom agent.
     ///
     /// Mirrors the MCP `_meta` convention.
@@ -3193,6 +3439,8 @@ public struct AgentCustomization: Codable, Sendable {
         case range
         case type
         case description
+        case model
+        case tools
         case meta = "_meta"
     }
 
@@ -3204,6 +3452,8 @@ public struct AgentCustomization: Codable, Sendable {
         range: TextRange? = nil,
         type: CustomizationType,
         description: String? = nil,
+        model: String? = nil,
+        tools: [String]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.id = id
@@ -3213,6 +3463,8 @@ public struct AgentCustomization: Codable, Sendable {
         self.range = range
         self.type = type
         self.description = description
+        self.model = model
+        self.tools = tools
         self.meta = meta
     }
 }
@@ -4714,6 +4966,39 @@ public enum ToolCallState: Codable, Sendable {
     }
 }
 
+public enum ToolCallConfirmationState: Codable, Sendable {
+    case pendingConfirmation(ToolCallPendingConfirmationState)
+    case pendingResultConfirmation(ToolCallPendingResultConfirmationState)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "status"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "pending-confirmation":
+            self = .pendingConfirmation(try ToolCallPendingConfirmationState(from: decoder))
+        case "pending-result-confirmation":
+            self = .pendingResultConfirmation(try ToolCallPendingResultConfirmationState(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .pendingConfirmation(let value): try value.encode(to: encoder)
+        case .pendingResultConfirmation(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
 public enum TerminalClaim: Codable, Sendable {
     case client(TerminalClientClaim)
     case session(TerminalSessionClaim)
@@ -5211,6 +5496,43 @@ public enum CanvasRequestOutcome: Codable, Sendable {
     }
 }
 
+public enum SessionInputRequest: Codable, Sendable {
+    case chatInput(SessionChatInputRequest)
+    case toolConfirmation(SessionToolConfirmationRequest)
+    case toolClientExecution(SessionToolClientExecutionRequest)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "chatInput":
+            self = .chatInput(try SessionChatInputRequest(from: decoder))
+        case "toolConfirmation":
+            self = .toolConfirmation(try SessionToolConfirmationRequest(from: decoder))
+        case "toolClientExecution":
+            self = .toolClientExecution(try SessionToolClientExecutionRequest(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .chatInput(let value): try value.encode(to: encoder)
+        case .toolConfirmation(let value): try value.encode(to: encoder)
+        case .toolClientExecution(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
 public enum ToolResultContent: Codable, Sendable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
@@ -5277,9 +5599,14 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
 
     public init(from decoder: Decoder) throws {
-        // SessionState has required `summary` field, try it first
+        // Try the most distinctive shapes first. SessionState has required
+        // `lifecycle` / `activeClients` / `chats`; ChatState has required
+        // `turns`; the remaining variants follow, with RootState as the
+        // catch-all.
         if let session = try? SessionState(from: decoder) {
             self = .session(session)
+        } else if let chat = try? ChatState(from: decoder) {
+            self = .chat(chat)
         } else if let terminal = try? TerminalState(from: decoder) {
             self = .terminal(terminal)
         } else if let changeset = try? ChangesetState(from: decoder) {

@@ -42,7 +42,10 @@ Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes
   "jsonrpc": "2.0",
   "id": 1,
   "method": "subscribe",
-  "params": { "channel": "ahp-session:/<uuid>" }
+  "params": {
+    "channel": "ahp-session:/<uuid>",
+    "delivery": { "maxLatencyMs": 100 }
+  }
 }
 
 // Server → Client (state-bearing channel)
@@ -72,6 +75,15 @@ Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes
 ```
 
 After subscribing, the client receives all messages scoped to that channel — both action envelopes (for state channels) and any channel-specific notifications.
+
+### Delivery preferences
+
+Clients MAY include `delivery.maxLatencyMs` on `subscribe` to request an upper
+bound, in milliseconds, on intentional server-side buffering for that
+subscription. Servers MAY use that budget to coalesce high-frequency updates
+while preserving the same reduced state a client would observe from immediate
+delivery. A value of `0` requests immediate delivery with no intentional
+coalescing. Omitting `delivery` uses the server's default delivery behavior.
 
 ## Unsubscribe (Notification)
 

@@ -228,6 +228,24 @@ pub enum ChatInputResponseKind {
     Cancel,
 }
 
+/// Discriminant for the kinds of outstanding input a session can surface in
+/// {@link SessionState.inputNeeded}.
+///
+/// This is a general/typological union (not a lifecycle), so the discriminant is
+/// a `*Kind`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SessionInputRequestKind {
+    /// A user-facing elicitation mirrored from a chat's `inputRequests`.
+    #[serde(rename = "chatInput")]
+    ChatInput,
+    /// A tool call awaiting parameter- or result-confirmation.
+    #[serde(rename = "toolConfirmation")]
+    ToolConfirmation,
+    /// A running tool the session wants an active client to execute.
+    #[serde(rename = "toolClientExecution")]
+    ToolClientExecution,
+}
+
 /// How a turn ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TurnState {
@@ -809,6 +827,38 @@ pub struct AgentInfo {
     /// into the session's `customizations` list.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub customizations: Option<Vec<Customization>>,
+    /// Static capabilities the agent advertises about itself. Clients use these
+    /// to gate features (multi-chat, fork) instead of switching on the provider
+    /// id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<AgentCapabilities>,
+}
+
+/// Static capabilities an {@link AgentInfo} advertises. Modelled after MCP
+/// capabilities: each field is opt-in and its presence (an empty object `{}`)
+/// signals support, while absence means the feature is unsupported and the
+/// corresponding client commands MUST NOT be used. Sub-fields carry
+/// per-capability options.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCapabilities {
+    /// The agent can host more than one concurrent chat per session. When absent,
+    /// clients MUST NOT call `createChat` to open chats beyond the default one the
+    /// session starts with. An empty object `{}` advertises multi-chat without
+    /// forking; set {@link MultipleChatsCapability.fork} to also allow forking.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multiple_chats: Option<MultipleChatsCapability>,
+}
+
+/// Options for the {@link AgentCapabilities.multipleChats} capability.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MultipleChatsCapability {
+    /// The agent can fork a chat from a specific turn. When absent or `false`,
+    /// clients MUST NOT pass a {@link ChatForkSource} (`source`) to `createChat`.
+    /// Forking always implies multi-chat support.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -870,7 +920,7 @@ pub struct ModelSelection {
 /// the session's effective customizations). Consumers resolve the agent's
 /// display name by looking up `uri` in the session's customization tree.
 ///
-/// A session with no `agent` selected uses the provider's default behavior.
+/// A message with no `agent` selected uses the provider's default behavior.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentSelection {
@@ -981,12 +1031,6 @@ pub struct ChatState {
     pub activity: Option<String>,
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     pub modified_at: String,
-    /// Optional per-chat model override (defaults to the session's model)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<ModelSelection>,
-    /// Optional per-chat agent override (defaults to the session's agent)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent: Option<AgentSelection>,
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
@@ -1000,7 +1044,7 @@ pub struct ChatState {
     /// Optional per-chat working directory.
     ///
     /// If absent, the chat inherits
-    /// {@link SessionSummary.workingDirectory | the session's working directory}.
+    /// {@link SessionState.workingDirectory | the session's working directory}.
     /// Hosts MAY override this for individual chats — for example, to give a
     /// subordinate chat its own git worktree so multiple chats in a session can
     /// make independent edits that the orchestrator later merges back.
@@ -1020,6 +1064,19 @@ pub struct ChatState {
     /// Requests for user input that are currently blocking or informing chat progress
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_requests: Option<Vec<ChatInputRequest>>,
+    /// The user's in-progress draft input for this chat — the message they are
+    /// composing but have not sent yet, including its
+    /// {@link Message.model | model} / {@link Message.agent | agent} selection
+    /// and attachments.
+    ///
+    /// Clients MAY periodically sync their local input state into this field so
+    /// a draft survives reloads and is visible to other clients viewing the same
+    /// chat. Eager syncing is **not** required — clients SHOULD debounce and MAY
+    /// sync only at convenient points. When presenting input UI for an existing
+    /// chat, clients SHOULD use any `draft` to initialize their input state.
+    /// Cleared (set to `undefined`) once the message is sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub draft: Option<Message>,
     /// Additional provider-specific metadata for this chat.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
@@ -1042,12 +1099,6 @@ pub struct ChatSummary {
     pub activity: Option<String>,
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     pub modified_at: String,
-    /// Optional per-chat model override (defaults to the session's model)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<ModelSelection>,
-    /// Optional per-chat agent override (defaults to the session's agent)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent: Option<AgentSelection>,
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
@@ -1068,11 +1119,39 @@ pub struct ChatSummary {
 }
 
 /// Full state for a single session, loaded when a client subscribes to the session's URI.
+///
+/// Inlines (denormalizes) every {@link SessionMetadata} field directly onto
+/// itself so subscribers receive one flat object instead of a nested summary.
+/// The lightweight catalog representation is {@link SessionSummary}, surfaced on
+/// the root channel; the host keeps the two in sync via
+/// `root/sessionSummaryChanged`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionState {
-    /// Lightweight session metadata
-    pub summary: SessionSummary,
+    /// Agent provider ID
+    pub provider: String,
+    /// Session title
+    pub title: String,
+    /// Current session status
+    pub status: u32,
+    /// Human-readable description of what the session is currently doing
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activity: Option<String>,
+    /// Server-owned project for this session
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<ProjectInfo>,
+    /// The default working directory URI for this session. Individual chats
+    /// MAY override via {@link ChatSummary.workingDirectory | their own
+    /// `workingDirectory`}; this field acts as the fallback for any chat that
+    /// does not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_directory: Option<Uri>,
+    /// Lightweight summary of this session's inline annotations channel
+    /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+    /// annotation / entry counts without subscribing. Absent when the session
+    /// does not expose an annotations channel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<AnnotationsSummary>,
     /// Session initialization state
     pub lifecycle: SessionLifecycle,
     /// Error details if creation failed
@@ -1160,6 +1239,22 @@ pub struct SessionState {
     /// `requestId`, or via `session/canvasRequestCancelled`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub canvas_requests: Option<Vec<SessionCanvasRequest>>,
+    /// Outstanding input the session is blocked on, aggregated across every chat
+    /// so a client can discover and answer it from the session channel alone,
+    /// without subscribing to individual chats.
+    ///
+    /// Each entry is self-sufficient: it carries the owning chat's URI plus every
+    /// identifier the client needs to respond. A client answers by dispatching the
+    /// ordinary `chat/*` action to that chat's channel — see
+    /// {@link SessionInputRequest} for the per-variant response path. A present,
+    /// non-empty list implies {@link SessionStatus.InputNeeded} on
+    /// {@link SessionSummary.status}.
+    ///
+    /// Host-managed: the host upserts entries with `session/inputNeededSet` as
+    /// chats raise requests and removes them with `session/inputNeededRemoved`
+    /// once the underlying request resolves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_needed: Option<Vec<SessionInputRequest>>,
     /// Additional provider-specific metadata for this session.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1220,6 +1315,92 @@ pub struct SessionActiveClient {
     pub can_render_canvases: Option<bool>,
 }
 
+/// A user-input elicitation surfaced at the session level, mirroring one entry
+/// of the owning chat's {@link ChatState.inputRequests}.
+///
+/// Respond by dispatching `chat/inputCompleted` (or syncing drafts with
+/// `chat/inputAnswerChanged`) to {@link SessionInputRequestBase.chat | `chat`},
+/// keyed by {@link ChatInputRequest.id | `request.id`}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChatInputRequest {
+    /// Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+    pub id: String,
+    /// The chat the underlying request lives in. This is the channel a client
+    /// dispatches its response to — it does not need to have subscribed to that
+    /// chat first.
+    pub chat: Uri,
+    /// The mirrored chat input request.
+    pub request: ChatInputRequest,
+}
+
+/// A tool call blocked on confirmation — either parameter confirmation before
+/// execution or result confirmation after — surfaced at the session level.
+///
+/// Respond by dispatching `chat/toolCallConfirmed` (for
+/// {@link ToolCallPendingConfirmationState}) or `chat/toolCallResultConfirmed`
+/// (for {@link ToolCallPendingResultConfirmationState}) to
+/// {@link SessionInputRequestBase.chat | `chat`}, keyed by `turnId` and
+/// `toolCall.toolCallId`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionToolConfirmationRequest {
+    /// Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+    pub id: String,
+    /// The chat the underlying request lives in. This is the channel a client
+    /// dispatches its response to — it does not need to have subscribed to that
+    /// chat first.
+    pub chat: Uri,
+    /// The turn the tool call belongs to.
+    pub turn_id: String,
+    /// The tool call awaiting confirmation.
+    pub tool_call: ToolCallConfirmationState,
+}
+
+/// A running tool whose execution is delegated to an active client. Surfaced so
+/// a client that provides the tool can pick up the work without subscribing to
+/// the owning chat.
+///
+/// The {@link toolCall} is always a {@link ToolCallRunningState} (a
+/// {@link ToolCallState} in `running` status) whose
+/// {@link ToolCallRunningState.contributor | `contributor`} is a client
+/// {@link ToolCallClientContributor} whose `clientId` matches the denormalized
+/// {@link clientId} here. Execute and report the result by dispatching
+/// `chat/toolCallComplete` (and optionally streaming with
+/// `chat/toolCallContentChanged`) to {@link SessionInputRequestBase.chat |
+/// `chat`}, keyed by `turnId` and `toolCall.toolCallId`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionToolClientExecutionRequest {
+    /// Stable key for this entry, unique within the session's
+    /// {@link SessionState.inputNeeded} list. The host derives it however it likes
+    /// (for example from the chat URI plus the underlying request or tool-call
+    /// id); consumers MUST treat it as opaque. It is the key for the
+    /// `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+    pub id: String,
+    /// The chat the underlying request lives in. This is the channel a client
+    /// dispatches its response to — it does not need to have subscribed to that
+    /// chat first.
+    pub chat: Uri,
+    /// The turn the tool call belongs to.
+    pub turn_id: String,
+    /// The `clientId` expected to execute the tool. Matches the `clientId` of the
+    /// tool call's client {@link ToolCallContributor}.
+    pub client_id: String,
+    /// The running tool call the session wants the owning client to execute. The
+    /// host only ever populates this with a {@link ToolCallRunningState} (i.e. a
+    /// {@link ToolCallState} in `running` status).
+    pub tool_call: ToolCallState,
+}
+
 /// Lightweight catalog entry summarizing one session. Surfaced via
 /// {@link RootChannelCommands.listSessions | `root/listSessions`} and
 /// `root/sessionAdded`/`root/sessionSummaryChanged` notifications.
@@ -1241,8 +1422,6 @@ pub struct SessionActiveClient {
 ///   chat currently driving the promoted status bits when a non-default chat
 ///   wins (e.g. the chat that raised `InputNeeded`).
 /// - `modifiedAt`: the max of all chats' `modifiedAt`.
-/// - `model` / `agent`: the session-level selection. Per-chat overrides are
-///   surfaced on individual {@link ChatSummary} entries, not aggregated up.
 /// - `workingDirectory`: the session-level **default**. Individual chats MAY
 ///   override via {@link ChatSummary.workingDirectory}; aggregating these up
 ///   is meaningless and SHOULD NOT be attempted.
@@ -1256,8 +1435,6 @@ pub struct SessionActiveClient {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
-    /// Session URI
-    pub resource: Uri,
     /// Agent provider ID
     pub provider: String,
     /// Session title
@@ -1267,40 +1444,33 @@ pub struct SessionSummary {
     /// Human-readable description of what the session is currently doing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
-    /// Creation timestamp
-    pub created_at: i64,
-    /// Last modification timestamp
-    pub modified_at: i64,
     /// Server-owned project for this session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<ProjectInfo>,
-    /// Currently selected model
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<ModelSelection>,
-    /// Currently selected custom agent.
-    ///
-    /// Absent (`undefined`) means no custom agent is selected for this session
-    /// — the session uses the provider's default behavior.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent: Option<AgentSelection>,
     /// The default working directory URI for this session. Individual chats
     /// MAY override via {@link ChatSummary.workingDirectory | their own
     /// `workingDirectory`}; this field acts as the fallback for any chat that
     /// does not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Aggregate summary of file changes associated with this session. Servers
-    /// may populate this to give clients a quick at-a-glance view of the
-    /// session's footprint (e.g., for list rendering) without requiring the
-    /// client to subscribe to a changeset.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub changes: Option<ChangesSummary>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
     /// does not expose an annotations channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotations: Option<AnnotationsSummary>,
+    /// Session URI
+    pub resource: Uri,
+    /// Creation timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+    pub created_at: String,
+    /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+    pub modified_at: String,
+    /// Aggregate summary of file changes associated with this session. Servers
+    /// may populate this to give clients a quick at-a-glance view of the
+    /// session's footprint (e.g., for list rendering) without requiring the
+    /// client to subscribe to a changeset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<ChangesSummary>,
     /// Lightweight server-defined metadata clients may use for the session
     /// presentation. The protocol does not interpret these values; producers
     /// SHOULD keep the payload small because summaries appear in session lists
@@ -1472,6 +1642,22 @@ pub struct Message {
     /// File/selection attachments
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attachments: Option<Vec<MessageAttachment>>,
+    /// The model this message was, or will be, sent with.
+    ///
+    /// For historic user/agent messages this records the model actually used, so
+    /// a client editing or resending the message can retain that selection. For a
+    /// {@link ChatState.draft | draft} it carries the model the user picked for
+    /// the message they are composing. Absent means the agent host's default
+    /// model applies.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelSelection>,
+    /// The custom agent this message was, or will be, sent with.
+    ///
+    /// For historic messages this records the agent actually used; for a
+    /// {@link ChatState.draft | draft} it carries the agent the user picked.
+    /// Absent means no custom agent — the provider's default behavior applies.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<AgentSelection>,
     /// Additional provider-specific metadata for this message.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -2040,6 +2226,9 @@ pub struct ToolCallStreamingState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2069,6 +2258,9 @@ pub struct ToolCallPendingConfirmationState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2111,6 +2303,9 @@ pub struct ToolCallRunningState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2149,6 +2344,9 @@ pub struct ToolCallPendingResultConfirmationState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2198,6 +2396,9 @@ pub struct ToolCallCompletedState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2247,6 +2448,9 @@ pub struct ToolCallCancelledState {
     pub tool_name: String,
     /// Human-readable tool name
     pub display_name: String,
+    /// Human-readable description of what the tool invocation intends to do
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Reference to the contributor of the tool being called.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contributor: Option<ToolCallContributor>,
@@ -2641,6 +2845,20 @@ pub struct AgentCustomization {
     /// invoke it. Sourced from the agent file's frontmatter `description`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Model the agent is pinned to, sourced from the agent file's
+    /// frontmatter `model`. Absent means the agent inherits the session's
+    /// default model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Allowlist of tool names the agent is scoped to, sourced from the
+    /// agent file's frontmatter `tools`. A non-empty list restricts the
+    /// agent to exactly those tools. Absent — or an empty list — imposes no
+    /// restriction beyond the session default: the agent may use any
+    /// available tool. Producers express "no restriction" by omitting the
+    /// field rather than sending an empty array, so an empty list carries no
+    /// meaning distinct from absence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<String>>,
     /// Additional provider-specific metadata for this custom agent.
     ///
     /// Mirrors the MCP `_meta` convention.
@@ -3806,6 +4024,20 @@ pub enum ToolCallState {
     Unknown(serde_json::Value),
 }
 
+/// A tool call blocked on parameter- or result-confirmation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum ToolCallConfirmationState {
+    #[serde(rename = "pending-confirmation")]
+    PendingConfirmation(ToolCallPendingConfirmationState),
+    #[serde(rename = "pending-result-confirmation")]
+    PendingResultConfirmation(ToolCallPendingResultConfirmationState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
 /// Who currently holds a terminal.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
@@ -4044,10 +4276,26 @@ pub enum CanvasRequestOutcome {
     Error(CanvasRequestErrorOutcome),
 }
 
+/// One outstanding piece of input a session is blocked on, aggregated across all chats.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum SessionInputRequest {
+    #[serde(rename = "chatInput")]
+    ChatInput(SessionChatInputRequest),
+    #[serde(rename = "toolConfirmation")]
+    ToolConfirmation(SessionToolConfirmationRequest),
+    #[serde(rename = "toolClientExecution")]
+    ToolClientExecution(SessionToolClientExecutionRequest),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
 /// The state payload of a snapshot — root, session, chat, terminal,
 /// changeset, resource-watch, or annotations state.
 ///
-/// Deserialized by trying session first (has required `summary`), then
+/// Deserialized by trying session first (has required `lifecycle`), then
 /// chat (has required `turns`), then terminal (has required `content`),
 /// then changeset (has required `status` and `files`), then resource-watch
 /// (has required `root` and `recursive`), then annotations (has required

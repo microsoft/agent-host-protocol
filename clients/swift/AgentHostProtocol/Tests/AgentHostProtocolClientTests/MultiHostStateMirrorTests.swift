@@ -35,17 +35,11 @@ final class MultiHostStateMirrorTests: XCTestCase {
     func testSessionUriCollisionAcrossHostsDoesNotClobber() async {
         let mirror = MultiHostStateMirror()
         let sessionA = SessionState(
-            summary: SessionSummary(
-                resource: "ahp-session:/s1", provider: "x", title: "A title",
-                status: .idle, createdAt: 1, modifiedAt: 1
-            ),
+            provider: "x", title: "A title", status: .idle,
             lifecycle: .ready, activeClients: [], chats: []
         )
         let sessionB = SessionState(
-            summary: SessionSummary(
-                resource: "ahp-session:/s1", provider: "x", title: "B title",
-                status: .idle, createdAt: 1, modifiedAt: 1
-            ),
+            provider: "x", title: "B title", status: .idle,
             lifecycle: .ready, activeClients: [], chats: []
         )
 
@@ -59,8 +53,8 @@ final class MultiHostStateMirrorTests: XCTestCase {
         )
 
         let sessions = await mirror.sessions
-        XCTAssertEqual(sessions[HostedResourceKey(hostId: "alpha", uri: "ahp-session:/s1")]?.summary.title, "A title")
-        XCTAssertEqual(sessions[HostedResourceKey(hostId: "beta", uri: "ahp-session:/s1")]?.summary.title, "B title")
+        XCTAssertEqual(sessions[HostedResourceKey(hostId: "alpha", uri: "ahp-session:/s1")]?.title, "A title")
+        XCTAssertEqual(sessions[HostedResourceKey(hostId: "beta", uri: "ahp-session:/s1")]?.title, "B title")
     }
 
     // MARK: - apply_root_action_updates_only_the_target_host
@@ -97,10 +91,7 @@ final class MultiHostStateMirrorTests: XCTestCase {
     func testApplySessionActionUpdatesOnlyTargetSession() async {
         let mirror = MultiHostStateMirror()
         let initial = SessionState(
-            summary: SessionSummary(
-                resource: "ahp-session:/s1", provider: "x", title: "Old",
-                status: .idle, createdAt: 1, modifiedAt: 1
-            ),
+            provider: "x", title: "Old", status: .idle,
             lifecycle: .ready, activeClients: [], chats: []
         )
         await mirror.applySnapshot(
@@ -123,8 +114,8 @@ final class MultiHostStateMirrorTests: XCTestCase {
         await mirror.apply(host: "alpha", envelope: envelope)
 
         let sessions = await mirror.sessions
-        XCTAssertEqual(sessions[HostedResourceKey(hostId: "alpha", uri: "ahp-session:/s1")]?.summary.title, "New on alpha")
-        XCTAssertEqual(sessions[HostedResourceKey(hostId: "beta", uri: "ahp-session:/s1")]?.summary.title, "Old",
+        XCTAssertEqual(sessions[HostedResourceKey(hostId: "alpha", uri: "ahp-session:/s1")]?.title, "New on alpha")
+        XCTAssertEqual(sessions[HostedResourceKey(hostId: "beta", uri: "ahp-session:/s1")]?.title, "Old",
                        "session-scoped action on alpha must not touch beta's identically-named session")
     }
 

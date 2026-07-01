@@ -67,6 +67,7 @@
             "toolCallId": "tc-1",
             "toolName": "search",
             "displayName": "Search Files",
+            "intention": null,
             "contributor": {
               "kind": "mcp",
               "customizationId": "mcp-1"

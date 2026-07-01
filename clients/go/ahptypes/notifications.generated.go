@@ -207,8 +207,6 @@ type OtlpExportMetricsParams struct {
 
 // PartialSessionSummary is the partial equivalent of SessionSummary — every field is optional for delta updates.
 type PartialSessionSummary struct {
-	// Session URI
-	Resource *URI `json:"resource,omitempty"`
 	// Agent provider ID
 	Provider *string `json:"provider,omitempty"`
 	// Session title
@@ -217,34 +215,29 @@ type PartialSessionSummary struct {
 	Status *SessionStatus `json:"status,omitempty"`
 	// Human-readable description of what the session is currently doing
 	Activity *string `json:"activity,omitempty"`
-	// Creation timestamp
-	CreatedAt *int64 `json:"createdAt,omitempty"`
-	// Last modification timestamp
-	ModifiedAt *int64 `json:"modifiedAt,omitempty"`
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
-	// Currently selected model
-	Model *ModelSelection `json:"model,omitempty"`
-	// Currently selected custom agent.
-	//
-	// Absent (`undefined`) means no custom agent is selected for this session
-	// — the session uses the provider's default behavior.
-	Agent *AgentSelection `json:"agent,omitempty"`
 	// The default working directory URI for this session. Individual chats
 	// MAY override via {@link ChatSummary.workingDirectory | their own
 	// `workingDirectory`}; this field acts as the fallback for any chat that
 	// does not.
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
-	// Aggregate summary of file changes associated with this session. Servers
-	// may populate this to give clients a quick at-a-glance view of the
-	// session's footprint (e.g., for list rendering) without requiring the
-	// client to subscribe to a changeset.
-	Changes *ChangesSummary `json:"changes,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
 	// does not expose an annotations channel.
 	Annotations *AnnotationsSummary `json:"annotations,omitempty"`
+	// Session URI
+	Resource *URI `json:"resource,omitempty"`
+	// Creation timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+	CreatedAt *string `json:"createdAt,omitempty"`
+	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+	ModifiedAt *string `json:"modifiedAt,omitempty"`
+	// Aggregate summary of file changes associated with this session. Servers
+	// may populate this to give clients a quick at-a-glance view of the
+	// session's footprint (e.g., for list rendering) without requiring the
+	// client to subscribe to a changeset.
+	Changes *ChangesSummary `json:"changes,omitempty"`
 	// Lightweight server-defined metadata clients may use for the session
 	// presentation. The protocol does not interpret these values; producers
 	// SHOULD keep the payload small because summaries appear in session lists

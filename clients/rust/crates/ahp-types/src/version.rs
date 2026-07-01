@@ -5,7 +5,7 @@
 #![allow(missing_docs)]
 
 /// Current protocol version (SemVer `MAJOR.MINOR.PATCH`).
-pub const PROTOCOL_VERSION: &str = "0.5.0";
+pub const PROTOCOL_VERSION: &str = "0.5.1";
 
 /// Every protocol version this crate is willing to negotiate, ordered
 /// most-preferred-first. The first entry equals [`PROTOCOL_VERSION`].
@@ -13,4 +13,4 @@ pub const PROTOCOL_VERSION: &str = "0.5.0";
 /// Consumers building `InitializeParams` should pass this slice (or a
 /// derived `Vec<String>`) so the same client binary can fall back to
 /// older protocol versions if the host doesn't accept the newest one.
-pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["0.5.0", "0.4.0", "0.3.0"];
+pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["0.5.1", "0.5.0"];

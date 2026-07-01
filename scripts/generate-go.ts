@@ -642,7 +642,7 @@ function generateDiscriminatedUnion(cfg: UnionConfig): string {
 const STATE_ENUMS = [
   'PolicyState', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
-  'ChatInputResponseKind',
+  'ChatInputResponseKind', 'SessionInputRequestKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason',
   'ConfirmationOptionKind', 'ToolCallContributorKind',
@@ -659,6 +659,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'RootState' },
   { name: 'RootConfigState' },
   { name: 'AgentInfo' },
+  { name: 'AgentCapabilities' },
+  { name: 'MultipleChatsCapability' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
   { name: 'AgentSelection' },
@@ -666,6 +668,9 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'ConfigSchema' },
   { name: 'SessionState' },
   { name: 'SessionActiveClient' },
+  { name: 'SessionChatInputRequest' },
+  { name: 'SessionToolConfirmationRequest' },
+  { name: 'SessionToolClientExecutionRequest' },
   { name: 'SessionSummary' },
   { name: 'ChangesSummary' },
   { name: 'ChatState' },
@@ -804,6 +809,17 @@ const TOOL_CALL_STATE_UNION: UnionConfig = {
     { variantName: 'PendingResultConfirmation', innerType: 'ToolCallPendingResultConfirmationState', wireValue: 'pending-result-confirmation' },
     { variantName: 'Completed', innerType: 'ToolCallCompletedState', wireValue: 'completed' },
     { variantName: 'Cancelled', innerType: 'ToolCallCancelledState', wireValue: 'cancelled' },
+  ],
+  unknown: true,
+};
+
+const TOOL_CALL_CONFIRMATION_STATE_UNION: UnionConfig = {
+  name: 'ToolCallConfirmationState',
+  discriminantField: 'status',
+  doc: 'ToolCallConfirmationState is a tool call blocked on parameter- or result-confirmation.',
+  variants: [
+    { variantName: 'PendingConfirmation', innerType: 'ToolCallPendingConfirmationState', wireValue: 'pending-confirmation' },
+    { variantName: 'PendingResultConfirmation', innerType: 'ToolCallPendingResultConfirmationState', wireValue: 'pending-result-confirmation' },
   ],
   unknown: true,
 };
@@ -985,6 +1001,18 @@ const CANVAS_REQUEST_OUTCOME_UNION: UnionConfig = {
   ],
 };
 
+const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
+  name: 'SessionInputRequest',
+  discriminantField: 'kind',
+  doc: 'SessionInputRequest is one outstanding piece of input a session is blocked on, aggregated across all chats.',
+  variants: [
+    { variantName: 'ChatInput', innerType: 'SessionChatInputRequest', wireValue: 'chatInput' },
+    { variantName: 'ToolConfirmation', innerType: 'SessionToolConfirmationRequest', wireValue: 'toolConfirmation' },
+    { variantName: 'ToolClientExecution', innerType: 'SessionToolClientExecutionRequest', wireValue: 'toolClientExecution' },
+  ],
+  unknown: true,
+};
+
 function generateChatOriginGo(): string {
   return `// ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
@@ -1115,13 +1143,13 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\treturn err
 \t}
 \tswitch {
-\tcase containsAll(probe, "summary", "lifecycle"):
+\tcase containsAll(probe, "lifecycle"):
 \t\tvar v SessionState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
 \t\t}
 \t\ts.Session = &v
-\tcase containsAll(probe, "summary", "turns"):
+\tcase containsAll(probe, "turns"):
 \t\tvar v ChatState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
@@ -1203,6 +1231,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_CALL_STATE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(TOOL_CALL_CONFIRMATION_STATE_UNION));
+  lines.push('');
   lines.push(generateDiscriminatedUnion(TERMINAL_CLAIM_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(TERMINAL_CONTENT_PART_UNION));
@@ -1230,6 +1260,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_OUTCOME_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
   lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
@@ -1268,18 +1300,18 @@ const ACTION_VARIANTS: {
   { type: 'chat/turnComplete', variantName: 'ChatTurnComplete', tsInterface: 'ChatTurnCompleteAction' },
   { type: 'chat/turnCancelled', variantName: 'ChatTurnCancelled', tsInterface: 'ChatTurnCancelledAction' },
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
+  { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
   { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
   { type: 'chat/pendingMessageSet', variantName: 'ChatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
+  { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
   { type: 'chat/truncated', variantName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
-  { type: 'session/modelChanged', variantName: 'SessionModelChanged', tsInterface: 'SessionModelChangedAction' },
-  { type: 'session/agentChanged', variantName: 'SessionAgentChanged', tsInterface: 'SessionAgentChangedAction' },
   { type: 'session/isReadChanged', variantName: 'SessionIsReadChanged', tsInterface: 'SessionIsReadChangedAction' },
   { type: 'session/isArchivedChanged', variantName: 'SessionIsArchivedChanged', tsInterface: 'SessionIsArchivedChangedAction' },
   { type: 'session/activityChanged', variantName: 'SessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
@@ -1287,6 +1319,8 @@ const ACTION_VARIANTS: {
   { type: 'session/serverToolsChanged', variantName: 'SessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
   { type: 'session/activeClientSet', variantName: 'SessionActiveClientSet', tsInterface: 'SessionActiveClientSetAction' },
   { type: 'session/activeClientRemoved', variantName: 'SessionActiveClientRemoved', tsInterface: 'SessionActiveClientRemovedAction' },
+  { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
+  { type: 'session/inputNeededRemoved', variantName: 'SessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
   { type: 'session/customizationsChanged', variantName: 'SessionCustomizationsChanged', tsInterface: 'SessionCustomizationsChangedAction' },
   { type: 'session/customizationToggled', variantName: 'SessionCustomizationToggled', tsInterface: 'SessionCustomizationToggledAction' },
   { type: 'session/customizationUpdated', variantName: 'SessionCustomizationUpdated', tsInterface: 'SessionCustomizationUpdatedAction' },
@@ -1436,7 +1470,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'ReconnectParams' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
-  { name: 'SubscribeParams' }, { name: 'SubscribeResult' },
+  { name: 'SubscribeParams' }, { name: 'SubscriptionDeliveryOptions' }, { name: 'SubscribeResult' },
   { name: 'SessionForkSource' }, { name: 'CreateSessionParams' },
   { name: 'DisposeSessionParams' },
   { name: 'ChatForkSource' }, { name: 'CreateChatParams' }, { name: 'DisposeChatParams' },
@@ -1926,6 +1960,7 @@ function checkExhaustiveness(project: Project): void {
     'ChatInputAnswer',
     'MessageAttachment',
     'MessageAttachmentBase',
+    'SessionMetadata',
     'Customization',
     'ChildCustomization',
     'ChildCustomizationType',
@@ -1934,6 +1969,8 @@ function checkExhaustiveness(project: Project): void {
     'ToolCallContributor',
     'CanvasRequestResult',
     'CanvasRequestOutcome',
+    'SessionInputRequest',
+    'ToolCallConfirmationState',
     'ReconnectResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',

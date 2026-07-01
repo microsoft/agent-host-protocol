@@ -65,8 +65,7 @@ class ReducersTest {
         val viaFn = sessionReducer(session, titleAction)
         val viaObj = SessionReducer.reduce(session, titleAction)
         assertEquals(viaFn, viaObj)
-        assertEquals("New Title", viaObj.summary.title)
-        assertEquals(MOCK_NOW, viaObj.summary.modifiedAt)
+        assertEquals("New Title", viaObj.title)
 
         // ChangesetReducer
         val cs = ChangesetState(status = ChangesetStatus.READY, files = emptyList())
@@ -212,13 +211,10 @@ class ReducersTest {
     @Test
     fun `currentTimestampProvider override flows through to reducer outputs`() {
         currentTimestampProvider = { 12345L }
-        val session = newSession()
-        val titleAction = StateActionSessionTitleChanged(
-            SessionTitleChangedAction(type = ActionType.SESSION_TITLE_CHANGED, title = "X"),
-        )
-        val result = sessionReducer(session, titleAction)
-        assertEquals(12345L, result.summary.modifiedAt)
 
+        // The chat reducer stamps `modifiedAt` from the injected timestamp
+        // provider. (The session reducer no longer stamps a timestamp — the
+        // host owns the root-channel summary's `modifiedAt`.)
         val chatResult = chatReducer(
             newChat(),
             StateActionChatTurnStarted(
@@ -235,7 +231,7 @@ class ReducersTest {
     @Test
     fun `actions from other channels are no-ops`() {
         // A root reducer should ignore session actions, and vice versa.
-        val session = newSession().copy(summary = newSession().summary.copy(title = "before"))
+        val session = newSession().copy(title = "before")
         val rootAction = StateActionRootAgentsChanged(
             RootAgentsChangedAction(type = ActionType.ROOT_AGENTS_CHANGED, agents = emptyList()),
         )
@@ -293,14 +289,9 @@ class ReducersTest {
     }
 
     private fun newSession(): SessionState = SessionState(
-        summary = SessionSummary(
-            resource = "ahp-session:/test",
-            provider = "copilot",
-            title = "Test",
-            status = SessionStatus.IDLE,
-            createdAt = 1000L,
-            modifiedAt = 1000L,
-        ),
+        provider = "copilot",
+        title = "Test",
+        status = SessionStatus.IDLE,
         lifecycle = SessionLifecycle.READY,
         activeClients = emptyList(),
         chats = emptyList(),

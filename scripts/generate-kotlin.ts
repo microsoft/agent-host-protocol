@@ -684,19 +684,22 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. SessionState has required
-        // \`summary\`; ChangesetState has required \`status\` + \`files\`;
-        // ResourceWatchState has required \`root\` + \`recursive\`;
-        // AnnotationsState has required \`annotations\`; TerminalState has \`uri\`
-        // / \`size\` / \`buffer\`; RootState is the catch-all.
+        // \`lifecycle\`; ChatState has required \`turns\`; ChangesetState has
+        // required \`status\` + \`files\`; ResourceWatchState has required
+        // \`root\` + \`recursive\`; AnnotationsState has required \`annotations\`
+        // (checked after session, whose optional annotations summary reuses the
+        // key); TerminalState has required \`content\`; RootState is the
+        // catch-all.
         return when {
-            obj.containsKey("summary") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
+            obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
+            obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
                 SnapshotState.Changeset(input.json.decodeFromJsonElement(ChangesetState.serializer(), element))
             obj.containsKey("root") && obj.containsKey("recursive") ->
                 SnapshotState.ResourceWatch(input.json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
             obj.containsKey("annotations") ->
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
-            obj.containsKey("size") || obj.containsKey("uri") || obj.containsKey("buffer") ->
+            obj.containsKey("content") ->
                 SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
             else -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
         }
@@ -783,7 +786,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
-  'ChatInputResponseKind',
+  'ChatInputResponseKind', 'SessionInputRequestKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason', 'ConfirmationOptionKind',
   'ToolCallContributorKind',
@@ -796,8 +799,11 @@ const STATE_ENUMS = [
 
 const STATE_STRUCTS = [
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
+  'AgentCapabilities',
+  'MultipleChatsCapability',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SessionState', 'SessionActiveClient',
+  'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'Turn', 'ActiveTurn', 'Message',
   'MessageOrigin',
   'ChatInputOption',
@@ -868,6 +874,16 @@ const TOOL_CALL_STATE_UNION: UnionConfig = {
     { caseName: 'PendingResultConfirmation', structName: 'ToolCallPendingResultConfirmationState', discriminantValue: 'pending-result-confirmation' },
     { caseName: 'Completed', structName: 'ToolCallCompletedState', discriminantValue: 'completed' },
     { caseName: 'Cancelled', structName: 'ToolCallCancelledState', discriminantValue: 'cancelled' },
+  ],
+  unknown: true,
+};
+
+const TOOL_CALL_CONFIRMATION_STATE_UNION: UnionConfig = {
+  name: 'ToolCallConfirmationState',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'PendingConfirmation', structName: 'ToolCallPendingConfirmationState', discriminantValue: 'pending-confirmation' },
+    { caseName: 'PendingResultConfirmation', structName: 'ToolCallPendingResultConfirmationState', discriminantValue: 'pending-result-confirmation' },
   ],
   unknown: true,
 };
@@ -1079,6 +1095,17 @@ const CANVAS_REQUEST_OUTCOME_UNION: UnionConfig = {
   ],
 };
 
+const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
+  name: 'SessionInputRequest',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'ChatInput', structName: 'SessionChatInputRequest', discriminantValue: 'chatInput' },
+    { caseName: 'ToolConfirmation', structName: 'SessionToolConfirmationRequest', discriminantValue: 'toolConfirmation' },
+    { caseName: 'ToolClientExecution', structName: 'SessionToolClientExecutionRequest', discriminantValue: 'toolClientExecution' },
+  ],
+  unknown: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1122,6 +1149,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(TOOL_CALL_STATE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(TOOL_CALL_CONFIRMATION_STATE_UNION));
+  lines.push('');
   lines.push(generateDiscriminatedUnion(TERMINAL_CLAIM_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(TERMINAL_CONTENT_PART_UNION));
@@ -1147,6 +1176,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_RESULT_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(CANVAS_REQUEST_OUTCOME_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -1180,11 +1211,10 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/turnComplete', caseName: 'ChatTurnComplete', tsInterface: 'ChatTurnCompleteAction' },
   { type: 'chat/turnCancelled', caseName: 'ChatTurnCancelled', tsInterface: 'ChatTurnCancelledAction' },
   { type: 'chat/error', caseName: 'ChatError', tsInterface: 'ChatErrorAction' },
+  { type: 'chat/activityChanged', caseName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
   { type: 'session/titleChanged', caseName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', caseName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
   { type: 'chat/reasoning', caseName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
-  { type: 'session/modelChanged', caseName: 'SessionModelChanged', tsInterface: 'SessionModelChangedAction' },
-  { type: 'session/agentChanged', caseName: 'SessionAgentChanged', tsInterface: 'SessionAgentChangedAction' },
   { type: 'session/isReadChanged', caseName: 'SessionIsReadChanged', tsInterface: 'SessionIsReadChangedAction' },
   { type: 'session/isArchivedChanged', caseName: 'SessionIsArchivedChanged', tsInterface: 'SessionIsArchivedChangedAction' },
   { type: 'session/activityChanged', caseName: 'SessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
@@ -1192,9 +1222,12 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/serverToolsChanged', caseName: 'SessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
   { type: 'session/activeClientSet', caseName: 'SessionActiveClientSet', tsInterface: 'SessionActiveClientSetAction' },
   { type: 'session/activeClientRemoved', caseName: 'SessionActiveClientRemoved', tsInterface: 'SessionActiveClientRemovedAction' },
+  { type: 'session/inputNeededSet', caseName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
+  { type: 'session/inputNeededRemoved', caseName: 'SessionInputNeededRemoved', tsInterface: 'SessionInputNeededRemovedAction' },
   { type: 'chat/pendingMessageSet', caseName: 'ChatPendingMessageSet', tsInterface: 'ChatPendingMessageSetAction' },
   { type: 'chat/pendingMessageRemoved', caseName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', caseName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
+  { type: 'chat/draftChanged', caseName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
   { type: 'chat/inputRequested', caseName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', caseName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', caseName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },
@@ -1402,7 +1435,7 @@ const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
   'ClientCapabilities',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
-  'SubscribeParams', 'SubscribeResult',
+  'SubscribeParams', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'SessionForkSource', 'CreateSessionParams', 'DisposeSessionParams',
   'ChatForkSource', 'CreateChatParams', 'DisposeChatParams',
   'ListSessionsParams', 'ListSessionsResult',
@@ -1906,12 +1939,15 @@ function checkExhaustiveness(project: Project): void {
     'ChatAction',                // source-only union covered by StateAction
     'MessageAttachment',            // MESSAGE_ATTACHMENT_UNION discriminated union
     'MessageAttachmentBase',        // base interface, flattened into the variant data classes via `extends`
+    'SessionMetadata',              // base interface, flattened into SessionState / SessionSummary via `extends`
     'Customization',                // CUSTOMIZATION_UNION discriminated union
     'ChildCustomization',           // CHILD_CUSTOMIZATION_UNION discriminated union
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
     'CanvasRequestResult',          // CANVAS_REQUEST_RESULT_UNION discriminated union
     'CanvasRequestOutcome',         // CANVAS_REQUEST_OUTCOME_UNION discriminated union
+    'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
+    'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ChildCustomizationType',       // TS subset alias of CustomizationType; consumers reuse CustomizationType
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()

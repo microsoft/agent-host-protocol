@@ -1,0 +1,34 @@
+{
+  "description": "session/inputNeededRemoved preserves orthogonal status flags (IsRead) when clearing the input-needed bit",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 56,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
+        "chat": "copilot:/test-session/chat-1",
+        "request": { "id": "req-1", "message": "Which environment?" }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededRemoved",
+      "id": "copilot:/test-session/chat-1#req-1"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 40,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  }
+}

@@ -31,7 +31,7 @@ use std::time::Duration;
 use ahp_types::actions::{ActionEnvelope, StateAction};
 use ahp_types::commands::{
     DispatchActionParams, InitializeParams, InitializeResult, ReconnectParams, ReconnectResult,
-    SubscribeParams, SubscribeResult, UnsubscribeParams,
+    SubscribeParams, SubscribeResult, SubscriptionDeliveryOptions, UnsubscribeParams,
 };
 use ahp_types::common::{Uri, ROOT_RESOURCE_URI};
 use ahp_types::messages::{
@@ -391,9 +391,25 @@ impl Client {
         &self,
         uri: String,
     ) -> Result<(SubscribeResult, SessionSubscription), ClientError> {
+        self.subscribe_with_delivery(uri, None).await
+    }
+
+    /// Subscribe to a URI with advisory delivery preferences and obtain a
+    /// handle that streams [`SubscriptionEvent`]s for that channel.
+    pub async fn subscribe_with_delivery(
+        &self,
+        uri: String,
+        delivery: Option<SubscriptionDeliveryOptions>,
+    ) -> Result<(SubscribeResult, SessionSubscription), ClientError> {
         let sub = self.attach_subscription(&uri).await;
         let result: SubscribeResult = self
-            .request("subscribe", SubscribeParams { channel: uri })
+            .request(
+                "subscribe",
+                SubscribeParams {
+                    channel: uri,
+                    delivery,
+                },
+            )
             .await?;
         Ok((result, sub))
     }

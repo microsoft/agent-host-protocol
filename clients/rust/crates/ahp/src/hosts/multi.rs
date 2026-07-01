@@ -475,7 +475,7 @@ impl MultiHostClient {
         // Sort by `modified_at` descending. `sort_by_key` requires a
         // total order on the key, which `Reverse` provides while
         // preserving the insertion order for equal keys.
-        out.sort_by_key(|item| std::cmp::Reverse(item.summary.modified_at));
+        out.sort_by_key(|item| std::cmp::Reverse(item.summary.modified_at.clone()));
         out
     }
 

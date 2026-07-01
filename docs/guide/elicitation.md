@@ -37,7 +37,7 @@ Because drafts live in session state, a user can answer one question on client A
 
 ## Status And Cleanup
 
-While any input request is open, `summary.status` is `SessionStatus.InputNeeded`. When the last request is completed and the turn is still active, status returns to `SessionStatus.InProgress`.
+While any input request is open, `status` is `SessionStatus.InputNeeded`. When the last request is completed and the turn is still active, status returns to `SessionStatus.InProgress`.
 
 If the active turn completes, is cancelled, errors, or is truncated before input completes, the server SHOULD consider outstanding input requests abandoned. The reducer removes outstanding requests.
 

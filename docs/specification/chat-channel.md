@@ -14,7 +14,13 @@ Multiple chat channels may be active simultaneously. Clients subscribe to each c
 
 ## State
 
-Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` **denormalizes** the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `model`, `agent`, `origin`, `workingDirectory`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests). Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectory`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)). Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+
+### Drafts
+
+[`ChatState.draft`](/reference/chat#chatstate) is the user's in-progress input for a chat — the [`Message`](/reference/chat#message) they are composing but have not sent yet, including its model/agent selection and attachments. Unlike the fields above, `draft` is state-only and is **not** mirrored onto [`ChatSummary`](/reference/chat#chatsummary).
+
+Clients MAY periodically sync their local input state into the draft by dispatching [`chat/draftChanged`](/reference/chat#actions). Eager syncing is not required — clients SHOULD debounce and MAY sync only at convenient points (for example, on blur). When presenting input UI for an existing chat, clients SHOULD use any `draft` to initialize their input state. Dispatch `chat/draftChanged` with no `draft` to clear it once the message is sent.
 
 ### Per-chat working directory
 
@@ -40,8 +46,7 @@ Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatSt
 
 [`createChat`](/reference/chat#createchat) is a JSON-RPC request. Callers identify the owning session via the request's `channel` parameter (`ahp-session:/<sid>`) and MAY supply:
 
-- an `initialMessage` to start the first turn immediately,
-- per-chat `agent` / `model` / `config` overrides that win over the session defaults, and
+- an `initialMessage` to start the first turn immediately — carrying its own [`model`](/reference/chat#message) / [`agent`](/reference/chat#message) selection — and
 - a `source` of type [`ChatForkSource`](/reference/chat#chatforksource) to fork from an existing chat at a specific turn.
 
 The server allocates the chat URI and adds the chat to the session's catalog (`session/chatAdded` on the session channel) before returning.

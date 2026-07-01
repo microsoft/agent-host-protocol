@@ -19,6 +19,41 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Added
 
+- `SubscribeParams.delivery.maxLatencyMs` and
+  `AHPClient.subscribe(_:delivery:)` for clients to request a maximum
+  subscription delivery latency, including `0` for no intentional coalescing.
+- Optional `capabilities` field on `AgentInfo` (`AgentCapabilities` with a
+  nested `multipleChats` capability carrying `fork`) so clients gate multi-chat
+  and fork via advertised capabilities instead of provider-id switches.
+- `SessionState.inputNeeded` — a session-level aggregate of outstanding input
+  requests across all chats (`SessionInputRequest` enum with
+  `SessionChatInputRequest`, `SessionToolConfirmationRequest`, and
+  `SessionToolClientExecutionRequest` cases), plus the
+  `StateAction.sessionInputNeededSet` / `StateAction.sessionInputNeededRemoved`
+  actions and the `ToolCallConfirmationState` union. The session reducer
+  maintains the `SessionStatus.inputNeeded` activity bit from the queue,
+  clearing it (falling back to `.inProgress`) when the last entry is removed.
+- Optional `intention` field on `ChatToolCallStartAction` and every tool-call
+  lifecycle state.
+- Optional `model` and `tools` fields on `AgentCustomization` for a custom
+  agent's pinned model and tool allowlist.
+
+### Fixed
+
+- `SnapshotState` now decodes the `chat` variant. Its decoder previously never
+  attempted `ChatState`, so chat snapshots failed to decode. Variant
+  disambiguation also no longer relies on the removed `summary` field (a leftover
+  from before `SessionState` was flattened).
+
+## [0.5.0] — 2026-06-26
+
+Implements AHP 0.5.0.
+
+### Added
+
+- `ChatActivityChangedAction` (`StateAction.chatActivityChanged`, wire
+  `chat/activityChanged`) for updating a chat's current activity description
+  independently of the session summary.
 - `ProgressParams` struct (wire `root/progress`) — a generic progress notification
   correlated by a `progressToken` (added on `CreateSessionParams`).
   Used today for the lazy first-use download of an agent's native SDK.
@@ -31,6 +66,12 @@ the tag matches the version pinned in [`VERSION`](VERSION).
   `clientId`.
 - Canvas surface — `SessionState.canvasRegistry`, `SessionState.openCanvases`, and `SessionState.canvasRequests`, plus `SessionActiveClient.canvasProviders` and `SessionActiveClient.canRenderCanvases`, for declared, instanced, agent-openable UI surfaces.
 - Eight canvas actions (wire `session/canvas*`): `StateAction.sessionCanvasRegistryChanged`, `.sessionCanvasInstanceOpened`, `.sessionCanvasInstanceUpdated`, `.sessionCanvasInstanceClosed`, `.sessionCanvasInstanceCloseRequested`, `.sessionCanvasRequestCreated`, `.sessionCanvasRequestCompleted`, and `.sessionCanvasRequestCancelled`, applied by the session reducer.
+- `ChatDraftChangedAction` (`StateAction.chatDraftChanged`, wire
+  `chat/draftChanged`) and `ChatState.draft` (`Message?`) to set or clear the
+  user's in-progress draft input for a chat. The chat reducer applies it
+  without stamping `modifiedAt`.
+- `Message.model` and `Message.agent` optional fields carrying the selection a
+  message was composed with.
 
 ### Changed
 
@@ -45,12 +86,23 @@ the tag matches the version pinned in [`VERSION`](VERSION).
   `[String]?`, allowing numeric, boolean, and null enum values.
 - `ModelSelection.config` values are now `AnyCodable` instead of `String`,
   allowing numeric, boolean, and null configuration values.
+- `SessionState` now inlines the session metadata fields (`provider`, `title`,
+  `status`, `activity`, `project`, `workingDirectory`, `annotations`) directly
+  instead of embedding a `summary: SessionSummary`. The session reducer mutates
+  these fields directly and no longer stamps a `modifiedAt`. `SessionSummary`
+  remains a root-only catalog struct whose `createdAt`/`modifiedAt` are now
+  ISO-8601 `String`s and which no longer carries `model`/`agent`.
+- `ChatState` and `ChatSummary` no longer carry `model`/`agent`.
 
 ### Removed
 
 - `SessionActiveClientToolsChangedAction`. An active client now updates its
   published tools by re-dispatching `StateAction.sessionActiveClientSet` with its
   full, updated entry.
+- `SessionModelChangedAction` (`StateAction.sessionModelChanged`,
+  `session/modelChanged`) and `SessionAgentChangedAction`
+  (`StateAction.sessionAgentChanged`, `session/agentChanged`), along with their
+  session-reducer handling.
 
 ## [0.4.0] — 2026-06-19
 

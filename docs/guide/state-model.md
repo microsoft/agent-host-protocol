@@ -55,7 +55,7 @@ ConfigPropertySchema {
 }
 ```
 
-When a model has a `configSchema`, clients present it as a form and pass the resolved values in a `ModelSelection` (see [Session Summary](#session-summary)).
+When a model has a `configSchema`, clients present it as a form and pass the resolved values in a `ModelSelection` (carried on each [`Message`](#user-messages)).
 
 `_meta` carries additional provider-specific metadata. Clients MAY look for well-known keys here to provide enhanced UI — for example, a `pricing` key may carry model pricing metadata.
 
@@ -67,15 +67,27 @@ Subscribable on a [Session Channel](/specification/session-channel) at `ahp-sess
 
 ```typescript
 SessionState {
-  summary: SessionSummary
+  // Session metadata, inlined directly (mirrored into the root-channel SessionSummary)
+  provider: string
+  title: string
+  status: number        // SessionStatus bitset
+  activity?: string
+  project?: ProjectInfo
+  workingDirectory?: URI
+  annotations?: AnnotationsSummary
+
   lifecycle: 'creating' | 'ready' | 'creationFailed'
   creationError?: ErrorInfo
-  turns: Turn[]
-  activeTurn: ActiveTurn | undefined
-  inputRequests?: SessionInputRequest[]
-  customizations?: SessionCustomization[]  // active session plugins
+  chats: ChatSummary[]                     // catalog of chats in this session
+  defaultChat?: URI                        // input-routing hint
+  activeClients: SessionActiveClient[]
+  customizations?: Customization[]         // active session plugins
+  changesets?: Changeset[]
+  config?: SessionConfigState
 }
 ```
+
+The session metadata fields above are inlined onto `SessionState`. The same fields are mirrored into the lightweight [`SessionSummary`](#session-summary) catalog entry on the root channel; the host keeps the two in sync via periodic `root/sessionSummaryChanged`.
 
 ### Lifecycle
 
@@ -92,16 +104,12 @@ SessionSummary {
   title: string
   status: number  // SessionStatus bitset
   activity?: string
-  createdAt: number
-  modifiedAt: number
+  createdAt: string   // ISO 8601, e.g. "2025-03-10T18:42:03.123Z"
+  modifiedAt: string  // ISO 8601
   project?: ProjectInfo
-  model?: ModelSelection
   workingDirectory?: URI
-}
-
-ModelSelection {
-  id: string                             // model ID
-  config?: Record<string, string>        // model-specific config values
+  annotations?: AnnotationsSummary
+  changes?: ChangesSummary
 }
 
 ProjectInfo {
@@ -114,7 +122,7 @@ The `status` bitset encodes both the session's activity state and metadata flags
 
 ### Session Status Bitset
 
-`summary.status` is a numeric bitset. Clients SHOULD use bitwise checks instead of string or equality checks for activity states:
+`status` is a numeric bitset. Clients SHOULD use bitwise checks instead of string or equality checks for activity states:
 
 | Name                        | Value | Bits                   | Meaning                                                                                                                                                                               |
 | --------------------------- | ----: | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -166,7 +174,18 @@ Message {
   text: string
   origin: { kind: MessageKind }
   attachments?: MessageAttachment[]
+  model?: ModelSelection   // selection this message was/will-be sent with
+  agent?: AgentSelection   // custom agent this message was/will-be sent with
   _meta?: Record<string, unknown>  // provider-specific metadata; see below
+}
+
+ModelSelection {
+  id: string                             // model ID
+  config?: Record<string, string>        // model-specific config values
+}
+
+AgentSelection {
+  uri: URI                               // stable custom-agent URI
 }
 
 type MessageAttachment =
@@ -200,6 +219,8 @@ MessageResourceAttachment {
 ```
 
 A message's `origin.kind` records who produced the message: `user` for a direct user message, `agent` for one the agent produces itself, `tool` for one a tool produces (for example, seeding the first message of a worker chat it spawned), and `systemNotification` for a system-generated notification. For the message that initiates a turn this is also the origin of the turn; for steering or queued messages it is just the origin of that message. A client is only allowed to send `user` messages.
+
+A message's optional `model` / `agent` record the selection it was, or will be, sent with. For historic turns this is the selection actually used, so a client editing or resending a message can retain it; when omitted, the agent host's default applies. A chat also exposes a `draft`: the [`Message`](#user-messages) the user is composing but has not sent yet (including its `model` / `agent`). Clients MAY periodically sync their input state into `draft` via `chat/draftChanged` (debounced, not eager) and SHOULD initialize input UI for an existing chat from any present `draft`.
 
 Attachments MAY be referenced inline by `text` via the optional `range` field, which points at a span in the message text. This is a text range, not a byte range. Attachments without a range are still associated with the message but are not anchored to a specific span.
 
@@ -380,7 +401,7 @@ The session list can be arbitrarily large and is **not** part of the state tree.
 - Clients fetch the list imperatively via `listSessions()` RPC.
 - The server sends lightweight **notifications** to keep connected clients' caches in sync without re-fetching:
   - `root/sessionAdded` and `root/sessionRemoved` signal lifecycle (creation and disposal).
-  - `root/sessionSummaryChanged` streams partial updates to an existing session's summary (title, status, `modifiedAt`, project, model, working directory) so clients that are displaying a session list can stay in sync without subscribing to every session URI individually. Only fields present in `changes` carry new values; omitted fields are unchanged. The server SHOULD emit this notification whenever any mutable summary field changes, and MAY coalesce or debounce noisy updates (for example, rapid `modifiedAt` bumps while a turn is streaming) at its discretion.
+  - `root/sessionSummaryChanged` streams partial updates to an existing session's summary (title, status, `modifiedAt`, project, working directory) so clients that are displaying a session list can stay in sync without subscribing to every session URI individually. Only fields present in `changes` carry new values; omitted fields are unchanged. The server SHOULD emit this notification whenever any mutable summary field changes, and MAY coalesce or debounce noisy updates (for example, rapid `modifiedAt` bumps while a turn is streaming) at its discretion.
 
 Notifications are ephemeral — not processed by reducers, not stored in state, not replayed on reconnect. On reconnect, clients re-fetch the list.
 

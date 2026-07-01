@@ -87,16 +87,17 @@ SessionStatus.IDLE in combined   // true
 
 ## Distribution
 
-Artifacts are published to Maven Central (Sonatype Central Portal) via Microsoft's ESRP-backed `vscode-engineering` `maven-package` pipeline template on `kotlin/v*` git tags. The [`gradle-maven-publish-plugin`](https://github.com/vanniktech/gradle-maven-publish-plugin) (v0.36+) is used to stage the artifacts into a local Maven repository layout that ESRP then signs and uploads.
+Artifacts are published to Maven Central (Sonatype Central Portal) via Microsoft's ESRP-backed `vscode-engineering` `maven-package` pipeline template on `kotlin/v*` git tags. The [`gradle-maven-publish-plugin`](https://github.com/vanniktech/gradle-maven-publish-plugin) (v0.36+) is used to stage and GPG-sign the artifacts into a local Maven repository layout that ESRP then uploads.
 
-The release pipeline ([`clients/kotlin/pipeline.yml`](pipeline.yml)) is an Azure DevOps pipeline (GitHub Actions cannot trigger ADO in this repo — PATs are not permitted):
+The release pipeline ([`clients/kotlin/pipeline.yml`](pipeline.yml)) is an Azure DevOps pipeline (GitHub Actions cannot trigger ADO in this repo — PATs are not permitted). Its repo-specific `buildSteps` cover validation and build; **staging + GPG signing are owned by the `maven-package` template** (common infrastructure — Maven Central always requires PGP signatures):
 
-1. **Tag validation** — verifies the `kotlin/vX.Y.Z` tag matches `gradle.properties` `VERSION_NAME`, that the version is not `-SNAPSHOT`, and that `CHANGELOG.md` has a matching `## [X.Y.Z]` heading.
-2. **Generator + Gradle check** — re-runs `npm run generate:kotlin` (fails on diff) and `./gradlew check`.
-3. **Stage** — `./gradlew -Pahp.signPublications=false publishAllPublicationsToStagingRepository` writes a Maven layout to `build/maven-staging/`. Local PGP signing is skipped because ESRP signs server-side.
-4. **ESRP publish** — the `maven-package` template hands the staging folder to ESRP (`contenttype: maven`), which signs and uploads to Maven Central via the Sonatype Central Portal.
+1. **Tag validation** (buildStep) — verifies the `kotlin/vX.Y.Z` tag matches `gradle.properties` `VERSION_NAME`, that the version is not `-SNAPSHOT`, and that `CHANGELOG.md` has a matching `## [X.Y.Z]` heading.
+2. **Generator + Gradle check** (buildSteps) — re-runs `npm run generate:kotlin` (fails on diff) and `./gradlew check`.
+3. **Fetch GPG key** (template) — `AzureKeyVault@2` pulls `maven-gpg-private-key` and `maven-gpg-passphrase` from the `vscode` Key Vault (the template's `signingKeyVault*` / `gpg*SecretName` defaults).
+4. **Stage & sign** (template) — the default `mavenStagingCommand` (`./gradlew publishAllPublicationsToStagingRepository …`) writes a Maven layout to `build/maven-staging/`, signing every artifact (`.asc`) with the in-memory GPG key (`ORG_GRADLE_PROJECT_signingInMemoryKey*`) and emitting `.md5`/`.sha1` checksums. `build.gradle.kts` signs by default (`ahp.signPublications` defaults to true). Maven Central requires these PGP signatures, and the ESRP Release `maven` content type does **not** generate them — so the template signs here.
+5. **ESRP publish** (template) — the signed staging folder is handed to ESRP (`contenttype: maven`), which uploads it to Maven Central via the Sonatype Central Portal.
 
-No GitHub-side secrets are required — ESRP credentials live inside the Microsoft ADO tenant.
+No GitHub-side secrets are required — both the ESRP credentials and the GPG signing key live inside the Microsoft ADO tenant (the latter in the `vscode` Key Vault). The matching GPG **public** key must be published to a keyserver so Maven Central can validate the signatures.
 
 ### Cutting a release
 

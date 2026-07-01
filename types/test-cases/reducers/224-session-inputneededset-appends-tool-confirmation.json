@@ -1,0 +1,69 @@
+{
+  "description": "session/inputNeededSet appends a tool-confirmation request to an existing inputNeeded list and keeps status InputNeeded",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
+        "chat": "copilot:/test-session/chat-1",
+        "request": { "id": "req-1", "message": "Which environment?" }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededSet",
+      "request": {
+        "kind": "toolConfirmation",
+        "id": "copilot:/test-session/chat-1#call-9",
+        "chat": "copilot:/test-session/chat-1",
+        "turnId": "turn-1",
+        "toolCall": {
+          "status": "pending-confirmation",
+          "toolCallId": "call-9",
+          "toolName": "write_file",
+          "displayName": "Write File",
+          "invocationMessage": "Write config.json",
+          "confirmationTitle": "Write file"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 24,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "inputNeeded": [
+      {
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
+        "chat": "copilot:/test-session/chat-1",
+        "request": { "id": "req-1", "message": "Which environment?" }
+      },
+      {
+        "kind": "toolConfirmation",
+        "id": "copilot:/test-session/chat-1#call-9",
+        "chat": "copilot:/test-session/chat-1",
+        "turnId": "turn-1",
+        "toolCall": {
+          "status": "pending-confirmation",
+          "toolCallId": "call-9",
+          "toolName": "write_file",
+          "displayName": "Write File",
+          "invocationMessage": "Write config.json",
+          "confirmationTitle": "Write file"
+        }
+      }
+    ]
+  }
+}

@@ -70,6 +70,18 @@ func withStatusFlag(status, flag ahptypes.SessionStatus, set bool) ahptypes.Sess
 	return status &^ flag
 }
 
+// withInputNeededStatus reflects the session-level input queue into the activity
+// bits of status. A non-empty queue promotes the activity to InputNeeded;
+// emptying it clears the input-needed-specific bit. Because InputNeeded implies
+// InProgress, an unblocked turn falls back to InProgress while an already-idle
+// session stays idle. Orthogonal flags (IsRead / IsArchived) are preserved.
+func withInputNeededStatus(status ahptypes.SessionStatus, inputNeeded []ahptypes.SessionInputRequest) ahptypes.SessionStatus {
+	if len(inputNeeded) == 0 {
+		return status &^ (ahptypes.SessionStatusInputNeeded &^ ahptypes.SessionStatusInProgress)
+	}
+	return (status &^ statusActivityMask) | ahptypes.SessionStatusInputNeeded
+}
+
 // ─── Tool-call helpers ─────────────────────────────────────────────────
 
 // toolCallCommon carries the fields shared by every concrete
@@ -78,6 +90,7 @@ type toolCallCommon struct {
 	id          string
 	name        string
 	displayName string
+	intention   *string
 	contributor *ahptypes.ToolCallContributor
 	meta        ahptypes.JSONObject
 }
@@ -85,17 +98,17 @@ type toolCallCommon struct {
 func toolCallMeta(tc ahptypes.ToolCallState) toolCallCommon {
 	switch v := tc.Value.(type) {
 	case *ahptypes.ToolCallStreamingState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallPendingConfirmationState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallRunningState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallPendingResultConfirmationState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallCompletedState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallCancelledState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
 	}
 	return toolCallCommon{}
 }
@@ -162,10 +175,6 @@ func refreshSummaryStatus(state *ahptypes.ChatState) {
 	state.Status = summaryStatus(state, nil)
 }
 
-func touchSessionModified(state *ahptypes.SessionState) {
-	state.Summary.ModifiedAt = nowMs()
-}
-
 func touchChatModified(state *ahptypes.ChatState) {
 	state.ModifiedAt = nowISOString()
 }
@@ -198,6 +207,7 @@ func endTurn(state *ahptypes.ChatState, turnID string, turnState ahptypes.TurnSt
 			ToolCallId:        common.id,
 			ToolName:          common.name,
 			DisplayName:       common.displayName,
+			Intention:         common.intention,
 			Contributor:       common.contributor,
 			Meta:              common.meta,
 			InvocationMessage: invocation,
@@ -258,6 +268,18 @@ func customizationID(c ahptypes.Customization) (string, bool) {
 	case *ahptypes.DirectoryCustomization:
 		return v.Id, true
 	case *ahptypes.McpServerCustomization:
+		return v.Id, true
+	}
+	return "", false
+}
+
+func sessionInputRequestID(r ahptypes.SessionInputRequest) (string, bool) {
+	switch v := r.Value.(type) {
+	case *ahptypes.SessionChatInputRequest:
+		return v.Id, true
+	case *ahptypes.SessionToolConfirmationRequest:
+		return v.Id, true
+	case *ahptypes.SessionToolClientExecutionRequest:
 		return v.Id, true
 	}
 	return "", false
@@ -419,6 +441,9 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		errCopy := a.Error
 		errStatus := ahptypes.SessionStatusError
 		return endTurn(state, a.TurnId, ahptypes.TurnStateError, &errStatus, &errCopy)
+	case *ahptypes.ChatActivityChangedAction:
+		state.Activity = a.Activity
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatToolCallStartAction:
 		if state.ActiveTurn == nil || state.ActiveTurn.Id != a.TurnId {
 			return ReduceOutcomeNoOp
@@ -430,6 +455,7 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 				ToolCallId:  a.ToolCallId,
 				ToolName:    a.ToolName,
 				DisplayName: a.DisplayName,
+				Intention:   a.Intention,
 				Contributor: a.Contributor,
 				Meta:        a.Meta,
 			}},
@@ -599,6 +625,9 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		}
 		state.QueuedMessages = reordered
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatDraftChangedAction:
+		state.Draft = a.Draft
+		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
 }
@@ -615,12 +644,6 @@ func mergeChatSummaryPartial(summary *ahptypes.ChatSummary, changes ahptypes.Par
 	}
 	if changes.ModifiedAt != nil {
 		summary.ModifiedAt = *changes.ModifiedAt
-	}
-	if changes.Model != nil {
-		summary.Model = changes.Model
-	}
-	if changes.Agent != nil {
-		summary.Agent = changes.Agent
 	}
 	if changes.Origin != nil {
 		summary.Origin = changes.Origin
@@ -677,26 +700,16 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		state.DefaultChat = a.DefaultChat
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionTitleChangedAction:
-		state.Summary.Title = a.Title
-		touchSessionModified(state)
-		return ReduceOutcomeApplied
-	case *ahptypes.SessionModelChangedAction:
-		model := a.Model
-		state.Summary.Model = &model
-		touchSessionModified(state)
-		return ReduceOutcomeApplied
-	case *ahptypes.SessionAgentChangedAction:
-		state.Summary.Agent = a.Agent
-		touchSessionModified(state)
+		state.Title = a.Title
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionIsReadChangedAction:
-		state.Summary.Status = withStatusFlag(state.Summary.Status, ahptypes.SessionStatusIsRead, a.IsRead)
+		state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsRead, a.IsRead)
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionIsArchivedChangedAction:
-		state.Summary.Status = withStatusFlag(state.Summary.Status, ahptypes.SessionStatusIsArchived, a.IsArchived)
+		state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsArchived, a.IsArchived)
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionActivityChangedAction:
-		state.Summary.Activity = a.Activity
+		state.Activity = a.Activity
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionChangesetsChangedAction:
 		if a.Changesets == nil {
@@ -718,7 +731,6 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		for k, v := range a.Config {
 			state.Config.Values[k] = v
 		}
-		touchSessionModified(state)
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionMetaChangedAction:
 		state.Meta = a.Meta
@@ -739,6 +751,33 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		for i := range state.ActiveClients {
 			if state.ActiveClients[i].ClientId == a.ClientId {
 				state.ActiveClients = append(state.ActiveClients[:i], state.ActiveClients[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.SessionInputNeededSetAction:
+		id, ok := sessionInputRequestID(a.Request)
+		if !ok {
+			return ReduceOutcomeNoOp
+		}
+		for i := range state.InputNeeded {
+			if got, ok := sessionInputRequestID(state.InputNeeded[i]); ok && got == id {
+				state.InputNeeded[i] = a.Request
+				state.Status = withInputNeededStatus(state.Status, state.InputNeeded)
+				return ReduceOutcomeApplied
+			}
+		}
+		state.InputNeeded = append(state.InputNeeded, a.Request)
+		state.Status = withInputNeededStatus(state.Status, state.InputNeeded)
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionInputNeededRemovedAction:
+		for i := range state.InputNeeded {
+			if got, ok := sessionInputRequestID(state.InputNeeded[i]); ok && got == a.Id {
+				state.InputNeeded = append(state.InputNeeded[:i], state.InputNeeded[i+1:]...)
+				if len(state.InputNeeded) == 0 {
+					state.InputNeeded = nil
+				}
+				state.Status = withInputNeededStatus(state.Status, state.InputNeeded)
 				return ReduceOutcomeApplied
 			}
 		}
@@ -1005,6 +1044,7 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 					ToolCallId:        common.id,
 					ToolName:          common.name,
 					DisplayName:       common.displayName,
+					Intention:         common.intention,
 					Contributor:       common.contributor,
 					Meta:              common.meta,
 					InvocationMessage: a.InvocationMessage,
@@ -1017,6 +1057,7 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 				ToolCallId:        common.id,
 				ToolName:          common.name,
 				DisplayName:       common.displayName,
+				Intention:         common.intention,
 				Contributor:       common.contributor,
 				Meta:              common.meta,
 				InvocationMessage: a.InvocationMessage,
@@ -1069,6 +1110,7 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 				ToolCallId:        s.ToolCallId,
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
+				Intention:         s.Intention,
 				Contributor:       s.Contributor,
 				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
@@ -1090,6 +1132,7 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 			ToolCallId:        s.ToolCallId,
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
+			Intention:         s.Intention,
 			Contributor:       s.Contributor,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
@@ -1133,6 +1176,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 				ToolCallId:        common.id,
 				ToolName:          common.name,
 				DisplayName:       common.displayName,
+				Intention:         common.intention,
 				Contributor:       common.contributor,
 				Meta:              common.meta,
 				InvocationMessage: invocation,
@@ -1151,6 +1195,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			ToolCallId:        common.id,
 			ToolName:          common.name,
 			DisplayName:       common.displayName,
+			Intention:         common.intention,
 			Contributor:       common.contributor,
 			Meta:              common.meta,
 			InvocationMessage: invocation,
@@ -1182,6 +1227,7 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 				ToolCallId:        s.ToolCallId,
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
+				Intention:         s.Intention,
 				Contributor:       s.Contributor,
 				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
@@ -1204,6 +1250,7 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 			ToolCallId:        s.ToolCallId,
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
+			Intention:         s.Intention,
 			Contributor:       s.Contributor,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,

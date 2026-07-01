@@ -254,7 +254,26 @@ data class SubscribeParams(
     /**
      * Channel URI this command targets.
      */
-    val channel: String
+    val channel: String,
+    /**
+     * Optional delivery preferences for this subscription.
+     *
+     * Servers MAY use these preferences to buffer and coalesce high-frequency
+     * updates while preserving the same reduced state. Omit this field for the
+     * server's default delivery behavior.
+     */
+    val delivery: SubscriptionDeliveryOptions? = null
+)
+
+@Serializable
+data class SubscriptionDeliveryOptions(
+    /**
+     * Maximum time, in milliseconds, that the server may intentionally delay
+     * delivery while buffering/coalescing updates for this subscription.
+     *
+     * A value of `0` requests immediate delivery with no intentional coalescing.
+     */
+    val maxLatencyMs: Long? = null
 )
 
 @Serializable
@@ -287,16 +306,6 @@ data class CreateSessionParams(
      * Agent provider ID
      */
     val provider: String? = null,
-    /**
-     * Model selection (ID and optional model-specific configuration)
-     */
-    val model: ModelSelection? = null,
-    /**
-     * Initial custom agent selection for the new session.
-     *
-     * Omit to start the session with no custom agent selected (provider default).
-     */
-    val agent: AgentSelection? = null,
     /**
      * Working directory for the session
      */
@@ -369,14 +378,6 @@ data class CreateChatParams(
      * Optional initial message for the new chat.
      */
     val initialMessage: Message? = null,
-    /**
-     * Optional per-chat model override.
-     */
-    val model: ModelSelection? = null,
-    /**
-     * Optional per-chat agent override.
-     */
-    val agent: AgentSelection? = null,
     /**
      * Optional source chat and turn to fork from.
      */

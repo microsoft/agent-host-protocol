@@ -308,12 +308,15 @@ public actor AHPClient {
     /// If the request fails (RPC error, timeout, transport drop), the local
     /// listener is removed and its stream finished — callers don't need to
     /// clean up the partially-attached subscription.
-    public func subscribe(_ uri: String) async throws -> (SubscribeResult, AsyncStream<SubscriptionEvent>) {
+    public func subscribe(
+        _ uri: String,
+        delivery: SubscriptionDeliveryOptions? = nil
+    ) async throws -> (SubscribeResult, AsyncStream<SubscriptionEvent>) {
         let (stream, listenerId) = attachSubscriptionInternal(uri)
         do {
             let result: SubscribeResult = try await request(
                 method: "subscribe",
-                params: SubscribeParams(channel: uri)
+                params: SubscribeParams(channel: uri, delivery: delivery)
             )
             return (result, stream)
         } catch {

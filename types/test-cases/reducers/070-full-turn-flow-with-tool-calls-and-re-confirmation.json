@@ -163,6 +163,7 @@
               "toolCallId": "tc1",
               "toolName": "edit",
               "displayName": "Edit File",
+              "intention": null,
               "contributor": null,
               "_meta": null,
               "invocationMessage": "Edit main.ts",
@@ -179,6 +180,7 @@
               "toolCallId": "tc2",
               "toolName": "write",
               "displayName": "Write File",
+              "intention": null,
               "contributor": null,
               "_meta": {
                 "permissionKind": "write",

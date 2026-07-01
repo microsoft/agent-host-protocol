@@ -26,6 +26,7 @@ fn agent(provider: &str) -> AgentInfo {
         models: vec![],
         protected_resources: None,
         customizations: None,
+        capabilities: None,
     }
 }
 
@@ -43,24 +44,15 @@ fn root_snapshot(agents: Vec<AgentInfo>) -> Snapshot {
     }
 }
 
-fn session_state(title: &str, resource: &str) -> SessionState {
+fn session_state(title: &str, _resource: &str) -> SessionState {
     SessionState {
-        summary: SessionSummary {
-            resource: resource.into(),
-            provider: "copilot".into(),
-            title: title.into(),
-            status: SessionStatus::Idle.bits(),
-            activity: None,
-            created_at: 0,
-            modified_at: 0,
-            project: None,
-            model: None,
-            agent: None,
-            working_directory: None,
-            changes: None,
-            annotations: None,
-            meta: None,
-        },
+        provider: "copilot".into(),
+        title: title.into(),
+        status: SessionStatus::Idle.bits(),
+        activity: None,
+        project: None,
+        working_directory: None,
+        annotations: None,
         lifecycle: SessionLifecycle::Ready,
         creation_error: None,
         server_tools: None,
@@ -73,6 +65,7 @@ fn session_state(title: &str, resource: &str) -> SessionState {
         open_canvases: None,
         canvas_requests: None,
         changesets: None,
+        input_needed: None,
         meta: None,
     }
 }
@@ -139,7 +132,7 @@ fn session_uri_collision_across_hosts_does_not_clobber() {
                 HostId::new("alpha"),
                 "ahp-session:/s1"
             ))
-            .map(|s| s.summary.title.as_str()),
+            .map(|s| s.title.as_str()),
         Some("A title")
     );
     assert_eq!(
@@ -148,7 +141,7 @@ fn session_uri_collision_across_hosts_does_not_clobber() {
                 HostId::new("beta"),
                 "ahp-session:/s1"
             ))
-            .map(|s| s.summary.title.as_str()),
+            .map(|s| s.title.as_str()),
         Some("B title")
     );
 }
@@ -210,7 +203,7 @@ fn apply_session_action_updates_only_the_target_session() {
                 HostId::new("alpha"),
                 "ahp-session:/s1"
             ))
-            .map(|s| s.summary.title.as_str()),
+            .map(|s| s.title.as_str()),
         Some("New on alpha")
     );
     assert_eq!(
@@ -219,7 +212,7 @@ fn apply_session_action_updates_only_the_target_session() {
                 HostId::new("beta"),
                 "ahp-session:/s1"
             ))
-            .map(|s| s.summary.title.as_str()),
+            .map(|s| s.title.as_str()),
         Some("Old"),
         "session-scoped action on alpha must not touch beta's identically-named session"
     );
@@ -361,11 +354,9 @@ fn non_action_event_is_ignored() {
                 title: "new".into(),
                 status: SessionStatus::Idle.bits(),
                 activity: None,
-                created_at: 0,
-                modified_at: 0,
+                created_at: "1970-01-01T00:00:00.000Z".into(),
+                modified_at: "1970-01-01T00:00:00.000Z".into(),
                 project: None,
-                model: None,
-                agent: None,
                 working_directory: None,
                 changes: None,
                 annotations: None,

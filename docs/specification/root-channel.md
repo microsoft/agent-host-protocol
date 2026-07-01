@@ -104,8 +104,8 @@ Emitted when a new session is created.
       "resource": "ahp-session:/<uuid>",
       "title": "New Session",
       "status": 1,
-      "createdAt": 1710000000000,
-      "modifiedAt": 1710000000000
+      "createdAt": "2024-03-09T16:00:00.000Z",
+      "modifiedAt": "2024-03-09T16:00:00.000Z"
     }
   }
 }
@@ -128,7 +128,7 @@ Emitted when a session is disposed.
 
 ### `root/sessionSummaryChanged`
 
-Emitted when any mutable field on an existing [`SessionSummary`](/reference/session#sessionsummary) changes (title, status, `modifiedAt`, model, agent, working directory, read/done state, diff statistics, …). Only the changed fields are carried; identity fields (`resource`, `provider`, `createdAt`) never change and MUST be omitted.
+Emitted when any mutable field on an existing [`SessionSummary`](/reference/session#sessionsummary) changes (title, status, `modifiedAt`, working directory, read/done state, change statistics, …). Only the changed fields are carried; identity fields (`resource`, `provider`, `createdAt`) never change and MUST be omitted.
 
 ```json
 {
@@ -140,7 +140,7 @@ Emitted when any mutable field on an existing [`SessionSummary`](/reference/sess
     "changes": {
       "title": "Refactor auth middleware",
       "status": 8,
-      "modifiedAt": 1710000123456
+      "modifiedAt": "2024-03-09T16:02:03.456Z"
     }
   }
 }

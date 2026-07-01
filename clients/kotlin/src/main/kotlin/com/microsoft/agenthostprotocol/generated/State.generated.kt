@@ -284,6 +284,32 @@ enum class ChatInputResponseKind {
 }
 
 /**
+ * Discriminant for the kinds of outstanding input a session can surface in
+ * {@link SessionState.inputNeeded}.
+ *
+ * This is a general/typological union (not a lifecycle), so the discriminant is
+ * a `*Kind`.
+ */
+@Serializable
+enum class SessionInputRequestKind {
+    /**
+     * A user-facing elicitation mirrored from a chat's `inputRequests`.
+     */
+    @SerialName("chatInput")
+    CHAT_INPUT,
+    /**
+     * A tool call awaiting parameter- or result-confirmation.
+     */
+    @SerialName("toolConfirmation")
+    TOOL_CONFIRMATION,
+    /**
+     * A running tool the session wants an active client to execute.
+     */
+    @SerialName("toolClientExecution")
+    TOOL_CLIENT_EXECUTION
+}
+
+/**
  * How a turn ended.
  */
 @Serializable
@@ -976,7 +1002,34 @@ data class AgentInfo(
      * resolved against the workspace, children are parsed) and propagated
      * into the session's `customizations` list.
      */
-    val customizations: List<Customization>? = null
+    val customizations: List<Customization>? = null,
+    /**
+     * Static capabilities the agent advertises about itself. Clients use these
+     * to gate features (multi-chat, fork) instead of switching on the provider
+     * id.
+     */
+    val capabilities: AgentCapabilities? = null
+)
+
+@Serializable
+data class AgentCapabilities(
+    /**
+     * The agent can host more than one concurrent chat per session. When absent,
+     * clients MUST NOT call `createChat` to open chats beyond the default one the
+     * session starts with. An empty object `{}` advertises multi-chat without
+     * forking; set {@link MultipleChatsCapability.fork} to also allow forking.
+     */
+    val multipleChats: MultipleChatsCapability? = null
+)
+
+@Serializable
+data class MultipleChatsCapability(
+    /**
+     * The agent can fork a chat from a specific turn. When absent or `false`,
+     * clients MUST NOT pass a {@link ChatForkSource} (`source`) to `createChat`.
+     * Forking always implies multi-chat support.
+     */
+    val fork: Boolean? = null
 )
 
 @Serializable
@@ -1154,14 +1207,6 @@ data class ChatState(
      */
     val modifiedAt: String,
     /**
-     * Optional per-chat model override (defaults to the session's model)
-     */
-    val model: ModelSelection? = null,
-    /**
-     * Optional per-chat agent override (defaults to the session's agent)
-     */
-    val agent: AgentSelection? = null,
-    /**
      * How this chat came into existence
      */
     val origin: ChatOrigin? = null,
@@ -1177,7 +1222,7 @@ data class ChatState(
      * Optional per-chat working directory.
      *
      * If absent, the chat inherits
-     * {@link SessionSummary.workingDirectory | the session's working directory}.
+     * {@link SessionState.workingDirectory | the session's working directory}.
      * Hosts MAY override this for individual chats — for example, to give a
      * subordinate chat its own git worktree so multiple chats in a session can
      * make independent edits that the orchestrator later merges back.
@@ -1203,6 +1248,20 @@ data class ChatState(
      * Requests for user input that are currently blocking or informing chat progress
      */
     val inputRequests: List<ChatInputRequest>? = null,
+    /**
+     * The user's in-progress draft input for this chat — the message they are
+     * composing but have not sent yet, including its
+     * {@link Message.model | model} / {@link Message.agent | agent} selection
+     * and attachments.
+     *
+     * Clients MAY periodically sync their local input state into this field so
+     * a draft survives reloads and is visible to other clients viewing the same
+     * chat. Eager syncing is **not** required — clients SHOULD debounce and MAY
+     * sync only at convenient points. When presenting input UI for an existing
+     * chat, clients SHOULD use any `draft` to initialize their input state.
+     * Cleared (set to `undefined`) once the message is sent.
+     */
+    val draft: Message? = null,
     /**
      * Additional provider-specific metadata for this chat.
      */
@@ -1233,14 +1292,6 @@ data class ChatSummary(
      */
     val modifiedAt: String,
     /**
-     * Optional per-chat model override (defaults to the session's model)
-     */
-    val model: ModelSelection? = null,
-    /**
-     * Optional per-chat agent override (defaults to the session's agent)
-     */
-    val agent: AgentSelection? = null,
-    /**
      * How this chat came into existence
      */
     val origin: ChatOrigin? = null,
@@ -1265,9 +1316,39 @@ data class ChatSummary(
 @Serializable
 data class SessionState(
     /**
-     * Lightweight session metadata
+     * Agent provider ID
      */
-    val summary: SessionSummary,
+    val provider: String,
+    /**
+     * Session title
+     */
+    val title: String,
+    /**
+     * Current session status
+     */
+    val status: SessionStatus,
+    /**
+     * Human-readable description of what the session is currently doing
+     */
+    val activity: String? = null,
+    /**
+     * Server-owned project for this session
+     */
+    val project: ProjectInfo? = null,
+    /**
+     * The default working directory URI for this session. Individual chats
+     * MAY override via {@link ChatSummary.workingDirectory | their own
+     * `workingDirectory`}; this field acts as the fallback for any chat that
+     * does not.
+     */
+    val workingDirectory: String? = null,
+    /**
+     * Lightweight summary of this session's inline annotations channel
+     * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
+     * annotation / entry counts without subscribing. Absent when the session
+     * does not expose an annotations channel.
+     */
+    val annotations: AnnotationsSummary? = null,
     /**
      * Session initialization state
      */
@@ -1371,6 +1452,23 @@ data class SessionState(
      */
     val canvasRequests: List<SessionCanvasRequest>? = null,
     /**
+     * Outstanding input the session is blocked on, aggregated across every chat
+     * so a client can discover and answer it from the session channel alone,
+     * without subscribing to individual chats.
+     *
+     * Each entry is self-sufficient: it carries the owning chat's URI plus every
+     * identifier the client needs to respond. A client answers by dispatching the
+     * ordinary `chat/​*` action to that chat's channel — see
+     * {@link SessionInputRequest} for the per-variant response path. A present,
+     * non-empty list implies {@link SessionStatus.InputNeeded} on
+     * {@link SessionSummary.status}.
+     *
+     * Host-managed: the host upserts entries with `session/inputNeededSet` as
+     * chats raise requests and removes them with `session/inputNeededRemoved`
+     * once the underlying request resolves.
+     */
+    val inputNeeded: List<SessionInputRequest>? = null,
+    /**
      * Additional provider-specific metadata for this session.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1435,11 +1533,91 @@ data class SessionActiveClient(
 )
 
 @Serializable
-data class SessionSummary(
+data class SessionChatInputRequest(
     /**
-     * Session URI
+     * Stable key for this entry, unique within the session's
+     * {@link SessionState.inputNeeded} list. The host derives it however it likes
+     * (for example from the chat URI plus the underlying request or tool-call
+     * id); consumers MUST treat it as opaque. It is the key for the
+     * `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
      */
-    val resource: String,
+    val id: String,
+    /**
+     * The chat the underlying request lives in. This is the channel a client
+     * dispatches its response to — it does not need to have subscribed to that
+     * chat first.
+     */
+    val chat: String,
+    val kind: SessionInputRequestKind,
+    /**
+     * The mirrored chat input request.
+     */
+    val request: ChatInputRequest
+)
+
+@Serializable
+data class SessionToolConfirmationRequest(
+    /**
+     * Stable key for this entry, unique within the session's
+     * {@link SessionState.inputNeeded} list. The host derives it however it likes
+     * (for example from the chat URI plus the underlying request or tool-call
+     * id); consumers MUST treat it as opaque. It is the key for the
+     * `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+     */
+    val id: String,
+    /**
+     * The chat the underlying request lives in. This is the channel a client
+     * dispatches its response to — it does not need to have subscribed to that
+     * chat first.
+     */
+    val chat: String,
+    val kind: SessionInputRequestKind,
+    /**
+     * The turn the tool call belongs to.
+     */
+    val turnId: String,
+    /**
+     * The tool call awaiting confirmation.
+     */
+    val toolCall: ToolCallConfirmationState
+)
+
+@Serializable
+data class SessionToolClientExecutionRequest(
+    /**
+     * Stable key for this entry, unique within the session's
+     * {@link SessionState.inputNeeded} list. The host derives it however it likes
+     * (for example from the chat URI plus the underlying request or tool-call
+     * id); consumers MUST treat it as opaque. It is the key for the
+     * `session/inputNeededSet` / `session/inputNeededRemoved` upsert convention.
+     */
+    val id: String,
+    /**
+     * The chat the underlying request lives in. This is the channel a client
+     * dispatches its response to — it does not need to have subscribed to that
+     * chat first.
+     */
+    val chat: String,
+    val kind: SessionInputRequestKind,
+    /**
+     * The turn the tool call belongs to.
+     */
+    val turnId: String,
+    /**
+     * The `clientId` expected to execute the tool. Matches the `clientId` of the
+     * tool call's client {@link ToolCallContributor}.
+     */
+    val clientId: String,
+    /**
+     * The running tool call the session wants the owning client to execute. The
+     * host only ever populates this with a {@link ToolCallRunningState} (i.e. a
+     * {@link ToolCallState} in `running` status).
+     */
+    val toolCall: ToolCallState
+)
+
+@Serializable
+data class SessionSummary(
     /**
      * Agent provider ID
      */
@@ -1457,28 +1635,9 @@ data class SessionSummary(
      */
     val activity: String? = null,
     /**
-     * Creation timestamp
-     */
-    val createdAt: Long,
-    /**
-     * Last modification timestamp
-     */
-    val modifiedAt: Long,
-    /**
      * Server-owned project for this session
      */
     val project: ProjectInfo? = null,
-    /**
-     * Currently selected model
-     */
-    val model: ModelSelection? = null,
-    /**
-     * Currently selected custom agent.
-     *
-     * Absent (`undefined`) means no custom agent is selected for this session
-     * — the session uses the provider's default behavior.
-     */
-    val agent: AgentSelection? = null,
     /**
      * The default working directory URI for this session. Individual chats
      * MAY override via {@link ChatSummary.workingDirectory | their own
@@ -1487,19 +1646,31 @@ data class SessionSummary(
      */
     val workingDirectory: String? = null,
     /**
-     * Aggregate summary of file changes associated with this session. Servers
-     * may populate this to give clients a quick at-a-glance view of the
-     * session's footprint (e.g., for list rendering) without requiring the
-     * client to subscribe to a changeset.
-     */
-    val changes: ChangesSummary? = null,
-    /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
      * annotation / entry counts without subscribing. Absent when the session
      * does not expose an annotations channel.
      */
     val annotations: AnnotationsSummary? = null,
+    /**
+     * Session URI
+     */
+    val resource: String,
+    /**
+     * Creation timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+     */
+    val createdAt: String,
+    /**
+     * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
+     */
+    val modifiedAt: String,
+    /**
+     * Aggregate summary of file changes associated with this session. Servers
+     * may populate this to give clients a quick at-a-glance view of the
+     * session's footprint (e.g., for list rendering) without requiring the
+     * client to subscribe to a changeset.
+     */
+    val changes: ChangesSummary? = null,
     /**
      * Lightweight server-defined metadata clients may use for the session
      * presentation. The protocol does not interpret these values; producers
@@ -1617,6 +1788,24 @@ data class Message(
      * File/selection attachments
      */
     val attachments: List<MessageAttachment>? = null,
+    /**
+     * The model this message was, or will be, sent with.
+     *
+     * For historic user/agent messages this records the model actually used, so
+     * a client editing or resending the message can retain that selection. For a
+     * {@link ChatState.draft | draft} it carries the model the user picked for
+     * the message they are composing. Absent means the agent host's default
+     * model applies.
+     */
+    val model: ModelSelection? = null,
+    /**
+     * The custom agent this message was, or will be, sent with.
+     *
+     * For historic messages this records the agent actually used; for a
+     * {@link ChatState.draft | draft} it carries the agent the user picked.
+     * Absent means no custom agent — the provider's default behavior applies.
+     */
+    val agent: AgentSelection? = null,
     /**
      * Additional provider-specific metadata for this message.
      *
@@ -2285,6 +2474,10 @@ data class ToolCallStreamingState(
      */
     val displayName: String,
     /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
+    /**
      * Reference to the contributor of the tool being called.
      */
     val contributor: ToolCallContributor? = null,
@@ -2322,6 +2515,10 @@ data class ToolCallPendingConfirmationState(
      * Human-readable tool name
      */
     val displayName: String,
+    /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
     /**
      * Reference to the contributor of the tool being called.
      */
@@ -2380,6 +2577,10 @@ data class ToolCallRunningState(
      */
     val displayName: String,
     /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
+    /**
      * Reference to the contributor of the tool being called.
      */
     val contributor: ToolCallContributor? = null,
@@ -2432,6 +2633,10 @@ data class ToolCallPendingResultConfirmationState(
      * Human-readable tool name
      */
     val displayName: String,
+    /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
     /**
      * Reference to the contributor of the tool being called.
      */
@@ -2503,6 +2708,10 @@ data class ToolCallCompletedState(
      */
     val displayName: String,
     /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
+    /**
      * Reference to the contributor of the tool being called.
      */
     val contributor: ToolCallContributor? = null,
@@ -2572,6 +2781,10 @@ data class ToolCallCancelledState(
      * Human-readable tool name
      */
     val displayName: String,
+    /**
+     * Human-readable description of what the tool invocation intends to do
+     */
+    val intention: String? = null,
     /**
      * Reference to the contributor of the tool being called.
      */
@@ -3043,6 +3256,22 @@ data class AgentCustomization(
      * invoke it. Sourced from the agent file's frontmatter `description`.
      */
     val description: String? = null,
+    /**
+     * Model the agent is pinned to, sourced from the agent file's
+     * frontmatter `model`. Absent means the agent inherits the session's
+     * default model.
+     */
+    val model: String? = null,
+    /**
+     * Allowlist of tool names the agent is scoped to, sourced from the
+     * agent file's frontmatter `tools`. A non-empty list restricts the
+     * agent to exactly those tools. Absent — or an empty list — imposes no
+     * restriction beyond the session default: the agent may use any
+     * available tool. Producers express "no restriction" by omitting the
+     * field rather than sending an empty array, so an empty list carries no
+     * meaning distinct from absence.
+     */
+    val tools: List<String>? = null,
     /**
      * Additional provider-specific metadata for this custom agent.
      *
@@ -4364,6 +4593,55 @@ internal object ToolCallStateSerializer : KSerializer<ToolCallState> {
     }
 }
 
+@Serializable(with = ToolCallConfirmationStateSerializer::class)
+sealed interface ToolCallConfirmationState
+
+@JvmInline
+value class ToolCallConfirmationStatePendingConfirmation(val value: ToolCallPendingConfirmationState) : ToolCallConfirmationState
+@JvmInline
+value class ToolCallConfirmationStatePendingResultConfirmation(val value: ToolCallPendingResultConfirmationState) : ToolCallConfirmationState
+/**
+ * Forward-compat catch-all for unknown ToolCallConfirmationState discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class ToolCallConfirmationStateUnknown(val raw: JsonObject) : ToolCallConfirmationState
+
+internal object ToolCallConfirmationStateSerializer : KSerializer<ToolCallConfirmationState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ToolCallConfirmationState")
+
+    override fun deserialize(decoder: Decoder): ToolCallConfirmationState {
+        val input = decoder as? JsonDecoder
+            ?: error("ToolCallConfirmationState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for ToolCallConfirmationState")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: return ToolCallConfirmationStateUnknown(obj)
+        return when (discriminant) {
+            "pending-confirmation" -> ToolCallConfirmationStatePendingConfirmation(input.json.decodeFromJsonElement(ToolCallPendingConfirmationState.serializer(), element))
+            "pending-result-confirmation" -> ToolCallConfirmationStatePendingResultConfirmation(input.json.decodeFromJsonElement(ToolCallPendingResultConfirmationState.serializer(), element))
+            else -> ToolCallConfirmationStateUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ToolCallConfirmationState) {
+        val output = encoder as? JsonEncoder
+            ?: error("ToolCallConfirmationState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is ToolCallConfirmationStatePendingConfirmation -> output.json.encodeToJsonElement(ToolCallPendingConfirmationState.serializer(), value.value)
+            is ToolCallConfirmationStatePendingResultConfirmation -> output.json.encodeToJsonElement(ToolCallPendingResultConfirmationState.serializer(), value.value)
+            is ToolCallConfirmationStateUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
 @Serializable(with = TerminalClaimSerializer::class)
 sealed interface TerminalClaim
 
@@ -5057,6 +5335,59 @@ internal object CanvasRequestOutcomeSerializer : KSerializer<CanvasRequestOutcom
     }
 }
 
+@Serializable(with = SessionInputRequestSerializer::class)
+sealed interface SessionInputRequest
+
+@JvmInline
+value class SessionInputRequestChatInput(val value: SessionChatInputRequest) : SessionInputRequest
+@JvmInline
+value class SessionInputRequestToolConfirmation(val value: SessionToolConfirmationRequest) : SessionInputRequest
+@JvmInline
+value class SessionInputRequestToolClientExecution(val value: SessionToolClientExecutionRequest) : SessionInputRequest
+/**
+ * Forward-compat catch-all for unknown SessionInputRequest discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class SessionInputRequestUnknown(val raw: JsonObject) : SessionInputRequest
+
+internal object SessionInputRequestSerializer : KSerializer<SessionInputRequest> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("SessionInputRequest")
+
+    override fun deserialize(decoder: Decoder): SessionInputRequest {
+        val input = decoder as? JsonDecoder
+            ?: error("SessionInputRequest can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for SessionInputRequest")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return SessionInputRequestUnknown(obj)
+        return when (discriminant) {
+            "chatInput" -> SessionInputRequestChatInput(input.json.decodeFromJsonElement(SessionChatInputRequest.serializer(), element))
+            "toolConfirmation" -> SessionInputRequestToolConfirmation(input.json.decodeFromJsonElement(SessionToolConfirmationRequest.serializer(), element))
+            "toolClientExecution" -> SessionInputRequestToolClientExecution(input.json.decodeFromJsonElement(SessionToolClientExecutionRequest.serializer(), element))
+            else -> SessionInputRequestUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: SessionInputRequest) {
+        val output = encoder as? JsonEncoder
+            ?: error("SessionInputRequest can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is SessionInputRequestChatInput -> output.json.encodeToJsonElement(SessionChatInputRequest.serializer(), value.value)
+            is SessionInputRequestToolConfirmation -> output.json.encodeToJsonElement(SessionToolConfirmationRequest.serializer(), value.value)
+            is SessionInputRequestToolClientExecution -> output.json.encodeToJsonElement(SessionToolClientExecutionRequest.serializer(), value.value)
+            is SessionInputRequestUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
 @Serializable(with = ToolResultContentSerializer::class)
 sealed interface ToolResultContent {
     @JvmInline value class Text(val value: ToolResultTextContent) : ToolResultContent
@@ -5140,19 +5471,22 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. SessionState has required
-        // `summary`; ChangesetState has required `status` + `files`;
-        // ResourceWatchState has required `root` + `recursive`;
-        // AnnotationsState has required `annotations`; TerminalState has `uri`
-        // / `size` / `buffer`; RootState is the catch-all.
+        // `lifecycle`; ChatState has required `turns`; ChangesetState has
+        // required `status` + `files`; ResourceWatchState has required
+        // `root` + `recursive`; AnnotationsState has required `annotations`
+        // (checked after session, whose optional annotations summary reuses the
+        // key); TerminalState has required `content`; RootState is the
+        // catch-all.
         return when {
-            obj.containsKey("summary") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
+            obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
+            obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
                 SnapshotState.Changeset(input.json.decodeFromJsonElement(ChangesetState.serializer(), element))
             obj.containsKey("root") && obj.containsKey("recursive") ->
                 SnapshotState.ResourceWatch(input.json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
             obj.containsKey("annotations") ->
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
-            obj.containsKey("size") || obj.containsKey("uri") || obj.containsKey("buffer") ->
+            obj.containsKey("content") ->
                 SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
             else -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
         }

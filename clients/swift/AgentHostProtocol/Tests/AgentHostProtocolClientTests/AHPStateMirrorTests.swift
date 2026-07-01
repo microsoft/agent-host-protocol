@@ -25,13 +25,9 @@ final class AHPStateMirrorTests: XCTestCase {
     func testApplySnapshotSeedsSessionState() async {
         let mirror = AHPStateMirror()
         let session = SessionState(
-            summary: SessionSummary(
-                resource: "ahp-session:/s1",
-                provider: "test",
-                title: "T",
-                status: .idle,
-                createdAt: 1, modifiedAt: 1
-            ),
+            provider: "test",
+            title: "T",
+            status: .idle,
             lifecycle: .ready,
             activeClients: [],
             chats: []
@@ -68,13 +64,9 @@ final class AHPStateMirrorTests: XCTestCase {
     func testApplySessionActionUpdatesSession() async {
         let mirror = AHPStateMirror()
         let initial = SessionState(
-            summary: SessionSummary(
-                resource: "ahp-session:/s1",
-                provider: "test",
-                title: "Old",
-                status: .idle,
-                createdAt: 1, modifiedAt: 1
-            ),
+            provider: "test",
+            title: "Old",
+            status: .idle,
             lifecycle: .ready,
             activeClients: [],
             chats: []
@@ -95,7 +87,7 @@ final class AHPStateMirrorTests: XCTestCase {
         )
         await mirror.apply(envelope)
         let sessions = await mirror.sessions
-        XCTAssertEqual(sessions["ahp-session:/s1"]?.summary.title, "New")
+        XCTAssertEqual(sessions["ahp-session:/s1"]?.title, "New")
     }
 
     func testResetClearsState() async {

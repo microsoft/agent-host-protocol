@@ -32,14 +32,9 @@ final class NativeReducerTests: XCTestCase {
         status: SessionStatus = .idle
     ) -> SessionState {
         SessionState(
-            summary: SessionSummary(
-                resource: S,
-                provider: "copilot",
-                title: "Test Session",
-                status: status,
-                createdAt: 1000,
-                modifiedAt: 1000
-            ),
+            provider: "copilot",
+            title: "Test Session",
+            status: status,
             lifecycle: lifecycle,
             activeClients: [],
             chats: []
@@ -80,12 +75,12 @@ final class NativeReducerTests: XCTestCase {
     func testCombinedReducer() {
         let r1 = AnyReducer<SessionState, StateAction> { state, action in
             if case .sessionTitleChanged(let a) = action {
-                state.summary.title = a.title
+                state.title = a.title
             }
         }
         let r2 = AnyReducer<SessionState, StateAction> { state, action in
-            if case .sessionModelChanged(let a) = action {
-                state.summary.model = a.model
+            if case .sessionActivityChanged(let a) = action {
+                state.activity = a.activity
             }
         }
         let combined = CombinedReducer([r1, r2])
@@ -94,12 +89,12 @@ final class NativeReducerTests: XCTestCase {
         combined.reduce(into: &state, action: .sessionTitleChanged(SessionTitleChangedAction(
             type: .sessionTitleChanged, title: "Custom Title"
         )))
-        XCTAssertEqual(state.summary.title, "Custom Title")
+        XCTAssertEqual(state.title, "Custom Title")
 
-        combined.reduce(into: &state, action: .sessionModelChanged(SessionModelChangedAction(
-            type: .sessionModelChanged, model: ModelSelection(id: "gpt-4")
+        combined.reduce(into: &state, action: .sessionActivityChanged(SessionActivityChangedAction(
+            type: .sessionActivityChanged, activity: "Thinking"
         )))
-        XCTAssertEqual(state.summary.model?.id, "gpt-4")
+        XCTAssertEqual(state.activity, "Thinking")
     }
 
     func testApplyingConvenience() {

@@ -23,11 +23,11 @@ import type {
   SessionChatUpdatedAction,
   SessionDefaultChatChangedAction,
   SessionTitleChangedAction,
-  SessionModelChangedAction,
-  SessionAgentChangedAction,
   SessionServerToolsChangedAction,
   SessionActiveClientSetAction,
   SessionActiveClientRemovedAction,
+  SessionInputNeededSetAction,
+  SessionInputNeededRemovedAction,
   SessionCustomizationsChangedAction,
   SessionCustomizationToggledAction,
   SessionCustomizationUpdatedAction,
@@ -63,11 +63,13 @@ import type {
   ChatTurnCompleteAction,
   ChatTurnCancelledAction,
   ChatErrorAction,
+  ChatActivityChangedAction,
   ChatUsageAction,
   ChatReasoningAction,
   ChatPendingMessageSetAction,
   ChatPendingMessageRemovedAction,
   ChatQueuedMessagesReorderedAction,
+  ChatDraftChangedAction,
   ChatInputRequestedAction,
   ChatInputAnswerChangedAction,
   ChatInputCompletedAction,
@@ -139,17 +141,19 @@ export const enum ActionType {
   ChatTurnComplete = 'chat/turnComplete',
   ChatTurnCancelled = 'chat/turnCancelled',
   ChatError = 'chat/error',
+  ChatActivityChanged = 'chat/activityChanged',
   SessionTitleChanged = 'session/titleChanged',
   ChatUsage = 'chat/usage',
   ChatReasoning = 'chat/reasoning',
-  SessionModelChanged = 'session/modelChanged',
-  SessionAgentChanged = 'session/agentChanged',
   SessionServerToolsChanged = 'session/serverToolsChanged',
   SessionActiveClientSet = 'session/activeClientSet',
   SessionActiveClientRemoved = 'session/activeClientRemoved',
+  SessionInputNeededSet = 'session/inputNeededSet',
+  SessionInputNeededRemoved = 'session/inputNeededRemoved',
   ChatPendingMessageSet = 'chat/pendingMessageSet',
   ChatPendingMessageRemoved = 'chat/pendingMessageRemoved',
   ChatQueuedMessagesReordered = 'chat/queuedMessagesReordered',
+  ChatDraftChanged = 'chat/draftChanged',
   ChatInputRequested = 'chat/inputRequested',
   ChatInputAnswerChanged = 'chat/inputAnswerChanged',
   ChatInputCompleted = 'chat/inputCompleted',
@@ -246,11 +250,11 @@ export type StateAction =
   | SessionChatUpdatedAction
   | SessionDefaultChatChangedAction
   | SessionTitleChangedAction
-  | SessionModelChangedAction
-  | SessionAgentChangedAction
   | SessionServerToolsChangedAction
   | SessionActiveClientSetAction
   | SessionActiveClientRemovedAction
+  | SessionInputNeededSetAction
+  | SessionInputNeededRemovedAction
   | SessionCustomizationsChangedAction
   | SessionCustomizationToggledAction
   | SessionCustomizationUpdatedAction
@@ -283,11 +287,13 @@ export type StateAction =
   | ChatTurnCompleteAction
   | ChatTurnCancelledAction
   | ChatErrorAction
+  | ChatActivityChangedAction
   | ChatUsageAction
   | ChatReasoningAction
   | ChatPendingMessageSetAction
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
+  | ChatDraftChangedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction

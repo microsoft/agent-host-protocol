@@ -20,6 +20,7 @@ import type {
   ReconnectParams,
   ReconnectResult,
   SubscribeParams,
+  SubscriptionDeliveryOptions,
   SubscribeResult,
   UnsubscribeParams,
 } from '../types/common/commands.js';
@@ -73,6 +74,12 @@ export interface AhpClientConfig {
    * events are dropped). Default `4096`.
    */
   subscriptionBuffer?: number;
+}
+
+/** Optional preferences for a `subscribe` request. */
+export interface SubscribeOptions {
+  /** Advisory delivery preferences for this subscription. */
+  delivery?: SubscriptionDeliveryOptions;
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
@@ -291,10 +298,16 @@ export class AhpClient {
    * before the `subscribe` request is sent, so no events delivered during
    * the round-trip are missed.
    */
-  async subscribe(uri: URI): Promise<{ result: SubscribeResult; subscription: Subscription }> {
+  async subscribe(
+    uri: URI,
+    options: SubscribeOptions = {},
+  ): Promise<{ result: SubscribeResult; subscription: Subscription }> {
     const subscription = this.attachSubscription(uri);
     try {
-      const params: SubscribeParams = { channel: uri };
+      const params: SubscribeParams = {
+        channel: uri,
+        ...(options.delivery ? { delivery: options.delivery } : {}),
+      };
       const result = await this.request('subscribe', params);
       return { result, subscription };
     } catch (err) {

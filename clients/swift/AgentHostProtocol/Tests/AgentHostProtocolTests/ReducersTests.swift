@@ -28,14 +28,9 @@ final class ReducersTests: XCTestCase {
         status: SessionStatus = .idle
     ) -> SessionState {
         SessionState(
-            summary: SessionSummary(
-                resource: S,
-                provider: "copilot",
-                title: "Test Session",
-                status: status,
-                createdAt: 1000,
-                modifiedAt: 1000
-            ),
+            provider: "copilot",
+            title: "Test Session",
+            status: status,
             lifecycle: lifecycle,
             activeClients: [],
             chats: []
@@ -122,7 +117,7 @@ final class ReducersTests: XCTestCase {
         XCTAssertGreaterThan(next.modifiedAt, state.modifiedAt)
     }
 
-    func testTitleChangedUpdatesModifiedAt() {
+    func testTitleChangedUpdatesTitle() {
         let state = makeSessionState(lifecycle: .ready)
         let next = sessionReducer(
             state: state,
@@ -130,6 +125,6 @@ final class ReducersTests: XCTestCase {
                 type: .sessionTitleChanged, title: "New Title"
             ))
         )
-        XCTAssertGreaterThan(next.summary.modifiedAt, state.summary.modifiedAt)
+        XCTAssertEqual(next.title, "New Title")
     }
 }

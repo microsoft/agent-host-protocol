@@ -1,0 +1,44 @@
+{
+  "name": "agent-customization-model-and-tools",
+  "group": "A",
+  "description": "An AgentCustomization child inside a PluginCustomization carries the optional first-class `model` (string) and `tools` (string[]) fields. Both survive a decode/re-encode through the typed ChildCustomization union in every client.",
+  "type": "Customization",
+  "input": {
+    "type": "plugin",
+    "id": "plugin-1",
+    "uri": "https://example.com/plugins/coding",
+    "name": "Coding Plugin",
+    "enabled": true,
+    "children": [
+      {
+        "type": "agent",
+        "id": "agent-reviewer",
+        "uri": "file:///plugins/coding/agents/reviewer.md",
+        "name": "Reviewer",
+        "description": "Reviews diffs for correctness.",
+        "model": "claude-sonnet-4.5",
+        "tools": ["read", "grep", "edit"]
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "type": "plugin",
+      "id": "plugin-1",
+      "uri": "https://example.com/plugins/coding",
+      "name": "Coding Plugin",
+      "enabled": true,
+      "children": [
+        {
+          "type": "agent",
+          "id": "agent-reviewer",
+          "uri": "file:///plugins/coding/agents/reviewer.md",
+          "name": "Reviewer",
+          "description": "Reviews diffs for correctness.",
+          "model": "claude-sonnet-4.5",
+          "tools": ["read", "grep", "edit"]
+        }
+      ]
+    }
+  ]
+}

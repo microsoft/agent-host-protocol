@@ -89,7 +89,6 @@ struct SidebarView: View {
         return summaries.filter {
             $0.title.localizedCaseInsensitiveContains(searchText)
             || $0.provider.localizedCaseInsensitiveContains(searchText)
-            || ($0.model?.id ?? "").localizedCaseInsensitiveContains(searchText)
             || ($0.workingDirectory ?? "").localizedCaseInsensitiveContains(searchText)
         }
     }
@@ -668,13 +667,6 @@ struct SessionRow: View {
                     }
                     Text(summary.provider)
                         .font(.caption)
-                    if showModel, let model = summary.model {
-                        Text("·")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                        Text(model.id)
-                            .font(.caption)
-                    }
                 }
                 .foregroundStyle(.secondary)
             }

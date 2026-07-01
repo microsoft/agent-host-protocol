@@ -1,0 +1,30 @@
+{
+  "description": "chat/draftChanged with no draft clears an existing draft",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "draft": {
+      "text": "Draft in progress",
+      "origin": {
+        "kind": "user"
+      }
+    }
+  },
+  "actions": [
+    {
+      "type": "chat/draftChanged"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "draft": null
+  }
+}

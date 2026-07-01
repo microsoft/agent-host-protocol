@@ -225,11 +225,33 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
 public struct SubscribeParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional delivery preferences for this subscription.
+    ///
+    /// Servers MAY use these preferences to buffer and coalesce high-frequency
+    /// updates while preserving the same reduced state. Omit this field for the
+    /// server's default delivery behavior.
+    public var delivery: SubscriptionDeliveryOptions?
 
     public init(
-        channel: String
+        channel: String,
+        delivery: SubscriptionDeliveryOptions? = nil
     ) {
         self.channel = channel
+        self.delivery = delivery
+    }
+}
+
+public struct SubscriptionDeliveryOptions: Codable, Sendable {
+    /// Maximum time, in milliseconds, that the server may intentionally delay
+    /// delivery while buffering/coalescing updates for this subscription.
+    ///
+    /// A value of `0` requests immediate delivery with no intentional coalescing.
+    public var maxLatencyMs: Int?
+
+    public init(
+        maxLatencyMs: Int? = nil
+    ) {
+        self.maxLatencyMs = maxLatencyMs
     }
 }
 
@@ -264,12 +286,6 @@ public struct CreateSessionParams: Codable, Sendable {
     public var channel: String
     /// Agent provider ID
     public var provider: String?
-    /// Model selection (ID and optional model-specific configuration)
-    public var model: ModelSelection?
-    /// Initial custom agent selection for the new session.
-    ///
-    /// Omit to start the session with no custom agent selected (provider default).
-    public var agent: AgentSelection?
     /// Working directory for the session
     public var workingDirectory: String?
     /// Fork from an existing session. The new session is populated with content
@@ -300,8 +316,6 @@ public struct CreateSessionParams: Codable, Sendable {
     public init(
         channel: String,
         provider: String? = nil,
-        model: ModelSelection? = nil,
-        agent: AgentSelection? = nil,
         workingDirectory: String? = nil,
         fork: SessionForkSource? = nil,
         config: [String: AnyCodable]? = nil,
@@ -310,8 +324,6 @@ public struct CreateSessionParams: Codable, Sendable {
     ) {
         self.channel = channel
         self.provider = provider
-        self.model = model
-        self.agent = agent
         self.workingDirectory = workingDirectory
         self.fork = fork
         self.config = config
@@ -353,10 +365,6 @@ public struct CreateChatParams: Codable, Sendable {
     public var chat: String
     /// Optional initial message for the new chat.
     public var initialMessage: Message?
-    /// Optional per-chat model override.
-    public var model: ModelSelection?
-    /// Optional per-chat agent override.
-    public var agent: AgentSelection?
     /// Optional source chat and turn to fork from.
     public var source: ChatForkSource?
 
@@ -364,15 +372,11 @@ public struct CreateChatParams: Codable, Sendable {
         channel: String,
         chat: String,
         initialMessage: Message? = nil,
-        model: ModelSelection? = nil,
-        agent: AgentSelection? = nil,
         source: ChatForkSource? = nil
     ) {
         self.channel = channel
         self.chat = chat
         self.initialMessage = initialMessage
-        self.model = model
-        self.agent = agent
         self.source = source
     }
 }

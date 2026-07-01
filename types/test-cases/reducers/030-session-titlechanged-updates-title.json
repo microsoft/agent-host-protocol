@@ -2,14 +2,9 @@
   "description": "session/titleChanged updates title",
   "reducer": "session",
   "initial": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "Test Session",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 1000
-    },
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
     "lifecycle": "creating",
     "activeClients": [],
     "chats": []
@@ -21,14 +16,9 @@
     }
   ],
   "expected": {
-    "summary": {
-      "resource": "copilot:/test-session",
-      "provider": "copilot",
-      "title": "New Title",
-      "status": 1,
-      "createdAt": 1000,
-      "modifiedAt": 9999
-    },
+    "provider": "copilot",
+    "title": "New Title",
+    "status": 1,
     "lifecycle": "creating",
     "activeClients": [],
     "chats": []

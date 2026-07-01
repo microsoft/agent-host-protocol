@@ -87,8 +87,8 @@ function makeSummary(resource: string, title: string, modifiedAt: number): Sessi
     provider: 'copilot',
     title,
     status: SessionStatus.IDLE,
-    createdAt: 0,
-    modifiedAt,
+    createdAt: new Date(0).toISOString(),
+    modifiedAt: new Date(modifiedAt).toISOString(),
   };
 }
 

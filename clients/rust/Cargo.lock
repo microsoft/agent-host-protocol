@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "ahp"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ahp-types",
  "ahp-ws",
@@ -18,7 +18,7 @@ dependencies = [
 
 [[package]]
 name = "ahp-types"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -27,7 +27,7 @@ dependencies = [
 
 [[package]]
 name = "ahp-ws"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ahp",
  "futures-util",

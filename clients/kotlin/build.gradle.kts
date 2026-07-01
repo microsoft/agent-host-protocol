@@ -74,12 +74,15 @@ mavenPublishing {
     // `SonatypeHost` parameter has been removed from the public API.
     publishToMavenCentral(automaticRelease = true)
 
-    // The ADO pipeline (`clients/kotlin/pipeline.yml`) hands a staged
-    // Maven layout to ESRP, which performs PGP signing on the server
-    // side. Local-signing is only meaningful for direct
-    // `publishAndReleaseToMavenCentral` runs, which we no longer use
-    // for releases. Gate local signing on a Gradle property so the
-    // pipeline can opt out without supplying PGP keys.
+    // The ADO pipeline (`clients/kotlin/pipeline.yml`) signs the staged
+    // Maven layout with our own GPG key before handing it to ESRP. Maven
+    // Central requires a detached PGP (`.asc`) signature for every file
+    // and the ESRP Release `maven` content type does not generate them,
+    // so signing happens here via the Vanniktech in-memory key support
+    // (`ORG_GRADLE_PROJECT_signingInMemoryKey` / `…KeyPassword`, sourced
+    // from the `vscode` Key Vault in the pipeline). Gate signing on a
+    // Gradle property so local `publishToMavenLocal` smoke-tests can opt
+    // out without configuring a PGP key.
     if (providers.gradleProperty("ahp.signPublications").orElse("true").get().toBoolean()) {
         signAllPublications()
     }
@@ -103,9 +106,10 @@ mavenPublishing {
 // (`clients/kotlin/pipeline.yml`). Running
 // `./gradlew publishAllPublicationsToStagingRepository` lays out a
 // standard Maven repository under `build/maven-staging/`
-// (`<groupId-with-slashes>/<artifactId>/<version>/...`) that ESRP then
-// uploads to Maven Central via `contenttype: maven`. Signing (PGP) is
-// performed by ESRP, so the staged artifacts do not need `.asc` files.
+// (`<groupId-with-slashes>/<artifactId>/<version>/...`) — including the
+// `.asc` PGP signatures and `.md5`/`.sha1` checksums Maven Central
+// requires — that ESRP then uploads to Maven Central via
+// `contenttype: maven`.
 publishing {
     repositories {
         maven {

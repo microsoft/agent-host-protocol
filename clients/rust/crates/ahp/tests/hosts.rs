@@ -230,6 +230,7 @@ async fn single_constructor_yields_connected_handle() {
         models: vec![],
         protected_resources: None,
         customizations: None,
+        capabilities: None,
     };
     let state = FakeHostState::new().with_agents(vec![agent.clone()]);
     let factory = make_basic_factory(state);
@@ -1020,17 +1021,24 @@ async fn add_host_cancellation_releases_pending_reservation() {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 fn make_summary(uri: &str, title: &str, modified_at: i64) -> ahp_types::state::SessionSummary {
+    let secs = modified_at / 1000;
+    let ms = modified_at % 1000;
+    let modified = format!(
+        "1970-01-01T{:02}:{:02}:{:02}.{:03}Z",
+        secs / 3600,
+        (secs % 3600) / 60,
+        secs % 60,
+        ms
+    );
     ahp_types::state::SessionSummary {
         resource: uri.into(),
         provider: "copilot".into(),
         title: title.into(),
         status: 0,
         activity: None,
-        created_at: 0,
-        modified_at,
+        created_at: "1970-01-01T00:00:00.000Z".into(),
+        modified_at: modified,
         project: None,
-        model: None,
-        agent: None,
         working_directory: None,
         changes: None,
         annotations: None,

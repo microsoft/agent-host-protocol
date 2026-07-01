@@ -107,10 +107,11 @@ test('subscribe attaches before sending the request and fans out an action', asy
   const client = new AhpClient(c);
   client.connect();
 
-  const subPromise = client.subscribe('ahp-session:/s1');
+  const subPromise = client.subscribe('ahp-session:/s1', { delivery: { maxLatencyMs: 100 } });
   const req = await readRequest(s);
   assert.equal(req.method, 'subscribe');
   assert.equal((req.params as SubscribeParams).channel, 'ahp-session:/s1');
+  assert.deepEqual((req.params as SubscribeParams).delivery, { maxLatencyMs: 100 });
 
   const result: SubscribeResult = {
     channel: 'ahp-session:/s1',
