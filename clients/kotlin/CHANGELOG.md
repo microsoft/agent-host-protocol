@@ -17,6 +17,8 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 
 ### Added
 
+- Optional `contentSha256` field on `ContentRef`, carrying the SHA-256 hash of
+  the referenced content so consumers can verify integrity or deduplicate.
 - `SubscribeParams.delivery.maxLatencyMs` for clients to request a maximum
   subscription delivery latency, including `0` for no intentional coalescing.
 - Optional `capabilities` field on `AgentInfo` (`AgentCapabilities` with a

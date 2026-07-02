@@ -2216,6 +2216,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "contentSha256": {
+          "type": "string",
+          "description": "Content SHA-256 hash"
         }
       },
       "required": [
@@ -4807,6 +4811,10 @@
           "type": "string",
           "description": "Content MIME type"
         },
+        "contentSha256": {
+          "type": "string",
+          "description": "Content SHA-256 hash"
+        },
         "type": {
           "$ref": "#/$defs/MessageAttachmentKind.Resource",
           "description": "Discriminant"
@@ -4902,6 +4910,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "contentSha256": {
+          "type": "string",
+          "description": "Content SHA-256 hash"
         },
         "kind": {
           "$ref": "#/$defs/ResponsePartKind.ContentRef",
@@ -5628,6 +5640,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "contentSha256": {
+          "type": "string",
+          "description": "Content SHA-256 hash"
         },
         "type": {
           "$ref": "#/$defs/ToolResultContentType.Resource"

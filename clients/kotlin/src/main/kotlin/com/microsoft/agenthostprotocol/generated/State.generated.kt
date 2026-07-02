@@ -2113,6 +2113,10 @@ data class MessageResourceAttachment(
      */
     val contentType: String? = null,
     /**
+     * Content SHA-256 hash
+     */
+    val contentSha256: String? = null,
+    /**
      * Discriminant
      */
     val type: MessageAttachmentKind,
@@ -2204,7 +2208,11 @@ data class ContentRef(
     /**
      * Content MIME type
      */
-    val contentType: String? = null
+    val contentType: String? = null,
+    /**
+     * Content SHA-256 hash
+     */
+    val contentSha256: String? = null
 )
 
 @Serializable
@@ -2221,6 +2229,10 @@ data class ResourceReponsePart(
      * Content MIME type
      */
     val contentType: String? = null,
+    /**
+     * Content SHA-256 hash
+     */
+    val contentSha256: String? = null,
     /**
      * Discriminant
      */
@@ -2785,6 +2797,10 @@ data class ToolResultResourceContent(
      * Content MIME type
      */
     val contentType: String? = null,
+    /**
+     * Content SHA-256 hash
+     */
+    val contentSha256: String? = null,
     val type: ToolResultContentType
 )
 

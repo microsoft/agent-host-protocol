@@ -2061,6 +2061,8 @@ public struct MessageResourceAttachment: Codable, Sendable {
     public var sizeHint: Int?
     /// Content MIME type
     public var contentType: String?
+    /// Content SHA-256 hash
+    public var contentSha256: String?
     /// Discriminant
     public var type: MessageAttachmentKind
     /// Optional selection within the referenced textual resource.
@@ -2076,6 +2078,7 @@ public struct MessageResourceAttachment: Codable, Sendable {
         case uri
         case sizeHint
         case contentType
+        case contentSha256
         case type
         case selection
     }
@@ -2088,6 +2091,7 @@ public struct MessageResourceAttachment: Codable, Sendable {
         uri: String,
         sizeHint: Int? = nil,
         contentType: String? = nil,
+        contentSha256: String? = nil,
         type: MessageAttachmentKind,
         selection: TextSelection? = nil
     ) {
@@ -2098,6 +2102,7 @@ public struct MessageResourceAttachment: Codable, Sendable {
         self.uri = uri
         self.sizeHint = sizeHint
         self.contentType = contentType
+        self.contentSha256 = contentSha256
         self.type = type
         self.selection = selection
     }
@@ -2192,15 +2197,19 @@ public struct ContentRef: Codable, Sendable {
     public var sizeHint: Int?
     /// Content MIME type
     public var contentType: String?
+    /// Content SHA-256 hash
+    public var contentSha256: String?
 
     public init(
         uri: String,
         sizeHint: Int? = nil,
-        contentType: String? = nil
+        contentType: String? = nil,
+        contentSha256: String? = nil
     ) {
         self.uri = uri
         self.sizeHint = sizeHint
         self.contentType = contentType
+        self.contentSha256 = contentSha256
     }
 }
 
@@ -2211,6 +2220,8 @@ public struct ResourceReponsePart: Codable, Sendable {
     public var sizeHint: Int?
     /// Content MIME type
     public var contentType: String?
+    /// Content SHA-256 hash
+    public var contentSha256: String?
     /// Discriminant
     public var kind: ResponsePartKind
 
@@ -2218,11 +2229,13 @@ public struct ResourceReponsePart: Codable, Sendable {
         uri: String,
         sizeHint: Int? = nil,
         contentType: String? = nil,
+        contentSha256: String? = nil,
         kind: ResponsePartKind
     ) {
         self.uri = uri
         self.sizeHint = sizeHint
         self.contentType = contentType
+        self.contentSha256 = contentSha256
         self.kind = kind
     }
 }
@@ -2939,17 +2952,21 @@ public struct ToolResultResourceContent: Codable, Sendable {
     public var sizeHint: Int?
     /// Content MIME type
     public var contentType: String?
+    /// Content SHA-256 hash
+    public var contentSha256: String?
     public var type: ToolResultContentType
 
     public init(
         uri: String,
         sizeHint: Int? = nil,
         contentType: String? = nil,
+        contentSha256: String? = nil,
         type: ToolResultContentType
     ) {
         self.uri = uri
         self.sizeHint = sizeHint
         self.contentType = contentType
+        self.contentSha256 = contentSha256
         self.type = type
     }
 }
