@@ -58,15 +58,15 @@ use ahp_types::actions::{
     ChatToolCallResultConfirmedAction, ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, CanvasState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
-    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization, ErrorInfo,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalState, TerminalUnclassifiedPart, ToolCallCancellationReason,
-    ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
-    ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStreamingState, Turn,
-    TurnState,
+    ActiveTurn, AnnotationsState, CanvasState, ChangesetOperationStatus, ChangesetState,
+    ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption,
+    Customization, ErrorInfo, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
+    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalState, TerminalUnclassifiedPart,
+    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallPendingConfirmationState,
+    ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
+    ToolCallState, ToolCallStreamingState, Turn, TurnState,
 };
 
 /// What happened when an action was applied.
@@ -1636,7 +1636,7 @@ pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> 
                 state.url = Some(url.clone());
             }
             if let Some(availability) = &a.availability {
-                state.availability = availability.clone();
+                state.availability = *availability;
             }
             ReduceOutcome::Applied
         }
