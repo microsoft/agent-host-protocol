@@ -223,6 +223,11 @@ describe('isClientDispatchable', () => {
     const action = { type: ActionType.SessionReady, session: 'x' } as const;
     assert.equal(isClientDispatchable(action), false);
   });
+
+  it('accepts and narrows client-dispatchable canvas actions', () => {
+    const action = { type: ActionType.CanvasCloseRequested } as const;
+    assert.equal(isClientDispatchable(action), true);
+  });
 });
 
 // ─── Immutability Checks ─────────────────────────────────────────────────────
