@@ -154,11 +154,23 @@ public struct ClientCapabilities: Codable, Sendable {
     /// capability is declared. Clients that omit it MUST treat
     /// App-bearing tool calls as ordinary MCP tool calls.
     public var mcpApps: [String: AnyCodable]?
+    /// Client can render canvases and host client-declared canvas providers — it
+    /// can render an opaque canvas URL in an isolated surface, and it can answer
+    /// `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for canvases
+    /// it declares via {@link SessionActiveClient.canvasProviders}.
+    ///
+    /// Hosts SHOULD only populate {@link SessionState.canvases} /
+    /// {@link SessionState.openCanvases} and only route canvas requests to a
+    /// client that declared this capability. Clients that omit it see no canvas
+    /// surface. See {@link /specification/canvas-channel | Canvas Channel}.
+    public var canvas: [String: AnyCodable]?
 
     public init(
-        mcpApps: [String: AnyCodable]? = nil
+        mcpApps: [String: AnyCodable]? = nil,
+        canvas: [String: AnyCodable]? = nil
     ) {
         self.mcpApps = mcpApps
+        self.canvas = canvas
     }
 }
 
@@ -1280,6 +1292,166 @@ public struct ChangesetOperationFollowUp: Codable, Sendable {
     ) {
         self.content = content
         self.external = external
+    }
+}
+
+public struct CanvasOpenParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Provider-local canvas id to open.
+    public var canvasId: String
+    /// Owning provider id.
+    public var extensionId: String
+    /// Caller-minted handle for the new instance.
+    public var instanceId: String
+    /// Open input, validated by the provider against its declared schema.
+    public var input: [String: AnyCodable]?
+
+    public init(
+        channel: String,
+        canvasId: String,
+        extensionId: String,
+        instanceId: String,
+        input: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.canvasId = canvasId
+        self.extensionId = extensionId
+        self.instanceId = instanceId
+        self.input = input
+    }
+}
+
+public struct CanvasOpenResult: Codable, Sendable {
+    /// Initial content address for the instance (see {@link CanvasState.url}).
+    public var url: String?
+    /// Initial title.
+    public var title: String?
+    /// Initial provider-defined status.
+    public var status: String?
+
+    public init(
+        url: String? = nil,
+        title: String? = nil,
+        status: String? = nil
+    ) {
+        self.url = url
+        self.title = title
+        self.status = status
+    }
+}
+
+public struct CanvasInvokeActionParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Instance handle the action targets.
+    public var instanceId: String
+    /// Provider-local canvas id of the instance.
+    public var canvasId: String
+    /// Owning provider id.
+    public var extensionId: String
+    /// Declared action name to invoke.
+    public var actionName: String
+    /// Action input, validated by the provider against its declared schema.
+    public var input: [String: AnyCodable]?
+
+    public init(
+        channel: String,
+        instanceId: String,
+        canvasId: String,
+        extensionId: String,
+        actionName: String,
+        input: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.instanceId = instanceId
+        self.canvasId = canvasId
+        self.extensionId = extensionId
+        self.actionName = actionName
+        self.input = input
+    }
+}
+
+public struct CanvasInvokeActionResult: Codable, Sendable {
+    /// Opaque, provider-defined return value.
+    public var value: AnyCodable?
+
+    public init(
+        value: AnyCodable? = nil
+    ) {
+        self.value = value
+    }
+}
+
+public struct CanvasCloseParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Instance handle to close.
+    public var instanceId: String
+    /// Provider-local canvas id of the instance.
+    public var canvasId: String
+    /// Owning provider id.
+    public var extensionId: String
+
+    public init(
+        channel: String,
+        instanceId: String,
+        canvasId: String,
+        extensionId: String
+    ) {
+        self.channel = channel
+        self.instanceId = instanceId
+        self.canvasId = canvasId
+        self.extensionId = extensionId
+    }
+}
+
+public struct CanvasReadResourceParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// An `ahp-canvas-content:/<instanceId>/<path>` content URI to read.
+    public var uri: String
+
+    public init(
+        channel: String,
+        uri: String
+    ) {
+        self.channel = channel
+        self.uri = uri
+    }
+}
+
+public struct CanvasReadResourceResult: Codable, Sendable {
+    /// The resolved content parts, wrapped for forward compatibility.
+    public var contents: [CanvasResourceContent]
+
+    public init(
+        contents: [CanvasResourceContent]
+    ) {
+        self.contents = contents
+    }
+}
+
+public struct CanvasResourceContent: Codable, Sendable {
+    /// The content URI this part resolves.
+    public var uri: String
+    /// MIME type of the content, when known.
+    public var mimeType: String?
+    /// UTF-8 text content, for text payloads.
+    public var text: String?
+    /// Base64-encoded content, for binary payloads.
+    public var blob: String?
+
+    public init(
+        uri: String,
+        mimeType: String? = nil,
+        text: String? = nil,
+        blob: String? = nil
+    ) {
+        self.uri = uri
+        self.mimeType = mimeType
+        self.text = text
+        self.blob = blob
     }
 }
 

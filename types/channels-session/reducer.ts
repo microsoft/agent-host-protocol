@@ -156,6 +156,12 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
     case ActionType.SessionServerToolsChanged:
       return { ...state, serverTools: action.tools };
 
+    case ActionType.SessionCanvasesChanged:
+      return { ...state, canvases: action.canvases };
+
+    case ActionType.SessionOpenCanvasesChanged:
+      return { ...state, openCanvases: action.openCanvases };
+
     case ActionType.SessionActiveClientSet: {
       const list = state.activeClients;
       const idx = list.findIndex(c => c.clientId === action.activeClient.clientId);

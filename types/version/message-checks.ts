@@ -76,7 +76,11 @@ type _ExpectedCommands =
   | 'resolveSessionConfig'
   | 'sessionConfigCompletions'
   | 'completions'
-  | 'invokeChangesetOperation';
+  | 'invokeChangesetOperation'
+  | 'canvasOpen'
+  | 'canvasInvokeAction'
+  | 'canvasClose'
+  | 'canvasReadResource';
 
 /** All methods annotated `@messageType Notification` (client → server). */
 type _ExpectedClientNotifications =
@@ -106,7 +110,10 @@ type _ExpectedServerCommands =
   | 'resourceResolve'
   | 'resourceMkdir'
   | 'resourceRequest'
-  | 'createResourceWatch';
+  | 'createResourceWatch'
+  | 'canvasOpen'
+  | 'canvasInvokeAction'
+  | 'canvasClose';
 
 // ─── Assertions ──────────────────────────────────────────────────────────────
 

@@ -171,6 +171,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | CanvasState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -649,6 +650,7 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'CanvasAvailability', 'CanvasProviderKind',
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
@@ -768,6 +770,13 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
   { name: 'ResourceChange' },
+  { name: 'SessionCanvasAction' },
+  { name: 'SessionCanvasDeclaration' },
+  { name: 'ClientCanvasDeclaration' },
+  { name: 'OpenCanvasRef' },
+  { name: 'CanvasServerProviderSource' },
+  { name: 'CanvasClientProviderSource' },
+  { name: 'CanvasState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -978,6 +987,17 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const CANVAS_PROVIDER_SOURCE_UNION: UnionConfig = {
+  name: 'CanvasProviderSource',
+  discriminantField: 'kind',
+  doc: 'CanvasProviderSource identifies where a canvas declaration came from — used for request routing and cleanup when its provider disconnects.',
+  variants: [
+    { variantName: 'Server', innerType: 'CanvasServerProviderSource', wireValue: 'server' },
+    { variantName: 'Client', innerType: 'CanvasClientProviderSource', wireValue: 'client' },
+  ],
+  unknown: true,
+};
+
 function generateChatOriginGo(): string {
   return `// ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
@@ -1063,10 +1083,10 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, or annotations state. The active
-// variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
-// for required fields in the canonical order
-// (session → chat → terminal → changeset → resourceWatch → annotations → root).
+// chat, terminal, changeset, resource-watch, canvas, or annotations state. The
+// active variant is chosen by which pointer field is non-nil; UnmarshalJSON
+// probes for required fields in the canonical order
+// (session → chat → terminal → changeset → resourceWatch → canvas → annotations → root).
 type SnapshotState struct {
 \tRoot          *RootState          \`json:"-"\`
 \tSession       *SessionState       \`json:"-"\`
@@ -1074,6 +1094,7 @@ type SnapshotState struct {
 \tTerminal      *TerminalState      \`json:"-"\`
 \tChangeset     *ChangesetState     \`json:"-"\`
 \tResourceWatch *ResourceWatchState \`json:"-"\`
+\tCanvas        *CanvasState        \`json:"-"\`
 \tAnnotations   *AnnotationsState   \`json:"-"\`
 }
 
@@ -1090,6 +1111,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.Changeset)
 \tcase s.ResourceWatch != nil:
 \t\treturn json.Marshal(s.ResourceWatch)
+\tcase s.Canvas != nil:
+\t\treturn json.Marshal(s.Canvas)
 \tcase s.Annotations != nil:
 \t\treturn json.Marshal(s.Annotations)
 \tcase s.Root != nil:
@@ -1138,6 +1161,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.ResourceWatch = &v
+\tcase containsAll(probe, "canvasId", "provider"):
+\t\tvar v CanvasState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Canvas = &v
 \tcase containsAll(probe, "annotations"):
 \t\tvar v AnnotationsState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1223,6 +1252,7 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(TOOL_CALL_CONTRIBUTOR_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
+  lines.push(generateDiscriminatedUnion(CANVAS_PROVIDER_SOURCE_UNION));
   lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
@@ -1278,6 +1308,8 @@ const ACTION_VARIANTS: {
   { type: 'session/activityChanged', variantName: 'SessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
   { type: 'session/changesetsChanged', variantName: 'SessionChangesetsChanged', tsInterface: 'SessionChangesetsChangedAction' },
   { type: 'session/serverToolsChanged', variantName: 'SessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
+  { type: 'session/canvasesChanged', variantName: 'SessionCanvasesChanged', tsInterface: 'SessionCanvasesChangedAction' },
+  { type: 'session/openCanvasesChanged', variantName: 'SessionOpenCanvasesChanged', tsInterface: 'SessionOpenCanvasesChangedAction' },
   { type: 'session/activeClientSet', variantName: 'SessionActiveClientSet', tsInterface: 'SessionActiveClientSetAction' },
   { type: 'session/activeClientRemoved', variantName: 'SessionActiveClientRemoved', tsInterface: 'SessionActiveClientRemovedAction' },
   { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
@@ -1314,6 +1346,9 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'canvas/updated', variantName: 'CanvasUpdated', tsInterface: 'CanvasUpdatedAction' },
+  { type: 'canvas/closeRequested', variantName: 'CanvasCloseRequested', tsInterface: 'CanvasCloseRequestedAction' },
+  { type: 'canvas/message', variantName: 'CanvasMessage', tsInterface: 'CanvasMessageAction' },
 ];
 
 function generateMergedChatToolCallConfirmedStruct(): string {
@@ -1449,6 +1484,11 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'CompletionsParams' }, { name: 'CompletionItem' }, { name: 'CompletionsResult' },
   { name: 'InvokeChangesetOperationParams' }, { name: 'InvokeChangesetOperationResult' },
   { name: 'ChangesetOperationFollowUp' },
+  { name: 'CanvasOpenParams' }, { name: 'CanvasOpenResult' },
+  { name: 'CanvasInvokeActionParams' }, { name: 'CanvasInvokeActionResult' },
+  { name: 'CanvasCloseParams' },
+  { name: 'CanvasReadResourceParams' }, { name: 'CanvasReadResourceResult' },
+  { name: 'CanvasResourceContent' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1662,6 +1702,8 @@ const (
 \tErrorCodeNotFound                    int32 = -32008
 \tErrorCodePermissionDenied            int32 = -32009
 \tErrorCodeAlreadyExists               int32 = -32010
+\tErrorCodeConflict                    int32 = -32011
+\tErrorCodeCanvasProviderError         int32 = -32012
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.
@@ -1688,6 +1730,14 @@ type PermissionDeniedErrorData struct {
 // UnsupportedProtocolVersion (-32005) error.
 type UnsupportedProtocolVersionErrorData struct {
 \tSupportedVersions []string \`json:"supportedVersions"\`
+}
+
+// CanvasProviderErrorData is the detail payload of a
+// CanvasProviderError (-32012) error. The Code is a provider-defined
+// string (opaque to AHP) identifying the failure.
+type CanvasProviderErrorData struct {
+\tCode    string \`json:"code"\`
+\tMessage string \`json:"message"\`
 }
 `;
 }
@@ -1923,11 +1973,13 @@ function checkExhaustiveness(project: Project): void {
     'McpServerState',
     'ToolCallContributor',
     'SessionInputRequest',
+    'CanvasProviderSource',
     'ToolCallConfirmationState',
     'ReconnectResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',
+    'CanvasProviderErrorData',
     'AhpError',
     'AhpErrorDetailsMap',
     'AhpErrorCode',

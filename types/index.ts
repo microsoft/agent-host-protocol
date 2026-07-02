@@ -110,6 +110,14 @@ export type {
   TelemetryCapabilities,
   ResourceWatchState,
   ResourceChange,
+  CanvasState,
+  SessionCanvasAction,
+  SessionCanvasDeclaration,
+  ClientCanvasDeclaration,
+  OpenCanvasRef,
+  CanvasServerProviderSource,
+  CanvasClientProviderSource,
+  CanvasProviderSource,
 } from './state.js';
 
 export {
@@ -137,6 +145,8 @@ export {
   ChangesetOperationStatus,
   ChangesetOperationScope,
   ResourceChangeType,
+  CanvasAvailability,
+  CanvasProviderKind,
 } from './state.js';
 
 // Action types
@@ -213,6 +223,11 @@ export type {
   TerminalCommandFinishedAction,
   TerminalCommandDetectionAvailableAction,
   ResourceWatchChangedAction,
+  SessionCanvasesChangedAction,
+  SessionOpenCanvasesChangedAction,
+  CanvasUpdatedAction,
+  CanvasCloseRequestedAction,
+  CanvasMessageAction,
 } from './actions.js';
 
 export { ActionType } from './actions.js';
@@ -238,6 +253,9 @@ export type {
   ResourceWatchAction,
   ClientResourceWatchAction,
   ServerResourceWatchAction,
+  CanvasAction,
+  ClientCanvasAction,
+  ServerCanvasAction,
 } from './action-origin.generated.js';
 
 export { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
@@ -251,6 +269,7 @@ export {
   changesetReducer,
   annotationsReducer,
   resourceWatchReducer,
+  canvasReducer,
   isClientDispatchable,
 } from './reducers.js';
 
@@ -322,6 +341,14 @@ export type {
   InvokeChangesetOperationResult,
   ChangesetOperationTarget,
   ChangesetOperationFollowUp,
+  CanvasOpenParams,
+  CanvasOpenResult,
+  CanvasInvokeActionParams,
+  CanvasInvokeActionResult,
+  CanvasCloseParams,
+  CanvasReadResourceParams,
+  CanvasReadResourceResult,
+  CanvasResourceContent,
 } from './commands.js';
 
 export { ReconnectResultType, ContentEncoding, CompletionItemKind, ResourceType, ResourceWriteMode } from './commands.js';
@@ -377,6 +404,7 @@ export type {
   AhpErrorDetailsMap,
   AuthRequiredErrorData,
   PermissionDeniedErrorData,
+  CanvasProviderErrorData,
 } from './errors.js';
 
 // Version registry

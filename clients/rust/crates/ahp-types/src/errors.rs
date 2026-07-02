@@ -55,6 +55,8 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. `ResourceWriteParams.if_match`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
+    /// A canvas provider request (`canvasOpen`, `canvasInvokeAction`, or `canvasClose`) failed; the error `data` carries a provider-defined `{ code, message }`.
+    pub const CANVAS_PROVIDER_ERROR: i32 = -32012;
 }
 
 /// Type alias: AHP application error code.
@@ -92,4 +94,15 @@ pub struct UnsupportedProtocolVersionErrorData {
     /// either a SemVer `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`) or a
     /// SemVer range constraint (e.g. `">=0.1.0 <0.3.0"` or `"^0.2.0"`).
     pub supported_versions: Vec<String>,
+}
+
+/// Details carried in the `data` field of a `CanvasProviderError` (-32012)
+/// error.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasProviderErrorData {
+    /// Provider-defined error code identifying the failure.
+    pub code: String,
+    /// Human-readable error message.
+    pub message: String,
 }

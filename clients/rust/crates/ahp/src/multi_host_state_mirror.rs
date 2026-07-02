@@ -37,13 +37,14 @@ use std::collections::HashMap;
 use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AnnotationsState, ChangesetState, ChatState, ResourceWatchState, RootState, SessionState,
-    SnapshotState, TerminalState,
+    AnnotationsState, CanvasState, ChangesetState, ChatState, ResourceWatchState, RootState,
+    SessionState, SnapshotState, TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
 use crate::reducers::{
-    apply_action_to_chat, apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
+    apply_action_to_canvas, apply_action_to_chat, apply_action_to_root, apply_action_to_session,
+    apply_action_to_terminal,
 };
 use crate::SubscriptionEvent;
 
@@ -92,6 +93,7 @@ pub struct MultiHostStateMirror {
     changesets: HashMap<HostedResourceKey, ChangesetState>,
     annotations: HashMap<HostedResourceKey, AnnotationsState>,
     resource_watches: HashMap<HostedResourceKey, ResourceWatchState>,
+    canvases: HashMap<HostedResourceKey, CanvasState>,
 }
 
 impl MultiHostStateMirror {
@@ -135,6 +137,11 @@ impl MultiHostStateMirror {
         &self.resource_watches
     }
 
+    /// Borrow the canvas states map keyed by `(host_id, uri)`.
+    pub fn canvases(&self) -> &HashMap<HostedResourceKey, CanvasState> {
+        &self.canvases
+    }
+
     /// Convenience: apply a [`HostSubscriptionEvent`] produced by
     /// [`crate::hosts::MultiHostClient::events`]. Action envelopes are
     /// routed through the reducer; non-action events (session-summary
@@ -176,6 +183,10 @@ impl MultiHostStateMirror {
         }
         if let Some(terminal) = self.terminals.get_mut(&key) {
             apply_action_to_terminal(terminal, &envelope.action);
+            return;
+        }
+        if let Some(canvas) = self.canvases.get_mut(&key) {
+            apply_action_to_canvas(canvas, &envelope.action);
         }
         // Changesets are seeded by `apply_snapshot` only — there's no
         // changeset reducer in the SDK today (matching the Swift
@@ -208,6 +219,9 @@ impl MultiHostStateMirror {
             SnapshotState::ResourceWatch(state) => {
                 self.resource_watches.insert(key, state.as_ref().clone());
             }
+            SnapshotState::Canvas(state) => {
+                self.canvases.insert(key, state.as_ref().clone());
+            }
             SnapshotState::Annotations(state) => {
                 self.annotations.insert(key, state.as_ref().clone());
             }
@@ -215,7 +229,7 @@ impl MultiHostStateMirror {
     }
 
     /// Drop every slot keyed under `host` — root state, sessions,
-    /// terminals, changesets, resource watches, and annotations.
+    /// terminals, changesets, resource watches, canvases, and annotations.
     pub fn reset_host(&mut self, host: &HostId) {
         self.root_states.remove(host);
         self.sessions.retain(|key, _| &key.host_id != host);
@@ -224,6 +238,7 @@ impl MultiHostStateMirror {
         self.changesets.retain(|key, _| &key.host_id != host);
         self.annotations.retain(|key, _| &key.host_id != host);
         self.resource_watches.retain(|key, _| &key.host_id != host);
+        self.canvases.retain(|key, _| &key.host_id != host);
     }
 
     /// Drop every host's state.
@@ -235,5 +250,6 @@ impl MultiHostStateMirror {
         self.changesets.clear();
         self.annotations.clear();
         self.resource_watches.clear();
+        self.canvases.clear();
     }
 }

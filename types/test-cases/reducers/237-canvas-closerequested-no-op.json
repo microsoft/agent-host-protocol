@@ -1,0 +1,25 @@
+{
+  "description": "canvas/closeRequested is a side-effect-only signal — the reducer keeps state unchanged",
+  "reducer": "canvas",
+  "initial": {
+    "instanceId": "canvas-1",
+    "canvasId": "markdown",
+    "extensionId": "acme.editors",
+    "title": "Draft",
+    "availability": "ready",
+    "provider": { "kind": "server" }
+  },
+  "actions": [
+    {
+      "type": "canvas/closeRequested"
+    }
+  ],
+  "expected": {
+    "instanceId": "canvas-1",
+    "canvasId": "markdown",
+    "extensionId": "acme.editors",
+    "title": "Draft",
+    "availability": "ready",
+    "provider": { "kind": "server" }
+  }
+}

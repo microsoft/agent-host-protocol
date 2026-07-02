@@ -81,6 +81,11 @@ public enum ActionType: String, Codable, Sendable {
     case terminalCommandExecuted = "terminal/commandExecuted"
     case terminalCommandFinished = "terminal/commandFinished"
     case resourceWatchChanged = "resourceWatch/changed"
+    case sessionCanvasesChanged = "session/canvasesChanged"
+    case sessionOpenCanvasesChanged = "session/openCanvasesChanged"
+    case canvasUpdated = "canvas/updated"
+    case canvasCloseRequested = "canvas/closeRequested"
+    case canvasMessage = "canvas/message"
 }
 
 // MARK: - Action Infrastructure
@@ -971,6 +976,34 @@ public struct SessionServerToolsChangedAction: Codable, Sendable {
     }
 }
 
+public struct SessionCanvasesChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Updated canvas registry (full replacement).
+    public var canvases: [SessionCanvasDeclaration]
+
+    public init(
+        type: ActionType,
+        canvases: [SessionCanvasDeclaration]
+    ) {
+        self.type = type
+        self.canvases = canvases
+    }
+}
+
+public struct SessionOpenCanvasesChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Updated open-instance catalogue (full replacement).
+    public var openCanvases: [OpenCanvasRef]
+
+    public init(
+        type: ActionType,
+        openCanvases: [OpenCanvasRef]
+    ) {
+        self.type = type
+        self.openCanvases = openCanvases
+    }
+}
+
 public struct SessionActiveClientSetAction: Codable, Sendable {
     public var type: ActionType
     /// The active client to add or update, matched by `clientId`.
@@ -1718,6 +1751,56 @@ public struct ResourceWatchChangedAction: Codable, Sendable {
     }
 }
 
+public struct CanvasUpdatedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New title. Absent preserves the current title.
+    public var title: String?
+    /// New provider-defined status. Absent preserves the current status.
+    public var status: String?
+    /// New content address. Absent preserves the current url.
+    public var url: String?
+    /// New availability. Absent preserves the current availability.
+    public var availability: CanvasAvailability?
+
+    public init(
+        type: ActionType,
+        title: String? = nil,
+        status: String? = nil,
+        url: String? = nil,
+        availability: CanvasAvailability? = nil
+    ) {
+        self.type = type
+        self.title = title
+        self.status = status
+        self.url = url
+        self.availability = availability
+    }
+}
+
+public struct CanvasCloseRequestedAction: Codable, Sendable {
+    public var type: ActionType
+
+    public init(
+        type: ActionType
+    ) {
+        self.type = type
+    }
+}
+
+public struct CanvasMessageAction: Codable, Sendable {
+    public var type: ActionType
+    /// Opaque, provider-defined message payload.
+    public var payload: AnyCodable
+
+    public init(
+        type: ActionType,
+        payload: AnyCodable
+    ) {
+        self.type = type
+        self.payload = payload
+    }
+}
+
 // MARK: - Partial Summary Types
 
 public struct PartialChatSummary: Codable, Sendable {
@@ -1801,6 +1884,8 @@ public enum StateAction: Codable, Sendable {
     case sessionActivityChanged(SessionActivityChangedAction)
     case sessionChangesetsChanged(SessionChangesetsChangedAction)
     case sessionServerToolsChanged(SessionServerToolsChangedAction)
+    case sessionCanvasesChanged(SessionCanvasesChangedAction)
+    case sessionOpenCanvasesChanged(SessionOpenCanvasesChangedAction)
     case sessionActiveClientSet(SessionActiveClientSetAction)
     case sessionActiveClientRemoved(SessionActiveClientRemovedAction)
     case sessionInputNeededSet(SessionInputNeededSetAction)
@@ -1846,6 +1931,9 @@ public enum StateAction: Codable, Sendable {
     case terminalCommandExecuted(TerminalCommandExecutedAction)
     case terminalCommandFinished(TerminalCommandFinishedAction)
     case resourceWatchChanged(ResourceWatchChangedAction)
+    case canvasUpdated(CanvasUpdatedAction)
+    case canvasCloseRequested(CanvasCloseRequestedAction)
+    case canvasMessage(CanvasMessageAction)
     /// Unknown or future action type; reducers treat this as a no-op.
     /// The raw payload (including its `type` discriminant) is preserved
     /// as an `AnyCodable` so a decode→encode round-trip re-emits it
@@ -1918,6 +2006,10 @@ public enum StateAction: Codable, Sendable {
             self = .sessionChangesetsChanged(try SessionChangesetsChangedAction(from: decoder))
         case "session/serverToolsChanged":
             self = .sessionServerToolsChanged(try SessionServerToolsChangedAction(from: decoder))
+        case "session/canvasesChanged":
+            self = .sessionCanvasesChanged(try SessionCanvasesChangedAction(from: decoder))
+        case "session/openCanvasesChanged":
+            self = .sessionOpenCanvasesChanged(try SessionOpenCanvasesChangedAction(from: decoder))
         case "session/activeClientSet":
             self = .sessionActiveClientSet(try SessionActiveClientSetAction(from: decoder))
         case "session/activeClientRemoved":
@@ -2008,6 +2100,12 @@ public enum StateAction: Codable, Sendable {
             self = .terminalCommandFinished(try TerminalCommandFinishedAction(from: decoder))
         case "resourceWatch/changed":
             self = .resourceWatchChanged(try ResourceWatchChangedAction(from: decoder))
+        case "canvas/updated":
+            self = .canvasUpdated(try CanvasUpdatedAction(from: decoder))
+        case "canvas/closeRequested":
+            self = .canvasCloseRequested(try CanvasCloseRequestedAction(from: decoder))
+        case "canvas/message":
+            self = .canvasMessage(try CanvasMessageAction(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -2045,6 +2143,8 @@ public enum StateAction: Codable, Sendable {
         case .sessionActivityChanged(let v): try v.encode(to: encoder)
         case .sessionChangesetsChanged(let v): try v.encode(to: encoder)
         case .sessionServerToolsChanged(let v): try v.encode(to: encoder)
+        case .sessionCanvasesChanged(let v): try v.encode(to: encoder)
+        case .sessionOpenCanvasesChanged(let v): try v.encode(to: encoder)
         case .sessionActiveClientSet(let v): try v.encode(to: encoder)
         case .sessionActiveClientRemoved(let v): try v.encode(to: encoder)
         case .sessionInputNeededSet(let v): try v.encode(to: encoder)
@@ -2090,6 +2190,9 @@ public enum StateAction: Codable, Sendable {
         case .terminalCommandExecuted(let v): try v.encode(to: encoder)
         case .terminalCommandFinished(let v): try v.encode(to: encoder)
         case .resourceWatchChanged(let v): try v.encode(to: encoder)
+        case .canvasUpdated(let v): try v.encode(to: encoder)
+        case .canvasCloseRequested(let v): try v.encode(to: encoder)
+        case .canvasMessage(let v): try v.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

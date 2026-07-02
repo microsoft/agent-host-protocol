@@ -1,0 +1,37 @@
+{
+  "description": "canvas/updated overwrites every presented field (title, status, url, availability)",
+  "reducer": "canvas",
+  "initial": {
+    "instanceId": "canvas-1",
+    "canvasId": "markdown",
+    "extensionId": "acme.editors",
+    "extensionName": "Acme Editors",
+    "displayName": "Markdown Editor",
+    "title": "Draft",
+    "status": "idle",
+    "url": "ahp-canvas-content:/canvas-1/index.html",
+    "availability": "ready",
+    "provider": { "kind": "server" }
+  },
+  "actions": [
+    {
+      "type": "canvas/updated",
+      "title": "Published",
+      "status": "saved",
+      "url": "https://example.com/docs/published.html",
+      "availability": "stale"
+    }
+  ],
+  "expected": {
+    "instanceId": "canvas-1",
+    "canvasId": "markdown",
+    "extensionId": "acme.editors",
+    "extensionName": "Acme Editors",
+    "displayName": "Markdown Editor",
+    "title": "Published",
+    "status": "saved",
+    "url": "https://example.com/docs/published.html",
+    "availability": "stale",
+    "provider": { "kind": "server" }
+  }
+}

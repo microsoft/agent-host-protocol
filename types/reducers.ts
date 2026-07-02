@@ -12,4 +12,5 @@ export { terminalReducer } from './channels-terminal/reducer.js';
 export { changesetReducer } from './channels-changeset/reducer.js';
 export { annotationsReducer } from './channels-annotations/reducer.js';
 export { resourceWatchReducer } from './channels-resource-watch/reducer.js';
+export { canvasReducer } from './channels-canvas/reducer.js';
 export { softAssertNever, isClientDispatchable } from './common/reducer-helpers.js';

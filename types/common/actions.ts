@@ -39,6 +39,8 @@ import type {
   SessionChangesetsChangedAction,
   SessionConfigChangedAction,
   SessionMetaChangedAction,
+  SessionCanvasesChangedAction,
+  SessionOpenCanvasesChangedAction,
 } from '../channels-session/actions.js';
 
 import type {
@@ -103,6 +105,12 @@ import type {
 import type {
   ResourceWatchChangedAction,
 } from '../channels-resource-watch/actions.js';
+
+import type {
+  CanvasUpdatedAction,
+  CanvasCloseRequestedAction,
+  CanvasMessageAction,
+} from '../channels-canvas/actions.js';
 
 // ─── Action Type Enum ────────────────────────────────────────────────────────
 
@@ -187,6 +195,11 @@ export const enum ActionType {
   TerminalCommandExecuted = 'terminal/commandExecuted',
   TerminalCommandFinished = 'terminal/commandFinished',
   ResourceWatchChanged = 'resourceWatch/changed',
+  SessionCanvasesChanged = 'session/canvasesChanged',
+  SessionOpenCanvasesChanged = 'session/openCanvasesChanged',
+  CanvasUpdated = 'canvas/updated',
+  CanvasCloseRequested = 'canvas/closeRequested',
+  CanvasMessage = 'canvas/message',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -297,4 +310,9 @@ export type StateAction =
   | TerminalCommandDetectionAvailableAction
   | TerminalCommandExecutedAction
   | TerminalCommandFinishedAction
-  | ResourceWatchChangedAction;
+  | ResourceWatchChangedAction
+  | SessionCanvasesChangedAction
+  | SessionOpenCanvasesChangedAction
+  | CanvasUpdatedAction
+  | CanvasCloseRequestedAction
+  | CanvasMessageAction;

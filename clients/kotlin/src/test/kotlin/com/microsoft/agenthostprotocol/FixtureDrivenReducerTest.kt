@@ -3,6 +3,7 @@ package com.microsoft.agenthostprotocol
 import com.microsoft.agenthostprotocol.generated.ChatState
 import com.microsoft.agenthostprotocol.generated.ChangesetState
 import com.microsoft.agenthostprotocol.generated.AnnotationsState
+import com.microsoft.agenthostprotocol.generated.CanvasState
 import com.microsoft.agenthostprotocol.generated.ResourceWatchState
 import com.microsoft.agenthostprotocol.generated.RootState
 import com.microsoft.agenthostprotocol.generated.SessionState
@@ -212,6 +213,18 @@ class FixtureDrivenReducerTest {
                 run = { state ->
                     var s = state
                     for (action in actions) s = resourceWatchReducer(s, action)
+                    s
+                },
+            )
+
+            "canvas" -> compareFixture(
+                file = file,
+                initial = initial,
+                expected = expected,
+                serializer = CanvasState.serializer(),
+                run = { state ->
+                    var s = state
+                    for (action in actions) s = canvasReducer(s, action)
                     s
                 },
             )

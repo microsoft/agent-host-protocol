@@ -175,7 +175,17 @@ enum class ActionType {
     @SerialName("terminal/commandFinished")
     TERMINAL_COMMAND_FINISHED,
     @SerialName("resourceWatch/changed")
-    RESOURCE_WATCH_CHANGED
+    RESOURCE_WATCH_CHANGED,
+    @SerialName("session/canvasesChanged")
+    SESSION_CANVASES_CHANGED,
+    @SerialName("session/openCanvasesChanged")
+    SESSION_OPEN_CANVASES_CHANGED,
+    @SerialName("canvas/updated")
+    CANVAS_UPDATED,
+    @SerialName("canvas/closeRequested")
+    CANVAS_CLOSE_REQUESTED,
+    @SerialName("canvas/message")
+    CANVAS_MESSAGE
 }
 
 // ─── Action Infrastructure ──────────────────────────────────────────────────
@@ -774,6 +784,24 @@ data class SessionServerToolsChangedAction(
 )
 
 @Serializable
+data class SessionCanvasesChangedAction(
+    val type: ActionType,
+    /**
+     * Updated canvas registry (full replacement).
+     */
+    val canvases: List<SessionCanvasDeclaration>
+)
+
+@Serializable
+data class SessionOpenCanvasesChangedAction(
+    val type: ActionType,
+    /**
+     * Updated open-instance catalogue (full replacement).
+     */
+    val openCanvases: List<OpenCanvasRef>
+)
+
+@Serializable
 data class SessionActiveClientSetAction(
     val type: ActionType,
     /**
@@ -1291,6 +1319,41 @@ data class ResourceWatchChangedAction(
     val changes: JsonElement
 )
 
+@Serializable
+data class CanvasUpdatedAction(
+    val type: ActionType,
+    /**
+     * New title. Absent preserves the current title.
+     */
+    val title: String? = null,
+    /**
+     * New provider-defined status. Absent preserves the current status.
+     */
+    val status: String? = null,
+    /**
+     * New content address. Absent preserves the current url.
+     */
+    val url: String? = null,
+    /**
+     * New availability. Absent preserves the current availability.
+     */
+    val availability: CanvasAvailability? = null
+)
+
+@Serializable
+data class CanvasCloseRequestedAction(
+    val type: ActionType
+)
+
+@Serializable
+data class CanvasMessageAction(
+    val type: ActionType,
+    /**
+     * Opaque, provider-defined message payload.
+     */
+    val payload: JsonElement
+)
+
 // ─── Partial Summary Types ──────────────────────────────────────────────────
 
 @Serializable
@@ -1381,6 +1444,8 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionActivityChanged(val value: SessionActivityChangedAction) : StateAction
 @JvmInline value class StateActionSessionChangesetsChanged(val value: SessionChangesetsChangedAction) : StateAction
 @JvmInline value class StateActionSessionServerToolsChanged(val value: SessionServerToolsChangedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasesChanged(val value: SessionCanvasesChangedAction) : StateAction
+@JvmInline value class StateActionSessionOpenCanvasesChanged(val value: SessionOpenCanvasesChangedAction) : StateAction
 @JvmInline value class StateActionSessionActiveClientSet(val value: SessionActiveClientSetAction) : StateAction
 @JvmInline value class StateActionSessionActiveClientRemoved(val value: SessionActiveClientRemovedAction) : StateAction
 @JvmInline value class StateActionSessionInputNeededSet(val value: SessionInputNeededSetAction) : StateAction
@@ -1426,6 +1491,9 @@ sealed interface StateAction
 @JvmInline value class StateActionTerminalCommandExecuted(val value: TerminalCommandExecutedAction) : StateAction
 @JvmInline value class StateActionTerminalCommandFinished(val value: TerminalCommandFinishedAction) : StateAction
 @JvmInline value class StateActionResourceWatchChanged(val value: ResourceWatchChangedAction) : StateAction
+@JvmInline value class StateActionCanvasUpdated(val value: CanvasUpdatedAction) : StateAction
+@JvmInline value class StateActionCanvasCloseRequested(val value: CanvasCloseRequestedAction) : StateAction
+@JvmInline value class StateActionCanvasMessage(val value: CanvasMessageAction) : StateAction
 @JvmInline value class StateActionUnknown(val raw: JsonObject) : StateAction
 
 internal object StateActionSerializer : KSerializer<StateAction> {
@@ -1471,6 +1539,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/activityChanged" -> StateActionSessionActivityChanged(input.json.decodeFromJsonElement(SessionActivityChangedAction.serializer(), element))
             "session/changesetsChanged" -> StateActionSessionChangesetsChanged(input.json.decodeFromJsonElement(SessionChangesetsChangedAction.serializer(), element))
             "session/serverToolsChanged" -> StateActionSessionServerToolsChanged(input.json.decodeFromJsonElement(SessionServerToolsChangedAction.serializer(), element))
+            "session/canvasesChanged" -> StateActionSessionCanvasesChanged(input.json.decodeFromJsonElement(SessionCanvasesChangedAction.serializer(), element))
+            "session/openCanvasesChanged" -> StateActionSessionOpenCanvasesChanged(input.json.decodeFromJsonElement(SessionOpenCanvasesChangedAction.serializer(), element))
             "session/activeClientSet" -> StateActionSessionActiveClientSet(input.json.decodeFromJsonElement(SessionActiveClientSetAction.serializer(), element))
             "session/activeClientRemoved" -> StateActionSessionActiveClientRemoved(input.json.decodeFromJsonElement(SessionActiveClientRemovedAction.serializer(), element))
             "session/inputNeededSet" -> StateActionSessionInputNeededSet(input.json.decodeFromJsonElement(SessionInputNeededSetAction.serializer(), element))
@@ -1516,6 +1586,9 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "terminal/commandExecuted" -> StateActionTerminalCommandExecuted(input.json.decodeFromJsonElement(TerminalCommandExecutedAction.serializer(), element))
             "terminal/commandFinished" -> StateActionTerminalCommandFinished(input.json.decodeFromJsonElement(TerminalCommandFinishedAction.serializer(), element))
             "resourceWatch/changed" -> StateActionResourceWatchChanged(input.json.decodeFromJsonElement(ResourceWatchChangedAction.serializer(), element))
+            "canvas/updated" -> StateActionCanvasUpdated(input.json.decodeFromJsonElement(CanvasUpdatedAction.serializer(), element))
+            "canvas/closeRequested" -> StateActionCanvasCloseRequested(input.json.decodeFromJsonElement(CanvasCloseRequestedAction.serializer(), element))
+            "canvas/message" -> StateActionCanvasMessage(input.json.decodeFromJsonElement(CanvasMessageAction.serializer(), element))
             else -> StateActionUnknown(obj)
         }
     }
@@ -1554,6 +1627,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionActivityChanged -> output.json.encodeToJsonElement(SessionActivityChangedAction.serializer(), value.value)
             is StateActionSessionChangesetsChanged -> output.json.encodeToJsonElement(SessionChangesetsChangedAction.serializer(), value.value)
             is StateActionSessionServerToolsChanged -> output.json.encodeToJsonElement(SessionServerToolsChangedAction.serializer(), value.value)
+            is StateActionSessionCanvasesChanged -> output.json.encodeToJsonElement(SessionCanvasesChangedAction.serializer(), value.value)
+            is StateActionSessionOpenCanvasesChanged -> output.json.encodeToJsonElement(SessionOpenCanvasesChangedAction.serializer(), value.value)
             is StateActionSessionActiveClientSet -> output.json.encodeToJsonElement(SessionActiveClientSetAction.serializer(), value.value)
             is StateActionSessionActiveClientRemoved -> output.json.encodeToJsonElement(SessionActiveClientRemovedAction.serializer(), value.value)
             is StateActionSessionInputNeededSet -> output.json.encodeToJsonElement(SessionInputNeededSetAction.serializer(), value.value)
@@ -1599,6 +1674,9 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionTerminalCommandExecuted -> output.json.encodeToJsonElement(TerminalCommandExecutedAction.serializer(), value.value)
             is StateActionTerminalCommandFinished -> output.json.encodeToJsonElement(TerminalCommandFinishedAction.serializer(), value.value)
             is StateActionResourceWatchChanged -> output.json.encodeToJsonElement(ResourceWatchChangedAction.serializer(), value.value)
+            is StateActionCanvasUpdated -> output.json.encodeToJsonElement(CanvasUpdatedAction.serializer(), value.value)
+            is StateActionCanvasCloseRequested -> output.json.encodeToJsonElement(CanvasCloseRequestedAction.serializer(), value.value)
+            is StateActionCanvasMessage -> output.json.encodeToJsonElement(CanvasMessageAction.serializer(), value.value)
             is StateActionUnknown -> value.raw
         }
         output.encodeJsonElement(element)

@@ -1,0 +1,61 @@
+{
+  "description": "session/openCanvasesChanged replaces state.openCanvases with the new catalogue",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/openCanvasesChanged",
+      "openCanvases": [
+        {
+          "instanceId": "canvas-1",
+          "channel": "ahp-canvas:/canvas-1",
+          "canvasId": "markdown",
+          "extensionId": "acme.editors",
+          "extensionName": "Acme Editors",
+          "title": "README.md",
+          "availability": "ready"
+        },
+        {
+          "instanceId": "canvas-2",
+          "channel": "ahp-canvas:/canvas-2",
+          "canvasId": "image",
+          "extensionId": "acme.viewers",
+          "availability": "stale"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "openCanvases": [
+      {
+        "instanceId": "canvas-1",
+        "channel": "ahp-canvas:/canvas-1",
+        "canvasId": "markdown",
+        "extensionId": "acme.editors",
+        "extensionName": "Acme Editors",
+        "title": "README.md",
+        "availability": "ready"
+      },
+      {
+        "instanceId": "canvas-2",
+        "channel": "ahp-canvas:/canvas-2",
+        "canvasId": "image",
+        "extensionId": "acme.viewers",
+        "availability": "stale"
+      }
+    ],
+    "activeClients": [],
+    "chats": []
+  }
+}

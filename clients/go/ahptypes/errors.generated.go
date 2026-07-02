@@ -36,6 +36,8 @@ const (
 	ErrorCodeNotFound                   int32 = -32008
 	ErrorCodePermissionDenied           int32 = -32009
 	ErrorCodeAlreadyExists              int32 = -32010
+	ErrorCodeConflict                   int32 = -32011
+	ErrorCodeCanvasProviderError        int32 = -32012
 )
 
 // AhpErrorCode is the type alias used by AHP application error codes.
@@ -62,4 +64,12 @@ type PermissionDeniedErrorData struct {
 // UnsupportedProtocolVersion (-32005) error.
 type UnsupportedProtocolVersionErrorData struct {
 	SupportedVersions []string `json:"supportedVersions"`
+}
+
+// CanvasProviderErrorData is the detail payload of a
+// CanvasProviderError (-32012) error. The Code is a provider-defined
+// string (opaque to AHP) identifying the failure.
+type CanvasProviderErrorData struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }

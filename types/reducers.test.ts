@@ -25,11 +25,12 @@ import {
   changesetReducer,
   annotationsReducer,
   resourceWatchReducer,
+  canvasReducer,
   isClientDispatchable,
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState } from './state.js';
+import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, CanvasState } from './state.js';
 import {
   SessionStatus,
   TurnState,
@@ -54,6 +55,7 @@ function readChannelSources(baseName: string): string {
     'channels-changeset',
     'channels-annotations',
     'channels-resource-watch',
+    'channels-canvas',
   ];
   return dirs
     .map(dir => {
@@ -140,6 +142,8 @@ describe('reducer fixtures', () => {
           state = annotationsReducer(state as AnnotationsState, action as any);
         } else if (fixture.reducer === 'resourceWatch') {
           state = resourceWatchReducer(state as ResourceWatchState, action as any);
+        } else if (fixture.reducer === 'canvas') {
+          state = canvasReducer(state as CanvasState, action as any);
         } else {
           state = sessionReducer(state as SessionState, action as any);
         }

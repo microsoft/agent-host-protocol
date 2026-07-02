@@ -18,6 +18,7 @@ public actor AHPStateMirror {
     public private(set) var changesets: [String: ChangesetState] = [:]
     public private(set) var annotations: [String: AnnotationsState] = [:]
     public private(set) var resourceWatches: [String: ResourceWatchState] = [:]
+    public private(set) var canvases: [String: CanvasState] = [:]
 
     public init() {}
 
@@ -47,6 +48,11 @@ public actor AHPStateMirror {
         if channel.hasPrefix("ahp-terminal:"), var terminal = terminals[channel] {
             terminal = terminalReducer(state: terminal, action: action)
             terminals[channel] = terminal
+            return
+        }
+        if channel.hasPrefix("ahp-canvas:"), var canvas = canvases[channel] {
+            canvas = canvasReducer(state: canvas, action: action)
+            canvases[channel] = canvas
             return
         }
         if changesets[channel] != nil {
@@ -84,6 +90,8 @@ public actor AHPStateMirror {
             changesets[snapshot.resource] = state
         case .resourceWatch(let state):
             resourceWatches[snapshot.resource] = state
+        case .canvas(let state):
+            canvases[snapshot.resource] = state
         case .annotations(let state):
             annotations[snapshot.resource] = state
         }
@@ -98,5 +106,6 @@ public actor AHPStateMirror {
         changesets.removeAll()
         annotations.removeAll()
         resourceWatches.removeAll()
+        canvases.removeAll()
     }
 }

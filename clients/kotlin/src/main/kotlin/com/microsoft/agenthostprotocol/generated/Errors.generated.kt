@@ -57,6 +57,10 @@ object AhpErrorCodes {
     const val PERMISSION_DENIED: Int = -32009
     /** The target resource already exists and the operation does not allow overwriting */
     const val ALREADY_EXISTS: Int = -32010
+    /** An optimistic-concurrency precondition failed: a request precondition token no longer matches the resource state */
+    const val CONFLICT: Int = -32011
+    /** A canvas provider request (canvasOpen, canvasInvokeAction, or canvasClose) failed; `data` carries a provider-defined `{ code, message }` */
+    const val CANVAS_PROVIDER_ERROR: Int = -32012
 }
 
 // ─── Error Detail Payloads ──────────────────────────────────────────────────
@@ -89,4 +93,16 @@ data class UnsupportedProtocolVersionErrorData(
      * constraint (e.g. `">=0.1.0 <0.3.0"` or `"^0.2.0"`).
      */
     val supportedVersions: List<String>
+)
+
+@Serializable
+data class CanvasProviderErrorData(
+    /**
+     * Provider-defined error code identifying the failure.
+     */
+    val code: String,
+    /**
+     * Human-readable error message.
+     */
+    val message: String
 )

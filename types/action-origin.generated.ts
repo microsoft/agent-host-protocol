@@ -78,6 +78,11 @@ import type {
   TerminalCommandExecutedAction,
   TerminalCommandFinishedAction,
   ResourceWatchChangedAction,
+  SessionCanvasesChangedAction,
+  SessionOpenCanvasesChangedAction,
+  CanvasUpdatedAction,
+  CanvasCloseRequestedAction,
+  CanvasMessageAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -129,6 +134,8 @@ export type SessionAction =
   | SessionChangesetsChangedAction
   | SessionConfigChangedAction
   | SessionMetaChangedAction
+  | SessionCanvasesChangedAction
+  | SessionOpenCanvasesChangedAction
 ;
 
 /** Union of session actions that clients may dispatch. */
@@ -160,6 +167,8 @@ export type ServerSessionAction =
   | SessionActivityChangedAction
   | SessionChangesetsChangedAction
   | SessionMetaChangedAction
+  | SessionCanvasesChangedAction
+  | SessionOpenCanvasesChangedAction
 ;
 
 /** Union of all chat-scoped actions. */
@@ -321,6 +330,24 @@ export type ServerResourceWatchAction =
   | ResourceWatchChangedAction
 ;
 
+/** Union of all canvas-scoped actions. */
+export type CanvasAction =
+  | CanvasUpdatedAction
+  | CanvasCloseRequestedAction
+  | CanvasMessageAction
+;
+
+/** Union of canvas actions that clients may dispatch. */
+export type ClientCanvasAction =
+  | CanvasCloseRequestedAction
+  | CanvasMessageAction
+;
+
+/** Union of canvas actions that only the server may produce. */
+export type ServerCanvasAction =
+  | CanvasUpdatedAction
+;
+
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
 
 /**
@@ -403,4 +430,9 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.TerminalCommandExecuted]: false,
   [ActionType.TerminalCommandFinished]: false,
   [ActionType.ResourceWatchChanged]: false,
+  [ActionType.SessionCanvasesChanged]: false,
+  [ActionType.SessionOpenCanvasesChanged]: false,
+  [ActionType.CanvasUpdated]: false,
+  [ActionType.CanvasCloseRequested]: true,
+  [ActionType.CanvasMessage]: true,
 };

@@ -195,7 +195,19 @@ data class ClientCapabilities(
      * capability is declared. Clients that omit it MUST treat
      * App-bearing tool calls as ordinary MCP tool calls.
      */
-    val mcpApps: Map<String, JsonElement>? = null
+    val mcpApps: Map<String, JsonElement>? = null,
+    /**
+     * Client can render canvases and host client-declared canvas providers — it
+     * can render an opaque canvas URL in an isolated surface, and it can answer
+     * `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for canvases
+     * it declares via {@link SessionActiveClient.canvasProviders}.
+     *
+     * Hosts SHOULD only populate {@link SessionState.canvases} /
+     * {@link SessionState.openCanvases} and only route canvas requests to a
+     * client that declared this capability. Clients that omit it see no canvas
+     * surface. See {@link /specification/canvas-channel | Canvas Channel}.
+     */
+    val canvas: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -1116,6 +1128,142 @@ data class ChangesetOperationFollowUp(
      * When `true`, open in an external handler rather than inline.
      */
     val external: Boolean? = null
+)
+
+@Serializable
+data class CanvasOpenParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Provider-local canvas id to open.
+     */
+    val canvasId: String,
+    /**
+     * Owning provider id.
+     */
+    val extensionId: String,
+    /**
+     * Caller-minted handle for the new instance.
+     */
+    val instanceId: String,
+    /**
+     * Open input, validated by the provider against its declared schema.
+     */
+    val input: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class CanvasOpenResult(
+    /**
+     * Initial content address for the instance (see {@link CanvasState.url}).
+     */
+    val url: String? = null,
+    /**
+     * Initial title.
+     */
+    val title: String? = null,
+    /**
+     * Initial provider-defined status.
+     */
+    val status: String? = null
+)
+
+@Serializable
+data class CanvasInvokeActionParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Instance handle the action targets.
+     */
+    val instanceId: String,
+    /**
+     * Provider-local canvas id of the instance.
+     */
+    val canvasId: String,
+    /**
+     * Owning provider id.
+     */
+    val extensionId: String,
+    /**
+     * Declared action name to invoke.
+     */
+    val actionName: String,
+    /**
+     * Action input, validated by the provider against its declared schema.
+     */
+    val input: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class CanvasInvokeActionResult(
+    /**
+     * Opaque, provider-defined return value.
+     */
+    val value: JsonElement? = null
+)
+
+@Serializable
+data class CanvasCloseParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Instance handle to close.
+     */
+    val instanceId: String,
+    /**
+     * Provider-local canvas id of the instance.
+     */
+    val canvasId: String,
+    /**
+     * Owning provider id.
+     */
+    val extensionId: String
+)
+
+@Serializable
+data class CanvasReadResourceParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * An `ahp-canvas-content:/<instanceId>/<path>` content URI to read.
+     */
+    val uri: String
+)
+
+@Serializable
+data class CanvasReadResourceResult(
+    /**
+     * The resolved content parts, wrapped for forward compatibility.
+     */
+    val contents: List<CanvasResourceContent>
+)
+
+@Serializable
+data class CanvasResourceContent(
+    /**
+     * The content URI this part resolves.
+     */
+    val uri: String,
+    /**
+     * MIME type of the content, when known.
+     */
+    val mimeType: String? = null,
+    /**
+     * UTF-8 text content, for text payloads.
+     */
+    val text: String? = null,
+    /**
+     * Base64-encoded content, for binary payloads.
+     */
+    val blob: String? = null
 )
 
 // ─── ReconnectResult Union ──────────────────────────────────────────────────

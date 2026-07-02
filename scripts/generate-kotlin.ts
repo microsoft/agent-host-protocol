@@ -147,6 +147,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | CanvasState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -660,7 +661,7 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 function generateSnapshotState(): string {
   return `/**
  * The state payload of a snapshot — root, session, chat, terminal, changeset,
- * resource-watch, or annotations state.
+ * resource-watch, canvas, or annotations state.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
@@ -670,6 +671,7 @@ sealed interface SnapshotState {
     @JvmInline value class Terminal(val value: TerminalState) : SnapshotState
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
+    @JvmInline value class Canvas(val value: CanvasState) : SnapshotState
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
 }
 
@@ -686,7 +688,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // Try the most distinctive shape first. SessionState has required
         // \`lifecycle\`; ChatState has required \`turns\`; ChangesetState has
         // required \`status\` + \`files\`; ResourceWatchState has required
-        // \`root\` + \`recursive\`; AnnotationsState has required \`annotations\`
+        // \`root\` + \`recursive\`; CanvasState has required \`canvasId\` +
+        // \`provider\`; AnnotationsState has required \`annotations\`
         // (checked after session, whose optional annotations summary reuses the
         // key); TerminalState has required \`content\`; RootState is the
         // catch-all.
@@ -697,6 +700,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.Changeset(input.json.decodeFromJsonElement(ChangesetState.serializer(), element))
             obj.containsKey("root") && obj.containsKey("recursive") ->
                 SnapshotState.ResourceWatch(input.json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
+            obj.containsKey("canvasId") && obj.containsKey("provider") ->
+                SnapshotState.Canvas(input.json.decodeFromJsonElement(CanvasState.serializer(), element))
             obj.containsKey("annotations") ->
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
             obj.containsKey("content") ->
@@ -715,6 +720,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Terminal -> output.json.encodeToJsonElement(TerminalState.serializer(), value.value)
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)
+            is SnapshotState.Canvas -> output.json.encodeToJsonElement(CanvasState.serializer(), value.value)
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
         }
         output.encodeJsonElement(element)
@@ -793,6 +799,7 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'CanvasAvailability', 'CanvasProviderKind',
 ];
 
 const STATE_STRUCTS = [
@@ -843,6 +850,8 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
+  'SessionCanvasAction', 'SessionCanvasDeclaration', 'ClientCanvasDeclaration', 'OpenCanvasRef',
+  'CanvasServerProviderSource', 'CanvasClientProviderSource', 'CanvasState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1081,6 +1090,16 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const CANVAS_PROVIDER_SOURCE_UNION: UnionConfig = {
+  name: 'CanvasProviderSource',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Server', structName: 'CanvasServerProviderSource', discriminantValue: 'server' },
+    { caseName: 'Client', structName: 'CanvasClientProviderSource', discriminantValue: 'client' },
+  ],
+  unknown: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1150,6 +1169,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_PROVIDER_SOURCE_UNION));
+  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1191,6 +1212,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/activityChanged', caseName: 'SessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
   { type: 'session/changesetsChanged', caseName: 'SessionChangesetsChanged', tsInterface: 'SessionChangesetsChangedAction' },
   { type: 'session/serverToolsChanged', caseName: 'SessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
+  { type: 'session/canvasesChanged', caseName: 'SessionCanvasesChanged', tsInterface: 'SessionCanvasesChangedAction' },
+  { type: 'session/openCanvasesChanged', caseName: 'SessionOpenCanvasesChanged', tsInterface: 'SessionOpenCanvasesChangedAction' },
   { type: 'session/activeClientSet', caseName: 'SessionActiveClientSet', tsInterface: 'SessionActiveClientSetAction' },
   { type: 'session/activeClientRemoved', caseName: 'SessionActiveClientRemoved', tsInterface: 'SessionActiveClientRemovedAction' },
   { type: 'session/inputNeededSet', caseName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
@@ -1236,6 +1259,9 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'canvas/updated', caseName: 'CanvasUpdated', tsInterface: 'CanvasUpdatedAction' },
+  { type: 'canvas/closeRequested', caseName: 'CanvasCloseRequested', tsInterface: 'CanvasCloseRequestedAction' },
+  { type: 'canvas/message', caseName: 'CanvasMessage', tsInterface: 'CanvasMessageAction' },
 ];
 
 /** Merged data class for the approved/denied tool call confirmed action. */
@@ -1423,6 +1449,10 @@ const COMMAND_STRUCTS = [
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
+  'CanvasOpenParams', 'CanvasOpenResult',
+  'CanvasInvokeActionParams', 'CanvasInvokeActionResult',
+  'CanvasCloseParams',
+  'CanvasReadResourceParams', 'CanvasReadResourceResult', 'CanvasResourceContent',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1659,12 +1689,16 @@ function generateErrorsFile(project: Project): string {
   lines.push('    const val PERMISSION_DENIED: Int = -32009');
   lines.push('    /** The target resource already exists and the operation does not allow overwriting */');
   lines.push('    const val ALREADY_EXISTS: Int = -32010');
+  lines.push('    /** An optimistic-concurrency precondition failed: a request precondition token no longer matches the resource state */');
+  lines.push('    const val CONFLICT: Int = -32011');
+  lines.push('    /** A canvas provider request (canvasOpen, canvasInvokeAction, or canvasClose) failed; `data` carries a provider-defined `{ code, message }` */');
+  lines.push('    const val CANVAS_PROVIDER_ERROR: Int = -32012');
   lines.push('}');
   lines.push('');
 
   lines.push('// ─── Error Detail Payloads ──────────────────────────────────────────────────');
   lines.push('');
-  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData']) {
+  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData', 'CanvasProviderErrorData']) {
     try {
       lines.push(generateDataClassFromInterface(project, ifaceName));
       lines.push('');
@@ -1910,12 +1944,14 @@ function checkExhaustiveness(project: Project): void {
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
+    'CanvasProviderSource',         // CANVAS_PROVIDER_SOURCE_UNION discriminated union
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ChildCustomizationType',       // TS subset alias of CustomizationType; consumers reuse CustomizationType
     'CustomizationLoadState',       // CUSTOMIZATION_LOAD_STATE_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()
+    'CanvasProviderErrorData',      // emitted by generateErrorsFile()
     'AhpError',                     // typed via JsonRpcError; not a Kotlin data class
     'AhpErrorDetailsMap',           // type-level mapping; not a Kotlin type
     'AhpErrorCode',                 // type-level alias over AhpErrorCodes const enum

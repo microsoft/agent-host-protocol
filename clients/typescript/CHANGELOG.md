@@ -46,6 +46,18 @@ hotfix escape hatch.
   lifecycle state.
 - Optional `model` and `tools` fields on `AgentCustomization` for a custom
   agent's pinned model and tool allowlist.
+- Canvas channel support: the per-instance `CanvasState` plus the
+  `CanvasUpdatedAction` (`canvas/updated`), `CanvasCloseRequestedAction`
+  (`canvas/closeRequested`), and `CanvasMessageAction` (`canvas/message`)
+  actions, the `SessionCanvasesChangedAction` (`session/canvasesChanged`) and
+  `SessionOpenCanvasesChangedAction` (`session/openCanvasesChanged`) session
+  actions, and the canvas discovery types (`SessionCanvasDeclaration`,
+  `ClientCanvasDeclaration`, `OpenCanvasRef`, `CanvasProviderSource`) on
+  `SessionState.canvases` / `SessionState.openCanvases`. Adds the
+  `ClientCapabilities.canvas` capability, the `canvasOpen` / `canvasInvokeAction`
+  / `canvasClose` / `canvasReadResource` methods, and the `CanvasProviderError`
+  error. The session reducer replaces the canvas registry/catalogue and the
+  `canvasReducer` sparse-merges `canvas/updated`.
 
 ### Removed
 

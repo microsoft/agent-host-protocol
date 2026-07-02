@@ -23,6 +23,10 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+## [0.6.0] — Unreleased
+
+Spec version: `0.6.0`
+
 ### Added
 
 - Optional `intention` field on `chat/toolCallStart` and every `ToolCallState`
@@ -39,6 +43,20 @@ changes accumulate. Track in-flight protocol changes via PRs touching
   extends `PaginatedResult`, letting clients fetch a large session catalogue
   incrementally. Fully additive — omitting the fields preserves today's
   behaviour.
+- Canvas channel — an opt-in surface for the agent to open rich, interactive UI
+  surfaces (document/spreadsheet editors, diff views, live previews) alongside a
+  session, following the "one channel per resource" model of terminals and
+  changesets. Adds the `ClientCapabilities.canvas` capability; the
+  `SessionState.canvases` registry and `SessionState.openCanvases` catalogue
+  (`session/canvasesChanged` / `session/openCanvasesChanged`) plus
+  `SessionActiveClient.canvasProviders` and the `SessionCanvasDeclaration` /
+  `ClientCanvasDeclaration` / `OpenCanvasRef` / `CanvasProviderSource` discovery
+  types; the per-instance `ahp-canvas:/<id>` channel and its `CanvasState`; the
+  `canvas/updated`, `canvas/closeRequested`, and `canvas/message` actions; the
+  `canvasOpen` / `canvasInvokeAction` / `canvasClose` provider request family and
+  the client → server `canvasReadResource` content-fetch request; and the
+  `CanvasProviderError` (`-32012`) error. See
+  [`docs/specification/canvas-channel.md`](docs/specification/canvas-channel.md).
 
 ### Removed
 

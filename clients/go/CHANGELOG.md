@@ -40,6 +40,18 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
   lifecycle state.
 - Optional `Model` and `Tools` fields on `AgentCustomization` for a custom
   agent's pinned model and tool allowlist.
+- Canvas channel support: the per-instance `CanvasState` plus the
+  `CanvasUpdatedAction` (wire `canvas/updated`), `CanvasCloseRequestedAction`
+  (`canvas/closeRequested`), and `CanvasMessageAction` (`canvas/message`)
+  actions, the `SessionCanvasesChangedAction` (`session/canvasesChanged`) and
+  `SessionOpenCanvasesChangedAction` (`session/openCanvasesChanged`) session
+  actions, and the canvas discovery types (`SessionCanvasDeclaration`,
+  `ClientCanvasDeclaration`, `OpenCanvasRef`, `CanvasProviderSource`) on
+  `SessionState.Canvases` / `SessionState.OpenCanvases`. Adds the
+  `ClientCapabilities.Canvas` capability, the `canvasOpen` / `canvasInvokeAction`
+  / `canvasClose` / `canvasReadResource` methods, and the `CanvasProviderError`
+  error. The session reducer replaces the canvas registry/catalogue and
+  `ApplyActionToCanvas` sparse-merges `canvas/updated`.
 
 ### Removed
 

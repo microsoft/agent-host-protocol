@@ -738,6 +738,12 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 	case *ahptypes.SessionServerToolsChangedAction:
 		state.ServerTools = append([]ahptypes.ToolDefinition(nil), a.Tools...)
 		return ReduceOutcomeApplied
+	case *ahptypes.SessionCanvasesChangedAction:
+		state.Canvases = append([]ahptypes.SessionCanvasDeclaration(nil), a.Canvases...)
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionOpenCanvasesChangedAction:
+		state.OpenCanvases = append([]ahptypes.OpenCanvasRef(nil), a.OpenCanvases...)
+		return ReduceOutcomeApplied
 	case *ahptypes.SessionActiveClientSetAction:
 		for i := range state.ActiveClients {
 			if state.ActiveClients[i].ClientId == a.ActiveClient.ClientId {
@@ -1472,6 +1478,38 @@ func ApplyActionToAnnotations(state *ahptypes.AnnotationsState, action ahptypes.
 func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahptypes.StateAction) ReduceOutcome {
 	switch action.Value.(type) {
 	case *ahptypes.ResourceWatchChangedAction:
+		return ReduceOutcomeNoOp
+	}
+	return ReduceOutcomeOutOfScope
+}
+
+// ApplyActionToCanvas applies action to the [ahptypes.CanvasState] in
+// place. `canvas/updated` is a sparse merge — a presented field
+// (title, status, url, availability) overwrites the corresponding
+// state field and an absent field preserves the current value.
+// `canvas/closeRequested` and `canvas/message` are side-effect-only
+// client→host signals the host acts on out of band, so they leave the
+// state unchanged. Returns [ReduceOutcomeOutOfScope] for actions that
+// target a different state tree.
+func ApplyActionToCanvas(state *ahptypes.CanvasState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.CanvasUpdatedAction:
+		if a.Title != nil {
+			state.Title = a.Title
+		}
+		if a.Status != nil {
+			state.Status = a.Status
+		}
+		if a.Url != nil {
+			state.Url = a.Url
+		}
+		if a.Availability != nil {
+			state.Availability = *a.Availability
+		}
+		return ReduceOutcomeApplied
+	case *ahptypes.CanvasCloseRequestedAction:
+		return ReduceOutcomeNoOp
+	case *ahptypes.CanvasMessageAction:
 		return ReduceOutcomeNoOp
 	}
 	return ReduceOutcomeOutOfScope
