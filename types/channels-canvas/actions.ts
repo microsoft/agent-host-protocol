@@ -12,6 +12,15 @@ import type { CanvasAvailability } from '../channels-session/state.js';
 /**
  * The canvas instance's presentation state changed.
  *
+ * Emitted by the server for a server-side provider, or dispatched by the client
+ * that provides the instance to push its own presentation changes — mirroring
+ * how `terminal/titleChanged` lets a client-owned terminal rename itself. This
+ * is the only path a client-side provider has to update the structured
+ * {@link CanvasState} (and the {@link OpenCanvasRef} fields mirrored from it)
+ * that other subscribers render. The host stays the authoritative reducer: it
+ * SHOULD reject an update from a client that is not the instance's resolved
+ * provider, then applies the merge and re-broadcasts to subscribers.
+ *
  * Sparse-merge semantics: each present field overwrites the corresponding
  * {@link CanvasState} field, and an absent field preserves the current value.
  * There is no clear-to-absent via this action — that three-state distinction
@@ -21,6 +30,7 @@ import type { CanvasAvailability } from '../channels-session/state.js';
  *
  * @category Canvas Actions
  * @version 1
+ * @clientDispatchable
  */
 export interface CanvasUpdatedAction {
   type: ActionType.CanvasUpdated;

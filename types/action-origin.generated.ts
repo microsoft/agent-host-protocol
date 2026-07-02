@@ -339,13 +339,14 @@ export type CanvasAction =
 
 /** Union of canvas actions that clients may dispatch. */
 export type ClientCanvasAction =
+  | CanvasUpdatedAction
   | CanvasCloseRequestedAction
   | CanvasMessageAction
 ;
 
 /** Union of canvas actions that only the server may produce. */
 export type ServerCanvasAction =
-  | CanvasUpdatedAction
+  never
 ;
 
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
@@ -432,7 +433,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ResourceWatchChanged]: false,
   [ActionType.SessionCanvasesChanged]: false,
   [ActionType.SessionOpenCanvasesChanged]: false,
-  [ActionType.CanvasUpdated]: false,
+  [ActionType.CanvasUpdated]: true,
   [ActionType.CanvasCloseRequested]: true,
   [ActionType.CanvasMessage]: true,
 };

@@ -140,13 +140,15 @@ Three actions travel on the per-instance channel. Because the channel is scoped 
 
 | Action | Client-dispatchable | Reducer effect |
 |---|:---:|---|
-| `canvas/updated` | No | Sparse-merges `title` / `status` / `url` / `availability` into `CanvasState`. |
+| `canvas/updated` | Yes | Sparse-merges `title` / `status` / `url` / `availability` into `CanvasState`. |
 | `canvas/closeRequested` | Yes | No-op — signals the host to run the close flow. |
 | `canvas/message` | Yes | No-op — opaque View ↔ provider message bridge. |
 
-`canvas/updated` uses **sparse-merge** semantics: each present field overwrites the corresponding `CanvasState` field, and an absent field preserves the current value. There is no clear-to-absent through this action — a provider that needs to reset a field re-publishes it, and a full reset arrives as a fresh `CanvasState` snapshot on (re)subscribe.
+`canvas/updated` is dispatched by the server for a server-side provider, or by the client that provides an instance to push its own presentation changes — the same client-dispatchable pattern as `terminal/titleChanged`, and the only way a client-side provider updates the structured `CanvasState` (and the `OpenCanvasRef` fields mirrored from it) that other subscribers render. The host stays the authoritative reducer: it SHOULD reject an update from a client that is not the instance's resolved provider, then applies the merge and re-broadcasts.
 
-`canvas/closeRequested` and `canvas/message` are pure signals with no-op reducers, mirroring how `terminal/input` is a side-effect-only client action — they never bloat channel state. `canvas/closeRequested` is a client → host signal (the user hit ✕); the host responds by resolving `canvasClose` against the provider and dropping the instance from `openCanvases`. `canvas/message` is bidirectional: a client dispatches it to carry a View → provider message, and the host emits it to carry a provider → View message.
+It uses **sparse-merge** semantics: each present field overwrites the corresponding `CanvasState` field, and an absent field preserves the current value. There is no clear-to-absent through this action — a provider that needs to reset a field re-publishes it, and a full reset arrives as a fresh `CanvasState` snapshot on (re)subscribe.
+
+`canvas/closeRequested` and `canvas/message` are pure signals with no-op reducers, mirroring how `terminal/input` is a side-effect-only client action — they never bloat channel state. `canvas/closeRequested` is a client → host signal (the user hit ✕); the host responds by resolving `canvasClose` against the provider and dropping the instance from `openCanvases`. `canvas/message` is bidirectional: a client dispatches it to carry a View → provider message, and the host emits it to carry a provider → View message. A View → provider message is routed to the instance's single resolved provider — relayed to that client when the provider and renderer are different clients, or handled host-internally for a server-side provider. Targeting a particular renderer for a provider → View message when an instance has more than one renderer is not yet specified; it depends on the still-open render-targeting question and is out of scope here.
 
 ## Provider request family
 
@@ -160,7 +162,7 @@ sequenceDiagram
     participant C as Client (provider + renderer)
 
     Note over C: declares ClientCapabilities.canvas<br/>publishes canvasProviders
-    C->>H: dispatchAction session/activeClientsChanged (canvasProviders)
+    C->>H: dispatchAction session/activeClientSet (canvasProviders)
     H->>C: action session/canvasesChanged (registry)
 
     A->>H: open canvas "diff"
@@ -192,11 +194,13 @@ sequenceDiagram
 
 `canvasReadResource` is modeled on MCP's `resources/read`; each `CanvasResourceContent` carries the resolved `uri`, an optional `mimeType`, and exactly one of `text` (UTF-8) or `blob` (base64).
 
+The channel split within the family is deliberate: the three provider operations are session-scoped RPCs and travel on the session channel (`ahp-session:/<uuid>`), while `canvasReadResource` resolves content bytes and so targets the instance's own channel (`ahp-canvas:/<id>`).
+
 ### Actions
 
 | Action | Direction |
 |---|---|
-| `canvas/updated` | host → client (over the standard `action` envelope) |
+| `canvas/updated` | client → host (a client-side provider) **or** host → client |
 | `canvas/closeRequested` | client → host |
 | `canvas/message` | client → host **or** host → client |
 

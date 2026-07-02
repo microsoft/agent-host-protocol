@@ -1884,7 +1884,7 @@
     },
     "CanvasUpdatedAction": {
       "type": "object",
-      "description": "The canvas instance's presentation state changed.\n\nSparse-merge semantics: each present field overwrites the corresponding\n{@link CanvasState} field, and an absent field preserves the current value.\nThere is no clear-to-absent via this action — that three-state distinction\ncannot survive JSON transport uniformly across languages, so a provider that\nneeds to reset a field re-publishes it, and a full reset arrives as a fresh\n{@link CanvasState} snapshot on (re)subscribe.",
+      "description": "The canvas instance's presentation state changed.\n\nEmitted by the server for a server-side provider, or dispatched by the client\nthat provides the instance to push its own presentation changes — mirroring\nhow `terminal/titleChanged` lets a client-owned terminal rename itself. This\nis the only path a client-side provider has to update the structured\n{@link CanvasState} (and the {@link OpenCanvasRef} fields mirrored from it)\nthat other subscribers render. The host stays the authoritative reducer: it\nSHOULD reject an update from a client that is not the instance's resolved\nprovider, then applies the merge and re-broadcasts to subscribers.\n\nSparse-merge semantics: each present field overwrites the corresponding\n{@link CanvasState} field, and an absent field preserves the current value.\nThere is no clear-to-absent via this action — that three-state distinction\ncannot survive JSON transport uniformly across languages, so a provider that\nneeds to reset a field re-publishes it, and a full reset arrives as a fresh\n{@link CanvasState} snapshot on (re)subscribe.",
       "properties": {
         "type": {
           "$ref": "#/$defs/ActionType.CanvasUpdated"
