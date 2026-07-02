@@ -252,8 +252,8 @@ export interface ContentRef {
   sizeHint?: number;
   /** Content MIME type */
   contentType?: string;
-  /** Content SHA-256 hash */
-  contentSha256?: string;
+  /** Content nonce */
+  nonce?: string;
 }
 
 // ─── File Edit ───────────────────────────────────────────────────────────────

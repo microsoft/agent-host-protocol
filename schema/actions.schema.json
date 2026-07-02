@@ -2217,9 +2217,9 @@
           "type": "string",
           "description": "Content MIME type"
         },
-        "contentSha256": {
+        "nonce": {
           "type": "string",
-          "description": "Content SHA-256 hash"
+          "description": "Content nonce"
         }
       },
       "required": [
@@ -4811,9 +4811,9 @@
           "type": "string",
           "description": "Content MIME type"
         },
-        "contentSha256": {
+        "nonce": {
           "type": "string",
-          "description": "Content SHA-256 hash"
+          "description": "Content nonce"
         },
         "type": {
           "$ref": "#/$defs/MessageAttachmentKind.Resource",
@@ -4911,9 +4911,9 @@
           "type": "string",
           "description": "Content MIME type"
         },
-        "contentSha256": {
+        "nonce": {
           "type": "string",
-          "description": "Content SHA-256 hash"
+          "description": "Content nonce"
         },
         "kind": {
           "$ref": "#/$defs/ResponsePartKind.ContentRef",
@@ -5641,9 +5641,9 @@
           "type": "string",
           "description": "Content MIME type"
         },
-        "contentSha256": {
+        "nonce": {
           "type": "string",
-          "description": "Content SHA-256 hash"
+          "description": "Content nonce"
         },
         "type": {
           "$ref": "#/$defs/ToolResultContentType.Resource"

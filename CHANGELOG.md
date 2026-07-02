@@ -25,8 +25,7 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 
 ### Added
 
-- Optional `contentSha256` field on `ContentRef`, carrying the SHA-256 hash of
-  the referenced content so consumers can verify integrity or deduplicate.
+- Optional `nonce` field on `ContentRef`.
 - Optional `intention` field on `chat/toolCallStart` and every `ToolCallState`
   variant, providing a human-readable description of what the invocation intends
   to do.

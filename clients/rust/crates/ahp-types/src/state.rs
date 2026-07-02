@@ -1919,9 +1919,9 @@ pub struct MessageResourceAttachment {
     /// Content MIME type
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
-    /// Content SHA-256 hash
+    /// Content nonce
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content_sha256: Option<String>,
+    pub nonce: Option<String>,
     /// Optional selection within the referenced textual resource.
     ///
     /// Only meaningful for textual resources.
@@ -1995,9 +1995,9 @@ pub struct ContentRef {
     /// Content MIME type
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
-    /// Content SHA-256 hash
+    /// Content nonce
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content_sha256: Option<String>,
+    pub nonce: Option<String>,
 }
 
 /// A content part that's a reference to large content stored outside the state tree.
@@ -2012,9 +2012,9 @@ pub struct ResourceResponsePart {
     /// Content MIME type
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
-    /// Content SHA-256 hash
+    /// Content nonce
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content_sha256: Option<String>,
+    pub nonce: Option<String>,
 }
 
 /// A tool call represented as a response part.
@@ -2452,9 +2452,9 @@ pub struct ToolResultResourceContent {
     /// Content MIME type
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
-    /// Content SHA-256 hash
+    /// Content nonce
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content_sha256: Option<String>,
+    pub nonce: Option<String>,
 }
 
 /// Describes a file modification performed by a tool.

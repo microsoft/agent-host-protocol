@@ -16,8 +16,7 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Added
 
-- Optional `ContentSha256` field on `ContentRef`, carrying the SHA-256 hash of
-  the referenced content so consumers can verify integrity or deduplicate.
+- Optional `Nonce` field on `ContentRef`.
 - `SubscribeParams.Delivery.MaxLatencyMs` and `Client.SubscribeWithDelivery`
   for clients to request a maximum subscription delivery latency, including
   `0` for no intentional coalescing.

@@ -2113,9 +2113,9 @@ data class MessageResourceAttachment(
      */
     val contentType: String? = null,
     /**
-     * Content SHA-256 hash
+     * Content nonce
      */
-    val contentSha256: String? = null,
+    val nonce: String? = null,
     /**
      * Discriminant
      */
@@ -2210,9 +2210,9 @@ data class ContentRef(
      */
     val contentType: String? = null,
     /**
-     * Content SHA-256 hash
+     * Content nonce
      */
-    val contentSha256: String? = null
+    val nonce: String? = null
 )
 
 @Serializable
@@ -2230,9 +2230,9 @@ data class ResourceReponsePart(
      */
     val contentType: String? = null,
     /**
-     * Content SHA-256 hash
+     * Content nonce
      */
-    val contentSha256: String? = null,
+    val nonce: String? = null,
     /**
      * Discriminant
      */
@@ -2798,9 +2798,9 @@ data class ToolResultResourceContent(
      */
     val contentType: String? = null,
     /**
-     * Content SHA-256 hash
+     * Content nonce
      */
-    val contentSha256: String? = null,
+    val nonce: String? = null,
     val type: ToolResultContentType
 )
 
