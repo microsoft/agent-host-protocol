@@ -20,7 +20,7 @@ use crate::state::{
     OpenCanvasRef, PendingMessageKind, ResponsePart, SessionActiveClient, SessionCanvasDeclaration,
     SessionInputRequest, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
     ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolDefinition,
-    ToolResultContent, UsageInfo,
+    ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -114,6 +114,8 @@ pub enum ActionType {
     SessionMcpServerStateChanged,
     #[serde(rename = "chat/truncated")]
     ChatTruncated,
+    #[serde(rename = "chat/turnsLoaded")]
+    ChatTurnsLoaded,
     #[serde(rename = "session/isReadChanged")]
     SessionIsReadChanged,
     #[serde(rename = "session/isArchivedChanged")]
@@ -1105,6 +1107,23 @@ pub struct ChatTruncatedAction {
     pub turn_id: Option<String>,
 }
 
+/// Loads older completed turns into this chat's state.
+///
+/// Hosts dispatch this before responding to `fetchTurns`, and before applying
+/// any operation that references a turn older than the currently loaded window.
+/// `turns` is ordered oldest-first and is prepended to the current `turns`
+/// window. `turnsNextCursor` replaces the state's cursor; omit it when all
+/// retained turns are now loaded.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatTurnsLoadedAction {
+    /// Older completed turns loaded into the state, ordered oldest-first.
+    pub turns: Vec<Turn>,
+    /// Opaque cursor for loading the next older page, if one remains.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turns_next_cursor: Option<String>,
+}
+
 /// Client changed a mutable config value mid-session.
 ///
 /// Only properties with `sessionMutable: true` in the config schema may be
@@ -1704,6 +1723,8 @@ pub enum StateAction {
     SessionMcpServerStateChanged(Box<SessionMcpServerStateChangedAction>),
     #[serde(rename = "chat/truncated")]
     ChatTruncated(ChatTruncatedAction),
+    #[serde(rename = "chat/turnsLoaded")]
+    ChatTurnsLoaded(ChatTurnsLoadedAction),
     #[serde(rename = "session/configChanged")]
     SessionConfigChanged(SessionConfigChangedAction),
     #[serde(rename = "session/metaChanged")]

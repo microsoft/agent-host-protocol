@@ -16,6 +16,20 @@ Multiple chat channels may be active simultaneously. Clients subscribe to each c
 
 Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectory`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)). Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
 
+When a client subscribes with `view.turns`, the server MAY expose only a tail of
+the most recent completed turns in the initial snapshot. The requested number is
+advisory: the server MAY return more or fewer turns than requested. If
+`view.turns` is omitted, the server MUST return all retained turns. If older
+retained turns remain available, `ChatState.turnsNextCursor` is present. The
+client passes this opaque cursor to
+[`fetchTurns`](#commands-paramschannel--ahp-chatuuid) to ask the host to
+dispatch `chat/turnsLoaded`, which prepends older turns into the same reduced
+chat state and updates or clears `turnsNextCursor`.
+
+Hosts MUST also eagerly load older turns into state before applying any
+operation that references a turn outside the currently loaded window (for
+example, a fork or truncation targeting an older turn).
+
 ### Drafts
 
 [`ChatState.draft`](/reference/chat#chatstate) is the user's in-progress input for a chat — the [`Message`](/reference/chat#message) they are composing but have not sent yet, including its model/agent selection and attachments. Unlike the fields above, `draft` is state-only and is **not** mirrored onto [`ChatSummary`](/reference/chat#chatsummary).
@@ -96,7 +110,7 @@ This section lists wire methods that are interpreted in the context of a chat UR
 
 | Method | Kind | Purpose |
 |---|---|---|
-| `fetchTurns` | request | Page historical turns for this chat. |
+| `fetchTurns` | request | Ask the host to load older historical turns into this chat state. |
 | `completions` | request | Chat-scoped inline completions (e.g. user-message mentions). |
 
 `createChat` is dispatched against the owning session URI (`params.channel = "ahp-session:/<sid>"`).

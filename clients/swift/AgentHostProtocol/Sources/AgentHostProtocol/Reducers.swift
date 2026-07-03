@@ -403,10 +403,21 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         }
         var next = state
         next.turns = turns
+        if a.turnId == nil {
+            next.turnsNextCursor = nil
+        }
         next.activeTurn = nil
         next.inputRequests = nil
         next.status = chatSummaryStatus(next)
         next.modifiedAt = currentTimestamp()
+        return next
+
+    case .chatTurnsLoaded(let a):
+        let existingIds = Set(state.turns.map(\.id))
+        let olderTurns = a.turns.filter { !existingIds.contains($0.id) }
+        var next = state
+        next.turns = olderTurns + state.turns
+        next.turnsNextCursor = a.turnsNextCursor
         return next
 
     // ── Session Input Requests ─────────────────────────────────────────────

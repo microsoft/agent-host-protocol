@@ -299,10 +299,10 @@ actor AHPConnection {
         return result.items
     }
 
-    func fetchTurns(session: String, before: String? = nil, limit: Int? = nil) async throws -> FetchTurnsResult {
+    func fetchTurns(session: String, cursor: String? = nil) async throws -> FetchTurnsResult {
         try await sendRequest(
             method: "fetchTurns",
-            params: FetchTurnsParams(channel: session, before: before, limit: limit)
+            params: FetchTurnsParams(channel: session, cursor: cursor)
         )
     }
 
@@ -1084,10 +1084,10 @@ private actor LegacyAHPConnection {
     }
 
     /// Fetch turns for a session.
-    func fetchTurns(session: String, before: String? = nil, limit: Int? = nil) async throws -> FetchTurnsResult {
+    func fetchTurns(session: String, cursor: String? = nil) async throws -> FetchTurnsResult {
         try await sendRequest(
             method: "fetchTurns",
-            params: FetchTurnsParams(channel: session, before: before, limit: limit)
+            params: FetchTurnsParams(channel: session, cursor: cursor)
         )
     }
 

@@ -1166,6 +1166,15 @@ data class ChatState(
      */
     val turns: List<Turn>,
     /**
+     * Cursor for loading older completed turns into this chat state.
+     *
+     * Presence means `turns` is a tail window and more historical turns are
+     * available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
+     * the loaded turns into state and update or clear this cursor before
+     * responding. Absence means the state contains all retained turns.
+     */
+    val turnsNextCursor: String? = null,
+    /**
      * Currently in-progress turn
      */
     val activeTurn: ActiveTurn? = null,
@@ -2185,6 +2194,10 @@ data class MessageResourceAttachment(
      */
     val contentType: String? = null,
     /**
+     * Content nonce
+     */
+    val nonce: String? = null,
+    /**
      * Discriminant
      */
     val type: MessageAttachmentKind,
@@ -2276,7 +2289,11 @@ data class ContentRef(
     /**
      * Content MIME type
      */
-    val contentType: String? = null
+    val contentType: String? = null,
+    /**
+     * Content nonce
+     */
+    val nonce: String? = null
 )
 
 @Serializable
@@ -2293,6 +2310,10 @@ data class ResourceReponsePart(
      * Content MIME type
      */
     val contentType: String? = null,
+    /**
+     * Content nonce
+     */
+    val nonce: String? = null,
     /**
      * Discriminant
      */
@@ -2857,6 +2878,10 @@ data class ToolResultResourceContent(
      * Content MIME type
      */
     val contentType: String? = null,
+    /**
+     * Content nonce
+     */
+    val nonce: String? = null,
     val type: ToolResultContentType
 )
 

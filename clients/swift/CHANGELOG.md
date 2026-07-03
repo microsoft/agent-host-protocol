@@ -19,6 +19,24 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ### Added
 
+- Canvas channel support: the per-instance `CanvasState` plus the
+  `StateAction.canvasUpdated` / `StateAction.canvasCloseRequested` /
+  `StateAction.canvasMessage` actions, the `StateAction.sessionCanvasesChanged`
+  / `StateAction.sessionOpenCanvasesChanged` session actions, and the canvas
+  discovery types (`SessionCanvasDeclaration`, `ClientCanvasDeclaration`,
+  `OpenCanvasRef`, `CanvasProviderSource`) on `SessionState.canvases` /
+  `SessionState.openCanvases`. Adds the `ClientCapabilities.canvas` capability,
+  the `canvasOpen` / `canvasInvokeAction` / `canvasClose` / `canvasReadResource`
+  methods, and the `CanvasProviderError` error. The session reducer replaces the
+  canvas registry/catalogue and the canvas reducer sparse-merges `canvas/updated`.
+
+## [0.5.1] — 2026-07-02
+
+Implements AHP 0.5.1.
+
+### Added
+
+- Optional `nonce` field on `ContentRef`.
 - `SubscribeParams.delivery.maxLatencyMs` and
   `AHPClient.subscribe(_:delivery:)` for clients to request a maximum
   subscription delivery latency, including `0` for no intentional coalescing.
@@ -30,6 +48,9 @@ the tag matches the version pinned in [`VERSION`](VERSION).
   `ListSessionsParams` and `ListSessionsResult` now carry these fields, letting
   clients page through a large session catalogue. Fully additive — omitting the
   fields preserves prior behaviour.
+- `SubscribeParams.view.turns`, `ChatState.turnsNextCursor`, and the
+  `chat/turnsLoaded` action so clients can subscribe to a bounded tail of chat
+  history and page older turns into the reduced chat state on demand.
 - `SessionState.inputNeeded` — a session-level aggregate of outstanding input
   requests across all chats (`SessionInputRequest` enum with
   `SessionChatInputRequest`, `SessionToolConfirmationRequest`, and
@@ -42,16 +63,14 @@ the tag matches the version pinned in [`VERSION`](VERSION).
   lifecycle state.
 - Optional `model` and `tools` fields on `AgentCustomization` for a custom
   agent's pinned model and tool allowlist.
-- Canvas channel support: the per-instance `CanvasState` plus the
-  `StateAction.canvasUpdated` / `StateAction.canvasCloseRequested` /
-  `StateAction.canvasMessage` actions, the `StateAction.sessionCanvasesChanged`
-  / `StateAction.sessionOpenCanvasesChanged` session actions, and the canvas
-  discovery types (`SessionCanvasDeclaration`, `ClientCanvasDeclaration`,
-  `OpenCanvasRef`, `CanvasProviderSource`) on `SessionState.canvases` /
-  `SessionState.openCanvases`. Adds the `ClientCapabilities.canvas` capability,
-  the `canvasOpen` / `canvasInvokeAction` / `canvasClose` / `canvasReadResource`
-  methods, and the `CanvasProviderError` error. The session reducer replaces the
-  canvas registry/catalogue and the canvas reducer sparse-merges `canvas/updated`.
+
+### Changed
+
+- `fetchTurns` now accepts `cursor` from `ChatState.turnsNextCursor` and returns
+  an empty result after the host has loaded older turns into chat state, instead
+  of returning a detached `{ turns, hasMore }` page.
+- Generated clients now advertise only protocol `0.5.1`, since the `fetchTurns`
+  contract is not wire-compatible with `0.5.0`.
 
 ### Removed
 

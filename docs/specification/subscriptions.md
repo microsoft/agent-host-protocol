@@ -46,7 +46,8 @@ Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes
   "method": "subscribe",
   "params": {
     "channel": "ahp-session:/<uuid>",
-    "delivery": { "maxLatencyMs": 100 }
+    "delivery": { "maxLatencyMs": 100 },
+    "view": { "turns": 30 }
   }
 }
 
@@ -86,6 +87,21 @@ subscription. Servers MAY use that budget to coalesce high-frequency updates
 while preserving the same reduced state a client would observe from immediate
 delivery. A value of `0` requests immediate delivery with no intentional
 coalescing. Omitting `delivery` uses the server's default delivery behavior.
+
+### Snapshot views
+
+Clients MAY include `view` on `subscribe` to ask the server to shape the
+returned snapshot. View preferences are advisory and additive: a server that
+does not understand a requested view ignores it and returns its default
+snapshot, and clients MUST tolerate receiving more state than requested.
+
+For chat channels, `view.turns` asks the server to expose approximately that
+many most-recent completed turns in the snapshot. The value is advisory: the
+server MAY return more or fewer turns than requested. If `view.turns` is
+omitted, the server MUST return all retained turns. If older retained turns
+remain available, the returned `ChatState` includes `turnsNextCursor`; the
+client can pass that cursor to `fetchTurns` to ask the host to page older turns
+into the same reduced state.
 
 ## Unsubscribe (Notification)
 

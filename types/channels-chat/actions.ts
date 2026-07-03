@@ -16,6 +16,7 @@ import type {
   ChatInputResponseKind,
   ConfirmationOption,
   ToolCallContributor,
+  Turn,
 } from './state.js';
 import {
   ToolCallConfirmationReason,
@@ -496,6 +497,26 @@ export interface ChatTruncatedAction {
   turnId?: string;
 }
 
+/**
+ * Loads older completed turns into this chat's state.
+ *
+ * Hosts dispatch this before responding to `fetchTurns`, and before applying
+ * any operation that references a turn older than the currently loaded window.
+ * `turns` is ordered oldest-first and is prepended to the current `turns`
+ * window. `turnsNextCursor` replaces the state's cursor; omit it when all
+ * retained turns are now loaded.
+ *
+ * @category Chat Actions
+ * @version 1
+ */
+export interface ChatTurnsLoadedAction {
+  type: ActionType.ChatTurnsLoaded;
+  /** Older completed turns loaded into the state, ordered oldest-first. */
+  turns: Turn[];
+  /** Opaque cursor for loading the next older page, if one remains. */
+  turnsNextCursor?: string;
+}
+
 // ─── Pending Message Actions ─────────────────────────────────────────────────
 
 /**
@@ -662,6 +683,7 @@ export type ChatAction =
   | ChatUsageAction
   | ChatReasoningAction
   | ChatTruncatedAction
+  | ChatTurnsLoadedAction
   | ChatPendingMessageSetAction
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction

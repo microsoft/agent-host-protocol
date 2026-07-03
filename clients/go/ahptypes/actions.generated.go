@@ -62,6 +62,7 @@ const (
 	ActionTypeSessionCustomizationRemoved       ActionType = "session/customizationRemoved"
 	ActionTypeSessionMcpServerStateChanged      ActionType = "session/mcpServerStateChanged"
 	ActionTypeChatTruncated                     ActionType = "chat/truncated"
+	ActionTypeChatTurnsLoaded                   ActionType = "chat/turnsLoaded"
 	ActionTypeSessionIsReadChanged              ActionType = "session/isReadChanged"
 	ActionTypeSessionIsArchivedChanged          ActionType = "session/isArchivedChanged"
 	ActionTypeSessionActivityChanged            ActionType = "session/activityChanged"
@@ -676,6 +677,21 @@ type ChatTruncatedAction struct {
 	Type ActionType `json:"type"`
 	// Keep turns up to and including this turn. Omit to clear all turns.
 	TurnId *string `json:"turnId,omitempty"`
+}
+
+// Loads older completed turns into this chat's state.
+//
+// Hosts dispatch this before responding to `fetchTurns`, and before applying
+// any operation that references a turn older than the currently loaded window.
+// `turns` is ordered oldest-first and is prepended to the current `turns`
+// window. `turnsNextCursor` replaces the state's cursor; omit it when all
+// retained turns are now loaded.
+type ChatTurnsLoadedAction struct {
+	Type ActionType `json:"type"`
+	// Older completed turns loaded into the state, ordered oldest-first.
+	Turns []Turn `json:"turns"`
+	// Opaque cursor for loading the next older page, if one remains.
+	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
 }
 
 // The read state of the session changed.
@@ -1361,6 +1377,7 @@ func (*ChatInputRequestedAction) isStateAction()                {}
 func (*ChatInputAnswerChangedAction) isStateAction()            {}
 func (*ChatInputCompletedAction) isStateAction()                {}
 func (*ChatTruncatedAction) isStateAction()                     {}
+func (*ChatTurnsLoadedAction) isStateAction()                   {}
 func (*SessionIsReadChangedAction) isStateAction()              {}
 func (*SessionIsArchivedChangedAction) isStateAction()          {}
 func (*SessionActivityChangedAction) isStateAction()            {}
@@ -1622,6 +1639,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/truncated":
 		var value ChatTruncatedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/turnsLoaded":
+		var value ChatTurnsLoadedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

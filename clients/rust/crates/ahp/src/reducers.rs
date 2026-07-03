@@ -49,7 +49,7 @@
 //! );
 //! ```
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ahp_types::actions::{
@@ -932,6 +932,20 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             }
         }),
         StateAction::ChatTruncated(a) => apply_truncated(state, a.turn_id.as_deref()),
+        StateAction::ChatTurnsLoaded(a) => {
+            let existing_ids: HashSet<&str> =
+                state.turns.iter().map(|turn| turn.id.as_str()).collect();
+            let mut older_turns: Vec<Turn> = a
+                .turns
+                .iter()
+                .filter(|turn| !existing_ids.contains(turn.id.as_str()))
+                .cloned()
+                .collect();
+            older_turns.append(&mut state.turns);
+            state.turns = older_turns;
+            state.turns_next_cursor = a.turns_next_cursor.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::ChatInputRequested(a) => {
             upsert_input_request(state, a.request.clone());
             ReduceOutcome::Applied
@@ -1297,6 +1311,7 @@ fn apply_truncated(state: &mut ChatState, turn_id: Option<&str>) -> ReduceOutcom
     match turn_id {
         None => {
             state.turns.clear();
+            state.turns_next_cursor = None;
         }
         Some(id) => {
             let Some(idx) = state.turns.iter().position(|t| t.id == id) else {
@@ -1702,6 +1717,7 @@ mod tests {
             interactivity: None,
             working_directory: None,
             turns: Vec::new(),
+            turns_next_cursor: None,
             active_turn: None,
             steering_message: None,
             queued_messages: None,

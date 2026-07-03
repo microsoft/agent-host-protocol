@@ -112,6 +112,8 @@ enum class ActionType {
     SESSION_MCP_SERVER_STATE_CHANGED,
     @SerialName("chat/truncated")
     CHAT_TRUNCATED,
+    @SerialName("chat/turnsLoaded")
+    CHAT_TURNS_LOADED,
     @SerialName("session/isReadChanged")
     SESSION_IS_READ_CHANGED,
     @SerialName("session/isArchivedChanged")
@@ -997,6 +999,19 @@ data class ChatTruncatedAction(
 )
 
 @Serializable
+data class ChatTurnsLoadedAction(
+    val type: ActionType,
+    /**
+     * Older completed turns loaded into the state, ordered oldest-first.
+     */
+    val turns: List<Turn>,
+    /**
+     * Opaque cursor for loading the next older page, if one remains.
+     */
+    val turnsNextCursor: String? = null
+)
+
+@Serializable
 data class SessionConfigChangedAction(
     val type: ActionType,
     /**
@@ -1463,6 +1478,7 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionCustomizationRemoved(val value: SessionCustomizationRemovedAction) : StateAction
 @JvmInline value class StateActionSessionMcpServerStateChanged(val value: SessionMcpServerStateChangedAction) : StateAction
 @JvmInline value class StateActionChatTruncated(val value: ChatTruncatedAction) : StateAction
+@JvmInline value class StateActionChatTurnsLoaded(val value: ChatTurnsLoadedAction) : StateAction
 @JvmInline value class StateActionSessionConfigChanged(val value: SessionConfigChangedAction) : StateAction
 @JvmInline value class StateActionSessionMetaChanged(val value: SessionMetaChangedAction) : StateAction
 @JvmInline value class StateActionChangesetStatusChanged(val value: ChangesetStatusChangedAction) : StateAction
@@ -1558,6 +1574,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/customizationRemoved" -> StateActionSessionCustomizationRemoved(input.json.decodeFromJsonElement(SessionCustomizationRemovedAction.serializer(), element))
             "session/mcpServerStateChanged" -> StateActionSessionMcpServerStateChanged(input.json.decodeFromJsonElement(SessionMcpServerStateChangedAction.serializer(), element))
             "chat/truncated" -> StateActionChatTruncated(input.json.decodeFromJsonElement(ChatTruncatedAction.serializer(), element))
+            "chat/turnsLoaded" -> StateActionChatTurnsLoaded(input.json.decodeFromJsonElement(ChatTurnsLoadedAction.serializer(), element))
             "session/configChanged" -> StateActionSessionConfigChanged(input.json.decodeFromJsonElement(SessionConfigChangedAction.serializer(), element))
             "session/metaChanged" -> StateActionSessionMetaChanged(input.json.decodeFromJsonElement(SessionMetaChangedAction.serializer(), element))
             "changeset/statusChanged" -> StateActionChangesetStatusChanged(input.json.decodeFromJsonElement(ChangesetStatusChangedAction.serializer(), element))
@@ -1646,6 +1663,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionCustomizationRemoved -> output.json.encodeToJsonElement(SessionCustomizationRemovedAction.serializer(), value.value)
             is StateActionSessionMcpServerStateChanged -> output.json.encodeToJsonElement(SessionMcpServerStateChangedAction.serializer(), value.value)
             is StateActionChatTruncated -> output.json.encodeToJsonElement(ChatTruncatedAction.serializer(), value.value)
+            is StateActionChatTurnsLoaded -> output.json.encodeToJsonElement(ChatTurnsLoadedAction.serializer(), value.value)
             is StateActionSessionConfigChanged -> output.json.encodeToJsonElement(SessionConfigChangedAction.serializer(), value.value)
             is StateActionSessionMetaChanged -> output.json.encodeToJsonElement(SessionMetaChangedAction.serializer(), value.value)
             is StateActionChangesetStatusChanged -> output.json.encodeToJsonElement(ChangesetStatusChangedAction.serializer(), value.value)

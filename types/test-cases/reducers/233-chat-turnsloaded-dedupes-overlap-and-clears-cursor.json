@@ -1,0 +1,113 @@
+{
+  "description": "chat/turnsLoaded skips already-loaded turns and clears the cursor when omitted",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "t2",
+        "message": {
+          "text": "Second",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t3",
+        "message": {
+          "text": "Third",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "turnsNextCursor": "cursor-1",
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnsLoaded",
+      "turns": [
+        {
+          "id": "t1",
+          "message": {
+            "text": "First",
+            "origin": {
+              "kind": "user"
+            }
+          },
+          "responseParts": [],
+          "usage": null,
+          "state": "complete"
+        },
+        {
+          "id": "t2",
+          "message": {
+            "text": "Second from page",
+            "origin": {
+              "kind": "user"
+            }
+          },
+          "responseParts": [],
+          "usage": null,
+          "state": "complete"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t2",
+        "message": {
+          "text": "Second",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t3",
+        "message": {
+          "text": "Third",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "turnsNextCursor": null,
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

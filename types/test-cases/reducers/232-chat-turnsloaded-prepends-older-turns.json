@@ -1,0 +1,102 @@
+{
+  "description": "chat/turnsLoaded prepends older turns and updates the next cursor",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "t3",
+        "message": {
+          "text": "Third",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "turnsNextCursor": "cursor-1",
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnsLoaded",
+      "turns": [
+        {
+          "id": "t1",
+          "message": {
+            "text": "First",
+            "origin": {
+              "kind": "user"
+            }
+          },
+          "responseParts": [],
+          "usage": null,
+          "state": "complete"
+        },
+        {
+          "id": "t2",
+          "message": {
+            "text": "Second",
+            "origin": {
+              "kind": "user"
+            }
+          },
+          "responseParts": [],
+          "usage": null,
+          "state": "complete"
+        }
+      ],
+      "turnsNextCursor": "cursor-2"
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t2",
+        "message": {
+          "text": "Second",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "t3",
+        "message": {
+          "text": "Third",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "turnsNextCursor": "cursor-2",
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

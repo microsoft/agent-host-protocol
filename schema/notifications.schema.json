@@ -539,6 +539,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
         }
       },
       "required": [
@@ -2524,6 +2528,10 @@
           },
           "description": "Completed turns"
         },
+        "turnsNextCursor": {
+          "type": "string",
+          "description": "Cursor for loading older completed turns into this chat state.\n\nPresence means `turns` is a tail window and more historical turns are\navailable. Pass this opaque cursor to `fetchTurns`; the host MUST insert\nthe loaded turns into state and update or clear this cursor before\nresponding. Absence means the state contains all retained turns."
+        },
         "activeTurn": {
           "$ref": "#/$defs/ActiveTurn",
           "description": "Currently in-progress turn"
@@ -3330,6 +3338,10 @@
           "type": "string",
           "description": "Content MIME type"
         },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
+        },
         "type": {
           "$ref": "#/$defs/MessageAttachmentKind.Resource",
           "description": "Discriminant"
@@ -3425,6 +3437,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
         },
         "kind": {
           "$ref": "#/$defs/ResponsePartKind.ContentRef",
@@ -4151,6 +4167,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
         },
         "type": {
           "$ref": "#/$defs/ToolResultContentType.Resource"

@@ -401,6 +401,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
         }
       },
       "required": [
@@ -2386,6 +2390,10 @@
           },
           "description": "Completed turns"
         },
+        "turnsNextCursor": {
+          "type": "string",
+          "description": "Cursor for loading older completed turns into this chat state.\n\nPresence means `turns` is a tail window and more historical turns are\navailable. Pass this opaque cursor to `fetchTurns`; the host MUST insert\nthe loaded turns into state and update or clear this cursor before\nresponding. Absence means the state contains all retained turns."
+        },
         "activeTurn": {
           "$ref": "#/$defs/ActiveTurn",
           "description": "Currently in-progress turn"
@@ -3192,6 +3200,10 @@
           "type": "string",
           "description": "Content MIME type"
         },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
+        },
         "type": {
           "$ref": "#/$defs/MessageAttachmentKind.Resource",
           "description": "Discriminant"
@@ -3287,6 +3299,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
         },
         "kind": {
           "$ref": "#/$defs/ResponsePartKind.ContentRef",
@@ -4013,6 +4029,10 @@
         "contentType": {
           "type": "string",
           "description": "Content MIME type"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
         },
         "type": {
           "$ref": "#/$defs/ToolResultContentType.Resource"
@@ -4938,11 +4958,25 @@
         "delivery": {
           "$ref": "#/$defs/SubscriptionDeliveryOptions",
           "description": "Optional delivery preferences for this subscription.\n\nServers MAY use these preferences to buffer and coalesce high-frequency\nupdates while preserving the same reduced state. Omit this field for the\nserver's default delivery behavior."
+        },
+        "view": {
+          "$ref": "#/$defs/SubscribeView",
+          "description": "Optional client-requested shape for the returned snapshot.\n\nServers that do not understand a requested view ignore it and return their\ndefault snapshot. Clients MUST tolerate receiving more state than requested."
         }
       },
       "required": [
         "channel"
       ]
+    },
+    "SubscribeView": {
+      "type": "object",
+      "description": "Optional client-requested shape for a subscription snapshot.",
+      "properties": {
+        "turns": {
+          "type": "number",
+          "description": "Advisory number of most-recent completed turns to expose in a chat\nsnapshot.\n\nServers MAY return more or fewer turns than requested. When omitted, the\nhost MUST return all retained turns. When older turns remain available, the\nreturned {@link ChatState} carries `turnsNextCursor`; clients pass that\ncursor to `fetchTurns` to ask the host to page more turns into the chat\nstate."
+        }
+      }
     },
     "SubscriptionDeliveryOptions": {
       "type": "object",
@@ -5641,19 +5675,15 @@
     },
     "FetchTurnsParams": {
       "type": "object",
-      "description": "Fetches historical turns for a chat. Used for lazy loading of conversation\nhistory.",
+      "description": "Requests that the host load older historical turns into a chat state.\n\nThe command result does not carry turns. Instead, before responding, the host\nMUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat\nchannel's `turns` state, ahead of the already-loaded window, and update or\nclear `turnsNextCursor`.\n\nBefore applying any operation that references a turn outside the currently\nloaded window, the host MUST eagerly load enough older turns into state for\nthat operation to reduce against valid state.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Chat URI"
         },
-        "before": {
+        "cursor": {
           "type": "string",
-          "description": "Turn ID to fetch before (exclusive). Omit to fetch from the most recent turn."
-        },
-        "limit": {
-          "type": "number",
-          "description": "Maximum number of turns to return. Server MAY impose its own upper bound."
+          "description": "Opaque cursor from `ChatState.turnsNextCursor`.\n\nThe host MUST reject unrecognised cursors with `InvalidParams`. Omit only\nwhen asking the host to opportunistically load its next older page for the\nchat, if any."
         }
       },
       "required": [
@@ -5663,23 +5693,7 @@
     "FetchTurnsResult": {
       "type": "object",
       "description": "Result of the `fetchTurns` command.",
-      "properties": {
-        "turns": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Turn"
-          },
-          "description": "The requested turns, ordered oldest-first"
-        },
-        "hasMore": {
-          "type": "boolean",
-          "description": "Whether more turns exist before the returned range"
-        }
-      },
-      "required": [
-        "turns",
-        "hasMore"
-      ]
+      "properties": {}
     },
     "CompletionsParams": {
       "type": "object",

@@ -512,6 +512,20 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		})
 	case *ahptypes.ChatTruncatedAction:
 		return applyTruncated(state, a.TurnId)
+	case *ahptypes.ChatTurnsLoadedAction:
+		existingIds := make(map[string]struct{}, len(state.Turns))
+		for _, turn := range state.Turns {
+			existingIds[turn.Id] = struct{}{}
+		}
+		olderTurns := make([]ahptypes.Turn, 0, len(a.Turns)+len(state.Turns))
+		for _, turn := range a.Turns {
+			if _, ok := existingIds[turn.Id]; !ok {
+				olderTurns = append(olderTurns, turn)
+			}
+		}
+		state.Turns = append(olderTurns, state.Turns...)
+		state.TurnsNextCursor = a.TurnsNextCursor
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatInputRequestedAction:
 		upsertInputRequest(state, a.Request)
 		return ReduceOutcomeApplied
@@ -1179,6 +1193,7 @@ func applyMcpServerStatusChanged(state *ahptypes.SessionState, a *ahptypes.Sessi
 func applyTruncated(state *ahptypes.ChatState, turnID *string) ReduceOutcome {
 	if turnID == nil {
 		state.Turns = []ahptypes.Turn{}
+		state.TurnsNextCursor = nil
 	} else {
 		idx := -1
 		for i := range state.Turns {

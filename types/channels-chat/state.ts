@@ -71,6 +71,15 @@ export interface ChatState {
   // ── Conversation contents ──────────────────────────────────────────
   /** Completed turns */
   turns: Turn[];
+  /**
+   * Cursor for loading older completed turns into this chat state.
+   *
+   * Presence means `turns` is a tail window and more historical turns are
+   * available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
+   * the loaded turns into state and update or clear this cursor before
+   * responding. Absence means the state contains all retained turns.
+   */
+  turnsNextCursor?: string;
   /** Currently in-progress turn */
   activeTurn?: ActiveTurn;
   /** Message to inject into the current turn at a convenient point */

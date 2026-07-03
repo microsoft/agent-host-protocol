@@ -20,6 +20,7 @@ import type {
   ReconnectParams,
   ReconnectResult,
   SubscribeParams,
+  SubscribeView,
   SubscriptionDeliveryOptions,
   SubscribeResult,
   UnsubscribeParams,
@@ -80,6 +81,8 @@ export interface AhpClientConfig {
 export interface SubscribeOptions {
   /** Advisory delivery preferences for this subscription. */
   delivery?: SubscriptionDeliveryOptions;
+  /** Optional client-requested shape for the returned snapshot. */
+  view?: SubscribeView;
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
@@ -307,6 +310,7 @@ export class AhpClient {
       const params: SubscribeParams = {
         channel: uri,
         ...(options.delivery ? { delivery: options.delivery } : {}),
+        ...(options.view ? { view: options.view } : {}),
       };
       const result = await this.request('subscribe', params);
       return { result, subscription };

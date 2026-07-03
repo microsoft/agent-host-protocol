@@ -310,13 +310,14 @@ public actor AHPClient {
     /// clean up the partially-attached subscription.
     public func subscribe(
         _ uri: String,
-        delivery: SubscriptionDeliveryOptions? = nil
+        delivery: SubscriptionDeliveryOptions? = nil,
+        view: SubscribeView? = nil
     ) async throws -> (SubscribeResult, AsyncStream<SubscriptionEvent>) {
         let (stream, listenerId) = attachSubscriptionInternal(uri)
         do {
             let result: SubscribeResult = try await request(
                 method: "subscribe",
-                params: SubscribeParams(channel: uri, delivery: delivery)
+                params: SubscribeParams(channel: uri, delivery: delivery, view: view)
             )
             return (result, stream)
         } catch {

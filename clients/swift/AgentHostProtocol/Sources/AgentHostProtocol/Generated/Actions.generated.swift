@@ -49,6 +49,7 @@ public enum ActionType: String, Codable, Sendable {
     case sessionCustomizationRemoved = "session/customizationRemoved"
     case sessionMcpServerStateChanged = "session/mcpServerStateChanged"
     case chatTruncated = "chat/truncated"
+    case chatTurnsLoaded = "chat/turnsLoaded"
     case sessionIsReadChanged = "session/isReadChanged"
     case sessionIsArchivedChanged = "session/isArchivedChanged"
     case sessionActivityChanged = "session/activityChanged"
@@ -1284,6 +1285,24 @@ public struct ChatTruncatedAction: Codable, Sendable {
     }
 }
 
+public struct ChatTurnsLoadedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Older completed turns loaded into the state, ordered oldest-first.
+    public var turns: [Turn]
+    /// Opaque cursor for loading the next older page, if one remains.
+    public var turnsNextCursor: String?
+
+    public init(
+        type: ActionType,
+        turns: [Turn],
+        turnsNextCursor: String? = nil
+    ) {
+        self.type = type
+        self.turns = turns
+        self.turnsNextCursor = turnsNextCursor
+    }
+}
+
 public struct SessionConfigChangedAction: Codable, Sendable {
     public var type: ActionType
     /// Updated config values
@@ -1903,6 +1922,7 @@ public enum StateAction: Codable, Sendable {
     case sessionCustomizationRemoved(SessionCustomizationRemovedAction)
     case sessionMcpServerStateChanged(SessionMcpServerStateChangedAction)
     case chatTruncated(ChatTruncatedAction)
+    case chatTurnsLoaded(ChatTurnsLoadedAction)
     case sessionConfigChanged(SessionConfigChangedAction)
     case sessionMetaChanged(SessionMetaChangedAction)
     case changesetStatusChanged(ChangesetStatusChangedAction)
@@ -2044,6 +2064,8 @@ public enum StateAction: Codable, Sendable {
             self = .sessionMcpServerStateChanged(try SessionMcpServerStateChangedAction(from: decoder))
         case "chat/truncated":
             self = .chatTruncated(try ChatTruncatedAction(from: decoder))
+        case "chat/turnsLoaded":
+            self = .chatTurnsLoaded(try ChatTurnsLoadedAction(from: decoder))
         case "session/configChanged":
             self = .sessionConfigChanged(try SessionConfigChangedAction(from: decoder))
         case "session/metaChanged":
@@ -2162,6 +2184,7 @@ public enum StateAction: Codable, Sendable {
         case .sessionCustomizationRemoved(let v): try v.encode(to: encoder)
         case .sessionMcpServerStateChanged(let v): try v.encode(to: encoder)
         case .chatTruncated(let v): try v.encode(to: encoder)
+        case .chatTurnsLoaded(let v): try v.encode(to: encoder)
         case .sessionConfigChanged(let v): try v.encode(to: encoder)
         case .sessionMetaChanged(let v): try v.encode(to: encoder)
         case .changesetStatusChanged(let v): try v.encode(to: encoder)

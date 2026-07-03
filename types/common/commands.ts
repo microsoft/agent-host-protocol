@@ -333,6 +333,32 @@ export interface SubscribeParams extends BaseParams {
    * server's default delivery behavior.
    */
   delivery?: SubscriptionDeliveryOptions;
+  /**
+   * Optional client-requested shape for the returned snapshot.
+   *
+   * Servers that do not understand a requested view ignore it and return their
+   * default snapshot. Clients MUST tolerate receiving more state than requested.
+   */
+  view?: SubscribeView;
+}
+
+/**
+ * Optional client-requested shape for a subscription snapshot.
+ *
+ * @category Commands
+ */
+export interface SubscribeView {
+  /**
+   * Advisory number of most-recent completed turns to expose in a chat
+   * snapshot.
+   *
+   * Servers MAY return more or fewer turns than requested. When omitted, the
+   * host MUST return all retained turns. When older turns remain available, the
+   * returned {@link ChatState} carries `turnsNextCursor`; clients pass that
+   * cursor to `fetchTurns` to ask the host to page more turns into the chat
+   * state.
+   */
+  turns?: number;
 }
 
 /**

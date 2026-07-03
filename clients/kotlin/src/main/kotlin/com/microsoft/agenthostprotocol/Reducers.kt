@@ -1058,11 +1058,22 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         }
         val next = state.copy(
             turns = turns,
+            turnsNextCursor = if (a.turnId == null) null else state.turnsNextCursor,
             activeTurn = null,
             inputRequests = null,
             modifiedAt = nowIsoString(),
         )
         next.copy(status = chatSummaryStatus(next))
+    }
+
+    is StateActionChatTurnsLoaded -> {
+        val a = action.value
+        val existingIds = state.turns.map { it.id }.toSet()
+        val olderTurns = a.turns.filter { it.id !in existingIds }
+        state.copy(
+            turns = olderTurns + state.turns,
+            turnsNextCursor = a.turnsNextCursor,
+        )
     }
 
     // ── Session Input Requests ────────────────────────────────────────────

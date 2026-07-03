@@ -23,22 +23,12 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+## [0.5.2] — Unreleased
+
+Spec version: `0.5.2`
+
 ### Added
 
-- Optional `intention` field on `chat/toolCallStart` and every `ToolCallState`
-  variant, providing a human-readable description of what the invocation intends
-  to do.
-- Optional `model` and `tools` fields on `AgentCustomization`, giving a custom
-  agent's pinned model and tool allowlist a first-class home instead of `_meta`.
-- Optional `capabilities` field on `AgentInfo` (`AgentCapabilities` with a
-  nested `multipleChats` capability carrying `fork`) so clients gate multi-chat
-  and fork via advertised capabilities instead of provider-id switches.
-- Cursor-based pagination for `listSessions`, via new shared `PaginatedParams`
-  (`limit` + `cursor`) and `PaginatedResult` (`nextCursor`) types:
-  `ListSessionsParams` now extends `PaginatedParams` and `ListSessionsResult`
-  extends `PaginatedResult`, letting clients fetch a large session catalogue
-  incrementally. Fully additive — omitting the fields preserves today's
-  behaviour.
 - Canvas channel — an opt-in surface for the agent to open rich, interactive UI
   surfaces (document/spreadsheet editors, diff views, live previews) alongside a
   session, following the "one channel per resource" model of terminals and
@@ -54,13 +44,7 @@ changes accumulate. Track in-flight protocol changes via PRs touching
   `CanvasProviderError` (`-32012`) error. See
   [`docs/specification/canvas-channel.md`](docs/specification/canvas-channel.md).
 
-### Removed
-
-- `filter` field from `ListSessionsParams`. It was an untyped `object`
-  placeholder with no defined semantics; it will be reintroduced with a concrete
-  shape once session filtering/sorting is specified.
-
-## [0.5.1] — Unreleased
+## [0.5.1] — 2026-07-02
 
 Spec version: `0.5.1`
 
@@ -82,6 +66,38 @@ Spec version: `0.5.1`
 - `ToolCallConfirmationState` union (`ToolCallPendingConfirmationState |
   ToolCallPendingResultConfirmationState`) for the tool call carried by
   `SessionToolConfirmationRequest`.
+- Optional `nonce` field on `ContentRef`.
+- Optional `intention` field on `chat/toolCallStart` and every `ToolCallState`
+  variant, providing a human-readable description of what the invocation intends
+  to do.
+- Optional `model` and `tools` fields on `AgentCustomization`, giving a custom
+  agent's pinned model and tool allowlist a first-class home instead of `_meta`.
+- Optional `capabilities` field on `AgentInfo` (`AgentCapabilities` with a
+  nested `multipleChats` capability carrying `fork`) so clients gate multi-chat
+  and fork via advertised capabilities instead of provider-id switches.
+- Cursor-based pagination for `listSessions`, via new shared `PaginatedParams`
+  (`limit` + `cursor`) and `PaginatedResult` (`nextCursor`) types:
+  `ListSessionsParams` now extends `PaginatedParams` and `ListSessionsResult`
+  extends `PaginatedResult`, letting clients fetch a large session catalogue
+  incrementally. Fully additive — omitting the fields preserves today's
+  behaviour.
+- `SubscribeParams.view.turns`, `ChatState.turnsNextCursor`, and the
+  `chat/turnsLoaded` action so clients can subscribe to a bounded tail of chat
+  history and page older turns into the reduced chat state on demand.
+
+### Changed
+
+- `fetchTurns` now accepts `cursor` from `ChatState.turnsNextCursor` and returns
+  an empty result after the host has loaded older turns into chat state, instead
+  of returning a detached `{ turns, hasMore }` page.
+- Generated clients now advertise only protocol `0.5.1`, since the `fetchTurns`
+  contract is not wire-compatible with `0.5.0`.
+
+### Removed
+
+- `filter` field from `ListSessionsParams`. It was an untyped `object`
+  placeholder with no defined semantics; it will be reintroduced with a concrete
+  shape once session filtering/sorting is specified.
 
 ## [0.5.0] — 2026-06-26
 

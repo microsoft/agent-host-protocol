@@ -1054,6 +1054,13 @@ type ChatState struct {
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
+	// Cursor for loading older completed turns into this chat state.
+	//
+	// Presence means `turns` is a tail window and more historical turns are
+	// available. Pass this opaque cursor to `fetchTurns`; the host MUST insert
+	// the loaded turns into state and update or clear this cursor before
+	// responding. Absence means the state contains all retained turns.
+	TurnsNextCursor *string `json:"turnsNextCursor,omitempty"`
 	// Currently in-progress turn
 	ActiveTurn *ActiveTurn `json:"activeTurn,omitempty"`
 	// Message to inject into the current turn at a convenient point
@@ -1569,6 +1576,8 @@ type MessageResourceAttachment struct {
 	SizeHint *int64 `json:"sizeHint,omitempty"`
 	// Content MIME type
 	ContentType *string `json:"contentType,omitempty"`
+	// Content nonce
+	Nonce *string `json:"nonce,omitempty"`
 	// Discriminant
 	Type MessageAttachmentKind `json:"type"`
 	// Optional selection within the referenced textual resource.
@@ -1635,6 +1644,8 @@ type ContentRef struct {
 	SizeHint *int64 `json:"sizeHint,omitempty"`
 	// Content MIME type
 	ContentType *string `json:"contentType,omitempty"`
+	// Content nonce
+	Nonce *string `json:"nonce,omitempty"`
 }
 
 // A content part that's a reference to large content stored outside the state tree.
@@ -1645,6 +1656,8 @@ type ResourceResponsePart struct {
 	SizeHint *int64 `json:"sizeHint,omitempty"`
 	// Content MIME type
 	ContentType *string `json:"contentType,omitempty"`
+	// Content nonce
+	Nonce *string `json:"nonce,omitempty"`
 	// Discriminant
 	Kind ResponsePartKind `json:"kind"`
 }
@@ -2006,8 +2019,10 @@ type ToolResultResourceContent struct {
 	// Approximate size in bytes
 	SizeHint *int64 `json:"sizeHint,omitempty"`
 	// Content MIME type
-	ContentType *string               `json:"contentType,omitempty"`
-	Type        ToolResultContentType `json:"type"`
+	ContentType *string `json:"contentType,omitempty"`
+	// Content nonce
+	Nonce *string               `json:"nonce,omitempty"`
+	Type  ToolResultContentType `json:"type"`
 }
 
 // Describes a file modification performed by a tool.

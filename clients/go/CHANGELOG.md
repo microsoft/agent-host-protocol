@@ -16,6 +16,26 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
 
 ### Added
 
+- Canvas channel support: the per-instance `CanvasState` plus the
+  `CanvasUpdatedAction` (wire `canvas/updated`), `CanvasCloseRequestedAction`
+  (`canvas/closeRequested`), and `CanvasMessageAction` (`canvas/message`)
+  actions, the `SessionCanvasesChangedAction` (`session/canvasesChanged`) and
+  `SessionOpenCanvasesChangedAction` (`session/openCanvasesChanged`) session
+  actions, and the canvas discovery types (`SessionCanvasDeclaration`,
+  `ClientCanvasDeclaration`, `OpenCanvasRef`, `CanvasProviderSource`) on
+  `SessionState.Canvases` / `SessionState.OpenCanvases`. Adds the
+  `ClientCapabilities.Canvas` capability, the `canvasOpen` / `canvasInvokeAction`
+  / `canvasClose` / `canvasReadResource` methods, and the `CanvasProviderError`
+  error. The session reducer replaces the canvas registry/catalogue and
+  `ApplyActionToCanvas` sparse-merges `canvas/updated`.
+
+## [0.5.1] — 2026-07-02
+
+Implements AHP 0.5.1.
+
+### Added
+
+- Optional `Nonce` field on `ContentRef`.
 - `SubscribeParams.Delivery.MaxLatencyMs` and `Client.SubscribeWithDelivery`
   for clients to request a maximum subscription delivery latency, including
   `0` for no intentional coalescing.
@@ -27,6 +47,9 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
   `ListSessionsParams` and `ListSessionsResult` now carry these fields, letting
   clients page through a large session catalogue. Fully additive — omitting the
   fields preserves prior behaviour.
+- `SubscribeParams.View.Turns`, `ChatState.TurnsNextCursor`, and the
+  `chat/turnsLoaded` action so clients can subscribe to a bounded tail of chat
+  history and page older turns into the reduced chat state on demand.
 - `SessionState.InputNeeded` — a session-level aggregate of outstanding input
   requests across all chats (`SessionInputRequest` union with
   `SessionChatInputRequest`, `SessionToolConfirmationRequest`, and
@@ -40,18 +63,14 @@ tag whose matching `## [X.Y.Z]` heading is missing from this file.
   lifecycle state.
 - Optional `Model` and `Tools` fields on `AgentCustomization` for a custom
   agent's pinned model and tool allowlist.
-- Canvas channel support: the per-instance `CanvasState` plus the
-  `CanvasUpdatedAction` (wire `canvas/updated`), `CanvasCloseRequestedAction`
-  (`canvas/closeRequested`), and `CanvasMessageAction` (`canvas/message`)
-  actions, the `SessionCanvasesChangedAction` (`session/canvasesChanged`) and
-  `SessionOpenCanvasesChangedAction` (`session/openCanvasesChanged`) session
-  actions, and the canvas discovery types (`SessionCanvasDeclaration`,
-  `ClientCanvasDeclaration`, `OpenCanvasRef`, `CanvasProviderSource`) on
-  `SessionState.Canvases` / `SessionState.OpenCanvases`. Adds the
-  `ClientCapabilities.Canvas` capability, the `canvasOpen` / `canvasInvokeAction`
-  / `canvasClose` / `canvasReadResource` methods, and the `CanvasProviderError`
-  error. The session reducer replaces the canvas registry/catalogue and
-  `ApplyActionToCanvas` sparse-merges `canvas/updated`.
+
+### Changed
+
+- `fetchTurns` now accepts `Cursor` from `ChatState.TurnsNextCursor` and returns
+  an empty result after the host has loaded older turns into chat state, instead
+  of returning a detached `{ turns, hasMore }` page.
+- Generated clients now advertise only protocol `0.5.1`, since the `fetchTurns`
+  contract is not wire-compatible with `0.5.0`.
 
 ### Removed
 

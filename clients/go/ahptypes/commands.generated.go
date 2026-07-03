@@ -216,6 +216,24 @@ type SubscribeParams struct {
 	// updates while preserving the same reduced state. Omit this field for the
 	// server's default delivery behavior.
 	Delivery *SubscriptionDeliveryOptions `json:"delivery,omitempty"`
+	// Optional client-requested shape for the returned snapshot.
+	//
+	// Servers that do not understand a requested view ignore it and return their
+	// default snapshot. Clients MUST tolerate receiving more state than requested.
+	View *SubscribeView `json:"view,omitempty"`
+}
+
+// Optional client-requested shape for a subscription snapshot.
+type SubscribeView struct {
+	// Advisory number of most-recent completed turns to expose in a chat
+	// snapshot.
+	//
+	// Servers MAY return more or fewer turns than requested. When omitted, the
+	// host MUST return all retained turns. When older turns remain available, the
+	// returned {@link ChatState} carries `turnsNextCursor`; clients pass that
+	// cursor to `fetchTurns` to ask the host to page more turns into the chat
+	// state.
+	Turns *int64 `json:"turns,omitempty"`
 }
 
 // Advisory delivery preferences for a single subscription.
@@ -693,23 +711,29 @@ type CreateResourceWatchResult struct {
 	Channel URI `json:"channel"`
 }
 
-// Fetches historical turns for a chat. Used for lazy loading of conversation
-// history.
+// Requests that the host load older historical turns into a chat state.
+//
+// The command result does not carry turns. Instead, before responding, the host
+// MUST dispatch `chat/turnsLoaded` to insert any loaded turns into the chat
+// channel's `turns` state, ahead of the already-loaded window, and update or
+// clear `turnsNextCursor`.
+//
+// Before applying any operation that references a turn outside the currently
+// loaded window, the host MUST eagerly load enough older turns into state for
+// that operation to reduce against valid state.
 type FetchTurnsParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
-	// Turn ID to fetch before (exclusive). Omit to fetch from the most recent turn.
-	Before *string `json:"before,omitempty"`
-	// Maximum number of turns to return. Server MAY impose its own upper bound.
-	Limit *int64 `json:"limit,omitempty"`
+	// Opaque cursor from `ChatState.turnsNextCursor`.
+	//
+	// The host MUST reject unrecognised cursors with `InvalidParams`. Omit only
+	// when asking the host to opportunistically load its next older page for the
+	// chat, if any.
+	Cursor *string `json:"cursor,omitempty"`
 }
 
 // Result of the `fetchTurns` command.
 type FetchTurnsResult struct {
-	// The requested turns, ordered oldest-first
-	Turns []Turn `json:"turns"`
-	// Whether more turns exist before the returned range
-	HasMore bool `json:"hasMore"`
 }
 
 // Stop receiving updates for a channel.
