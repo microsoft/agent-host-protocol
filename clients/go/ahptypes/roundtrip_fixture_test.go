@@ -234,6 +234,10 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v PartialSessionSummary
 		dec(&v)
 		return enc(&v)
+	case "Implementation":
+		var v Implementation
+		dec(&v)
+		return enc(&v)
 	default:
 		t.Fatalf("%s: round-trip fixture: unknown wire type %q. Add a decode entry to decodeAndReencode.", name, typ)
 		return ""

@@ -36,6 +36,11 @@ Spec version: `0.5.2`
 - `disableUserInvocation` on `SkillCustomization`, plus `disableModelInvocation`
   and `disableUserInvocation` on `AgentCustomization`, giving custom agents and
   skills a symmetric user/model invocation matrix.
+- Optional `serverInfo` on `InitializeResult` and `clientInfo` on
+  `InitializeParams`, each an `Implementation` (`name`, optional `version`,
+  optional `title`), so either side of the handshake can identify its
+  implementation and build. Informational only — mirrors LSP/MCP and MUST NOT
+  be used for feature detection.
 
 ### Changed
 

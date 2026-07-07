@@ -25,6 +25,11 @@ Implements AHP 0.5.2.
   `RuleCustomization`, `HookCustomization`).
 - `DisableUserInvocation` on `SkillCustomization`, plus `DisableModelInvocation`
   and `DisableUserInvocation` on `AgentCustomization`.
+- Optional `ServerInfo` on `InitializeResult` and `ClientInfo` on
+  `InitializeParams`, each an `Implementation` struct (`Name`, optional
+  `Version`, optional `Title`), identifying the implementation and build behind
+  either side of the handshake. Informational only — MUST NOT be used for
+  feature detection.
 
 ### Changed
 

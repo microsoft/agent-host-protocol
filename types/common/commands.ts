@@ -101,6 +101,36 @@ export interface PaginatedResult {
 // ─── initialize ──────────────────────────────────────────────────────────────
 
 /**
+ * Identifies a protocol implementation — the software (and build) on one end
+ * of the connection, as distinct from the {@link AgentInfo | agent persona} it
+ * hosts. Carried as {@link InitializeParams.clientInfo | `clientInfo`} on the
+ * client side and {@link InitializeResult.serverInfo | `serverInfo`} on the
+ * server side, mirroring LSP's `clientInfo`/`serverInfo` and MCP's
+ * `Implementation`.
+ *
+ * This is **informational only**: it exists for logging, telemetry, an
+ * about/status affordance, and — as a last resort — a known-issue workaround
+ * for a specific buggy build. It is **not** a feature-detection mechanism.
+ * Feature availability stays with the capability model
+ * ({@link ClientCapabilities} and the various `*.capabilities` declarations);
+ * implementations SHOULD NOT gate protocol behaviour on parsing
+ * {@link Implementation.version | `version`}.
+ *
+ * @category Commands
+ */
+export interface Implementation {
+  /** Implementation name, e.g. a product or package identifier. */
+  name: string;
+  /**
+   * Implementation version. A [SemVer](https://semver.org) string is
+   * recommended but not required.
+   */
+  version?: string;
+  /** Optional human-readable display name. */
+  title?: string;
+}
+
+/**
  * Establishes a new connection and negotiates the protocol version.
  * This MUST be the first message sent by the client.
  *
@@ -125,6 +155,14 @@ export interface InitializeParams extends BaseParams {
   protocolVersions: string[];
   /** Unique client identifier */
   clientId: string;
+  /**
+   * Optional identity of the client implementation (name and version).
+   * Informational only — see {@link Implementation} for how it may and may not
+   * be used. Distinct from {@link InitializeParams.clientId | `clientId`},
+   * which is an opaque per-connection identifier used for reconnection, not a
+   * human-readable implementation name.
+   */
+  clientInfo?: Implementation;
   /** URIs to subscribe to during handshake */
   initialSubscriptions?: URI[];
   /**
@@ -187,6 +225,14 @@ export interface InitializeResult {
   protocolVersion: string;
   /** Current server sequence number */
   serverSeq: number;
+  /**
+   * Optional identity of the server implementation (name and version).
+   * Informational only — see {@link Implementation} for how it may and may not
+   * be used. Whereas {@link InitializeResult.protocolVersion | `protocolVersion`}
+   * identifies the negotiated protocol, `serverInfo` identifies the host
+   * software behind it.
+   */
+  serverInfo?: Implementation;
   /** Snapshots for each `initialSubscriptions` URI */
   snapshots: Snapshot[];
   /** Suggested default directory for remote filesystem browsing */

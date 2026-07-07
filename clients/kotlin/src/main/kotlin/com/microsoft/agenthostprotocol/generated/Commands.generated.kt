@@ -124,6 +124,14 @@ data class InitializeParams(
      */
     val clientId: String,
     /**
+     * Optional identity of the client implementation (name and version).
+     * Informational only — see {@link Implementation} for how it may and may not
+     * be used. Distinct from {@link InitializeParams.clientId | `clientId`},
+     * which is an opaque per-connection identifier used for reconnection, not a
+     * human-readable implementation name.
+     */
+    val clientInfo: Implementation? = null,
+    /**
      * URIs to subscribe to during handshake
      */
     val initialSubscriptions: List<String>? = null,
@@ -155,6 +163,14 @@ data class InitializeResult(
      * Current server sequence number
      */
     val serverSeq: Long,
+    /**
+     * Optional identity of the server implementation (name and version).
+     * Informational only — see {@link Implementation} for how it may and may not
+     * be used. Whereas {@link InitializeResult.protocolVersion | `protocolVersion`}
+     * identifies the negotiated protocol, `serverInfo` identifies the host
+     * software behind it.
+     */
+    val serverInfo: Implementation? = null,
     /**
      * Snapshots for each `initialSubscriptions` URI
      */
@@ -196,6 +212,23 @@ data class ClientCapabilities(
      * App-bearing tool calls as ordinary MCP tool calls.
      */
     val mcpApps: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class Implementation(
+    /**
+     * Implementation name, e.g. a product or package identifier.
+     */
+    val name: String,
+    /**
+     * Implementation version. A [SemVer](https://semver.org) string is
+     * recommended but not required.
+     */
+    val version: String? = null,
+    /**
+     * Optional human-readable display name.
+     */
+    val title: String? = null
 )
 
 @Serializable
