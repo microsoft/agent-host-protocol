@@ -133,6 +133,8 @@ pub enum ActionType {
     ChangesetFileSet,
     #[serde(rename = "changeset/fileRemoved")]
     ChangesetFileRemoved,
+    #[serde(rename = "changeset/filesReviewedChanged")]
+    ChangesetFilesReviewedChanged,
     #[serde(rename = "changeset/contentChanged")]
     ChangesetContentChanged,
     #[serde(rename = "changeset/operationsChanged")]
@@ -1151,6 +1153,25 @@ pub struct ChangesetFileRemovedAction {
     pub file_id: String,
 }
 
+/// Update the {@link ChangesetFile.reviewed} flag for one or more files,
+/// identified by their {@link ChangesetFile.id}.
+///
+/// Dispatched by the server as the user marks files reviewed or unreviewed
+/// (e.g. toggling a single file, or a "mark all as reviewed" affordance).
+/// Only servers that support the "review" functionality dispatch this; a
+/// server that leaves {@link ChangesetFile.reviewed} `undefined` never does.
+///
+/// The reducer sets `reviewed` on every matching file and ignores any
+/// `fileIds` entry that does not correspond to a current file.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesetFilesReviewedChangedAction {
+    /// The {@link ChangesetFile.id}s whose reviewed state changed.
+    pub file_ids: Vec<String>,
+    /// The new reviewed state to apply to each listed file.
+    pub reviewed: bool,
+}
+
 /// The changeset's full content changed. Full replacement semantics: `files`
 /// replaces the previous file list, and `operations`, when present, replaces
 /// the previous operation list.
@@ -1638,6 +1659,8 @@ pub enum StateAction {
     ChangesetFileSet(ChangesetFileSetAction),
     #[serde(rename = "changeset/fileRemoved")]
     ChangesetFileRemoved(ChangesetFileRemovedAction),
+    #[serde(rename = "changeset/filesReviewedChanged")]
+    ChangesetFilesReviewedChanged(ChangesetFilesReviewedChangedAction),
     #[serde(rename = "changeset/contentChanged")]
     ChangesetContentChanged(Box<ChangesetContentChangedAction>),
     #[serde(rename = "changeset/operationsChanged")]

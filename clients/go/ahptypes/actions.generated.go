@@ -72,6 +72,7 @@ const (
 	ActionTypeChangesetStatusChanged            ActionType = "changeset/statusChanged"
 	ActionTypeChangesetFileSet                  ActionType = "changeset/fileSet"
 	ActionTypeChangesetFileRemoved              ActionType = "changeset/fileRemoved"
+	ActionTypeChangesetFilesReviewedChanged     ActionType = "changeset/filesReviewedChanged"
 	ActionTypeChangesetContentChanged           ActionType = "changeset/contentChanged"
 	ActionTypeChangesetOperationsChanged        ActionType = "changeset/operationsChanged"
 	ActionTypeChangesetOperationStatusChanged   ActionType = "changeset/operationStatusChanged"
@@ -950,6 +951,24 @@ type ChangesetFileRemovedAction struct {
 	FileId string `json:"fileId"`
 }
 
+// Update the {@link ChangesetFile.reviewed} flag for one or more files,
+// identified by their {@link ChangesetFile.id}.
+//
+// Dispatched by the server as the user marks files reviewed or unreviewed
+// (e.g. toggling a single file, or a "mark all as reviewed" affordance).
+// Only servers that support the "review" functionality dispatch this; a
+// server that leaves {@link ChangesetFile.reviewed} `undefined` never does.
+//
+// The reducer sets `reviewed` on every matching file and ignores any
+// `fileIds` entry that does not correspond to a current file.
+type ChangesetFilesReviewedChangedAction struct {
+	Type ActionType `json:"type"`
+	// The {@link ChangesetFile.id}s whose reviewed state changed.
+	FileIds []string `json:"fileIds"`
+	// The new reviewed state to apply to each listed file.
+	Reviewed bool `json:"reviewed"`
+}
+
 // The changeset's full content changed. Full replacement semantics: `files`
 // replaces the previous file list, and `operations`, when present, replaces
 // the previous operation list.
@@ -1318,6 +1337,7 @@ func (*SessionMetaChangedAction) isStateAction()                {}
 func (*ChangesetStatusChangedAction) isStateAction()            {}
 func (*ChangesetFileSetAction) isStateAction()                  {}
 func (*ChangesetFileRemovedAction) isStateAction()              {}
+func (*ChangesetFilesReviewedChangedAction) isStateAction()     {}
 func (*ChangesetContentChangedAction) isStateAction()           {}
 func (*ChangesetOperationsChangedAction) isStateAction()        {}
 func (*ChangesetOperationStatusChangedAction) isStateAction()   {}
@@ -1675,6 +1695,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "changeset/fileRemoved":
 		var value ChangesetFileRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "changeset/filesReviewedChanged":
+		var value ChangesetFilesReviewedChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

@@ -27,6 +27,11 @@ Implements AHP 0.5.2.
 - `disable_user_invocation` on `SkillCustomization`, plus
   `disable_model_invocation` and `disable_user_invocation` on
   `AgentCustomization`.
+- Optional `reviewed` field on `ChangesetFile`. Omitting it (or setting it to
+  `None`) signals that the server does not support the file "review"
+  functionality.
+- `changeset/filesReviewedChanged` action for servers to update the `reviewed`
+  flag of one or more changeset files.
 
 ### Changed
 

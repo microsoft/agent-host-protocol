@@ -25,6 +25,11 @@ Implements AHP 0.5.2.
   `RuleCustomization`, `HookCustomization`).
 - `DisableUserInvocation` on `SkillCustomization`, plus `DisableModelInvocation`
   and `DisableUserInvocation` on `AgentCustomization`.
+- Optional `Reviewed` field on `ChangesetFile`. Omitting it (or setting it to
+  `nil`) signals that the server does not support the file "review"
+  functionality.
+- `changeset/filesReviewedChanged` action for servers to update the `Reviewed`
+  flag of one or more changeset files.
 
 ### Changed
 

@@ -23,6 +23,14 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+### Added
+
+- Optional `reviewed` field on `ChangesetFile`. Omitting it (or setting it to
+  `undefined`) signals that the server does not support the file "review"
+  functionality.
+- `changeset/filesReviewedChanged` action for servers to update the `reviewed`
+  flag of one or more changeset files.
+
 ## [0.5.2] — Unreleased
 
 Spec version: `0.5.2`

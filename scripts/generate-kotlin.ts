@@ -1214,6 +1214,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'changeset/statusChanged', caseName: 'ChangesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
   { type: 'changeset/fileSet', caseName: 'ChangesetFileSet', tsInterface: 'ChangesetFileSetAction' },
   { type: 'changeset/fileRemoved', caseName: 'ChangesetFileRemoved', tsInterface: 'ChangesetFileRemovedAction' },
+  { type: 'changeset/filesReviewedChanged', caseName: 'ChangesetFilesReviewedChanged', tsInterface: 'ChangesetFilesReviewedChangedAction' },
   { type: 'changeset/contentChanged', caseName: 'ChangesetContentChanged', tsInterface: 'ChangesetContentChangedAction' },
   { type: 'changeset/operationsChanged', caseName: 'ChangesetOperationsChanged', tsInterface: 'ChangesetOperationsChangedAction' },
   { type: 'changeset/operationStatusChanged', caseName: 'ChangesetOperationStatusChanged', tsInterface: 'ChangesetOperationStatusChangedAction' },

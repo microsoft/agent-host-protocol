@@ -2850,6 +2850,11 @@ type ChangesetFile struct {
 	// Reuses the existing {@link FileEdit} shape. Clients derive line
 	// additions, deletions, and rename/create/delete semantics from this.
 	Edit FileEdit `json:"edit"`
+	// Whether the user has reviewed this file. Omit (or set to `undefined`)
+	// to indicate that the server does not support the "review" functionality;
+	// in that case clients should not surface any reviewed/unreviewed
+	// affordance for this file.
+	Reviewed *bool `json:"reviewed,omitempty"`
 	// Server-defined opaque metadata, surfaced to operations and tooling
 	// but not interpreted by the protocol.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`

@@ -3466,6 +3466,12 @@ pub struct ChangesetFile {
     /// Reuses the existing {@link FileEdit} shape. Clients derive line
     /// additions, deletions, and rename/create/delete semantics from this.
     pub edit: FileEdit,
+    /// Whether the user has reviewed this file. Omit (or set to `undefined`)
+    /// to indicate that the server does not support the "review" functionality;
+    /// in that case clients should not surface any reviewed/unreviewed
+    /// affordance for this file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewed: Option<bool>,
     /// Server-defined opaque metadata, surfaced to operations and tooling
     /// but not interpreted by the protocol.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]

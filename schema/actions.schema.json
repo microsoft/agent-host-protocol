@@ -1641,6 +1641,31 @@
         "fileId"
       ]
     },
+    "ChangesetFilesReviewedChangedAction": {
+      "type": "object",
+      "description": "Update the {@link ChangesetFile.reviewed} flag for one or more files,\nidentified by their {@link ChangesetFile.id}.\n\nDispatched by the server as the user marks files reviewed or unreviewed\n(e.g. toggling a single file, or a \"mark all as reviewed\" affordance).\nOnly servers that support the \"review\" functionality dispatch this; a\nserver that leaves {@link ChangesetFile.reviewed} `undefined` never does.\n\nThe reducer sets `reviewed` on every matching file and ignores any\n`fileIds` entry that does not correspond to a current file.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ActionType.ChangesetFilesReviewedChanged"
+        },
+        "fileIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The {@link ChangesetFile.id}s whose reviewed state changed."
+        },
+        "reviewed": {
+          "type": "boolean",
+          "description": "The new reviewed state to apply to each listed file."
+        }
+      },
+      "required": [
+        "type",
+        "fileIds",
+        "reviewed"
+      ]
+    },
     "ChangesetContentChangedAction": {
       "type": "object",
       "description": "The changeset's full content changed. Full replacement semantics: `files`\nreplaces the previous file list, and `operations`, when present, replaces\nthe previous operation list.\n\nProducers SHOULD use this action for initial snapshots and bulk refreshes;\nuse {@link ChangesetFileSetAction}, {@link ChangesetFileRemovedAction}, and\n{@link ChangesetOperationsChangedAction} for incremental updates.",
@@ -6119,6 +6144,10 @@
           "$ref": "#/$defs/FileEdit",
           "description": "Reuses the existing {@link FileEdit} shape. Clients derive line\nadditions, deletions, and rename/create/delete semantics from this."
         },
+        "reviewed": {
+          "type": "boolean",
+          "description": "Whether the user has reviewed this file. Omit (or set to `undefined`)\nto indicate that the server does not support the \"review\" functionality;\nin that case clients should not surface any reviewed/unreviewed\naffordance for this file."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -6923,6 +6952,9 @@
         },
         {
           "$ref": "#/$defs/ChangesetFileRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/ChangesetFilesReviewedChangedAction"
         },
         {
           "$ref": "#/$defs/ChangesetContentChangedAction"

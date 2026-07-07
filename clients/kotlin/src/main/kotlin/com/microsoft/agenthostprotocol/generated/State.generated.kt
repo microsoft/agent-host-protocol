@@ -3884,6 +3884,13 @@ data class ChangesetFile(
      */
     val edit: FileEdit,
     /**
+     * Whether the user has reviewed this file. Omit (or set to `undefined`)
+     * to indicate that the server does not support the "review" functionality;
+     * in that case clients should not surface any reviewed/unreviewed
+     * affordance for this file.
+     */
+    val reviewed: Boolean? = null,
+    /**
      * Server-defined opaque metadata, surfaced to operations and tooling
      * but not interpreted by the protocol.
      */

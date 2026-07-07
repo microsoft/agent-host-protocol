@@ -4235,6 +4235,11 @@ public struct ChangesetFile: Codable, Sendable {
     /// Reuses the existing {@link FileEdit} shape. Clients derive line
     /// additions, deletions, and rename/create/delete semantics from this.
     public var edit: FileEdit
+    /// Whether the user has reviewed this file. Omit (or set to `undefined`)
+    /// to indicate that the server does not support the "review" functionality;
+    /// in that case clients should not surface any reviewed/unreviewed
+    /// affordance for this file.
+    public var reviewed: Bool?
     /// Server-defined opaque metadata, surfaced to operations and tooling
     /// but not interpreted by the protocol.
     public var meta: [String: AnyCodable]?
@@ -4242,16 +4247,19 @@ public struct ChangesetFile: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id
         case edit
+        case reviewed
         case meta = "_meta"
     }
 
     public init(
         id: String,
         edit: FileEdit,
+        reviewed: Bool? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.id = id
         self.edit = edit
+        self.reviewed = reviewed
         self.meta = meta
     }
 }

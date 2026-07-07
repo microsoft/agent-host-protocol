@@ -68,6 +68,7 @@ ChangesetState {
 ChangesetFile {
   id: string                               // typically `after.uri` (or `before.uri` for deletions)
   edit: FileEdit                           // reuses the existing FileEdit shape
+  reviewed?: boolean                       // omit when the server has no "review" support
   _meta?: Record<string, unknown>
 }
 ```
@@ -80,6 +81,7 @@ of the changeset URI:
 | `changeset/statusChanged`           | No                   | `status` transitioned (e.g. `computing → ready`).                            |
 | `changeset/fileSet`                 | No                   | Upsert a `ChangesetFile` (new or replacing existing by `id`).                |
 | `changeset/fileRemoved`             | No                   | A file is no longer in the changeset.                                        |
+| `changeset/filesReviewedChanged`    | No                   | The `reviewed` flag for one or more files changed (servers with review support). |
 | `changeset/contentChanged`          | No                   | Full replacement of files, optionally with operations or error details.      |
 | `changeset/operationsChanged`       | No                   | The set of available `operations` changed.                                   |
 | `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |

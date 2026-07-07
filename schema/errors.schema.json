@@ -4255,6 +4255,10 @@
           "$ref": "#/$defs/FileEdit",
           "description": "Reuses the existing {@link FileEdit} shape. Clients derive line\nadditions, deletions, and rename/create/delete semantics from this."
         },
+        "reviewed": {
+          "type": "boolean",
+          "description": "Whether the user has reviewed this file. Omit (or set to `undefined`)\nto indicate that the server does not support the \"review\" functionality;\nin that case clients should not surface any reviewed/unreviewed\naffordance for this file."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
