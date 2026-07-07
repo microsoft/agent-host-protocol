@@ -7,8 +7,8 @@ The connection lifecycle defines how an AHP client and server establish, resume,
 The client initiates the connection with an `initialize` **request**. The client offers a list of protocol versions it can speak; the server picks one and responds with the negotiated version and initial state snapshots:
 
 ```
-1. Client → Server:  initialize(protocolVersions[], clientId, initialSubscriptions?, locale?)
-2. Server → Client:  { protocolVersion, serverSeq, snapshots[], defaultDirectory? }
+1. Client → Server:  initialize(protocolVersions[], clientId, clientInfo?, initialSubscriptions?, locale?)
+2. Server → Client:  { protocolVersion, serverSeq, serverInfo?, snapshots[], defaultDirectory? }
 ```
 
 ### Initialize (Client → Server)
