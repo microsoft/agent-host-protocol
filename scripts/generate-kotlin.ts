@@ -1398,7 +1398,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ContentEncoding', 'CompletionItem
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
-  'ClientCapabilities',
+  'ClientCapabilities', 'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'SessionForkSource', 'CreateSessionParams', 'DisposeSessionParams',

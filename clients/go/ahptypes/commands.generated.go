@@ -94,6 +94,12 @@ type InitializeParams struct {
 	ProtocolVersions []string `json:"protocolVersions"`
 	// Unique client identifier
 	ClientId string `json:"clientId"`
+	// Optional identity of the client implementation (name and version).
+	// Informational only — see {@link Implementation} for how it may and may not
+	// be used. Distinct from {@link InitializeParams.clientId | `clientId`},
+	// which is an opaque per-connection identifier used for reconnection, not a
+	// human-readable implementation name.
+	ClientInfo *Implementation `json:"clientInfo,omitempty"`
 	// URIs to subscribe to during handshake
 	InitialSubscriptions []URI `json:"initialSubscriptions,omitempty"`
 	// IETF BCP 47 language tag indicating the client's preferred locale
@@ -122,6 +128,12 @@ type InitializeResult struct {
 	ProtocolVersion string `json:"protocolVersion"`
 	// Current server sequence number
 	ServerSeq int64 `json:"serverSeq"`
+	// Optional identity of the server implementation (name and version).
+	// Informational only — see {@link Implementation} for how it may and may not
+	// be used. Whereas {@link InitializeResult.protocolVersion | `protocolVersion`}
+	// identifies the negotiated protocol, `serverInfo` identifies the host
+	// software behind it.
+	ServerInfo *Implementation `json:"serverInfo,omitempty"`
 	// Snapshots for each `initialSubscriptions` URI
 	Snapshots []Snapshot `json:"snapshots"`
 	// Suggested default directory for remote filesystem browsing
@@ -157,6 +169,30 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+}
+
+// Identifies a protocol implementation — the software (and build) on one end
+// of the connection, as distinct from the {@link AgentInfo | agent persona} it
+// hosts. Carried as {@link InitializeParams.clientInfo | `clientInfo`} on the
+// client side and {@link InitializeResult.serverInfo | `serverInfo`} on the
+// server side, mirroring LSP's `clientInfo`/`serverInfo` and MCP's
+// `Implementation`.
+//
+// This is **informational only**: it exists for logging, telemetry, an
+// about/status affordance, and — as a last resort — a known-issue workaround
+// for a specific buggy build. It is **not** a feature-detection mechanism.
+// Feature availability stays with the capability model
+// ({@link ClientCapabilities} and the various `*.capabilities` declarations);
+// implementations SHOULD NOT gate protocol behaviour on parsing
+// {@link Implementation.version | `version`}.
+type Implementation struct {
+	// Implementation name, e.g. a product or package identifier.
+	Name string `json:"name"`
+	// Implementation version. A [SemVer](https://semver.org) string is
+	// recommended but not required.
+	Version *string `json:"version,omitempty"`
+	// Optional human-readable display name.
+	Title *string `json:"title,omitempty"`
 }
 
 // Re-establishes a dropped connection. The server replays missed actions or

@@ -1,0 +1,18 @@
+{
+  "name": "implementation-identity",
+  "group": "A",
+  "description": "The handshake `Implementation` identity (carried as InitializeParams.clientInfo / InitializeResult.serverInfo) decodes and re-encodes its required `name` plus optional `version` and `title` through the real generated type in every client.",
+  "type": "Implementation",
+  "input": {
+    "name": "acme-agent-host",
+    "version": "1.4.2",
+    "title": "ACME Agent Host"
+  },
+  "acceptableOutputs": [
+    {
+      "name": "acme-agent-host",
+      "version": "1.4.2",
+      "title": "ACME Agent Host"
+    }
+  ]
+}

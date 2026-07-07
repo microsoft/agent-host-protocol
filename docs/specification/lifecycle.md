@@ -7,8 +7,8 @@ The connection lifecycle defines how an AHP client and server establish, resume,
 The client initiates the connection with an `initialize` **request**. The client offers a list of protocol versions it can speak; the server picks one and responds with the negotiated version and initial state snapshots:
 
 ```
-1. Client → Server:  initialize(protocolVersions[], clientId, initialSubscriptions?, locale?)
-2. Server → Client:  { protocolVersion, serverSeq, snapshots[], defaultDirectory? }
+1. Client → Server:  initialize(protocolVersions[], clientId, clientInfo?, initialSubscriptions?, locale?)
+2. Server → Client:  { protocolVersion, serverSeq, serverInfo?, snapshots[], defaultDirectory? }
 ```
 
 ### Initialize (Client → Server)
@@ -24,6 +24,7 @@ The client initiates the connection with an `initialize` **request**. The client
     "channel": "ahp-root://",
     "protocolVersions": ["0.3.0"],
     "clientId": "client-abc",
+    "clientInfo": { "name": "acme-ide", "version": "2.5.0" },
     "initialSubscriptions": ["ahp-root://"],
     "locale": "en-US"
   }
@@ -36,6 +37,8 @@ The client initiates the connection with an `initialize` **request**. The client
 
 `locale` is an optional IETF BCP 47 language tag (e.g. `"en-US"`, `"ja"`) indicating the client's preferred language. The server SHOULD use this to localise user-facing strings such as confirmation option labels.
 
+`clientInfo` optionally identifies the client *implementation* — its `name` and, optionally, `version` and display `title`. It is distinct from `clientId`, which is an opaque per-connection identifier used for reconnection. See [Implementation identity](#implementation-identity) below.
+
 ### Initialize Response (Server → Client)
 
 ```json
@@ -45,6 +48,7 @@ The client initiates the connection with an `initialize` **request**. The client
   "result": {
     "protocolVersion": "0.3.0",
     "serverSeq": 42,
+    "serverInfo": { "name": "acme-agent-host", "version": "1.4.2" },
     "defaultDirectory": "file:///home/testuser",
     "snapshots": [
       {
@@ -62,6 +66,14 @@ The client initiates the connection with an `initialize` **request**. The client
 If present, `defaultDirectory` provides a server-local starting location for remote filesystem browsing.
 
 If the server cannot accept the connection for any other reason, it MUST return a JSON-RPC error. See [Error Codes](/reference/error-codes) for defined codes.
+
+### Implementation identity
+
+Both sides of the handshake MAY advertise the *implementation* behind them: the client via `InitializeParams.clientInfo` and the server via `InitializeResult.serverInfo`. Each is an `Implementation` (see the [`initialize`](/reference/common#initialize) reference) carrying a required `name` plus optional `version` and display `title`. This mirrors LSP's `clientInfo`/`serverInfo` and MCP's `Implementation`.
+
+Implementation identity is **informational only** — for logging, telemetry, an about/status affordance, and, as a last resort, a known-issue workaround for a specific buggy build. It answers "what software, and which build, is on the other end," which is distinct from both the negotiated `protocolVersion` and the [`AgentInfo`](/reference/root#agentinfo) that names the agent persona.
+
+It is **not** a feature-detection mechanism. Feature availability stays with the capability model (`ClientCapabilities` and the various `*.capabilities` declarations); clients and servers SHOULD NOT gate protocol behaviour on parsing `version`. Both fields are optional and purely additive: a peer that omits its own info, or ignores the other side's, stays fully interoperable.
 
 ## Authentication
 

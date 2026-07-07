@@ -26,7 +26,7 @@
 
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
-    commands::ChangesetOperationTarget,
+    commands::{ChangesetOperationTarget, Implementation},
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
     notifications::{PartialSessionSummary, SessionAddedParams},
@@ -219,6 +219,7 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "SessionSummary" => round_trip!(SessionSummary),
         "SessionAddedParams" => round_trip!(SessionAddedParams),
         "PartialSessionSummary" => round_trip!(PartialSessionSummary),
+        "Implementation" => round_trip!(Implementation),
         other => Err(format!(
             "{}: unknown wire type {:?}. Add a decode entry to decode_and_reencode.",
             file, other

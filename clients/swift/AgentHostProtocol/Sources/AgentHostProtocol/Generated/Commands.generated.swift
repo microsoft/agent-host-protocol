@@ -71,6 +71,12 @@ public struct InitializeParams: Codable, Sendable {
     public var protocolVersions: [String]
     /// Unique client identifier
     public var clientId: String
+    /// Optional identity of the client implementation (name and version).
+    /// Informational only — see {@link Implementation} for how it may and may not
+    /// be used. Distinct from {@link InitializeParams.clientId | `clientId`},
+    /// which is an opaque per-connection identifier used for reconnection, not a
+    /// human-readable implementation name.
+    public var clientInfo: Implementation?
     /// URIs to subscribe to during handshake
     public var initialSubscriptions: [String]?
     /// IETF BCP 47 language tag indicating the client's preferred locale
@@ -88,6 +94,7 @@ public struct InitializeParams: Codable, Sendable {
         channel: String,
         protocolVersions: [String],
         clientId: String,
+        clientInfo: Implementation? = nil,
         initialSubscriptions: [String]? = nil,
         locale: String? = nil,
         capabilities: ClientCapabilities? = nil
@@ -95,6 +102,7 @@ public struct InitializeParams: Codable, Sendable {
         self.channel = channel
         self.protocolVersions = protocolVersions
         self.clientId = clientId
+        self.clientInfo = clientInfo
         self.initialSubscriptions = initialSubscriptions
         self.locale = locale
         self.capabilities = capabilities
@@ -108,6 +116,12 @@ public struct InitializeResult: Codable, Sendable {
     public var protocolVersion: String
     /// Current server sequence number
     public var serverSeq: Int
+    /// Optional identity of the server implementation (name and version).
+    /// Informational only — see {@link Implementation} for how it may and may not
+    /// be used. Whereas {@link InitializeResult.protocolVersion | `protocolVersion`}
+    /// identifies the negotiated protocol, `serverInfo` identifies the host
+    /// software behind it.
+    public var serverInfo: Implementation?
     /// Snapshots for each `initialSubscriptions` URI
     public var snapshots: [Snapshot]
     /// Suggested default directory for remote filesystem browsing
@@ -127,6 +141,7 @@ public struct InitializeResult: Codable, Sendable {
     public init(
         protocolVersion: String,
         serverSeq: Int,
+        serverInfo: Implementation? = nil,
         snapshots: [Snapshot],
         defaultDirectory: String? = nil,
         completionTriggerCharacters: [String]? = nil,
@@ -134,6 +149,7 @@ public struct InitializeResult: Codable, Sendable {
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
+        self.serverInfo = serverInfo
         self.snapshots = snapshots
         self.defaultDirectory = defaultDirectory
         self.completionTriggerCharacters = completionTriggerCharacters
@@ -159,6 +175,26 @@ public struct ClientCapabilities: Codable, Sendable {
         mcpApps: [String: AnyCodable]? = nil
     ) {
         self.mcpApps = mcpApps
+    }
+}
+
+public struct Implementation: Codable, Sendable {
+    /// Implementation name, e.g. a product or package identifier.
+    public var name: String
+    /// Implementation version. A [SemVer](https://semver.org) string is
+    /// recommended but not required.
+    public var version: String?
+    /// Optional human-readable display name.
+    public var title: String?
+
+    public init(
+        name: String,
+        version: String? = nil,
+        title: String? = nil
+    ) {
+        self.name = name
+        self.version = version
+        self.title = title
     }
 }
 

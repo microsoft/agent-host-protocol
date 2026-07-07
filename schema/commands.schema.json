@@ -42,6 +42,27 @@
         }
       }
     },
+    "Implementation": {
+      "type": "object",
+      "description": "Identifies a protocol implementation — the software (and build) on one end\nof the connection, as distinct from the {@link AgentInfo | agent persona} it\nhosts. Carried as {@link InitializeParams.clientInfo | `clientInfo`} on the\nclient side and {@link InitializeResult.serverInfo | `serverInfo`} on the\nserver side, mirroring LSP's `clientInfo`/`serverInfo` and MCP's\n`Implementation`.\n\nThis is **informational only**: it exists for logging, telemetry, an\nabout/status affordance, and — as a last resort — a known-issue workaround\nfor a specific buggy build. It is **not** a feature-detection mechanism.\nFeature availability stays with the capability model\n({@link ClientCapabilities} and the various `*.capabilities` declarations);\nimplementations SHOULD NOT gate protocol behaviour on parsing\n{@link Implementation.version | `version`}.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Implementation name, e.g. a product or package identifier."
+        },
+        "version": {
+          "type": "string",
+          "description": "Implementation version. A [SemVer](https://semver.org) string is\nrecommended but not required."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional human-readable display name."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
     "InitializeParams": {
       "type": "object",
       "description": "Establishes a new connection and negotiates the protocol version.\nThis MUST be the first message sent by the client.",
@@ -62,6 +83,10 @@
         "clientId": {
           "type": "string",
           "description": "Unique client identifier"
+        },
+        "clientInfo": {
+          "$ref": "#/$defs/Implementation",
+          "description": "Optional identity of the client implementation (name and version).\nInformational only — see {@link Implementation} for how it may and may not\nbe used. Distinct from {@link InitializeParams.clientId | `clientId`},\nwhich is an opaque per-connection identifier used for reconnection, not a\nhuman-readable implementation name."
         },
         "initialSubscriptions": {
           "type": "array",
@@ -107,6 +132,10 @@
         "serverSeq": {
           "type": "number",
           "description": "Current server sequence number"
+        },
+        "serverInfo": {
+          "$ref": "#/$defs/Implementation",
+          "description": "Optional identity of the server implementation (name and version).\nInformational only — see {@link Implementation} for how it may and may not\nbe used. Whereas {@link InitializeResult.protocolVersion | `protocolVersion`}\nidentifies the negotiated protocol, `serverInfo` identifies the host\nsoftware behind it."
         },
         "snapshots": {
           "type": "array",
