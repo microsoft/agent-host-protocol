@@ -1388,6 +1388,28 @@ func ApplyActionToChangeset(state *ahptypes.ChangesetState, action ahptypes.Stat
 		}
 		return ReduceOutcomeNoOp
 
+	case *ahptypes.ChangesetFilesReviewedChangedAction:
+		ids := make(map[string]struct{}, len(a.FileIds))
+		for _, id := range a.FileIds {
+			ids[id] = struct{}{}
+		}
+		changed := false
+		for i := range state.Files {
+			if _, ok := ids[state.Files[i].Id]; !ok {
+				continue
+			}
+			if state.Files[i].Reviewed != nil && *state.Files[i].Reviewed == a.Reviewed {
+				continue
+			}
+			reviewed := a.Reviewed
+			state.Files[i].Reviewed = &reviewed
+			changed = true
+		}
+		if !changed {
+			return ReduceOutcomeNoOp
+		}
+		return ReduceOutcomeApplied
+
 	case *ahptypes.ChangesetContentChangedAction:
 		state.Files = a.Files
 		if a.Operations != nil {

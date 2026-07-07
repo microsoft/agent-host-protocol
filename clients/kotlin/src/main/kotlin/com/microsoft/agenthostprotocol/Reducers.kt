@@ -1346,6 +1346,20 @@ public fun changesetReducer(state: ChangesetState, action: StateAction): Changes
         }
     }
 
+    is StateActionChangesetFilesReviewedChanged -> {
+        val ids = action.value.fileIds.toSet()
+        var changed = false
+        val next = state.files.map { file ->
+            if (file.id !in ids || file.reviewed == action.value.reviewed) {
+                file
+            } else {
+                changed = true
+                file.copy(reviewed = action.value.reviewed)
+            }
+        }
+        if (changed) state.copy(files = next) else state
+    }
+
     is StateActionChangesetContentChanged ->
         if (action.value.operations == null) {
             state.copy(files = action.value.files, error = action.value.error)

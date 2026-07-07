@@ -1096,6 +1096,19 @@ public func changesetReducer(state: ChangesetState, action: StateAction) -> Chan
         next.files.remove(at: idx)
         return next
 
+    case .changesetFilesReviewedChanged(let a):
+        let ids = Set(a.fileIds)
+        var next = state
+        var changed = false
+        for idx in next.files.indices {
+            guard ids.contains(next.files[idx].id), next.files[idx].reviewed != a.reviewed else {
+                continue
+            }
+            next.files[idx].reviewed = a.reviewed
+            changed = true
+        }
+        return changed ? next : state
+
     case .changesetContentChanged(let a):
         var next = state
         next.files = a.files
