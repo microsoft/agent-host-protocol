@@ -366,6 +366,7 @@ impl Client {
             },
             locale: None,
             capabilities: None,
+            client_info: None,
         };
         self.request("initialize", params).await
     }

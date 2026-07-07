@@ -57,7 +57,7 @@
 //! ## Build an `initialize` request
 //!
 //! ```
-//! use ahp_types::commands::InitializeParams;
+//! use ahp_types::commands::{Implementation, InitializeParams};
 //! use ahp_types::messages::{JsonRpcMessage, JsonRpcRequest, JsonRpcVersion};
 //! use ahp_types::common::AnyValue;
 //!
@@ -68,6 +68,11 @@
 //!     initial_subscriptions: Some(vec!["ahp-root://".into()]),
 //!     locale: Some("en".into()),
 //!     capabilities: None,
+//!     client_info: Some(Implementation {
+//!         name: "my-host".into(),
+//!         version: Some("1.0.0".into()),
+//!         title: Some("My Host".into()),
+//!     }),
 //! };
 //!
 //! let req = JsonRpcMessage::Request(JsonRpcRequest {
