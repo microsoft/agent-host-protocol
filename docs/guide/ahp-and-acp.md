@@ -40,17 +40,17 @@ The host is the boundary between these two concerns.
 | **Reconnection / replay** | Built-in — clients reconnect with `lastSeenServerSeq` and replay missed actions | Not specified at the protocol level |
 | **Agent abstraction** | Agent-agnostic by design — clients never see agent-specific details | Agent-specific — defines the agent's interface directly |
 | **Session lifecycle** | Host manages sessions; clients subscribe by URI | Client creates sessions directly with the agent |
-| **Streaming** | Actions (`session/delta`, `session/responsePart`) applied through reducers | `session/update` notifications sent over the wire |
+| **Streaming** | Actions (`chat/delta`, `chat/responsePart`) applied through reducers | `session/update` notifications sent over the wire |
 
 ## How They Compose
 
 An AHP host implementation can use ACP as its agent backend protocol. The internal flow looks like this:
 
-1. **Client dispatches an action** (e.g. `session/turnStarted`) via AHP.
+1. **Client dispatches an action** (e.g. `chat/turnStarted`) via AHP.
 2. **Host sequences it** — assigns a `serverSeq`, applies it to the authoritative state, broadcasts the action envelope to all subscribed clients.
 3. **Host translates to ACP** — sends a `session/prompt` to the ACP agent.
 4. **Agent streams back** — the ACP agent sends `session/update` notifications with content chunks, tool calls, and permission requests.
-5. **Host maps to AHP actions** — the agent event mapper converts ACP-specific events into agent-agnostic AHP actions (`session/delta`, `chat/toolCallStart`, `chat/toolCallReady`, etc.).
+5. **Host maps to AHP actions** — the agent event mapper converts ACP-specific events into agent-agnostic AHP actions (`chat/delta`, `chat/toolCallStart`, `chat/toolCallReady`, etc.).
 6. **Host broadcasts** — each mapped action gets a `serverSeq` and flows to all subscribed clients through the normal state synchronization path.
 
 The host is acting as a bridge: it speaks AHP upstream (to clients) and ACP downstream (to agents). The agent event mapper is the translation layer between the two.
@@ -63,9 +63,9 @@ When multiple clients connect to the same agent session, the host serializes the
 
 Concretely:
 
-- **Turn ownership**: Only one turn runs at a time. When Client A starts a turn, Clients B and C see the `session/turnStarted` action and know the session is busy. AHP's state tree makes this visible to everyone.
+- **Turn ownership**: Only one turn runs at a time per chat. When Client A starts a turn in a chat, Clients B and C see the `chat/turnStarted` action and know that chat is busy. AHP's state tree makes this visible to everyone.
 - **Tool call confirmation**: When the agent needs user approval for a tool call, the host surfaces it as a state action. Any client can resolve it — but only once (the first `chat/toolCallConfirmed` wins; subsequent ones are rejected). The host arbitrates.
-- **Cancellation**: Any client can cancel a running turn. The host sequences the `session/turnCancelled` action and forwards the cancellation to the agent via ACP's `session/cancel`. All clients see the result.
+- **Cancellation**: Any client can cancel a running turn. The host sequences the `chat/turnCancelled` action and forwards the cancellation to the agent via ACP's `session/cancel`. All clients see the result.
 - **Optimistic updates with reconciliation**: Clients apply their own actions immediately (write-ahead) and reconcile when the server echoes them back. This gives responsive UI without sacrificing consistency — something a 1:1 protocol doesn't need to worry about.
 
 ACP doesn't need any of this because it assumes one client. AHP adds exactly this coordination, and nothing more — it doesn't redefine how agents work, what tools they expose, or how they stream content.

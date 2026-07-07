@@ -1145,6 +1145,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'changeset/statusChanged', caseName: 'changesetStatusChanged', tsInterface: 'ChangesetStatusChangedAction' },
   { type: 'changeset/fileSet', caseName: 'changesetFileSet', tsInterface: 'ChangesetFileSetAction' },
   { type: 'changeset/fileRemoved', caseName: 'changesetFileRemoved', tsInterface: 'ChangesetFileRemovedAction' },
+  { type: 'changeset/filesReviewedChanged', caseName: 'changesetFilesReviewedChanged', tsInterface: 'ChangesetFilesReviewedChangedAction' },
   { type: 'changeset/contentChanged', caseName: 'changesetContentChanged', tsInterface: 'ChangesetContentChangedAction' },
   { type: 'changeset/operationsChanged', caseName: 'changesetOperationsChanged', tsInterface: 'ChangesetOperationsChangedAction' },
   { type: 'changeset/operationStatusChanged', caseName: 'changesetOperationStatusChanged', tsInterface: 'ChangesetOperationStatusChangedAction' },
@@ -1340,7 +1341,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
-  'InitializeParams', 'InitializeResult', 'ClientCapabilities',
+  'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'SessionForkSource', 'CreateSessionParams', 'DisposeSessionParams',

@@ -23,6 +23,14 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+### Added
+
+- Optional `reviewed` field on `ChangesetFile`. Omitting it (or setting it to
+  `undefined`) signals that the server does not support the file "review"
+  functionality.
+- `changeset/filesReviewedChanged` action for servers to update the `reviewed`
+  flag of one or more changeset files.
+
 ## [0.5.2] — Unreleased
 
 Spec version: `0.5.2`
@@ -36,6 +44,11 @@ Spec version: `0.5.2`
 - `disableUserInvocation` on `SkillCustomization`, plus `disableModelInvocation`
   and `disableUserInvocation` on `AgentCustomization`, giving custom agents and
   skills a symmetric user/model invocation matrix.
+- Optional `serverInfo` on `InitializeResult` and `clientInfo` on
+  `InitializeParams`, each an `Implementation` (`name`, optional `version`,
+  optional `title`), so either side of the handshake can identify its
+  implementation and build. Informational only — mirrors LSP/MCP and MUST NOT
+  be used for feature detection.
 - Canvas channel — an opt-in surface for the agent to open rich, interactive UI
   surfaces (document/spreadsheet editors, diff views, live previews) alongside a
   session, following the "one channel per resource" model of terminals and
@@ -57,6 +70,15 @@ Spec version: `0.5.2`
   (`plugin`, `directory`, or top-level `mcpServer`) or an individual child by
   `id` and sets that entry's `enabled`; the effective state of a child is
   `container.enabled && (child.enabled ?? true)`.
+
+### Fixed
+
+- The generated JSON Schema artifacts (`schema/*.json`) are now self-contained
+  and strict-`oneOf`-safe. The generator no longer emits an empty `{}` branch in
+  a union type alias's `oneOf` (which matched any value and defeated strict
+  `oneOf` validation), backfills the `enum`, enum-member, and type-alias `$ref`s
+  that were previously dangling across all five schema files, and renders `null`
+  members as `{ "type": "null" }` (#302).
 
 ## [0.5.1] — 2026-07-02
 

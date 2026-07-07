@@ -1095,7 +1095,7 @@
       "description": "A canvas provided by the host. Carries no `clientId` — server-side provider\nrequests are resolved host-internally rather than routed to a peer.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CanvasProviderKind.Server"
+          "const": "server"
         }
       },
       "required": [
@@ -1107,7 +1107,7 @@
       "description": "A canvas provided by a connected client. The host routes\n`canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for this canvas\nto the identified client.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CanvasProviderKind.Client"
+          "const": "client"
         },
         "clientId": {
           "type": "string",
@@ -1297,7 +1297,7 @@
           "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
         },
         "kind": {
-          "$ref": "#/$defs/SessionInputRequestKind.ChatInput"
+          "const": "chatInput"
         },
         "request": {
           "$ref": "#/$defs/ChatInputRequest",
@@ -1324,7 +1324,7 @@
           "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
         },
         "kind": {
-          "$ref": "#/$defs/SessionInputRequestKind.ToolConfirmation"
+          "const": "toolConfirmation"
         },
         "turnId": {
           "type": "string",
@@ -1356,7 +1356,7 @@
           "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
         },
         "kind": {
-          "$ref": "#/$defs/SessionInputRequestKind.ToolClientExecution"
+          "const": "toolClientExecution"
         },
         "turnId": {
           "type": "string",
@@ -1760,7 +1760,7 @@
       "description": "Container is being loaded by the host.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CustomizationLoadStatus.Loading"
+          "const": "loading"
         }
       },
       "required": [
@@ -1772,7 +1772,7 @@
       "description": "Container loaded successfully.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CustomizationLoadStatus.Loaded"
+          "const": "loaded"
         }
       },
       "required": [
@@ -1784,7 +1784,7 @@
       "description": "Container partially loaded but has warnings.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CustomizationLoadStatus.Degraded"
+          "const": "degraded"
         },
         "message": {
           "type": "string",
@@ -1801,7 +1801,7 @@
       "description": "Container failed to load.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CustomizationLoadStatus.Error"
+          "const": "error"
         },
         "message": {
           "type": "string",
@@ -1914,7 +1914,7 @@
           "description": "Children discovered inside this container.\n\nAbsent means the host has not parsed this container yet. An empty\narray means the host parsed the container and it contributes\nnothing."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Plugin"
+          "const": "plugin"
         }
       },
       "required": [
@@ -1972,7 +1972,7 @@
           "description": "Children discovered inside this container.\n\nAbsent means the host has not parsed this container yet. An empty\narray means the host parsed the container and it contributes\nnothing."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Plugin"
+          "const": "plugin"
         },
         "nonce": {
           "type": "string",
@@ -2034,7 +2034,7 @@
           "description": "Children discovered inside this container.\n\nAbsent means the host has not parsed this container yet. An empty\narray means the host parsed the container and it contributes\nnothing."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Directory"
+          "const": "directory"
         },
         "contents": {
           "$ref": "#/$defs/ChildCustomizationType",
@@ -2125,7 +2125,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Agent"
+          "const": "agent"
         },
         "description": {
           "type": "string",
@@ -2195,7 +2195,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Skill"
+          "const": "skill"
         },
         "description": {
           "type": "string",
@@ -2249,7 +2249,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Prompt"
+          "const": "prompt"
         },
         "description": {
           "type": "string",
@@ -2295,7 +2295,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Rule"
+          "const": "rule"
         },
         "description": {
           "type": "string",
@@ -2352,7 +2352,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Hook"
+          "const": "hook"
         }
       },
       "required": [
@@ -2390,7 +2390,7 @@
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.McpServer"
+          "const": "mcpServer"
         },
         "enabled": {
           "type": "boolean",
@@ -2474,7 +2474,7 @@
       "description": "Server is registered with the host but has not yet started.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.Starting"
+          "const": "starting"
         }
       },
       "required": [
@@ -2486,7 +2486,7 @@
       "description": "Server is running and serving requests.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.Ready"
+          "const": "ready"
         }
       },
       "required": [
@@ -2498,7 +2498,7 @@
       "description": "Server is reachable but cannot serve requests until the client\nauthenticates. Mirrors the discovery flow defined by\n[RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)\n(Protected Resource Metadata) and the OAuth 2.1 / RFC 6750 challenge\nsemantics required by the MCP authorization spec.\n\nClients react to this state by calling the existing `authenticate`\ncommand with the {@link ProtectedResourceMetadata.resource | resource}\ncarried here. There is **no** `notify/authRequired` notification for\nMCP servers — the action stream is the single source of truth.\n\nWhen the transition is triggered by a request issued during a turn\n— most commonly\n{@link McpAuthRequiredReason.InsufficientScope | `InsufficientScope`}\nsurfacing mid-tool-call — the host SHOULD also raise\n{@link SessionStatus.InputNeeded} on the session so the block is\nvisible at the summary level. Clients SHOULD watch this status on\nany MCP server backing a running tool call and surface an explicit\naffordance (e.g. a \"grant additional access\" prompt) tied to that\ntool call, rather than relying on the user to notice the\ncustomization’s status badge.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.AuthRequired"
+          "const": "authRequired"
         },
         "reason": {
           "$ref": "#/$defs/McpAuthRequiredReason",
@@ -2531,7 +2531,7 @@
       "description": "Server failed to start, crashed, or otherwise transitioned to a\nnon-recoverable error. Use {@link McpServerStatus.AuthRequired}\nfor authentication failures.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.Error"
+          "const": "error"
         },
         "error": {
           "$ref": "#/$defs/ErrorInfo",
@@ -2548,7 +2548,7 @@
       "description": "Server has been shut down. The host MAY remove the server from the\nsession entirely shortly after this state.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.Stopped"
+          "const": "stopped"
         }
       },
       "required": [
@@ -2776,7 +2776,7 @@
           "description": "Whether the user must answer this question to accept the request"
         },
         "kind": {
-          "$ref": "#/$defs/ChatInputQuestionKind.Text"
+          "const": "text"
         },
         "format": {
           "type": "string",
@@ -2824,10 +2824,10 @@
         "kind": {
           "oneOf": [
             {
-              "$ref": "#/$defs/ChatInputQuestionKind.Number"
+              "const": "number"
             },
             {
-              "$ref": "#/$defs/ChatInputQuestionKind.Integer"
+              "const": "integer"
             }
           ]
         },
@@ -2871,7 +2871,7 @@
           "description": "Whether the user must answer this question to accept the request"
         },
         "kind": {
-          "$ref": "#/$defs/ChatInputQuestionKind.Boolean"
+          "const": "boolean"
         },
         "defaultValue": {
           "type": "boolean",
@@ -2905,7 +2905,7 @@
           "description": "Whether the user must answer this question to accept the request"
         },
         "kind": {
-          "$ref": "#/$defs/ChatInputQuestionKind.SingleSelect"
+          "const": "single-select"
         },
         "options": {
           "type": "array",
@@ -2947,7 +2947,7 @@
           "description": "Whether the user must answer this question to accept the request"
         },
         "kind": {
-          "$ref": "#/$defs/ChatInputQuestionKind.MultiSelect"
+          "const": "multi-select"
         },
         "options": {
           "type": "array",
@@ -3016,7 +3016,7 @@
       "description": "Value captured for one answer.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.Text"
+          "const": "text"
         },
         "value": {
           "type": "string"
@@ -3031,7 +3031,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.Number"
+          "const": "number"
         },
         "value": {
           "type": "number"
@@ -3046,7 +3046,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.Boolean"
+          "const": "boolean"
         },
         "value": {
           "type": "boolean"
@@ -3061,7 +3061,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.Selected"
+          "const": "selected"
         },
         "value": {
           "type": "string"
@@ -3083,7 +3083,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.SelectedMany"
+          "const": "selected-many"
         },
         "value": {
           "type": "array",
@@ -3110,10 +3110,10 @@
         "state": {
           "oneOf": [
             {
-              "$ref": "#/$defs/ChatInputAnswerState.Draft"
+              "const": "draft"
             },
             {
-              "$ref": "#/$defs/ChatInputAnswerState.Submitted"
+              "const": "submitted"
             }
           ],
           "description": "Answer state"
@@ -3132,7 +3132,7 @@
       "type": "object",
       "properties": {
         "state": {
-          "$ref": "#/$defs/ChatInputAnswerState.Skipped",
+          "const": "skipped",
           "description": "Answer state"
         },
         "freeformValues": {
@@ -3317,7 +3317,7 @@
           "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
         },
         "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Simple",
+          "const": "simple",
           "description": "Discriminant"
         },
         "modelRepresentation": {
@@ -3352,7 +3352,7 @@
           "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
         },
         "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.EmbeddedResource",
+          "const": "embeddedResource",
           "description": "Discriminant"
         },
         "data": {
@@ -3413,7 +3413,7 @@
           "description": "Content nonce"
         },
         "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Resource",
+          "const": "resource",
           "description": "Discriminant"
         },
         "selection": {
@@ -3449,7 +3449,7 @@
           "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
         },
         "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Annotations",
+          "const": "annotations",
           "description": "Discriminant"
         },
         "resource": {
@@ -3474,7 +3474,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.Markdown",
+          "const": "markdown",
           "description": "Discriminant"
         },
         "id": {
@@ -3513,7 +3513,7 @@
           "description": "Content nonce"
         },
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.ContentRef",
+          "const": "contentRef",
           "description": "Discriminant"
         }
       },
@@ -3527,7 +3527,7 @@
       "description": "A tool call represented as a response part.\n\nTool calls are part of the response stream, interleaved with text and\nreasoning. The `toolCall.toolCallId` serves as the part identifier for\nactions that target this part.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.ToolCall",
+          "const": "toolCall",
           "description": "Discriminant"
         },
         "toolCall": {
@@ -3545,7 +3545,7 @@
       "description": "Reasoning/thinking content from the model.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.Reasoning",
+          "const": "reasoning",
           "description": "Discriminant"
         },
         "id": {
@@ -3568,7 +3568,7 @@
       "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent harness\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.SystemNotification",
+          "const": "systemNotification",
           "description": "Discriminant"
         },
         "content": {
@@ -3612,7 +3612,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ToolCallContributorKind.Client"
+          "const": "client"
         },
         "clientId": {
           "type": "string",
@@ -3628,7 +3628,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ToolCallContributorKind.MCP"
+          "const": "mcp"
         },
         "customizationId": {
           "type": "string",
@@ -3768,7 +3768,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.Streaming"
+          "const": "streaming"
         },
         "partialInput": {
           "type": "string",
@@ -3824,7 +3824,7 @@
           "description": "Raw tool input"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.PendingConfirmation"
+          "const": "pending-confirmation"
         },
         "confirmationTitle": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -3900,7 +3900,7 @@
           "description": "Raw tool input"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.Running"
+          "const": "running"
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -4000,7 +4000,7 @@
           "description": "Error details if the tool failed"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.PendingResultConfirmation"
+          "const": "pending-result-confirmation"
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -4095,7 +4095,7 @@
           "description": "Error details if the tool failed"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.Completed"
+          "const": "completed"
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -4155,7 +4155,7 @@
           "description": "Raw tool input"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.Cancelled"
+          "const": "cancelled"
         },
         "reason": {
           "$ref": "#/$defs/ToolCallCancellationReason",
@@ -4188,7 +4188,7 @@
       "description": "Text content in a tool result.\n\nMirrors MCP `TextContent`.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.Text"
+          "const": "text"
         },
         "text": {
           "type": "string",
@@ -4205,7 +4205,7 @@
       "description": "Base64-encoded binary content embedded in a tool result.\n\nMirrors MCP `EmbeddedResource` for inline binary data.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.EmbeddedResource"
+          "const": "embeddedResource"
         },
         "data": {
           "type": "string",
@@ -4243,7 +4243,7 @@
           "description": "Content nonce"
         },
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.Resource"
+          "const": "resource"
         }
       },
       "required": [
@@ -4300,7 +4300,7 @@
           "description": "Optional diff display metadata"
         },
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.FileEdit"
+          "const": "fileEdit"
         }
       },
       "required": [
@@ -4312,7 +4312,7 @@
       "description": "A reference to a terminal whose output is relevant to this tool result.\n\nClients can subscribe to the terminal's URI to stream its output in real\ntime, providing live feedback while a tool is executing.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.Terminal"
+          "const": "terminal"
         },
         "resource": {
           "$ref": "#/$defs/URI",
@@ -4334,7 +4334,7 @@
       "description": "A reference, embedded in a tool result, to a worker chat spawned by the tool\ncall (a sub-agent delegation), referenced by a chat URI (`ahp-chat:/...`).\n\nThis is the spawning tool call's forward view of the worker. The worker chat\nrecords the same edge in reverse via its {@link ChatOrigin} (`kind: 'tool'`),\nwhose `toolCallId` identifies the tool call that emitted this content.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.Subagent"
+          "const": "subagent"
         },
         "resource": {
           "$ref": "#/$defs/URI",
@@ -4391,7 +4391,7 @@
       "description": "A terminal claimed by a connected client.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/TerminalClaimKind.Client",
+          "const": "client",
           "description": "Discriminant"
         },
         "clientId": {
@@ -4409,7 +4409,7 @@
       "description": "A terminal claimed by a session, optionally scoped to a specific turn or tool call.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/TerminalClaimKind.Session",
+          "const": "session",
           "description": "Discriminant"
         },
         "session": {
@@ -4614,6 +4614,10 @@
         "edit": {
           "$ref": "#/$defs/FileEdit",
           "description": "Reuses the existing {@link FileEdit} shape. Clients derive line\nadditions, deletions, and rename/create/delete semantics from this."
+        },
+        "reviewed": {
+          "type": "boolean",
+          "description": "Whether the user has reviewed this file. Omit (or set to `undefined`)\nto indicate that the server does not support the \"review\" functionality;\nin that case clients should not surface any reviewed/unreviewed\naffordance for this file."
         },
         "_meta": {
           "type": "object",
@@ -4919,6 +4923,543 @@
         "availability",
         "provider"
       ]
+    },
+    "URI": {
+      "type": "string",
+      "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
+    },
+    "AuthRequiredReason": {
+      "enum": [
+        "required",
+        "expired"
+      ],
+      "type": "string",
+      "description": "Reason why authentication is required."
+    },
+    "SessionStatus": {
+      "enum": [
+        1,
+        2,
+        8,
+        24,
+        32,
+        64
+      ],
+      "type": "number",
+      "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
+    },
+    "JsonPrimitive": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A primitive JSON value: a string, number, boolean, or `null`."
+    },
+    "Customization": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PluginCustomization"
+        },
+        {
+          "$ref": "#/$defs/DirectoryCustomization"
+        },
+        {
+          "$ref": "#/$defs/McpServerCustomization"
+        }
+      ],
+      "description": "A top-level customization active in a session. Either a container\n({@link PluginCustomization} or {@link DirectoryCustomization}) whose\nleaf customizations live in its\n{@link ContainerCustomizationBase.children | `children`} array, or a\nbare {@link McpServerCustomization} surfaced directly by the host."
+    },
+    "PolicyState": {
+      "enum": [
+        "enabled",
+        "disabled",
+        "unconfigured"
+      ],
+      "type": "string",
+      "description": "Policy configuration state for a model."
+    },
+    "SessionLifecycle": {
+      "enum": [
+        "creating",
+        "ready",
+        "creationFailed"
+      ],
+      "type": "string",
+      "description": "Session initialization state."
+    },
+    "SessionInputRequest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SessionChatInputRequest"
+        },
+        {
+          "$ref": "#/$defs/SessionToolConfirmationRequest"
+        },
+        {
+          "$ref": "#/$defs/SessionToolClientExecutionRequest"
+        }
+      ],
+      "description": "One outstanding piece of input a session is blocked on, aggregated across all\nchats in {@link SessionState.inputNeeded}.\n\nEach entry is self-sufficient: it carries the owning\n{@link SessionInputRequestBase.chat | `chat`} URI plus every identifier needed\nto construct the response, so a client can answer by dispatching the ordinary\n`chat/*` action (`chat/inputCompleted`, `chat/toolCallConfirmed`,\n`chat/toolCallComplete`, …) to that chat's channel **without having subscribed\nto the chat**. The host removes the entry with `session/inputNeededRemoved`\nonce the underlying request resolves."
+    },
+    "CanvasProviderSource": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CanvasServerProviderSource"
+        },
+        {
+          "$ref": "#/$defs/CanvasClientProviderSource"
+        }
+      ],
+      "description": "Where a canvas declaration came from — used for request routing and for\ncleaning the entry up when its provider disconnects. Modeled as a\ndiscriminated union so the `clientId` is only present (and required) for the\nclient variant."
+    },
+    "CanvasAvailability": {
+      "enum": [
+        "ready",
+        "stale"
+      ],
+      "type": "string",
+      "description": "Availability of a canvas provider or open instance."
+    },
+    "ToolCallConfirmationState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ToolCallPendingConfirmationState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPendingResultConfirmationState"
+        }
+      ],
+      "description": "The two tool-call states that block on a client confirmation: parameter\nconfirmation before execution ({@link ToolCallPendingConfirmationState}) and\nresult confirmation after execution\n({@link ToolCallPendingResultConfirmationState}).\n\nSurfaced at the session level by {@link SessionToolConfirmationRequest}."
+    },
+    "ToolCallState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ToolCallStreamingState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPendingConfirmationState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallRunningState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPendingResultConfirmationState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallCompletedState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallCancelledState"
+        }
+      ],
+      "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
+    },
+    "CustomizationLoadState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CustomizationLoadingState"
+        },
+        {
+          "$ref": "#/$defs/CustomizationLoadedState"
+        },
+        {
+          "$ref": "#/$defs/CustomizationDegradedState"
+        },
+        {
+          "$ref": "#/$defs/CustomizationErrorState"
+        }
+      ],
+      "description": "Discriminated load state for a container customization\n({@link PluginCustomization} or {@link DirectoryCustomization})."
+    },
+    "ChildCustomization": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AgentCustomization"
+        },
+        {
+          "$ref": "#/$defs/SkillCustomization"
+        },
+        {
+          "$ref": "#/$defs/PromptCustomization"
+        },
+        {
+          "$ref": "#/$defs/RuleCustomization"
+        },
+        {
+          "$ref": "#/$defs/HookCustomization"
+        },
+        {
+          "$ref": "#/$defs/McpServerCustomization"
+        }
+      ],
+      "description": "Child customizations that live inside a {@link PluginCustomization} or\n{@link DirectoryCustomization}."
+    },
+    "ChildCustomizationType": {
+      "oneOf": [
+        {
+          "const": "agent"
+        },
+        {
+          "const": "skill"
+        },
+        {
+          "const": "prompt"
+        },
+        {
+          "const": "rule"
+        },
+        {
+          "const": "hook"
+        },
+        {
+          "const": "mcpServer"
+        }
+      ],
+      "description": "Customization types that appear as children of a\n{@link PluginCustomization} or {@link DirectoryCustomization}."
+    },
+    "McpServerState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/McpServerStartingState"
+        },
+        {
+          "$ref": "#/$defs/McpServerReadyState"
+        },
+        {
+          "$ref": "#/$defs/McpServerAuthRequiredState"
+        },
+        {
+          "$ref": "#/$defs/McpServerErrorState"
+        },
+        {
+          "$ref": "#/$defs/McpServerStoppedState"
+        }
+      ],
+      "description": "Discriminated union of all MCP server lifecycle states.\nDiscriminated by `kind` (a {@link McpServerStatus} value)."
+    },
+    "McpAuthRequiredReason": {
+      "enum": [
+        "required",
+        "expired",
+        "insufficientScope"
+      ],
+      "type": "string",
+      "description": "Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}\nstate. Mirrors the three failure modes defined by the\n[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md)."
+    },
+    "ChatOrigin": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "chat": {
+              "type": "string"
+            },
+            "turnId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "chat",
+            "turnId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "chat": {
+              "type": "string"
+            },
+            "toolCallId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "chat",
+            "toolCallId"
+          ]
+        }
+      ],
+      "description": "How a chat came into existence. Clients MAY use it to render\ncontextual UI (parent indicators, fork markers, \"spawned by tool\" badges).\n\nThe `tool` variant records a tool-spawned worker from the worker's side: its\n`chat`/`toolCallId` identify the spawning tool call in the parent chat. This\nis the canonical record of the spawn relationship. The same edge is surfaced\nfrom the parent's side by {@link ToolResultSubagentContent}, whose `resource`\nis this chat's URI; hosts MUST keep the two consistent."
+    },
+    "ChatInteractivity": {
+      "enum": [
+        "full",
+        "read-only",
+        "hidden"
+      ],
+      "type": "string",
+      "description": "How a user can interact with a chat.\n\n- `Full` — user can send messages and watch (default when absent)\n- `ReadOnly` — user can watch but not send messages (e.g. agent team workers)\n- `Hidden` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
+    },
+    "ChatInputQuestion": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatInputTextQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChatInputNumberQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChatInputBooleanQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChatInputSingleSelectQuestion"
+        },
+        {
+          "$ref": "#/$defs/ChatInputMultiSelectQuestion"
+        }
+      ],
+      "description": "One question within a chat input request."
+    },
+    "ChatInputAnswer": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatInputAnswered"
+        },
+        {
+          "$ref": "#/$defs/ChatInputSkipped"
+        }
+      ],
+      "description": "Draft, submitted, or skipped answer for one question."
+    },
+    "ChatInputAnswerValue": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ChatInputTextAnswerValue"
+        },
+        {
+          "$ref": "#/$defs/ChatInputNumberAnswerValue"
+        },
+        {
+          "$ref": "#/$defs/ChatInputBooleanAnswerValue"
+        },
+        {
+          "$ref": "#/$defs/ChatInputSelectedAnswerValue"
+        },
+        {
+          "$ref": "#/$defs/ChatInputSelectedManyAnswerValue"
+        }
+      ]
+    },
+    "ResponsePart": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MarkdownResponsePart"
+        },
+        {
+          "$ref": "#/$defs/ResourceReponsePart"
+        },
+        {
+          "$ref": "#/$defs/ToolCallResponsePart"
+        },
+        {
+          "$ref": "#/$defs/ReasoningResponsePart"
+        },
+        {
+          "$ref": "#/$defs/SystemNotificationResponsePart"
+        }
+      ]
+    },
+    "TurnState": {
+      "enum": [
+        "complete",
+        "cancelled",
+        "error"
+      ],
+      "type": "string",
+      "description": "How a turn ended."
+    },
+    "MessageKind": {
+      "enum": [
+        "user",
+        "agent",
+        "tool",
+        "systemNotification"
+      ],
+      "type": "string",
+      "description": "Discriminant for {@link MessageOrigin} — identifies who produced a message."
+    },
+    "MessageAttachment": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SimpleMessageAttachment"
+        },
+        {
+          "$ref": "#/$defs/MessageEmbeddedResourceAttachment"
+        },
+        {
+          "$ref": "#/$defs/MessageResourceAttachment"
+        },
+        {
+          "$ref": "#/$defs/MessageAnnotationsAttachment"
+        }
+      ],
+      "description": "An attachment associated with a {@link Message}."
+    },
+    "StringOrMarkdown": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "markdown": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "markdown"
+          ]
+        }
+      ],
+      "description": "A string that may optionally be rendered as Markdown.\n\n- A plain `string` is rendered as-is (no Markdown processing).\n- An object with `{ markdown: string }` is rendered with Markdown formatting."
+    },
+    "ConfirmationOptionKind": {
+      "enum": [
+        "approve",
+        "deny"
+      ],
+      "type": "string",
+      "description": "Whether a confirmation option represents an approval or denial action."
+    },
+    "ToolCallContributor": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ToolCallClientContributor"
+        },
+        {
+          "$ref": "#/$defs/ToolCallMcpContributor"
+        }
+      ]
+    },
+    "ToolResultContent": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ToolResultTextContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultEmbeddedResourceContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultResourceContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultFileEditContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultTerminalContent"
+        },
+        {
+          "$ref": "#/$defs/ToolResultSubagentContent"
+        }
+      ],
+      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`ToolResultResourceContent` for lazy-loading large results,\n`ToolResultFileEditContent` for file edit diffs,\n`ToolResultTerminalContent` for live terminal output, and\n`ToolResultSubagentContent` for tool-spawned worker chats (AHP extensions)."
+    },
+    "ToolCallConfirmationReason": {
+      "enum": [
+        "not-needed",
+        "user-action",
+        "setting"
+      ],
+      "type": "string",
+      "description": "How a tool call was confirmed for execution.\n\n- `NotNeeded` — No confirmation required (auto-approved)\n- `UserAction` — User explicitly approved\n- `Setting` — Approved by a persistent user setting"
+    },
+    "ToolCallCancellationReason": {
+      "enum": [
+        "denied",
+        "skipped",
+        "result-denied"
+      ],
+      "type": "string",
+      "description": "Why a tool call was cancelled."
+    },
+    "TerminalClaim": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TerminalClientClaim"
+        },
+        {
+          "$ref": "#/$defs/TerminalSessionClaim"
+        }
+      ],
+      "description": "Describes who currently holds a terminal. A terminal may be claimed by\neither a connected client or a session (e.g. during a tool call)."
+    },
+    "TerminalContentPart": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TerminalUnclassifiedPart"
+        },
+        {
+          "$ref": "#/$defs/TerminalCommandPart"
+        }
+      ],
+      "description": "A content part within terminal output."
+    },
+    "ChangesetStatus": {
+      "enum": [
+        "computing",
+        "ready",
+        "error"
+      ],
+      "type": "string",
+      "description": "Computation lifecycle of a {@link ChangesetState}."
+    },
+    "ChangesetOperationScope": {
+      "enum": [
+        "changeset",
+        "resource",
+        "range"
+      ],
+      "type": "string",
+      "description": "Where a {@link ChangesetOperation} can be invoked."
+    },
+    "ChangesetOperationStatus": {
+      "enum": [
+        "idle",
+        "running",
+        "error",
+        "disabled"
+      ],
+      "type": "string",
+      "description": "Execution lifecycle of a {@link ChangesetOperation}.\n\nAn operation is invoked imperatively via `invokeChangesetOperation`, but\nits progress and outcome are reflected back into changeset state so that\nevery subscriber observes a consistent view (e.g. a spinner on a \"Create\nPull Request\" button, or an inline error after a failed \"revert\")."
+    },
+    "ResourceChangeType": {
+      "enum": [
+        "added",
+        "updated",
+        "deleted"
+      ],
+      "type": "string",
+      "description": "Discriminant for {@link ResourceChange.type}."
     }
   }
 }

@@ -21,7 +21,7 @@
     "docs:preview": "vitepress preview docs",
     "typecheck": "tsc --noEmit -p types/tsconfig.json",
     "lint": "eslint",
-    "test": "npm run typecheck && npm run lint && npm run verify:release-metadata && npm run verify:changelog && npx c8 --include types/reducers.ts --check-coverage --branches 100 tsx --test types/*.test.ts types/version/*.test.ts"
+    "test": "npm run typecheck && npm run lint && npm run verify:release-metadata && npm run verify:changelog && npx c8 --include types/reducers.ts --check-coverage --branches 100 tsx --test types/*.test.ts types/version/*.test.ts scripts/*.test.ts"
   },
   "repository": {
     "type": "git",

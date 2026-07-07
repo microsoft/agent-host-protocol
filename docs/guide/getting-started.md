@@ -84,11 +84,23 @@ Session creation uses an imperative RPC command:
 }
 ```
 
-The initial snapshot has `lifecycle: 'creating'`. The server asynchronously initializes the agent backend, then dispatches either a `session/ready` or `session/creationFailed` action.
+The initial snapshot has `lifecycle: 'creating'`. The server asynchronously initializes the agent backend, then dispatches either a `session/ready` or `session/creationFailed` action. A ready session starts with a default chat: its `ahp-chat:/<cid>` URI is carried in `SessionState.defaultChat` and listed in the session's `chats` catalog. Per-conversation state — turns, streaming responses, and tool calls — lives on that chat's own channel, not the session channel. See the [Chat Channel specification](/specification/chat-channel) for the full per-chat model.
 
 ## Sending a Message
 
-To start a turn, the client dispatches a `session/turnStarted` action. This is a **write-ahead** action — the client applies it optimistically to its local state:
+Turns happen on a **chat channel**. Subscribe to the session's default chat the same way you subscribed to the session:
+
+```jsonc
+// Client → Server (request): subscribe to the session's default chat
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "subscribe",
+  "params": { "channel": "ahp-chat:/<cid>" }
+}
+```
+
+To start a turn, dispatch a `chat/turnStarted` action on the chat channel. This is a **write-ahead** action — the client applies it optimistically to its local chat state:
 
 ```jsonc
 // Client → Server (notification, fire-and-forget)
@@ -96,10 +108,10 @@ To start a turn, the client dispatches a `session/turnStarted` action. This is a
   "jsonrpc": "2.0",
   "method": "dispatchAction",
   "params": {
-    "channel": "ahp-session:/<uuid>",
+    "channel": "ahp-chat:/<cid>",
     "clientSeq": 1,
     "action": {
-      "type": "session/turnStarted",
+      "type": "chat/turnStarted",
       "turnId": "turn-1",
       "message": { "text": "Explain this code", "origin": { "kind": "user" } }
     }
@@ -107,34 +119,34 @@ To start a turn, the client dispatches a `session/turnStarted` action. This is a
 }
 ```
 
-The server begins agent processing and streams back actions:
+The server begins agent processing and streams back actions on the same chat channel:
 
 ```jsonc
 // Server → Client: streaming text delta
 { "method": "action", "params": {
-  "channel": "ahp-session:/<uuid>",
-  "action": { "type": "session/delta", "turnId": "turn-1", "partId": "p1", "content": "This code " },
+  "channel": "ahp-chat:/<cid>",
+  "action": { "type": "chat/delta", "turnId": "turn-1", "partId": "p1", "content": "This code " },
   "serverSeq": 6
 }}
 
 // Server → Client: more streaming text
 { "method": "action", "params": {
-  "channel": "ahp-session:/<uuid>",
-  "action": { "type": "session/delta", "turnId": "turn-1", "partId": "p1", "content": "defines a function..." },
+  "channel": "ahp-chat:/<cid>",
+  "action": { "type": "chat/delta", "turnId": "turn-1", "partId": "p1", "content": "defines a function..." },
   "serverSeq": 7
 }}
 
 // Server → Client: turn complete
 { "method": "action", "params": {
-  "channel": "ahp-session:/<uuid>",
-  "action": { "type": "session/turnComplete", "turnId": "turn-1" },
+  "channel": "ahp-chat:/<cid>",
+  "action": { "type": "chat/turnComplete", "turnId": "turn-1" },
   "serverSeq": 8
 }}
 ```
 
 ## Handling Tool Calls
 
-When the agent invokes a tool, the server emits a sequence of actions modelling the tool call's lifecycle (see [State Model — Tool Call Lifecycle](/guide/state-model#tool-call-lifecycle) for the full state machine):
+When the agent invokes a tool, the server emits a sequence of actions on the chat channel modelling the tool call's lifecycle (see [State Model — Tool Call Lifecycle](/guide/state-model#tool-call-lifecycle) for the full state machine):
 
 1. `chat/toolCallStart` — a new tool call begins.
 2. `chat/toolCallDelta` — partial parameters stream in.
@@ -149,7 +161,7 @@ The client resolves a `pending-confirmation` tool call by dispatching `chat/tool
   "jsonrpc": "2.0",
   "method": "dispatchAction",
   "params": {
-    "channel": "ahp-session:/<uuid>",
+    "channel": "ahp-chat:/<cid>",
     "clientSeq": 2,
     "action": {
       "type": "chat/toolCallConfirmed",

@@ -25,6 +25,16 @@ Implements AHP 0.5.2.
   `RuleCustomization`, `HookCustomization`).
 - `DisableUserInvocation` on `SkillCustomization`, plus `DisableModelInvocation`
   and `DisableUserInvocation` on `AgentCustomization`.
+- Optional `Reviewed` field on `ChangesetFile`. Omitting it (or setting it to
+  `nil`) signals that the server does not support the file "review"
+  functionality.
+- `changeset/filesReviewedChanged` action for servers to update the `Reviewed`
+  flag of one or more changeset files.
+- Optional `ServerInfo` on `InitializeResult` and `ClientInfo` on
+  `InitializeParams`, each an `Implementation` struct (`Name`, optional
+  `Version`, optional `Title`), identifying the implementation and build behind
+  either side of the handshake. Informational only — MUST NOT be used for
+  feature detection.
 - Canvas channel support: the per-instance `CanvasState` plus the
   `CanvasUpdatedAction` (wire `canvas/updated`), `CanvasCloseRequestedAction`
   (`canvas/closeRequested`), and `CanvasMessageAction` (`canvas/message`)

@@ -32,34 +32,34 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/terminalsChanged` | No | Lightweight terminal catalogue changed (full replacement) |
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
 
-## Session Actions
+## Session & Chat Actions
 
-Session actions travel on the relevant [Session Channel](/specification/session-channel). Some are server-only (produced by the agent backend), others are client-dispatchable.
+Actions travel on the channel named by their prefix: `session/*` actions on the [Session Channel](/specification/session-channel) (`ahp-session:/<uuid>`), and `chat/*` actions on a [Chat Channel](/specification/chat-channel) (`ahp-chat:/<cid>`). A session is a catalog of chats; its per-conversation activity — turns, streaming, tool calls, pending messages, and input requests — lives on the chat channels, while lifecycle, metadata, tool-registry, and customization actions live on the session channel. Some actions are server-only (produced by the agent backend), others are client-dispatchable.
 
-When a client dispatches an action, the server applies it to the state and also reacts to it as a side effect (e.g. `session/turnStarted` triggers agent processing, `session/turnCancelled` aborts it). This avoids a separate command→action translation layer for the common interactive cases.
+When a client dispatches an action, the server applies it to the state and also reacts to it as a side effect (e.g. `chat/turnStarted` triggers agent processing, `chat/turnCancelled` aborts it). This avoids a separate command→action translation layer for the common interactive cases.
 
-### Lifecycle
+### Lifecycle (session channel)
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `session/ready` | No | Session backend initialised successfully |
 | `session/creationFailed` | No | Session backend failed to initialise |
 
-### Turn Lifecycle
+### Turn Lifecycle (chat channel)
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
-| `session/turnStarted` | **Yes** | User sent a message; server starts processing |
-| `session/delta` | No | Streaming text chunk appended to a response part by `partId` |
-| `session/responsePart` | No | New response part created (markdown, reasoning, content ref, tool call) |
-| `session/reasoning` | No | Reasoning/thinking text appended to a reasoning part by `partId` |
-| `session/usage` | No | Token usage report for the active turn |
-| `session/turnComplete` | No | Turn finished (assistant idle) |
-| `session/turnCancelled` | **Yes** | Turn was aborted; server stops processing |
-| `session/error` | No | Error during turn processing |
-| `session/truncated` | **Yes** | Turn history truncated (with optional `turnId` cutoff) |
+| `chat/turnStarted` | **Yes** | User sent a message; server starts processing |
+| `chat/delta` | No | Streaming text chunk appended to a response part by `partId` |
+| `chat/responsePart` | No | New response part created (markdown, reasoning, content ref, tool call) |
+| `chat/reasoning` | No | Reasoning/thinking text appended to a reasoning part by `partId` |
+| `chat/usage` | No | Token usage report for the active turn |
+| `chat/turnComplete` | No | Turn finished (assistant idle) |
+| `chat/turnCancelled` | **Yes** | Turn was aborted; server stops processing |
+| `chat/error` | No | Error during turn processing |
+| `chat/truncated` | **Yes** | Turn history truncated (with optional `turnId` cutoff) |
 
-### Tool Calls
+### Tool Calls (chat channel)
 
 Tool calls follow a discriminated-union state machine — see [State Model — Tool Call Lifecycle](/guide/state-model#tool-call-lifecycle) for the full diagram.
 
@@ -88,7 +88,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `session/configChanged` | **Yes** | Mutable session config values changed |
 | `session/metaChanged` | No | The session's `_meta` side-channel was replaced |
 
-### Server & Active-Client Tools
+### Server & Active-Client Tools (session channel)
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
@@ -98,23 +98,23 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 
 See [Customizations & Client Tools](/guide/customizations) for the full flow.
 
-### Pending Messages
+### Pending Messages (chat channel)
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
-| `session/pendingMessageSet` | **Yes** | A steering or queued message was set (upsert) |
-| `session/pendingMessageRemoved` | **Yes** | A pending message was cancelled (by client) or consumed (by server) |
-| `session/queuedMessagesReordered` | **Yes** | Queued messages were reordered |
+| `chat/pendingMessageSet` | **Yes** | A steering or queued message was set (upsert) |
+| `chat/pendingMessageRemoved` | **Yes** | A pending message was cancelled (by client) or consumed (by server) |
+| `chat/queuedMessagesReordered` | **Yes** | Queued messages were reordered |
 
 The `pendingMessageSet` and `pendingMessageRemoved` actions carry a `kind` discriminant (`'steering'` or `'queued'`). See the [State Model — Pending Messages](/guide/state-model#pending-messages) for semantics.
 
-### Input Requests
+### Input Requests (chat channel)
 
 | Type | Client-dispatchable? | When |
 |---|---|---|
-| `session/inputRequested` | No | Server requested structured input from the user (upsert) |
-| `session/inputAnswerChanged` | **Yes** | Client updated a single draft / submitted / skipped answer |
-| `session/inputCompleted` | **Yes** | Client accepted, declined, or cancelled an input request |
+| `chat/inputRequested` | No | Server requested structured input from the user (upsert) |
+| `chat/inputAnswerChanged` | **Yes** | Client updated a single draft / submitted / skipped answer |
+| `chat/inputCompleted` | **Yes** | Client accepted, declined, or cancelled an input request |
 
 See [Elicitation](/guide/elicitation) for the request lifecycle.
 
@@ -173,9 +173,9 @@ Clients interact with the server by dispatching actions as fire-and-forget notif
   "jsonrpc": "2.0",
   "method": "dispatchAction",
   "params": {
-    "channel": "ahp-session:/<uuid>",
+    "channel": "ahp-chat:/<cid>",
     "clientSeq": 1,
-    "action": { "type": "session/turnStarted", "turnId": "t1", ... }
+    "action": { "type": "chat/turnStarted", "turnId": "t1", ... }
   }
 }
 ```
@@ -184,13 +184,13 @@ The client applies the action **optimistically** to its local state before sendi
 
 | Action | Server-side effect |
 |---|---|
-| `session/turnStarted` | Begins agent processing for the new turn |
+| `chat/turnStarted` | Begins agent processing for the new turn |
 | `chat/toolCallConfirmed` | Approves or denies a pending tool call; unblocks or cancels tool execution |
-| `session/turnCancelled` | Aborts the in-progress turn |
+| `chat/turnCancelled` | Aborts the in-progress turn |
 | `session/titleChanged` | Updates the session title (rename) |
-| `session/pendingMessageSet` | Stores a steering or queued message (upsert); if queued and idle, auto-starts a turn |
-| `session/pendingMessageRemoved` | Cancels a pending message before it is consumed |
-| `session/queuedMessagesReordered` | Reorders queued messages; unknown IDs ignored, unmentioned messages kept at end |
+| `chat/pendingMessageSet` | Stores a steering or queued message (upsert); if queued and idle, auto-starts a turn |
+| `chat/pendingMessageRemoved` | Cancels a pending message before it is consumed |
+| `chat/queuedMessagesReordered` | Reorders queued messages; unknown IDs ignored, unmentioned messages kept at end |
 | `session/customizationToggled` | Toggles a container or child customization on or off by id |
 | `session/isReadChanged` | Marks the session as read or unread |
 | `session/isArchivedChanged` | Archives or unarchives the session |
@@ -203,6 +203,7 @@ State is mutated by pure reducer functions — one per state-bearing channel typ
 ```typescript
 rootReducer(state: RootState, action: RootAction): RootState
 sessionReducer(state: SessionState, action: SessionAction): SessionState
+chatReducer(state: ChatState, action: ChatAction): ChatState
 terminalReducer(state: TerminalState, action: TerminalAction): TerminalState
 ```
 

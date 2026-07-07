@@ -10,7 +10,7 @@ AHP stays agent-agnostic: it describes client-facing session state and display-r
 
 ## Channels: the core abstraction
 
-Every push-style interaction in AHP lives on a **channel** — a URI-identified subscribable resource. The root catalogue (`ahp-root://`), each session (`ahp-session:/<uuid>`), each terminal (`ahp-terminal:/<id>`), and each changeset (`ahp-changeset:/<id>`) is its own channel. A channel MAY hold an immutable state tree, or it MAY be a stateless pub/sub topic (planned: logging, MCP relay, LSP relay).
+Every push-style interaction in AHP lives on a **channel** — a URI-identified subscribable resource. The root catalogue (`ahp-root://`), each session (`ahp-session:/<uuid>`), each chat (`ahp-chat:/<uuid>`), each terminal (`ahp-terminal:/<id>`), and each changeset (`ahp-changeset:/<id>`) is its own channel. A channel MAY hold an immutable state tree, or it MAY be a stateless pub/sub topic (planned: logging, MCP relay, LSP relay).
 
 Channels are also the routing key for the wire protocol. **Every command's params and every notification's params carry a top-level `channel: URI`** — so a server, a client, or an intermediate proxy can dispatch any incoming message just by inspecting `(method, params.channel)`, without per-method deserialisation. Connection-level commands (`initialize`, `ping`, `listSessions`, the `resource*` filesystem commands, `authenticate`) use the literal `'ahp-root://'`.
 
@@ -57,8 +57,8 @@ Because updates arrive as ordered actions against shared snapshots, clients can 
 
 | Concept | Description |
 |---|---|
-| **Channels** | URI-identified subscribable resources. State channels (root, sessions, terminals, changesets) hold an immutable state tree; stateless channels exist for streaming data. Every message carries `channel: URI` for routing. |
-| **State** | Immutable tree per state channel — root state, per-session state, per-terminal state, per-changeset state. |
+| **Channels** | URI-identified subscribable resources. State channels (root, sessions, chats, terminals, changesets) hold an immutable state tree; stateless channels exist for streaming data. Every message carries `channel: URI` for routing. |
+| **State** | Immutable tree per state channel — root state, per-session state, per-chat state, per-terminal state, per-changeset state. |
 | **Actions** | Discriminated union of typed mutations. The sole mechanism for state change. Delivered inside `ActionEnvelope`s whose `channel` field identifies the target channel. |
 | **Reducers** | Pure functions: `(state, action) → newState`. Run identically on server and client. |
 | **Subscriptions** | Clients subscribe to channels to receive snapshots and action streams. |

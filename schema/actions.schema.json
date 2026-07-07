@@ -54,7 +54,7 @@
       "description": "Fired when available agent backends or their models change.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.RootAgentsChanged"
+          "const": "root/agentsChanged"
         },
         "agents": {
           "type": "array",
@@ -74,7 +74,7 @@
       "description": "Fired when the number of active sessions changes.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.RootActiveSessionsChanged"
+          "const": "root/activeSessionsChanged"
         },
         "activeSessions": {
           "type": "number",
@@ -91,7 +91,7 @@
       "description": "Fired when the list of known terminals changes.\n\nFull-replacement semantics: the `terminals` array replaces the previous\n`terminals` entirely.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.RootTerminalsChanged"
+          "const": "root/terminalsChanged"
         },
         "terminals": {
           "type": "array",
@@ -111,7 +111,7 @@
       "description": "Fired when agent-host configuration values change.\n\nBy default, the reducer merges the new values into `state.config.values`.\nSet `replace` to `true` to replace all values instead of merging.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.RootConfigChanged"
+          "const": "root/configChanged"
         },
         "config": {
           "type": "object",
@@ -133,7 +133,7 @@
       "description": "Session backend initialized successfully.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionReady"
+          "const": "session/ready"
         }
       },
       "required": [
@@ -145,7 +145,7 @@
       "description": "Session backend failed to initialize.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionCreationFailed"
+          "const": "session/creationFailed"
         },
         "error": {
           "$ref": "#/$defs/ErrorInfo",
@@ -162,7 +162,7 @@
       "description": "A chat was added to this session's catalog. Upsert semantics: if a chat\nwith the same `summary.resource` already exists, the existing entry is\nreplaced.\n\nMirrors the root-channel `root/sessionAdded` notification.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionChatAdded"
+          "const": "session/chatAdded"
         },
         "summary": {
           "$ref": "#/$defs/ChatSummary",
@@ -179,7 +179,7 @@
       "description": "A chat was removed from this session's catalog. No-op when no entry matches.\n\nMirrors the root-channel `root/sessionRemoved` notification.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionChatRemoved"
+          "const": "session/chatRemoved"
         },
         "chat": {
           "$ref": "#/$defs/URI",
@@ -196,7 +196,7 @@
       "description": "One existing chat's summary fields changed.\n\nPartial-update semantics: only fields present in `changes` are written;\nomitted fields are preserved. Identity fields (`resource`) MUST NOT be\ncarried in `changes`. No-op when no entry with `chat` exists — clients\nSHOULD then wait for a {@link SessionChatAddedAction | `session/chatAdded`}.\n\nMirrors the root-channel `root/sessionSummaryChanged` notification.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionChatUpdated"
+          "const": "session/chatUpdated"
         },
         "chat": {
           "$ref": "#/$defs/URI",
@@ -252,7 +252,7 @@
       "description": "The default chat input-routing hint for this session changed.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionDefaultChatChanged"
+          "const": "session/defaultChatChanged"
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
@@ -268,7 +268,7 @@
       "description": "Session title updated. Fired by the server when the title is auto-generated\nfrom conversation, or dispatched by a client to rename a session.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionTitleChanged"
+          "const": "session/titleChanged"
         },
         "title": {
           "type": "string",
@@ -285,7 +285,7 @@
       "description": "The read state of the session changed.\n\nDispatched by a client to mark a session as read (e.g. after viewing it)\nor unread (e.g. after new activity since the client last looked at it).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionIsReadChanged"
+          "const": "session/isReadChanged"
         },
         "isRead": {
           "type": "boolean",
@@ -302,7 +302,7 @@
       "description": "The archived state of the session changed.\n\nDispatched by a client to archive a session (e.g. the task is\ncomplete) or to unarchive it.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionIsArchivedChanged"
+          "const": "session/isArchivedChanged"
         },
         "isArchived": {
           "type": "boolean",
@@ -319,7 +319,7 @@
       "description": "The activity description of the session changed.\n\nDispatched by the server to indicate what the session is currently doing\n(e.g. running a tool, thinking). Clear activity by setting it to `undefined`.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionActivityChanged"
+          "const": "session/activityChanged"
         },
         "activity": {
           "type": "string",
@@ -336,7 +336,7 @@
       "description": "The {@link Changeset | catalogue of changesets} the agent host\nadvertises for this session changed. Replaces\n{@link SessionState.changesets | `state.changesets`} entirely\n(full-replacement semantics) — set to `undefined` to clear the\ncatalogue.\n\nProducers dispatch this whenever entries are added or removed. The\nfan-out happens through this action so observers see catalogue\nmutations in the same {@link ChangesetAction | per-changeset} action\nstream they already follow for file-level updates.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionChangesetsChanged"
+          "const": "session/changesetsChanged"
         },
         "changesets": {
           "type": "array",
@@ -356,7 +356,7 @@
       "description": "Server tools for this session have changed.\n\nFull-replacement semantics: the `tools` array replaces the previous `serverTools` entirely.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionServerToolsChanged"
+          "const": "session/serverToolsChanged"
         },
         "tools": {
           "type": "array",
@@ -376,7 +376,7 @@
       "description": "An active client for this session was added or updated.\n\nUpsert semantics keyed by {@link SessionActiveClient.clientId | `clientId`}:\na client dispatches this action with its own `SessionActiveClient` to join\nthe session's active clients or refresh its entry, replacing any existing\nentry that has the same `clientId`. Multiple clients may be active at once.\nThis is also how a client updates its published tools or customizations —\nre-dispatch with the full, updated entry. Use\n{@link SessionActiveClientRemovedAction | `session/activeClientRemoved`} to\nleave. The server SHOULD automatically dispatch that removal when an active\nclient disconnects.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionActiveClientSet"
+          "const": "session/activeClientSet"
         },
         "activeClient": {
           "$ref": "#/$defs/SessionActiveClient",
@@ -393,7 +393,7 @@
       "description": "An active client was removed from this session.\n\nRemoves the entry for the client identified by `clientId` from\n{@link SessionState.activeClients}; a no-op when no entry matches.\n\nThe host SHOULD dispatch this automatically when a client stops participating\nin the session — for example when it unsubscribes from the session channel,\nwhen it disconnects and does not reconnect within a host-defined grace\nperiod, or when a `reconnect` command's `subscriptions` omit a session the\nclient was still active in. When removing a client, the host SHOULD also\ncancel that client's in-flight tool calls — those whose tool call state\ncarries a client `ToolCallContributor` with the matching `clientId` — by\ndispatching `chat/toolCallComplete` with `result.success = false`. (There is\nno per-tool-call server cancel; a failed completion is the cancellation\nmechanism, and the call ends in `completed` status with a failed result.)",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionActiveClientRemoved"
+          "const": "session/activeClientRemoved"
         },
         "clientId": {
           "type": "string",
@@ -410,7 +410,7 @@
       "description": "The aggregated canvas registry for this session changed.\n\nFull-replacement semantics: the `canvases` array replaces\n{@link SessionState.canvases} entirely, mirroring\n`session/serverToolsChanged`. The host republishes the union of every\nconnected provider (server-side and client-declared) whenever it changes.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionCanvasesChanged"
+          "const": "session/canvasesChanged"
         },
         "canvases": {
           "type": "array",
@@ -430,7 +430,7 @@
       "description": "The catalogue of open canvas instances for this session changed.\n\nFull-replacement semantics: the `openCanvases` array replaces\n{@link SessionState.openCanvases} entirely. The host republishes the\ncatalogue as instances open and close.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionOpenCanvasesChanged"
+          "const": "session/openCanvasesChanged"
         },
         "openCanvases": {
           "type": "array",
@@ -450,7 +450,7 @@
       "description": "A session-level input request was added or updated.\n\nUpsert semantics keyed by {@link SessionInputRequest.id | `request.id`}: the\nhost dispatches this with the full {@link SessionInputRequest} to append a new\nentry to {@link SessionState.inputNeeded} or replace the existing entry with\nthe same `id`.\n\nServer-originated: the host mirrors chat-level requests (elicitations, tool\nconfirmations, client-tool executions) into the session aggregate so clients\nsubscribed only to the session channel can discover them. Clients respond by\ndispatching the ordinary `chat/*` action to the entry's `chat` channel — see\n{@link SessionInputRequest}.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionInputNeededSet"
+          "const": "session/inputNeededSet"
         },
         "request": {
           "$ref": "#/$defs/SessionInputRequest",
@@ -467,7 +467,7 @@
       "description": "A session-level input request was removed.\n\nRemoves the entry identified by `id` from\n{@link SessionState.inputNeeded}; a no-op when no entry matches.\n\nServer-originated: the host dispatches this once the underlying request\nresolves (the user answers, the tool call is confirmed, or the client\nreports its result).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionInputNeededRemoved"
+          "const": "session/inputNeededRemoved"
         },
         "id": {
           "type": "string",
@@ -484,7 +484,7 @@
       "description": "The session's customizations have changed.\n\nFull-replacement semantics: the `customizations` array replaces the\nprevious `customizations` entirely.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionCustomizationsChanged"
+          "const": "session/customizationsChanged"
         },
         "customizations": {
           "type": "array",
@@ -504,7 +504,7 @@
       "description": "A client toggled a customization on or off.\n\nMatches `id` against every top-level customization first — a plugin or\ndirectory container, or a bare top-level MCP server — then against the\nchildren inside each container (a skill, agent, or other entry), and\nsets the matched entry's `enabled` flag. Disabling a container still\ndisables all of its children — the effective state of a child is\n`container.enabled && (child.enabled ?? true)` — so toggling a child\nonly matters while its container is enabled. Is a no-op when no\ncustomization has the given `id`.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionCustomizationToggled"
+          "const": "session/customizationToggled"
         },
         "id": {
           "type": "string",
@@ -526,7 +526,7 @@
       "description": "Upserts a top-level customization (plugin or directory).\n\nThe reducer locates the existing entry by `customization.id`:\n\n- If found, the entry is replaced entirely with `customization`,\n  including its `children` array. To preserve existing children, the\n  host must include them on the payload.\n- If not found, the entry is appended.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionCustomizationUpdated"
+          "const": "session/customizationUpdated"
         },
         "customization": {
           "$ref": "#/$defs/Customization",
@@ -543,7 +543,7 @@
       "description": "Removes a customization by id.\n\nSearches every container and its children for the entry. If the entry\nis a container, its children are removed with it. Is a no-op when no\nmatching id is found.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionCustomizationRemoved"
+          "const": "session/customizationRemoved"
         },
         "id": {
           "type": "string",
@@ -560,7 +560,7 @@
       "description": "Updates the runtime fields of an existing\n{@link McpServerCustomization} — narrow alternative to\n{@link SessionCustomizationUpdatedAction} for the high-frequency\n`starting` ↔ `ready` ↔ `authRequired` transitions.\n\nLocates the target entry by `id`, searching both the top-level\ncustomization list and the `children` array of every container.\nReplaces the entry's {@link McpServerCustomization.state | `state`}\nand {@link McpServerCustomization.channel | `channel`}\n(full-replacement semantics: omit `channel` to clear an existing\nchannel URI). Other fields of the customization are preserved.\n\nIs a no-op when no matching `McpServerCustomization` is found. To\nupdate any other field (name, icons, `mcpApp` capabilities, etc.) use\n{@link SessionCustomizationUpdatedAction} instead.\n\nWhen the transition is to {@link McpServerStatus.AuthRequired}\nbecause of a request issued mid-turn, the host SHOULD also raise\n{@link SessionStatus.InputNeeded} on the session — see\n{@link McpServerAuthRequiredState} for the rationale.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionMcpServerStateChanged"
+          "const": "session/mcpServerStateChanged"
         },
         "id": {
           "type": "string",
@@ -586,7 +586,7 @@
       "description": "Client changed a mutable config value mid-session.\n\nOnly properties with `sessionMutable: true` in the config schema may be\nchanged. The server validates and broadcasts the action; the reducer merges\nthe new values into `state.config.values`.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionConfigChanged"
+          "const": "session/configChanged"
         },
         "config": {
           "type": "object",
@@ -608,7 +608,7 @@
       "description": "The session's `_meta` side-channel changed. Replaces `state._meta`\nentirely (full-replacement semantics). Producers SHOULD merge any\nkeys they wish to preserve into the new value before dispatching.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.SessionMetaChanged"
+          "const": "session/metaChanged"
         },
         "_meta": {
           "type": "object",
@@ -649,7 +649,7 @@
       "description": "A new message has been sent to the agent, and a new turn starts.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatTurnStarted"
+          "const": "chat/turnStarted"
         },
         "turnId": {
           "type": "string",
@@ -680,7 +680,7 @@
       "description": "Streaming text chunk from the assistant, appended to a specific response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\npart (markdown or reasoning), then use this action to append text to it.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatDelta"
+          "const": "chat/delta"
         },
         "turnId": {
           "type": "string",
@@ -712,7 +712,7 @@
       "description": "Structured content appended to the response.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatResponsePart"
+          "const": "chat/responsePart"
         },
         "turnId": {
           "type": "string",
@@ -752,7 +752,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
         },
         "type": {
-          "$ref": "#/$defs/ActionType.ChatToolCallStart"
+          "const": "chat/toolCallStart"
         },
         "toolName": {
           "type": "string",
@@ -797,7 +797,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
         },
         "type": {
-          "$ref": "#/$defs/ActionType.ChatToolCallDelta"
+          "const": "chat/toolCallDelta"
         },
         "content": {
           "type": "string",
@@ -833,7 +833,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
         },
         "type": {
-          "$ref": "#/$defs/ActionType.ChatToolCallReady"
+          "const": "chat/toolCallReady"
         },
         "invocationMessage": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -900,7 +900,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
         },
         "type": {
-          "$ref": "#/$defs/ActionType.ChatToolCallConfirmed"
+          "const": "chat/toolCallConfirmed"
         },
         "approved": {
           "description": "The tool call was approved"
@@ -944,7 +944,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
         },
         "type": {
-          "$ref": "#/$defs/ActionType.ChatToolCallConfirmed"
+          "const": "chat/toolCallConfirmed"
         },
         "approved": {
           "description": "The tool call was denied"
@@ -952,10 +952,10 @@
         "reason": {
           "oneOf": [
             {
-              "$ref": "#/$defs/ToolCallCancellationReason.Denied"
+              "const": "denied"
             },
             {
-              "$ref": "#/$defs/ToolCallCancellationReason.Skipped"
+              "const": "skipped"
             }
           ],
           "description": "Why the tool was cancelled"
@@ -999,7 +999,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
         },
         "type": {
-          "$ref": "#/$defs/ActionType.ChatToolCallComplete"
+          "const": "chat/toolCallComplete"
         },
         "result": {
           "$ref": "#/$defs/ToolCallResult",
@@ -1035,7 +1035,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
         },
         "type": {
-          "$ref": "#/$defs/ActionType.ChatToolCallResultConfirmed"
+          "const": "chat/toolCallResultConfirmed"
         },
         "approved": {
           "type": "boolean",
@@ -1067,7 +1067,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
         },
         "type": {
-          "$ref": "#/$defs/ActionType.ChatToolCallContentChanged"
+          "const": "chat/toolCallContentChanged"
         },
         "content": {
           "type": "array",
@@ -1089,7 +1089,7 @@
       "description": "Turn finished — the assistant is idle.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatTurnComplete"
+          "const": "chat/turnComplete"
         },
         "turnId": {
           "type": "string",
@@ -1111,7 +1111,7 @@
       "description": "Turn was aborted; server stops processing.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatTurnCancelled"
+          "const": "chat/turnCancelled"
         },
         "turnId": {
           "type": "string",
@@ -1133,7 +1133,7 @@
       "description": "Error during turn processing.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatError"
+          "const": "chat/error"
         },
         "turnId": {
           "type": "string",
@@ -1160,7 +1160,7 @@
       "description": "The activity description of this chat changed.\n\nDispatched by the server to indicate what the chat is currently doing\n(e.g. running a tool, thinking). Clear activity by omitting it or setting it\nto `undefined`.\nProducers SHOULD also update the parent session's chat catalog with\n`session/chatUpdated` so `ChatSummary.activity` stays in sync.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatActivityChanged"
+          "const": "chat/activityChanged"
         },
         "activity": {
           "type": "string",
@@ -1176,7 +1176,7 @@
       "description": "Token usage report for a turn.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatUsage"
+          "const": "chat/usage"
         },
         "turnId": {
           "type": "string",
@@ -1203,7 +1203,7 @@
       "description": "Reasoning/thinking text from the model, appended to a specific reasoning response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\nreasoning part, then use this action to append text to it.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatReasoning"
+          "const": "chat/reasoning"
         },
         "turnId": {
           "type": "string",
@@ -1235,7 +1235,7 @@
       "description": "Truncates a session's history. If `turnId` is provided, all turns after that\nturn are removed and the specified turn is kept. If `turnId` is omitted, all\nturns are removed.\n\nIf there is an active turn it is silently dropped and the chat status\nreturns to `idle`.\n\nCommon use-case: truncate old data then dispatch a new\n`chat/turnStarted` with an edited message.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatTruncated"
+          "const": "chat/truncated"
         },
         "turnId": {
           "type": "string",
@@ -1251,7 +1251,7 @@
       "description": "Loads older completed turns into this chat's state.\n\nHosts dispatch this before responding to `fetchTurns`, and before applying\nany operation that references a turn older than the currently loaded window.\n`turns` is ordered oldest-first and is prepended to the current `turns`\nwindow. `turnsNextCursor` replaces the state's cursor; omit it when all\nretained turns are now loaded.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatTurnsLoaded"
+          "const": "chat/turnsLoaded"
         },
         "turns": {
           "type": "array",
@@ -1275,7 +1275,7 @@
       "description": "A pending message was set (upsert semantics: creates or replaces).\n\nFor steering messages, this always replaces the single steering message.\nFor queued messages, if a message with the given `id` already exists it is\nupdated in place; otherwise it is appended to the queue. If the chat is\nidle when a queued message is set, the server SHOULD immediately consume it\nand start a new turn.\n\nA client is only allowed to send {@link MessageKind.User} messages.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatPendingMessageSet"
+          "const": "chat/pendingMessageSet"
         },
         "kind": {
           "$ref": "#/$defs/PendingMessageKind",
@@ -1302,7 +1302,7 @@
       "description": "A pending message was removed (steering or queued).\n\nDispatched by clients to cancel a pending message, or by the server when\nit consumes a message (e.g. starting a turn from a queued message or\ninjecting a steering message into the current turn).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatPendingMessageRemoved"
+          "const": "chat/pendingMessageRemoved"
         },
         "kind": {
           "$ref": "#/$defs/PendingMessageKind",
@@ -1324,7 +1324,7 @@
       "description": "Reorder the queued messages.\n\nThe `order` array contains the IDs of queued messages in their new\ndesired order. IDs not present in the current queue are ignored.\nQueued messages whose IDs are absent from `order` are appended at\nthe end in their original relative order (so a client with a stale\nview of the queue never silently drops messages).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatQueuedMessagesReordered"
+          "const": "chat/queuedMessagesReordered"
         },
         "order": {
           "type": "array",
@@ -1344,7 +1344,7 @@
       "description": "The chat's draft input changed.\n\nClients MAY periodically sync their local input state — the message the user\nis composing, including its {@link Message.model | model} /\n{@link Message.agent | agent} selection and attachments — into the chat's\n{@link ChatState.draft | `draft`} so it survives reloads and is visible to\nother clients viewing the same chat. Eager syncing is **not** required;\nclients SHOULD debounce and MAY sync only at convenient points. Set `draft`\nto `undefined` to clear it (e.g. once the message is sent).\n\nA client is only allowed to draft {@link MessageKind.User} messages.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatDraftChanged"
+          "const": "chat/draftChanged"
         },
         "draft": {
           "$ref": "#/$defs/Message",
@@ -1360,7 +1360,7 @@
       "description": "A session requested input from the user.\n\nFull-request upsert semantics: the `request` replaces any existing request\nwith the same `id`, or is appended if it is new. Answer drafts are preserved\nunless `request.answers` is provided.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatInputRequested"
+          "const": "chat/inputRequested"
         },
         "request": {
           "$ref": "#/$defs/ChatInputRequest",
@@ -1377,7 +1377,7 @@
       "description": "A client updated, submitted, skipped, or removed a single in-progress answer.\n\nDispatching with `answer: undefined` removes that question's answer draft.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatInputAnswerChanged"
+          "const": "chat/inputAnswerChanged"
         },
         "requestId": {
           "type": "string",
@@ -1403,7 +1403,7 @@
       "description": "A client accepted, declined, or cancelled a session input request.\n\nIf accepted, the server uses `answers` (when provided) plus the request's\nsynced answer state to resume the blocked operation.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChatInputCompleted"
+          "const": "chat/inputCompleted"
         },
         "requestId": {
           "type": "string",
@@ -1432,7 +1432,7 @@
       "description": "Terminal output data (pty → client direction).\n\nAppends `data` to the terminal's `content` in the reducer.\n\n`terminal/data` and `terminal/input` are intentionally separate actions\nbecause standard write-ahead reconciliation is not safe for terminal I/O.\nA pty is a stateful, mutable process — optimistically applying input or\npredicting output would produce incorrect state. Instead, `terminal/input`\nis a side-effect-only action (client → server → pty), and `terminal/data`\nis server-authoritative output (pty → server → client).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalData"
+          "const": "terminal/data"
         },
         "data": {
           "type": "string",
@@ -1449,7 +1449,7 @@
       "description": "Keyboard input sent to the terminal process (client → pty direction).\n\nThis is a side-effect-only action: the server forwards the data to the\nterminal's pty. The reducer treats this as a no-op since `terminal/data`\nactions will reflect any resulting output.\n\nSee `terminal/data` for why these two actions are kept separate.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalInput"
+          "const": "terminal/input"
         },
         "data": {
           "type": "string",
@@ -1466,7 +1466,7 @@
       "description": "Terminal dimensions changed.\n\nDispatchable by clients to request a resize, or by the server to inform\nclients of the actual terminal dimensions.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalResized"
+          "const": "terminal/resized"
         },
         "cols": {
           "type": "number",
@@ -1488,7 +1488,7 @@
       "description": "Terminal claim changed. A client or session transfers ownership of the terminal.\n\nThe server SHOULD reject if the dispatching client does not currently hold\nthe claim.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalClaimed"
+          "const": "terminal/claimed"
         },
         "claim": {
           "$ref": "#/$defs/TerminalClaim",
@@ -1505,7 +1505,7 @@
       "description": "Terminal title changed.\n\nFired by the server when the terminal process updates its title (e.g. via\nescape sequences), or dispatched by a client to rename a terminal.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalTitleChanged"
+          "const": "terminal/titleChanged"
         },
         "title": {
           "type": "string",
@@ -1522,7 +1522,7 @@
       "description": "Terminal working directory changed.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalCwdChanged"
+          "const": "terminal/cwdChanged"
         },
         "cwd": {
           "$ref": "#/$defs/URI",
@@ -1539,7 +1539,7 @@
       "description": "Terminal process exited.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalExited"
+          "const": "terminal/exited"
         },
         "exitCode": {
           "type": "number",
@@ -1555,7 +1555,7 @@
       "description": "Terminal scrollback buffer cleared.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalCleared"
+          "const": "terminal/cleared"
         }
       },
       "required": [
@@ -1567,7 +1567,7 @@
       "description": "Shell integration has loaded and the terminal now supports command\ndetection. The server dispatches this when shell integration becomes\navailable (which may happen asynchronously after the terminal is created).\n\nClients MUST NOT assume command detection is available until this action\n(or `terminal/commandExecuted`) has been received.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalCommandDetectionAvailable"
+          "const": "terminal/commandDetectionAvailable"
         }
       },
       "required": [
@@ -1579,7 +1579,7 @@
       "description": "A command has been submitted to the shell and is now executing.\nAll subsequent `terminal/data` actions (until the matching\n`terminal/commandFinished`) constitute this command's output.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalCommandExecuted"
+          "const": "terminal/commandExecuted"
         },
         "commandId": {
           "type": "string",
@@ -1606,7 +1606,7 @@
       "description": "A command has finished executing.\n\nThe sequence of `terminal/data` actions between the preceding\n`terminal/commandExecuted` (same `commandId`) and this action constitutes\nthe complete output of the command.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.TerminalCommandFinished"
+          "const": "terminal/commandFinished"
         },
         "commandId": {
           "type": "string",
@@ -1631,7 +1631,7 @@
       "description": "The {@link ChangesetState.status} for this changeset transitioned (e.g.\n`computing → ready`). The error payload is set together with `status`\nwhenever it transitions to {@link ChangesetStatus.Error | Error}.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChangesetStatusChanged"
+          "const": "changeset/statusChanged"
         },
         "status": {
           "$ref": "#/$defs/ChangesetStatus",
@@ -1652,7 +1652,7 @@
       "description": "Upsert a {@link ChangesetFile} in the changeset — adds a new entry, or\nreplaces an existing one identified by {@link ChangesetFile.id}.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChangesetFileSet"
+          "const": "changeset/fileSet"
         },
         "file": {
           "$ref": "#/$defs/ChangesetFile",
@@ -1669,7 +1669,7 @@
       "description": "Remove a {@link ChangesetFile} from the changeset by its id.\n\nTypically dispatched when a file is reverted, staged out, or otherwise\nno longer in scope (e.g. a renamed file is replaced by a new entry).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChangesetFileRemoved"
+          "const": "changeset/fileRemoved"
         },
         "fileId": {
           "type": "string",
@@ -1681,12 +1681,37 @@
         "fileId"
       ]
     },
+    "ChangesetFilesReviewedChangedAction": {
+      "type": "object",
+      "description": "Update the {@link ChangesetFile.reviewed} flag for one or more files,\nidentified by their {@link ChangesetFile.id}.\n\nDispatched by the server as the user marks files reviewed or unreviewed\n(e.g. toggling a single file, or a \"mark all as reviewed\" affordance).\nOnly servers that support the \"review\" functionality dispatch this; a\nserver that leaves {@link ChangesetFile.reviewed} `undefined` never does.\n\nThe reducer sets `reviewed` on every matching file and ignores any\n`fileIds` entry that does not correspond to a current file.",
+      "properties": {
+        "type": {
+          "const": "changeset/filesReviewedChanged"
+        },
+        "fileIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The {@link ChangesetFile.id}s whose reviewed state changed."
+        },
+        "reviewed": {
+          "type": "boolean",
+          "description": "The new reviewed state to apply to each listed file."
+        }
+      },
+      "required": [
+        "type",
+        "fileIds",
+        "reviewed"
+      ]
+    },
     "ChangesetContentChangedAction": {
       "type": "object",
       "description": "The changeset's full content changed. Full replacement semantics: `files`\nreplaces the previous file list, and `operations`, when present, replaces\nthe previous operation list.\n\nProducers SHOULD use this action for initial snapshots and bulk refreshes;\nuse {@link ChangesetFileSetAction}, {@link ChangesetFileRemovedAction}, and\n{@link ChangesetOperationsChangedAction} for incremental updates.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChangesetContentChanged"
+          "const": "changeset/contentChanged"
         },
         "files": {
           "type": "array",
@@ -1717,7 +1742,7 @@
       "description": "The set of operations available on this changeset changed. Full\nreplacement semantics: `operations` replaces the previous list (or\nremoves it entirely when `operations` is `undefined`).",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChangesetOperationsChanged"
+          "const": "changeset/operationsChanged"
         },
         "operations": {
           "type": "array",
@@ -1737,7 +1762,7 @@
       "description": "The {@link ChangesetOperation.status} for a single operation transitioned\n(e.g. `idle → running → idle`, or `running → error`). The error payload\nis set together with `status` whenever it transitions to\n{@link ChangesetOperationStatus.Error | Error}, and cleared on any other\ntransition.\n\nTargets one operation by its {@link ChangesetOperation.id}. If no\noperation with that id is currently present in the changeset, the action\nis a no-op. Use {@link ChangesetOperationsChangedAction} to add, remove,\nor otherwise replace the operation list itself.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChangesetOperationStatusChanged"
+          "const": "changeset/operationStatusChanged"
         },
         "operationId": {
           "type": "string",
@@ -1763,7 +1788,7 @@
       "description": "Drop every file from the changeset.\n\nTwo cases use this:\n1. The underlying source moved (branch switched, fork point invalidated,\n   …) and the server is recomputing from scratch — subsequent\n   {@link ChangesetFileSetAction} entries will repopulate it.\n2. The owning session has ended and the URI is becoming\n   un-subscribable — the server will unsubscribe all clients shortly\n   after dispatching this action.\n\nClients SHOULD release any references on receipt and SHOULD NOT\ndistinguish the two cases from the action alone — instead, react to\nthe corresponding session-level lifecycle signal (e.g.\n`root/sessionRemoved`) for the \"going away\" case.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ChangesetCleared"
+          "const": "changeset/cleared"
         }
       },
       "required": [
@@ -1775,7 +1800,7 @@
       "description": "Upsert an {@link Annotation} in the annotations channel — adds a new\nannotation, or replaces an existing one identified by\n{@link Annotation.id}.\n\nDispatched by a client to create an annotation (together with its\nmandatory first entry) or to re-anchor / resolve an existing one; the\ndispatching client assigns the {@link Annotation.id} and the id of any\nnew entry. When replacing, the full annotation payload (including its\n{@link Annotation.entries | entries} list) is substituted; producers\nSHOULD prefer {@link AnnotationsEntrySetAction} for per-entry edits, and\n{@link AnnotationsUpdatedAction} to resolve / re-anchor an existing\nannotation, to keep wire updates small.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.AnnotationsSet"
+          "const": "annotations/set"
         },
         "annotation": {
           "$ref": "#/$defs/Annotation",
@@ -1792,7 +1817,7 @@
       "description": "Partially update an existing {@link Annotation}'s own properties — a narrow\nalternative to {@link AnnotationsSetAction} for the common case of resolving\n/ re-opening or re-anchoring an annotation without resending its\n{@link Annotation.entries | entries}.\n\nTargets one annotation by its {@link annotationId}. Only the fields present\non the action are written; omitted fields leave the corresponding\n{@link Annotation} property unchanged. The annotation's\n{@link Annotation.entries | entries}, {@link Annotation.id | id}, and\n{@link Annotation._meta | _meta} are never touched — dispatch\n{@link AnnotationsSetAction} to replace those, to clear {@link range}\n(re-anchor to the whole file), or {@link AnnotationsEntrySetAction} /\n{@link AnnotationsEntryRemovedAction} to edit individual entries.\n\nIf {@link annotationId} does not match any current annotation the action is\na no-op.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.AnnotationsUpdated"
+          "const": "annotations/updated"
         },
         "annotationId": {
           "type": "string",
@@ -1825,7 +1850,7 @@
       "description": "Remove an {@link Annotation} from the channel by its id.\n\nDispatched to delete an entire annotation and every entry it contains.\nBecause the protocol forbids empty annotations, a client that wants to\nremove the last remaining entry dispatches this action — collapsing the\nannotation — rather than {@link AnnotationsEntryRemovedAction}.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.AnnotationsRemoved"
+          "const": "annotations/removed"
         },
         "annotationId": {
           "type": "string",
@@ -1842,7 +1867,7 @@
       "description": "Upsert an {@link AnnotationEntry} within an existing annotation — adds a\nnew entry, or replaces one identified by {@link AnnotationEntry.id}. The\ndispatching client assigns the {@link AnnotationEntry.id} of a new entry.\nIf {@link annotationId} does not match any current annotation the action\nis a no-op.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.AnnotationsEntrySet"
+          "const": "annotations/entrySet"
         },
         "annotationId": {
           "type": "string",
@@ -1864,7 +1889,7 @@
       "description": "Remove a single {@link AnnotationEntry} from an annotation without\ncollapsing the annotation itself. Used when more than one entry remains —\nto remove the last entry a client dispatches {@link AnnotationsRemovedAction}\ninstead, since the protocol forbids empty annotations.\n\nIf either {@link annotationId} or {@link entryId} does not match the\ncurrent state the action is a no-op.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.AnnotationsEntryRemoved"
+          "const": "annotations/entryRemoved"
         },
         "annotationId": {
           "type": "string",
@@ -1886,7 +1911,7 @@
       "description": "A batch of resource changes observed by the watcher.\n\nWatch events are coalesced into batches by the server to keep the\naction stream tractable; an empty `changes.items` list MUST NOT be\ndispatched. The reducer does not retain change history — these\nactions exist purely to deliver events to subscribers, who consume\nthem directly off the action stream and apply their own logic.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.ResourceWatchChanged"
+          "const": "resourceWatch/changed"
         },
         "changes": {
           "type": "object",
@@ -1911,7 +1936,7 @@
       "description": "The canvas instance's presentation state changed.\n\nEmitted by the server for a server-side provider, or dispatched by the client\nthat provides the instance to push its own presentation changes — mirroring\nhow `terminal/titleChanged` lets a client-owned terminal rename itself. This\nis the only path a client-side provider has to update the structured\n{@link CanvasState} (and the {@link OpenCanvasRef} fields mirrored from it)\nthat other subscribers render. The host stays the authoritative reducer: it\nSHOULD reject an update from a client that is not the instance's resolved\nprovider, then applies the merge and re-broadcasts to subscribers.\n\nSparse-merge semantics: each present field overwrites the corresponding\n{@link CanvasState} field, and an absent field preserves the current value.\nThere is no clear-to-absent via this action — that three-state distinction\ncannot survive JSON transport uniformly across languages, so a provider that\nneeds to reset a field re-publishes it, and a full reset arrives as a fresh\n{@link CanvasState} snapshot on (re)subscribe.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.CanvasUpdated"
+          "const": "canvas/updated"
         },
         "title": {
           "type": "string",
@@ -1939,7 +1964,7 @@
       "description": "The user asked to close this canvas (e.g. hit the ✕ on the surface).\n\nA pure client→host signal with a no-op reducer, mirroring how\n`terminal/input` is a side-effect-only client action. The host runs the\nclose flow in response — resolving `canvasClose` against the provider and\ndropping the instance from {@link SessionState.openCanvases} — rather than\nthe reducer mutating channel state.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.CanvasCloseRequested"
+          "const": "canvas/closeRequested"
         }
       },
       "required": [
@@ -1951,7 +1976,7 @@
       "description": "An opaque message relayed between the rendered canvas View and the\ninstance's provider — the relay-carried analogue of a `postMessage` bridge.\n\nBidirectional: a client dispatches it to carry a View→provider message, and\nthe host emits it to carry a provider→View message (routed to the provider\nresolved for the instance, or handled host-internally for a server-side\nprovider). Like `terminal/input` and {@link CanvasCloseRequestedAction} it\nis a pure signal with a no-op reducer, so it never bloats channel state. See\n{@link /specification/canvas-channel | Canvas Channel}.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ActionType.CanvasMessage"
+          "const": "canvas/message"
         },
         "payload": {
           "description": "Opaque, provider-defined message payload."
@@ -1964,7 +1989,6 @@
     },
     "ChatToolCallConfirmedAction": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/ChatToolCallApprovedAction"
         },
@@ -1976,7 +2000,6 @@
     },
     "ChatAction": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/ChatTurnStartedAction"
         },
@@ -2895,7 +2918,7 @@
       "description": "A canvas provided by the host. Carries no `clientId` — server-side provider\nrequests are resolved host-internally rather than routed to a peer.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CanvasProviderKind.Server"
+          "const": "server"
         }
       },
       "required": [
@@ -2907,7 +2930,7 @@
       "description": "A canvas provided by a connected client. The host routes\n`canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for this canvas\nto the identified client.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CanvasProviderKind.Client"
+          "const": "client"
         },
         "clientId": {
           "type": "string",
@@ -3097,7 +3120,7 @@
           "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
         },
         "kind": {
-          "$ref": "#/$defs/SessionInputRequestKind.ChatInput"
+          "const": "chatInput"
         },
         "request": {
           "$ref": "#/$defs/ChatInputRequest",
@@ -3124,7 +3147,7 @@
           "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
         },
         "kind": {
-          "$ref": "#/$defs/SessionInputRequestKind.ToolConfirmation"
+          "const": "toolConfirmation"
         },
         "turnId": {
           "type": "string",
@@ -3156,7 +3179,7 @@
           "description": "The chat the underlying request lives in. This is the channel a client\ndispatches its response to — it does not need to have subscribed to that\nchat first."
         },
         "kind": {
-          "$ref": "#/$defs/SessionInputRequestKind.ToolClientExecution"
+          "const": "toolClientExecution"
         },
         "turnId": {
           "type": "string",
@@ -3560,7 +3583,7 @@
       "description": "Container is being loaded by the host.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CustomizationLoadStatus.Loading"
+          "const": "loading"
         }
       },
       "required": [
@@ -3572,7 +3595,7 @@
       "description": "Container loaded successfully.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CustomizationLoadStatus.Loaded"
+          "const": "loaded"
         }
       },
       "required": [
@@ -3584,7 +3607,7 @@
       "description": "Container partially loaded but has warnings.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CustomizationLoadStatus.Degraded"
+          "const": "degraded"
         },
         "message": {
           "type": "string",
@@ -3601,7 +3624,7 @@
       "description": "Container failed to load.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/CustomizationLoadStatus.Error"
+          "const": "error"
         },
         "message": {
           "type": "string",
@@ -3714,7 +3737,7 @@
           "description": "Children discovered inside this container.\n\nAbsent means the host has not parsed this container yet. An empty\narray means the host parsed the container and it contributes\nnothing."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Plugin"
+          "const": "plugin"
         }
       },
       "required": [
@@ -3772,7 +3795,7 @@
           "description": "Children discovered inside this container.\n\nAbsent means the host has not parsed this container yet. An empty\narray means the host parsed the container and it contributes\nnothing."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Plugin"
+          "const": "plugin"
         },
         "nonce": {
           "type": "string",
@@ -3834,7 +3857,7 @@
           "description": "Children discovered inside this container.\n\nAbsent means the host has not parsed this container yet. An empty\narray means the host parsed the container and it contributes\nnothing."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Directory"
+          "const": "directory"
         },
         "contents": {
           "$ref": "#/$defs/ChildCustomizationType",
@@ -3925,7 +3948,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Agent"
+          "const": "agent"
         },
         "description": {
           "type": "string",
@@ -3995,7 +4018,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Skill"
+          "const": "skill"
         },
         "description": {
           "type": "string",
@@ -4049,7 +4072,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Prompt"
+          "const": "prompt"
         },
         "description": {
           "type": "string",
@@ -4095,7 +4118,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Rule"
+          "const": "rule"
         },
         "description": {
           "type": "string",
@@ -4152,7 +4175,7 @@
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.Hook"
+          "const": "hook"
         }
       },
       "required": [
@@ -4190,7 +4213,7 @@
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
         "type": {
-          "$ref": "#/$defs/CustomizationType.McpServer"
+          "const": "mcpServer"
         },
         "enabled": {
           "type": "boolean",
@@ -4274,7 +4297,7 @@
       "description": "Server is registered with the host but has not yet started.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.Starting"
+          "const": "starting"
         }
       },
       "required": [
@@ -4286,7 +4309,7 @@
       "description": "Server is running and serving requests.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.Ready"
+          "const": "ready"
         }
       },
       "required": [
@@ -4298,7 +4321,7 @@
       "description": "Server is reachable but cannot serve requests until the client\nauthenticates. Mirrors the discovery flow defined by\n[RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)\n(Protected Resource Metadata) and the OAuth 2.1 / RFC 6750 challenge\nsemantics required by the MCP authorization spec.\n\nClients react to this state by calling the existing `authenticate`\ncommand with the {@link ProtectedResourceMetadata.resource | resource}\ncarried here. There is **no** `notify/authRequired` notification for\nMCP servers — the action stream is the single source of truth.\n\nWhen the transition is triggered by a request issued during a turn\n— most commonly\n{@link McpAuthRequiredReason.InsufficientScope | `InsufficientScope`}\nsurfacing mid-tool-call — the host SHOULD also raise\n{@link SessionStatus.InputNeeded} on the session so the block is\nvisible at the summary level. Clients SHOULD watch this status on\nany MCP server backing a running tool call and surface an explicit\naffordance (e.g. a \"grant additional access\" prompt) tied to that\ntool call, rather than relying on the user to notice the\ncustomization’s status badge.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.AuthRequired"
+          "const": "authRequired"
         },
         "reason": {
           "$ref": "#/$defs/McpAuthRequiredReason",
@@ -4331,7 +4354,7 @@
       "description": "Server failed to start, crashed, or otherwise transitioned to a\nnon-recoverable error. Use {@link McpServerStatus.AuthRequired}\nfor authentication failures.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.Error"
+          "const": "error"
         },
         "error": {
           "$ref": "#/$defs/ErrorInfo",
@@ -4348,7 +4371,7 @@
       "description": "Server has been shut down. The host MAY remove the server from the\nsession entirely shortly after this state.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/McpServerStatus.Stopped"
+          "const": "stopped"
         }
       },
       "required": [
@@ -4576,7 +4599,7 @@
           "description": "Whether the user must answer this question to accept the request"
         },
         "kind": {
-          "$ref": "#/$defs/ChatInputQuestionKind.Text"
+          "const": "text"
         },
         "format": {
           "type": "string",
@@ -4624,10 +4647,10 @@
         "kind": {
           "oneOf": [
             {
-              "$ref": "#/$defs/ChatInputQuestionKind.Number"
+              "const": "number"
             },
             {
-              "$ref": "#/$defs/ChatInputQuestionKind.Integer"
+              "const": "integer"
             }
           ]
         },
@@ -4671,7 +4694,7 @@
           "description": "Whether the user must answer this question to accept the request"
         },
         "kind": {
-          "$ref": "#/$defs/ChatInputQuestionKind.Boolean"
+          "const": "boolean"
         },
         "defaultValue": {
           "type": "boolean",
@@ -4705,7 +4728,7 @@
           "description": "Whether the user must answer this question to accept the request"
         },
         "kind": {
-          "$ref": "#/$defs/ChatInputQuestionKind.SingleSelect"
+          "const": "single-select"
         },
         "options": {
           "type": "array",
@@ -4747,7 +4770,7 @@
           "description": "Whether the user must answer this question to accept the request"
         },
         "kind": {
-          "$ref": "#/$defs/ChatInputQuestionKind.MultiSelect"
+          "const": "multi-select"
         },
         "options": {
           "type": "array",
@@ -4816,7 +4839,7 @@
       "description": "Value captured for one answer.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.Text"
+          "const": "text"
         },
         "value": {
           "type": "string"
@@ -4831,7 +4854,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.Number"
+          "const": "number"
         },
         "value": {
           "type": "number"
@@ -4846,7 +4869,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.Boolean"
+          "const": "boolean"
         },
         "value": {
           "type": "boolean"
@@ -4861,7 +4884,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.Selected"
+          "const": "selected"
         },
         "value": {
           "type": "string"
@@ -4883,7 +4906,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ChatInputAnswerValueKind.SelectedMany"
+          "const": "selected-many"
         },
         "value": {
           "type": "array",
@@ -4910,10 +4933,10 @@
         "state": {
           "oneOf": [
             {
-              "$ref": "#/$defs/ChatInputAnswerState.Draft"
+              "const": "draft"
             },
             {
-              "$ref": "#/$defs/ChatInputAnswerState.Submitted"
+              "const": "submitted"
             }
           ],
           "description": "Answer state"
@@ -4932,7 +4955,7 @@
       "type": "object",
       "properties": {
         "state": {
-          "$ref": "#/$defs/ChatInputAnswerState.Skipped",
+          "const": "skipped",
           "description": "Answer state"
         },
         "freeformValues": {
@@ -5117,7 +5140,7 @@
           "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
         },
         "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Simple",
+          "const": "simple",
           "description": "Discriminant"
         },
         "modelRepresentation": {
@@ -5152,7 +5175,7 @@
           "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
         },
         "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.EmbeddedResource",
+          "const": "embeddedResource",
           "description": "Discriminant"
         },
         "data": {
@@ -5213,7 +5236,7 @@
           "description": "Content nonce"
         },
         "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Resource",
+          "const": "resource",
           "description": "Discriminant"
         },
         "selection": {
@@ -5249,7 +5272,7 @@
           "description": "Additional implementation-defined metadata for the attachment.\n\nIf the attachment was produced by the `completions` command, the client\nMUST preserve every property of `_meta` originally returned by the agent\nhost when sending the user message containing the accepted completion."
         },
         "type": {
-          "$ref": "#/$defs/MessageAttachmentKind.Annotations",
+          "const": "annotations",
           "description": "Discriminant"
         },
         "resource": {
@@ -5274,7 +5297,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.Markdown",
+          "const": "markdown",
           "description": "Discriminant"
         },
         "id": {
@@ -5313,7 +5336,7 @@
           "description": "Content nonce"
         },
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.ContentRef",
+          "const": "contentRef",
           "description": "Discriminant"
         }
       },
@@ -5327,7 +5350,7 @@
       "description": "A tool call represented as a response part.\n\nTool calls are part of the response stream, interleaved with text and\nreasoning. The `toolCall.toolCallId` serves as the part identifier for\nactions that target this part.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.ToolCall",
+          "const": "toolCall",
           "description": "Discriminant"
         },
         "toolCall": {
@@ -5345,7 +5368,7 @@
       "description": "Reasoning/thinking content from the model.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.Reasoning",
+          "const": "reasoning",
           "description": "Discriminant"
         },
         "id": {
@@ -5368,7 +5391,7 @@
       "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent harness\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ResponsePartKind.SystemNotification",
+          "const": "systemNotification",
           "description": "Discriminant"
         },
         "content": {
@@ -5412,7 +5435,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ToolCallContributorKind.Client"
+          "const": "client"
         },
         "clientId": {
           "type": "string",
@@ -5428,7 +5451,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/ToolCallContributorKind.MCP"
+          "const": "mcp"
         },
         "customizationId": {
           "type": "string",
@@ -5568,7 +5591,7 @@
           "description": "Additional provider-specific metadata for this tool call.\n\nThis MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)\n`McpUiToolMeta` found in MCP tool calls, which may be used in combination\nwith the {@link contributor} to serve MCP Apps."
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.Streaming"
+          "const": "streaming"
         },
         "partialInput": {
           "type": "string",
@@ -5624,7 +5647,7 @@
           "description": "Raw tool input"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.PendingConfirmation"
+          "const": "pending-confirmation"
         },
         "confirmationTitle": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -5700,7 +5723,7 @@
           "description": "Raw tool input"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.Running"
+          "const": "running"
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -5800,7 +5823,7 @@
           "description": "Error details if the tool failed"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.PendingResultConfirmation"
+          "const": "pending-result-confirmation"
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -5895,7 +5918,7 @@
           "description": "Error details if the tool failed"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.Completed"
+          "const": "completed"
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -5955,7 +5978,7 @@
           "description": "Raw tool input"
         },
         "status": {
-          "$ref": "#/$defs/ToolCallStatus.Cancelled"
+          "const": "cancelled"
         },
         "reason": {
           "$ref": "#/$defs/ToolCallCancellationReason",
@@ -5988,7 +6011,7 @@
       "description": "Text content in a tool result.\n\nMirrors MCP `TextContent`.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.Text"
+          "const": "text"
         },
         "text": {
           "type": "string",
@@ -6005,7 +6028,7 @@
       "description": "Base64-encoded binary content embedded in a tool result.\n\nMirrors MCP `EmbeddedResource` for inline binary data.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.EmbeddedResource"
+          "const": "embeddedResource"
         },
         "data": {
           "type": "string",
@@ -6043,7 +6066,7 @@
           "description": "Content nonce"
         },
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.Resource"
+          "const": "resource"
         }
       },
       "required": [
@@ -6100,7 +6123,7 @@
           "description": "Optional diff display metadata"
         },
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.FileEdit"
+          "const": "fileEdit"
         }
       },
       "required": [
@@ -6112,7 +6135,7 @@
       "description": "A reference to a terminal whose output is relevant to this tool result.\n\nClients can subscribe to the terminal's URI to stream its output in real\ntime, providing live feedback while a tool is executing.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.Terminal"
+          "const": "terminal"
         },
         "resource": {
           "$ref": "#/$defs/URI",
@@ -6134,7 +6157,7 @@
       "description": "A reference, embedded in a tool result, to a worker chat spawned by the tool\ncall (a sub-agent delegation), referenced by a chat URI (`ahp-chat:/...`).\n\nThis is the spawning tool call's forward view of the worker. The worker chat\nrecords the same edge in reverse via its {@link ChatOrigin} (`kind: 'tool'`),\nwhose `toolCallId` identifies the tool call that emitted this content.",
       "properties": {
         "type": {
-          "$ref": "#/$defs/ToolResultContentType.Subagent"
+          "const": "subagent"
         },
         "resource": {
           "$ref": "#/$defs/URI",
@@ -6191,7 +6214,7 @@
       "description": "A terminal claimed by a connected client.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/TerminalClaimKind.Client",
+          "const": "client",
           "description": "Discriminant"
         },
         "clientId": {
@@ -6209,7 +6232,7 @@
       "description": "A terminal claimed by a session, optionally scoped to a specific turn or tool call.",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/TerminalClaimKind.Session",
+          "const": "session",
           "description": "Discriminant"
         },
         "session": {
@@ -6414,6 +6437,10 @@
         "edit": {
           "$ref": "#/$defs/FileEdit",
           "description": "Reuses the existing {@link FileEdit} shape. Clients derive line\nadditions, deletions, and rename/create/delete semantics from this."
+        },
+        "reviewed": {
+          "type": "boolean",
+          "description": "Whether the user has reviewed this file. Omit (or set to `undefined`)\nto indicate that the server does not support the \"review\" functionality;\nin that case clients should not surface any reviewed/unreviewed\naffordance for this file."
         },
         "_meta": {
           "type": "object",
@@ -6750,13 +6777,14 @@
         {
           "type": "boolean"
         },
-        {}
+        {
+          "type": "null"
+        }
       ],
       "description": "A primitive JSON value: a string, number, boolean, or `null`."
     },
     "CanvasProviderSource": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/CanvasServerProviderSource"
         },
@@ -6768,7 +6796,6 @@
     },
     "SessionInputRequest": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/SessionChatInputRequest"
         },
@@ -6783,31 +6810,29 @@
     },
     "ChildCustomizationType": {
       "oneOf": [
-        {},
         {
-          "$ref": "#/$defs/CustomizationType.Agent"
+          "const": "agent"
         },
         {
-          "$ref": "#/$defs/CustomizationType.Skill"
+          "const": "skill"
         },
         {
-          "$ref": "#/$defs/CustomizationType.Prompt"
+          "const": "prompt"
         },
         {
-          "$ref": "#/$defs/CustomizationType.Rule"
+          "const": "rule"
         },
         {
-          "$ref": "#/$defs/CustomizationType.Hook"
+          "const": "hook"
         },
         {
-          "$ref": "#/$defs/CustomizationType.McpServer"
+          "const": "mcpServer"
         }
       ],
       "description": "Customization types that appear as children of a\n{@link PluginCustomization} or {@link DirectoryCustomization}."
     },
     "CustomizationLoadState": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/CustomizationLoadingState"
         },
@@ -6825,7 +6850,6 @@
     },
     "ChildCustomization": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/AgentCustomization"
         },
@@ -6849,7 +6873,6 @@
     },
     "Customization": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/PluginCustomization"
         },
@@ -6864,7 +6887,6 @@
     },
     "McpServerState": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/McpServerStartingState"
         },
@@ -6885,7 +6907,6 @@
     },
     "ChatOrigin": {
       "oneOf": [
-        {},
         {
           "type": "object",
           "properties": {
@@ -6990,7 +7011,6 @@
     },
     "MessageAttachment": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/SimpleMessageAttachment"
         },
@@ -7008,7 +7028,6 @@
     },
     "ResponsePart": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/MarkdownResponsePart"
         },
@@ -7038,7 +7057,6 @@
     },
     "ToolCallState": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/ToolCallStreamingState"
         },
@@ -7062,7 +7080,6 @@
     },
     "ToolCallConfirmationState": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/ToolCallPendingConfirmationState"
         },
@@ -7074,7 +7091,6 @@
     },
     "ToolResultContent": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/ToolResultTextContent"
         },
@@ -7109,7 +7125,6 @@
     },
     "TerminalContentPart": {
       "oneOf": [
-        {},
         {
           "$ref": "#/$defs/TerminalUnclassifiedPart"
         },
@@ -7291,6 +7306,9 @@
           "$ref": "#/$defs/ChangesetFileRemovedAction"
         },
         {
+          "$ref": "#/$defs/ChangesetFilesReviewedChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChangesetContentChangedAction"
         },
         {
@@ -7369,6 +7387,165 @@
           "$ref": "#/$defs/CanvasMessageAction"
         }
       ]
+    },
+    "URI": {
+      "type": "string",
+      "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
+    },
+    "SessionStatus": {
+      "enum": [
+        1,
+        2,
+        8,
+        24,
+        32,
+        64
+      ],
+      "type": "number",
+      "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
+    },
+    "ChatInteractivity": {
+      "enum": [
+        "full",
+        "read-only",
+        "hidden"
+      ],
+      "type": "string",
+      "description": "How a user can interact with a chat.\n\n- `Full` — user can send messages and watch (default when absent)\n- `ReadOnly` — user can watch but not send messages (e.g. agent team workers)\n- `Hidden` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
+    },
+    "ToolCallConfirmationReason": {
+      "enum": [
+        "not-needed",
+        "user-action",
+        "setting"
+      ],
+      "type": "string",
+      "description": "How a tool call was confirmed for execution.\n\n- `NotNeeded` — No confirmation required (auto-approved)\n- `UserAction` — User explicitly approved\n- `Setting` — Approved by a persistent user setting"
+    },
+    "PendingMessageKind": {
+      "enum": [
+        "steering",
+        "queued"
+      ],
+      "type": "string",
+      "description": "Discriminant for pending message kinds."
+    },
+    "ChatInputResponseKind": {
+      "enum": [
+        "accept",
+        "decline",
+        "cancel"
+      ],
+      "type": "string",
+      "description": "How a client completed an input request."
+    },
+    "ChangesetStatus": {
+      "enum": [
+        "computing",
+        "ready",
+        "error"
+      ],
+      "type": "string",
+      "description": "Computation lifecycle of a {@link ChangesetState}."
+    },
+    "ChangesetOperationStatus": {
+      "enum": [
+        "idle",
+        "running",
+        "error",
+        "disabled"
+      ],
+      "type": "string",
+      "description": "Execution lifecycle of a {@link ChangesetOperation}.\n\nAn operation is invoked imperatively via `invokeChangesetOperation`, but\nits progress and outcome are reflected back into changeset state so that\nevery subscriber observes a consistent view (e.g. a spinner on a \"Create\nPull Request\" button, or an inline error after a failed \"revert\")."
+    },
+    "CanvasAvailability": {
+      "enum": [
+        "ready",
+        "stale"
+      ],
+      "type": "string",
+      "description": "Availability of a canvas provider or open instance."
+    },
+    "PolicyState": {
+      "enum": [
+        "enabled",
+        "disabled",
+        "unconfigured"
+      ],
+      "type": "string",
+      "description": "Policy configuration state for a model."
+    },
+    "SessionLifecycle": {
+      "enum": [
+        "creating",
+        "ready",
+        "creationFailed"
+      ],
+      "type": "string",
+      "description": "Session initialization state."
+    },
+    "McpAuthRequiredReason": {
+      "enum": [
+        "required",
+        "expired",
+        "insufficientScope"
+      ],
+      "type": "string",
+      "description": "Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}\nstate. Mirrors the three failure modes defined by the\n[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md)."
+    },
+    "TurnState": {
+      "enum": [
+        "complete",
+        "cancelled",
+        "error"
+      ],
+      "type": "string",
+      "description": "How a turn ended."
+    },
+    "MessageKind": {
+      "enum": [
+        "user",
+        "agent",
+        "tool",
+        "systemNotification"
+      ],
+      "type": "string",
+      "description": "Discriminant for {@link MessageOrigin} — identifies who produced a message."
+    },
+    "ConfirmationOptionKind": {
+      "enum": [
+        "approve",
+        "deny"
+      ],
+      "type": "string",
+      "description": "Whether a confirmation option represents an approval or denial action."
+    },
+    "ToolCallCancellationReason": {
+      "enum": [
+        "denied",
+        "skipped",
+        "result-denied"
+      ],
+      "type": "string",
+      "description": "Why a tool call was cancelled."
+    },
+    "ChangesetOperationScope": {
+      "enum": [
+        "changeset",
+        "resource",
+        "range"
+      ],
+      "type": "string",
+      "description": "Where a {@link ChangesetOperation} can be invoked."
+    },
+    "ResourceChangeType": {
+      "enum": [
+        "added",
+        "updated",
+        "deleted"
+      ],
+      "type": "string",
+      "description": "Discriminant for {@link ResourceChange.type}."
     }
   }
 }

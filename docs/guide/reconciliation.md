@@ -52,7 +52,7 @@ Time  Server                          Client A                        Client B
 
 ## Why Rebasing Is Simple
 
-Most session actions are **append-only**:
+Most chat actions are **append-only**:
 - Add turn, append delta, add tool call, append response part.
 
 Pending actions still apply cleanly to an updated confirmed state because they operate on independent data — the turn the client created still exists; the content it appended is additive.

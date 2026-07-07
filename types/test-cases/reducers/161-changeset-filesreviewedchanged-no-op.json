@@ -1,0 +1,51 @@
+{
+  "description": "changeset/filesReviewedChanged is a no-op when no listed file needs its reviewed state changed",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "reviewed": true,
+        "edit": {
+          "after": {
+            "uri": "file:///src/a.ts",
+            "content": {
+              "uri": "content:/a"
+            }
+          },
+          "diff": {
+            "added": 1
+          }
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/filesReviewedChanged",
+      "fileIds": ["file:///src/a.ts", "file:///src/missing.ts"],
+      "reviewed": true
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "reviewed": true,
+        "edit": {
+          "after": {
+            "uri": "file:///src/a.ts",
+            "content": {
+              "uri": "content:/a"
+            }
+          },
+          "diff": {
+            "added": 1
+          }
+        }
+      }
+    ]
+  }
+}

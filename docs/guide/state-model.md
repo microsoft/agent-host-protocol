@@ -137,6 +137,33 @@ Bits 0–4 encode mutually-exclusive **activity** status (exactly one is set at 
 
 For example, `(status & SessionStatus.InProgress) !== 0` is true for both `InProgress` and `InputNeeded`. A session that is idle, read, and archived has status `1 | 32 | 64 = 97`.
 
+## Chat State
+
+Subscribable on a [Chat Channel](/specification/chat-channel) at `ahp-chat:/<cid>`. A session is a catalog of chats (`SessionState.chats`); each chat carries the per-conversation state — the turn history, the active turn and its streaming response parts, tool calls, steering/queued messages, outstanding input requests, and the user's in-progress draft. A session starts with a default chat (`SessionState.defaultChat`); hosts advertising the `multipleChats` capability let clients open more via `createChat`.
+
+```typescript
+ChatState {
+  // Chat summary fields, inlined directly (mirrored into SessionState.chats)
+  resource: URI
+  title: string
+  status: number          // SessionStatus bitset
+  activity?: string
+  modifiedAt: string
+  origin?: ChatOrigin      // how the chat came to exist (user / fork / tool)
+  workingDirectory?: URI
+
+  turns: Turn[]                       // completed turns
+  turnsNextCursor?: string            // page older turns via fetchTurns
+  activeTurn?: ActiveTurn             // the in-progress turn, if any
+  steeringMessage?: PendingMessage
+  queuedMessages?: PendingMessage[]
+  inputRequests?: ChatInputRequest[]
+  draft?: Message                     // user's in-progress input
+}
+```
+
+The sections below — turns, response parts, tool calls, pending messages, and input requests — describe the contents of `ChatState`.
+
 ## Turns
 
 A turn represents one request/response cycle between user and agent.
@@ -266,14 +293,14 @@ All response content — text, tool calls, reasoning, and content references —
 // Inline markdown content
 MarkdownResponsePart {
   kind: 'markdown'
-  id: string               // targeted by session/delta for text appends
+  id: string               // targeted by chat/delta for text appends
   content: string
 }
 
 // Reasoning/thinking content from the model
 ReasoningResponsePart {
   kind: 'reasoning'
-  id: string               // targeted by session/reasoning for text appends
+  id: string               // targeted by chat/reasoning for text appends
   content: string
 }
 
@@ -292,7 +319,7 @@ ContentRef {
 }
 ```
 
-Text content uses a **create-then-append** pattern: the server first emits a `session/responsePart` action to create a new markdown (or reasoning) part with an `id`, then streams text into it via `session/delta` (or `session/reasoning`) actions targeting that `partId`. This pattern is extensible to future streaming content types.
+Text content uses a **create-then-append** pattern: the server first emits a `chat/responsePart` action to create a new markdown (or reasoning) part with an `id`, then streams text into it via `chat/delta` (or `chat/reasoning`) actions targeting that `partId`. This pattern is extensible to future streaming content types.
 
 Clients fetch `ContentRef` content separately via the `resourceRead(uri)` command. This keeps the state tree small and serializable.
 
@@ -357,22 +384,22 @@ By default, clients render a binary approve/deny UI for `pending-confirmation` t
 
 For example, a server might offer `"Approve"`, `"Approve in this Session"`, `"Deny"`, and `"Deny with reason"`. When the user picks an option, the client dispatches `chat/toolCallConfirmed` with `selectedOptionId` set to the chosen option's `id`. The reducer resolves the full `ConfirmationOption` object and stores it as `selectedOption` on the resulting `running` or `cancelled` state, and it carries through to `completed`.
 
-## Session Input Requests
+## Input Requests
 
-Sessions can request structured input from the user by storing live requests in top-level session state:
+A chat can request structured input from the user by storing live requests in its chat state (on the chat channel):
 
 ```typescript
-SessionState {
+ChatState {
   // ...existing fields...
-  inputRequests?: SessionInputRequest[]
+  inputRequests?: ChatInputRequest[]
 }
 
-SessionInputRequest {
+ChatInputRequest {
   id: string
-  message: string
+  message?: string
   url?: URI
-  questions?: SessionInputQuestion[]
-  answers?: Record<string, SessionInputAnswer>
+  questions?: ChatInputQuestion[]
+  answers?: Record<string, ChatInputAnswer>
 }
 ```
 
@@ -407,10 +434,10 @@ Notifications are ephemeral — not processed by reducers, not stored in state, 
 
 ## Pending Messages
 
-Sessions maintain two optional arrays of **pending messages** — instructions queued for future delivery to the agent:
+Each chat maintains two optional **pending messages** — instructions queued for future delivery to the agent:
 
 ```typescript
-SessionState {
+ChatState {
   // ...existing fields...
   steeringMessage?: PendingMessage      // inject into current turn
   queuedMessages?: PendingMessage[]     // start as new turns
@@ -426,7 +453,7 @@ PendingMessage {
 
 The steering message is injected into the **current turn** at a convenient point. Clients set a steering message to guide the agent mid-flight — for example, telling it to focus on a specific file or change approach. Only one steering message exists at a time; adding a new one replaces any existing one.
 
-- When the session has an active turn, the server consumes the steering message at its discretion, dispatching `session/pendingMessageRemoved` when it does.
+- When the chat has an active turn, the server consumes the steering message at its discretion, dispatching `chat/pendingMessageRemoved` when it does.
 - When set while idle, the steering message is silently stored until a turn starts.
 
 ### Queued Messages
@@ -434,8 +461,8 @@ The steering message is injected into the **current turn** at a convenient point
 Queued messages are automatically started as **new turns** after the current turn finishes. The server processes them FIFO (by arrival order).
 
 - When a turn completes and queued messages exist, the server removes the first queued message and starts a new turn from it.
-- When a queued message is added while the session is idle, the server SHOULD immediately consume it and start a turn.
-- The resulting `session/turnStarted` action includes a `queuedMessageId` field linking back to the source queued message.
+- When a queued message is added while the chat is idle, the server SHOULD immediately consume it and start a turn.
+- The resulting `chat/turnStarted` action includes a `queuedMessageId` field linking back to the source queued message.
 
 ```mermaid
 sequenceDiagram
@@ -459,14 +486,14 @@ sequenceDiagram
 
 ### Management
 
-Clients can **set** or **remove** both steering and queued messages at any time using the `session/pendingMessageSet` (upsert) and `session/pendingMessageRemoved` actions with a `kind` discriminant (`'steering'` or `'queued'`).
+Clients can **set** or **remove** both steering and queued messages at any time using the `chat/pendingMessageSet` (upsert) and `chat/pendingMessageRemoved` actions with a `kind` discriminant (`'steering'` or `'queued'`).
 
-## Session Truncation
+## Chat Truncation
 
-The `session/truncated` action removes turn history from a session. It is **client-dispatchable** — either side can truncate. If the session has an active turn it is silently dropped and the session status returns to `idle`.
+The `chat/truncated` action removes turn history from a chat. It is **client-dispatchable** — either side can truncate. If the chat has an active turn it is silently dropped and the chat's status returns to `idle`.
 
 - **With `turnId`** — keeps all turns up to and including the specified turn; removes everything after it.
-- **Without `turnId`** — removes all turns (empties the session).
+- **Without `turnId`** — removes all turns (empties the chat).
 
 A common pattern is to truncate and then immediately start a new turn with an edited message:
 
@@ -477,13 +504,13 @@ sequenceDiagram
 
     Note over Client: User edits message from turn t-2
 
-    Client->>Server: action (session/truncated, turnId: t-1)
+    Client->>Server: action (chat/truncated, turnId: t-1)
     Note over Server: Drops turns after t-1, drops active turn
 
-    Server->>Client: action (session/truncated)
+    Server->>Client: action (chat/truncated)
 
-    Client->>Server: action (session/turnStarted, edited message)
-    Server->>Client: action (session/turnStarted)
+    Client->>Server: action (chat/turnStarted, edited message)
+    Server->>Client: action (chat/turnStarted)
     Note over Server: New turn begins with edited message
 ```
 

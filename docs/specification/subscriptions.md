@@ -25,7 +25,8 @@ The rest of this page details the URI scheme and the lifecycle of a subscription
 | URI | State type | Description |
 |---|---|---|
 | `ahp-root://` | `RootState` | Global state (agents, terminals, host config). Always present. |
-| `ahp-session:/<uuid>` | `SessionState` | Per-session state. The session's provider is carried on `SessionSummary.provider`, not in the URI scheme. |
+| `ahp-session:/<uuid>` | `SessionState` | Per-session state (metadata plus the `chats` catalog). The session's provider is carried on `SessionSummary.provider`, not in the URI scheme. |
+| `ahp-chat:/<cid>` | `ChatState` | Per-chat conversation state (turns, streaming, tool calls, pending messages, input requests). A session starts with a default chat; multi-chat hosts add more via `createChat`. See [Chat Channel](/specification/chat-channel). |
 | `ahp-terminal:/<id>` | `TerminalState` | Per-terminal state. Server-defined id. |
 | `ahp-changeset:/<id>` | `ChangesetState` | Per-changeset state. URI is obtained by expanding a `Changeset.uriTemplate` advertised on a session; the id is server-defined. |
 | `ahp-otlp:` _(authority/path host-defined)_ | _stateless_ | OpenTelemetry signal channels (logs, traces, metrics). Concrete URIs are advertised on `InitializeResult.telemetry`; clients MUST treat them as opaque. See [Telemetry Channel](/specification/telemetry-channel). |
@@ -46,8 +47,7 @@ Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes
   "method": "subscribe",
   "params": {
     "channel": "ahp-session:/<uuid>",
-    "delivery": { "maxLatencyMs": 100 },
-    "view": { "turns": 30 }
+    "delivery": { "maxLatencyMs": 100 }
   }
 }
 
@@ -59,10 +59,12 @@ Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes
     "snapshot": {
       "resource": "ahp-session:/<uuid>",
       "state": {
-        "summary": { "resource": "ahp-session:/<uuid>", "title": "New Session", ... },
+        "provider": "copilot",
+        "title": "New Session",
+        "status": 1,
         "lifecycle": "creating",
-        "turns": [],
-        "activeTurn": null
+        "chats": [],
+        "activeClients": []
       },
       "fromSeq": 5
     }
@@ -126,8 +128,8 @@ State channels deliver mutations via the `action` server notification. The param
   "jsonrpc": "2.0",
   "method": "action",
   "params": {
-    "channel": "ahp-session:/<uuid>",
-    "action": { "type": "session/delta", "turnId": "t1", "partId": "p1", "content": "Hello" },
+    "channel": "ahp-chat:/<cid>",
+    "action": { "type": "chat/delta", "turnId": "t1", "partId": "p1", "content": "Hello" },
     "serverSeq": 6,
     "origin": { "clientId": "client-1", "clientSeq": 1 }
   }
@@ -136,6 +138,7 @@ State channels deliver mutations via the `action` server notification. The param
 
 - Root actions go to all clients subscribed to `ahp-root://`.
 - Session actions go to all clients subscribed to that session's URI.
+- Chat actions go to all clients subscribed to that chat's URI.
 - Terminal actions go to all clients subscribed to that terminal's URI.
 
 Action payloads (the inner `action` object) carry only fields intrinsic to the action — the channel comes from the envelope. Individual actions do NOT carry a `session: URI` or `terminal: URI` field of their own.
@@ -147,9 +150,9 @@ The client → server dispatch path uses a different method, `dispatchAction`, w
   "jsonrpc": "2.0",
   "method": "dispatchAction",
   "params": {
-    "channel": "ahp-session:/<uuid>",
+    "channel": "ahp-chat:/<cid>",
     "clientSeq": 1,
-    "action": { "type": "session/turnStarted", "turnId": "t1", "message": { "text": "Hi", "origin": { "kind": "user" } } }
+    "action": { "type": "chat/turnStarted", "turnId": "t1", "message": { "text": "Hi", "origin": { "kind": "user" } } }
   }
 }
 ```

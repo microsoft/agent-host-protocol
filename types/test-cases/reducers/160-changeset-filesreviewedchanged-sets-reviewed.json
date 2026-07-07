@@ -1,0 +1,110 @@
+{
+  "description": "changeset/filesReviewedChanged sets reviewed on matching files, skips files already at the target value, and ignores files not listed",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": {
+          "after": {
+            "uri": "file:///src/a.ts",
+            "content": {
+              "uri": "content:/a"
+            }
+          },
+          "diff": {
+            "added": 1
+          }
+        }
+      },
+      {
+        "id": "file:///src/b.ts",
+        "reviewed": true,
+        "edit": {
+          "after": {
+            "uri": "file:///src/b.ts",
+            "content": {
+              "uri": "content:/b"
+            }
+          },
+          "diff": {
+            "added": 5
+          }
+        }
+      },
+      {
+        "id": "file:///src/c.ts",
+        "reviewed": false,
+        "edit": {
+          "after": {
+            "uri": "file:///src/c.ts",
+            "content": {
+              "uri": "content:/c"
+            }
+          },
+          "diff": {
+            "added": 2
+          }
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/filesReviewedChanged",
+      "fileIds": ["file:///src/a.ts", "file:///src/b.ts", "file:///src/missing.ts"],
+      "reviewed": true
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "reviewed": true,
+        "edit": {
+          "after": {
+            "uri": "file:///src/a.ts",
+            "content": {
+              "uri": "content:/a"
+            }
+          },
+          "diff": {
+            "added": 1
+          }
+        }
+      },
+      {
+        "id": "file:///src/b.ts",
+        "reviewed": true,
+        "edit": {
+          "after": {
+            "uri": "file:///src/b.ts",
+            "content": {
+              "uri": "content:/b"
+            }
+          },
+          "diff": {
+            "added": 5
+          }
+        }
+      },
+      {
+        "id": "file:///src/c.ts",
+        "reviewed": false,
+        "edit": {
+          "after": {
+            "uri": "file:///src/c.ts",
+            "content": {
+              "uri": "content:/c"
+            }
+          },
+          "diff": {
+            "added": 2
+          }
+        }
+      }
+    ]
+  }
+}

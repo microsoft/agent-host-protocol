@@ -85,13 +85,15 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Channels & Subscriptions](/specification/subscriptions)** — The channel model, the universal `channel: URI` routing key, and the subscription mechanism shared by every channel type.
 - **[Authentication](/specification/authentication)** — RFC 9728 / RFC 6750 authentication flow.
 - **[Root Channel](/specification/root-channel)** — `ahp-root://` — agents, terminals catalogue, host config, session catalogue events.
-- **[Session Channel](/specification/session-channel)** — `ahp-session:/<uuid>` — per-session state, turns, tool calls, pending messages.
+- **[Session Channel](/specification/session-channel)** — `ahp-session:/<uuid>` — per-session state: the `chats` catalog, default chat, active clients, customizations, changesets, and aggregated status.
+- **[Chat Channel](/specification/chat-channel)** — `ahp-chat:/<cid>` — per-chat conversation state: turns, streaming, tool calls, pending messages, and input requests.
 - **[Terminal Channel](/specification/terminal-channel)** — per-terminal pty state, data flow, claims, command detection.
 - **[Telemetry Channel](/specification/telemetry-channel)** — `ahp-otlp:` — OpenTelemetry logs, traces, and metrics emitted by the agent host.
 - **[Versioning](/specification/versioning)** — Protocol version negotiation and compatibility.
 - **[Common Types](/reference/common)** — Cross-cutting types, base command/notification shapes, and JSON-RPC wire types.
 - **[Root Channel Reference](/reference/root)** — `RootState`, root actions, root commands, and root notifications.
 - **[Session Channel Reference](/reference/session)** — `SessionState`, session actions, and session commands.
+- **[Chat Channel Reference](/reference/chat)** — `ChatState`, chat actions, and chat commands.
 - **[Terminal Channel Reference](/reference/terminal)** — `TerminalState`, terminal actions, and terminal commands.
 - **[Changeset Channel Reference](/reference/changeset)** — `ChangesetState`, changeset actions, and changeset commands.
 - **[Messages](/reference/messages)** — Index of every JSON-RPC method with links to the channel page that documents it.

@@ -210,27 +210,27 @@ onBeforeUnmount(() => {
             <div class="wire-rail">
               <div class="wire-line" style="--i:0">
                 <span class="seq">41</span>
-                <span class="evt evt-blue">session/turnStarted</span>
+                <span class="evt evt-blue">chat/turnStarted</span>
                 <span class="payload">"Add retry logic to the API client"</span>
               </div>
               <div class="wire-line" style="--i:1">
                 <span class="seq">42</span>
-                <span class="evt evt-blue">session/delta</span>
+                <span class="evt evt-blue">chat/delta</span>
                 <span class="payload">"Sure — I'll wrap the fetch call…"</span>
               </div>
               <div class="wire-line" style="--i:2">
                 <span class="seq">43</span>
-                <span class="evt evt-orange">session/toolCallStart</span>
+                <span class="evt evt-orange">chat/toolCallStart</span>
                 <span class="payload">Edit file · <span class="mono">src/api.ts</span></span>
               </div>
               <div class="wire-line" style="--i:3">
                 <span class="seq">46</span>
-                <span class="evt evt-orange">session/toolCallComplete</span>
+                <span class="evt evt-orange">chat/toolCallComplete</span>
                 <span class="payload"><span class="wt-green">ok</span> · 1 file changed</span>
               </div>
               <div class="wire-line" style="--i:4">
                 <span class="seq">47</span>
-                <span class="evt evt-green">session/turnComplete</span>
+                <span class="evt evt-green">chat/turnComplete</span>
                 <span class="payload">turn <span class="mono">t_8c1</span> done</span>
               </div>
             </div>

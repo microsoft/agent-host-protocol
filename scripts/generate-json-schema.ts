@@ -7,6 +7,7 @@ import {
   Project,
   InterfaceDeclaration,
   TypeAliasDeclaration,
+  EnumDeclaration,
   PropertySignature,
   Node,
   Type,
@@ -72,6 +73,37 @@ function findInterface(project: Project, name: string): InterfaceDeclaration | u
   return undefined;
 }
 
+function findTypeAlias(project: Project, name: string): TypeAliasDeclaration | undefined {
+  for (const sf of project.getSourceFiles()) {
+    const ta = sf.getTypeAlias(name);
+    if (ta) return ta;
+  }
+  return undefined;
+}
+
+function findEnum(project: Project, name: string): EnumDeclaration | undefined {
+  for (const sf of project.getSourceFiles()) {
+    const en = sf.getEnum(name);
+    if (en) return en;
+  }
+  return undefined;
+}
+
+// A whole `const enum` → a JSON Schema `enum` of its members' evaluated values.
+// ts-morph evaluates const-enum initializers (including bitwise expressions like
+// `(1 << 3) | (1 << 4)`), so numeric flag enums resolve to concrete numbers.
+function enumToSchema(en: EnumDeclaration): JsonSchema {
+  const values = en.getMembers().map(m => m.getValue());
+  const defined = values.filter((v): v is string | number => v !== undefined);
+  const schema: JsonSchema = { enum: defined };
+  if (defined.every(v => typeof v === 'string')) schema.type = 'string';
+  else if (defined.every(v => typeof v === 'number')) schema.type = 'number';
+  const rawDesc = en.getJsDocs()[0]?.getDescription();
+  const desc = rawDesc ? normalizeDescription(rawDesc) : '';
+  if (desc) schema.description = desc;
+  return schema;
+}
+
 function getAllInterfaceProperties(iface: InterfaceDeclaration, project: Project): PropertySignature[] {
   const props: PropertySignature[] = [];
 
@@ -94,7 +126,13 @@ function getAllInterfaceProperties(iface: InterfaceDeclaration, project: Project
 
 // ─── Type → JSON Schema Conversion ──────────────────────────────────────────
 
-function typeTextToSchema(typeText: string, project: Project): JsonSchema {
+function typeTextToSchema(typeText: string, project: Project, _depth = 0): JsonSchema {
+  // Real protocol types nest only a handful of levels deep; a runaway depth
+  // means a type text is re-expanding to itself (e.g. a nested `|` mis-routed
+  // as a top-level union). Fail loudly rather than overflowing the stack.
+  if (_depth > 100) {
+    throw new Error(`typeTextToSchema: recursion limit exceeded on type text: ${typeText}`);
+  }
   let cleaned = typeText
     .replace(/import\([^)]+\)\./g, '')
     .trim();
@@ -114,13 +152,14 @@ function typeTextToSchema(typeText: string, project: Project): JsonSchema {
   if (cleaned === 'string') return { type: 'string' };
   if (cleaned === 'number') return { type: 'number' };
   if (cleaned === 'boolean') return { type: 'boolean' };
+  if (cleaned === 'null') return { type: 'null' };
   if (cleaned === 'unknown') return {};
   if (cleaned === 'object') return { type: 'object' };
 
   // Array types
   const arrayMatch = cleaned.match(/^(.+)\[\]$/);
   if (arrayMatch) {
-    return { type: 'array', items: typeTextToSchema(arrayMatch[1], project) };
+    return { type: 'array', items: typeTextToSchema(arrayMatch[1], project, _depth + 1) };
   }
 
   // Record<string, X>
@@ -128,14 +167,14 @@ function typeTextToSchema(typeText: string, project: Project): JsonSchema {
   if (recordMatch) {
     return {
       type: 'object',
-      additionalProperties: typeTextToSchema(recordMatch[1], project) as any,
+      additionalProperties: typeTextToSchema(recordMatch[1], project, _depth + 1) as any,
     };
   }
 
   // Type | undefined → just the type (handled by optionality)
   const undefinedMatch = cleaned.match(/^(.+?)\s*\|\s*undefined$/);
   if (undefinedMatch) {
-    return typeTextToSchema(undefinedMatch[1], project);
+    return typeTextToSchema(undefinedMatch[1], project, _depth + 1);
   }
 
   // Partial<X> — inline every property of X as optional (no `required`).
@@ -152,14 +191,38 @@ function typeTextToSchema(typeText: string, project: Project): JsonSchema {
     }
   }
 
-  // Union types (not string literals): A | B
-  if (cleaned.includes(' | ') && !cleaned.startsWith("'")) {
-    const parts = splitUnionType(cleaned);
-    const filteredParts = parts.filter(p => p !== 'undefined');
-    if (filteredParts.length === 1) {
-      return typeTextToSchema(filteredParts[0], project);
+  // Union types (not string literals): A | B. Only treat as a union when there
+  // is a genuine TOP-LEVEL `|`. splitUnionType is depth-aware, so a `|` nested
+  // inside `{ … }` or `<…>` (e.g. an inline object with a `side?: 'a' | 'b'`
+  // field) yields a single part equal to the input — it must fall through to the
+  // inline-object / reference handling below rather than re-expanding forever.
+  // A union type-alias's printed text can also carry a leading `|`
+  // (`type X =\n  | A\n  | B`), which makes splitUnionType yield an empty first
+  // element; dropping empties (and `undefined`) keeps us from emitting a
+  // matches-anything `{}` branch that breaks strict `oneOf` validation.
+  if (cleaned.includes('|') && !cleaned.startsWith("'")) {
+    const parts = splitUnionType(cleaned).filter(p => p !== 'undefined' && p !== '');
+    if (parts.length > 1) {
+      return { oneOf: parts.map(p => typeTextToSchema(p, project, _depth + 1)) };
     }
-    return { oneOf: filteredParts.map(p => typeTextToSchema(p, project)) };
+    if (parts.length === 1 && parts[0] !== cleaned) {
+      return typeTextToSchema(parts[0], project, _depth + 1);
+    }
+  }
+
+  // Enum member access: `ActionType.ChatTurnStarted` → the member's literal
+  // value as a `const`. Without this the capitalized-identifier fallback below
+  // emits a `$ref` to `#/$defs/ActionType.ChatTurnStarted` that is never
+  // defined (dangling). Must run before the interface-reference fallback.
+  const enumMemberMatch = cleaned.match(/^([A-Z]\w*)\.(\w+)$/);
+  if (enumMemberMatch) {
+    const [, enumName, memberName] = enumMemberMatch;
+    const en = findEnum(project, enumName);
+    const member = en?.getMember(memberName);
+    const value = member?.getValue();
+    if (value !== undefined) {
+      return { const: value };
+    }
   }
 
   // Inline object: { message: string; code?: string }
@@ -507,6 +570,85 @@ function generateErrorsSchema(project: Project): JsonSchema {
   return schema;
 }
 
+// ─── Transitive $def resolution ──────────────────────────────────────────────
+
+// Collect every `#/$defs/<name>` reference target reachable in a schema node.
+function collectRefTargets(node: JsonSchema | undefined, acc: Set<string>): void {
+  if (!node || typeof node !== 'object') return;
+  if (node.$ref) {
+    const m = node.$ref.match(/^#\/\$defs\/(.+)$/);
+    if (m) acc.add(m[1]);
+  }
+  if (node.items) collectRefTargets(node.items, acc);
+  if (node.additionalProperties && typeof node.additionalProperties === 'object') {
+    collectRefTargets(node.additionalProperties as JsonSchema, acc);
+  }
+  if (node.properties) {
+    for (const key of Object.keys(node.properties)) collectRefTargets(node.properties[key], acc);
+  }
+  if (node.$defs) {
+    for (const key of Object.keys(node.$defs)) collectRefTargets(node.$defs[key], acc);
+  }
+  for (const branch of [node.oneOf, node.anyOf]) {
+    if (branch) for (const b of branch) collectRefTargets(b, acc);
+  }
+}
+
+// Resolve a referenced type name to its schema, searching interfaces, type
+// aliases, and enums (in that order). Returns undefined for names that resolve
+// to none of the above (left for the caller to surface).
+function buildDefForName(project: Project, name: string): JsonSchema | undefined {
+  const iface = findInterface(project, name);
+  if (iface) return interfaceToSchema(iface, project);
+
+  const ta = findTypeAlias(project, name);
+  if (ta) {
+    const typeText = ta.getTypeNode()?.getText() || '';
+    const schema = typeTextToSchema(typeText, project);
+    const rawDesc = ta.getJsDocs()[0]?.getDescription();
+    const desc = rawDesc ? normalizeDescription(rawDesc) : '';
+    if (desc && !schema.description) schema.description = desc;
+    return schema;
+  }
+
+  const en = findEnum(project, name);
+  if (en) return enumToSchema(en);
+
+  return undefined;
+}
+
+// Walk a fully-built schema and backfill any `$def` that is referenced but not
+// yet defined — enums, type aliases (including `URI = string`), and interfaces
+// living in source files the per-schema generator did not eagerly inline. Runs
+// to a fixpoint because a newly-added `$def` can itself reference further types.
+// This is what keeps every generated schema self-contained (no dangling `$ref`).
+function resolveMissingDefs(schema: JsonSchema, project: Project): void {
+  schema.$defs = schema.$defs || {};
+  const unresolved = new Set<string>();
+  for (;;) {
+    const refs = new Set<string>();
+    collectRefTargets(schema, refs);
+    let added = false;
+    for (const name of refs) {
+      if (schema.$defs[name] || unresolved.has(name)) continue;
+      const def = buildDefForName(project, name);
+      if (def) {
+        schema.$defs[name] = def;
+        added = true;
+      } else {
+        unresolved.add(name);
+      }
+    }
+    if (!added) break;
+  }
+  if (unresolved.size > 0) {
+    throw new Error(
+      `generate-json-schema: unresolved $ref target(s) with no interface/alias/enum: ` +
+        `${[...unresolved].sort().join(', ')}`,
+    );
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export function generateJsonSchemas(project: Project, outDir: string): void {
@@ -522,6 +664,7 @@ export function generateJsonSchemas(project: Project, outDir: string): void {
 
   for (const { filename, generator } of schemas) {
     const schema = generator(project);
+    resolveMissingDefs(schema, project);
     fs.writeFileSync(
       path.join(outDir, filename),
       JSON.stringify(schema, null, 2) + '\n',
