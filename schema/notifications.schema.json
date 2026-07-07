@@ -2055,6 +2055,44 @@
         "writable"
       ]
     },
+    "ChildCustomizationBase": {
+      "type": "object",
+      "description": "Fields shared by the leaf child customizations that live inside a\ncontainer — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase: it always carries an explicit {@link McpServerCustomization.enabled}\nbecause it can appear as a top-level customization too.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Session-unique opaque identifier. Used by every action that targets a\nspecific customization. Minted by whoever publishes the customization\n(typically the agent host)."
+        },
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Source URI for this customization. A plugin URL, a file URI, or a\ndirectory URI.\n\nFor declarations that live inside a larger file — e.g. an MCP\nserver declared inline in a `plugins.json` manifest — `uri` points\nto the containing file and {@link CustomizationBase.range | `range`}\nnarrows it to the declaration's span."
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable name."
+        },
+        "icons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Icon"
+          },
+          "description": "Icons for UI display."
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+        }
+      },
+      "required": [
+        "id",
+        "uri",
+        "name"
+      ]
+    },
     "AgentCustomization": {
       "type": "object",
       "description": "A custom agent contributed by a plugin or directory.\n\nMirrors the [Open Plugins agent](https://open-plugins.com/agent-builders/components/agents)\nformat: a markdown file with YAML frontmatter, where the body is the\nagent's system prompt.",
@@ -2082,6 +2120,10 @@
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+        },
         "type": {
           "$ref": "#/$defs/CustomizationType.Agent"
         },
@@ -2099,6 +2141,14 @@
             "type": "string"
           },
           "description": "Allowlist of tool names the agent is scoped to, sourced from the\nagent file's frontmatter `tools`. A non-empty list restricts the\nagent to exactly those tools. Absent — or an empty list — imposes no\nrestriction beyond the session default: the agent may use any\navailable tool. Producers express \"no restriction\" by omitting the\nfield rather than sending an empty array, so an empty list carries no\nmeaning distinct from absence."
+        },
+        "disableModelInvocation": {
+          "type": "boolean",
+          "description": "When `true`, the agent will not auto-delegate to this custom agent\nas a sub-agent; it can only be selected by the user. Absent or\n`false` means the agent may delegate to it."
+        },
+        "disableUserInvocation": {
+          "type": "boolean",
+          "description": "When `true`, the user cannot select this custom agent (for example,\nin a picker); it remains available for the agent to auto-delegate\nto. Absent or `false` means the user may select it."
         },
         "_meta": {
           "type": "object",
@@ -2140,6 +2190,10 @@
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+        },
         "type": {
           "$ref": "#/$defs/CustomizationType.Skill"
         },
@@ -2150,6 +2204,10 @@
         "disableModelInvocation": {
           "type": "boolean",
           "description": "When `true`, only the user can invoke this skill — the agent will not\nauto-invoke it. Sourced from the command skill's frontmatter\n`disable-model-invocation` flag."
+        },
+        "disableUserInvocation": {
+          "type": "boolean",
+          "description": "When `true`, the user cannot directly invoke this skill (for example,\nas a slash command); it remains available for the agent to\nauto-invoke. Absent or `false` means the user may invoke it."
         }
       },
       "required": [
@@ -2185,6 +2243,10 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "$ref": "#/$defs/CustomizationType.Prompt"
@@ -2227,6 +2289,10 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "$ref": "#/$defs/CustomizationType.Rule"
@@ -2280,6 +2346,10 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "$ref": "#/$defs/CustomizationType.Hook"

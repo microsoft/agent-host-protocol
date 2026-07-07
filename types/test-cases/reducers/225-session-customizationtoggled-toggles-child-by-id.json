@@ -1,0 +1,96 @@
+{
+  "description": "session/customizationToggled toggles a child by id",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-top",
+        "uri": "https://mcp.example/server",
+        "name": "Top-level Server",
+        "enabled": true,
+        "state": {
+          "kind": "ready"
+        }
+      },
+      {
+        "type": "plugin",
+        "id": "plugin-a",
+        "uri": "https://plugins.example/a",
+        "name": "Plugin A",
+        "enabled": true,
+        "children": [
+          {
+            "type": "skill",
+            "id": "skill-1",
+            "uri": "https://plugins.example/a#skills/lint",
+            "name": "lint",
+            "disableUserInvocation": true
+          },
+          {
+            "type": "agent",
+            "id": "agent-1",
+            "uri": "https://plugins.example/a#agents/reviewer",
+            "name": "reviewer"
+          }
+        ]
+      }
+    ],
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/customizationToggled",
+      "id": "skill-1",
+      "enabled": false
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-top",
+        "uri": "https://mcp.example/server",
+        "name": "Top-level Server",
+        "enabled": true,
+        "state": {
+          "kind": "ready"
+        }
+      },
+      {
+        "type": "plugin",
+        "id": "plugin-a",
+        "uri": "https://plugins.example/a",
+        "name": "Plugin A",
+        "enabled": true,
+        "children": [
+          {
+            "type": "skill",
+            "id": "skill-1",
+            "uri": "https://plugins.example/a#skills/lint",
+            "name": "lint",
+            "enabled": false,
+            "disableUserInvocation": true
+          },
+          {
+            "type": "agent",
+            "id": "agent-1",
+            "uri": "https://plugins.example/a#agents/reviewer",
+            "name": "reviewer"
+          }
+        ]
+      }
+    ],
+    "activeClients": [],
+    "chats": []
+  }
+}

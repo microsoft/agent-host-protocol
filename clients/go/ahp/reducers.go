@@ -324,12 +324,42 @@ func setContainerEnabled(c *ahptypes.Customization, enabled bool) {
 	}
 }
 
+func setChildEnabled(c *ahptypes.ChildCustomization, enabled bool) {
+	switch v := c.Value.(type) {
+	case *ahptypes.AgentCustomization:
+		v.Enabled = &enabled
+	case *ahptypes.SkillCustomization:
+		v.Enabled = &enabled
+	case *ahptypes.PromptCustomization:
+		v.Enabled = &enabled
+	case *ahptypes.RuleCustomization:
+		v.Enabled = &enabled
+	case *ahptypes.HookCustomization:
+		v.Enabled = &enabled
+	case *ahptypes.McpServerCustomization:
+		v.Enabled = enabled
+	}
+}
+
 func applyToggle(list []ahptypes.Customization, id string, enabled bool) bool {
 	for i := range list {
 		got, ok := customizationID(list[i])
 		if ok && got == id {
 			setContainerEnabled(&list[i], enabled)
 			return true
+		}
+	}
+	for i := range list {
+		children := containerChildren(&list[i])
+		if children == nil {
+			continue
+		}
+		for j := range *children {
+			got, ok := childCustomizationID((*children)[j])
+			if ok && got == id {
+				setChildEnabled(&(*children)[j], enabled)
+				return true
+			}
 		}
 	}
 	return false

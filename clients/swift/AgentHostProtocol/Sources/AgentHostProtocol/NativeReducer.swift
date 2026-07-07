@@ -233,6 +233,32 @@ func setCustomizationEnabled(_ c: inout Customization, _ enabled: Bool) {
     }
 }
 
+func setChildCustomizationEnabled(_ c: inout ChildCustomization, _ enabled: Bool) {
+    switch c {
+    case .agent(var x):
+        x.enabled = enabled
+        c = .agent(x)
+    case .skill(var x):
+        x.enabled = enabled
+        c = .skill(x)
+    case .prompt(var x):
+        x.enabled = enabled
+        c = .prompt(x)
+    case .rule(var x):
+        x.enabled = enabled
+        c = .rule(x)
+    case .hook(var x):
+        x.enabled = enabled
+        c = .hook(x)
+    case .mcpServer(var x):
+        x.enabled = enabled
+        c = .mcpServer(x)
+    // Unknown/future child customization: opaque payload, nothing to mutate.
+    case .unknown:
+        break
+    }
+}
+
 func toggleCustomization(in list: inout [Customization], id: String, enabled: Bool) -> Bool {
     for i in list.indices {
         if customizationId(list[i]) == id {
@@ -241,6 +267,17 @@ func toggleCustomization(in list: inout [Customization], id: String, enabled: Bo
             list[i] = entry
             return true
         }
+    }
+    for containerIdx in list.indices {
+        var container = list[containerIdx]
+        guard var children = customizationChildren(container) else { continue }
+        guard let childIdx = children.firstIndex(where: { childId($0) == id }) else { continue }
+        var child = children[childIdx]
+        setChildCustomizationEnabled(&child, enabled)
+        children[childIdx] = child
+        setCustomizationChildren(&container, children)
+        list[containerIdx] = container
+        return true
     }
     return false
 }

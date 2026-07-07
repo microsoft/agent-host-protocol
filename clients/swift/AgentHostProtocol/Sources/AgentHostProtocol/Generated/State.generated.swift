@@ -3374,6 +3374,18 @@ public struct AgentCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Whether this child is individually enabled. Absent means enabled, so a
+    /// producer only needs to set it to surface a child that exists but is
+    /// turned off on its own.
+    ///
+    /// This flag is independent of the parent container's: the **effective**
+    /// enabled state of a child is
+    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
+    /// disables every child regardless of each child's own flag.
+    ///
+    /// A child is turned on or off by id with
+    /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
+    public var enabled: Bool?
     public var type: CustomizationType
     /// Short description of what the agent specializes in and when to
     /// invoke it. Sourced from the agent file's frontmatter `description`.
@@ -3390,6 +3402,14 @@ public struct AgentCustomization: Codable, Sendable {
     /// field rather than sending an empty array, so an empty list carries no
     /// meaning distinct from absence.
     public var tools: [String]?
+    /// When `true`, the agent will not auto-delegate to this custom agent
+    /// as a sub-agent; it can only be selected by the user. Absent or
+    /// `false` means the agent may delegate to it.
+    public var disableModelInvocation: Bool?
+    /// When `true`, the user cannot select this custom agent (for example,
+    /// in a picker); it remains available for the agent to auto-delegate
+    /// to. Absent or `false` means the user may select it.
+    public var disableUserInvocation: Bool?
     /// Additional provider-specific metadata for this custom agent.
     ///
     /// Mirrors the MCP `_meta` convention.
@@ -3401,10 +3421,13 @@ public struct AgentCustomization: Codable, Sendable {
         case name
         case icons
         case range
+        case enabled
         case type
         case description
         case model
         case tools
+        case disableModelInvocation
+        case disableUserInvocation
         case meta = "_meta"
     }
 
@@ -3414,10 +3437,13 @@ public struct AgentCustomization: Codable, Sendable {
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        enabled: Bool? = nil,
         type: CustomizationType,
         description: String? = nil,
         model: String? = nil,
         tools: [String]? = nil,
+        disableModelInvocation: Bool? = nil,
+        disableUserInvocation: Bool? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.id = id
@@ -3425,10 +3451,13 @@ public struct AgentCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.enabled = enabled
         self.type = type
         self.description = description
         self.model = model
         self.tools = tools
+        self.disableModelInvocation = disableModelInvocation
+        self.disableUserInvocation = disableUserInvocation
         self.meta = meta
     }
 }
@@ -3455,6 +3484,18 @@ public struct SkillCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Whether this child is individually enabled. Absent means enabled, so a
+    /// producer only needs to set it to surface a child that exists but is
+    /// turned off on its own.
+    ///
+    /// This flag is independent of the parent container's: the **effective**
+    /// enabled state of a child is
+    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
+    /// disables every child regardless of each child's own flag.
+    ///
+    /// A child is turned on or off by id with
+    /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
+    public var enabled: Bool?
     public var type: CustomizationType
     /// Short description used for help text and auto-invocation matching.
     /// Sourced from the skill's frontmatter `description`.
@@ -3463,6 +3504,10 @@ public struct SkillCustomization: Codable, Sendable {
     /// auto-invoke it. Sourced from the command skill's frontmatter
     /// `disable-model-invocation` flag.
     public var disableModelInvocation: Bool?
+    /// When `true`, the user cannot directly invoke this skill (for example,
+    /// as a slash command); it remains available for the agent to
+    /// auto-invoke. Absent or `false` means the user may invoke it.
+    public var disableUserInvocation: Bool?
 
     public init(
         id: String,
@@ -3470,18 +3515,22 @@ public struct SkillCustomization: Codable, Sendable {
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        enabled: Bool? = nil,
         type: CustomizationType,
         description: String? = nil,
-        disableModelInvocation: Bool? = nil
+        disableModelInvocation: Bool? = nil,
+        disableUserInvocation: Bool? = nil
     ) {
         self.id = id
         self.uri = uri
         self.name = name
         self.icons = icons
         self.range = range
+        self.enabled = enabled
         self.type = type
         self.description = description
         self.disableModelInvocation = disableModelInvocation
+        self.disableUserInvocation = disableUserInvocation
     }
 }
 
@@ -3507,6 +3556,18 @@ public struct PromptCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Whether this child is individually enabled. Absent means enabled, so a
+    /// producer only needs to set it to surface a child that exists but is
+    /// turned off on its own.
+    ///
+    /// This flag is independent of the parent container's: the **effective**
+    /// enabled state of a child is
+    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
+    /// disables every child regardless of each child's own flag.
+    ///
+    /// A child is turned on or off by id with
+    /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
+    public var enabled: Bool?
     public var type: CustomizationType
     /// Short description of what the prompt does.
     public var description: String?
@@ -3517,6 +3578,7 @@ public struct PromptCustomization: Codable, Sendable {
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        enabled: Bool? = nil,
         type: CustomizationType,
         description: String? = nil
     ) {
@@ -3525,6 +3587,7 @@ public struct PromptCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.enabled = enabled
         self.type = type
         self.description = description
     }
@@ -3552,6 +3615,18 @@ public struct RuleCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Whether this child is individually enabled. Absent means enabled, so a
+    /// producer only needs to set it to surface a child that exists but is
+    /// turned off on its own.
+    ///
+    /// This flag is independent of the parent container's: the **effective**
+    /// enabled state of a child is
+    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
+    /// disables every child regardless of each child's own flag.
+    ///
+    /// A child is turned on or off by id with
+    /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
+    public var enabled: Bool?
     public var type: CustomizationType
     /// Description of what the rule enforces.
     public var description: String?
@@ -3569,6 +3644,7 @@ public struct RuleCustomization: Codable, Sendable {
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        enabled: Bool? = nil,
         type: CustomizationType,
         description: String? = nil,
         alwaysApply: Bool? = nil,
@@ -3579,6 +3655,7 @@ public struct RuleCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.enabled = enabled
         self.type = type
         self.description = description
         self.alwaysApply = alwaysApply
@@ -3608,6 +3685,18 @@ public struct HookCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Whether this child is individually enabled. Absent means enabled, so a
+    /// producer only needs to set it to surface a child that exists but is
+    /// turned off on its own.
+    ///
+    /// This flag is independent of the parent container's: the **effective**
+    /// enabled state of a child is
+    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
+    /// disables every child regardless of each child's own flag.
+    ///
+    /// A child is turned on or off by id with
+    /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
+    public var enabled: Bool?
     public var type: CustomizationType
 
     public init(
@@ -3616,6 +3705,7 @@ public struct HookCustomization: Codable, Sendable {
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        enabled: Bool? = nil,
         type: CustomizationType
     ) {
         self.id = id
@@ -3623,6 +3713,7 @@ public struct HookCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.enabled = enabled
         self.type = type
     }
 }

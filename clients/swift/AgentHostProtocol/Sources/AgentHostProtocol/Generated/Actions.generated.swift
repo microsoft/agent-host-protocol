@@ -1203,9 +1203,9 @@ public struct SessionCustomizationsChangedAction: Codable, Sendable {
 
 public struct SessionCustomizationToggledAction: Codable, Sendable {
     public var type: ActionType
-    /// The id of the container to toggle.
+    /// The id of the container or child to toggle.
     public var id: String
-    /// Whether to enable or disable the container.
+    /// Whether to enable or disable the targeted customization.
     public var enabled: Bool
 
     public init(

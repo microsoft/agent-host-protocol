@@ -15,8 +15,17 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
 
 ## [Unreleased]
 
+## [0.5.2] — Unreleased
+
+Implements AHP 0.5.2.
+
 ### Added
 
+- Optional `enabled` field on the child customization types
+  (`AgentCustomization`, `SkillCustomization`, `PromptCustomization`,
+  `RuleCustomization`, `HookCustomization`).
+- `disableUserInvocation` on `SkillCustomization`, plus `disableModelInvocation`
+  and `disableUserInvocation` on `AgentCustomization`.
 - Canvas channel support: the per-instance `CanvasState` plus the
   `CanvasUpdatedAction`, `CanvasCloseRequestedAction`, and `CanvasMessageAction`
   actions, the `SessionCanvasesChangedAction` / `SessionOpenCanvasesChangedAction`
@@ -27,6 +36,12 @@ versions (`*-SNAPSHOT`) are explicitly rejected by the publish pipeline; bump
   / `canvasClose` / `canvasReadResource` methods, and the `CanvasProviderError`
   error. The session reducer replaces the canvas registry/catalogue and the
   canvas reducer sparse-merges `canvas/updated`.
+
+### Changed
+
+- The `session/customizationToggled` reducer now toggles any top-level
+  customization (`plugin`, `directory`, or top-level `mcpServer`) or an
+  individual child by `id`, setting that entry's `enabled`.
 
 ## [0.5.1] — 2026-07-02
 

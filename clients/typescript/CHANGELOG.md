@@ -20,8 +20,17 @@ hotfix escape hatch.
 
 ## [Unreleased]
 
+## [0.5.2] — Unreleased
+
+Implements AHP 0.5.2.
+
 ### Added
 
+- Optional `enabled` field on the child customization types
+  (`AgentCustomization`, `SkillCustomization`, `PromptCustomization`,
+  `RuleCustomization`, `HookCustomization`).
+- `disableUserInvocation` on `SkillCustomization`, plus `disableModelInvocation`
+  and `disableUserInvocation` on `AgentCustomization`.
 - Canvas channel support: the per-instance `CanvasState` plus the
   `CanvasUpdatedAction` (`canvas/updated`), `CanvasCloseRequestedAction`
   (`canvas/closeRequested`), and `CanvasMessageAction` (`canvas/message`)
@@ -34,6 +43,12 @@ hotfix escape hatch.
   / `canvasClose` / `canvasReadResource` methods, and the `CanvasProviderError`
   error. The session reducer replaces the canvas registry/catalogue and the
   `canvasReducer` sparse-merges `canvas/updated`.
+
+### Changed
+
+- The `session/customizationToggled` reducer now toggles any top-level
+  customization (`plugin`, `directory`, or top-level `mcpServer`) or an
+  individual child by `id`, setting that entry's `enabled`.
 
 ## [0.5.1] — 2026-07-02
 

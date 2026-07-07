@@ -104,18 +104,20 @@ stateDiagram-v2
 
 ## Children
 
-Every child carries the same base fields (`id`, `uri`, `name`, optional `icons`). Children are leaf nodes — no further nesting — and their parent is implied by which container holds them in its `children` array. Children have no `enabled` or `clientId`: only containers can be toggled, and client provenance lives on the container since clients can only contribute containers, not individual children.
+Every child carries the same base fields (`id`, `uri`, `name`, optional `icons`) plus an `enabled` flag — optional for the five leaf children (absent means enabled) and always present on an `McpServerCustomization`. Children are leaf nodes — no further nesting — and their parent is implied by which container holds them in its `children` array. A child's `enabled` is independent of its container's. Children have no `clientId`: client provenance lives on the container since clients can only contribute containers, not individual children.
 
 Each child type carries optional metadata sourced from its [Open Plugins](https://open-plugins.com/plugin-builders/specification.md) component definition (typically the file's YAML frontmatter):
 
 ```typescript
-AgentCustomization        { type: 'agent';       description?, model?, tools? }
-SkillCustomization        { type: 'skill';       description?, disableModelInvocation? }
+AgentCustomization        { type: 'agent';       description?, model?, tools?, disableModelInvocation?, disableUserInvocation? }
+SkillCustomization        { type: 'skill';       description?, disableModelInvocation?, disableUserInvocation? }
 PromptCustomization       { type: 'prompt';      description? }
 RuleCustomization         { type: 'rule';        description?, alwaysApply?, globs? }    // covers "instruction" formats too
 HookCustomization         { type: 'hook';        event?, matcher? }
 McpServerCustomization    { type: 'mcpServer';   enabled, state, channel?, mcpApp? }   // see /guide/mcp
 ```
+
+Agents and skills carry a symmetric invocation matrix. `disableModelInvocation` removes the entry from the agent's automatic choices — a custom agent it won't auto-delegate to, or a skill it won't auto-invoke — while leaving it available for the user to pick. `disableUserInvocation` does the reverse: the entry stays available for the agent to invoke but is hidden from user-facing pickers and slash-commands. Both are absent/`false` by default (invocable by either party), and they are independent, so an entry can be agent-only, user-only, both, or neither.
 
 The protocol intentionally omits host-internal execution details (a hook's command/script, an MCP server's `command`/`args`/`env`, etc.). Those stay on the agent host; clients see only what's needed for display, search, and selection. MCP tools and their descriptions surface through the standard tool channels once the server is running. The MCP-specific runtime fields (`state`, `channel`, `mcpApp`) are covered in [MCP Servers](/guide/mcp).
 
@@ -129,17 +131,17 @@ state.customizations
 
 ## Toggling
 
-Any client can enable or disable a top-level container by dispatching `session/customizationToggled` with the container's `id`:
+Any client can enable or disable any customization by dispatching `session/customizationToggled` with that entry's `id`:
 
 ```typescript
 {
   type: 'session/customizationToggled'
-  id: string         // container id
+  id: string         // any customization id
   enabled: boolean
 }
 ```
 
-Only containers (plugins and directories) have an `enabled` flag — children are always active when their container is enabled. The action is a no-op if no container has that id.
+Both containers and children carry an `enabled` flag. The reducer matches `id` against every top-level customization first — plugins, directories, and bare top-level MCP servers — then against the children inside every container, and sets that entry's `enabled`. A child's effective state is `container.enabled && (child.enabled ?? true)`, so disabling a container disables all of its children regardless of each child's own flag, and a child toggle only takes effect while its container is enabled. The action is a no-op if no customization has that id.
 
 ```mermaid
 sequenceDiagram
@@ -385,7 +387,7 @@ sequenceDiagram
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `session/customizationsChanged` | No | Server replaced the top-level customization list (full replacement) |
-| `session/customizationToggled` | **Yes** | Client toggled a container or child on or off by id |
+| `session/customizationToggled` | **Yes** | Client toggled a customization on or off by id |
 | `session/customizationUpdated` | No | Server upserts a top-level container by id (full-entry replacement, including children) |
 | `session/customizationRemoved` | No | Server removes a customization by id (containers cascade) |
 | `session/activeClientSet` | **Yes** | Client joins or refreshes as an active client (with tools + customizations), keyed by `clientId` |

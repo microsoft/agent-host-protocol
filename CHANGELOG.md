@@ -29,6 +29,13 @@ Spec version: `0.5.2`
 
 ### Added
 
+- Optional `enabled` flag on the child customizations (`AgentCustomization`,
+  `SkillCustomization`, `PromptCustomization`, `RuleCustomization`,
+  `HookCustomization`) so an individual child can be turned off independently of
+  its container; absent means enabled.
+- `disableUserInvocation` on `SkillCustomization`, plus `disableModelInvocation`
+  and `disableUserInvocation` on `AgentCustomization`, giving custom agents and
+  skills a symmetric user/model invocation matrix.
 - Canvas channel — an opt-in surface for the agent to open rich, interactive UI
   surfaces (document/spreadsheet editors, diff views, live previews) alongside a
   session, following the "one channel per resource" model of terminals and
@@ -43,6 +50,13 @@ Spec version: `0.5.2`
   the client → server `canvasReadResource` content-fetch request; and the
   `CanvasProviderError` (`-32012`) error. See
   [`docs/specification/canvas-channel.md`](docs/specification/canvas-channel.md).
+
+### Changed
+
+- `session/customizationToggled` now targets any top-level customization
+  (`plugin`, `directory`, or top-level `mcpServer`) or an individual child by
+  `id` and sets that entry's `enabled`; the effective state of a child is
+  `container.enabled && (child.enabled ?? true)`.
 
 ## [0.5.1] — 2026-07-02
 

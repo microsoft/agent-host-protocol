@@ -943,11 +943,11 @@ data class SessionCustomizationsChangedAction(
 data class SessionCustomizationToggledAction(
     val type: ActionType,
     /**
-     * The id of the container to toggle.
+     * The id of the container or child to toggle.
      */
     val id: String,
     /**
-     * Whether to enable or disable the container.
+     * Whether to enable or disable the targeted customization.
      */
     val enabled: Boolean
 )
