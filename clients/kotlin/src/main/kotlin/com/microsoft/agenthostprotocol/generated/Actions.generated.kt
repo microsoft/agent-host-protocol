@@ -110,6 +110,10 @@ enum class ActionType {
     SESSION_CUSTOMIZATION_REMOVED,
     @SerialName("session/mcpServerStateChanged")
     SESSION_MCP_SERVER_STATE_CHANGED,
+    @SerialName("session/mcpServerStartRequested")
+    SESSION_MCP_SERVER_START_REQUESTED,
+    @SerialName("session/mcpServerStopRequested")
+    SESSION_MCP_SERVER_STOP_REQUESTED,
     @SerialName("chat/truncated")
     CHAT_TRUNCATED,
     @SerialName("chat/turnsLoaded")
@@ -992,6 +996,24 @@ data class SessionMcpServerStateChangedAction(
 )
 
 @Serializable
+data class SessionMcpServerStartRequestedAction(
+    val type: ActionType,
+    /**
+     * The id of the {@link McpServerCustomization} to start.
+     */
+    val id: String
+)
+
+@Serializable
+data class SessionMcpServerStopRequestedAction(
+    val type: ActionType,
+    /**
+     * The id of the {@link McpServerCustomization} to stop.
+     */
+    val id: String
+)
+
+@Serializable
 data class ChatTruncatedAction(
     val type: ActionType,
     /**
@@ -1492,6 +1514,8 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionCustomizationUpdated(val value: SessionCustomizationUpdatedAction) : StateAction
 @JvmInline value class StateActionSessionCustomizationRemoved(val value: SessionCustomizationRemovedAction) : StateAction
 @JvmInline value class StateActionSessionMcpServerStateChanged(val value: SessionMcpServerStateChangedAction) : StateAction
+@JvmInline value class StateActionSessionMcpServerStartRequested(val value: SessionMcpServerStartRequestedAction) : StateAction
+@JvmInline value class StateActionSessionMcpServerStopRequested(val value: SessionMcpServerStopRequestedAction) : StateAction
 @JvmInline value class StateActionChatTruncated(val value: ChatTruncatedAction) : StateAction
 @JvmInline value class StateActionChatTurnsLoaded(val value: ChatTurnsLoadedAction) : StateAction
 @JvmInline value class StateActionSessionConfigChanged(val value: SessionConfigChangedAction) : StateAction
@@ -1589,6 +1613,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/customizationUpdated" -> StateActionSessionCustomizationUpdated(input.json.decodeFromJsonElement(SessionCustomizationUpdatedAction.serializer(), element))
             "session/customizationRemoved" -> StateActionSessionCustomizationRemoved(input.json.decodeFromJsonElement(SessionCustomizationRemovedAction.serializer(), element))
             "session/mcpServerStateChanged" -> StateActionSessionMcpServerStateChanged(input.json.decodeFromJsonElement(SessionMcpServerStateChangedAction.serializer(), element))
+            "session/mcpServerStartRequested" -> StateActionSessionMcpServerStartRequested(input.json.decodeFromJsonElement(SessionMcpServerStartRequestedAction.serializer(), element))
+            "session/mcpServerStopRequested" -> StateActionSessionMcpServerStopRequested(input.json.decodeFromJsonElement(SessionMcpServerStopRequestedAction.serializer(), element))
             "chat/truncated" -> StateActionChatTruncated(input.json.decodeFromJsonElement(ChatTruncatedAction.serializer(), element))
             "chat/turnsLoaded" -> StateActionChatTurnsLoaded(input.json.decodeFromJsonElement(ChatTurnsLoadedAction.serializer(), element))
             "session/configChanged" -> StateActionSessionConfigChanged(input.json.decodeFromJsonElement(SessionConfigChangedAction.serializer(), element))
@@ -1679,6 +1705,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionCustomizationUpdated -> output.json.encodeToJsonElement(SessionCustomizationUpdatedAction.serializer(), value.value)
             is StateActionSessionCustomizationRemoved -> output.json.encodeToJsonElement(SessionCustomizationRemovedAction.serializer(), value.value)
             is StateActionSessionMcpServerStateChanged -> output.json.encodeToJsonElement(SessionMcpServerStateChangedAction.serializer(), value.value)
+            is StateActionSessionMcpServerStartRequested -> output.json.encodeToJsonElement(SessionMcpServerStartRequestedAction.serializer(), value.value)
+            is StateActionSessionMcpServerStopRequested -> output.json.encodeToJsonElement(SessionMcpServerStopRequestedAction.serializer(), value.value)
             is StateActionChatTruncated -> output.json.encodeToJsonElement(ChatTruncatedAction.serializer(), value.value)
             is StateActionChatTurnsLoaded -> output.json.encodeToJsonElement(ChatTurnsLoadedAction.serializer(), value.value)
             is StateActionSessionConfigChanged -> output.json.encodeToJsonElement(SessionConfigChangedAction.serializer(), value.value)

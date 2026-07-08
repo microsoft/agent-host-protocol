@@ -1,0 +1,94 @@
+{
+  "description": "session/mcpServerStartRequested is a no-op when no customization carries the targeted id",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "plugin",
+        "id": "plugin-a",
+        "uri": "https://plugins.example/a",
+        "name": "Plugin A",
+        "enabled": true
+      },
+      {
+        "type": "plugin",
+        "id": "plugin-b",
+        "uri": "https://plugins.example/b",
+        "name": "Plugin B",
+        "enabled": true,
+        "children": [
+          {
+            "type": "skill",
+            "id": "skill-1",
+            "uri": "https://plugins.example/b#skills/lint",
+            "name": "lint"
+          }
+        ]
+      },
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "enabled": true,
+        "state": {
+          "kind": "stopped"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/mcpServerStartRequested",
+      "id": "mcp-does-not-exist"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "plugin",
+        "id": "plugin-a",
+        "uri": "https://plugins.example/a",
+        "name": "Plugin A",
+        "enabled": true
+      },
+      {
+        "type": "plugin",
+        "id": "plugin-b",
+        "uri": "https://plugins.example/b",
+        "name": "Plugin B",
+        "enabled": true,
+        "children": [
+          {
+            "type": "skill",
+            "id": "skill-1",
+            "uri": "https://plugins.example/b#skills/lint",
+            "name": "lint"
+          }
+        ]
+      },
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "enabled": true,
+        "state": {
+          "kind": "stopped"
+        }
+      }
+    ]
+  }
+}

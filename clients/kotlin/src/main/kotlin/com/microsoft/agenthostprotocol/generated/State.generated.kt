@@ -478,6 +478,8 @@ enum class ToolResultContentType {
     FILE_EDIT,
     @SerialName("terminal")
     TERMINAL,
+    @SerialName("terminalComplete")
+    TERMINAL_COMPLETE,
     @SerialName("subagent")
     SUBAGENT
 }
@@ -2916,6 +2918,32 @@ data class ToolResultTerminalContent(
 )
 
 @Serializable
+data class ToolResultTerminalCompleteContent(
+    val type: ToolResultContentType,
+    /**
+     * URI of the `ahp-terminal:` channel that carried live output for this
+     * command, if one was exposed.
+     */
+    val resource: String? = null,
+    /**
+     * Exit code from the completed command, if reported by the runtime
+     */
+    val exitCode: Long? = null,
+    /**
+     * Working directory where the command was executed
+     */
+    val cwd: String? = null,
+    /**
+     * Preview of the command's output, if available
+     */
+    val preview: String? = null,
+    /**
+     * Whether `preview` is known to be incomplete or truncated
+     */
+    val truncated: Boolean? = null
+)
+
+@Serializable
 data class ToolResultSubagentContent(
     val type: ToolResultContentType,
     /**
@@ -3019,7 +3047,16 @@ data class PluginCustomization(
      * nothing.
      */
     val children: List<ChildCustomization>? = null,
-    val type: CustomizationType
+    val type: CustomizationType,
+    /**
+     * Version of the plugin, sourced from the
+     * [Open Plugins](https://open-plugins.com/) manifest's optional
+     * `version` field (semver, e.g. `"1.2.0"`). Absent when the manifest
+     * declares no version — the field is optional there — or the source
+     * has no version concept. Provenance / display only: the host neither
+     * parses nor enforces it.
+     */
+    val version: String? = null
 )
 
 @Serializable
@@ -3078,6 +3115,15 @@ data class ClientPluginCustomization(
      */
     val children: List<ChildCustomization>? = null,
     val type: CustomizationType,
+    /**
+     * Version of the plugin, sourced from the
+     * [Open Plugins](https://open-plugins.com/) manifest's optional
+     * `version` field (semver, e.g. `"1.2.0"`). Absent when the manifest
+     * declares no version — the field is optional there — or the source
+     * has no version concept. Provenance / display only: the host neither
+     * parses nor enforces it.
+     */
+    val version: String? = null,
     /**
      * Opaque version token used by the host to detect changes.
      */
@@ -5322,6 +5368,7 @@ sealed interface ToolResultContent {
     @JvmInline value class Resource(val value: ToolResultResourceContent) : ToolResultContent
     @JvmInline value class FileEdit(val value: ToolResultFileEditContent) : ToolResultContent
     @JvmInline value class Terminal(val value: ToolResultTerminalContent) : ToolResultContent
+    @JvmInline value class TerminalComplete(val value: ToolResultTerminalCompleteContent) : ToolResultContent
     @JvmInline value class Subagent(val value: ToolResultSubagentContent) : ToolResultContent
 
     /**
@@ -5351,6 +5398,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
             "resource" -> ToolResultContent.Resource(input.json.decodeFromJsonElement(ToolResultResourceContent.serializer(), element))
             "fileEdit" -> ToolResultContent.FileEdit(input.json.decodeFromJsonElement(ToolResultFileEditContent.serializer(), element))
             "terminal" -> ToolResultContent.Terminal(input.json.decodeFromJsonElement(ToolResultTerminalContent.serializer(), element))
+            "terminalComplete" -> ToolResultContent.TerminalComplete(input.json.decodeFromJsonElement(ToolResultTerminalCompleteContent.serializer(), element))
             "subagent" -> ToolResultContent.Subagent(input.json.decodeFromJsonElement(ToolResultSubagentContent.serializer(), element))
             else -> ToolResultContent.Unknown(obj)
         }
@@ -5365,6 +5413,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
             is ToolResultContent.Resource -> output.json.encodeToJsonElement(ToolResultResourceContent.serializer(), value.value)
             is ToolResultContent.FileEdit -> output.json.encodeToJsonElement(ToolResultFileEditContent.serializer(), value.value)
             is ToolResultContent.Terminal -> output.json.encodeToJsonElement(ToolResultTerminalContent.serializer(), value.value)
+            is ToolResultContent.TerminalComplete -> output.json.encodeToJsonElement(ToolResultTerminalCompleteContent.serializer(), value.value)
             is ToolResultContent.Subagent -> output.json.encodeToJsonElement(ToolResultSubagentContent.serializer(), value.value)
             is ToolResultContent.Unknown -> value.raw
         }

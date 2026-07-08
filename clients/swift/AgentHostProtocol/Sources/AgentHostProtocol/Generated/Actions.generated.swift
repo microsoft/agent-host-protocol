@@ -48,6 +48,8 @@ public enum ActionType: String, Codable, Sendable {
     case sessionCustomizationUpdated = "session/customizationUpdated"
     case sessionCustomizationRemoved = "session/customizationRemoved"
     case sessionMcpServerStateChanged = "session/mcpServerStateChanged"
+    case sessionMcpServerStartRequested = "session/mcpServerStartRequested"
+    case sessionMcpServerStopRequested = "session/mcpServerStopRequested"
     case chatTruncated = "chat/truncated"
     case chatTurnsLoaded = "chat/turnsLoaded"
     case sessionIsReadChanged = "session/isReadChanged"
@@ -1272,6 +1274,34 @@ public struct SessionMcpServerStateChangedAction: Codable, Sendable {
     }
 }
 
+public struct SessionMcpServerStartRequestedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The id of the {@link McpServerCustomization} to start.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
+    }
+}
+
+public struct SessionMcpServerStopRequestedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The id of the {@link McpServerCustomization} to stop.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
+    }
+}
+
 public struct ChatTruncatedAction: Codable, Sendable {
     public var type: ActionType
     /// Keep turns up to and including this turn. Omit to clear all turns.
@@ -1940,6 +1970,8 @@ public enum StateAction: Codable, Sendable {
     case sessionCustomizationUpdated(SessionCustomizationUpdatedAction)
     case sessionCustomizationRemoved(SessionCustomizationRemovedAction)
     case sessionMcpServerStateChanged(SessionMcpServerStateChangedAction)
+    case sessionMcpServerStartRequested(SessionMcpServerStartRequestedAction)
+    case sessionMcpServerStopRequested(SessionMcpServerStopRequestedAction)
     case chatTruncated(ChatTruncatedAction)
     case chatTurnsLoaded(ChatTurnsLoadedAction)
     case sessionConfigChanged(SessionConfigChangedAction)
@@ -2082,6 +2114,10 @@ public enum StateAction: Codable, Sendable {
             self = .sessionCustomizationRemoved(try SessionCustomizationRemovedAction(from: decoder))
         case "session/mcpServerStateChanged":
             self = .sessionMcpServerStateChanged(try SessionMcpServerStateChangedAction(from: decoder))
+        case "session/mcpServerStartRequested":
+            self = .sessionMcpServerStartRequested(try SessionMcpServerStartRequestedAction(from: decoder))
+        case "session/mcpServerStopRequested":
+            self = .sessionMcpServerStopRequested(try SessionMcpServerStopRequestedAction(from: decoder))
         case "chat/truncated":
             self = .chatTruncated(try ChatTruncatedAction(from: decoder))
         case "chat/turnsLoaded":
@@ -2205,6 +2241,8 @@ public enum StateAction: Codable, Sendable {
         case .sessionCustomizationUpdated(let v): try v.encode(to: encoder)
         case .sessionCustomizationRemoved(let v): try v.encode(to: encoder)
         case .sessionMcpServerStateChanged(let v): try v.encode(to: encoder)
+        case .sessionMcpServerStartRequested(let v): try v.encode(to: encoder)
+        case .sessionMcpServerStopRequested(let v): try v.encode(to: encoder)
         case .chatTruncated(let v): try v.encode(to: encoder)
         case .chatTurnsLoaded(let v): try v.encode(to: encoder)
         case .sessionConfigChanged(let v): try v.encode(to: encoder)

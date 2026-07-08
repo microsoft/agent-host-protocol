@@ -8,11 +8,12 @@ The channel concept is woven into every wire message. **Every command and every 
 
 | Direction | Methods | `channel` value |
 |---|---|---|
-| Client → Server commands (channel-scoped) | `subscribe`, `unsubscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, `canvasReadResource` | The target channel's URI (e.g. `ahp-session:/<uuid>`, or `ahp-canvas:/<id>` for `canvasReadResource`). |
+| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, `canvasReadResource` | The target channel's URI (e.g. `ahp-session:/<uuid>`, or `ahp-canvas:/<id>` for `canvasReadResource`). |
 | Client → Server commands (connection-level) | `initialize`, `ping`, `reconnect`, `listSessions`, `authenticate`, `resolveSessionConfig`, `sessionConfigCompletions`, `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | Literal `'ahp-root://'`. |
 | Server → Client commands (bidirectional `resource*` family) | The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins). | Literal `'ahp-root://'`. |
 | Server → Client commands (canvas provider family) | `canvasOpen`, `canvasInvokeAction`, `canvasClose` — initiated by the host against the client that declared the target canvas provider; mirrored in the client → server map for symmetry. See [Canvas Channel](/specification/canvas-channel). | The owning `ahp-session:/<uuid>` URI. |
 | Client → Server `dispatchAction` | The channel the action targets. |
+| Client → Server `unsubscribe` | The channel being unsubscribed. |
 | Server → Client `action` | The channel that owns the action envelope. |
 | Server → Client protocol notifications | `root/sessionAdded`, `root/sessionRemoved`, `root/sessionSummaryChanged`, `auth/required`, `otlp/exportLogs`, `otlp/exportTraces`, `otlp/exportMetrics` | The channel the notification scopes to (the root channel for `root/*`; the channel the auth requirement targets for `auth/required`; the host-defined `ahp-otlp:` channel URI for `otlp/*`). |
 
@@ -30,7 +31,7 @@ The rest of this page details the URI scheme and the lifecycle of a subscription
 | `ahp-terminal:/<id>` | `TerminalState` | Per-terminal state. Server-defined id. |
 | `ahp-changeset:/<id>` | `ChangesetState` | Per-changeset state. URI is obtained by expanding a `Changeset.uriTemplate` advertised on a session; the id is server-defined. |
 | `ahp-otlp:` _(authority/path host-defined)_ | _stateless_ | OpenTelemetry signal channels (logs, traces, metrics). Concrete URIs are advertised on `InitializeResult.telemetry`; clients MUST treat them as opaque. See [Telemetry Channel](/specification/telemetry-channel). |
-| `ahp-resource-watch:/<id>` | `ResourceWatchState` | Per-watch channel returned by `createResourceWatch`. Delivers `resourceWatch/changed` actions for file/directory changes under the watched URI. The id is caller-chosen. |
+| `ahp-resource-watch:/<id>` | `ResourceWatchState` | Per-watch channel returned by `createResourceWatch`. Delivers `resourceWatch/changed` actions for file/directory changes under the watched URI. The id is receiver-assigned. |
 | `ahp-canvas:/<id>` | `CanvasState` | Per-open-canvas-instance state. URI is server-assigned and surfaced on `OpenCanvasRef.channel`; the id is opaque. See [Canvas Channel](/specification/canvas-channel). |
 
 Future channel types (LSP relay, MCP relay, …) introduce their own URI schemes. Clients MUST NOT subscribe to a scheme they do not understand.

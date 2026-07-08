@@ -112,6 +112,10 @@ pub enum ActionType {
     SessionCustomizationRemoved,
     #[serde(rename = "session/mcpServerStateChanged")]
     SessionMcpServerStateChanged,
+    #[serde(rename = "session/mcpServerStartRequested")]
+    SessionMcpServerStartRequested,
+    #[serde(rename = "session/mcpServerStopRequested")]
+    SessionMcpServerStopRequested,
     #[serde(rename = "chat/truncated")]
     ChatTruncated,
     #[serde(rename = "chat/turnsLoaded")]
@@ -1096,6 +1100,48 @@ pub struct SessionMcpServerStateChangedAction {
     pub channel: Option<Uri>,
 }
 
+/// Requests that the host start or restart an existing
+/// {@link McpServerCustomization}.
+///
+/// Locates the target entry by `id`, searching both the top-level
+/// customization list and the `children` array of every container. The
+/// reducer optimistically moves the server to
+/// {@link McpServerStatus.Starting | `starting`} and clears any previous
+/// {@link McpServerCustomization.channel | `channel`}; the host remains
+/// authoritative and SHOULD follow with
+/// {@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}
+/// once the server becomes ready, needs authentication, fails, or is
+/// rejected. Is a no-op when no matching `McpServerCustomization` is found.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMcpServerStartRequestedAction {
+    /// The id of the {@link McpServerCustomization} to start.
+    pub id: String,
+}
+
+/// Requests that the host stop an existing {@link McpServerCustomization}.
+///
+/// Locates the target entry by `id`, searching both the top-level
+/// customization list and the `children` array of every container. The
+/// reducer optimistically moves the server to
+/// {@link McpServerStatus.Stopped | `stopped`} and clears any previous
+/// {@link McpServerCustomization.channel | `channel`}. Replacing an
+/// {@link McpServerStatus.AuthRequired | `authRequired`} lifecycle state with
+/// `stopped` unblocks the server from waiting on authentication. If the host
+/// also raised session-level input-needed state solely for that MCP server, it
+/// SHOULD remove that input-needed entry when accepting the stop.
+///
+/// The host remains authoritative and MAY reject the action or follow with
+/// {@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}
+/// if the final lifecycle state differs. Is a no-op when no matching
+/// `McpServerCustomization` is found.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMcpServerStopRequestedAction {
+    /// The id of the {@link McpServerCustomization} to stop.
+    pub id: String,
+}
+
 /// Truncates a session's history. If `turnId` is provided, all turns after that
 /// turn are removed and the specified turn is kept. If `turnId` is omitted, all
 /// turns are removed.
@@ -1746,6 +1792,10 @@ pub enum StateAction {
     SessionCustomizationRemoved(SessionCustomizationRemovedAction),
     #[serde(rename = "session/mcpServerStateChanged")]
     SessionMcpServerStateChanged(Box<SessionMcpServerStateChangedAction>),
+    #[serde(rename = "session/mcpServerStartRequested")]
+    SessionMcpServerStartRequested(SessionMcpServerStartRequestedAction),
+    #[serde(rename = "session/mcpServerStopRequested")]
+    SessionMcpServerStopRequested(SessionMcpServerStopRequestedAction),
     #[serde(rename = "chat/truncated")]
     ChatTruncated(ChatTruncatedAction),
     #[serde(rename = "chat/turnsLoaded")]

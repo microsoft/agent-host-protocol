@@ -888,7 +888,15 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		}
 		return ReduceOutcomeNoOp
 	case *ahptypes.SessionMcpServerStateChangedAction:
-		return applyMcpServerStatusChanged(state, a)
+		return updateMcpServerCustomizationState(state, a.Id, a.State, a.Channel)
+	case *ahptypes.SessionMcpServerStartRequestedAction:
+		return updateMcpServerCustomizationState(state, a.Id, ahptypes.McpServerState{Value: &ahptypes.McpServerStartingState{
+			Kind: ahptypes.McpServerStatusStarting,
+		}}, nil)
+	case *ahptypes.SessionMcpServerStopRequestedAction:
+		return updateMcpServerCustomizationState(state, a.Id, ahptypes.McpServerState{Value: &ahptypes.McpServerStoppedState{
+			Kind: ahptypes.McpServerStatusStopped,
+		}}, nil)
 	}
 	return ReduceOutcomeOutOfScope
 }
@@ -1180,22 +1188,22 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 	})
 }
 
-func applyMcpServerStatusChanged(state *ahptypes.SessionState, a *ahptypes.SessionMcpServerStateChangedAction) ReduceOutcome {
+func updateMcpServerCustomizationState(state *ahptypes.SessionState, id string, nextState ahptypes.McpServerState, channel *ahptypes.URI) ReduceOutcome {
 	list := state.Customizations
 	if list == nil {
 		return ReduceOutcomeNoOp
 	}
 	for i := range list {
 		got, ok := customizationID(list[i])
-		if !ok || got != a.Id {
+		if !ok || got != id {
 			continue
 		}
 		mcp, ok := list[i].Value.(*ahptypes.McpServerCustomization)
 		if !ok {
 			return ReduceOutcomeNoOp
 		}
-		mcp.State = a.State
-		mcp.Channel = a.Channel
+		mcp.State = nextState
+		mcp.Channel = channel
 		return ReduceOutcomeApplied
 	}
 	for i := range list {
@@ -1205,15 +1213,15 @@ func applyMcpServerStatusChanged(state *ahptypes.SessionState, a *ahptypes.Sessi
 		}
 		for j := range *children {
 			got, ok := childCustomizationID((*children)[j])
-			if !ok || got != a.Id {
+			if !ok || got != id {
 				continue
 			}
 			mcp, ok := (*children)[j].Value.(*ahptypes.McpServerCustomization)
 			if !ok {
 				return ReduceOutcomeNoOp
 			}
-			mcp.State = a.State
-			mcp.Channel = a.Channel
+			mcp.State = nextState
+			mcp.Channel = channel
 			return ReduceOutcomeApplied
 		}
 	}

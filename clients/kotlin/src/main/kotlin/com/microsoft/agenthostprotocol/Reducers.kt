@@ -675,14 +675,46 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
 
     is StateActionSessionMcpServerStateChanged -> {
         val a = action.value
+        updateMcpServerCustomizationState(state, a.id, a.state, a.channel)
+    }
+
+    is StateActionSessionMcpServerStartRequested -> {
+        val a = action.value
+        updateMcpServerCustomizationState(
+            state,
+            a.id,
+            McpServerStateStarting(McpServerStartingState(McpServerStatus.STARTING)),
+            null
+        )
+    }
+
+    is StateActionSessionMcpServerStopRequested -> {
+        val a = action.value
+        updateMcpServerCustomizationState(
+            state,
+            a.id,
+            McpServerStateStopped(McpServerStoppedState(McpServerStatus.STOPPED)),
+            null
+        )
+    }
+
+    else -> state
+}
+
+private fun updateMcpServerCustomizationState(
+    state: SessionState,
+    id: String,
+    nextState: McpServerState,
+    channel: URI?
+): SessionState {
         val list = state.customizations
-        if (list == null) state else {
-            val topIdx = list.indexOfFirst { customizationId(it) == a.id }
+    return if (list == null) state else {
+            val topIdx = list.indexOfFirst { customizationId(it) == id }
             if (topIdx >= 0) {
                 val entry = list[topIdx]
                 if (entry !is CustomizationMcpServer) state else {
                     val updated = list.toMutableList()
-                    updated[topIdx] = CustomizationMcpServer(entry.value.copy(state = a.state, channel = a.channel))
+                    updated[topIdx] = CustomizationMcpServer(entry.value.copy(state = nextState, channel = channel))
                     state.copy(customizations = updated)
                 }
             } else {
@@ -690,13 +722,13 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 val updated = list.map { container ->
                     val children = customizationChildren(container)
                     if (children == null) container else {
-                        val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
+                        val childIdx = children.indexOfFirst { childCustomizationId(it) == id }
                         if (childIdx < 0) container else {
                             val child = children[childIdx]
                             if (child !is ChildCustomizationMcpServer) container else {
                                 changed = true
                                 val newChildren = children.toMutableList()
-                                newChildren[childIdx] = ChildCustomizationMcpServer(child.value.copy(state = a.state, channel = a.channel))
+                                newChildren[childIdx] = ChildCustomizationMcpServer(child.value.copy(state = nextState, channel = channel))
                                 withCustomizationChildren(container, newChildren)
                             }
                         }
@@ -705,9 +737,6 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 if (!changed) state else state.copy(customizations = updated)
             }
         }
-    }
-
-    else -> state
 }
 
 // ─── Chat Reducer ───────────────────────────────────────────────────────────

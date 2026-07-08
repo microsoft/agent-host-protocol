@@ -158,7 +158,7 @@ Emitted when any mutable field on an existing [`SessionSummary`](/reference/sess
 }
 ```
 
-Servers MAY coalesce or debounce this notification for noisy fields — for example, rapid `modifiedAt` bumps during a streaming turn, or frequent `diffs` updates during an edit burst. Clients that have no cached entry for `session` MAY ignore the notification.
+Servers MAY coalesce or debounce this notification for noisy fields — for example, rapid `modifiedAt` bumps during a streaming turn, or frequent `changes` updates during an edit burst. Clients that have no cached entry for `session` MAY ignore the notification.
 
 Like all protocol notifications, the `root/*` events are ephemeral and are **not** replayed on reconnect. After reconnecting, clients SHOULD re-fetch the catalogue via [`listSessions`](/reference/root#listsessions).
 

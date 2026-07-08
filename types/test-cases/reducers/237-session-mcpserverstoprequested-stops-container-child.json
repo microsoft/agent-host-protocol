@@ -1,0 +1,82 @@
+{
+  "description": "session/mcpServerStopRequested moves a nested McpServer customization to stopped and clears its channel",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "plugin",
+        "id": "plugin-a",
+        "uri": "https://plugins.example/a",
+        "name": "Plugin A",
+        "enabled": true,
+        "children": [
+          {
+            "type": "skill",
+            "id": "skill-1",
+            "uri": "https://plugins.example/a#skills/lint",
+            "name": "lint"
+          },
+          {
+            "type": "mcpServer",
+            "id": "mcp-child",
+            "uri": "https://plugins.example/a#mcp/search",
+            "name": "Search",
+            "enabled": true,
+            "state": {
+              "kind": "ready"
+            },
+            "channel": "mcp://search"
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/mcpServerStopRequested",
+      "id": "mcp-child"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "plugin",
+        "id": "plugin-a",
+        "uri": "https://plugins.example/a",
+        "name": "Plugin A",
+        "enabled": true,
+        "children": [
+          {
+            "type": "skill",
+            "id": "skill-1",
+            "uri": "https://plugins.example/a#skills/lint",
+            "name": "lint"
+          },
+          {
+            "type": "mcpServer",
+            "id": "mcp-child",
+            "uri": "https://plugins.example/a#mcp/search",
+            "name": "Search",
+            "enabled": true,
+            "state": {
+              "kind": "stopped"
+            },
+            "channel": null
+          }
+        ]
+      }
+    ]
+  }
+}

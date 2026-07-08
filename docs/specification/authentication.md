@@ -122,7 +122,7 @@ The RFC 9728 `resource` field is already a unique identifier for the protected r
 
 When a command fails because the client has not authenticated for a required protected resource, the server SHOULD return error code `-32007` (`AuthRequired`). This error MAY be returned from **any** command — not just `authenticate`.
 
-The `data` field of the JSON-RPC error SHOULD contain a `ProtectedResourceMetadata[]` array describing the resources that require authentication. This allows clients to handle authentication programmatically:
+The `data` field of the JSON-RPC error MUST be an `AuthRequiredErrorData` object (`{ resources: ProtectedResourceMetadata[] }`) describing the resources that require authentication. This allows clients to handle authentication programmatically:
 
 ```jsonc
 // Client → Server
@@ -140,14 +140,16 @@ The `data` field of the JSON-RPC error SHOULD contain a `ProtectedResourceMetada
   "error": {
     "code": -32007,
     "message": "Authentication required for GitHub Copilot",
-    "data": [
-      {
-        "resource": "https://api.github.com",
-        "resource_name": "GitHub Copilot",
-        "authorization_servers": ["https://github.com/login/oauth"],
-        "scopes_supported": ["read:user", "user:email"]
-      }
-    ]
+    "data": {
+      "resources": [
+        {
+          "resource": "https://api.github.com",
+          "resource_name": "GitHub Copilot",
+          "authorization_servers": ["https://github.com/login/oauth"],
+          "scopes_supported": ["read:user", "user:email"]
+        }
+      ]
+    }
   }
 }
 ```

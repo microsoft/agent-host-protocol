@@ -42,6 +42,11 @@ McpServerCustomization {
 
 `enabled` follows the same model as any other container — it's toggled with `session/customizationToggled`. Disabling a server signals the host to stop it; the host then transitions the runtime through `stopped` and removes it from the session (or leaves it as `stopped` until removal, host's choice).
 
+Clients can also ask the host to manage the server process without changing the customization's enabled intent:
+
+- [`session/mcpServerStartRequested`](/reference/session#sessionmcpserverstartrequestedaction) asks the host to start or restart an existing MCP server customization. Reducers optimistically move the server to `starting` and clear any stale `channel`; the host remains authoritative and follows with `session/mcpServerStateChanged`.
+- [`session/mcpServerStopRequested`](/reference/session#sessionmcpserverstoprequestedaction) asks the host to stop an existing MCP server customization. Reducers optimistically move the server to `stopped` and clear any stale `channel`. Stopping an `authRequired` server unblocks it from waiting on authentication; if the host raised session-level input solely for that server, it should remove that input-needed entry when accepting the stop.
+
 ## Runtime status
 
 `state` is a [discriminated union on `kind`](/reference/session#mcpserverstatus). It is the host's view of the server's lifecycle, separate from `enabled` (which is the user's intent).
@@ -56,15 +61,16 @@ stateDiagram-v2
 
     ready --> authRequired : token expired / step-up
     ready --> error : crashed
-    ready --> stopped : disabled or removed
+    ready --> stopped : disabled, stop requested, or removed
 
     authRequired --> ready : authenticate succeeded
     authRequired --> error : auth abandoned / fatal
-    authRequired --> stopped : disabled
+    authRequired --> stopped : disabled or stop requested
 
-    error --> starting : retry
+    error --> starting : retry or start requested
     error --> stopped : removed
 
+    stopped --> starting : start requested
     stopped --> [*]
 ```
 
@@ -76,7 +82,7 @@ stateDiagram-v2
 | `error` | Unrecoverable failure. Carries an `ErrorInfo`. Use `authRequired` for auth-specific failures. |
 | `stopped` | Shut down. The host MAY remove the entry shortly after. |
 
-High-frequency lifecycle transitions go through the narrow [`session/mcpServerStateChanged`](/reference/session#sessionmcpserverstatuschangedaction) action, which upserts just `state` (and optionally `channel`) on an existing entry. Use `session/customizationUpdated` for anything else (name, icons, `mcpApp`).
+High-frequency lifecycle transitions go through the narrow [`session/mcpServerStateChanged`](/reference/session#sessionmcpserverstatuschangedaction) action, which upserts just `state` (and optionally `channel`) on an existing entry. Client start/stop intent goes through `session/mcpServerStartRequested` and `session/mcpServerStopRequested`; use `session/customizationUpdated` for anything else (name, icons, `mcpApp`).
 
 ## Authentication
 

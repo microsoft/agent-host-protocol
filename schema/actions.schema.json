@@ -581,6 +581,40 @@
         "state"
       ]
     },
+    "SessionMcpServerStartRequestedAction": {
+      "type": "object",
+      "description": "Requests that the host start or restart an existing\n{@link McpServerCustomization}.\n\nLocates the target entry by `id`, searching both the top-level\ncustomization list and the `children` array of every container. The\nreducer optimistically moves the server to\n{@link McpServerStatus.Starting | `starting`} and clears any previous\n{@link McpServerCustomization.channel | `channel`}; the host remains\nauthoritative and SHOULD follow with\n{@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}\nonce the server becomes ready, needs authentication, fails, or is\nrejected. Is a no-op when no matching `McpServerCustomization` is found.",
+      "properties": {
+        "type": {
+          "const": "session/mcpServerStartRequested"
+        },
+        "id": {
+          "type": "string",
+          "description": "The id of the {@link McpServerCustomization} to start."
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ]
+    },
+    "SessionMcpServerStopRequestedAction": {
+      "type": "object",
+      "description": "Requests that the host stop an existing {@link McpServerCustomization}.\n\nLocates the target entry by `id`, searching both the top-level\ncustomization list and the `children` array of every container. The\nreducer optimistically moves the server to\n{@link McpServerStatus.Stopped | `stopped`} and clears any previous\n{@link McpServerCustomization.channel | `channel`}. Replacing an\n{@link McpServerStatus.AuthRequired | `authRequired`} lifecycle state with\n`stopped` unblocks the server from waiting on authentication. If the host\nalso raised session-level input-needed state solely for that MCP server, it\nSHOULD remove that input-needed entry when accepting the stop.\n\nThe host remains authoritative and MAY reject the action or follow with\n{@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}\nif the final lifecycle state differs. Is a no-op when no matching\n`McpServerCustomization` is found.",
+      "properties": {
+        "type": {
+          "const": "session/mcpServerStopRequested"
+        },
+        "id": {
+          "type": "string",
+          "description": "The id of the {@link McpServerCustomization} to stop."
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ]
+    },
     "SessionConfigChangedAction": {
       "type": "object",
       "description": "Client changed a mutable config value mid-session.\n\nOnly properties with `sessionMutable: true` in the config schema may be\nchanged. The server validates and broadcasts the action; the reducer merges\nthe new values into `state.config.values`.",
@@ -3738,6 +3772,10 @@
         },
         "type": {
           "const": "plugin"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the plugin, sourced from the\n[Open Plugins](https://open-plugins.com/) manifest's optional\n`version` field (semver, e.g. `\"1.2.0\"`). Absent when the manifest\ndeclares no version — the field is optional there — or the source\nhas no version concept. Provenance / display only: the host neither\nparses nor enforces it."
         }
       },
       "required": [
@@ -3796,6 +3834,10 @@
         },
         "type": {
           "const": "plugin"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the plugin, sourced from the\n[Open Plugins](https://open-plugins.com/) manifest's optional\n`version` field (semver, e.g. `\"1.2.0\"`). Absent when the manifest\ndeclares no version — the field is optional there — or the source\nhas no version concept. Provenance / display only: the host neither\nparses nor enforces it."
         },
         "nonce": {
           "type": "string",
@@ -6152,6 +6194,38 @@
         "title"
       ]
     },
+    "ToolResultTerminalCompleteContent": {
+      "type": "object",
+      "description": "Record of a command executed by a terminal-style tool (e.g. a shell tool),\nappended to the tool result when the command exits.\n\nThis records the command's exit, not the terminal's — the terminal may\nkeep running afterwards.\n\nWhen live output was exposed through a terminal channel (a\n{@link ToolResultTerminalContent} block in the same tool result),\n{@link resource} identifies that channel; otherwise this block stands alone\nas the retained command result.",
+      "properties": {
+        "type": {
+          "const": "terminalComplete"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the `ahp-terminal:` channel that carried live output for this\ncommand, if one was exposed."
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Exit code from the completed command, if reported by the runtime"
+        },
+        "cwd": {
+          "$ref": "#/$defs/URI",
+          "description": "Working directory where the command was executed"
+        },
+        "preview": {
+          "type": "string",
+          "description": "Preview of the command's output, if available"
+        },
+        "truncated": {
+          "type": "boolean",
+          "description": "Whether `preview` is known to be incomplete or truncated"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
     "ToolResultSubagentContent": {
       "type": "object",
       "description": "A reference, embedded in a tool result, to a worker chat spawned by the tool\ncall (a sub-agent delegation), referenced by a chat URI (`ahp-chat:/...`).\n\nThis is the spawning tool call's forward view of the worker. The worker chat\nrecords the same edge in reverse via its {@link ChatOrigin} (`kind: 'tool'`),\nwhose `toolCallId` identifies the tool call that emitted this content.",
@@ -7107,10 +7181,13 @@
           "$ref": "#/$defs/ToolResultTerminalContent"
         },
         {
+          "$ref": "#/$defs/ToolResultTerminalCompleteContent"
+        },
+        {
           "$ref": "#/$defs/ToolResultSubagentContent"
         }
       ],
-      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`ToolResultResourceContent` for lazy-loading large results,\n`ToolResultFileEditContent` for file edit diffs,\n`ToolResultTerminalContent` for live terminal output, and\n`ToolResultSubagentContent` for tool-spawned worker chats (AHP extensions)."
+      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`ToolResultResourceContent` for lazy-loading large results,\n`ToolResultFileEditContent` for file edit diffs,\n`ToolResultTerminalContent` for live terminal output,\n`ToolResultTerminalCompleteContent` for terminal-style completion metadata, and\n`ToolResultSubagentContent` for tool-spawned worker chats (AHP extensions)."
     },
     "TerminalClaim": {
       "oneOf": [
@@ -7202,6 +7279,12 @@
         },
         {
           "$ref": "#/$defs/SessionMcpServerStateChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionMcpServerStartRequestedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionMcpServerStopRequestedAction"
         },
         {
           "$ref": "#/$defs/SessionIsReadChangedAction"

@@ -33,9 +33,6 @@ Changeset {
    * `'turn'`, or `'compare-turns'`. Other values allowed.
    */
   changeKind: string
-  additions?: number
-  deletions?: number
-  files?: number
 }
 ```
 
@@ -85,8 +82,7 @@ of the changeset URI:
 | `changeset/contentChanged`          | No                   | Full replacement of files, optionally with operations or error details.      |
 | `changeset/operationsChanged`       | No                   | The set of available `operations` changed.                                   |
 | `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |
-| `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched).                                    |
-| `changeset/disposed`                | No                   | The changeset URI is no longer subscribable.                                 |
+| `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched, or the owning session ended).       |
 
 ### Changeset Operations
 
@@ -111,9 +107,10 @@ ChangesetOperation {
   /**
    * Execution status of the operation. The server sets `'running'` while
    * an invocation is in flight, `'error'` (with `error`) when the most
-   * recent invocation failed, and `'idle'` otherwise.
+   * recent invocation failed, `'disabled'` when the operation cannot
+   * currently be invoked, and `'idle'` otherwise.
    */
-  status: 'idle' | 'running' | 'error'
+  status: 'idle' | 'running' | 'error' | 'disabled'
   /** Present iff `status === 'error'`. */
   error?: ErrorInfo
 }
@@ -134,7 +131,7 @@ through the normal `changeset/*` action stream.
 
 ```typescript
 invokeChangesetOperation(params: {
-  changeset: URI
+  channel: URI
   operationId: string
   target?:
     | { kind: ChangesetOperationTargetKind.Resource; resource: URI; side?: 'before' | 'after' }
@@ -169,7 +166,7 @@ a JSON-RPC error.
    `invokeChangesetOperation`. The server applies the operation and
    emits any resulting changeset updates.
 5. When a session ends, all of its changesets implicitly become
-   un-subscribable. Existing subscriptions receive `changeset/disposed`
+   un-subscribable. Existing subscriptions receive `changeset/cleared`
    and the server unsubscribes them.
 
 ## Migration from v0.1.0

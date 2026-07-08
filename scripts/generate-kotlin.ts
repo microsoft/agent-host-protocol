@@ -736,6 +736,7 @@ sealed interface ToolResultContent {
     @JvmInline value class Resource(val value: ToolResultResourceContent) : ToolResultContent
     @JvmInline value class FileEdit(val value: ToolResultFileEditContent) : ToolResultContent
     @JvmInline value class Terminal(val value: ToolResultTerminalContent) : ToolResultContent
+    @JvmInline value class TerminalComplete(val value: ToolResultTerminalCompleteContent) : ToolResultContent
     @JvmInline value class Subagent(val value: ToolResultSubagentContent) : ToolResultContent
 
     /**
@@ -765,6 +766,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
             "resource" -> ToolResultContent.Resource(input.json.decodeFromJsonElement(ToolResultResourceContent.serializer(), element))
             "fileEdit" -> ToolResultContent.FileEdit(input.json.decodeFromJsonElement(ToolResultFileEditContent.serializer(), element))
             "terminal" -> ToolResultContent.Terminal(input.json.decodeFromJsonElement(ToolResultTerminalContent.serializer(), element))
+            "terminalComplete" -> ToolResultContent.TerminalComplete(input.json.decodeFromJsonElement(ToolResultTerminalCompleteContent.serializer(), element))
             "subagent" -> ToolResultContent.Subagent(input.json.decodeFromJsonElement(ToolResultSubagentContent.serializer(), element))
             else -> ToolResultContent.Unknown(obj)
         }
@@ -779,6 +781,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
             is ToolResultContent.Resource -> output.json.encodeToJsonElement(ToolResultResourceContent.serializer(), value.value)
             is ToolResultContent.FileEdit -> output.json.encodeToJsonElement(ToolResultFileEditContent.serializer(), value.value)
             is ToolResultContent.Terminal -> output.json.encodeToJsonElement(ToolResultTerminalContent.serializer(), value.value)
+            is ToolResultContent.TerminalComplete -> output.json.encodeToJsonElement(ToolResultTerminalCompleteContent.serializer(), value.value)
             is ToolResultContent.Subagent -> output.json.encodeToJsonElement(ToolResultSubagentContent.serializer(), value.value)
             is ToolResultContent.Unknown -> value.raw
         }
@@ -832,7 +835,8 @@ const STATE_STRUCTS = [
   'ToolCallCancelledState', 'ConfirmationOption', 'ToolDefinition', 'ToolAnnotations',
   'ToolResultTextContent', 'ToolResultEmbeddedResourceContent',
   'ToolResultResourceContent', 'ToolResultFileEditContent',
-  'ToolResultTerminalContent', 'ToolResultSubagentContent',
+  'ToolResultTerminalContent', 'ToolResultTerminalCompleteContent',
+  'ToolResultSubagentContent',
   'CustomizationLoadingState', 'CustomizationLoadedState',
   'CustomizationDegradedState', 'CustomizationErrorState',
   'PluginCustomization', 'ClientPluginCustomization', 'DirectoryCustomization',
@@ -1230,6 +1234,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/customizationUpdated', caseName: 'SessionCustomizationUpdated', tsInterface: 'SessionCustomizationUpdatedAction' },
   { type: 'session/customizationRemoved', caseName: 'SessionCustomizationRemoved', tsInterface: 'SessionCustomizationRemovedAction' },
   { type: 'session/mcpServerStateChanged', caseName: 'SessionMcpServerStateChanged', tsInterface: 'SessionMcpServerStateChangedAction' },
+  { type: 'session/mcpServerStartRequested', caseName: 'SessionMcpServerStartRequested', tsInterface: 'SessionMcpServerStartRequestedAction' },
+  { type: 'session/mcpServerStopRequested', caseName: 'SessionMcpServerStopRequested', tsInterface: 'SessionMcpServerStopRequestedAction' },
   { type: 'chat/truncated', caseName: 'ChatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', caseName: 'ChatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
   { type: 'session/configChanged', caseName: 'SessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },

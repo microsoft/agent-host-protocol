@@ -70,8 +70,7 @@ Session creation uses an imperative RPC command:
   "method": "createSession",
   "params": {
     "channel": "ahp-session:/<uuid>",
-    "provider": "copilot",
-    "model": "gpt-4o"
+    "provider": "copilot"
   }
 }
 
@@ -168,7 +167,7 @@ The client resolves a `pending-confirmation` tool call by dispatching `chat/tool
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "approved": true,
-      "confirmed": "user"
+      "confirmed": "user-action"
     }
   }
 }

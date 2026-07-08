@@ -22,11 +22,11 @@ AgentInfo {
   provider: string         // e.g. 'copilot'
   displayName: string
   description: string
-  models: ModelInfo[]
-  customizations?: CustomizationRef[]  // Open Plugins
+  models: SessionModelInfo[]
+  customizations?: Customization[]  // Open Plugins
 }
 
-ModelInfo {
+SessionModelInfo {
   id: string
   provider: string
   name: string
@@ -255,7 +255,7 @@ Resource and embedded-resource attachments MAY also include `selection` to ident
 
 Use `SimpleMessageAttachment` for opaque attachments whose model representation is supplied by the producer, `MessageEmbeddedResourceAttachment` for small inline base64 payloads (e.g. a pasted image), and `MessageResourceAttachment` to reference a resource by URI (the content is fetched via `resourceRead` when needed).
 
-`UserMessage._meta` carries additional provider-specific metadata for the message itself (independent of any attachment `_meta` blob). Clients MAY look for well-known keys here to provide enhanced UI, and agent hosts MAY use it to carry context that does not fit any other field. Mirrors the [MCP `_meta` convention](https://modelcontextprotocol.io/specification/2025-06-18/basic#meta).
+`Message._meta` carries additional provider-specific metadata for the message itself (independent of any attachment `_meta` blob). Clients MAY look for well-known keys here to provide enhanced UI, and agent hosts MAY use it to carry context that does not fit any other field. Mirrors the [MCP `_meta` convention](https://modelcontextprotocol.io/specification/2025-06-18/basic#meta).
 
 Attachments produced by the [`completions`](#user-message-completions) command MAY include a `_meta` blob; clients MUST preserve every property of `_meta` when echoing the attachment back in the user message.
 
@@ -266,7 +266,7 @@ To support `@`-mention pickers and similar inline-completion experiences, the cl
 ```typescript
 CompletionsParams {
   kind: 'userMessage'      // CompletionItemKind.UserMessage
-  session: URI
+  channel: URI
   text: string             // full text typed so far
   offset: number           // cursor offset (UTF-16 code units)
 }
@@ -315,7 +315,7 @@ ContentRef {
   kind: 'contentRef'
   uri: string              // scheme://sessionId/contentId
   sizeHint?: number
-  mimeType?: string
+  contentType?: string
 }
 ```
 

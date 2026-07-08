@@ -14,12 +14,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## Protocol Version
 
-The current protocol version is **1**. The version is a single integer that increments when new features require capability negotiation or behavioral semantics change.
-
-```
-Version history:
-  1 — Initial: core session lifecycle, streaming, tools, permissions
-```
+Protocol versions are [SemVer](https://semver.org) `MAJOR.MINOR.PATCH` strings; see the [GitHub Releases](https://github.com/microsoft/agent-host-protocol/releases) page for the current published version. Peers negotiate a shared version at initialization: the client offers `InitializeParams.protocolVersions` (an array, most-preferred first) and the server selects one and returns it as `InitializeResult.protocolVersion`.
 
 See [Versioning](/specification/versioning) for the full version strategy.
 

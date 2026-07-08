@@ -82,7 +82,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `session/titleChanged` | **Yes** | Session title updated (auto-generated or client rename) |
 | `session/activityChanged` | No | Server updated the session's current activity description |
 | `chat/activityChanged` | No | Server updated a chat's current activity description |
-| `session/diffsChanged` | No | File diffs in the session summary changed (full replacement) |
+| `session/changesetsChanged` | No | The catalog of changesets the host advertises for this session changed (full replacement) |
 | `session/isReadChanged` | **Yes** | Client marked session as read or unread |
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |
 | `session/configChanged` | **Yes** | Mutable session config values changed |
@@ -194,7 +194,6 @@ The client applies the action **optimistically** to its local state before sendi
 | `session/customizationToggled` | Toggles a container or child customization on or off by id |
 | `session/isReadChanged` | Marks the session as read or unread |
 | `session/isArchivedChanged` | Archives or unarchives the session |
-| `session/activityChanged` | Updates the session's current activity description |
 
 ## Reducers
 

@@ -1,0 +1,52 @@
+{
+  "description": "session/mcpServerStartRequested moves a top-level McpServer customization to starting and clears its channel",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "enabled": true,
+        "state": {
+          "kind": "ready"
+        },
+        "channel": "mcp://filesystem"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/mcpServerStartRequested",
+      "id": "mcp-1"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "enabled": true,
+        "state": {
+          "kind": "starting"
+        },
+        "channel": null
+      }
+    ]
+  }
+}

@@ -705,31 +705,23 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         return state
 
     case .sessionMcpServerStateChanged(let a):
-        guard var list = state.customizations else { return state }
-        if let topIdx = list.firstIndex(where: { customizationId($0) == a.id }) {
-            guard case .mcpServer(var entry) = list[topIdx] else { return state }
-            entry.state = a.state
-            entry.channel = a.channel
-            list[topIdx] = .mcpServer(entry)
-            var next = state
-            next.customizations = list
-            return next
-        }
-        for containerIdx in list.indices {
-            var container = list[containerIdx]
-            guard var children = customizationChildren(container) else { continue }
-            guard let childIdx = children.firstIndex(where: { childId($0) == a.id }) else { continue }
-            guard case .mcpServer(var child) = children[childIdx] else { continue }
-            child.state = a.state
-            child.channel = a.channel
-            children[childIdx] = .mcpServer(child)
-            setCustomizationChildren(&container, children)
-            list[containerIdx] = container
-            var next = state
-            next.customizations = list
-            return next
-        }
-        return state
+        return updateMcpServerCustomizationState(state, id: a.id, state: a.state, channel: a.channel)
+
+    case .sessionMcpServerStartRequested(let a):
+        return updateMcpServerCustomizationState(
+            state,
+            id: a.id,
+            state: .starting(McpServerStartingState(kind: .starting)),
+            channel: nil
+        )
+
+    case .sessionMcpServerStopRequested(let a):
+        return updateMcpServerCustomizationState(
+            state,
+            id: a.id,
+            state: .stopped(McpServerStoppedState(kind: .stopped)),
+            channel: nil
+        )
 
     default:
         return state
@@ -753,6 +745,8 @@ public let clientDispatchableActions: Set<String> = [
     "chat/inputAnswerChanged",
     "chat/inputCompleted",
     "session/customizationToggled",
+    "session/mcpServerStartRequested",
+    "session/mcpServerStopRequested",
     "session/isReadChanged",
     "session/isArchivedChanged",
 ]
@@ -767,7 +761,9 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .chatPendingMessageSet,
          .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
          .chatInputAnswerChanged, .chatInputCompleted,
-         .sessionCustomizationToggled, .sessionIsReadChanged,
+         .sessionCustomizationToggled,
+         .sessionMcpServerStartRequested, .sessionMcpServerStopRequested,
+         .sessionIsReadChanged,
          .sessionIsArchivedChanged:
         return true
     default:
@@ -780,6 +776,39 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
 private func currentTimestamp() -> String {
     let date = Date(timeIntervalSince1970: Double(currentTimestampProvider()) / 1000)
     return iso8601TimestampFormatter.string(from: date)
+}
+
+private func updateMcpServerCustomizationState(
+    _ state: SessionState,
+    id: String,
+    state nextState: McpServerState,
+    channel: URI?
+) -> SessionState {
+    guard var list = state.customizations else { return state }
+    if let topIdx = list.firstIndex(where: { customizationId($0) == id }) {
+        guard case .mcpServer(var entry) = list[topIdx] else { return state }
+        entry.state = nextState
+        entry.channel = channel
+        list[topIdx] = .mcpServer(entry)
+        var next = state
+        next.customizations = list
+        return next
+    }
+    for containerIdx in list.indices {
+        var container = list[containerIdx]
+        guard var children = customizationChildren(container) else { continue }
+        guard let childIdx = children.firstIndex(where: { childId($0) == id }) else { continue }
+        guard case .mcpServer(var child) = children[childIdx] else { continue }
+        child.state = nextState
+        child.channel = channel
+        children[childIdx] = .mcpServer(child)
+        setCustomizationChildren(&container, children)
+        list[containerIdx] = container
+        var next = state
+        next.customizations = list
+        return next
+    }
+    return state
 }
 
 private func mergeChatSummaryChanges(_ summary: inout ChatSummary, changes: PartialChatSummary) {

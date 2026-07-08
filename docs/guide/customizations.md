@@ -231,7 +231,6 @@ A client registers its tools by including them in the `session/activeClientSet` 
 // Client joins as an active client with tools and customizations
 dispatch({
   type: 'session/activeClientSet',
-  session: sessionUri,
   activeClient: {
     clientId: 'my-client-id',
     displayName: 'VS Code',
@@ -260,7 +259,6 @@ To change its tool list, a client re-dispatches `session/activeClientSet` with i
 ```typescript
 dispatch({
   type: 'session/activeClientSet',
-  session: sessionUri,
   activeClient: {
     clientId: 'my-client-id',
     displayName: 'VS Code',

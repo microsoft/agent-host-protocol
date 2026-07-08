@@ -26,6 +26,8 @@ Implements AHP 0.5.2.
 
 ### Added
 
+- `ToolResultTerminalCompleteContent` for terminal-style completion metadata in tool
+  results.
 - Optional `enabled` field on the child customization types
   (`AgentCustomization`, `SkillCustomization`, `PromptCustomization`,
   `RuleCustomization`, `HookCustomization`).
@@ -40,6 +42,13 @@ Implements AHP 0.5.2.
   `InitializeParams`, each an `Implementation` (`name`, optional `version`,
   optional `title`), identifying the implementation and build behind either side
   of the handshake. Informational only — MUST NOT be used for feature detection.
+- Optional `version` field on `PluginCustomization` (inherited by
+  `ClientPluginCustomization`), carrying the plugin's semver sourced from the
+  Open Plugins manifest. Provenance / display only.
+- `session/mcpServerStartRequested` and `session/mcpServerStopRequested`
+  actions for clients to ask the host to start or stop MCP servers; stopping
+  moves an `authRequired` server to `stopped` so it no longer waits on
+  authentication.
 - Canvas channel support: the per-instance `CanvasState` plus the
   `CanvasUpdatedAction` (`canvas/updated`), `CanvasCloseRequestedAction`
   (`canvas/closeRequested`), and `CanvasMessageAction` (`canvas/message`)

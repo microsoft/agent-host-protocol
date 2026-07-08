@@ -116,7 +116,7 @@ Every terminal always has an owner. When a terminal is no longer needed, it shou
 
 ## Terminal Actions
 
-All terminal actions carry a `terminal: URI` field identifying the target terminal.
+Terminal actions travel on the terminal's channel; the target terminal is identified by the action envelope's `channel`, not a field on the action itself.
 
 ### Data Flow
 

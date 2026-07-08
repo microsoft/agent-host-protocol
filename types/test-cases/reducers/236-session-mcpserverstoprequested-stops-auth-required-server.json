@@ -1,0 +1,58 @@
+{
+  "description": "session/mcpServerStopRequested moves an auth-required top-level McpServer customization to stopped",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "enabled": true,
+        "state": {
+          "kind": "authRequired",
+          "reason": "required",
+          "resource": {
+            "resource": "https://mcp.example/filesystem",
+            "authorization_servers": [
+              "https://login.example"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/mcpServerStopRequested",
+      "id": "mcp-1"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "enabled": true,
+        "state": {
+          "kind": "stopped"
+        },
+        "channel": null
+      }
+    ]
+  }
+}

@@ -61,6 +61,8 @@ const (
 	ActionTypeSessionCustomizationUpdated       ActionType = "session/customizationUpdated"
 	ActionTypeSessionCustomizationRemoved       ActionType = "session/customizationRemoved"
 	ActionTypeSessionMcpServerStateChanged      ActionType = "session/mcpServerStateChanged"
+	ActionTypeSessionMcpServerStartRequested    ActionType = "session/mcpServerStartRequested"
+	ActionTypeSessionMcpServerStopRequested     ActionType = "session/mcpServerStopRequested"
 	ActionTypeChatTruncated                     ActionType = "chat/truncated"
 	ActionTypeChatTurnsLoaded                   ActionType = "chat/turnsLoaded"
 	ActionTypeSessionIsReadChanged              ActionType = "session/isReadChanged"
@@ -928,6 +930,46 @@ type SessionMcpServerStateChangedAction struct {
 	Channel *URI `json:"channel,omitempty"`
 }
 
+// Requests that the host start or restart an existing
+// {@link McpServerCustomization}.
+//
+// Locates the target entry by `id`, searching both the top-level
+// customization list and the `children` array of every container. The
+// reducer optimistically moves the server to
+// {@link McpServerStatus.Starting | `starting`} and clears any previous
+// {@link McpServerCustomization.channel | `channel`}; the host remains
+// authoritative and SHOULD follow with
+// {@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}
+// once the server becomes ready, needs authentication, fails, or is
+// rejected. Is a no-op when no matching `McpServerCustomization` is found.
+type SessionMcpServerStartRequestedAction struct {
+	Type ActionType `json:"type"`
+	// The id of the {@link McpServerCustomization} to start.
+	Id string `json:"id"`
+}
+
+// Requests that the host stop an existing {@link McpServerCustomization}.
+//
+// Locates the target entry by `id`, searching both the top-level
+// customization list and the `children` array of every container. The
+// reducer optimistically moves the server to
+// {@link McpServerStatus.Stopped | `stopped`} and clears any previous
+// {@link McpServerCustomization.channel | `channel`}. Replacing an
+// {@link McpServerStatus.AuthRequired | `authRequired`} lifecycle state with
+// `stopped` unblocks the server from waiting on authentication. If the host
+// also raised session-level input-needed state solely for that MCP server, it
+// SHOULD remove that input-needed entry when accepting the stop.
+//
+// The host remains authoritative and MAY reject the action or follow with
+// {@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}
+// if the final lifecycle state differs. Is a no-op when no matching
+// `McpServerCustomization` is found.
+type SessionMcpServerStopRequestedAction struct {
+	Type ActionType `json:"type"`
+	// The id of the {@link McpServerCustomization} to stop.
+	Id string `json:"id"`
+}
+
 // Client changed a mutable config value mid-session.
 //
 // Only properties with `sessionMutable: true` in the config schema may be
@@ -1417,6 +1459,8 @@ func (*SessionCustomizationToggledAction) isStateAction()       {}
 func (*SessionCustomizationUpdatedAction) isStateAction()       {}
 func (*SessionCustomizationRemovedAction) isStateAction()       {}
 func (*SessionMcpServerStateChangedAction) isStateAction()      {}
+func (*SessionMcpServerStartRequestedAction) isStateAction()    {}
+func (*SessionMcpServerStopRequestedAction) isStateAction()     {}
 func (*SessionConfigChangedAction) isStateAction()              {}
 func (*SessionMetaChangedAction) isStateAction()                {}
 func (*ChangesetStatusChangedAction) isStateAction()            {}
@@ -1765,6 +1809,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "session/mcpServerStateChanged":
 		var value SessionMcpServerStateChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/mcpServerStartRequested":
+		var value SessionMcpServerStartRequestedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/mcpServerStopRequested":
+		var value SessionMcpServerStopRequestedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

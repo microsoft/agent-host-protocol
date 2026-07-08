@@ -1666,6 +1666,10 @@
         },
         "type": {
           "const": "plugin"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the plugin, sourced from the\n[Open Plugins](https://open-plugins.com/) manifest's optional\n`version` field (semver, e.g. `\"1.2.0\"`). Absent when the manifest\ndeclares no version — the field is optional there — or the source\nhas no version concept. Provenance / display only: the host neither\nparses nor enforces it."
         }
       },
       "required": [
@@ -1724,6 +1728,10 @@
         },
         "type": {
           "const": "plugin"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the plugin, sourced from the\n[Open Plugins](https://open-plugins.com/) manifest's optional\n`version` field (semver, e.g. `\"1.2.0\"`). Absent when the manifest\ndeclares no version — the field is optional there — or the source\nhas no version concept. Provenance / display only: the host neither\nparses nor enforces it."
         },
         "nonce": {
           "type": "string",
@@ -4080,6 +4088,38 @@
         "title"
       ]
     },
+    "ToolResultTerminalCompleteContent": {
+      "type": "object",
+      "description": "Record of a command executed by a terminal-style tool (e.g. a shell tool),\nappended to the tool result when the command exits.\n\nThis records the command's exit, not the terminal's — the terminal may\nkeep running afterwards.\n\nWhen live output was exposed through a terminal channel (a\n{@link ToolResultTerminalContent} block in the same tool result),\n{@link resource} identifies that channel; otherwise this block stands alone\nas the retained command result.",
+      "properties": {
+        "type": {
+          "const": "terminalComplete"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of the `ahp-terminal:` channel that carried live output for this\ncommand, if one was exposed."
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Exit code from the completed command, if reported by the runtime"
+        },
+        "cwd": {
+          "$ref": "#/$defs/URI",
+          "description": "Working directory where the command was executed"
+        },
+        "preview": {
+          "type": "string",
+          "description": "Preview of the command's output, if available"
+        },
+        "truncated": {
+          "type": "boolean",
+          "description": "Whether `preview` is known to be incomplete or truncated"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
     "ToolResultSubagentContent": {
       "type": "object",
       "description": "A reference, embedded in a tool result, to a worker chat spawned by the tool\ncall (a sub-agent delegation), referenced by a chat URI (`ahp-chat:/...`).\n\nThis is the spawning tool call's forward view of the worker. The worker chat\nrecords the same edge in reverse via its {@link ChatOrigin} (`kind: 'tool'`),\nwhose `toolCallId` identifies the tool call that emitted this content.",
@@ -5035,10 +5075,13 @@
           "$ref": "#/$defs/ToolResultTerminalContent"
         },
         {
+          "$ref": "#/$defs/ToolResultTerminalCompleteContent"
+        },
+        {
           "$ref": "#/$defs/ToolResultSubagentContent"
         }
       ],
-      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`ToolResultResourceContent` for lazy-loading large results,\n`ToolResultFileEditContent` for file edit diffs,\n`ToolResultTerminalContent` for live terminal output, and\n`ToolResultSubagentContent` for tool-spawned worker chats (AHP extensions)."
+      "description": "Content block in a tool result.\n\nMirrors the content blocks in MCP `CallToolResult.content`, plus\n`ToolResultResourceContent` for lazy-loading large results,\n`ToolResultFileEditContent` for file edit diffs,\n`ToolResultTerminalContent` for live terminal output,\n`ToolResultTerminalCompleteContent` for terminal-style completion metadata, and\n`ToolResultSubagentContent` for tool-spawned worker chats (AHP extensions)."
     },
     "TerminalClaim": {
       "oneOf": [

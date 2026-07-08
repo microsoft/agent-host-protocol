@@ -946,6 +946,15 @@ interface ContainerCustomizationBase extends CustomizationBase {
  */
 export interface PluginCustomization extends ContainerCustomizationBase {
   type: CustomizationType.Plugin;
+  /**
+   * Version of the plugin, sourced from the
+   * [Open Plugins](https://open-plugins.com/) manifest's optional
+   * `version` field (semver, e.g. `"1.2.0"`). Absent when the manifest
+   * declares no version — the field is optional there — or the source
+   * has no version concept. Provenance / display only: the host neither
+   * parses nor enforces it.
+   */
+  version?: string;
 }
 
 /**
