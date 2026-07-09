@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Optional `_meta` slot on `SystemNotificationResponsePart`, following the MCP `_meta` convention. A host MAY attach a machine-readable descriptor of what triggered the notification so clients can categorize, icon, group, filter, or localize it without parsing `content`.",
+  "issues": [308]
+}

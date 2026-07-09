@@ -884,6 +884,16 @@ export interface SystemNotificationResponsePart {
   kind: ResponsePartKind.SystemNotification;
   /** The text of the system notification */
   content: StringOrMarkdown;
+  /**
+   * Additional provider-specific metadata for this notification.
+   *
+   * A host MAY attach a machine-readable descriptor of what triggered the
+   * notification so clients can categorize, icon, group, filter, or localize
+   * it without parsing `content`. Clients MAY look for well-known keys here to
+   * provide enhanced UI, and MUST render coherently from `content` alone when
+   * `_meta` is absent or unrecognized.
+   */
+  _meta?: Record<string, unknown>;
 }
 
 

@@ -324,6 +324,7 @@ ContentRef {
 SystemNotificationResponsePart {
   kind: 'systemNotification'
   content: StringOrMarkdown
+  _meta?: Record<string, unknown>   // machine-readable trigger metadata; see below
 }
 
 // Durable record of a resolved input request (see Input Requests below)
@@ -333,6 +334,8 @@ InputRequestResponsePart {
   response: ChatInputResponseKind  // 'accept' | 'decline' | 'cancel'
 }
 ```
+
+`SystemNotificationResponsePart._meta` carries provider-specific metadata describing what triggered the notification. A host MAY attach a machine-readable descriptor so clients can categorize, icon, group, filter, or localize the notification without parsing `content`. Clients MAY inspect well-known keys for enhanced UI, and MUST render coherently from `content` alone when `_meta` is absent or unrecognized.
 
 Text content uses a **create-then-append** pattern: the server first emits a `chat/responsePart` action to create a new markdown (or reasoning) part with an `id`, then streams text into it via `chat/delta` (or `chat/reasoning`) actions targeting that `partId`. This pattern is extensible to future streaming content types.
 

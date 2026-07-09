@@ -2291,13 +2291,29 @@ public struct SystemNotificationResponsePart: Codable, Sendable {
     public var kind: ResponsePartKind
     /// The text of the system notification
     public var content: StringOrMarkdown
+    /// Additional provider-specific metadata for this notification.
+    ///
+    /// A host MAY attach a machine-readable descriptor of what triggered the
+    /// notification so clients can categorize, icon, group, filter, or localize
+    /// it without parsing `content`. Clients MAY look for well-known keys here to
+    /// provide enhanced UI, and MUST render coherently from `content` alone when
+    /// `_meta` is absent or unrecognized.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case content
+        case meta = "_meta"
+    }
 
     public init(
         kind: ResponsePartKind,
-        content: StringOrMarkdown
+        content: StringOrMarkdown,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.kind = kind
         self.content = content
+        self.meta = meta
     }
 }
 

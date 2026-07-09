@@ -3211,6 +3211,11 @@
         "content": {
           "$ref": "#/$defs/StringOrMarkdown",
           "description": "The text of the system notification"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this notification.\n\nA host MAY attach a machine-readable descriptor of what triggered the\nnotification so clients can categorize, icon, group, filter, or localize\nit without parsing `content`. Clients MAY look for well-known keys here to\nprovide enhanced UI, and MUST render coherently from `content` alone when\n`_meta` is absent or unrecognized."
         }
       },
       "required": [
