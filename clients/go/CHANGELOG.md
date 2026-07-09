@@ -31,11 +31,18 @@ Implements AHP 0.5.2.
   `RuleCustomization`, `HookCustomization`).
 - `DisableUserInvocation` on `SkillCustomization`, plus `DisableModelInvocation`
   and `DisableUserInvocation` on `AgentCustomization`.
-- Optional `Reviewed` field on `ChangesetFile`. Omitting it (or setting it to
-  `nil`) signals that the server does not support the file "review"
-  functionality.
-- `changeset/filesReviewedChanged` action for servers to update the `Reviewed`
-  flag of one or more changeset files.
+- Optional `ReviewChanges` capability on `AgentInfo.Capabilities`
+  (`AgentCapabilities`). Its presence (an empty object `{}`) advertises that the
+  agent supports a rich "review changes" experience: a per-file reviewed flag
+  the user and host keep current as files are reviewed.
+- Optional `Reviewed` field on `ChangesetFile`, tracking whether the user has
+  reviewed ("viewed") a file. Meaningful only when the agent advertises the
+  `reviewChanges` capability; otherwise left `nil`.
+- `changeset/filesReviewedChanged` action to update the `Reviewed` flag of one
+  or more changeset files. Carries a `Files` array of `ChangesetReviewedFile`
+  (`Id` plus optional `Range`) entries, so a client can mark either a whole file
+  or a specific `TextRange` reviewed. Client-dispatchable — clients (and the
+  host) drive the review state — and gated on the `reviewChanges` capability.
 - Optional `Meta` (wire `_meta`) provider-metadata field on every customization
   type, moved from `AgentCustomization` up to the shared customization base so
   `PluginCustomization`, `ClientPluginCustomization`, `DirectoryCustomization`,

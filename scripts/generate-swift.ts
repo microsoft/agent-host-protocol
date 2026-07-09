@@ -593,7 +593,7 @@ const STATE_STRUCTS = [
   'TerminalClientClaim', 'TerminalSessionClaim', 'TerminalState',
   'TerminalUnclassifiedPart', 'TerminalCommandPart',
   'UsageInfo', 'ErrorInfo', 'Snapshot',
-  'Changeset', 'ChangesetState', 'ChangesetFile', 'ChangesetOperation',
+  'Changeset', 'ChangesetState', 'ChangesetFile', 'ChangesetReviewedFile', 'ChangesetOperation',
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',

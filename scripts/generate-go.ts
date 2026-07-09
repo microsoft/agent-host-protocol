@@ -761,6 +761,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'Changeset' },
   { name: 'ChangesetState' },
   { name: 'ChangesetFile' },
+  { name: 'ChangesetReviewedFile' },
   { name: 'ChangesetOperation' },
   { name: 'AnnotationsSummary' },
   { name: 'AnnotationsState' },

@@ -538,6 +538,11 @@
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
           "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nforking; set {@link MultipleChatsCapability.fork} to also allow forking."
+        },
+        "reviewChanges": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The agent supports a rich \"review changes\" experience: it tracks a\nper-file reviewed (a.k.a. \"viewed\") flag on the files of its\n{@link ChangesetFile | changeset files} and accepts client-dispatched\n`changeset/filesReviewedChanged` actions, so the user can mark files\nreviewed or unreviewed as they work through a diff.\n\nAn empty object `{}` advertises support. When absent, clients MUST NOT\ndispatch `changeset/filesReviewedChanged` and SHOULD NOT surface any\nreviewed/unreviewed affordance; the server leaves\n{@link ChangesetFile.reviewed} `undefined`."
         }
       }
     },
@@ -4263,7 +4268,7 @@
         },
         "reviewed": {
           "type": "boolean",
-          "description": "Whether the user has reviewed this file. Omit (or set to `undefined`)\nto indicate that the server does not support the \"review\" functionality;\nin that case clients should not surface any reviewed/unreviewed\naffordance for this file."
+          "description": "Whether the user has reviewed (a.k.a. \"viewed\") this file.\n\nOnly meaningful when the owning agent advertises the `reviewChanges`\ncapability ({@link AgentCapabilities.reviewChanges}); such servers seed\nthe flag and both they and clients keep it current by dispatching\n`changeset/filesReviewedChanged`. Omit (or set to `undefined`) when the\nagent does not support the \"review\" experience — in that case clients\nMUST NOT surface any reviewed/unreviewed affordance for this file."
         },
         "_meta": {
           "type": "object",

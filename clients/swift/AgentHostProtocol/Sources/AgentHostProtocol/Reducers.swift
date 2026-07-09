@@ -1126,7 +1126,7 @@ public func changesetReducer(state: ChangesetState, action: StateAction) -> Chan
         return next
 
     case .changesetFilesReviewedChanged(let a):
-        let ids = Set(a.fileIds)
+        let ids = Set(a.files.filter { $0.range == nil }.map { $0.id })
         var next = state
         var changed = false
         for idx in next.files.indices {

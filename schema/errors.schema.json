@@ -627,6 +627,11 @@
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
           "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nforking; set {@link MultipleChatsCapability.fork} to also allow forking."
+        },
+        "reviewChanges": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The agent supports a rich \"review changes\" experience: it tracks a\nper-file reviewed (a.k.a. \"viewed\") flag on the files of its\n{@link ChangesetFile | changeset files} and accepts client-dispatched\n`changeset/filesReviewedChanged` actions, so the user can mark files\nreviewed or unreviewed as they work through a diff.\n\nAn empty object `{}` advertises support. When absent, clients MUST NOT\ndispatch `changeset/filesReviewedChanged` and SHOULD NOT surface any\nreviewed/unreviewed affordance; the server leaves\n{@link ChangesetFile.reviewed} `undefined`."
         }
       }
     },
@@ -4352,7 +4357,7 @@
         },
         "reviewed": {
           "type": "boolean",
-          "description": "Whether the user has reviewed this file. Omit (or set to `undefined`)\nto indicate that the server does not support the \"review\" functionality;\nin that case clients should not surface any reviewed/unreviewed\naffordance for this file."
+          "description": "Whether the user has reviewed (a.k.a. \"viewed\") this file.\n\nOnly meaningful when the owning agent advertises the `reviewChanges`\ncapability ({@link AgentCapabilities.reviewChanges}); such servers seed\nthe flag and both they and clients keep it current by dispatching\n`changeset/filesReviewedChanged`. Omit (or set to `undefined`) when the\nagent does not support the \"review\" experience — in that case clients\nMUST NOT surface any reviewed/unreviewed affordance for this file."
         },
         "_meta": {
           "type": "object",
@@ -8094,17 +8099,17 @@
     },
     "ChangesetFilesReviewedChangedAction": {
       "type": "object",
-      "description": "Update the {@link ChangesetFile.reviewed} flag for one or more files,\nidentified by their {@link ChangesetFile.id}.\n\nDispatched by the server as the user marks files reviewed or unreviewed\n(e.g. toggling a single file, or a \"mark all as reviewed\" affordance).\nOnly servers that support the \"review\" functionality dispatch this; a\nserver that leaves {@link ChangesetFile.reviewed} `undefined` never does.\n\nThe reducer sets `reviewed` on every matching file and ignores any\n`fileIds` entry that does not correspond to a current file.",
+      "description": "Update the {@link ChangesetFile.reviewed} flag for one or more files,\neach identified by its {@link ChangesetFile.id} and optionally narrowed to a\n{@link ChangesetReviewedFile.range | range}.\n\nDispatched as the user marks files reviewed or unreviewed (e.g. toggling a\nsingle file, marking a range as read, or a \"mark all as reviewed\"\naffordance). Clients dispatch it directly — applying the change\noptimistically — to drive a rich review experience, and the agent host MAY\nalso originate it (e.g. auto-marking a file reviewed once its diff has\nscrolled past). Only meaningful when the agent advertises the\n`reviewChanges` capability ({@link AgentCapabilities.reviewChanges}); a\nserver that leaves {@link ChangesetFile.reviewed} `undefined` neither\ndispatches nor accepts it.\n\nThe reducer sets `reviewed` on every matching whole-file entry (one without\na `range`) and ignores any entry that does not correspond to a current file.\nRange-scoped entries do not change the whole-file `reviewed` flag; they are\nsurfaced to the host and richer clients that track partial review.",
       "properties": {
         "type": {
           "const": "changeset/filesReviewedChanged"
         },
-        "fileIds": {
+        "files": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/ChangesetReviewedFile"
           },
-          "description": "The {@link ChangesetFile.id}s whose reviewed state changed."
+          "description": "The files (optionally narrowed to a range) whose reviewed state changed."
         },
         "reviewed": {
           "type": "boolean",
@@ -8113,7 +8118,7 @@
       },
       "required": [
         "type",
-        "fileIds",
+        "files",
         "reviewed"
       ]
     },
@@ -8656,6 +8661,23 @@
       ],
       "type": "string",
       "description": "How a client completed an input request."
+    },
+    "ChangesetReviewedFile": {
+      "type": "object",
+      "description": "A file whose reviewed state is being changed by a\n{@link ChangesetFilesReviewedChangedAction}, optionally narrowed to a\nsub-range.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The {@link ChangesetFile.id} of the file whose reviewed state changed."
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "Range within the file the review applies to, letting clients mark just a\nportion of a diff as reviewed. Omit to apply to the whole file.\n\nRange-scoped reviews are a signal to the authoritative host (which decides\nhow to aggregate them and when to consider the whole file reviewed); the\nreduced {@link ChangesetFile.reviewed} flag only reflects whole-file\nentries (those without a `range`)."
+        }
+      },
+      "required": [
+        "id"
+      ]
     }
   }
 }

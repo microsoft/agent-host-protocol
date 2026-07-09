@@ -1386,18 +1386,18 @@ public struct ChangesetFileRemovedAction: Codable, Sendable {
 
 public struct ChangesetFilesReviewedChangedAction: Codable, Sendable {
     public var type: ActionType
-    /// The {@link ChangesetFile.id}s whose reviewed state changed.
-    public var fileIds: [String]
+    /// The files (optionally narrowed to a range) whose reviewed state changed.
+    public var files: [ChangesetReviewedFile]
     /// The new reviewed state to apply to each listed file.
     public var reviewed: Bool
 
     public init(
         type: ActionType,
-        fileIds: [String],
+        files: [ChangesetReviewedFile],
         reviewed: Bool
     ) {
         self.type = type
-        self.fileIds = fileIds
+        self.files = files
         self.reviewed = reviewed
     }
 }

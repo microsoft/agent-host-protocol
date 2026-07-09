@@ -918,7 +918,20 @@ data class AgentCapabilities(
      * session starts with. An empty object `{}` advertises multi-chat without
      * forking; set {@link MultipleChatsCapability.fork} to also allow forking.
      */
-    val multipleChats: MultipleChatsCapability? = null
+    val multipleChats: MultipleChatsCapability? = null,
+    /**
+     * The agent supports a rich "review changes" experience: it tracks a
+     * per-file reviewed (a.k.a. "viewed") flag on the files of its
+     * {@link ChangesetFile | changeset files} and accepts client-dispatched
+     * `changeset/filesReviewedChanged` actions, so the user can mark files
+     * reviewed or unreviewed as they work through a diff.
+     *
+     * An empty object `{}` advertises support. When absent, clients MUST NOT
+     * dispatch `changeset/filesReviewedChanged` and SHOULD NOT surface any
+     * reviewed/unreviewed affordance; the server leaves
+     * {@link ChangesetFile.reviewed} `undefined`.
+     */
+    val reviewChanges: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -4004,10 +4017,14 @@ data class ChangesetFile(
      */
     val edit: FileEdit,
     /**
-     * Whether the user has reviewed this file. Omit (or set to `undefined`)
-     * to indicate that the server does not support the "review" functionality;
-     * in that case clients should not surface any reviewed/unreviewed
-     * affordance for this file.
+     * Whether the user has reviewed (a.k.a. "viewed") this file.
+     *
+     * Only meaningful when the owning agent advertises the `reviewChanges`
+     * capability ({@link AgentCapabilities.reviewChanges}); such servers seed
+     * the flag and both they and clients keep it current by dispatching
+     * `changeset/filesReviewedChanged`. Omit (or set to `undefined`) when the
+     * agent does not support the "review" experience — in that case clients
+     * MUST NOT surface any reviewed/unreviewed affordance for this file.
      */
     val reviewed: Boolean? = null,
     /**
@@ -4016,6 +4033,24 @@ data class ChangesetFile(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class ChangesetReviewedFile(
+    /**
+     * The {@link ChangesetFile.id} of the file whose reviewed state changed.
+     */
+    val id: String,
+    /**
+     * Range within the file the review applies to, letting clients mark just a
+     * portion of a diff as reviewed. Omit to apply to the whole file.
+     *
+     * Range-scoped reviews are a signal to the authoritative host (which decides
+     * how to aggregate them and when to consider the whole file reviewed); the
+     * reduced {@link ChangesetFile.reviewed} flag only reflects whole-file
+     * entries (those without a `range`).
+     */
+    val range: TextRange? = null
 )
 
 @Serializable

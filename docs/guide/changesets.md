@@ -65,7 +65,7 @@ ChangesetState {
 ChangesetFile {
   id: string                               // typically `after.uri` (or `before.uri` for deletions)
   edit: FileEdit                           // reuses the existing FileEdit shape
-  reviewed?: boolean                       // omit when the server has no "review" support
+  reviewed?: boolean                       // omit unless the agent advertises `reviewChanges`
   _meta?: Record<string, unknown>
 }
 ```
@@ -78,11 +78,35 @@ of the changeset URI:
 | `changeset/statusChanged`           | No                   | `status` transitioned (e.g. `computing → ready`).                            |
 | `changeset/fileSet`                 | No                   | Upsert a `ChangesetFile` (new or replacing existing by `id`).                |
 | `changeset/fileRemoved`             | No                   | A file is no longer in the changeset.                                        |
-| `changeset/filesReviewedChanged`    | No                   | The `reviewed` flag for one or more files changed (servers with review support). |
+| `changeset/filesReviewedChanged`    | **Yes**              | The `reviewed` flag for one or more files changed (agents advertising the `reviewChanges` capability). |
 | `changeset/contentChanged`          | No                   | Full replacement of files, optionally with operations or error details.      |
 | `changeset/operationsChanged`       | No                   | The set of available `operations` changed.                                   |
 | `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |
 | `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched, or the owning session ended).       |
+
+### Reviewing Changes
+
+An agent that advertises the `reviewChanges` capability
+(an empty object `{}` on `AgentInfo.capabilities.reviewChanges`) opts into a
+rich "review changes" experience: it seeds a per-file `reviewed` (a.k.a.
+"viewed") flag on each `ChangesetFile` and lets the user tick files off as they
+read through a diff. Both the host and clients keep the flag current by
+dispatching `changeset/filesReviewedChanged`, which carries a `files` array —
+each entry a `{ id, range? }` naming a file and, optionally, the `TextRange`
+that was reviewed — plus the new `reviewed` value. Because the action is
+client-dispatchable, a client can apply the toggle optimistically (e.g. mark a
+file reviewed the moment its diff scrolls out of view) and every other
+subscriber converges on the same state.
+
+Entries without a `range` set the whole-file `reviewed` flag, which is what the
+reducer projects into state. An entry _with_ a `range` marks just that portion
+of the diff as reviewed; this is a signal to the authoritative host (which
+decides how to aggregate partial reviews and when the whole file counts as
+reviewed) and does not, on its own, flip the whole-file `reviewed` flag.
+
+When the capability is absent, clients MUST NOT dispatch
+`changeset/filesReviewedChanged` and SHOULD NOT surface any
+reviewed/unreviewed affordance; such agents leave `reviewed` `undefined`.
 
 ### Changeset Operations
 

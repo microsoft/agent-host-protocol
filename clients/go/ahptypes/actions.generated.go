@@ -994,19 +994,27 @@ type ChangesetFileRemovedAction struct {
 }
 
 // Update the {@link ChangesetFile.reviewed} flag for one or more files,
-// identified by their {@link ChangesetFile.id}.
+// each identified by its {@link ChangesetFile.id} and optionally narrowed to a
+// {@link ChangesetReviewedFile.range | range}.
 //
-// Dispatched by the server as the user marks files reviewed or unreviewed
-// (e.g. toggling a single file, or a "mark all as reviewed" affordance).
-// Only servers that support the "review" functionality dispatch this; a
-// server that leaves {@link ChangesetFile.reviewed} `undefined` never does.
+// Dispatched as the user marks files reviewed or unreviewed (e.g. toggling a
+// single file, marking a range as read, or a "mark all as reviewed"
+// affordance). Clients dispatch it directly — applying the change
+// optimistically — to drive a rich review experience, and the agent host MAY
+// also originate it (e.g. auto-marking a file reviewed once its diff has
+// scrolled past). Only meaningful when the agent advertises the
+// `reviewChanges` capability ({@link AgentCapabilities.reviewChanges}); a
+// server that leaves {@link ChangesetFile.reviewed} `undefined` neither
+// dispatches nor accepts it.
 //
-// The reducer sets `reviewed` on every matching file and ignores any
-// `fileIds` entry that does not correspond to a current file.
+// The reducer sets `reviewed` on every matching whole-file entry (one without
+// a `range`) and ignores any entry that does not correspond to a current file.
+// Range-scoped entries do not change the whole-file `reviewed` flag; they are
+// surfaced to the host and richer clients that track partial review.
 type ChangesetFilesReviewedChangedAction struct {
 	Type ActionType `json:"type"`
-	// The {@link ChangesetFile.id}s whose reviewed state changed.
-	FileIds []string `json:"fileIds"`
+	// The files (optionally narrowed to a range) whose reviewed state changed.
+	Files []ChangesetReviewedFile `json:"files"`
 	// The new reviewed state to apply to each listed file.
 	Reviewed bool `json:"reviewed"`
 }

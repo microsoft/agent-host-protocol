@@ -1,12 +1,12 @@
 {
-  "description": "changeset/filesReviewedChanged is a no-op when no listed file needs its reviewed state changed",
+  "description": "changeset/filesReviewedChanged with only range-scoped entries does not change the whole-file reviewed flag",
   "reducer": "changeset",
   "initial": {
     "status": "ready",
     "files": [
       {
         "id": "file:///src/a.ts",
-        "reviewed": true,
+        "reviewed": false,
         "edit": {
           "after": {
             "uri": "file:///src/a.ts",
@@ -15,7 +15,7 @@
             }
           },
           "diff": {
-            "added": 1
+            "added": 4
           }
         }
       }
@@ -24,7 +24,15 @@
   "actions": [
     {
       "type": "changeset/filesReviewedChanged",
-      "files": [{ "id": "file:///src/a.ts" }, { "id": "file:///src/missing.ts" }],
+      "files": [
+        {
+          "id": "file:///src/a.ts",
+          "range": {
+            "start": { "line": 0, "character": 0 },
+            "end": { "line": 1, "character": 0 }
+          }
+        }
+      ],
       "reviewed": true
     }
   ],
@@ -33,7 +41,7 @@
     "files": [
       {
         "id": "file:///src/a.ts",
-        "reviewed": true,
+        "reviewed": false,
         "edit": {
           "after": {
             "uri": "file:///src/a.ts",
@@ -42,7 +50,7 @@
             }
           },
           "diff": {
-            "added": 1
+            "added": 4
           }
         }
       }

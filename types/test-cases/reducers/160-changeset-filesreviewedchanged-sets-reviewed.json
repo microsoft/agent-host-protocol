@@ -1,5 +1,5 @@
 {
-  "description": "changeset/filesReviewedChanged sets reviewed on matching files, skips files already at the target value, and ignores files not listed",
+  "description": "changeset/filesReviewedChanged sets reviewed on matching whole-file entries, skips files already at the target value, ignores files not listed, and leaves range-scoped entries' whole-file flag unchanged",
   "reducer": "changeset",
   "initial": {
     "status": "ready",
@@ -47,13 +47,38 @@
             "added": 2
           }
         }
+      },
+      {
+        "id": "file:///src/d.ts",
+        "edit": {
+          "after": {
+            "uri": "file:///src/d.ts",
+            "content": {
+              "uri": "content:/d"
+            }
+          },
+          "diff": {
+            "added": 3
+          }
+        }
       }
     ]
   },
   "actions": [
     {
       "type": "changeset/filesReviewedChanged",
-      "fileIds": ["file:///src/a.ts", "file:///src/b.ts", "file:///src/missing.ts"],
+      "files": [
+        { "id": "file:///src/a.ts" },
+        { "id": "file:///src/b.ts" },
+        { "id": "file:///src/missing.ts" },
+        {
+          "id": "file:///src/d.ts",
+          "range": {
+            "start": { "line": 0, "character": 0 },
+            "end": { "line": 2, "character": 0 }
+          }
+        }
+      ],
       "reviewed": true
     }
   ],
@@ -102,6 +127,20 @@
           },
           "diff": {
             "added": 2
+          }
+        }
+      },
+      {
+        "id": "file:///src/d.ts",
+        "edit": {
+          "after": {
+            "uri": "file:///src/d.ts",
+            "content": {
+              "uri": "content:/d"
+            }
+          },
+          "diff": {
+            "added": 3
           }
         }
       }

@@ -1397,9 +1397,11 @@ func ApplyActionToChangeset(state *ahptypes.ChangesetState, action ahptypes.Stat
 		return ReduceOutcomeNoOp
 
 	case *ahptypes.ChangesetFilesReviewedChangedAction:
-		ids := make(map[string]struct{}, len(a.FileIds))
-		for _, id := range a.FileIds {
-			ids[id] = struct{}{}
+		ids := make(map[string]struct{}, len(a.Files))
+		for _, f := range a.Files {
+			if f.Range == nil {
+				ids[f.Id] = struct{}{}
+			}
 		}
 		changed := false
 		for i := range state.Files {

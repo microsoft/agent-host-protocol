@@ -14,11 +14,11 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[allow(unused_imports)]
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, Changeset, ChangesetFile,
-    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
-    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
-    ConfirmationOption, Customization, ErrorInfo, McpServerState, Message, ModelSelection,
-    PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest, TerminalClaim,
-    TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
+    ChangesetOperation, ChangesetOperationStatus, ChangesetReviewedFile, ChangesetStatus,
+    ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
+    ChatSummary, ConfirmationOption, Customization, ErrorInfo, McpServerState, Message,
+    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest,
+    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallResult, ToolDefinition, ToolResultContent, Turn, UsageInfo,
 };
 
@@ -1200,20 +1200,28 @@ pub struct ChangesetFileRemovedAction {
 }
 
 /// Update the {@link ChangesetFile.reviewed} flag for one or more files,
-/// identified by their {@link ChangesetFile.id}.
+/// each identified by its {@link ChangesetFile.id} and optionally narrowed to a
+/// {@link ChangesetReviewedFile.range | range}.
 ///
-/// Dispatched by the server as the user marks files reviewed or unreviewed
-/// (e.g. toggling a single file, or a "mark all as reviewed" affordance).
-/// Only servers that support the "review" functionality dispatch this; a
-/// server that leaves {@link ChangesetFile.reviewed} `undefined` never does.
+/// Dispatched as the user marks files reviewed or unreviewed (e.g. toggling a
+/// single file, marking a range as read, or a "mark all as reviewed"
+/// affordance). Clients dispatch it directly — applying the change
+/// optimistically — to drive a rich review experience, and the agent host MAY
+/// also originate it (e.g. auto-marking a file reviewed once its diff has
+/// scrolled past). Only meaningful when the agent advertises the
+/// `reviewChanges` capability ({@link AgentCapabilities.reviewChanges}); a
+/// server that leaves {@link ChangesetFile.reviewed} `undefined` neither
+/// dispatches nor accepts it.
 ///
-/// The reducer sets `reviewed` on every matching file and ignores any
-/// `fileIds` entry that does not correspond to a current file.
+/// The reducer sets `reviewed` on every matching whole-file entry (one without
+/// a `range`) and ignores any entry that does not correspond to a current file.
+/// Range-scoped entries do not change the whole-file `reviewed` flag; they are
+/// surfaced to the host and richer clients that track partial review.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangesetFilesReviewedChangedAction {
-    /// The {@link ChangesetFile.id}s whose reviewed state changed.
-    pub file_ids: Vec<String>,
+    /// The files (optionally narrowed to a range) whose reviewed state changed.
+    pub files: Vec<ChangesetReviewedFile>,
     /// The new reviewed state to apply to each listed file.
     pub reviewed: bool,
 }

@@ -1065,9 +1065,9 @@ data class ChangesetFileRemovedAction(
 data class ChangesetFilesReviewedChangedAction(
     val type: ActionType,
     /**
-     * The {@link ChangesetFile.id}s whose reviewed state changed.
+     * The files (optionally narrowed to a range) whose reviewed state changed.
      */
-    val fileIds: List<String>,
+    val files: List<ChangesetReviewedFile>,
     /**
      * The new reviewed state to apply to each listed file.
      */
