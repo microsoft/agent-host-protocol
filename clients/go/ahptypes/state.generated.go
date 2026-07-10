@@ -209,6 +209,7 @@ const (
 	ResponsePartKindToolCall           ResponsePartKind = "toolCall"
 	ResponsePartKindReasoning          ResponsePartKind = "reasoning"
 	ResponsePartKindSystemNotification ResponsePartKind = "systemNotification"
+	ResponsePartKindInputRequest       ResponsePartKind = "inputRequest"
 )
 
 // Status of a tool call in the lifecycle state machine.
@@ -1696,6 +1697,37 @@ type SystemNotificationResponsePart struct {
 	Kind ResponsePartKind `json:"kind"`
 	// The text of the system notification
 	Content StringOrMarkdown `json:"content"`
+	// Additional provider-specific metadata for this notification.
+	//
+	// A host MAY attach a machine-readable descriptor of what triggered the
+	// notification so clients can categorize, icon, group, filter, or localize
+	// it without parsing `content`. Clients MAY look for well-known keys here to
+	// provide enhanced UI, and MUST render coherently from `content` alone when
+	// `_meta` is absent or unrecognized.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// A resolved input request (elicitation) recorded in the turn transcript.
+//
+// While an input request is open it lives in {@link ChatState.inputRequests}
+// as live, interactive state (see {@link ChatInputRequest}). When the request
+// completes via `chat/inputCompleted`, the reducer removes it from
+// `inputRequests` and appends this part to the active turn so the decision
+// survives in history. This mirrors how a tool-call confirmation persists in
+// its {@link ToolCallResponsePart} (via `confirmed` / `selectedOption` on the
+// terminal {@link ToolCallState}): the live surface drives in-flight UX, the
+// terminal outcome is durable and backfillable via `fetchTurns`.
+//
+// No part is recorded when an outstanding request is *abandoned* (the turn
+// completes, is cancelled, errors, or is truncated) rather than *completed*.
+type InputRequestResponsePart struct {
+	// Discriminant
+	Kind ResponsePartKind `json:"kind"`
+	// The resolved request, carrying its `id`, `message`, `url`, `questions`,
+	// and the final `answers` synced/submitted at completion.
+	Request ChatInputRequest `json:"request"`
+	// How the request was resolved: `accept`, `decline`, or `cancel`.
+	Response ChatInputResponseKind `json:"response"`
 }
 
 // Tool execution result details, available after execution completes.
@@ -2139,6 +2171,12 @@ type PluginCustomization struct {
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
 	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Whether this container is currently enabled.
 	Enabled bool `json:"enabled"`
 	// `clientId` of the client that contributed this container. Absent for
@@ -2194,6 +2232,12 @@ type ClientPluginCustomization struct {
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
 	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Whether this container is currently enabled.
 	Enabled bool `json:"enabled"`
 	// `clientId` of the client that contributed this container. Absent for
@@ -2251,6 +2295,12 @@ type DirectoryCustomization struct {
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
 	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Whether this container is currently enabled.
 	Enabled bool `json:"enabled"`
 	// `clientId` of the client that contributed this container. Absent for
@@ -2299,6 +2349,12 @@ type AgentCustomization struct {
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
 	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Whether this child is individually enabled. Absent means enabled, so a
 	// producer only needs to set it to surface a child that exists but is
 	// turned off on its own.
@@ -2335,10 +2391,6 @@ type AgentCustomization struct {
 	// in a picker); it remains available for the agent to auto-delegate
 	// to. Absent or `false` means the user may select it.
 	DisableUserInvocation *bool `json:"disableUserInvocation,omitempty"`
-	// Additional provider-specific metadata for this custom agent.
-	//
-	// Mirrors the MCP `_meta` convention.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // A skill contributed by a plugin or directory.
@@ -2369,6 +2421,12 @@ type SkillCustomization struct {
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
 	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Whether this child is individually enabled. Absent means enabled, so a
 	// producer only needs to set it to surface a child that exists but is
 	// turned off on its own.
@@ -2418,6 +2476,12 @@ type PromptCustomization struct {
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
 	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Whether this child is individually enabled. Absent means enabled, so a
 	// producer only needs to set it to surface a child that exists but is
 	// turned off on its own.
@@ -2466,6 +2530,12 @@ type RuleCustomization struct {
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
 	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Whether this child is individually enabled. Absent means enabled, so a
 	// producer only needs to set it to surface a child that exists but is
 	// turned off on its own.
@@ -2513,6 +2583,12 @@ type HookCustomization struct {
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
 	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Whether this child is individually enabled. Absent means enabled, so a
 	// producer only needs to set it to surface a child that exists but is
 	// turned off on its own.
@@ -2557,8 +2633,14 @@ type McpServerCustomization struct {
 	// customization is a subset of a larger file (for example, one entry
 	// in an inline `mcpServers` block of a `plugins.json` manifest).
 	// Absent when the customization covers the whole resource.
-	Range *TextRange        `json:"range,omitempty"`
-	Type  CustomizationType `json:"type"`
+	Range *TextRange `json:"range,omitempty"`
+	// Additional provider-specific metadata for this customization.
+	//
+	// Mirrors the MCP `_meta` convention. Optional and opaque to the
+	// protocol; producers and consumers agree on its contents
+	// out-of-band.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	Type CustomizationType          `json:"type"`
 	// Whether this MCP server is currently enabled.
 	Enabled bool `json:"enabled"`
 	// Current lifecycle state of the MCP server.
@@ -3300,6 +3382,7 @@ func (*ResourceResponsePart) isResponsePart()           {}
 func (*ToolCallResponsePart) isResponsePart()           {}
 func (*ReasoningResponsePart) isResponsePart()          {}
 func (*SystemNotificationResponsePart) isResponsePart() {}
+func (*InputRequestResponsePart) isResponsePart()       {}
 
 // ResponsePartUnknown carries an unrecognized ResponsePart variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type ResponsePartUnknown struct {
@@ -3341,6 +3424,12 @@ func (u *ResponsePart) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "systemNotification":
 		var value SystemNotificationResponsePart
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "inputRequest":
+		var value InputRequestResponsePart
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

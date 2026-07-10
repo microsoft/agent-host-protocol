@@ -15,12 +15,13 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
-## [0.5.2] — Unreleased
+## [0.5.2] — 2026-07-09
 
 Implements AHP 0.5.2.
 
 ### Added
 
+- Typed `resource*` convenience methods on `ahp::Client`: send wrappers (`resource_read`, `resource_write`, `resource_list`, `resource_copy`, `resource_delete`, `resource_move`, `resource_resolve`, `resource_mkdir`, `resource_request`, `create_resource_watch`) and inbound server-request handling via `set_server_request_handler` / `set_resource_request_handlers` (new `ServerRequestHandler`, `ServerRequestFuture`, and `ResourceRequestHandlers` types). Inbound server-initiated requests are now answered (previously dropped) — via the installed handler, or `MethodNotFound` when none is set.
 - `ToolResultTerminalCompleteContent` for terminal-style completion metadata in tool
   results.
 - Optional `enabled` field on the child customization types
@@ -34,11 +35,18 @@ Implements AHP 0.5.2.
   functionality.
 - `changeset/filesReviewedChanged` action for servers to update the `reviewed`
   flag of one or more changeset files.
+- Optional `meta` (wire `_meta`) provider-metadata field on every customization
+  type, moved from `AgentCustomization` up to the shared customization base so
+  `PluginCustomization`, `ClientPluginCustomization`, `DirectoryCustomization`,
+  `SkillCustomization`, `PromptCustomization`, `RuleCustomization`,
+  `HookCustomization`, and `McpServerCustomization` all carry it.
 - Optional `server_info` on `InitializeResult` and `client_info` on
   `InitializeParams`, each an `Implementation` struct (`name`, optional
   `version`, optional `title`), identifying the implementation and build behind
   either side of the handshake. Informational only — MUST NOT be used for
   feature detection.
+- Optional `terminal_command_prefix` on `InitializeResult` for hosts that
+  support interpreting `!`-prefixed user messages as terminal commands.
 - Optional `version` field on `PluginCustomization` (inherited by
   `ClientPluginCustomization`), carrying the plugin's semver sourced from the
   Open Plugins manifest. Provenance / display only.
@@ -46,16 +54,12 @@ Implements AHP 0.5.2.
   actions for clients to ask the host to start or stop MCP servers; stopping
   moves an `authRequired` server to `stopped` so it no longer waits on
   authentication.
-- Canvas channel support: the per-instance `CanvasState` plus the
-  `StateAction::CanvasUpdated` / `StateAction::CanvasCloseRequested` /
-  `StateAction::CanvasMessage` actions, the `StateAction::SessionCanvasesChanged`
-  / `StateAction::SessionOpenCanvasesChanged` session actions, and the canvas
-  discovery types (`SessionCanvasDeclaration`, `ClientCanvasDeclaration`,
-  `OpenCanvasRef`, `CanvasProviderSource`) on `SessionState.canvases` /
-  `SessionState.open_canvases`. Adds the `ClientCapabilities.canvas` capability,
-  the `canvasOpen` / `canvasInvokeAction` / `canvasClose` / `canvasReadResource`
-  methods, and the `CanvasProviderError` error. The session reducer replaces the
-  canvas registry/catalogue and the canvas reducer sparse-merges `canvas/updated`.
+- `InputRequestResponsePart` and the `ResponsePart::InputRequest` variant. The
+  reducer now records a resolved input request in the active turn's
+  `response_parts` on `chat/inputCompleted` — embedding the resolved
+  `ChatInputRequest` (final `answers`) and the `response` (`accept`, `decline`,
+  or `cancel`) — so the outcome persists after the live request is removed.
+  Abandoned requests still record nothing (#324).
 
 ### Changed
 

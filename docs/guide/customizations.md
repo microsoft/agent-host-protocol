@@ -42,6 +42,10 @@ Every customization carries an `id` and a `uri`. They are different concepts:
 
 Use `id` for protocol operations. Use `uri` for persistent references (e.g. `AgentSelection.uri`, which must survive across sessions).
 
+## Provider metadata
+
+Every customization — container or child — also carries an optional `_meta` object: a provider-specific escape hatch that mirrors the MCP `_meta` convention. It is opaque to the protocol, so a minimal client can ignore it entirely; producers and consumers that populate it agree on its contents out-of-band. Prefer a first-class field whenever data has a natural typed home (e.g. an agent's `model`), and reserve `_meta` for genuinely provider-specific data with no dedicated AHP field.
+
 ## Containers
 
 Container customizations carry a host-reported `load` state and a `children` array.

@@ -1158,11 +1158,30 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatInputCompleted -> {
         val a = action.value
         val existing = state.inputRequests
-        if (existing == null || existing.none { it.id == a.requestId }) {
+        val completed = existing?.firstOrNull { it.id == a.requestId }
+        if (existing == null || completed == null) {
             state
         } else {
             val remaining = existing.filter { it.id != a.requestId }
-            val next = state.copy(inputRequests = remaining.ifEmpty { null })
+            var next = state.copy(inputRequests = remaining.ifEmpty { null })
+            // Project the resolved request into the active turn's transcript so
+            // the decision survives after the live request is gone. Abandoned
+            // requests (turn end/truncate) are removed without a part.
+            val activeTurn = next.activeTurn
+            if (activeTurn != null) {
+                val finalAnswers = (completed.answers ?: emptyMap()) + (a.answers ?: emptyMap())
+                val request = completed.copy(answers = finalAnswers.ifEmpty { null })
+                val newPart = ResponsePartInputRequest(
+                    InputRequestResponsePart(
+                        kind = ResponsePartKind.INPUT_REQUEST,
+                        request = request,
+                        response = a.response,
+                    ),
+                )
+                next = next.copy(
+                    activeTurn = activeTurn.copy(responseParts = activeTurn.responseParts + newPart),
+                )
+            }
             next.copy(
                 status = chatSummaryStatus(next),
                 modifiedAt = nowIsoString(),

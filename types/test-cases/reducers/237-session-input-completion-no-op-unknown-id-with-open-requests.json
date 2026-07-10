@@ -1,0 +1,59 @@
+{
+  "description": "session input completion is a no-op for an unknown id while other requests remain open",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "message": {
+        "text": "Hi",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    },
+    "inputRequests": [
+      {
+        "id": "present-1",
+        "message": "Still open"
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/inputCompleted",
+      "requestId": "absent",
+      "response": "cancel"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "message": {
+        "text": "Hi",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    },
+    "inputRequests": [
+      {
+        "id": "present-1",
+        "message": "Still open"
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

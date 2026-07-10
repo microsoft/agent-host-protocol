@@ -41,6 +41,14 @@ While a chat has any open input request, that chat's `status` carries `SessionSt
 
 If the active turn completes, is cancelled, errors, or is truncated before input completes, the server SHOULD consider outstanding input requests abandoned. The reducer removes outstanding requests.
 
+## Durable Record
+
+When `chat/inputCompleted` resolves a request while a turn is active, the reducer removes the live request from `inputRequests` and appends an `InputRequestResponsePart` (`kind: 'inputRequest'`) to the active turn's `responseParts`. This mirrors how a resolved tool-call confirmation persists on its terminal `ToolCallState`: the decision becomes part of the durable, replayable transcript instead of vanishing with the ephemeral request.
+
+The recorded part embeds the resolved `request` — carrying its `id`, `message`, `url`, `questions`, and the final `answers` (synced drafts overlaid by any `answers` supplied on `chat/inputCompleted`) — alongside the `response` (`accept`, `decline`, or `cancel`). All three outcomes are recorded, so a declined or cancelled prompt still leaves a trace a client can render after the fact.
+
+Abandonment is the one case that records nothing: when a turn ends, is cancelled, errors, or is truncated, outstanding requests are dropped without a transcript part, because no user decision was reached.
+
 ## Questions And Answers
 
 Each question is a discriminated union by `kind`:

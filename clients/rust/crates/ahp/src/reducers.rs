@@ -60,14 +60,14 @@ use ahp_types::actions::{
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, CanvasState, ChangesetOperationStatus, ChangesetState,
     ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption,
-    Customization, ErrorInfo, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalState, TerminalUnclassifiedPart, ToolCallCancellationReason,
-    ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
-    ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStreamingState, Turn,
-    TurnState,
+    Customization, ErrorInfo, InputRequestResponsePart, McpServerStartingState, McpServerState,
+    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
+    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalState, TerminalUnclassifiedPart,
+    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallPendingConfirmationState,
+    ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
+    ToolCallState, ToolCallStreamingState, Turn, TurnState,
 };
 
 /// What happened when an action was applied.
@@ -521,6 +521,7 @@ where
             ResponsePart::Reasoning(r) => Some(r.id.clone()),
             ResponsePart::ContentRef(_)
             | ResponsePart::SystemNotification(_)
+            | ResponsePart::InputRequest(_)
             | ResponsePart::Unknown(_) => None,
         };
         if id.as_deref() == Some(part_id) {
@@ -988,16 +989,42 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatInputAnswerChanged(a) => apply_input_answer_changed(state, a),
         StateAction::ChatInputCompleted(a) => {
-            let Some(list) = state.input_requests.as_mut() else {
+            let Some(list) = state.input_requests.as_ref() else {
                 return ReduceOutcome::NoOp;
             };
-            let had = list.iter().any(|r| r.id == a.request_id);
-            if !had {
+            let Some(completed) = list.iter().find(|r| r.id == a.request_id).cloned() else {
                 return ReduceOutcome::NoOp;
+            };
+            if let Some(list) = state.input_requests.as_mut() {
+                list.retain(|r| r.id != a.request_id);
+                if list.is_empty() {
+                    state.input_requests = None;
+                }
             }
-            list.retain(|r| r.id != a.request_id);
-            if list.is_empty() {
-                state.input_requests = None;
+            // Project the resolved request into the active turn's transcript so
+            // the decision survives after the live request is gone. Abandoned
+            // requests (turn end/truncate) are removed without a part.
+            if let Some(active) = state.active_turn.as_mut() {
+                let mut final_answers = completed.answers.clone().unwrap_or_default();
+                if let Some(answers) = &a.answers {
+                    for (k, v) in answers {
+                        final_answers.insert(k.clone(), v.clone());
+                    }
+                }
+                let request = ChatInputRequest {
+                    answers: if final_answers.is_empty() {
+                        None
+                    } else {
+                        Some(final_answers)
+                    },
+                    ..completed
+                };
+                active
+                    .response_parts
+                    .push(ResponsePart::InputRequest(InputRequestResponsePart {
+                        request,
+                        response: a.response,
+                    }));
             }
             refresh_summary_status(state);
             touch_chat_modified(state);

@@ -1,6 +1,6 @@
 {
   "name": "@microsoft/agent-host-protocol",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "TypeScript client for the Agent Host Protocol (AHP).",
   "type": "module",
   "license": "MIT",

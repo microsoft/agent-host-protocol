@@ -32,6 +32,7 @@ import com.microsoft.agenthostprotocol.generated.ActionEnvelope
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
 import com.microsoft.agenthostprotocol.generated.Customization
 import com.microsoft.agenthostprotocol.generated.Implementation
+import com.microsoft.agenthostprotocol.generated.InitializeResult
 import com.microsoft.agenthostprotocol.generated.JsonRpcErrorResponse
 import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
@@ -249,6 +250,7 @@ class RoundTripCorpusTest {
             "SessionAddedParams" -> rt(SessionAddedParams.serializer())
             "PartialSessionSummary" -> rt(PartialSessionSummary.serializer())
             "Implementation" -> rt(Implementation.serializer())
+            "InitializeResult" -> rt(InitializeResult.serializer())
             else -> fail(
                 "$file: unknown wire type \"$typeName\". " +
                     "Add a decode entry to decodeAndReencode.",

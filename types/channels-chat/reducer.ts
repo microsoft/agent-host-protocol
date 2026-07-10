@@ -12,6 +12,7 @@ import type {
   ToolCallState,
   ResponsePart,
   ToolCallResponsePart,
+  InputRequestResponsePart,
   Turn,
   PendingMessage,
   ConfirmationOption,
@@ -596,9 +597,11 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
 
     case ActionType.ChatInputCompleted: {
       const existing = state.inputRequests;
-      if (!existing?.some(request => request.id === action.requestId)) {
+      const idx = existing?.findIndex(request => request.id === action.requestId) ?? -1;
+      if (!existing || idx < 0) {
         return state;
       }
+      const completed = existing[idx];
       const inputRequests = existing.filter(request => request.id !== action.requestId);
       const next: ChatState = {
         ...state,
@@ -607,6 +610,24 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         next.inputRequests = inputRequests;
       } else {
         delete next.inputRequests;
+      }
+      // Project the resolved request into the active turn's transcript so the
+      // "asked X → answered Y" decision survives after the live request is
+      // gone. Abandoned requests (turn end/truncate) are removed without a part.
+      if (next.activeTurn) {
+        const finalAnswers = { ...(completed.answers ?? {}), ...(action.answers ?? {}) };
+        const part: InputRequestResponsePart = {
+          kind: ResponsePartKind.InputRequest,
+          request: {
+            ...completed,
+            answers: Object.keys(finalAnswers).length > 0 ? finalAnswers : undefined,
+          },
+          response: action.response,
+        };
+        next.activeTurn = {
+          ...next.activeTurn,
+          responseParts: [...next.activeTurn.responseParts, part],
+        };
       }
       return {
         ...next,

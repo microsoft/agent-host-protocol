@@ -7,7 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
@@ -22,5 +22,5 @@ tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
 tokio-util = "0.7"
 futures-util = "0.3"
 tracing = "0.1"
-ahp-types = { path = "crates/ahp-types", version = "0.5.1" }
-ahp = { path = "crates/ahp", version = "0.5.1" }
+ahp-types = { path = "crates/ahp-types", version = "0.5.2" }
+ahp = { path = "crates/ahp", version = "0.5.2" }

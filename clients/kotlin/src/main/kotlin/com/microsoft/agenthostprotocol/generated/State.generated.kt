@@ -392,7 +392,9 @@ enum class ResponsePartKind {
     @SerialName("reasoning")
     REASONING,
     @SerialName("systemNotification")
-    SYSTEM_NOTIFICATION
+    SYSTEM_NOTIFICATION,
+    @SerialName("inputRequest")
+    INPUT_REQUEST
 }
 
 /**
@@ -2359,7 +2361,35 @@ data class SystemNotificationResponsePart(
     /**
      * The text of the system notification
      */
-    val content: StringOrMarkdown
+    val content: StringOrMarkdown,
+    /**
+     * Additional provider-specific metadata for this notification.
+     *
+     * A host MAY attach a machine-readable descriptor of what triggered the
+     * notification so clients can categorize, icon, group, filter, or localize
+     * it without parsing `content`. Clients MAY look for well-known keys here to
+     * provide enhanced UI, and MUST render coherently from `content` alone when
+     * `_meta` is absent or unrecognized.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class InputRequestResponsePart(
+    /**
+     * Discriminant
+     */
+    val kind: ResponsePartKind,
+    /**
+     * The resolved request, carrying its `id`, `message`, `url`, `questions`,
+     * and the final `answers` synced/submitted at completion.
+     */
+    val request: ChatInputRequest,
+    /**
+     * How the request was resolved: `accept`, `decline`, or `cancel`.
+     */
+    val response: ChatInputResponseKind
 )
 
 @Serializable
@@ -3026,6 +3056,15 @@ data class PluginCustomization(
      */
     val range: TextRange? = null,
     /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Whether this container is currently enabled.
      */
     val enabled: Boolean,
@@ -3092,6 +3131,15 @@ data class ClientPluginCustomization(
      * Absent when the customization covers the whole resource.
      */
     val range: TextRange? = null,
+    /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Whether this container is currently enabled.
      */
@@ -3164,6 +3212,15 @@ data class DirectoryCustomization(
      */
     val range: TextRange? = null,
     /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Whether this container is currently enabled.
      */
     val enabled: Boolean,
@@ -3230,6 +3287,15 @@ data class AgentCustomization(
      */
     val range: TextRange? = null,
     /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Whether this child is individually enabled. Absent means enabled, so a
      * producer only needs to set it to surface a child that exists but is
      * turned off on its own.
@@ -3276,14 +3342,7 @@ data class AgentCustomization(
      * in a picker); it remains available for the agent to auto-delegate
      * to. Absent or `false` means the user may select it.
      */
-    val disableUserInvocation: Boolean? = null,
-    /**
-     * Additional provider-specific metadata for this custom agent.
-     *
-     * Mirrors the MCP `_meta` convention.
-     */
-    @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val disableUserInvocation: Boolean? = null
 )
 
 @Serializable
@@ -3319,6 +3378,15 @@ data class SkillCustomization(
      * Absent when the customization covers the whole resource.
      */
     val range: TextRange? = null,
+    /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Whether this child is individually enabled. Absent means enabled, so a
      * producer only needs to set it to surface a child that exists but is
@@ -3387,6 +3455,15 @@ data class PromptCustomization(
      */
     val range: TextRange? = null,
     /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Whether this child is individually enabled. Absent means enabled, so a
      * producer only needs to set it to surface a child that exists but is
      * turned off on its own.
@@ -3440,6 +3517,15 @@ data class RuleCustomization(
      * Absent when the customization covers the whole resource.
      */
     val range: TextRange? = null,
+    /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Whether this child is individually enabled. Absent means enabled, so a
      * producer only needs to set it to surface a child that exists but is
@@ -3506,6 +3592,15 @@ data class HookCustomization(
      */
     val range: TextRange? = null,
     /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Whether this child is individually enabled. Absent means enabled, so a
      * producer only needs to set it to surface a child that exists but is
      * turned off on its own.
@@ -3555,6 +3650,15 @@ data class McpServerCustomization(
      * Absent when the customization covers the whole resource.
      */
     val range: TextRange? = null,
+    /**
+     * Additional provider-specific metadata for this customization.
+     *
+     * Mirrors the MCP `_meta` convention. Optional and opaque to the
+     * protocol; producers and consumers agree on its contents
+     * out-of-band.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     val type: CustomizationType,
     /**
      * Whether this MCP server is currently enabled.
@@ -4484,6 +4588,8 @@ value class ResponsePartToolCall(val value: ToolCallResponsePart) : ResponsePart
 value class ResponsePartReasoning(val value: ReasoningResponsePart) : ResponsePart
 @JvmInline
 value class ResponsePartSystemNotification(val value: SystemNotificationResponsePart) : ResponsePart
+@JvmInline
+value class ResponsePartInputRequest(val value: InputRequestResponsePart) : ResponsePart
 /**
  * Forward-compat catch-all for unknown ResponsePart discriminators.
  *
@@ -4513,6 +4619,7 @@ internal object ResponsePartSerializer : KSerializer<ResponsePart> {
             "toolCall" -> ResponsePartToolCall(input.json.decodeFromJsonElement(ToolCallResponsePart.serializer(), element))
             "reasoning" -> ResponsePartReasoning(input.json.decodeFromJsonElement(ReasoningResponsePart.serializer(), element))
             "systemNotification" -> ResponsePartSystemNotification(input.json.decodeFromJsonElement(SystemNotificationResponsePart.serializer(), element))
+            "inputRequest" -> ResponsePartInputRequest(input.json.decodeFromJsonElement(InputRequestResponsePart.serializer(), element))
             else -> ResponsePartUnknown(obj)
         }
     }
@@ -4526,6 +4633,7 @@ internal object ResponsePartSerializer : KSerializer<ResponsePart> {
             is ResponsePartToolCall -> output.json.encodeToJsonElement(ToolCallResponsePart.serializer(), value.value)
             is ResponsePartReasoning -> output.json.encodeToJsonElement(ReasoningResponsePart.serializer(), value.value)
             is ResponsePartSystemNotification -> output.json.encodeToJsonElement(SystemNotificationResponsePart.serializer(), value.value)
+            is ResponsePartInputRequest -> output.json.encodeToJsonElement(InputRequestResponsePart.serializer(), value.value)
             is ResponsePartUnknown -> value.raw
         }
         output.encodeJsonElement(element)

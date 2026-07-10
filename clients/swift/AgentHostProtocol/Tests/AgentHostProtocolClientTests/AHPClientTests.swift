@@ -591,6 +591,98 @@ final class AHPClientTests: XCTestCase {
     }
 
 
+    func testResourceReadSendWrapperTargetsRootChannel() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+
+        let serverTask = Task {
+            let request = try await readRequest(from: serverSide, expectedMethod: "resourceRead")
+            let paramsCodable = try XCTUnwrap(request.params)
+            let paramsData = try JSONEncoder().encode(paramsCodable)
+            let params = try JSONDecoder().decode(ResourceReadParams.self, from: paramsData)
+            // The wrapper must force the root channel regardless of caller input.
+            XCTAssertEqual(params.channel, RootResourceURI)
+            XCTAssertEqual(params.uri, "ahp-resource:/notes.txt")
+            try await respond(
+                to: request.id,
+                with: ResourceReadResult(data: "hi", encoding: .utf8),
+                on: serverSide
+            )
+        }
+
+        let result = try await client.resourceRead(
+            ResourceReadParams(channel: "", uri: "ahp-resource:/notes.txt")
+        )
+        XCTAssertEqual(result.data, "hi")
+        XCTAssertEqual(result.encoding, .utf8)
+
+        try await serverTask.value
+        await client.shutdown()
+    }
+
+    func testInboundResourceRequestRoutesToTypedHandler() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+
+        await client.setResourceRequestHandlers(ResourceRequestHandlers(
+            onResourceRead: { params in
+                XCTAssertEqual(params.uri, "ahp-resource:/from-server.txt")
+                return ResourceReadResult(data: "server-data", encoding: .utf8)
+            }
+        ))
+
+        // A registered method is answered by the typed handler.
+        let readReq = JsonRpcMessage.request(
+            id: 100,
+            method: "resourceRead",
+            params: AnyCodable([
+                "channel": "ahp-root://",
+                "uri": "ahp-resource:/from-server.txt",
+            ])
+        )
+        try await serverSide.send(TransportMessage.encoded(readReq))
+
+        let readReply = try await readParsed(from: serverSide)
+        guard case .successResponse(let id, let result) = readReply else {
+            return XCTFail("expected successResponse, got \(readReply)")
+        }
+        XCTAssertEqual(id, 100)
+        let resultData = try JSONEncoder().encode(result)
+        let decoded = try JSONDecoder().decode(ResourceReadResult.self, from: resultData)
+        XCTAssertEqual(decoded.data, "server-data")
+
+        // An unregistered method falls through to MethodNotFound.
+        let writeReq = JsonRpcMessage.request(
+            id: 101,
+            method: "resourceWrite",
+            params: AnyCodable([
+                "channel": "ahp-root://",
+                "uri": "ahp-resource:/x.txt",
+                "data": "y",
+                "encoding": "utf-8",
+            ])
+        )
+        try await serverSide.send(TransportMessage.encoded(writeReq))
+
+        let writeReply = try await readParsed(from: serverSide)
+        guard case .errorResponse(let errId, let error) = writeReply else {
+            return XCTFail("expected errorResponse, got \(writeReply)")
+        }
+        XCTAssertEqual(errId, 101)
+        XCTAssertEqual(error.code, -32601)
+
+        await client.shutdown()
+    }
+
+    private func readParsed(from transport: InMemoryTransport) async throws -> JsonRpcMessage {
+        guard let raw = try await transport.recv() else {
+            throw TestError.unexpectedClose
+        }
+        return try raw.intoParsed()
+    }
+
     private struct ParsedRequest { let id: Int; let method: String; let params: AnyCodable? }
 
     private func readRequest(

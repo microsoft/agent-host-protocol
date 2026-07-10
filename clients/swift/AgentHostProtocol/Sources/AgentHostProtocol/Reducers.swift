@@ -446,12 +446,31 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
 
     case .chatInputCompleted(let a):
         guard var existing = state.inputRequests,
-              existing.contains(where: { $0.id == a.requestId }) else {
+              let completed = existing.first(where: { $0.id == a.requestId }) else {
             return state
         }
         existing.removeAll { $0.id == a.requestId }
         var next = state
         next.inputRequests = existing.isEmpty ? nil : existing
+        // Project the resolved request into the active turn's transcript so the
+        // decision survives after the live request is gone. Abandoned requests
+        // (turn end/truncate) are removed without a part.
+        if var activeTurn = next.activeTurn {
+            var finalAnswers = completed.answers ?? [:]
+            if let answers = a.answers {
+                for (k, v) in answers {
+                    finalAnswers[k] = v
+                }
+            }
+            var request = completed
+            request.answers = finalAnswers.isEmpty ? nil : finalAnswers
+            activeTurn.responseParts.append(.inputRequest(InputRequestResponsePart(
+                kind: .inputRequest,
+                request: request,
+                response: a.response
+            )))
+            next.activeTurn = activeTurn
+        }
         next.status = chatSummaryStatus(next)
         next.modifiedAt = currentTimestamp()
         return next

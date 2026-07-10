@@ -23,15 +23,52 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
+## [0.6.0] — Unreleased
+
+Spec version: `0.6.0`
+
+## [0.5.2] — 2026-07-09
+
+Spec version: `0.5.2`
+
 ### Added
 
 - `ToolResultTerminalCompleteContent` for terminal-style completion metadata in tool
   results.
+- Optional `enabled` flag on the child customizations (`AgentCustomization`,
+  `SkillCustomization`, `PromptCustomization`, `RuleCustomization`,
+  `HookCustomization`) so an individual child can be turned off independently of
+  its container; absent means enabled.
+- `disableUserInvocation` on `SkillCustomization`, plus `disableModelInvocation`
+  and `disableUserInvocation` on `AgentCustomization`, giving custom agents and
+  skills a symmetric user/model invocation matrix.
 - Optional `reviewed` field on `ChangesetFile`. Omitting it (or setting it to
   `undefined`) signals that the server does not support the file "review"
   functionality.
 - `changeset/filesReviewedChanged` action for servers to update the `reviewed`
   flag of one or more changeset files.
+- Hoisted the optional `_meta` provider-metadata slot from `AgentCustomization`
+  up to the shared `CustomizationBase`, so every customization type
+  (`PluginCustomization`, `ClientPluginCustomization`, `DirectoryCustomization`,
+  `SkillCustomization`, `PromptCustomization`, `RuleCustomization`,
+  `HookCustomization`, and `McpServerCustomization`) now carries the same
+  provider-specific escape hatch. Wire-compatible: `AgentCustomization` still
+  exposes `_meta`, now by inheritance.
+- Optional `serverInfo` on `InitializeResult` and `clientInfo` on
+  `InitializeParams`, each an `Implementation` (`name`, optional `version`,
+  optional `title`), so either side of the handshake can identify its
+  implementation and build. Informational only — mirrors LSP/MCP and MUST NOT
+  be used for feature detection.
+- `InputRequestResponsePart` (`kind: 'inputRequest'`) — a new `ResponsePart`
+  variant that records a resolved input request in a turn's transcript. On
+  `chat/inputCompleted`, the reducer now appends this part (embedding the
+  resolved `ChatInputRequest` with its final `answers` and the `response`:
+  `accept`, `decline`, or `cancel`) to the active turn's `responseParts`, so an
+  elicitation's outcome persists durably, mirroring how a resolved tool-call
+  confirmation is retained. Requests abandoned by turn end, cancel, error, or
+  truncation still record nothing (#324).
+- Optional `terminalCommandPrefix` marker on `InitializeResult` for hosts that
+  support interpreting `!`-prefixed user messages as terminal commands.
 - Optional `version` field on `PluginCustomization` (inherited by
   `ClientPluginCustomization`), carrying the plugin's semver sourced from the
   Open Plugins manifest's optional `version`. Provenance / display only; absent
@@ -40,39 +77,6 @@ changes accumulate. Track in-flight protocol changes via PRs touching
   actions for clients to ask the host to start or stop MCP servers; stopping
   moves an `authRequired` server to `stopped` so it no longer waits on
   authentication.
-
-## [0.5.2] — Unreleased
-
-Spec version: `0.5.2`
-
-### Added
-
-- Optional `enabled` flag on the child customizations (`AgentCustomization`,
-  `SkillCustomization`, `PromptCustomization`, `RuleCustomization`,
-  `HookCustomization`) so an individual child can be turned off independently of
-  its container; absent means enabled.
-- `disableUserInvocation` on `SkillCustomization`, plus `disableModelInvocation`
-  and `disableUserInvocation` on `AgentCustomization`, giving custom agents and
-  skills a symmetric user/model invocation matrix.
-- Optional `serverInfo` on `InitializeResult` and `clientInfo` on
-  `InitializeParams`, each an `Implementation` (`name`, optional `version`,
-  optional `title`), so either side of the handshake can identify its
-  implementation and build. Informational only — mirrors LSP/MCP and MUST NOT
-  be used for feature detection.
-- Canvas channel — an opt-in surface for the agent to open rich, interactive UI
-  surfaces (document/spreadsheet editors, diff views, live previews) alongside a
-  session, following the "one channel per resource" model of terminals and
-  changesets. Adds the `ClientCapabilities.canvas` capability; the
-  `SessionState.canvases` registry and `SessionState.openCanvases` catalogue
-  (`session/canvasesChanged` / `session/openCanvasesChanged`) plus
-  `SessionActiveClient.canvasProviders` and the `SessionCanvasDeclaration` /
-  `ClientCanvasDeclaration` / `OpenCanvasRef` / `CanvasProviderSource` discovery
-  types; the per-instance `ahp-canvas:/<id>` channel and its `CanvasState`; the
-  `canvas/updated`, `canvas/closeRequested`, and `canvas/message` actions; the
-  `canvasOpen` / `canvasInvokeAction` / `canvasClose` provider request family and
-  the client → server `canvasReadResource` content-fetch request; and the
-  `CanvasProviderError` (`-32012`) error. See
-  [`docs/specification/canvas-channel.md`](docs/specification/canvas-channel.md).
 
 ### Changed
 

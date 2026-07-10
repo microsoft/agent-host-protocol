@@ -828,7 +828,7 @@ const STATE_STRUCTS = [
   'MessageAnnotationsAttachment',
   'MarkdownResponsePart', 'ContentRef',
   'ResourceReponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
-  'SystemNotificationResponsePart',
+  'SystemNotificationResponsePart', 'InputRequestResponsePart',
   'ToolCallResult', 'ToolCallStreamingState',
   'ToolCallPendingConfirmationState', 'ToolCallRunningState',
   'ToolCallPendingResultConfirmationState', 'ToolCallCompletedState',
@@ -867,6 +867,7 @@ const RESPONSE_PART_UNION: UnionConfig = {
     { caseName: 'ToolCall', structName: 'ToolCallResponsePart', discriminantValue: 'toolCall' },
     { caseName: 'Reasoning', structName: 'ReasoningResponsePart', discriminantValue: 'reasoning' },
     { caseName: 'SystemNotification', structName: 'SystemNotificationResponsePart', discriminantValue: 'systemNotification' },
+    { caseName: 'InputRequest', structName: 'InputRequestResponsePart', discriminantValue: 'inputRequest' },
   ],
   unknown: true,
 };

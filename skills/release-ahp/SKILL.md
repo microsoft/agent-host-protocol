@@ -34,16 +34,15 @@ is for coordinated cross-artifact releases.
 A release is **two commits in one PR**, plus **six tags pushed at the first
 commit's SHA after merge**:
 
-1. **Release commit** — date-stamps every `## [X.Y.Z]` CHANGELOG heading,
-   bumps every client manifest from the previous version → `X.Y.Z`, and
-   regenerates `release-metadata.json` for every client. **All six tags
-   must point at this commit's SHA.**
+1. **Release commit** — consumes `docs/.changes/*.json` fragments into
+   dated `## [X.Y.Z]` CHANGELOG sections, bumps every client manifest from
+   the previous version → `X.Y.Z`, and regenerates `release-metadata.json`
+   for every client. **All six tags must point at this commit's SHA.**
 2. **Post-release commit** — bumps `PROTOCOL_VERSION` in
    `types/version/registry.ts` to the next planned version, prepends it to
    `SUPPORTED_PROTOCOL_VERSIONS`, regenerates each
-   `Version.generated.{rs,kt,swift,go}`, and reopens
-   `## [Unreleased]` in every CHANGELOG (plus a
-   `## [X.Y+1.0] — Unreleased` placeholder in the root spec `CHANGELOG.md`).
+   `Version.generated.{rs,kt,swift,go}`, and adds a
+   `## [X.Y+1.0] — Unreleased` placeholder in the root spec `CHANGELOG.md`.
 
 ## Step-by-step
 
@@ -51,8 +50,8 @@ commit's SHA after merge**:
 
 Before touching anything, confirm with the user:
 
-- **Release version** (`X.Y.Z`) — must equal the `## [X.Y.Z]` heading
-  already accumulated under `## [Unreleased]` in every CHANGELOG.
+- **Release version** (`X.Y.Z`) — the version to use when consuming
+  `docs/.changes/*.json` into the six changelogs.
 - **Next development version** (default: bump minor, i.e. `X.(Y+1).0`).
 - **Release scope** (default: all six artifacts; rare to release one in
   isolation).
@@ -61,12 +60,11 @@ Before touching anything, confirm with the user:
 
 Create `release/ahp-<version>` off `main`. Then in a single commit:
 
-- **CHANGELOGs** — for each of the 6 files (`CHANGELOG.md`,
-  `clients/{rust,kotlin,typescript,swift,go}/CHANGELOG.md`):
-  - Replace `## [Unreleased]` (or `## [X.Y.Z] — Unreleased`) with
-    `## [X.Y.Z] — <today YYYY-MM-DD>`.
-  - In each per-client CHANGELOG, add a single line `Implements AHP X.Y.Z.`
-    under the new heading if not already present.
+- **CHANGELOGs** — run
+  `npm run changelog:release -- --version X.Y.Z --date <today YYYY-MM-DD>`
+  to collapse `docs/.changes/*.json` into the six changelogs. This creates
+  or replaces each `## [X.Y.Z] — <today YYYY-MM-DD>` section and adds the
+  `Spec version` / `Implements AHP X.Y.Z.` line automatically.
 - **Manifests** — bump every native version file to `X.Y.Z`:
   - `clients/rust/Cargo.toml` `[workspace.package].version` **and** the
     `version = "X.Y.Z"` pins on `ahp-types`/`ahp` inside
@@ -81,10 +79,11 @@ Create `release/ahp-<version>` off `main`. Then in a single commit:
   - In `clients/rust/`: `cargo update -w` (rewrites only the workspace
     crates in `Cargo.lock` — outside crates stay pinned).
 - **Metadata** — at repo root: `npm run generate:metadata`.
-- **Verify** — at repo root: `npm test`. This runs both
-  `verify:release-metadata` and `verify:changelog`, which together gate
-  the release: a mismatch between a manifest version and its CHANGELOG
-  heading will fail here and not at tag-push time.
+- **Verify** — at repo root: `npm test`. This runs
+  `verify:change-fragments`, `verify:release-metadata`, and
+  `verify:changelog`, which together gate the release: malformed fragments,
+  a metadata drift, or a missing CHANGELOG heading will fail here and not at
+  tag-push time.
 
 > **Do not** bump `PROTOCOL_VERSION` in this commit. The tag-push
 > workflows validate that the registry version matches the tag's version,
@@ -108,10 +107,11 @@ On the same branch, in a second commit:
     first; keep any older entries the previous list had).
 - Run `npm run generate` at repo root — this regenerates every client's
   `Version.generated.*` and every `release-metadata.json`.
-- Reopen `## [Unreleased]` at the top of every CHANGELOG, **above** the
-  newly date-stamped `## [X.Y.Z]` heading. In the root spec
-  `CHANGELOG.md`, also add a `## [X.(Y+1).0] — Unreleased` placeholder
-  (with a `Spec version: \`X.(Y+1).0\`` line).
+- In the root spec `CHANGELOG.md`, add a
+  `## [X.(Y+1).0] — Unreleased` placeholder (with a
+  `Spec version: \`X.(Y+1).0\`` line) below the existing
+  `## [Unreleased]` section. Per-client changelogs already keep their
+  empty `## [Unreleased]` section after fragment consumption.
 - Run `npm test` again.
 
 Commit message:

@@ -1,5 +1,5 @@
 {
-  "description": "session input requests sync drafts and restore in-progress status after completion",
+  "description": "session input requests sync drafts, record a resolved inputRequest part in the active turn, and restore in-progress status after completion",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -88,7 +88,54 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "input-1",
+            "message": "Clarify requirements",
+            "questions": [
+              {
+                "id": "q1",
+                "kind": "single-select",
+                "message": "Which runtime?",
+                "options": [
+                  {
+                    "id": "node",
+                    "label": "Node.js"
+                  },
+                  {
+                    "id": "deno",
+                    "label": "Deno"
+                  }
+                ]
+              },
+              {
+                "id": "q2",
+                "kind": "text",
+                "message": "Anything else?"
+              }
+            ],
+            "answers": {
+              "q1": {
+                "state": "draft",
+                "value": {
+                  "kind": "selected",
+                  "value": "node"
+                }
+              },
+              "q2": {
+                "state": "draft",
+                "value": {
+                  "kind": "text",
+                  "value": "Keep it small."
+                }
+              }
+            }
+          },
+          "response": "accept"
+        }
+      ],
       "usage": null
     },
     "resource": "copilot:/test-session",

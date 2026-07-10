@@ -711,6 +711,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'ToolCallResponsePart' },
   { name: 'ReasoningResponsePart' },
   { name: 'SystemNotificationResponsePart' },
+  { name: 'InputRequestResponsePart' },
   { name: 'ToolCallResult' },
   { name: 'ConfirmationOption' },
   { name: 'ToolCallStreamingState' },
@@ -790,6 +791,7 @@ const RESPONSE_PART_UNION: UnionConfig = {
     { variantName: 'ToolCall', innerType: 'ToolCallResponsePart', wireValue: 'toolCall' },
     { variantName: 'Reasoning', innerType: 'ReasoningResponsePart', wireValue: 'reasoning' },
     { variantName: 'SystemNotification', innerType: 'SystemNotificationResponsePart', wireValue: 'systemNotification' },
+    { variantName: 'InputRequest', innerType: 'InputRequestResponsePart', wireValue: 'inputRequest' },
   ],
   unknown: true,
 };

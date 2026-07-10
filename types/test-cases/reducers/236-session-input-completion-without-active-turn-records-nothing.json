@@ -1,0 +1,57 @@
+{
+  "description": "session input completion without an active turn removes the request and records no transcript part",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "Earlier",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "inputRequests": [
+      {
+        "id": "orphan-1",
+        "message": "Standalone request"
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/inputCompleted",
+      "requestId": "orphan-1",
+      "response": "accept"
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "t1",
+        "message": {
+          "text": "Earlier",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:09.999Z"
+  }
+}

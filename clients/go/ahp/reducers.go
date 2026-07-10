@@ -566,22 +566,48 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		if list == nil {
 			return ReduceOutcomeNoOp
 		}
-		had := false
+		var completed *ahptypes.ChatInputRequest
 		next := list[:0]
-		for _, r := range list {
-			if r.Id == a.RequestId {
-				had = true
+		for i := range list {
+			if list[i].Id == a.RequestId {
+				c := list[i]
+				completed = &c
 				continue
 			}
-			next = append(next, r)
+			next = append(next, list[i])
 		}
-		if !had {
+		if completed == nil {
 			return ReduceOutcomeNoOp
 		}
 		if len(next) == 0 {
 			state.InputRequests = nil
 		} else {
 			state.InputRequests = next
+		}
+		// Project the resolved request into the active turn's transcript so the
+		// decision survives after the live request is gone. Abandoned requests
+		// (turn end/truncate) are removed without a part.
+		if state.ActiveTurn != nil {
+			finalAnswers := map[string]ahptypes.ChatInputAnswer{}
+			for k, v := range completed.Answers {
+				finalAnswers[k] = v
+			}
+			for k, v := range a.Answers {
+				finalAnswers[k] = v
+			}
+			request := *completed
+			if len(finalAnswers) == 0 {
+				request.Answers = nil
+			} else {
+				request.Answers = finalAnswers
+			}
+			state.ActiveTurn.ResponseParts = append(state.ActiveTurn.ResponseParts, ahptypes.ResponsePart{
+				Value: &ahptypes.InputRequestResponsePart{
+					Kind:     ahptypes.ResponsePartKindInputRequest,
+					Request:  request,
+					Response: a.Response,
+				},
+			})
 		}
 		refreshSummaryStatus(state)
 		touchChatModified(state)

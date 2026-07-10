@@ -845,6 +845,14 @@ interface CustomizationBase {
    * Absent when the customization covers the whole resource.
    */
   range?: TextRange;
+  /**
+   * Additional provider-specific metadata for this customization.
+   *
+   * Mirrors the MCP `_meta` convention. Optional and opaque to the
+   * protocol; producers and consumers agree on its contents
+   * out-of-band.
+   */
+  _meta?: Record<string, unknown>;
 }
 
 /**
@@ -1069,12 +1077,6 @@ export interface AgentCustomization extends ChildCustomizationBase {
    * to. Absent or `false` means the user may select it.
    */
   disableUserInvocation?: boolean;
-  /**
-   * Additional provider-specific metadata for this custom agent.
-   *
-   * Mirrors the MCP `_meta` convention.
-   */
-  _meta?: Record<string, unknown>;
 }
 
 /**

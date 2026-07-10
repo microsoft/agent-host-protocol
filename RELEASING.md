@@ -13,6 +13,31 @@ with its own release cadence. Each client release advertises which protocol
 versions it supports via a generated `SUPPORTED_PROTOCOL_VERSIONS` constant
 and a checked-in `clients/<lang>/release-metadata.json`.
 
+## Changelog fragments
+
+Normal feature/fix PRs do **not** edit `CHANGELOG.md` files directly. They add
+one or more JSON fragments under `docs/.changes/`; omitting `targets` applies
+the entry to the spec and all five clients, while `targets` can scope an entry
+to any subset of `spec`, `rust`, `kotlin`, `typescript`, `swift`, and `go`.
+
+Before tagging a coordinated release, collapse those fragments into the six
+Keep-a-Changelog files:
+
+```sh
+npm run changelog:release -- --version X.Y.Z --date YYYY-MM-DD
+```
+
+By default the command targets all artifacts. For a single-artifact hotfix, pass
+`--targets rust` (or `spec`, `kotlin`, `typescript`, `swift`, `go`; comma-join
+multiple targets for a subset). The command creates or replaces the
+`## [X.Y.Z] — YYYY-MM-DD` section in each selected artifact changelog, adds the
+`Spec version` / `Implements AHP` line, groups fragment messages under standard
+`Added` / `Changed` / `Fixed` subsections, and deletes consumed fragment files.
+If a fragment also targets artifacts not included in `--targets`, the command
+rewrites that fragment with the remaining targets so a later release can still
+consume it. Run `npm run verify:change-fragments` before release if you only
+want to validate fragment JSON without consuming it.
+
 ## Tag conventions
 
 | Artifact   | Tag pattern         | Workflow                          | Registry / discovery |
@@ -59,8 +84,8 @@ and a checked-in `clients/<lang>/release-metadata.json`.
    `[workspace.dependencies]` and any per-crate dependency declarations.
 3. Run `npm run generate:metadata` and commit the regenerated
    `clients/rust/release-metadata.json`.
-4. Rotate `clients/rust/CHANGELOG.md`: move the `## [Unreleased]` section to
-   `## [X.Y.Z] — YYYY-MM-DD` with an `Implements AHP <version>` line.
+4. Collapse Rust-scoped changelog fragments with
+   `npm run changelog:release -- --version X.Y.Z --targets rust`.
 5. Merge to `main`.
 6. Tag: `git tag rust/v0.X.Y && git push origin rust/v0.X.Y`.
 7. `publish-rust.yml` validates, then publishes `ahp-types`, `ahp`, and
@@ -72,7 +97,8 @@ and a checked-in `clients/<lang>/release-metadata.json`.
    `-SNAPSHOT` suffix (the publish workflow rejects snapshot tags).
 2. Run `npm run generate:metadata` and commit the regenerated
    `clients/kotlin/release-metadata.json`.
-3. Rotate `clients/kotlin/CHANGELOG.md`.
+3. Collapse Kotlin-scoped changelog fragments with
+   `npm run changelog:release -- --version X.Y.Z --targets kotlin`.
 4. Merge to `main`.
 5. Tag: `git tag kotlin/v0.X.Y && git push origin kotlin/v0.X.Y`.
 6. `clients/kotlin/pipeline.yml` (Azure DevOps) validates the tag,
@@ -96,8 +122,8 @@ use PATs to trigger ADO from GHA.
 2. `cd clients/typescript && npm install` to refresh the lockfile.
 3. Run `npm run generate:metadata` from the repo root and commit the
    regenerated `clients/typescript/release-metadata.json`.
-4. Rotate `clients/typescript/CHANGELOG.md`: move `## [Unreleased]` to
-   `## [X.Y.Z] — YYYY-MM-DD` with an `Implements AHP <version>` line.
+4. Collapse TypeScript-scoped changelog fragments with
+   `npm run changelog:release -- --version X.Y.Z --targets typescript`.
 5. Merge to `main`.
 6. Tag: `git tag typescript/v0.X.Y && git push origin typescript/v0.X.Y`.
 7. The ADO pipeline picks up the tag, validates it against
@@ -118,7 +144,8 @@ trigger started the run.
    leading `v`, no `-SNAPSHOT`).
 2. Run `npm run generate:metadata` and commit the regenerated
    `clients/swift/release-metadata.json`.
-3. Rotate `clients/swift/CHANGELOG.md`.
+3. Collapse Swift-scoped changelog fragments with
+   `npm run changelog:release -- --version X.Y.Z --targets swift`.
 4. Merge to `main`.
 5. Tag: `git tag v0.X.Y && git push origin v0.X.Y`. **Note the absence of
    any prefix** — this is the one place in the repo where bare semver tags
@@ -134,7 +161,8 @@ trigger started the run.
    `v`, no `-SNAPSHOT`).
 2. Run `npm run generate:metadata` and commit the regenerated
    `clients/go/release-metadata.json`.
-3. Rotate `clients/go/CHANGELOG.md`.
+3. Collapse Go-scoped changelog fragments with
+   `npm run changelog:release -- --version X.Y.Z --targets go`.
 4. Merge to `main`.
 5. Tag: `git tag clients/go/v0.X.Y && git push origin clients/go/v0.X.Y`.
    **The `clients/go/` prefix is required** — it is what the Go module
@@ -156,7 +184,8 @@ trigger started the run.
    new symbols.
 3. Run `npm run generate` to refresh schemas, generated client sources,
    and metadata.
-4. Rotate the root `CHANGELOG.md`.
+4. Collapse spec-scoped changelog fragments with
+   `npm run changelog:release -- --version X.Y.Z --targets spec`.
 5. Merge to `main`.
 6. Tag: `git tag spec/v0.X.Y && git push origin spec/v0.X.Y`.
 7. `publish-spec.yml` validates, regenerates the JSON schemas from the
@@ -169,6 +198,7 @@ trigger started the run.
 | --- | --- |
 | `Version.generated.{rs,kt,swift,go}` ↔ `types/version/registry.ts` | Per-language CI job re-runs `npm run generate:<lang>` and fails on diff. |
 | `release-metadata.json` ↔ native manifest + registry | `npm run verify:release-metadata` (also gated on every publish workflow). |
+| `docs/.changes/*.json` shape | `npm run verify:change-fragments` validates fragment type, message, targets, and issue references before release collapse. |
 | Native package version ↔ matching CHANGELOG entry | `npm run verify:changelog` (in CI, and re-run in `publish-rust.yml` / `publish-swift.yml` / `publish-go.yml` / both ADO `pipeline.yml`s). |
 | Tag ↔ manifest version | Every tag-driven publish workflow's "Verify tag matches" step. |
 | Tag-derived version ↔ CHANGELOG entry | Every tag-driven publish workflow's `grep -qE '^## \[<tag-version>\]'` step (defense-in-depth alongside `verify:changelog`). |

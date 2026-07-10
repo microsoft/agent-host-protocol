@@ -155,3 +155,135 @@ async fn request_response_and_action_fanout() {
     client.shutdown().await;
     server.await.unwrap();
 }
+
+#[tokio::test]
+async fn resource_read_send_wrapper_targets_root_channel() {
+    use ahp_types::commands::{ContentEncoding, ResourceReadParams};
+
+    let (client_side, mut server_side) = pair();
+    let client = Client::connect(client_side, ClientConfig::default())
+        .await
+        .expect("connect");
+
+    let server = tokio::spawn(async move {
+        let msg = server_side.recv().await.unwrap().unwrap();
+        let JsonRpcMessage::Request(req) = msg.into_parsed().unwrap() else {
+            panic!("expected Request")
+        };
+        assert_eq!(req.method, "resourceRead");
+        let params = req.params.unwrap();
+        // The wrapper must force the root channel regardless of caller input.
+        assert_eq!(params["channel"], "ahp-root://");
+        assert_eq!(params["uri"], "ahp-resource:/notes.txt");
+
+        let result = serde_json::json!({ "data": "hi", "encoding": "utf-8" });
+        let resp = JsonRpcMessage::SuccessResponse(JsonRpcSuccessResponse {
+            jsonrpc: JsonRpcVersion::V2,
+            id: req.id,
+            result: ahp_types::common::AnyValue::from(result),
+        });
+        server_side
+            .send(TransportMessage::encode(&resp).unwrap())
+            .await
+            .unwrap();
+    });
+
+    let result = client
+        .resource_read(ResourceReadParams {
+            channel: String::new(),
+            uri: "ahp-resource:/notes.txt".into(),
+            encoding: None,
+        })
+        .await
+        .expect("resource_read");
+    assert_eq!(result.data, "hi");
+    assert_eq!(result.encoding, ContentEncoding::Utf8);
+
+    client.shutdown().await;
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn inbound_resource_request_routes_to_typed_handler() {
+    use ahp::ResourceRequestHandlers;
+    use ahp_types::commands::{ContentEncoding, ResourceReadResult};
+
+    let (client_side, mut server_side) = pair();
+    let client = Client::connect(client_side, ClientConfig::default())
+        .await
+        .expect("connect");
+
+    client.set_resource_request_handlers(ResourceRequestHandlers::new().on_resource_read(
+        |params| async move {
+            assert_eq!(params.uri, "ahp-resource:/from-server.txt");
+            Ok(ResourceReadResult {
+                data: "server-data".into(),
+                encoding: ContentEncoding::Utf8,
+                content_type: None,
+            })
+        },
+    ));
+
+    // A registered method is answered by the typed handler; an unregistered
+    // one falls through to MethodNotFound.
+    let server = tokio::spawn(async move {
+        let read_req = JsonRpcMessage::Request(ahp_types::messages::JsonRpcRequest {
+            jsonrpc: JsonRpcVersion::V2,
+            id: 100,
+            method: "resourceRead".into(),
+            params: Some(ahp_types::common::AnyValue::from(serde_json::json!({
+                "channel": "ahp-root://",
+                "uri": "ahp-resource:/from-server.txt",
+            }))),
+        });
+        server_side
+            .send(TransportMessage::encode(&read_req).unwrap())
+            .await
+            .unwrap();
+
+        let JsonRpcMessage::SuccessResponse(resp) = server_side
+            .recv()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_parsed()
+            .unwrap()
+        else {
+            panic!("expected SuccessResponse")
+        };
+        assert_eq!(resp.id, 100);
+        assert_eq!(resp.result["data"], "server-data");
+
+        let write_req = JsonRpcMessage::Request(ahp_types::messages::JsonRpcRequest {
+            jsonrpc: JsonRpcVersion::V2,
+            id: 101,
+            method: "resourceWrite".into(),
+            params: Some(ahp_types::common::AnyValue::from(serde_json::json!({
+                "channel": "ahp-root://",
+                "uri": "ahp-resource:/x.txt",
+                "data": "y",
+                "encoding": "utf-8",
+            }))),
+        });
+        server_side
+            .send(TransportMessage::encode(&write_req).unwrap())
+            .await
+            .unwrap();
+
+        let JsonRpcMessage::ErrorResponse(resp) = server_side
+            .recv()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_parsed()
+            .unwrap()
+        else {
+            panic!("expected ErrorResponse")
+        };
+        assert_eq!(resp.id, 101);
+        assert_eq!(resp.error.code, -32601);
+    });
+
+    server.await.unwrap();
+    client.shutdown().await;
+}

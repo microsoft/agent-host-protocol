@@ -19,12 +19,34 @@ import type {
   PingParams,
   ReconnectParams,
   ReconnectResult,
+  ResourceReadParams,
+  ResourceReadResult,
+  ResourceWriteParams,
+  ResourceWriteResult,
+  ResourceListParams,
+  ResourceListResult,
+  ResourceCopyParams,
+  ResourceCopyResult,
+  ResourceDeleteParams,
+  ResourceDeleteResult,
+  ResourceMoveParams,
+  ResourceMoveResult,
+  ResourceResolveParams,
+  ResourceResolveResult,
+  ResourceMkdirParams,
+  ResourceMkdirResult,
+  ResourceRequestParams,
+  ResourceRequestResult,
   SubscribeParams,
   SubscribeView,
   SubscriptionDeliveryOptions,
   SubscribeResult,
   UnsubscribeParams,
 } from '../types/common/commands.js';
+import type {
+  CreateResourceWatchParams,
+  CreateResourceWatchResult,
+} from '../types/channels-resource-watch/commands.js';
 import type {
   CommandMap,
   ClientNotificationMap,
@@ -145,6 +167,46 @@ export type ServerRequestHandler = <M extends keyof ServerCommandMap>(
   params: ServerCommandMap[M]['params'],
 ) => Promise<ServerCommandMap[M]['result']>;
 
+/**
+ * Typed per-method handlers for inbound server-initiated resource requests.
+ *
+ * Every method of {@link ServerCommandMap} (the symmetrical `resource*`
+ * family) maps to an optional handler that receives the decoded params and
+ * returns — or resolves to — the matching result. This is the typed layer
+ * over the generic {@link ServerRequestHandler}: install it with
+ * {@link AhpClient.setResourceRequestHandlers}, or compose it yourself with
+ * {@link createResourceRequestHandler}. A method left undefined is reported
+ * back to the peer as JSON-RPC `MethodNotFound`.
+ */
+export type ResourceRequestHandlers = {
+  [M in keyof ServerCommandMap]?: (
+    params: ServerCommandMap[M]['params'],
+  ) => Promise<ServerCommandMap[M]['result']> | ServerCommandMap[M]['result'];
+};
+
+/**
+ * Compose a set of typed per-method {@link ResourceRequestHandlers} into a
+ * single {@link ServerRequestHandler} suitable for
+ * {@link AhpClient.setServerRequestHandler}. Requests whose method has no
+ * registered handler reject with a JSON-RPC `MethodNotFound` {@link RpcError}.
+ */
+export function createResourceRequestHandler(
+  handlers: ResourceRequestHandlers,
+): ServerRequestHandler {
+  return (async (method: keyof ServerCommandMap, params: unknown) => {
+    const handler = handlers[method] as
+      | ((p: unknown) => Promise<unknown> | unknown)
+      | undefined;
+    if (!handler) {
+      throw new RpcError(
+        JsonRpcErrorCodes.MethodNotFound,
+        `no handler for server method "${method}"`,
+      );
+    }
+    return handler(params);
+  }) as ServerRequestHandler;
+}
+
 // ─── Internal types ──────────────────────────────────────────────────────────
 
 interface PendingRequest {
@@ -218,6 +280,20 @@ export class AhpClient {
    */
   setServerRequestHandler(handler: ServerRequestHandler | null): void {
     this.serverRequestHandler = handler;
+  }
+
+  /**
+   * Install typed per-method handlers for inbound server-initiated resource
+   * requests ({@link ServerCommandMap}). Sugar over
+   * {@link AhpClient.setServerRequestHandler} +
+   * {@link createResourceRequestHandler}: a method left undefined is reported
+   * to the peer as JSON-RPC `MethodNotFound`. Pass `null` to clear the
+   * installed handler.
+   */
+  setResourceRequestHandlers(handlers: ResourceRequestHandlers | null): void {
+    this.setServerRequestHandler(
+      handlers ? createResourceRequestHandler(handlers) : null,
+    );
   }
 
   /**
@@ -389,6 +465,91 @@ export class AhpClient {
   async ping(): Promise<void> {
     const params: PingParams = { channel: 'ahp-root://' };
     await this.request('ping', params);
+  }
+
+  // ─── Resource commands ─────────────────────────────────────────────────────
+  //
+  // Typed convenience wrappers over the symmetrical `resource*` family. Each
+  // targets the root channel (`ahp-root://`), so callers omit `channel`. The
+  // reverse direction — a server calling these on the client — is handled via
+  // {@link AhpClient.setResourceRequestHandlers}.
+
+  /** Read the content of a resource by URI (`resourceRead`). */
+  async resourceRead(
+    params: Omit<ResourceReadParams, 'channel'>,
+  ): Promise<ResourceReadResult> {
+    return this.request('resourceRead', { ...params, channel: 'ahp-root://' });
+  }
+
+  /** Write content to a file on the receiver's filesystem (`resourceWrite`). */
+  async resourceWrite(
+    params: Omit<ResourceWriteParams, 'channel'>,
+  ): Promise<ResourceWriteResult> {
+    return this.request('resourceWrite', { ...params, channel: 'ahp-root://' });
+  }
+
+  /** List directory entries at a file URI (`resourceList`). */
+  async resourceList(
+    params: Omit<ResourceListParams, 'channel'>,
+  ): Promise<ResourceListResult> {
+    return this.request('resourceList', { ...params, channel: 'ahp-root://' });
+  }
+
+  /** Copy a resource from one URI to another (`resourceCopy`). */
+  async resourceCopy(
+    params: Omit<ResourceCopyParams, 'channel'>,
+  ): Promise<ResourceCopyResult> {
+    return this.request('resourceCopy', { ...params, channel: 'ahp-root://' });
+  }
+
+  /** Delete a resource at a URI (`resourceDelete`). */
+  async resourceDelete(
+    params: Omit<ResourceDeleteParams, 'channel'>,
+  ): Promise<ResourceDeleteResult> {
+    return this.request('resourceDelete', { ...params, channel: 'ahp-root://' });
+  }
+
+  /** Move (rename) a resource from one URI to another (`resourceMove`). */
+  async resourceMove(
+    params: Omit<ResourceMoveParams, 'channel'>,
+  ): Promise<ResourceMoveResult> {
+    return this.request('resourceMove', { ...params, channel: 'ahp-root://' });
+  }
+
+  /** Resolve a resource — `stat` + `realpath` (`resourceResolve`). */
+  async resourceResolve(
+    params: Omit<ResourceResolveParams, 'channel'>,
+  ): Promise<ResourceResolveResult> {
+    return this.request('resourceResolve', { ...params, channel: 'ahp-root://' });
+  }
+
+  /** Create a directory with `mkdir -p` semantics (`resourceMkdir`). */
+  async resourceMkdir(
+    params: Omit<ResourceMkdirParams, 'channel'>,
+  ): Promise<ResourceMkdirResult> {
+    return this.request('resourceMkdir', { ...params, channel: 'ahp-root://' });
+  }
+
+  /** Request permission to access a resource (`resourceRequest`). */
+  async resourceRequest(
+    params: Omit<ResourceRequestParams, 'channel'>,
+  ): Promise<ResourceRequestResult> {
+    return this.request('resourceRequest', { ...params, channel: 'ahp-root://' });
+  }
+
+  /**
+   * Create a resource watcher (`createResourceWatch`). Returns the
+   * `ahp-resource-watch:/<id>` channel URI; {@link AhpClient.subscribe} to it
+   * to receive change events, and {@link AhpClient.unsubscribe} to release the
+   * watcher.
+   */
+  async createResourceWatch(
+    params: Omit<CreateResourceWatchParams, 'channel'>,
+  ): Promise<CreateResourceWatchResult> {
+    return this.request('createResourceWatch', {
+      ...params,
+      channel: 'ahp-root://',
+    });
   }
 
   // ─── Lower-level JSON-RPC ──────────────────────────────────────────────────

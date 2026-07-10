@@ -22,6 +22,8 @@
 //! transport closes, or the last [`Client`] handle is dropped.
 
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
@@ -30,14 +32,20 @@ use std::time::Duration;
 
 use ahp_types::actions::{ActionEnvelope, StateAction};
 use ahp_types::commands::{
-    DispatchActionParams, InitializeParams, InitializeResult, ReconnectParams, ReconnectResult,
+    CreateResourceWatchParams, CreateResourceWatchResult, DispatchActionParams, InitializeParams,
+    InitializeResult, ReconnectParams, ReconnectResult, ResourceCopyParams, ResourceCopyResult,
+    ResourceDeleteParams, ResourceDeleteResult, ResourceListParams, ResourceListResult,
+    ResourceMkdirParams, ResourceMkdirResult, ResourceMoveParams, ResourceMoveResult,
+    ResourceReadParams, ResourceReadResult, ResourceRequestParams, ResourceRequestResult,
+    ResourceResolveParams, ResourceResolveResult, ResourceWriteParams, ResourceWriteResult,
     SubscribeParams, SubscribeResult, SubscribeView, SubscriptionDeliveryOptions,
     UnsubscribeParams,
 };
 use ahp_types::common::{Uri, ROOT_RESOURCE_URI};
+use ahp_types::errors::json_rpc_error_codes;
 use ahp_types::messages::{
-    ActionNotificationParams, JsonRpcError, JsonRpcMessage, JsonRpcNotification, JsonRpcRequest,
-    JsonRpcVersion,
+    ActionNotificationParams, JsonRpcError, JsonRpcErrorResponse, JsonRpcMessage,
+    JsonRpcNotification, JsonRpcRequest, JsonRpcSuccessResponse, JsonRpcVersion,
 };
 use ahp_types::notifications::{
     AuthRequiredParams, SessionAddedParams, SessionRemovedParams, SessionSummaryChangedParams,
@@ -195,11 +203,142 @@ struct Shared {
     next_id: AtomicU64,
     next_client_seq: AtomicU64,
     config: ClientConfig,
+    /// Handler for inbound server-initiated requests (the symmetrical
+    /// `resource*` family). `None` → the client replies `MethodNotFound`.
+    server_request_handler: std::sync::Mutex<Option<ServerRequestHandler>>,
 }
 
 enum Outbound {
     Message(JsonRpcMessage),
     Shutdown,
+}
+
+// ─── Server-initiated request handling ───────────────────────────────────────
+
+/// Future returned by a [`ServerRequestHandler`].
+pub type ServerRequestFuture = Pin<Box<dyn Future<Output = Result<Value, JsonRpcError>> + Send>>;
+
+/// Handler for inbound server-initiated requests.
+///
+/// AHP's `resource*` methods are symmetrical — a server may issue any of them
+/// back to the client. Install a handler with
+/// [`Client::set_server_request_handler`] (or the typed
+/// [`Client::set_resource_request_handlers`]) to answer them. When no handler
+/// is installed the client replies with `MethodNotFound`.
+///
+/// The closure receives the JSON-RPC method name and raw params, and resolves
+/// to the result value to return, or a [`JsonRpcError`] for an error response.
+pub type ServerRequestHandler = Arc<dyn Fn(String, Value) -> ServerRequestFuture + Send + Sync>;
+
+/// A single typed inbound `resource*` handler: decoded params in, typed result
+/// (or [`JsonRpcError`]) out.
+type ResourceHandler<P, R> =
+    Arc<dyn Fn(P) -> Pin<Box<dyn Future<Output = Result<R, JsonRpcError>> + Send>> + Send + Sync>;
+
+fn method_not_found(method: &str) -> JsonRpcError {
+    JsonRpcError {
+        code: json_rpc_error_codes::METHOD_NOT_FOUND,
+        message: format!("no handler for server method \"{method}\""),
+        data: None,
+    }
+}
+
+/// Decode `params` into `P`, run the typed `handler`, and re-encode its result.
+/// Answers `MethodNotFound` when no handler is registered for the method.
+fn run_resource_handler<P, R>(
+    handler: Option<ResourceHandler<P, R>>,
+    method: String,
+    params: Value,
+) -> ServerRequestFuture
+where
+    P: DeserializeOwned + Send + 'static,
+    R: Serialize + Send + 'static,
+{
+    Box::pin(async move {
+        let Some(handler) = handler else {
+            return Err(method_not_found(&method));
+        };
+        let parsed: P = serde_json::from_value(params).map_err(|e| JsonRpcError {
+            code: json_rpc_error_codes::INVALID_PARAMS,
+            message: e.to_string(),
+            data: None,
+        })?;
+        let result = handler(parsed).await?;
+        serde_json::to_value(result).map_err(|e| JsonRpcError {
+            code: json_rpc_error_codes::INTERNAL_ERROR,
+            message: e.to_string(),
+            data: None,
+        })
+    })
+}
+
+macro_rules! resource_request_handlers {
+    ($( $(#[$doc:meta])* $field:ident : $setter:ident => $method:literal ($params:ty) -> $result:ty ),+ $(,)?) => {
+        /// A typed per-method registry of inbound `resource*` request handlers.
+        ///
+        /// Sugar over [`Client::set_server_request_handler`]: build with the
+        /// `on_*` methods and install with
+        /// [`Client::set_resource_request_handlers`]. Each handler receives the
+        /// decoded params and returns the typed result (or a [`JsonRpcError`]).
+        /// Methods with no registered handler answer `MethodNotFound`.
+        #[derive(Clone, Default)]
+        pub struct ResourceRequestHandlers {
+            $( $(#[$doc])* pub $field: Option<ResourceHandler<$params, $result>>, )+
+        }
+
+        impl ResourceRequestHandlers {
+            /// Create an empty registry.
+            pub fn new() -> Self {
+                Self::default()
+            }
+
+            $(
+                $(#[$doc])*
+                pub fn $setter<F, Fut>(mut self, handler: F) -> Self
+                where
+                    F: Fn($params) -> Fut + Send + Sync + 'static,
+                    Fut: Future<Output = Result<$result, JsonRpcError>> + Send + 'static,
+                {
+                    self.$field = Some(Arc::new(move |p| Box::pin(handler(p))));
+                    self
+                }
+            )+
+
+            /// Collapse this typed registry into a generic [`ServerRequestHandler`].
+            pub fn into_handler(self) -> ServerRequestHandler {
+                Arc::new(move |method: String, params: Value| match method.as_str() {
+                    $( $method => run_resource_handler(self.$field.clone(), method.clone(), params), )+
+                    _ => {
+                        let unknown = method.clone();
+                        Box::pin(async move { Err(method_not_found(&unknown)) })
+                    }
+                })
+            }
+        }
+    };
+}
+
+resource_request_handlers! {
+    /// Handle an inbound `resourceRead` request.
+    resource_read: on_resource_read => "resourceRead" (ResourceReadParams) -> ResourceReadResult,
+    /// Handle an inbound `resourceWrite` request.
+    resource_write: on_resource_write => "resourceWrite" (ResourceWriteParams) -> ResourceWriteResult,
+    /// Handle an inbound `resourceList` request.
+    resource_list: on_resource_list => "resourceList" (ResourceListParams) -> ResourceListResult,
+    /// Handle an inbound `resourceCopy` request.
+    resource_copy: on_resource_copy => "resourceCopy" (ResourceCopyParams) -> ResourceCopyResult,
+    /// Handle an inbound `resourceDelete` request.
+    resource_delete: on_resource_delete => "resourceDelete" (ResourceDeleteParams) -> ResourceDeleteResult,
+    /// Handle an inbound `resourceMove` request.
+    resource_move: on_resource_move => "resourceMove" (ResourceMoveParams) -> ResourceMoveResult,
+    /// Handle an inbound `resourceResolve` request.
+    resource_resolve: on_resource_resolve => "resourceResolve" (ResourceResolveParams) -> ResourceResolveResult,
+    /// Handle an inbound `resourceMkdir` request.
+    resource_mkdir: on_resource_mkdir => "resourceMkdir" (ResourceMkdirParams) -> ResourceMkdirResult,
+    /// Handle an inbound `resourceRequest` request.
+    resource_request: on_resource_request => "resourceRequest" (ResourceRequestParams) -> ResourceRequestResult,
+    /// Handle an inbound `createResourceWatch` request.
+    create_resource_watch: on_create_resource_watch => "createResourceWatch" (CreateResourceWatchParams) -> CreateResourceWatchResult,
 }
 
 /// Async JSON-RPC client driving a pluggable [`Transport`].
@@ -243,6 +382,7 @@ impl Client {
             next_id: AtomicU64::new(1),
             next_client_seq: AtomicU64::new(1),
             config,
+            server_request_handler: std::sync::Mutex::new(None),
         });
 
         let handle = tokio::spawn(drive_transport(transport, shared.clone(), outbound_rx));
@@ -505,6 +645,144 @@ impl Client {
         .await?;
         Ok(DispatchHandle { client_seq })
     }
+
+    // ─── Server-initiated requests (inbound) ─────────────────────────────
+
+    /// Install a generic handler for inbound server-initiated requests.
+    ///
+    /// AHP's `resource*` methods are symmetrical, so a server may issue any
+    /// of them back to the client. The handler receives the method name and
+    /// raw params and resolves to the result value (or a [`JsonRpcError`]).
+    /// Replaces any previously-installed handler. When none is installed the
+    /// client answers inbound requests with `MethodNotFound`.
+    ///
+    /// For a typed, per-method API see [`Client::set_resource_request_handlers`].
+    pub fn set_server_request_handler<F, Fut>(&self, handler: F)
+    where
+        F: Fn(String, Value) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Value, JsonRpcError>> + Send + 'static,
+    {
+        let handler: ServerRequestHandler =
+            Arc::new(move |method, params| Box::pin(handler(method, params)));
+        if let Ok(mut guard) = self.shared.server_request_handler.lock() {
+            *guard = Some(handler);
+        }
+    }
+
+    /// Install typed per-method handlers for inbound `resource*` requests.
+    ///
+    /// Sugar over [`Client::set_server_request_handler`] that decodes params
+    /// and encodes results for you. Unhandled methods answer `MethodNotFound`.
+    pub fn set_resource_request_handlers(&self, handlers: ResourceRequestHandlers) {
+        if let Ok(mut guard) = self.shared.server_request_handler.lock() {
+            *guard = Some(handlers.into_handler());
+        }
+    }
+
+    /// Remove any installed server-request handler; inbound requests revert to
+    /// answering `MethodNotFound`.
+    pub fn clear_server_request_handler(&self) {
+        if let Ok(mut guard) = self.shared.server_request_handler.lock() {
+            *guard = None;
+        }
+    }
+
+    // ─── Resource commands (send) ────────────────────────────────────────
+    //
+    // Typed wrappers around `request()` for the symmetrical `resource*`
+    // family. Each targets the root channel; any `channel` set on `params`
+    // is overwritten.
+
+    /// Read a resource's content (`resourceRead`).
+    pub async fn resource_read(
+        &self,
+        mut params: ResourceReadParams,
+    ) -> Result<ResourceReadResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceRead", params).await
+    }
+
+    /// Write content to a resource (`resourceWrite`).
+    pub async fn resource_write(
+        &self,
+        mut params: ResourceWriteParams,
+    ) -> Result<ResourceWriteResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceWrite", params).await
+    }
+
+    /// List the children of a resource (`resourceList`).
+    pub async fn resource_list(
+        &self,
+        mut params: ResourceListParams,
+    ) -> Result<ResourceListResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceList", params).await
+    }
+
+    /// Copy a resource (`resourceCopy`).
+    pub async fn resource_copy(
+        &self,
+        mut params: ResourceCopyParams,
+    ) -> Result<ResourceCopyResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceCopy", params).await
+    }
+
+    /// Delete a resource (`resourceDelete`).
+    pub async fn resource_delete(
+        &self,
+        mut params: ResourceDeleteParams,
+    ) -> Result<ResourceDeleteResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceDelete", params).await
+    }
+
+    /// Move or rename a resource (`resourceMove`).
+    pub async fn resource_move(
+        &self,
+        mut params: ResourceMoveParams,
+    ) -> Result<ResourceMoveResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceMove", params).await
+    }
+
+    /// Resolve a resource URI to its canonical form (`resourceResolve`).
+    pub async fn resource_resolve(
+        &self,
+        mut params: ResourceResolveParams,
+    ) -> Result<ResourceResolveResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceResolve", params).await
+    }
+
+    /// Create a directory resource (`resourceMkdir`).
+    pub async fn resource_mkdir(
+        &self,
+        mut params: ResourceMkdirParams,
+    ) -> Result<ResourceMkdirResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceMkdir", params).await
+    }
+
+    /// Issue a free-form resource request (`resourceRequest`).
+    pub async fn resource_request(
+        &self,
+        mut params: ResourceRequestParams,
+    ) -> Result<ResourceRequestResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("resourceRequest", params).await
+    }
+
+    /// Create a resource watch channel (`createResourceWatch`). Pair the
+    /// returned channel URI with [`Client::subscribe`] to stream changes.
+    pub async fn create_resource_watch(
+        &self,
+        mut params: CreateResourceWatchParams,
+    ) -> Result<CreateResourceWatchResult, ClientError> {
+        params.channel = ROOT_RESOURCE_URI.to_string();
+        self.request("createResourceWatch", params).await
+    }
 }
 
 async fn drive_transport<T: Transport>(
@@ -568,7 +846,7 @@ async fn drive_transport<T: Transport>(
     }
 }
 
-async fn dispatch_inbound(shared: &Shared, msg: JsonRpcMessage) {
+async fn dispatch_inbound(shared: &Arc<Shared>, msg: JsonRpcMessage) {
     match msg {
         JsonRpcMessage::SuccessResponse(r) => {
             if let Some(tx) = shared.pending.lock().await.remove(&r.id) {
@@ -584,9 +862,47 @@ async fn dispatch_inbound(shared: &Shared, msg: JsonRpcMessage) {
             handle_notification(shared, n).await;
         }
         JsonRpcMessage::Request(r) => {
-            tracing::debug!(method = %r.method, "ignoring unexpected server request");
+            // Handle on a detached task: a handler may call back into the
+            // client (e.g. issue its own request), which must not block the
+            // transport read loop.
+            let shared = shared.clone();
+            tokio::spawn(async move {
+                handle_server_request(&shared, r).await;
+            });
         }
     }
+}
+
+/// Answer an inbound server-initiated request via the installed
+/// [`ServerRequestHandler`], or with `MethodNotFound` when none is set.
+async fn handle_server_request(shared: &Shared, req: JsonRpcRequest) {
+    let handler = shared
+        .server_request_handler
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone());
+    let id = req.id;
+    let params = req.params.unwrap_or(Value::Null);
+    let response = match handler {
+        Some(handler) => match handler(req.method, params).await {
+            Ok(result) => JsonRpcMessage::SuccessResponse(JsonRpcSuccessResponse {
+                jsonrpc: JsonRpcVersion::V2,
+                id,
+                result,
+            }),
+            Err(error) => JsonRpcMessage::ErrorResponse(JsonRpcErrorResponse {
+                jsonrpc: JsonRpcVersion::V2,
+                id,
+                error,
+            }),
+        },
+        None => JsonRpcMessage::ErrorResponse(JsonRpcErrorResponse {
+            jsonrpc: JsonRpcVersion::V2,
+            id,
+            error: method_not_found(&req.method),
+        }),
+    };
+    let _ = shared.outbound.send(Outbound::Message(response)).await;
 }
 
 async fn handle_notification(shared: &Shared, n: JsonRpcNotification) {

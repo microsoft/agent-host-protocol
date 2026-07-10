@@ -201,6 +201,7 @@ public enum ResponsePartKind: String, Codable, Sendable {
     case toolCall = "toolCall"
     case reasoning = "reasoning"
     case systemNotification = "systemNotification"
+    case inputRequest = "inputRequest"
 }
 
 /// Status of a tool call in the lifecycle state machine.
@@ -2346,13 +2347,49 @@ public struct SystemNotificationResponsePart: Codable, Sendable {
     public var kind: ResponsePartKind
     /// The text of the system notification
     public var content: StringOrMarkdown
+    /// Additional provider-specific metadata for this notification.
+    ///
+    /// A host MAY attach a machine-readable descriptor of what triggered the
+    /// notification so clients can categorize, icon, group, filter, or localize
+    /// it without parsing `content`. Clients MAY look for well-known keys here to
+    /// provide enhanced UI, and MUST render coherently from `content` alone when
+    /// `_meta` is absent or unrecognized.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case content
+        case meta = "_meta"
+    }
 
     public init(
         kind: ResponsePartKind,
-        content: StringOrMarkdown
+        content: StringOrMarkdown,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.kind = kind
         self.content = content
+        self.meta = meta
+    }
+}
+
+public struct InputRequestResponsePart: Codable, Sendable {
+    /// Discriminant
+    public var kind: ResponsePartKind
+    /// The resolved request, carrying its `id`, `message`, `url`, `questions`,
+    /// and the final `answers` synced/submitted at completion.
+    public var request: ChatInputRequest
+    /// How the request was resolved: `accept`, `decline`, or `cancel`.
+    public var response: ChatInputResponseKind
+
+    public init(
+        kind: ResponsePartKind,
+        request: ChatInputRequest,
+        response: ChatInputResponseKind
+    ) {
+        self.kind = kind
+        self.request = request
+        self.response = response
     }
 }
 
@@ -3205,6 +3242,12 @@ public struct PluginCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     /// Whether this container is currently enabled.
     public var enabled: Bool
     /// `clientId` of the client that contributed this container. Absent for
@@ -3228,12 +3271,28 @@ public struct PluginCustomization: Codable, Sendable {
     /// parses nor enforces it.
     public var version: String?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uri
+        case name
+        case icons
+        case range
+        case meta = "_meta"
+        case enabled
+        case clientId
+        case load
+        case children
+        case type
+        case version
+    }
+
     public init(
         id: String,
         uri: String,
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         enabled: Bool,
         clientId: String? = nil,
         load: CustomizationLoadState? = nil,
@@ -3246,6 +3305,7 @@ public struct PluginCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.enabled = enabled
         self.clientId = clientId
         self.load = load
@@ -3277,6 +3337,12 @@ public struct ClientPluginCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     /// Whether this container is currently enabled.
     public var enabled: Bool
     /// `clientId` of the client that contributed this container. Absent for
@@ -3302,12 +3368,29 @@ public struct ClientPluginCustomization: Codable, Sendable {
     /// Opaque version token used by the host to detect changes.
     public var nonce: String?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uri
+        case name
+        case icons
+        case range
+        case meta = "_meta"
+        case enabled
+        case clientId
+        case load
+        case children
+        case type
+        case version
+        case nonce
+    }
+
     public init(
         id: String,
         uri: String,
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         enabled: Bool,
         clientId: String? = nil,
         load: CustomizationLoadState? = nil,
@@ -3321,6 +3404,7 @@ public struct ClientPluginCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.enabled = enabled
         self.clientId = clientId
         self.load = load
@@ -3353,6 +3437,12 @@ public struct DirectoryCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     /// Whether this container is currently enabled.
     public var enabled: Bool
     /// `clientId` of the client that contributed this container. Absent for
@@ -3373,12 +3463,29 @@ public struct DirectoryCustomization: Codable, Sendable {
     /// Whether clients may write into this directory.
     public var writable: Bool
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uri
+        case name
+        case icons
+        case range
+        case meta = "_meta"
+        case enabled
+        case clientId
+        case load
+        case children
+        case type
+        case contents
+        case writable
+    }
+
     public init(
         id: String,
         uri: String,
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         enabled: Bool,
         clientId: String? = nil,
         load: CustomizationLoadState? = nil,
@@ -3392,6 +3499,7 @@ public struct DirectoryCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.enabled = enabled
         self.clientId = clientId
         self.load = load
@@ -3424,6 +3532,12 @@ public struct AgentCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -3460,10 +3574,6 @@ public struct AgentCustomization: Codable, Sendable {
     /// in a picker); it remains available for the agent to auto-delegate
     /// to. Absent or `false` means the user may select it.
     public var disableUserInvocation: Bool?
-    /// Additional provider-specific metadata for this custom agent.
-    ///
-    /// Mirrors the MCP `_meta` convention.
-    public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -3471,6 +3581,7 @@ public struct AgentCustomization: Codable, Sendable {
         case name
         case icons
         case range
+        case meta = "_meta"
         case enabled
         case type
         case description
@@ -3478,7 +3589,6 @@ public struct AgentCustomization: Codable, Sendable {
         case tools
         case disableModelInvocation
         case disableUserInvocation
-        case meta = "_meta"
     }
 
     public init(
@@ -3487,20 +3597,21 @@ public struct AgentCustomization: Codable, Sendable {
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
         type: CustomizationType,
         description: String? = nil,
         model: String? = nil,
         tools: [String]? = nil,
         disableModelInvocation: Bool? = nil,
-        disableUserInvocation: Bool? = nil,
-        meta: [String: AnyCodable]? = nil
+        disableUserInvocation: Bool? = nil
     ) {
         self.id = id
         self.uri = uri
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.enabled = enabled
         self.type = type
         self.description = description
@@ -3508,7 +3619,6 @@ public struct AgentCustomization: Codable, Sendable {
         self.tools = tools
         self.disableModelInvocation = disableModelInvocation
         self.disableUserInvocation = disableUserInvocation
-        self.meta = meta
     }
 }
 
@@ -3534,6 +3644,12 @@ public struct SkillCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -3559,12 +3675,27 @@ public struct SkillCustomization: Codable, Sendable {
     /// auto-invoke. Absent or `false` means the user may invoke it.
     public var disableUserInvocation: Bool?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uri
+        case name
+        case icons
+        case range
+        case meta = "_meta"
+        case enabled
+        case type
+        case description
+        case disableModelInvocation
+        case disableUserInvocation
+    }
+
     public init(
         id: String,
         uri: String,
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
         type: CustomizationType,
         description: String? = nil,
@@ -3576,6 +3707,7 @@ public struct SkillCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.enabled = enabled
         self.type = type
         self.description = description
@@ -3606,6 +3738,12 @@ public struct PromptCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -3622,12 +3760,25 @@ public struct PromptCustomization: Codable, Sendable {
     /// Short description of what the prompt does.
     public var description: String?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uri
+        case name
+        case icons
+        case range
+        case meta = "_meta"
+        case enabled
+        case type
+        case description
+    }
+
     public init(
         id: String,
         uri: String,
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
         type: CustomizationType,
         description: String? = nil
@@ -3637,6 +3788,7 @@ public struct PromptCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.enabled = enabled
         self.type = type
         self.description = description
@@ -3665,6 +3817,12 @@ public struct RuleCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -3688,12 +3846,27 @@ public struct RuleCustomization: Codable, Sendable {
     /// active for matching files.
     public var globs: [String]?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uri
+        case name
+        case icons
+        case range
+        case meta = "_meta"
+        case enabled
+        case type
+        case description
+        case alwaysApply
+        case globs
+    }
+
     public init(
         id: String,
         uri: String,
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
         type: CustomizationType,
         description: String? = nil,
@@ -3705,6 +3878,7 @@ public struct RuleCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.enabled = enabled
         self.type = type
         self.description = description
@@ -3735,6 +3909,12 @@ public struct HookCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -3749,12 +3929,24 @@ public struct HookCustomization: Codable, Sendable {
     public var enabled: Bool?
     public var type: CustomizationType
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uri
+        case name
+        case icons
+        case range
+        case meta = "_meta"
+        case enabled
+        case type
+    }
+
     public init(
         id: String,
         uri: String,
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         enabled: Bool? = nil,
         type: CustomizationType
     ) {
@@ -3763,6 +3955,7 @@ public struct HookCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.enabled = enabled
         self.type = type
     }
@@ -3790,6 +3983,12 @@ public struct McpServerCustomization: Codable, Sendable {
     /// in an inline `mcpServers` block of a `plugins.json` manifest).
     /// Absent when the customization covers the whole resource.
     public var range: TextRange?
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    public var meta: [String: AnyCodable]?
     public var type: CustomizationType
     /// Whether this MCP server is currently enabled.
     public var enabled: Bool
@@ -3815,12 +4014,27 @@ public struct McpServerCustomization: Codable, Sendable {
     /// which support apps.
     public var mcpApp: McpServerCustomizationApps?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case uri
+        case name
+        case icons
+        case range
+        case meta = "_meta"
+        case type
+        case enabled
+        case state
+        case channel
+        case mcpApp
+    }
+
     public init(
         id: String,
         uri: String,
         name: String,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
+        meta: [String: AnyCodable]? = nil,
         type: CustomizationType,
         enabled: Bool,
         state: McpServerState,
@@ -3832,6 +4046,7 @@ public struct McpServerCustomization: Codable, Sendable {
         self.name = name
         self.icons = icons
         self.range = range
+        self.meta = meta
         self.type = type
         self.enabled = enabled
         self.state = state
@@ -4900,6 +5115,7 @@ public enum ResponsePart: Codable, Sendable {
     case toolCall(ToolCallResponsePart)
     case reasoning(ReasoningResponsePart)
     case systemNotification(SystemNotificationResponsePart)
+    case inputRequest(InputRequestResponsePart)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
     case unknown(AnyCodable)
@@ -4922,6 +5138,8 @@ public enum ResponsePart: Codable, Sendable {
             self = .reasoning(try ReasoningResponsePart(from: decoder))
         case "systemNotification":
             self = .systemNotification(try SystemNotificationResponsePart(from: decoder))
+        case "inputRequest":
+            self = .inputRequest(try InputRequestResponsePart(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -4934,6 +5152,7 @@ public enum ResponsePart: Codable, Sendable {
         case .toolCall(let value): try value.encode(to: encoder)
         case .reasoning(let value): try value.encode(to: encoder)
         case .systemNotification(let value): try value.encode(to: encoder)
+        case .inputRequest(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

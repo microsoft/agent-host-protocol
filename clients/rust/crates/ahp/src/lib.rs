@@ -155,8 +155,8 @@ pub mod transport;
 pub use ahp_types;
 
 pub use client::{
-    Client, ClientConfig, ClientEvent, ClientEventStream, DispatchHandle, SessionSubscription,
-    SubscriptionEvent,
+    Client, ClientConfig, ClientEvent, ClientEventStream, DispatchHandle, ResourceRequestHandlers,
+    ServerRequestFuture, ServerRequestHandler, SessionSubscription, SubscriptionEvent,
 };
 pub use error::{ClientError, TransportError};
 pub use multi_host_state_mirror::{HostedResourceKey, MultiHostStateMirror};

@@ -143,6 +143,11 @@ type InitializeResult struct {
 	// {@link CompletionItemKind.UserMessage}. Typically includes characters like
 	// `'@'` or `'/'`.
 	CompletionTriggerCharacters []string `json:"completionTriggerCharacters,omitempty"`
+	// Prefix that the host recognizes at the start of a user {@link Message.text}
+	// as a shorthand for executing the remainder as a terminal command. Currently
+	// the standardized convention is `"!"`; absence means the host does not
+	// support command prefixes.
+	TerminalCommandPrefix *string `json:"terminalCommandPrefix,omitempty"`
 	// OTLP telemetry channels the host emits, if any. Each populated field is
 	// either a literal `ahp-otlp:` channel URI or an RFC 6570 URI template a
 	// client expands before subscribing (currently only the `logs` channel

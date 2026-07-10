@@ -1,0 +1,36 @@
+{
+  "name": "initialize-terminal-command-prefix",
+  "group": "A",
+  "description": "InitializeResult carries the optional terminalCommandPrefix marker so hosts can advertise support for !-prefixed terminal-command messages.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.5.2",
+    "serverSeq": 7,
+    "snapshots": [
+      {
+        "resource": "ahp-root://",
+        "state": {
+          "agents": []
+        },
+        "fromSeq": 7
+      }
+    ],
+    "terminalCommandPrefix": "!"
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "0.5.2",
+      "serverSeq": 7,
+      "snapshots": [
+        {
+          "resource": "ahp-root://",
+          "state": {
+            "agents": []
+          },
+          "fromSeq": 7
+        }
+      ],
+      "terminalCommandPrefix": "!"
+    }
+  ]
+}

@@ -160,6 +160,10 @@
           },
           "description": "Characters that, when typed in a {@link Message} input, SHOULD cause\nthe client to issue a `completions` request with\n{@link CompletionItemKind.UserMessage}. Typically includes characters like\n`'@'` or `'/'`."
         },
+        "terminalCommandPrefix": {
+          "type": "string",
+          "description": "Prefix that the host recognizes at the start of a user {@link Message.text}\nas a shorthand for executing the remainder as a terminal command. Currently\nthe standardized convention is `\"!\"`; absence means the host does not\nsupport command prefixes."
+        },
         "telemetry": {
           "$ref": "#/$defs/TelemetryCapabilities",
           "description": "OTLP telemetry channels the host emits, if any. Each populated field is\neither a literal `ahp-otlp:` channel URI or an RFC 6570 URI template a\nclient expands before subscribing (currently only the `logs` channel\ndefines a template variable, `{level}`, for subscriber-side severity\nfiltering). Clients MAY ignore signals they cannot process."
@@ -2982,6 +2986,11 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         }
       },
       "required": [
@@ -3075,6 +3084,11 @@
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
+        },
         "enabled": {
           "type": "boolean",
           "description": "Whether this container is currently enabled."
@@ -3128,6 +3142,11 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
         "enabled": {
           "type": "boolean",
@@ -3190,6 +3209,11 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
         "enabled": {
           "type": "boolean",
@@ -3256,6 +3280,11 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
         "enabled": {
           "type": "boolean",
@@ -3325,6 +3354,11 @@
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
+        },
         "enabled": {
           "type": "boolean",
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
@@ -3363,6 +3397,11 @@
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
+        },
         "enabled": {
           "type": "boolean",
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
@@ -3392,11 +3431,6 @@
         "disableUserInvocation": {
           "type": "boolean",
           "description": "When `true`, the user cannot select this custom agent (for example,\nin a picker); it remains available for the agent to auto-delegate\nto. Absent or `false` means the user may select it."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Additional provider-specific metadata for this custom agent.\n\nMirrors the MCP `_meta` convention."
         }
       },
       "required": [
@@ -3432,6 +3466,11 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
         "enabled": {
           "type": "boolean",
@@ -3487,6 +3526,11 @@
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
+        },
         "enabled": {
           "type": "boolean",
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
@@ -3532,6 +3576,11 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
         "enabled": {
           "type": "boolean",
@@ -3590,6 +3639,11 @@
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
+        },
         "enabled": {
           "type": "boolean",
           "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
@@ -3631,6 +3685,11 @@
         "range": {
           "$ref": "#/$defs/TextRange",
           "description": "Optional span within {@link CustomizationBase.uri | `uri`} when this\ncustomization is a subset of a larger file (for example, one entry\nin an inline `mcpServers` block of a `plugins.json` manifest).\nAbsent when the customization covers the whole resource."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
         "type": {
           "const": "mcpServer"
@@ -4806,6 +4865,29 @@
         "content"
       ]
     },
+    "InputRequestResponsePart": {
+      "type": "object",
+      "description": "A resolved input request (elicitation) recorded in the turn transcript.\n\nWhile an input request is open it lives in {@link ChatState.inputRequests}\nas live, interactive state (see {@link ChatInputRequest}). When the request\ncompletes via `chat/inputCompleted`, the reducer removes it from\n`inputRequests` and appends this part to the active turn so the decision\nsurvives in history. This mirrors how a tool-call confirmation persists in\nits {@link ToolCallResponsePart} (via `confirmed` / `selectedOption` on the\nterminal {@link ToolCallState}): the live surface drives in-flight UX, the\nterminal outcome is durable and backfillable via `fetchTurns`.\n\nNo part is recorded when an outstanding request is *abandoned* (the turn\ncompletes, is cancelled, errors, or is truncated) rather than *completed*.",
+      "properties": {
+        "kind": {
+          "const": "inputRequest",
+          "description": "Discriminant"
+        },
+        "request": {
+          "$ref": "#/$defs/ChatInputRequest",
+          "description": "The resolved request, carrying its `id`, `message`, `url`, `questions`,\nand the final `answers` synced/submitted at completion."
+        },
+        "response": {
+          "$ref": "#/$defs/ChatInputResponseKind",
+          "description": "How the request was resolved: `accept`, `decline`, or `cancel`."
+        }
+      },
+      "required": [
+        "kind",
+        "request",
+        "response"
+      ]
+    },
     "SystemNotificationResponsePart": {
       "type": "object",
       "description": "A system notification surfaced as part of the response stream.\n\nSystem notifications are messages authored by the agent harness\nthat need to be visible to both the agent (for situational awareness) and\nthe user (for transcript continuity). Examples include \"background subagent\nX completed\" or \"task Y was cancelled\".",
@@ -4817,6 +4899,11 @@
         "content": {
           "$ref": "#/$defs/StringOrMarkdown",
           "description": "The text of the system notification"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this notification.\n\nA host MAY attach a machine-readable descriptor of what triggered the\nnotification so clients can categorize, icon, group, filter, or localize\nit without parsing `content`. Clients MAY look for well-known keys here to\nprovide enhanced UI, and MUST render coherently from `content` alone when\n`_meta` is absent or unrecognized."
         }
       },
       "required": [
@@ -8950,6 +9037,9 @@
         },
         {
           "$ref": "#/$defs/SystemNotificationResponsePart"
+        },
+        {
+          "$ref": "#/$defs/InputRequestResponsePart"
         }
       ]
     },
@@ -8971,6 +9061,15 @@
       ],
       "type": "string",
       "description": "Discriminant for {@link MessageOrigin} — identifies who produced a message."
+    },
+    "ChatInputResponseKind": {
+      "enum": [
+        "accept",
+        "decline",
+        "cancel"
+      ],
+      "type": "string",
+      "description": "How a client completed an input request."
     },
     "ConfirmationOptionKind": {
       "enum": [
@@ -9089,15 +9188,6 @@
       ],
       "type": "string",
       "description": "Discriminant for pending message kinds."
-    },
-    "ChatInputResponseKind": {
-      "enum": [
-        "accept",
-        "decline",
-        "cancel"
-      ],
-      "type": "string",
-      "description": "How a client completed an input request."
     },
     "ChatToolCallConfirmedAction": {
       "oneOf": [

@@ -167,6 +167,12 @@ pub struct InitializeResult {
     /// `'@'` or `'/'`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completion_trigger_characters: Option<Vec<String>>,
+    /// Prefix that the host recognizes at the start of a user {@link Message.text}
+    /// as a shorthand for executing the remainder as a terminal command. Currently
+    /// the standardized convention is `"!"`; absence means the host does not
+    /// support command prefixes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_command_prefix: Option<String>,
     /// OTLP telemetry channels the host emits, if any. Each populated field is
     /// either a literal `ahp-otlp:` channel URI or an RFC 6570 URI template a
     /// client expands before subscribing (currently only the `logs` channel

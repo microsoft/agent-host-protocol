@@ -306,6 +306,8 @@ pub enum ResponsePartKind {
     Reasoning,
     #[serde(rename = "systemNotification")]
     SystemNotification,
+    #[serde(rename = "inputRequest")]
+    InputRequest,
 }
 
 /// Status of a tool call in the lifecycle state machine.
@@ -2117,6 +2119,38 @@ pub struct ReasoningResponsePart {
 pub struct SystemNotificationResponsePart {
     /// The text of the system notification
     pub content: StringOrMarkdown,
+    /// Additional provider-specific metadata for this notification.
+    ///
+    /// A host MAY attach a machine-readable descriptor of what triggered the
+    /// notification so clients can categorize, icon, group, filter, or localize
+    /// it without parsing `content`. Clients MAY look for well-known keys here to
+    /// provide enhanced UI, and MUST render coherently from `content` alone when
+    /// `_meta` is absent or unrecognized.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+/// A resolved input request (elicitation) recorded in the turn transcript.
+///
+/// While an input request is open it lives in {@link ChatState.inputRequests}
+/// as live, interactive state (see {@link ChatInputRequest}). When the request
+/// completes via `chat/inputCompleted`, the reducer removes it from
+/// `inputRequests` and appends this part to the active turn so the decision
+/// survives in history. This mirrors how a tool-call confirmation persists in
+/// its {@link ToolCallResponsePart} (via `confirmed` / `selectedOption` on the
+/// terminal {@link ToolCallState}): the live surface drives in-flight UX, the
+/// terminal outcome is durable and backfillable via `fetchTurns`.
+///
+/// No part is recorded when an outstanding request is *abandoned* (the turn
+/// completes, is cancelled, errors, or is truncated) rather than *completed*.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InputRequestResponsePart {
+    /// The resolved request, carrying its `id`, `message`, `url`, `questions`,
+    /// and the final `answers` synced/submitted at completion.
+    pub request: ChatInputRequest,
+    /// How the request was resolved: `accept`, `decline`, or `cancel`.
+    pub response: ChatInputResponseKind,
 }
 
 /// Tool execution result details, available after execution completes.
@@ -2657,6 +2691,13 @@ pub struct PluginCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this container is currently enabled.
     pub enabled: bool,
     /// `clientId` of the client that contributed this container. Absent for
@@ -2719,6 +2760,13 @@ pub struct ClientPluginCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this container is currently enabled.
     pub enabled: bool,
     /// `clientId` of the client that contributed this container. Absent for
@@ -2784,6 +2832,13 @@ pub struct DirectoryCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this container is currently enabled.
     pub enabled: bool,
     /// `clientId` of the client that contributed this container. Absent for
@@ -2838,6 +2893,13 @@ pub struct AgentCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -2879,11 +2941,6 @@ pub struct AgentCustomization {
     /// to. Absent or `false` means the user may select it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_user_invocation: Option<bool>,
-    /// Additional provider-specific metadata for this custom agent.
-    ///
-    /// Mirrors the MCP `_meta` convention.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
 }
 
 /// A skill contributed by a plugin or directory.
@@ -2918,6 +2975,13 @@ pub struct SkillCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -2974,6 +3038,13 @@ pub struct PromptCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -3027,6 +3098,13 @@ pub struct RuleCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -3081,6 +3159,13 @@ pub struct HookCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this child is individually enabled. Absent means enabled, so a
     /// producer only needs to set it to surface a child that exists but is
     /// turned off on its own.
@@ -3130,6 +3215,13 @@ pub struct McpServerCustomization {
     /// Absent when the customization covers the whole resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub range: Option<TextRange>,
+    /// Additional provider-specific metadata for this customization.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the
+    /// protocol; producers and consumers agree on its contents
+    /// out-of-band.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Whether this MCP server is currently enabled.
     pub enabled: bool,
     /// Current lifecycle state of the MCP server.
@@ -4018,6 +4110,8 @@ pub enum ResponsePart {
     Reasoning(ReasoningResponsePart),
     #[serde(rename = "systemNotification")]
     SystemNotification(SystemNotificationResponsePart),
+    #[serde(rename = "inputRequest")]
+    InputRequest(InputRequestResponsePart),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

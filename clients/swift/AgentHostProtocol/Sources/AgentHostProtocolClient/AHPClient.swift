@@ -84,6 +84,10 @@ public actor AHPClient {
     public private(set) var lastSeenServerSeq: Int = 0
     private var didShutdown: Bool = false
 
+    /// Handler for inbound server-initiated requests (the symmetrical
+    /// `resource*` family). `nil` → the client replies `MethodNotFound`.
+    private var serverRequestHandler: ServerRequestHandler?
+
     // MARK: - Init
 
     public init(transport: AHPTransport, config: AHPClientConfig = .default) {
@@ -405,6 +409,118 @@ public actor AHPClient {
             params: DispatchActionParams(channel: channel, clientSeq: clientSeq, action: action)
         )
         return DispatchHandle(clientSeq: clientSeq)
+    }
+
+    // MARK: - Resource commands (send)
+    //
+    // Typed wrappers around `request` for the symmetrical `resource*` family.
+    // Each targets the root channel; any `channel` set on the passed params is
+    // overwritten.
+
+    /// Read a resource's content (`resourceRead`).
+    @discardableResult
+    public func resourceRead(_ params: ResourceReadParams) async throws -> ResourceReadResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceRead", params: params)
+    }
+
+    /// Write content to a resource (`resourceWrite`).
+    @discardableResult
+    public func resourceWrite(_ params: ResourceWriteParams) async throws -> ResourceWriteResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceWrite", params: params)
+    }
+
+    /// List the children of a resource (`resourceList`).
+    @discardableResult
+    public func resourceList(_ params: ResourceListParams) async throws -> ResourceListResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceList", params: params)
+    }
+
+    /// Copy a resource (`resourceCopy`).
+    @discardableResult
+    public func resourceCopy(_ params: ResourceCopyParams) async throws -> ResourceCopyResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceCopy", params: params)
+    }
+
+    /// Delete a resource (`resourceDelete`).
+    @discardableResult
+    public func resourceDelete(_ params: ResourceDeleteParams) async throws -> ResourceDeleteResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceDelete", params: params)
+    }
+
+    /// Move or rename a resource (`resourceMove`).
+    @discardableResult
+    public func resourceMove(_ params: ResourceMoveParams) async throws -> ResourceMoveResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceMove", params: params)
+    }
+
+    /// Resolve a resource URI to its canonical form (`resourceResolve`).
+    @discardableResult
+    public func resourceResolve(_ params: ResourceResolveParams) async throws -> ResourceResolveResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceResolve", params: params)
+    }
+
+    /// Create a directory resource (`resourceMkdir`).
+    @discardableResult
+    public func resourceMkdir(_ params: ResourceMkdirParams) async throws -> ResourceMkdirResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceMkdir", params: params)
+    }
+
+    /// Issue a free-form resource request (`resourceRequest`).
+    @discardableResult
+    public func resourceRequest(_ params: ResourceRequestParams) async throws -> ResourceRequestResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "resourceRequest", params: params)
+    }
+
+    /// Create a resource watch channel (`createResourceWatch`). Pair the
+    /// returned channel URI with `subscribe(_:)` to stream changes.
+    @discardableResult
+    public func createResourceWatch(_ params: CreateResourceWatchParams) async throws -> CreateResourceWatchResult {
+        var params = params
+        params.channel = RootResourceURI
+        return try await request(method: "createResourceWatch", params: params)
+    }
+
+    // MARK: - Server-initiated requests (inbound)
+
+    /// Install a generic handler for inbound server-initiated requests.
+    ///
+    /// AHP's `resource*` methods are symmetrical, so a server may issue any of
+    /// them back to the client. The handler receives the method name and raw
+    /// params bytes and returns the JSON-encoded result to send back; throw
+    /// `AHPClientError.rpc(code:message:data:)` to return a specific error, or
+    /// any other error to return an internal error. Passing `nil` clears the
+    /// handler, reverting to `MethodNotFound` replies.
+    ///
+    /// For a typed, per-method API see `setResourceRequestHandlers(_:)`.
+    public func setServerRequestHandler(_ handler: ServerRequestHandler?) {
+        serverRequestHandler = handler
+    }
+
+    /// Install typed per-method handlers for inbound `resource*` requests.
+    ///
+    /// Sugar over `setServerRequestHandler(_:)` that decodes params and encodes
+    /// results for you. Methods with no registered handler answer
+    /// `MethodNotFound`.
+    public func setResourceRequestHandlers(_ handlers: ResourceRequestHandlers) {
+        serverRequestHandler = AHPClient.makeResourceHandler(handlers)
     }
 
     // MARK: - Generic request
@@ -760,11 +876,13 @@ public actor AHPClient {
             }
         case .notification(let method, let params):
             await handleNotification(method: method, paramsData: params)
-        case .request(let id, _, _):
-            // We don't yet implement server-initiated requests. Reply with
-            // a JSON-RPC `method not found` so the peer's pending map doesn't
-            // grow unbounded for buggy implementations.
-            await sendMethodNotFound(forId: id)
+        case .request(let id, let method, let params):
+            // Server-initiated requests (the symmetrical `resource*` family)
+            // are handled on a detached task so a handler that calls back
+            // into this client can't deadlock the receive loop.
+            Task { [weak self] in
+                await self?.handleServerRequest(id: id, method: method, paramsData: params)
+            }
         }
     }
 
@@ -905,6 +1023,118 @@ public actor AHPClient {
         }
     }
 
+    /// Answer an inbound server-initiated request via the installed
+    /// `serverRequestHandler`, or with `MethodNotFound` when none is set.
+    private func handleServerRequest(id: Int, method: String, paramsData: Data?) async {
+        guard let handler = serverRequestHandler else {
+            await sendMethodNotFound(forId: id)
+            return
+        }
+        do {
+            let resultData = try await handler(method, paramsData)
+            sendSuccessResponse(id: id, resultData: resultData)
+        } catch let AHPClientError.rpc(code, message, data) {
+            sendErrorResponse(id: id, code: code, message: message, data: data)
+        } catch {
+            sendErrorResponse(id: id, code: -32603, message: "\(error)", data: nil)
+        }
+    }
+
+    /// Yield a JSON-RPC success response, splicing `resultData` (JSON bytes)
+    /// into the frame's `result` slot without a Codable round-trip.
+    private func sendSuccessResponse(id: Int, resultData: Data) {
+        guard let cont = outboundContinuation else { return }
+        let resultAny = (try? JSONSerialization.jsonObject(
+            with: resultData, options: [.fragmentsAllowed]
+        )) ?? NSNull()
+        let dict: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": resultAny,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: dict) else { return }
+        cont.yield(data)
+    }
+
+    /// Yield a JSON-RPC error response with the given code/message/data.
+    private func sendErrorResponse(id: Int, code: Int, message: String, data: AnyCodable?) {
+        guard let cont = outboundContinuation else { return }
+        var errorObject: [String: Any] = [
+            "code": code,
+            "message": message,
+        ]
+        if let data,
+           let encoded = try? encoder.encode(data),
+           let dataAny = try? JSONSerialization.jsonObject(with: encoded, options: [.fragmentsAllowed]) {
+            errorObject["data"] = dataAny
+        }
+        let dict: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": errorObject,
+        ]
+        guard let wire = try? JSONSerialization.data(withJSONObject: dict) else { return }
+        cont.yield(wire)
+    }
+
+    /// Adapt a typed `ResourceRequestHandlers` into a generic
+    /// `ServerRequestHandler`: route by method, decode params, run the typed
+    /// handler, and encode the result. Unregistered methods → `MethodNotFound`.
+    private static func makeResourceHandler(_ handlers: ResourceRequestHandlers) -> ServerRequestHandler {
+        return { method, paramsData in
+            switch method {
+            case "resourceRead":
+                return try await dispatchResourceHandler(handlers.onResourceRead, paramsData, method)
+            case "resourceWrite":
+                return try await dispatchResourceHandler(handlers.onResourceWrite, paramsData, method)
+            case "resourceList":
+                return try await dispatchResourceHandler(handlers.onResourceList, paramsData, method)
+            case "resourceCopy":
+                return try await dispatchResourceHandler(handlers.onResourceCopy, paramsData, method)
+            case "resourceDelete":
+                return try await dispatchResourceHandler(handlers.onResourceDelete, paramsData, method)
+            case "resourceMove":
+                return try await dispatchResourceHandler(handlers.onResourceMove, paramsData, method)
+            case "resourceResolve":
+                return try await dispatchResourceHandler(handlers.onResourceResolve, paramsData, method)
+            case "resourceMkdir":
+                return try await dispatchResourceHandler(handlers.onResourceMkdir, paramsData, method)
+            case "resourceRequest":
+                return try await dispatchResourceHandler(handlers.onResourceRequest, paramsData, method)
+            case "createResourceWatch":
+                return try await dispatchResourceHandler(handlers.onCreateResourceWatch, paramsData, method)
+            default:
+                throw AHPClientError.rpc(
+                    code: -32601, message: "no handler for server method \"\(method)\"", data: nil
+                )
+            }
+        }
+    }
+
+    /// Decode `paramsData` into `P`, run `handler`, and encode its `R` result.
+    /// `nil` handler → `MethodNotFound`; decode failure → `InvalidParams`.
+    private static func dispatchResourceHandler<P: Decodable & Sendable, R: Encodable & Sendable>(
+        _ handler: (@Sendable (P) async throws -> R)?,
+        _ paramsData: Data?,
+        _ method: String
+    ) async throws -> Data {
+        guard let handler else {
+            throw AHPClientError.rpc(
+                code: -32601, message: "no handler for server method \"\(method)\"", data: nil
+            )
+        }
+        let params: P
+        do {
+            params = try JSONDecoder().decode(P.self, from: paramsData ?? Data("null".utf8))
+        } catch {
+            throw AHPClientError.rpc(
+                code: -32602, message: "invalid params for \(method): \(error)", data: nil
+            )
+        }
+        let result = try await handler(params)
+        return try JSONEncoder().encode(result)
+    }
+
     /// Send a JSON-RPC error response back to the peer. Used for unsolicited
     /// server-initiated requests so the peer's pending map doesn't grow
     /// unbounded.
@@ -990,6 +1220,62 @@ public actor AHPClient {
     /// requests.
     internal func _pendingCount() -> Int {
         return pending.count
+    }
+}
+
+// MARK: - Server-initiated request handling
+
+/// Handler for inbound server-initiated requests.
+///
+/// AHP's `resource*` methods are symmetrical — a server may issue any of them
+/// back to the client. Install one with `AHPClient.setServerRequestHandler(_:)`
+/// (or the typed `AHPClient.setResourceRequestHandlers(_:)`). The handler
+/// receives the method name and raw params bytes and returns the JSON-encoded
+/// result to send back; throw `AHPClientError.rpc(code:message:data:)` to
+/// return a specific error, or any other error to return an internal error.
+/// When no handler is installed the client replies with `MethodNotFound`.
+public typealias ServerRequestHandler = @Sendable (_ method: String, _ paramsData: Data?) async throws -> Data
+
+/// A typed per-method registry of inbound `resource*` request handlers.
+///
+/// Sugar over `AHPClient.setServerRequestHandler(_:)`: set the `on*` closures
+/// you care about and install with `AHPClient.setResourceRequestHandlers(_:)`.
+/// Each handler receives the decoded params and returns the typed result (or
+/// throws). Methods with no registered handler answer `MethodNotFound`.
+public struct ResourceRequestHandlers: Sendable {
+    public var onResourceRead: (@Sendable (ResourceReadParams) async throws -> ResourceReadResult)?
+    public var onResourceWrite: (@Sendable (ResourceWriteParams) async throws -> ResourceWriteResult)?
+    public var onResourceList: (@Sendable (ResourceListParams) async throws -> ResourceListResult)?
+    public var onResourceCopy: (@Sendable (ResourceCopyParams) async throws -> ResourceCopyResult)?
+    public var onResourceDelete: (@Sendable (ResourceDeleteParams) async throws -> ResourceDeleteResult)?
+    public var onResourceMove: (@Sendable (ResourceMoveParams) async throws -> ResourceMoveResult)?
+    public var onResourceResolve: (@Sendable (ResourceResolveParams) async throws -> ResourceResolveResult)?
+    public var onResourceMkdir: (@Sendable (ResourceMkdirParams) async throws -> ResourceMkdirResult)?
+    public var onResourceRequest: (@Sendable (ResourceRequestParams) async throws -> ResourceRequestResult)?
+    public var onCreateResourceWatch: (@Sendable (CreateResourceWatchParams) async throws -> CreateResourceWatchResult)?
+
+    public init(
+        onResourceRead: (@Sendable (ResourceReadParams) async throws -> ResourceReadResult)? = nil,
+        onResourceWrite: (@Sendable (ResourceWriteParams) async throws -> ResourceWriteResult)? = nil,
+        onResourceList: (@Sendable (ResourceListParams) async throws -> ResourceListResult)? = nil,
+        onResourceCopy: (@Sendable (ResourceCopyParams) async throws -> ResourceCopyResult)? = nil,
+        onResourceDelete: (@Sendable (ResourceDeleteParams) async throws -> ResourceDeleteResult)? = nil,
+        onResourceMove: (@Sendable (ResourceMoveParams) async throws -> ResourceMoveResult)? = nil,
+        onResourceResolve: (@Sendable (ResourceResolveParams) async throws -> ResourceResolveResult)? = nil,
+        onResourceMkdir: (@Sendable (ResourceMkdirParams) async throws -> ResourceMkdirResult)? = nil,
+        onResourceRequest: (@Sendable (ResourceRequestParams) async throws -> ResourceRequestResult)? = nil,
+        onCreateResourceWatch: (@Sendable (CreateResourceWatchParams) async throws -> CreateResourceWatchResult)? = nil
+    ) {
+        self.onResourceRead = onResourceRead
+        self.onResourceWrite = onResourceWrite
+        self.onResourceList = onResourceList
+        self.onResourceCopy = onResourceCopy
+        self.onResourceDelete = onResourceDelete
+        self.onResourceMove = onResourceMove
+        self.onResourceResolve = onResourceResolve
+        self.onResourceMkdir = onResourceMkdir
+        self.onResourceRequest = onResourceRequest
+        self.onCreateResourceWatch = onCreateResourceWatch
     }
 }
 

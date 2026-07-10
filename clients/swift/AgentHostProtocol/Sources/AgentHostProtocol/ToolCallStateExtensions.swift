@@ -84,6 +84,7 @@ extension ResponsePart {
         case .toolCall(let t): return t.toolCall.toolCallId
         case .contentRef: return nil
         case .systemNotification: return nil
+        case .inputRequest: return nil
         case .unknown: return nil
         }
     }

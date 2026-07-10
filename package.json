@@ -16,12 +16,14 @@
     "generate:metadata": "tsx scripts/generate.ts --metadata",
     "verify:release-metadata": "tsx scripts/verify-release-metadata.ts",
     "verify:changelog": "tsx scripts/verify-changelog.ts",
+    "verify:change-fragments": "tsx scripts/verify-change-fragments.ts",
+    "changelog:release": "tsx scripts/consume-change-fragments.ts",
     "docs:dev": "vitepress dev docs",
     "docs:build": "npm run generate && vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "typecheck": "tsc --noEmit -p types/tsconfig.json",
     "lint": "eslint",
-    "test": "npm run typecheck && npm run lint && npm run verify:release-metadata && npm run verify:changelog && npx c8 --include types/reducers.ts --check-coverage --branches 100 tsx --test types/*.test.ts types/version/*.test.ts scripts/*.test.ts"
+    "test": "npm run typecheck && npm run lint && npm run verify:release-metadata && npm run verify:changelog && npm run verify:change-fragments && npx c8 --include types/reducers.ts --check-coverage --branches 100 tsx --test types/*.test.ts types/version/*.test.ts scripts/*.test.ts"
   },
   "repository": {
     "type": "git",

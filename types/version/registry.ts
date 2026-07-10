@@ -15,7 +15,7 @@ import type { ServerNotificationMap } from '../messages.js';
  *
  * Formatted as a [SemVer](https://semver.org) `MAJOR.MINOR.PATCH` string.
  */
-export const PROTOCOL_VERSION = '0.5.2';
+export const PROTOCOL_VERSION = '0.6.0';
 
 /**
  * Every protocol version a client built from this source tree is willing
@@ -34,6 +34,7 @@ export const PROTOCOL_VERSION = '0.5.2';
  * `scripts/verify-release-metadata.ts`.
  */
 export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = Object.freeze([
+  '0.6.0',
   '0.5.2',
   '0.5.1',
 ]);
@@ -155,11 +156,11 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.TerminalCommandExecuted]: '0.1.0',
   [ActionType.TerminalCommandFinished]: '0.1.0',
   [ActionType.ResourceWatchChanged]: '0.2.0',
-  [ActionType.SessionCanvasesChanged]: '0.5.2',
-  [ActionType.SessionOpenCanvasesChanged]: '0.5.2',
-  [ActionType.CanvasUpdated]: '0.5.2',
-  [ActionType.CanvasCloseRequested]: '0.5.2',
-  [ActionType.CanvasMessage]: '0.5.2',
+  [ActionType.SessionCanvasesChanged]: '0.6.0',
+  [ActionType.SessionOpenCanvasesChanged]: '0.6.0',
+  [ActionType.CanvasUpdated]: '0.6.0',
+  [ActionType.CanvasCloseRequested]: '0.6.0',
+  [ActionType.CanvasMessage]: '0.6.0',
 };
 
 /**

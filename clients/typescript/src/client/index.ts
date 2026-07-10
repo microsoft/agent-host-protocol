@@ -5,7 +5,14 @@
  */
 
 export { AhpClient, Subscription } from './client.js';
-export type { AhpClientConfig, DispatchHandle, ServerRequestHandler, SubscribeOptions } from './client.js';
+export { createResourceRequestHandler } from './client.js';
+export type {
+  AhpClientConfig,
+  DispatchHandle,
+  ResourceRequestHandlers,
+  ServerRequestHandler,
+  SubscribeOptions,
+} from './client.js';
 export type { ClientEvent, ClosedReason, ConnectionState, SubscriptionEvent } from './events.js';
 export {
   AhpClientError,

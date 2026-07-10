@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -119,6 +120,199 @@ func TestClientRequestRoundTrip(t *testing.T) {
 	}
 	if result.ProtocolVersion != ahptypes.ProtocolVersion {
 		t.Errorf("ProtocolVersion = %q, want %q", result.ProtocolVersion, ahptypes.ProtocolVersion)
+	}
+}
+
+func TestResourceReadSendWrapperTargetsRootChannel(t *testing.T) {
+	clientSide, serverSide := newMemTransportPair()
+	serverErr := make(chan error, 1)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		msg, err := serverSide.Recv(ctx)
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		parsed, err := msg.IntoParsed()
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		if parsed.Request == nil {
+			serverErr <- errors.New("expected resourceRead request")
+			return
+		}
+		if parsed.Request.Method != "resourceRead" {
+			serverErr <- fmt.Errorf("method = %q, want resourceRead", parsed.Request.Method)
+			return
+		}
+		var params ahptypes.ResourceReadParams
+		if err := json.Unmarshal(parsed.Request.Params, &params); err != nil {
+			serverErr <- err
+			return
+		}
+		if params.Channel != ahptypes.RootResourceURI {
+			serverErr <- fmt.Errorf("channel = %q, want %q", params.Channel, ahptypes.RootResourceURI)
+			return
+		}
+		if params.Uri != "ahp-resource:/notes.txt" {
+			serverErr <- fmt.Errorf("uri = %q, want ahp-resource:/notes.txt", params.Uri)
+			return
+		}
+		resultBody, err := json.Marshal(ahptypes.ResourceReadResult{
+			Data:     "hi",
+			Encoding: ahptypes.ContentEncodingUtf8,
+		})
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		resp := ahptypes.JsonRpcMessage{SuccessResponse: &ahptypes.JsonRpcSuccessResponse{
+			JsonRpc: ahptypes.JsonRpcV2,
+			ID:      parsed.Request.ID,
+			Result:  resultBody,
+		}}
+		out, err := EncodeMessage(resp)
+		if err != nil {
+			serverErr <- err
+			return
+		}
+		serverErr <- serverSide.Send(ctx, out)
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, err := Connect(ctx, clientSide, DefaultConfig())
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	result, err := client.ResourceRead(ctx, ahptypes.ResourceReadParams{
+		Channel: "ahp-session:/ignored",
+		Uri:     "ahp-resource:/notes.txt",
+	})
+	if err != nil {
+		t.Fatalf("ResourceRead: %v", err)
+	}
+	if result.Data != "hi" {
+		t.Errorf("Data = %q, want hi", result.Data)
+	}
+	if result.Encoding != ahptypes.ContentEncodingUtf8 {
+		t.Errorf("Encoding = %q, want %q", result.Encoding, ahptypes.ContentEncodingUtf8)
+	}
+	if err := <-serverErr; err != nil {
+		t.Fatalf("server: %v", err)
+	}
+}
+
+func TestInboundResourceRequestRoutesToTypedHandler(t *testing.T) {
+	clientSide, serverSide := newMemTransportPair()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, err := Connect(ctx, clientSide, DefaultConfig())
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	client.SetResourceRequestHandlers(ResourceRequestHandlers{
+		OnResourceRead: func(ctx context.Context, p ahptypes.ResourceReadParams) (*ahptypes.ResourceReadResult, error) {
+			if ctx == nil {
+				t.Error("handler context is nil")
+			}
+			if p.Uri != "virtual:/server.txt" {
+				t.Errorf("handler uri = %q, want virtual:/server.txt", p.Uri)
+			}
+			return &ahptypes.ResourceReadResult{
+				Data:     "server-data",
+				Encoding: ahptypes.ContentEncodingUtf8,
+			}, nil
+		},
+	})
+
+	readParams, err := json.Marshal(ahptypes.ResourceReadParams{
+		Channel: ahptypes.RootResourceURI,
+		Uri:     "virtual:/server.txt",
+	})
+	if err != nil {
+		t.Fatalf("marshal read params: %v", err)
+	}
+	readReq := ahptypes.JsonRpcMessage{Request: &ahptypes.JsonRpcRequest{
+		JsonRpc: ahptypes.JsonRpcV2,
+		ID:      100,
+		Method:  "resourceRead",
+		Params:  readParams,
+	}}
+	readWire, err := EncodeMessage(readReq)
+	if err != nil {
+		t.Fatalf("encode read request: %v", err)
+	}
+	if err := serverSide.Send(ctx, readWire); err != nil {
+		t.Fatalf("send read request: %v", err)
+	}
+	readRespWire, err := serverSide.Recv(ctx)
+	if err != nil {
+		t.Fatalf("recv read response: %v", err)
+	}
+	readResp, err := readRespWire.IntoParsed()
+	if err != nil {
+		t.Fatalf("parse read response: %v", err)
+	}
+	if readResp.SuccessResponse == nil {
+		t.Fatalf("expected success response, got %+v", readResp)
+	}
+	if readResp.SuccessResponse.ID != 100 {
+		t.Errorf("success id = %d, want 100", readResp.SuccessResponse.ID)
+	}
+	var readResult ahptypes.ResourceReadResult
+	if err := json.Unmarshal(readResp.SuccessResponse.Result, &readResult); err != nil {
+		t.Fatalf("decode read result: %v", err)
+	}
+	if readResult.Data != "server-data" {
+		t.Errorf("Data = %q, want server-data", readResult.Data)
+	}
+
+	writeParams, err := json.Marshal(ahptypes.ResourceWriteParams{
+		Channel:  ahptypes.RootResourceURI,
+		Uri:      "virtual:/server.txt",
+		Data:     "client-data",
+		Encoding: ahptypes.ContentEncodingUtf8,
+	})
+	if err != nil {
+		t.Fatalf("marshal write params: %v", err)
+	}
+	writeReq := ahptypes.JsonRpcMessage{Request: &ahptypes.JsonRpcRequest{
+		JsonRpc: ahptypes.JsonRpcV2,
+		ID:      101,
+		Method:  "resourceWrite",
+		Params:  writeParams,
+	}}
+	writeWire, err := EncodeMessage(writeReq)
+	if err != nil {
+		t.Fatalf("encode write request: %v", err)
+	}
+	if err := serverSide.Send(ctx, writeWire); err != nil {
+		t.Fatalf("send write request: %v", err)
+	}
+	writeRespWire, err := serverSide.Recv(ctx)
+	if err != nil {
+		t.Fatalf("recv write response: %v", err)
+	}
+	writeResp, err := writeRespWire.IntoParsed()
+	if err != nil {
+		t.Fatalf("parse write response: %v", err)
+	}
+	if writeResp.ErrorResponse == nil {
+		t.Fatalf("expected error response, got %+v", writeResp)
+	}
+	if writeResp.ErrorResponse.ID != 101 {
+		t.Errorf("error id = %d, want 101", writeResp.ErrorResponse.ID)
+	}
+	if writeResp.ErrorResponse.Error.Code != ahptypes.ErrorCodeMethodNotFound {
+		t.Errorf("error code = %d, want %d", writeResp.ErrorResponse.Error.Code, ahptypes.ErrorCodeMethodNotFound)
 	}
 }
 

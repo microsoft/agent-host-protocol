@@ -192,6 +192,29 @@ func (s *EventStream) trySend(ev ClientEvent) {
 	}
 }
 
+// ServerRequestHandler answers server-initiated JSON-RPC requests.
+//
+// Return a JSON-encoded result on success, or a non-nil JSON-RPC error
+// to send an error response.
+type ServerRequestHandler func(method string, params json.RawMessage) (json.RawMessage, *ahptypes.JsonRpcError)
+
+// ResourceRequestHandlers is a typed registry for symmetrical resource requests.
+//
+// Install it with [Client.SetResourceRequestHandlers]. A nil per-method
+// handler is reported as MethodNotFound.
+type ResourceRequestHandlers struct {
+	OnResourceRead        func(context.Context, ahptypes.ResourceReadParams) (*ahptypes.ResourceReadResult, error)
+	OnResourceWrite       func(context.Context, ahptypes.ResourceWriteParams) (*ahptypes.ResourceWriteResult, error)
+	OnResourceList        func(context.Context, ahptypes.ResourceListParams) (*ahptypes.ResourceListResult, error)
+	OnResourceCopy        func(context.Context, ahptypes.ResourceCopyParams) (*ahptypes.ResourceCopyResult, error)
+	OnResourceDelete      func(context.Context, ahptypes.ResourceDeleteParams) (*ahptypes.ResourceDeleteResult, error)
+	OnResourceMove        func(context.Context, ahptypes.ResourceMoveParams) (*ahptypes.ResourceMoveResult, error)
+	OnResourceResolve     func(context.Context, ahptypes.ResourceResolveParams) (*ahptypes.ResourceResolveResult, error)
+	OnResourceMkdir       func(context.Context, ahptypes.ResourceMkdirParams) (*ahptypes.ResourceMkdirResult, error)
+	OnResourceRequest     func(context.Context, ahptypes.ResourceRequestParams) (*ahptypes.ResourceRequestResult, error)
+	OnCreateResourceWatch func(context.Context, ahptypes.CreateResourceWatchParams) (*ahptypes.CreateResourceWatchResult, error)
+}
+
 // Client is an async JSON-RPC client driving a pluggable [Transport].
 //
 // A Client is created with [Connect] which spawns a background
@@ -213,6 +236,9 @@ type Client struct {
 	subscriptionsMu sync.Mutex
 	subscriptions   map[string][]*Subscription
 	eventListeners  []*EventStream
+
+	serverRequestMu      sync.Mutex
+	serverRequestHandler ServerRequestHandler
 
 	nextID        atomic.Uint64
 	nextClientSeq atomic.Int64
@@ -429,7 +455,7 @@ func (c *Client) dispatch(msg ahptypes.JsonRpcMessage) {
 	case msg.Notification != nil:
 		c.handleNotification(*msg.Notification)
 	case msg.Request != nil:
-		// Server-initiated requests aren't supported in v0.1.0; drop.
+		go c.handleServerRequest(*msg.Request)
 	}
 }
 
@@ -493,6 +519,118 @@ func (c *Client) fanOut(channel string, ev SubscriptionEvent) {
 	for _, l := range listeners {
 		l.trySend(ClientEvent{Channel: channel, Event: ev})
 	}
+}
+
+func methodNotFound(method string) *ahptypes.JsonRpcError {
+	return &ahptypes.JsonRpcError{
+		Code:    ahptypes.ErrorCodeMethodNotFound,
+		Message: fmt.Sprintf("no handler for server method %q", method),
+	}
+}
+
+func errorFromHandler(err error) *ahptypes.JsonRpcError {
+	var rpc *RPCError
+	if errors.As(err, &rpc) {
+		return &ahptypes.JsonRpcError{Code: rpc.Code, Message: rpc.Message, Data: rpc.Data}
+	}
+	return &ahptypes.JsonRpcError{Code: ahptypes.ErrorCodeInternalError, Message: err.Error()}
+}
+
+func runResourceHandler[P any, R any](method string, params json.RawMessage, handler func(context.Context, P) (*R, error)) (json.RawMessage, *ahptypes.JsonRpcError) {
+	if handler == nil {
+		return nil, methodNotFound(method)
+	}
+	var decoded P
+	if err := json.Unmarshal(params, &decoded); err != nil {
+		return nil, &ahptypes.JsonRpcError{Code: ahptypes.ErrorCodeInvalidParams, Message: err.Error()}
+	}
+	result, err := handler(context.Background(), decoded)
+	if err != nil {
+		return nil, errorFromHandler(err)
+	}
+	if result == nil {
+		return json.RawMessage("{}"), nil
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		return nil, &ahptypes.JsonRpcError{Code: ahptypes.ErrorCodeInternalError, Message: err.Error()}
+	}
+	return raw, nil
+}
+
+// SetServerRequestHandler installs the generic handler for server-initiated
+// JSON-RPC requests.
+func (c *Client) SetServerRequestHandler(h ServerRequestHandler) {
+	c.serverRequestMu.Lock()
+	defer c.serverRequestMu.Unlock()
+	c.serverRequestHandler = h
+}
+
+// ClearServerRequestHandler removes the handler for server-initiated requests.
+func (c *Client) ClearServerRequestHandler() {
+	c.SetServerRequestHandler(nil)
+}
+
+// SetResourceRequestHandlers installs typed handlers for symmetrical resource
+// requests.
+func (c *Client) SetResourceRequestHandlers(h ResourceRequestHandlers) {
+	c.SetServerRequestHandler(func(method string, params json.RawMessage) (json.RawMessage, *ahptypes.JsonRpcError) {
+		switch method {
+		case "resourceRead":
+			return runResourceHandler(method, params, h.OnResourceRead)
+		case "resourceWrite":
+			return runResourceHandler(method, params, h.OnResourceWrite)
+		case "resourceList":
+			return runResourceHandler(method, params, h.OnResourceList)
+		case "resourceCopy":
+			return runResourceHandler(method, params, h.OnResourceCopy)
+		case "resourceDelete":
+			return runResourceHandler(method, params, h.OnResourceDelete)
+		case "resourceMove":
+			return runResourceHandler(method, params, h.OnResourceMove)
+		case "resourceResolve":
+			return runResourceHandler(method, params, h.OnResourceResolve)
+		case "resourceMkdir":
+			return runResourceHandler(method, params, h.OnResourceMkdir)
+		case "resourceRequest":
+			return runResourceHandler(method, params, h.OnResourceRequest)
+		case "createResourceWatch":
+			return runResourceHandler(method, params, h.OnCreateResourceWatch)
+		default:
+			return nil, methodNotFound(method)
+		}
+	})
+}
+
+func (c *Client) handleServerRequest(req ahptypes.JsonRpcRequest) {
+	c.serverRequestMu.Lock()
+	handler := c.serverRequestHandler
+	c.serverRequestMu.Unlock()
+
+	var response ahptypes.JsonRpcMessage
+	if handler == nil {
+		response = ahptypes.JsonRpcMessage{ErrorResponse: &ahptypes.JsonRpcErrorResponse{
+			JsonRpc: ahptypes.JsonRpcV2,
+			ID:      req.ID,
+			Error:   *methodNotFound(req.Method),
+		}}
+	} else if result, rpcErr := handler(req.Method, req.Params); rpcErr != nil {
+		response = ahptypes.JsonRpcMessage{ErrorResponse: &ahptypes.JsonRpcErrorResponse{
+			JsonRpc: ahptypes.JsonRpcV2,
+			ID:      req.ID,
+			Error:   *rpcErr,
+		}}
+	} else {
+		if len(result) == 0 {
+			result = json.RawMessage("null")
+		}
+		response = ahptypes.JsonRpcMessage{SuccessResponse: &ahptypes.JsonRpcSuccessResponse{
+			JsonRpc: ahptypes.JsonRpcV2,
+			ID:      req.ID,
+			Result:  result,
+		}}
+	}
+	_ = c.send(context.Background(), response)
 }
 
 // ─── Request / Notify ───────────────────────────────────────────────────
@@ -711,6 +849,116 @@ func (c *Client) Dispatch(ctx context.Context, channel string, action ahptypes.S
 		return DispatchHandle{}, err
 	}
 	return DispatchHandle{ClientSeq: seq}, nil
+}
+
+// ResourceRead reads a resource's content (`resourceRead`). It targets the
+// root channel; any Channel set on params is overwritten.
+func (c *Client) ResourceRead(ctx context.Context, params ahptypes.ResourceReadParams) (*ahptypes.ResourceReadResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceReadResult
+	if err := c.Request(ctx, "resourceRead", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResourceWrite writes resource content (`resourceWrite`). It targets the root
+// channel; any Channel set on params is overwritten.
+func (c *Client) ResourceWrite(ctx context.Context, params ahptypes.ResourceWriteParams) (*ahptypes.ResourceWriteResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceWriteResult
+	if err := c.Request(ctx, "resourceWrite", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResourceList lists directory entries (`resourceList`). It targets the root
+// channel; any Channel set on params is overwritten.
+func (c *Client) ResourceList(ctx context.Context, params ahptypes.ResourceListParams) (*ahptypes.ResourceListResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceListResult
+	if err := c.Request(ctx, "resourceList", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResourceCopy copies a resource (`resourceCopy`). It targets the root channel;
+// any Channel set on params is overwritten.
+func (c *Client) ResourceCopy(ctx context.Context, params ahptypes.ResourceCopyParams) (*ahptypes.ResourceCopyResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceCopyResult
+	if err := c.Request(ctx, "resourceCopy", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResourceDelete deletes a resource (`resourceDelete`). It targets the root
+// channel; any Channel set on params is overwritten.
+func (c *Client) ResourceDelete(ctx context.Context, params ahptypes.ResourceDeleteParams) (*ahptypes.ResourceDeleteResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceDeleteResult
+	if err := c.Request(ctx, "resourceDelete", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResourceMove moves a resource (`resourceMove`). It targets the root channel;
+// any Channel set on params is overwritten.
+func (c *Client) ResourceMove(ctx context.Context, params ahptypes.ResourceMoveParams) (*ahptypes.ResourceMoveResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceMoveResult
+	if err := c.Request(ctx, "resourceMove", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResourceResolve resolves resource metadata (`resourceResolve`). It targets
+// the root channel; any Channel set on params is overwritten.
+func (c *Client) ResourceResolve(ctx context.Context, params ahptypes.ResourceResolveParams) (*ahptypes.ResourceResolveResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceResolveResult
+	if err := c.Request(ctx, "resourceResolve", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResourceMkdir creates a directory (`resourceMkdir`). It targets the root
+// channel; any Channel set on params is overwritten.
+func (c *Client) ResourceMkdir(ctx context.Context, params ahptypes.ResourceMkdirParams) (*ahptypes.ResourceMkdirResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceMkdirResult
+	if err := c.Request(ctx, "resourceMkdir", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResourceRequest requests resource access (`resourceRequest`). It targets the
+// root channel; any Channel set on params is overwritten.
+func (c *Client) ResourceRequest(ctx context.Context, params ahptypes.ResourceRequestParams) (*ahptypes.ResourceRequestResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.ResourceRequestResult
+	if err := c.Request(ctx, "resourceRequest", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateResourceWatch creates a resource watcher (`createResourceWatch`). It
+// targets the root channel; any Channel set on params is overwritten.
+func (c *Client) CreateResourceWatch(ctx context.Context, params ahptypes.CreateResourceWatchParams) (*ahptypes.CreateResourceWatchResult, error) {
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.CreateResourceWatchResult
+	if err := c.Request(ctx, "createResourceWatch", params, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // Events returns a new top-level [EventStream] that receives every

@@ -1,0 +1,107 @@
+{
+  "description": "session input completion records a declined URL request in the active turn, merging final answers over synced drafts",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "message": {
+        "text": "Review",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    },
+    "inputRequests": [
+      {
+        "id": "review-1",
+        "message": "Review before continuing",
+        "url": "https://example.com/plan",
+        "questions": [
+          {
+            "id": "approve",
+            "kind": "boolean",
+            "message": "Approve the plan?",
+            "required": true
+          }
+        ],
+        "answers": {
+          "approve": {
+            "state": "draft",
+            "value": {
+              "kind": "boolean",
+              "value": true
+            }
+          }
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 24,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/inputCompleted",
+      "requestId": "review-1",
+      "response": "decline",
+      "answers": {
+        "approve": {
+          "state": "submitted",
+          "value": {
+            "kind": "boolean",
+            "value": false
+          }
+        }
+      }
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "message": {
+        "text": "Review",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "review-1",
+            "message": "Review before continuing",
+            "url": "https://example.com/plan",
+            "questions": [
+              {
+                "id": "approve",
+                "kind": "boolean",
+                "message": "Approve the plan?",
+                "required": true
+              }
+            ],
+            "answers": {
+              "approve": {
+                "state": "submitted",
+                "value": {
+                  "kind": "boolean",
+                  "value": false
+                }
+              }
+            }
+          },
+          "response": "decline"
+        }
+      ],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:09.999Z"
+  }
+}
