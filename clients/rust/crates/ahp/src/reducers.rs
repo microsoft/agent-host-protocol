@@ -1713,10 +1713,10 @@ pub fn apply_action_to_resource_watch(
 ///
 /// `canvas/updated` is a sparse merge — each present field overwrites the
 /// corresponding [`CanvasState`] field and an absent field preserves the
-/// current value. `canvas/closeRequested` and `canvas/message` are pure
-/// signals with no state effect (the host acts on them out of band),
-/// mirroring how `terminal/input` is side-effect-only. Actions targeting a
-/// different scope short-circuit as [`ReduceOutcome::OutOfScope`].
+/// current value. `canvas/closeRequested` is a pure signal with no state
+/// effect (the host acts on it out of band), mirroring how `terminal/input`
+/// is side-effect-only. Actions targeting a different scope short-circuit as
+/// [`ReduceOutcome::OutOfScope`].
 pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> ReduceOutcome {
     match action {
         StateAction::CanvasUpdated(a) => {
@@ -1735,7 +1735,6 @@ pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> 
             ReduceOutcome::Applied
         }
         StateAction::CanvasCloseRequested(_) => ReduceOutcome::NoOp,
-        StateAction::CanvasMessage(_) => ReduceOutcome::NoOp,
         _ => ReduceOutcome::OutOfScope,
     }
 }

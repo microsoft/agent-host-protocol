@@ -599,7 +599,7 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
-  'SessionCanvasAction', 'SessionCanvasDeclaration', 'ClientCanvasDeclaration', 'OpenCanvasRef',
+  'SessionCanvasOperation', 'SessionCanvasDeclaration', 'ClientCanvasDeclaration', 'OpenCanvasRef',
   'CanvasServerProviderSource', 'CanvasClientProviderSource', 'CanvasState',
 ];
 
@@ -1179,7 +1179,6 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'resourceWatch/changed', caseName: 'resourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
   { type: 'canvas/updated', caseName: 'canvasUpdated', tsInterface: 'CanvasUpdatedAction' },
   { type: 'canvas/closeRequested', caseName: 'canvasCloseRequested', tsInterface: 'CanvasCloseRequestedAction' },
-  { type: 'canvas/message', caseName: 'canvasMessage', tsInterface: 'CanvasMessageAction' },
 ];
 
 /** Merged struct for the approved/denied tool call confirmed action */
@@ -1377,9 +1376,8 @@ const COMMAND_STRUCTS = [
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
   'CanvasOpenParams', 'CanvasOpenResult',
-  'CanvasInvokeActionParams', 'CanvasInvokeActionResult',
+  'CanvasInvokeOperationParams', 'CanvasInvokeOperationResult',
   'CanvasCloseParams',
-  'CanvasReadResourceParams', 'CanvasReadResourceResult', 'CanvasResourceContent',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1611,7 +1609,7 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let alreadyExists = -32010');
   lines.push('    /// An optimistic-concurrency precondition failed: a request precondition token no longer matches the resource state');
   lines.push('    public static let conflict = -32011');
-  lines.push('    /// A canvas provider request (canvasOpen, canvasInvokeAction, or canvasClose) failed; `data` carries a provider-defined `{ code, message }`');
+  lines.push('    /// A canvas provider request (canvasOpen, canvasInvokeOperation, or canvasClose) failed; `data` carries a provider-defined `{ code, message }`');
   lines.push('    public static let canvasProviderError = -32012');
   lines.push('}');
   lines.push('');

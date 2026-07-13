@@ -191,9 +191,7 @@ enum class ActionType {
     @SerialName("canvas/updated")
     CANVAS_UPDATED,
     @SerialName("canvas/closeRequested")
-    CANVAS_CLOSE_REQUESTED,
-    @SerialName("canvas/message")
-    CANVAS_MESSAGE
+    CANVAS_CLOSE_REQUESTED
 }
 
 // ─── Action Infrastructure ──────────────────────────────────────────────────
@@ -1397,15 +1395,6 @@ data class CanvasCloseRequestedAction(
     val type: ActionType
 )
 
-@Serializable
-data class CanvasMessageAction(
-    val type: ActionType,
-    /**
-     * Opaque, provider-defined message payload.
-     */
-    val payload: JsonElement
-)
-
 // ─── Partial Summary Types ──────────────────────────────────────────────────
 
 @Serializable
@@ -1549,7 +1538,6 @@ sealed interface StateAction
 @JvmInline value class StateActionResourceWatchChanged(val value: ResourceWatchChangedAction) : StateAction
 @JvmInline value class StateActionCanvasUpdated(val value: CanvasUpdatedAction) : StateAction
 @JvmInline value class StateActionCanvasCloseRequested(val value: CanvasCloseRequestedAction) : StateAction
-@JvmInline value class StateActionCanvasMessage(val value: CanvasMessageAction) : StateAction
 @JvmInline value class StateActionUnknown(val raw: JsonObject) : StateAction
 
 internal object StateActionSerializer : KSerializer<StateAction> {
@@ -1648,7 +1636,6 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "resourceWatch/changed" -> StateActionResourceWatchChanged(input.json.decodeFromJsonElement(ResourceWatchChangedAction.serializer(), element))
             "canvas/updated" -> StateActionCanvasUpdated(input.json.decodeFromJsonElement(CanvasUpdatedAction.serializer(), element))
             "canvas/closeRequested" -> StateActionCanvasCloseRequested(input.json.decodeFromJsonElement(CanvasCloseRequestedAction.serializer(), element))
-            "canvas/message" -> StateActionCanvasMessage(input.json.decodeFromJsonElement(CanvasMessageAction.serializer(), element))
             else -> StateActionUnknown(obj)
         }
     }
@@ -1740,7 +1727,6 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionResourceWatchChanged -> output.json.encodeToJsonElement(ResourceWatchChangedAction.serializer(), value.value)
             is StateActionCanvasUpdated -> output.json.encodeToJsonElement(CanvasUpdatedAction.serializer(), value.value)
             is StateActionCanvasCloseRequested -> output.json.encodeToJsonElement(CanvasCloseRequestedAction.serializer(), value.value)
-            is StateActionCanvasMessage -> output.json.encodeToJsonElement(CanvasMessageAction.serializer(), value.value)
             is StateActionUnknown -> value.raw
         }
         output.encodeJsonElement(element)

@@ -113,7 +113,6 @@ import type {
 import type {
   CanvasUpdatedAction,
   CanvasCloseRequestedAction,
-  CanvasMessageAction,
 } from '../channels-canvas/actions.js';
 
 // ─── Action Type Enum ────────────────────────────────────────────────────────
@@ -207,7 +206,6 @@ export const enum ActionType {
   SessionOpenCanvasesChanged = 'session/openCanvasesChanged',
   CanvasUpdated = 'canvas/updated',
   CanvasCloseRequested = 'canvas/closeRequested',
-  CanvasMessage = 'canvas/message',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -326,5 +324,4 @@ export type StateAction =
   | SessionCanvasesChangedAction
   | SessionOpenCanvasesChangedAction
   | CanvasUpdatedAction
-  | CanvasCloseRequestedAction
-  | CanvasMessageAction;
+  | CanvasCloseRequestedAction;

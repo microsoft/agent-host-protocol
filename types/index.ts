@@ -112,7 +112,7 @@ export type {
   ResourceWatchState,
   ResourceChange,
   CanvasState,
-  SessionCanvasAction,
+  SessionCanvasOperation,
   SessionCanvasDeclaration,
   ClientCanvasDeclaration,
   OpenCanvasRef,
@@ -229,7 +229,6 @@ export type {
   SessionOpenCanvasesChangedAction,
   CanvasUpdatedAction,
   CanvasCloseRequestedAction,
-  CanvasMessageAction,
 } from './actions.js';
 
 export { ActionType } from './actions.js';
@@ -346,12 +345,9 @@ export type {
   ChangesetOperationFollowUp,
   CanvasOpenParams,
   CanvasOpenResult,
-  CanvasInvokeActionParams,
-  CanvasInvokeActionResult,
+  CanvasInvokeOperationParams,
+  CanvasInvokeOperationResult,
   CanvasCloseParams,
-  CanvasReadResourceParams,
-  CanvasReadResourceResult,
-  CanvasResourceContent,
 } from './commands.js';
 
 export { ReconnectResultType, ContentEncoding, CompletionItemKind, ResourceType, ResourceWriteMode } from './commands.js';

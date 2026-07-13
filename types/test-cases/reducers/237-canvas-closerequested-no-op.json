@@ -4,7 +4,7 @@
   "initial": {
     "instanceId": "canvas-1",
     "canvasId": "markdown",
-    "extensionId": "acme.editors",
+    "providerId": "acme.editors",
     "title": "Draft",
     "availability": "ready",
     "provider": { "kind": "server" }
@@ -17,7 +17,7 @@
   "expected": {
     "instanceId": "canvas-1",
     "canvasId": "markdown",
-    "extensionId": "acme.editors",
+    "providerId": "acme.editors",
     "title": "Draft",
     "availability": "ready",
     "provider": { "kind": "server" }

@@ -176,7 +176,7 @@ type ClientCapabilities struct {
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
 	// Client can render canvases and host client-declared canvas providers — it
 	// can render an opaque canvas URL in an isolated surface, and it can answer
-	// `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for canvases
+	// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for canvases
 	// it declares via {@link SessionActiveClient.canvasProviders}.
 	//
 	// Hosts SHOULD only populate {@link SessionState.canvases} /
@@ -1039,8 +1039,8 @@ type CanvasOpenParams struct {
 	Channel URI `json:"channel"`
 	// Provider-local canvas id to open.
 	CanvasId string `json:"canvasId"`
-	// Owning provider id.
-	ExtensionId string `json:"extensionId"`
+	// Owning provider id (opaque to AHP).
+	ProviderId string `json:"providerId"`
 	// Caller-minted handle for the new instance.
 	InstanceId string `json:"instanceId"`
 	// Open input, validated by the provider against its declared schema.
@@ -1057,30 +1057,30 @@ type CanvasOpenResult struct {
 	Status *string `json:"status,omitempty"`
 }
 
-// Invokes one of a canvas's declared actions against its provider.
+// Invokes one of a canvas's declared operations against its provider.
 //
 // Sent by the host to the providing client (or resolved host-internally for a
 // server-side provider) when the agent invokes a
-// {@link SessionCanvasAction | declared action} on an open instance. The
+// {@link SessionCanvasOperation | declared operation} on an open instance. The
 // provider returns an opaque, provider-defined value. Registered symmetrically
 // with the rest of the provider family (see {@link CanvasOpenParams}).
-type CanvasInvokeActionParams struct {
+type CanvasInvokeOperationParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
-	// Instance handle the action targets.
+	// Instance handle the operation targets.
 	InstanceId string `json:"instanceId"`
 	// Provider-local canvas id of the instance.
 	CanvasId string `json:"canvasId"`
-	// Owning provider id.
-	ExtensionId string `json:"extensionId"`
-	// Declared action name to invoke.
-	ActionName string `json:"actionName"`
-	// Action input, validated by the provider against its declared schema.
+	// Owning provider id (opaque to AHP).
+	ProviderId string `json:"providerId"`
+	// Declared operation name to invoke.
+	OperationName string `json:"operationName"`
+	// Operation input, validated by the provider against its declared schema.
 	Input map[string]json.RawMessage `json:"input,omitempty"`
 }
 
-// Result of the `canvasInvokeAction` command.
-type CanvasInvokeActionResult struct {
+// Result of the `canvasInvokeOperation` command.
+type CanvasInvokeOperationResult struct {
 	// Opaque, provider-defined return value.
 	Value *json.RawMessage `json:"value,omitempty"`
 }
@@ -1099,46 +1099,8 @@ type CanvasCloseParams struct {
 	InstanceId string `json:"instanceId"`
 	// Provider-local canvas id of the instance.
 	CanvasId string `json:"canvasId"`
-	// Owning provider id.
-	ExtensionId string `json:"extensionId"`
-}
-
-// Reads channel-served canvas content by `ahp-canvas-content:` URI.
-//
-// A client → host request, modeled on MCP's `resources/read`. When a canvas's
-// {@link CanvasState.url} (or a sub-resource the rendered document references)
-// is an `ahp-canvas-content:/<instanceId>/<path>` address, the renderer cannot
-// dial the host directly — for example in a relayed deployment behind a broker
-// — so it resolves the bytes over the instance's existing `ahp-canvas:/<id>`
-// channel with this request instead of loading a network URL. The `<instanceId>`
-// segment of the URI identifies which canvas channel to read from. See
-// {@link /specification/canvas-channel | Canvas Channel}.
-type CanvasReadResourceParams struct {
-	// Channel URI this command targets.
-	Channel URI `json:"channel"`
-	// An `ahp-canvas-content:/<instanceId>/<path>` content URI to read.
-	Uri string `json:"uri"`
-}
-
-// Result of the `canvasReadResource` command.
-type CanvasReadResourceResult struct {
-	// The resolved content parts, wrapped for forward compatibility.
-	Contents []CanvasResourceContent `json:"contents"`
-}
-
-// One resolved piece of channel-served canvas content.
-//
-// Carries exactly one of {@link text} (text payloads) or {@link blob}
-// (base64-encoded binary payloads).
-type CanvasResourceContent struct {
-	// The content URI this part resolves.
-	Uri string `json:"uri"`
-	// MIME type of the content, when known.
-	MimeType *string `json:"mimeType,omitempty"`
-	// UTF-8 text content, for text payloads.
-	Text *string `json:"text,omitempty"`
-	// Base64-encoded content, for binary payloads.
-	Blob *string `json:"blob,omitempty"`
+	// Owning provider id (opaque to AHP).
+	ProviderId string `json:"providerId"`
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

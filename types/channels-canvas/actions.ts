@@ -60,24 +60,3 @@ export interface CanvasUpdatedAction {
 export interface CanvasCloseRequestedAction {
   type: ActionType.CanvasCloseRequested;
 }
-
-/**
- * An opaque message relayed between the rendered canvas View and the
- * instance's provider — the relay-carried analogue of a `postMessage` bridge.
- *
- * Bidirectional: a client dispatches it to carry a View→provider message, and
- * the host emits it to carry a provider→View message (routed to the provider
- * resolved for the instance, or handled host-internally for a server-side
- * provider). Like `terminal/input` and {@link CanvasCloseRequestedAction} it
- * is a pure signal with a no-op reducer, so it never bloats channel state. See
- * {@link /specification/canvas-channel | Canvas Channel}.
- *
- * @category Canvas Actions
- * @version 1
- * @clientDispatchable
- */
-export interface CanvasMessageAction {
-  type: ActionType.CanvasMessage;
-  /** Opaque, provider-defined message payload. */
-  payload: unknown;
-}

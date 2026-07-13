@@ -1215,8 +1215,8 @@ public struct SessionActiveClient: Codable, Sendable {
     /// {@link SessionState.canvases} with
     /// {@link SessionCanvasDeclaration.source | `source`} set to
     /// `{ kind: 'client', clientId }` and routes
-    /// `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for them back
-    /// to this client. Only meaningful for a client that declared
+    /// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for them
+    /// back to this client. Only meaningful for a client that declared
     /// {@link ClientCapabilities.canvas}.
     public var canvasProviders: [ClientCanvasDeclaration]?
 
@@ -4843,12 +4843,12 @@ public struct ResourceChange: Codable, Sendable {
     }
 }
 
-public struct SessionCanvasAction: Codable, Sendable {
-    /// Action name, unique within the owning `(extensionId, canvasId)`.
+public struct SessionCanvasOperation: Codable, Sendable {
+    /// Operation name, unique within the owning `(providerId, canvasId)`.
     public var name: String
-    /// Human-readable description of what the action does.
+    /// Human-readable description of what the operation does.
     public var description: String?
-    /// JSON Schema for the action's input. Opaque to AHP; mirrors the
+    /// JSON Schema for the operation's input. Opaque to AHP; mirrors the
     /// {@link ToolDefinition.inputSchema} shape.
     public var inputSchema: [String: AnyCodable]?
 
@@ -4864,11 +4864,11 @@ public struct SessionCanvasAction: Codable, Sendable {
 }
 
 public struct SessionCanvasDeclaration: Codable, Sendable {
-    /// Owning provider id. Stable across declarations and instances.
-    public var extensionId: String
-    /// Human-readable provider name.
-    public var extensionName: String?
-    /// Provider-local canvas id. Unique within `extensionId`.
+    /// Owning provider id — an opaque namespace string AHP does not interpret,
+    /// carried so a provider-local {@link canvasId} stays unique across providers.
+    /// Stable across declarations and instances.
+    public var providerId: String
+    /// Provider-local canvas id. Unique within `providerId`.
     public var canvasId: String
     /// Human-readable canvas name.
     public var displayName: String
@@ -4877,28 +4877,26 @@ public struct SessionCanvasDeclaration: Codable, Sendable {
     /// JSON Schema for the canvas's open input. Opaque to AHP; mirrors the
     /// {@link ToolDefinition.inputSchema} shape.
     public var inputSchema: [String: AnyCodable]?
-    /// Actions this canvas exposes to the agent.
-    public var actions: [SessionCanvasAction]?
+    /// Operations this canvas exposes to the agent.
+    public var operations: [SessionCanvasOperation]?
     /// Where the declaration came from — for routing and cleanup.
     public var source: CanvasProviderSource
 
     public init(
-        extensionId: String,
-        extensionName: String? = nil,
+        providerId: String,
         canvasId: String,
         displayName: String,
         description: String,
         inputSchema: [String: AnyCodable]? = nil,
-        actions: [SessionCanvasAction]? = nil,
+        operations: [SessionCanvasOperation]? = nil,
         source: CanvasProviderSource
     ) {
-        self.extensionId = extensionId
-        self.extensionName = extensionName
+        self.providerId = providerId
         self.canvasId = canvasId
         self.displayName = displayName
         self.description = description
         self.inputSchema = inputSchema
-        self.actions = actions
+        self.operations = operations
         self.source = source
     }
 }
@@ -4912,55 +4910,44 @@ public struct ClientCanvasDeclaration: Codable, Sendable {
     public var description: String
     /// JSON Schema for the canvas's open input. Opaque to AHP.
     public var inputSchema: [String: AnyCodable]?
-    /// Actions this canvas exposes to the agent.
-    public var actions: [SessionCanvasAction]?
+    /// Operations this canvas exposes to the agent.
+    public var operations: [SessionCanvasOperation]?
 
     public init(
         canvasId: String,
         displayName: String,
         description: String,
         inputSchema: [String: AnyCodable]? = nil,
-        actions: [SessionCanvasAction]? = nil
+        operations: [SessionCanvasOperation]? = nil
     ) {
         self.canvasId = canvasId
         self.displayName = displayName
         self.description = description
         self.inputSchema = inputSchema
-        self.actions = actions
+        self.operations = operations
     }
 }
 
 public struct OpenCanvasRef: Codable, Sendable {
-    /// Server-assigned instance handle, unique within the session.
-    public var instanceId: String
-    /// The instance's channel URI (`ahp-canvas:/<id>`). Subscribe to it to load
-    /// the full {@link CanvasState}.
+    /// The instance's channel URI (`ahp-canvas:/<id>`). Uniquely identifies the
+    /// open canvas; subscribe to it to load the full {@link CanvasState}.
     public var channel: String
-    /// Provider-local canvas id this instance was opened from.
+    /// Provider-local canvas id this instance was opened from. Retained so a
+    /// catalogue view can pick the right native renderer without subscribing.
     public var canvasId: String
-    /// Owning provider id.
-    public var extensionId: String
-    /// Human-readable provider name.
-    public var extensionName: String?
     /// Current instance title, mirrored from {@link CanvasState.title}.
     public var title: String?
     /// Whether the instance's provider is currently available.
     public var availability: CanvasAvailability
 
     public init(
-        instanceId: String,
         channel: String,
         canvasId: String,
-        extensionId: String,
-        extensionName: String? = nil,
         title: String? = nil,
         availability: CanvasAvailability
     ) {
-        self.instanceId = instanceId
         self.channel = channel
         self.canvasId = canvasId
-        self.extensionId = extensionId
-        self.extensionName = extensionName
         self.title = title
         self.availability = availability
     }
@@ -4995,10 +4982,9 @@ public struct CanvasState: Codable, Sendable {
     public var instanceId: String
     /// Provider-local canvas id this instance was opened from.
     public var canvasId: String
-    /// Owning provider id.
-    public var extensionId: String
-    /// Human-readable provider name.
-    public var extensionName: String?
+    /// Owning provider id — an opaque namespace string AHP does not interpret,
+    /// carried so a provider-local {@link canvasId} stays unique across providers.
+    public var providerId: String
     /// Human-readable canvas name.
     public var displayName: String?
     /// Input the agent supplied when opening the instance. Retained so the
@@ -5010,8 +4996,11 @@ public struct CanvasState: Codable, Sendable {
     public var status: String?
     /// Renderer-targeted address for the opaque canvas content — either a
     /// directly-loadable URL (`https:`, an in-process scheme, `http://localhost`)
-    /// or a channel-served `ahp-canvas-content:/<instanceId>/<path>` address the
-    /// renderer resolves over this channel with `canvasReadResource`. The
+    /// or a content-reference URI the renderer resolves with the general
+    /// `resourceRead` command. Resolving over `resourceRead` keeps content flowing
+    /// entirely over the AHP transport, so a relayed or brokered deployment —
+    /// where the host is reachable only over AHP and cannot be dialed directly —
+    /// can still serve every byte, with no port or direct connection required. The
     /// renderer dispatches on the scheme and enforces its URL policy. See
     /// {@link /specification/canvas-channel | Canvas Channel}.
     public var url: String?
@@ -5023,8 +5012,7 @@ public struct CanvasState: Codable, Sendable {
     public init(
         instanceId: String,
         canvasId: String,
-        extensionId: String,
-        extensionName: String? = nil,
+        providerId: String,
         displayName: String? = nil,
         input: [String: AnyCodable]? = nil,
         title: String? = nil,
@@ -5035,8 +5023,7 @@ public struct CanvasState: Codable, Sendable {
     ) {
         self.instanceId = instanceId
         self.canvasId = canvasId
-        self.extensionId = extensionId
-        self.extensionName = extensionName
+        self.providerId = providerId
         self.displayName = displayName
         self.input = input
         self.title = title

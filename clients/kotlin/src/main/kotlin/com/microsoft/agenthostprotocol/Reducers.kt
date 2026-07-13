@@ -1559,10 +1559,10 @@ public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction):
  * Pure reducer for a [CanvasState]. `canvas/updated` is a sparse merge —
  * a presented field (title, status, url, availability) overwrites the
  * corresponding [CanvasState] field while an absent field preserves the
- * current value. `canvas/closeRequested` and `canvas/message` are pure
- * client→host signals the host acts on out of band, mirroring how
- * `terminal/input` is side-effect-only, so they return [state] unchanged.
- * Actions belonging to other channels (or unknown variants) are no-ops.
+ * current value. `canvas/closeRequested` is a pure client→host signal the
+ * host acts on out of band, mirroring how `terminal/input` is
+ * side-effect-only, so it returns [state] unchanged. Actions belonging to
+ * other channels (or unknown variants) are no-ops.
  */
 public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState = when (action) {
     is StateActionCanvasUpdated -> state.copy(
@@ -1572,6 +1572,5 @@ public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState =
         availability = action.value.availability ?: state.availability,
     )
     is StateActionCanvasCloseRequested -> state
-    is StateActionCanvasMessage -> state
     else -> state
 }

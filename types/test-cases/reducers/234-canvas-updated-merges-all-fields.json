@@ -4,12 +4,11 @@
   "initial": {
     "instanceId": "canvas-1",
     "canvasId": "markdown",
-    "extensionId": "acme.editors",
-    "extensionName": "Acme Editors",
+    "providerId": "acme.editors",
     "displayName": "Markdown Editor",
     "title": "Draft",
     "status": "idle",
-    "url": "ahp-canvas-content:/canvas-1/index.html",
+    "url": "ahp-session:/2f9c/content/canvas-1",
     "availability": "ready",
     "provider": { "kind": "server" }
   },
@@ -25,8 +24,7 @@
   "expected": {
     "instanceId": "canvas-1",
     "canvasId": "markdown",
-    "extensionId": "acme.editors",
-    "extensionName": "Acme Editors",
+    "providerId": "acme.editors",
     "displayName": "Markdown Editor",
     "title": "Published",
     "status": "saved",

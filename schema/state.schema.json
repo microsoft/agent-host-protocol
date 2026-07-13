@@ -833,7 +833,7 @@
           "items": {
             "$ref": "#/$defs/ClientCanvasDeclaration"
           },
-          "description": "Canvas declarations this client contributes as a provider. Published\natomically with the rest of the active-client entry via\n`session/activeClientSet` — exactly like {@link tools} — so there is no\nseparate canvas-provider change action. The host folds these into\n{@link SessionState.canvases} with\n{@link SessionCanvasDeclaration.source | `source`} set to\n`{ kind: 'client', clientId }` and routes\n`canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for them back\nto this client. Only meaningful for a client that declared\n{@link ClientCapabilities.canvas}."
+          "description": "Canvas declarations this client contributes as a provider. Published\natomically with the rest of the active-client entry via\n`session/activeClientSet` — exactly like {@link tools} — so there is no\nseparate canvas-provider change action. The host folds these into\n{@link SessionState.canvases} with\n{@link SessionCanvasDeclaration.source | `source`} set to\n`{ kind: 'client', clientId }` and routes\n`canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for them\nback to this client. Only meaningful for a client that declared\n{@link ClientCapabilities.canvas}."
         }
       },
       "required": [
@@ -855,7 +855,7 @@
     },
     "CanvasClientProviderSource": {
       "type": "object",
-      "description": "A canvas provided by a connected client. The host routes\n`canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for this canvas\nto the identified client.",
+      "description": "A canvas provided by a connected client. The host routes\n`canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for this\ncanvas to the identified client.",
       "properties": {
         "kind": {
           "const": "client"
@@ -870,22 +870,22 @@
         "clientId"
       ]
     },
-    "SessionCanvasAction": {
+    "SessionCanvasOperation": {
       "type": "object",
-      "description": "One named action a canvas exposes to the agent, mirroring the shape of a\n{@link ToolDefinition} entry. Unique within its owning\n`(extensionId, canvasId)`.",
+      "description": "One named operation a canvas exposes to the agent, mirroring the shape of a\n{@link ToolDefinition} entry. Unique within its owning\n`(providerId, canvasId)`. Named \"operation\" to match the changeset channel's\noperation vocabulary.",
       "properties": {
         "name": {
           "type": "string",
-          "description": "Action name, unique within the owning `(extensionId, canvasId)`."
+          "description": "Operation name, unique within the owning `(providerId, canvasId)`."
         },
         "description": {
           "type": "string",
-          "description": "Human-readable description of what the action does."
+          "description": "Human-readable description of what the operation does."
         },
         "inputSchema": {
           "type": "object",
           "additionalProperties": {},
-          "description": "JSON Schema for the action's input. Opaque to AHP; mirrors the\n{@link ToolDefinition.inputSchema} shape."
+          "description": "JSON Schema for the operation's input. Opaque to AHP; mirrors the\n{@link ToolDefinition.inputSchema} shape."
         }
       },
       "required": [
@@ -896,17 +896,13 @@
       "type": "object",
       "description": "One entry in the aggregated {@link SessionState.canvases} registry — a canvas\nthe agent can open, contributed by a server-side or client-declared provider.",
       "properties": {
-        "extensionId": {
+        "providerId": {
           "type": "string",
-          "description": "Owning provider id. Stable across declarations and instances."
-        },
-        "extensionName": {
-          "type": "string",
-          "description": "Human-readable provider name."
+          "description": "Owning provider id — an opaque namespace string AHP does not interpret,\ncarried so a provider-local {@link canvasId} stays unique across providers.\nStable across declarations and instances."
         },
         "canvasId": {
           "type": "string",
-          "description": "Provider-local canvas id. Unique within `extensionId`."
+          "description": "Provider-local canvas id. Unique within `providerId`."
         },
         "displayName": {
           "type": "string",
@@ -921,12 +917,12 @@
           "additionalProperties": {},
           "description": "JSON Schema for the canvas's open input. Opaque to AHP; mirrors the\n{@link ToolDefinition.inputSchema} shape."
         },
-        "actions": {
+        "operations": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/SessionCanvasAction"
+            "$ref": "#/$defs/SessionCanvasOperation"
           },
-          "description": "Actions this canvas exposes to the agent."
+          "description": "Operations this canvas exposes to the agent."
         },
         "source": {
           "$ref": "#/$defs/CanvasProviderSource",
@@ -934,7 +930,7 @@
         }
       },
       "required": [
-        "extensionId",
+        "providerId",
         "canvasId",
         "displayName",
         "description",
@@ -943,7 +939,7 @@
     },
     "ClientCanvasDeclaration": {
       "type": "object",
-      "description": "The lighter declaration shape a client publishes on\n{@link SessionActiveClient.canvasProviders}. The host derives the\n`extensionId` and {@link SessionCanvasDeclaration.source | `source`} when\nfolding it into {@link SessionState.canvases}.",
+      "description": "The lighter declaration shape a client publishes on\n{@link SessionActiveClient.canvasProviders}. The host derives the\n`providerId` and {@link SessionCanvasDeclaration.source | `source`} when\nfolding it into {@link SessionState.canvases}.",
       "properties": {
         "canvasId": {
           "type": "string",
@@ -962,12 +958,12 @@
           "additionalProperties": {},
           "description": "JSON Schema for the canvas's open input. Opaque to AHP."
         },
-        "actions": {
+        "operations": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/SessionCanvasAction"
+            "$ref": "#/$defs/SessionCanvasOperation"
           },
-          "description": "Actions this canvas exposes to the agent."
+          "description": "Operations this canvas exposes to the agent."
         }
       },
       "required": [
@@ -978,27 +974,15 @@
     },
     "OpenCanvasRef": {
       "type": "object",
-      "description": "A lightweight catalogue entry for one open canvas instance, surfaced on\n{@link SessionState.openCanvases}. The authoritative, mutable per-instance\nstate lives on the instance's own {@link CanvasState} channel; this entry\nexists so a subscriber can discover the channel URI and render it without\nsubscribing to every instance.",
+      "description": "A lightweight catalogue entry for one open canvas instance, surfaced on\n{@link SessionState.openCanvases}. The authoritative, mutable per-instance\nstate lives on the instance's own {@link CanvasState} channel; this entry\nexists so a subscriber can discover the channel URI and render it without\nsubscribing to every instance.\n\nThe instance is identified solely by its {@link channel} URI — the other\nidentity fields (`instanceId`, `providerId`) live on the full\n{@link CanvasState}, not here.",
       "properties": {
-        "instanceId": {
-          "type": "string",
-          "description": "Server-assigned instance handle, unique within the session."
-        },
         "channel": {
           "$ref": "#/$defs/URI",
-          "description": "The instance's channel URI (`ahp-canvas:/<id>`). Subscribe to it to load\nthe full {@link CanvasState}."
+          "description": "The instance's channel URI (`ahp-canvas:/<id>`). Uniquely identifies the\nopen canvas; subscribe to it to load the full {@link CanvasState}."
         },
         "canvasId": {
           "type": "string",
-          "description": "Provider-local canvas id this instance was opened from."
-        },
-        "extensionId": {
-          "type": "string",
-          "description": "Owning provider id."
-        },
-        "extensionName": {
-          "type": "string",
-          "description": "Human-readable provider name."
+          "description": "Provider-local canvas id this instance was opened from. Retained so a\ncatalogue view can pick the right native renderer without subscribing."
         },
         "title": {
           "type": "string",
@@ -1010,10 +994,8 @@
         }
       },
       "required": [
-        "instanceId",
         "channel",
         "canvasId",
-        "extensionId",
         "availability"
       ]
     },
@@ -4742,7 +4724,7 @@
     },
     "CanvasState": {
       "type": "object",
-      "description": "Full state for a single open canvas instance, delivered when a client\nsubscribes to the instance's `ahp-canvas:/<id>` channel.\n\nOne channel exists per open instance — the same \"one channel per resource\"\nconvention used by terminals, changesets, and resource watches. The\nlightweight catalogue entry that advertises this channel is\n{@link OpenCanvasRef} on {@link SessionState.openCanvases}; this state is the\nauthoritative, mutable per-instance view a renderer reads.\n\nRendering is state-driven: a client renders the canvas by reading\n{@link url} and resolving it per the renderer's URL policy — directly for a\nreachable address, or over this channel via `canvasReadResource` for an\n`ahp-canvas-content:` address. It never receives a \"render this\" request.",
+      "description": "Full state for a single open canvas instance, delivered when a client\nsubscribes to the instance's `ahp-canvas:/<id>` channel.\n\nOne channel exists per open instance — the same \"one channel per resource\"\nconvention used by terminals, changesets, and resource watches. The\nlightweight catalogue entry that advertises this channel is\n{@link OpenCanvasRef} on {@link SessionState.openCanvases}; this state is the\nauthoritative, mutable per-instance view a renderer reads.\n\nRendering is state-driven: a client renders the canvas by reading\n{@link url} and resolving it per the renderer's URL policy — directly for a\nreachable address, or over the general `resourceRead` command for a\ncontent-reference address. It never receives a \"render this\" request.",
       "properties": {
         "instanceId": {
           "type": "string",
@@ -4752,13 +4734,9 @@
           "type": "string",
           "description": "Provider-local canvas id this instance was opened from."
         },
-        "extensionId": {
+        "providerId": {
           "type": "string",
-          "description": "Owning provider id."
-        },
-        "extensionName": {
-          "type": "string",
-          "description": "Human-readable provider name."
+          "description": "Owning provider id — an opaque namespace string AHP does not interpret,\ncarried so a provider-local {@link canvasId} stays unique across providers."
         },
         "displayName": {
           "type": "string",
@@ -4779,7 +4757,7 @@
         },
         "url": {
           "type": "string",
-          "description": "Renderer-targeted address for the opaque canvas content — either a\ndirectly-loadable URL (`https:`, an in-process scheme, `http://localhost`)\nor a channel-served `ahp-canvas-content:/<instanceId>/<path>` address the\nrenderer resolves over this channel with `canvasReadResource`. The\nrenderer dispatches on the scheme and enforces its URL policy. See\n{@link /specification/canvas-channel | Canvas Channel}."
+          "description": "Renderer-targeted address for the opaque canvas content — either a\ndirectly-loadable URL (`https:`, an in-process scheme, `http://localhost`)\nor a content-reference URI the renderer resolves with the general\n`resourceRead` command. Resolving over `resourceRead` keeps content flowing\nentirely over the AHP transport, so a relayed or brokered deployment —\nwhere the host is reachable only over AHP and cannot be dialed directly —\ncan still serve every byte, with no port or direct connection required. The\nrenderer dispatches on the scheme and enforces its URL policy. See\n{@link /specification/canvas-channel | Canvas Channel}."
         },
         "availability": {
           "$ref": "#/$defs/CanvasAvailability",
@@ -4793,7 +4771,7 @@
       "required": [
         "instanceId",
         "canvasId",
-        "extensionId",
+        "providerId",
         "availability",
         "provider"
       ]

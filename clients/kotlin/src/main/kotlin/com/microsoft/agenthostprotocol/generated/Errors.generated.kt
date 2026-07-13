@@ -59,7 +59,7 @@ object AhpErrorCodes {
     const val ALREADY_EXISTS: Int = -32010
     /** An optimistic-concurrency precondition failed: a request precondition token no longer matches the resource state */
     const val CONFLICT: Int = -32011
-    /** A canvas provider request (canvasOpen, canvasInvokeAction, or canvasClose) failed; `data` carries a provider-defined `{ code, message }` */
+    /** A canvas provider request (canvasOpen, canvasInvokeOperation, or canvasClose) failed; `data` carries a provider-defined `{ code, message }` */
     const val CANVAS_PROVIDER_ERROR: Int = -32012
 }
 

@@ -24,8 +24,8 @@ import type {
  *
  * Rendering is state-driven: a client renders the canvas by reading
  * {@link url} and resolving it per the renderer's URL policy — directly for a
- * reachable address, or over this channel via `canvasReadResource` for an
- * `ahp-canvas-content:` address. It never receives a "render this" request.
+ * reachable address, or over the general `resourceRead` command for a
+ * content-reference address. It never receives a "render this" request.
  *
  * @category Canvas State
  */
@@ -34,10 +34,11 @@ export interface CanvasState {
   instanceId: string;
   /** Provider-local canvas id this instance was opened from. */
   canvasId: string;
-  /** Owning provider id. */
-  extensionId: string;
-  /** Human-readable provider name. */
-  extensionName?: string;
+  /**
+   * Owning provider id — an opaque namespace string AHP does not interpret,
+   * carried so a provider-local {@link canvasId} stays unique across providers.
+   */
+  providerId: string;
   /** Human-readable canvas name. */
   displayName?: string;
   /**
@@ -52,8 +53,11 @@ export interface CanvasState {
   /**
    * Renderer-targeted address for the opaque canvas content — either a
    * directly-loadable URL (`https:`, an in-process scheme, `http://localhost`)
-   * or a channel-served `ahp-canvas-content:/<instanceId>/<path>` address the
-   * renderer resolves over this channel with `canvasReadResource`. The
+   * or a content-reference URI the renderer resolves with the general
+   * `resourceRead` command. Resolving over `resourceRead` keeps content flowing
+   * entirely over the AHP transport, so a relayed or brokered deployment —
+   * where the host is reachable only over AHP and cannot be dialed directly —
+   * can still serve every byte, with no port or direct connection required. The
    * renderer dispatches on the scheme and enforces its URL policy. See
    * {@link /specification/canvas-channel | Canvas Channel}.
    */

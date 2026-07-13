@@ -102,7 +102,6 @@ const (
 	ActionTypeSessionOpenCanvasesChanged        ActionType = "session/openCanvasesChanged"
 	ActionTypeCanvasUpdated                     ActionType = "canvas/updated"
 	ActionTypeCanvasCloseRequested              ActionType = "canvas/closeRequested"
-	ActionTypeCanvasMessage                     ActionType = "canvas/message"
 )
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -1382,21 +1381,6 @@ type CanvasCloseRequestedAction struct {
 	Type ActionType `json:"type"`
 }
 
-// An opaque message relayed between the rendered canvas View and the
-// instance's provider — the relay-carried analogue of a `postMessage` bridge.
-//
-// Bidirectional: a client dispatches it to carry a View→provider message, and
-// the host emits it to carry a provider→View message (routed to the provider
-// resolved for the instance, or handled host-internally for a server-side
-// provider). Like `terminal/input` and {@link CanvasCloseRequestedAction} it
-// is a pure signal with a no-op reducer, so it never bloats channel state. See
-// {@link /specification/canvas-channel | Canvas Channel}.
-type CanvasMessageAction struct {
-	Type ActionType `json:"type"`
-	// Opaque, provider-defined message payload.
-	Payload json.RawMessage `json:"payload"`
-}
-
 // ─── StateAction Union ───────────────────────────────────────────────
 
 // StateAction is the discriminated union of every state action.
@@ -1491,7 +1475,6 @@ func (*TerminalCommandFinishedAction) isStateAction()           {}
 func (*ResourceWatchChangedAction) isStateAction()              {}
 func (*CanvasUpdatedAction) isStateAction()                     {}
 func (*CanvasCloseRequestedAction) isStateAction()              {}
-func (*CanvasMessageAction) isStateAction()                     {}
 
 // StateActionUnknown carries an unrecognized StateAction variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type StateActionUnknown struct {
@@ -2001,12 +1984,6 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "canvas/closeRequested":
 		var value CanvasCloseRequestedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "canvas/message":
-		var value CanvasMessageAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

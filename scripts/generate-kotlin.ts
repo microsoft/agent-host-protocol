@@ -854,7 +854,7 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
-  'SessionCanvasAction', 'SessionCanvasDeclaration', 'ClientCanvasDeclaration', 'OpenCanvasRef',
+  'SessionCanvasOperation', 'SessionCanvasDeclaration', 'ClientCanvasDeclaration', 'OpenCanvasRef',
   'CanvasServerProviderSource', 'CanvasClientProviderSource', 'CanvasState',
 ];
 
@@ -1270,7 +1270,6 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'resourceWatch/changed', caseName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
   { type: 'canvas/updated', caseName: 'CanvasUpdated', tsInterface: 'CanvasUpdatedAction' },
   { type: 'canvas/closeRequested', caseName: 'CanvasCloseRequested', tsInterface: 'CanvasCloseRequestedAction' },
-  { type: 'canvas/message', caseName: 'CanvasMessage', tsInterface: 'CanvasMessageAction' },
 ];
 
 /** Merged data class for the approved/denied tool call confirmed action. */
@@ -1459,9 +1458,8 @@ const COMMAND_STRUCTS = [
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
   'CanvasOpenParams', 'CanvasOpenResult',
-  'CanvasInvokeActionParams', 'CanvasInvokeActionResult',
+  'CanvasInvokeOperationParams', 'CanvasInvokeOperationResult',
   'CanvasCloseParams',
-  'CanvasReadResourceParams', 'CanvasReadResourceResult', 'CanvasResourceContent',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1700,7 +1698,7 @@ function generateErrorsFile(project: Project): string {
   lines.push('    const val ALREADY_EXISTS: Int = -32010');
   lines.push('    /** An optimistic-concurrency precondition failed: a request precondition token no longer matches the resource state */');
   lines.push('    const val CONFLICT: Int = -32011');
-  lines.push('    /** A canvas provider request (canvasOpen, canvasInvokeAction, or canvasClose) failed; `data` carries a provider-defined `{ code, message }` */');
+  lines.push('    /** A canvas provider request (canvasOpen, canvasInvokeOperation, or canvasClose) failed; `data` carries a provider-defined `{ code, message }` */');
   lines.push('    const val CANVAS_PROVIDER_ERROR: Int = -32012');
   lines.push('}');
   lines.push('');

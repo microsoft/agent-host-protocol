@@ -844,8 +844,8 @@ type SessionActiveClient struct {
 	// {@link SessionState.canvases} with
 	// {@link SessionCanvasDeclaration.source | `source`} set to
 	// `{ kind: 'client', clientId }` and routes
-	// `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for them back
-	// to this client. Only meaningful for a client that declared
+	// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for them
+	// back to this client. Only meaningful for a client that declared
 	// {@link ClientCapabilities.canvas}.
 	CanvasProviders []ClientCanvasDeclaration `json:"canvasProviders,omitempty"`
 }
@@ -3232,15 +3232,16 @@ type ResourceChange struct {
 	Type ResourceChangeType `json:"type"`
 }
 
-// One named action a canvas exposes to the agent, mirroring the shape of a
+// One named operation a canvas exposes to the agent, mirroring the shape of a
 // {@link ToolDefinition} entry. Unique within its owning
-// `(extensionId, canvasId)`.
-type SessionCanvasAction struct {
-	// Action name, unique within the owning `(extensionId, canvasId)`.
+// `(providerId, canvasId)`. Named "operation" to match the changeset channel's
+// operation vocabulary.
+type SessionCanvasOperation struct {
+	// Operation name, unique within the owning `(providerId, canvasId)`.
 	Name string `json:"name"`
-	// Human-readable description of what the action does.
+	// Human-readable description of what the operation does.
 	Description *string `json:"description,omitempty"`
-	// JSON Schema for the action's input. Opaque to AHP; mirrors the
+	// JSON Schema for the operation's input. Opaque to AHP; mirrors the
 	// {@link ToolDefinition.inputSchema} shape.
 	InputSchema map[string]json.RawMessage `json:"inputSchema,omitempty"`
 }
@@ -3248,11 +3249,11 @@ type SessionCanvasAction struct {
 // One entry in the aggregated {@link SessionState.canvases} registry — a canvas
 // the agent can open, contributed by a server-side or client-declared provider.
 type SessionCanvasDeclaration struct {
-	// Owning provider id. Stable across declarations and instances.
-	ExtensionId string `json:"extensionId"`
-	// Human-readable provider name.
-	ExtensionName *string `json:"extensionName,omitempty"`
-	// Provider-local canvas id. Unique within `extensionId`.
+	// Owning provider id — an opaque namespace string AHP does not interpret,
+	// carried so a provider-local {@link canvasId} stays unique across providers.
+	// Stable across declarations and instances.
+	ProviderId string `json:"providerId"`
+	// Provider-local canvas id. Unique within `providerId`.
 	CanvasId string `json:"canvasId"`
 	// Human-readable canvas name.
 	DisplayName string `json:"displayName"`
@@ -3261,15 +3262,15 @@ type SessionCanvasDeclaration struct {
 	// JSON Schema for the canvas's open input. Opaque to AHP; mirrors the
 	// {@link ToolDefinition.inputSchema} shape.
 	InputSchema map[string]json.RawMessage `json:"inputSchema,omitempty"`
-	// Actions this canvas exposes to the agent.
-	Actions []SessionCanvasAction `json:"actions,omitempty"`
+	// Operations this canvas exposes to the agent.
+	Operations []SessionCanvasOperation `json:"operations,omitempty"`
 	// Where the declaration came from — for routing and cleanup.
 	Source CanvasProviderSource `json:"source"`
 }
 
 // The lighter declaration shape a client publishes on
 // {@link SessionActiveClient.canvasProviders}. The host derives the
-// `extensionId` and {@link SessionCanvasDeclaration.source | `source`} when
+// `providerId` and {@link SessionCanvasDeclaration.source | `source`} when
 // folding it into {@link SessionState.canvases}.
 type ClientCanvasDeclaration struct {
 	// Provider-local canvas id, unique within the publishing client.
@@ -3280,8 +3281,8 @@ type ClientCanvasDeclaration struct {
 	Description string `json:"description"`
 	// JSON Schema for the canvas's open input. Opaque to AHP.
 	InputSchema map[string]json.RawMessage `json:"inputSchema,omitempty"`
-	// Actions this canvas exposes to the agent.
-	Actions []SessionCanvasAction `json:"actions,omitempty"`
+	// Operations this canvas exposes to the agent.
+	Operations []SessionCanvasOperation `json:"operations,omitempty"`
 }
 
 // A lightweight catalogue entry for one open canvas instance, surfaced on
@@ -3289,18 +3290,17 @@ type ClientCanvasDeclaration struct {
 // state lives on the instance's own {@link CanvasState} channel; this entry
 // exists so a subscriber can discover the channel URI and render it without
 // subscribing to every instance.
+//
+// The instance is identified solely by its {@link channel} URI — the other
+// identity fields (`instanceId`, `providerId`) live on the full
+// {@link CanvasState}, not here.
 type OpenCanvasRef struct {
-	// Server-assigned instance handle, unique within the session.
-	InstanceId string `json:"instanceId"`
-	// The instance's channel URI (`ahp-canvas:/<id>`). Subscribe to it to load
-	// the full {@link CanvasState}.
+	// The instance's channel URI (`ahp-canvas:/<id>`). Uniquely identifies the
+	// open canvas; subscribe to it to load the full {@link CanvasState}.
 	Channel URI `json:"channel"`
-	// Provider-local canvas id this instance was opened from.
+	// Provider-local canvas id this instance was opened from. Retained so a
+	// catalogue view can pick the right native renderer without subscribing.
 	CanvasId string `json:"canvasId"`
-	// Owning provider id.
-	ExtensionId string `json:"extensionId"`
-	// Human-readable provider name.
-	ExtensionName *string `json:"extensionName,omitempty"`
 	// Current instance title, mirrored from {@link CanvasState.title}.
 	Title *string `json:"title,omitempty"`
 	// Whether the instance's provider is currently available.
@@ -3314,8 +3314,8 @@ type CanvasServerProviderSource struct {
 }
 
 // A canvas provided by a connected client. The host routes
-// `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for this canvas
-// to the identified client.
+// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for this
+// canvas to the identified client.
 type CanvasClientProviderSource struct {
 	Kind CanvasProviderKind `json:"kind"`
 	// `clientId` of the providing client (matches `initialize`).
@@ -3333,17 +3333,16 @@ type CanvasClientProviderSource struct {
 //
 // Rendering is state-driven: a client renders the canvas by reading
 // {@link url} and resolving it per the renderer's URL policy — directly for a
-// reachable address, or over this channel via `canvasReadResource` for an
-// `ahp-canvas-content:` address. It never receives a "render this" request.
+// reachable address, or over the general `resourceRead` command for a
+// content-reference address. It never receives a "render this" request.
 type CanvasState struct {
 	// Server-assigned instance handle, unique within the session.
 	InstanceId string `json:"instanceId"`
 	// Provider-local canvas id this instance was opened from.
 	CanvasId string `json:"canvasId"`
-	// Owning provider id.
-	ExtensionId string `json:"extensionId"`
-	// Human-readable provider name.
-	ExtensionName *string `json:"extensionName,omitempty"`
+	// Owning provider id — an opaque namespace string AHP does not interpret,
+	// carried so a provider-local {@link canvasId} stays unique across providers.
+	ProviderId string `json:"providerId"`
 	// Human-readable canvas name.
 	DisplayName *string `json:"displayName,omitempty"`
 	// Input the agent supplied when opening the instance. Retained so the
@@ -3355,8 +3354,11 @@ type CanvasState struct {
 	Status *string `json:"status,omitempty"`
 	// Renderer-targeted address for the opaque canvas content — either a
 	// directly-loadable URL (`https:`, an in-process scheme, `http://localhost`)
-	// or a channel-served `ahp-canvas-content:/<instanceId>/<path>` address the
-	// renderer resolves over this channel with `canvasReadResource`. The
+	// or a content-reference URI the renderer resolves with the general
+	// `resourceRead` command. Resolving over `resourceRead` keeps content flowing
+	// entirely over the AHP transport, so a relayed or brokered deployment —
+	// where the host is reachable only over AHP and cannot be dialed directly —
+	// can still serve every byte, with no port or direct connection required. The
 	// renderer dispatches on the scheme and enforces its URL policy. See
 	// {@link /specification/canvas-channel | Canvas Channel}.
 	Url *string `json:"url,omitempty"`

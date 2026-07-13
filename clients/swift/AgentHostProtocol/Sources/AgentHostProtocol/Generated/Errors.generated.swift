@@ -42,7 +42,7 @@ public enum AhpErrorCodes {
     public static let alreadyExists = -32010
     /// An optimistic-concurrency precondition failed: a request precondition token no longer matches the resource state
     public static let conflict = -32011
-    /// A canvas provider request (canvasOpen, canvasInvokeAction, or canvasClose) failed; `data` carries a provider-defined `{ code, message }`
+    /// A canvas provider request (canvasOpen, canvasInvokeOperation, or canvasClose) failed; `data` carries a provider-defined `{ code, message }`
     public static let canvasProviderError = -32012
 }
 

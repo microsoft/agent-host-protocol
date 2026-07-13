@@ -14,9 +14,9 @@ import { softAssertNever } from '../common/reducer-helpers.js';
  *
  * `canvas/updated` is a sparse merge — a present field overwrites the
  * corresponding {@link CanvasState} field and an absent field preserves the
- * current value. `canvas/closeRequested` and `canvas/message` are pure
- * signals with no state effect (the host acts on them out of band), mirroring
- * how `terminal/input` is side-effect-only.
+ * current value. `canvas/closeRequested` is a pure signal with no state effect
+ * (the host acts on it out of band), mirroring how `terminal/input` is
+ * side-effect-only.
  */
 export function canvasReducer(state: CanvasState, action: CanvasAction, log?: (msg: string) => void): CanvasState {
   switch (action.type) {
@@ -32,10 +32,6 @@ export function canvasReducer(state: CanvasState, action: CanvasAction, log?: (m
     case ActionType.CanvasCloseRequested:
       // Side-effect-only: a client→host "user hit ✕" signal. The host runs
       // the close flow; the reducer keeps no state for it.
-      return state;
-
-    case ActionType.CanvasMessage:
-      // Side-effect-only: an opaque View↔provider relay message. No state.
       return state;
 
     default:

@@ -160,7 +160,6 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.SessionOpenCanvasesChanged]: '0.6.0',
   [ActionType.CanvasUpdated]: '0.6.0',
   [ActionType.CanvasCloseRequested]: '0.6.0',
-  [ActionType.CanvasMessage]: '0.6.0',
 };
 
 /**

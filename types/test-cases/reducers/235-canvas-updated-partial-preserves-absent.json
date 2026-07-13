@@ -4,10 +4,10 @@
   "initial": {
     "instanceId": "canvas-1",
     "canvasId": "markdown",
-    "extensionId": "acme.editors",
+    "providerId": "acme.editors",
     "title": "Draft",
     "status": "idle",
-    "url": "ahp-canvas-content:/canvas-1/index.html",
+    "url": "ahp-session:/2f9c/content/canvas-1",
     "availability": "ready",
     "provider": { "kind": "client", "clientId": "client-42" }
   },
@@ -21,7 +21,7 @@
   "expected": {
     "instanceId": "canvas-1",
     "canvasId": "markdown",
-    "extensionId": "acme.editors",
+    "providerId": "acme.editors",
     "title": "Renamed",
     "status": "idle",
     "url": "https://example.com/docs/renamed.html",

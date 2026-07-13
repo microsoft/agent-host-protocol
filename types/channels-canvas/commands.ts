@@ -1,7 +1,7 @@
 /**
  * Canvas Channel Commands — the server → client provider request family
- * (`canvasOpen` / `canvasInvokeAction` / `canvasClose`) and the client →
- * server `canvasReadResource` content-fetch request.
+ * (`canvasOpen` / `canvasInvokeOperation` / `canvasClose`) that drives a
+ * client-declared canvas provider.
  *
  * @module channels-canvas/commands
  */
@@ -40,7 +40,7 @@ import type { BaseParams } from '../common/commands.js';
  *   "params": {
  *     "channel": "ahp-session:/2f9c…",
  *     "canvasId": "diff",
- *     "extensionId": "acme.canvases",
+ *     "providerId": "acme.canvases",
  *     "instanceId": "inst-7",
  *     "input": { "path": "src/app.ts" }
  *   } }
@@ -57,8 +57,8 @@ export interface CanvasOpenParams extends BaseParams {
   channel: URI;
   /** Provider-local canvas id to open. */
   canvasId: string;
-  /** Owning provider id. */
-  extensionId: string;
+  /** Owning provider id (opaque to AHP). */
+  providerId: string;
   /** Caller-minted handle for the new instance. */
   instanceId: string;
   /** Open input, validated by the provider against its declared schema. */
@@ -77,45 +77,45 @@ export interface CanvasOpenResult {
   status?: string;
 }
 
-// ─── canvasInvokeAction ──────────────────────────────────────────────────────
+// ─── canvasInvokeOperation ───────────────────────────────────────────────────
 
 /**
- * Invokes one of a canvas's declared actions against its provider.
+ * Invokes one of a canvas's declared operations against its provider.
  *
  * Sent by the host to the providing client (or resolved host-internally for a
  * server-side provider) when the agent invokes a
- * {@link SessionCanvasAction | declared action} on an open instance. The
+ * {@link SessionCanvasOperation | declared operation} on an open instance. The
  * provider returns an opaque, provider-defined value. Registered symmetrically
  * with the rest of the provider family (see {@link CanvasOpenParams}).
  *
  * @category Commands
- * @method canvasInvokeAction
+ * @method canvasInvokeOperation
  * @direction Client ↔ Server
  * @messageType Request
  * @version 1
  * @throws `CanvasProviderError` (`-32012`) if the provider has no handler for
- * the action (`canvas_action_no_handler`) or the invocation fails; `data`
- * carries the provider-defined `{ code, message }`.
+ * the operation or the invocation fails; `data` carries the provider-defined
+ * `{ code, message }`.
  */
-export interface CanvasInvokeActionParams extends BaseParams {
+export interface CanvasInvokeOperationParams extends BaseParams {
   /** The owning session channel URI (`ahp-session:/<uuid>`). */
   channel: URI;
-  /** Instance handle the action targets. */
+  /** Instance handle the operation targets. */
   instanceId: string;
   /** Provider-local canvas id of the instance. */
   canvasId: string;
-  /** Owning provider id. */
-  extensionId: string;
-  /** Declared action name to invoke. */
-  actionName: string;
-  /** Action input, validated by the provider against its declared schema. */
+  /** Owning provider id (opaque to AHP). */
+  providerId: string;
+  /** Declared operation name to invoke. */
+  operationName: string;
+  /** Operation input, validated by the provider against its declared schema. */
   input?: Record<string, unknown>;
 }
 
 /**
- * Result of the `canvasInvokeAction` command.
+ * Result of the `canvasInvokeOperation` command.
  */
-export interface CanvasInvokeActionResult {
+export interface CanvasInvokeOperationResult {
   /** Opaque, provider-defined return value. */
   value?: unknown;
 }
@@ -144,78 +144,6 @@ export interface CanvasCloseParams extends BaseParams {
   instanceId: string;
   /** Provider-local canvas id of the instance. */
   canvasId: string;
-  /** Owning provider id. */
-  extensionId: string;
-}
-
-// ─── canvasReadResource ──────────────────────────────────────────────────────
-
-/**
- * Reads channel-served canvas content by `ahp-canvas-content:` URI.
- *
- * A client → host request, modeled on MCP's `resources/read`. When a canvas's
- * {@link CanvasState.url} (or a sub-resource the rendered document references)
- * is an `ahp-canvas-content:/<instanceId>/<path>` address, the renderer cannot
- * dial the host directly — for example in a relayed deployment behind a broker
- * — so it resolves the bytes over the instance's existing `ahp-canvas:/<id>`
- * channel with this request instead of loading a network URL. The `<instanceId>`
- * segment of the URI identifies which canvas channel to read from. See
- * {@link /specification/canvas-channel | Canvas Channel}.
- *
- * @category Commands
- * @method canvasReadResource
- * @direction Client → Server
- * @messageType Request
- * @version 1
- * @throws `NotFound` (`-32008`) if the content URI does not resolve.
- * @example
- * ```jsonc
- * // Client → Server
- * { "jsonrpc": "2.0", "id": 52, "method": "canvasReadResource",
- *   "params": {
- *     "channel": "ahp-canvas:/9b1e…",
- *     "uri": "ahp-canvas-content:/inst-7/index.html"
- *   } }
- *
- * // Server → Client
- * { "jsonrpc": "2.0", "id": 52, "result": {
- *   "contents": [
- *     { "uri": "ahp-canvas-content:/inst-7/index.html",
- *       "mimeType": "text/html", "text": "<!doctype html>…" }
- *   ]
- * } }
- * ```
- */
-export interface CanvasReadResourceParams extends BaseParams {
-  /** The owning canvas channel URI (`ahp-canvas:/<id>`). */
-  channel: URI;
-  /** An `ahp-canvas-content:/<instanceId>/<path>` content URI to read. */
-  uri: string;
-}
-
-/**
- * Result of the `canvasReadResource` command.
- */
-export interface CanvasReadResourceResult {
-  /** The resolved content parts, wrapped for forward compatibility. */
-  contents: CanvasResourceContent[];
-}
-
-/**
- * One resolved piece of channel-served canvas content.
- *
- * Carries exactly one of {@link text} (text payloads) or {@link blob}
- * (base64-encoded binary payloads).
- *
- * @category Commands
- */
-export interface CanvasResourceContent {
-  /** The content URI this part resolves. */
-  uri: string;
-  /** MIME type of the content, when known. */
-  mimeType?: string;
-  /** UTF-8 text content, for text payloads. */
-  text?: string;
-  /** Base64-encoded content, for binary payloads. */
-  blob?: string;
+  /** Owning provider id (opaque to AHP). */
+  providerId: string;
 }

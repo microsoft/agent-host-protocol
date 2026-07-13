@@ -222,7 +222,7 @@ data class ClientCapabilities(
     /**
      * Client can render canvases and host client-declared canvas providers — it
      * can render an opaque canvas URL in an isolated surface, and it can answer
-     * `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for canvases
+     * `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for canvases
      * it declares via {@link SessionActiveClient.canvasProviders}.
      *
      * Hosts SHOULD only populate {@link SessionState.canvases} /
@@ -1194,9 +1194,9 @@ data class CanvasOpenParams(
      */
     val canvasId: String,
     /**
-     * Owning provider id.
+     * Owning provider id (opaque to AHP).
      */
-    val extensionId: String,
+    val providerId: String,
     /**
      * Caller-minted handle for the new instance.
      */
@@ -1224,13 +1224,13 @@ data class CanvasOpenResult(
 )
 
 @Serializable
-data class CanvasInvokeActionParams(
+data class CanvasInvokeOperationParams(
     /**
      * Channel URI this command targets.
      */
     val channel: String,
     /**
-     * Instance handle the action targets.
+     * Instance handle the operation targets.
      */
     val instanceId: String,
     /**
@@ -1238,21 +1238,21 @@ data class CanvasInvokeActionParams(
      */
     val canvasId: String,
     /**
-     * Owning provider id.
+     * Owning provider id (opaque to AHP).
      */
-    val extensionId: String,
+    val providerId: String,
     /**
-     * Declared action name to invoke.
+     * Declared operation name to invoke.
      */
-    val actionName: String,
+    val operationName: String,
     /**
-     * Action input, validated by the provider against its declared schema.
+     * Operation input, validated by the provider against its declared schema.
      */
     val input: Map<String, JsonElement>? = null
 )
 
 @Serializable
-data class CanvasInvokeActionResult(
+data class CanvasInvokeOperationResult(
     /**
      * Opaque, provider-defined return value.
      */
@@ -1274,49 +1274,9 @@ data class CanvasCloseParams(
      */
     val canvasId: String,
     /**
-     * Owning provider id.
+     * Owning provider id (opaque to AHP).
      */
-    val extensionId: String
-)
-
-@Serializable
-data class CanvasReadResourceParams(
-    /**
-     * Channel URI this command targets.
-     */
-    val channel: String,
-    /**
-     * An `ahp-canvas-content:/<instanceId>/<path>` content URI to read.
-     */
-    val uri: String
-)
-
-@Serializable
-data class CanvasReadResourceResult(
-    /**
-     * The resolved content parts, wrapped for forward compatibility.
-     */
-    val contents: List<CanvasResourceContent>
-)
-
-@Serializable
-data class CanvasResourceContent(
-    /**
-     * The content URI this part resolves.
-     */
-    val uri: String,
-    /**
-     * MIME type of the content, when known.
-     */
-    val mimeType: String? = null,
-    /**
-     * UTF-8 text content, for text payloads.
-     */
-    val text: String? = null,
-    /**
-     * Base64-encoded content, for binary payloads.
-     */
-    val blob: String? = null
+    val providerId: String
 )
 
 // ─── ReconnectResult Union ──────────────────────────────────────────────────

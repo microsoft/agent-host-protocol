@@ -803,7 +803,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
   { name: 'ResourceChange' },
-  { name: 'SessionCanvasAction' },
+  { name: 'SessionCanvasOperation' },
   { name: 'SessionCanvasDeclaration' },
   { name: 'ClientCanvasDeclaration' },
   { name: 'OpenCanvasRef' },
@@ -1263,7 +1263,6 @@ const ACTION_VARIANTS: {
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
   { type: 'canvas/updated', variantName: 'CanvasUpdated', tsInterface: 'CanvasUpdatedAction' },
   { type: 'canvas/closeRequested', variantName: 'CanvasCloseRequested', tsInterface: 'CanvasCloseRequestedAction' },
-  { type: 'canvas/message', variantName: 'CanvasMessage', tsInterface: 'CanvasMessageAction' },
 ];
 
 function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Session'): string {
@@ -1437,10 +1436,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'InvokeChangesetOperationParams' }, { name: 'InvokeChangesetOperationResult' },
   { name: 'ChangesetOperationFollowUp' },
   { name: 'CanvasOpenParams' }, { name: 'CanvasOpenResult' },
-  { name: 'CanvasInvokeActionParams' }, { name: 'CanvasInvokeActionResult' },
+  { name: 'CanvasInvokeOperationParams' }, { name: 'CanvasInvokeOperationResult' },
   { name: 'CanvasCloseParams' },
-  { name: 'CanvasReadResourceParams' }, { name: 'CanvasReadResourceResult' },
-  { name: 'CanvasResourceContent' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1663,7 +1660,7 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. \`ResourceWriteParams.if_match\`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
-    /// A canvas provider request (\`canvasOpen\`, \`canvasInvokeAction\`, or \`canvasClose\`) failed; the error \`data\` carries a provider-defined \`{ code, message }\`.
+    /// A canvas provider request (\`canvasOpen\`, \`canvasInvokeOperation\`, or \`canvasClose\`) failed; the error \`data\` carries a provider-defined \`{ code, message }\`.
     pub const CANVAS_PROVIDER_ERROR: i32 = -32012;
 }
 

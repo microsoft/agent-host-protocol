@@ -1588,10 +1588,9 @@ func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahpty
 // place. `canvas/updated` is a sparse merge — a presented field
 // (title, status, url, availability) overwrites the corresponding
 // state field and an absent field preserves the current value.
-// `canvas/closeRequested` and `canvas/message` are side-effect-only
-// client→host signals the host acts on out of band, so they leave the
-// state unchanged. Returns [ReduceOutcomeOutOfScope] for actions that
-// target a different state tree.
+// `canvas/closeRequested` is a side-effect-only client→host signal the
+// host acts on out of band, so it leaves the state unchanged. Returns
+// [ReduceOutcomeOutOfScope] for actions that target a different state tree.
 func ApplyActionToCanvas(state *ahptypes.CanvasState, action ahptypes.StateAction) ReduceOutcome {
 	switch a := action.Value.(type) {
 	case *ahptypes.CanvasUpdatedAction:
@@ -1609,8 +1608,6 @@ func ApplyActionToCanvas(state *ahptypes.CanvasState, action ahptypes.StateActio
 		}
 		return ReduceOutcomeApplied
 	case *ahptypes.CanvasCloseRequestedAction:
-		return ReduceOutcomeNoOp
-	case *ahptypes.CanvasMessageAction:
 		return ReduceOutcomeNoOp
 	}
 	return ReduceOutcomeOutOfScope

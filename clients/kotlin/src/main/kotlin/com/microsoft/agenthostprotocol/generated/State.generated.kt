@@ -1446,8 +1446,8 @@ data class SessionActiveClient(
      * {@link SessionState.canvases} with
      * {@link SessionCanvasDeclaration.source | `source`} set to
      * `{ kind: 'client', clientId }` and routes
-     * `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for them back
-     * to this client. Only meaningful for a client that declared
+     * `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for them
+     * back to this client. Only meaningful for a client that declared
      * {@link ClientCapabilities.canvas}.
      */
     val canvasProviders: List<ClientCanvasDeclaration>? = null
@@ -4341,17 +4341,17 @@ data class ResourceChange(
 )
 
 @Serializable
-data class SessionCanvasAction(
+data class SessionCanvasOperation(
     /**
-     * Action name, unique within the owning `(extensionId, canvasId)`.
+     * Operation name, unique within the owning `(providerId, canvasId)`.
      */
     val name: String,
     /**
-     * Human-readable description of what the action does.
+     * Human-readable description of what the operation does.
      */
     val description: String? = null,
     /**
-     * JSON Schema for the action's input. Opaque to AHP; mirrors the
+     * JSON Schema for the operation's input. Opaque to AHP; mirrors the
      * {@link ToolDefinition.inputSchema} shape.
      */
     val inputSchema: Map<String, JsonElement>? = null
@@ -4360,15 +4360,13 @@ data class SessionCanvasAction(
 @Serializable
 data class SessionCanvasDeclaration(
     /**
-     * Owning provider id. Stable across declarations and instances.
+     * Owning provider id — an opaque namespace string AHP does not interpret,
+     * carried so a provider-local {@link canvasId} stays unique across providers.
+     * Stable across declarations and instances.
      */
-    val extensionId: String,
+    val providerId: String,
     /**
-     * Human-readable provider name.
-     */
-    val extensionName: String? = null,
-    /**
-     * Provider-local canvas id. Unique within `extensionId`.
+     * Provider-local canvas id. Unique within `providerId`.
      */
     val canvasId: String,
     /**
@@ -4385,9 +4383,9 @@ data class SessionCanvasDeclaration(
      */
     val inputSchema: Map<String, JsonElement>? = null,
     /**
-     * Actions this canvas exposes to the agent.
+     * Operations this canvas exposes to the agent.
      */
-    val actions: List<SessionCanvasAction>? = null,
+    val operations: List<SessionCanvasOperation>? = null,
     /**
      * Where the declaration came from — for routing and cleanup.
      */
@@ -4413,34 +4411,23 @@ data class ClientCanvasDeclaration(
      */
     val inputSchema: Map<String, JsonElement>? = null,
     /**
-     * Actions this canvas exposes to the agent.
+     * Operations this canvas exposes to the agent.
      */
-    val actions: List<SessionCanvasAction>? = null
+    val operations: List<SessionCanvasOperation>? = null
 )
 
 @Serializable
 data class OpenCanvasRef(
     /**
-     * Server-assigned instance handle, unique within the session.
-     */
-    val instanceId: String,
-    /**
-     * The instance's channel URI (`ahp-canvas:/<id>`). Subscribe to it to load
-     * the full {@link CanvasState}.
+     * The instance's channel URI (`ahp-canvas:/<id>`). Uniquely identifies the
+     * open canvas; subscribe to it to load the full {@link CanvasState}.
      */
     val channel: String,
     /**
-     * Provider-local canvas id this instance was opened from.
+     * Provider-local canvas id this instance was opened from. Retained so a
+     * catalogue view can pick the right native renderer without subscribing.
      */
     val canvasId: String,
-    /**
-     * Owning provider id.
-     */
-    val extensionId: String,
-    /**
-     * Human-readable provider name.
-     */
-    val extensionName: String? = null,
     /**
      * Current instance title, mirrored from {@link CanvasState.title}.
      */
@@ -4476,13 +4463,10 @@ data class CanvasState(
      */
     val canvasId: String,
     /**
-     * Owning provider id.
+     * Owning provider id — an opaque namespace string AHP does not interpret,
+     * carried so a provider-local {@link canvasId} stays unique across providers.
      */
-    val extensionId: String,
-    /**
-     * Human-readable provider name.
-     */
-    val extensionName: String? = null,
+    val providerId: String,
     /**
      * Human-readable canvas name.
      */
@@ -4503,8 +4487,11 @@ data class CanvasState(
     /**
      * Renderer-targeted address for the opaque canvas content — either a
      * directly-loadable URL (`https:`, an in-process scheme, `http://localhost`)
-     * or a channel-served `ahp-canvas-content:/<instanceId>/<path>` address the
-     * renderer resolves over this channel with `canvasReadResource`. The
+     * or a content-reference URI the renderer resolves with the general
+     * `resourceRead` command. Resolving over `resourceRead` keeps content flowing
+     * entirely over the AHP transport, so a relayed or brokered deployment —
+     * where the host is reachable only over AHP and cannot be dialed directly —
+     * can still serve every byte, with no port or direct connection required. The
      * renderer dispatches on the scheme and enforces its URL policy. See
      * {@link /specification/canvas-channel | Canvas Channel}.
      */

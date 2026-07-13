@@ -55,7 +55,7 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. `ResourceWriteParams.if_match`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
-    /// A canvas provider request (`canvasOpen`, `canvasInvokeAction`, or `canvasClose`) failed; the error `data` carries a provider-defined `{ code, message }`.
+    /// A canvas provider request (`canvasOpen`, `canvasInvokeOperation`, or `canvasClose`) failed; the error `data` carries a provider-defined `{ code, message }`.
     pub const CANVAS_PROVIDER_ERROR: i32 = -32012;
 }
 

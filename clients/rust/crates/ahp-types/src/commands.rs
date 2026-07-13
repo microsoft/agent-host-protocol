@@ -205,7 +205,7 @@ pub struct ClientCapabilities {
     pub mcp_apps: Option<JsonObject>,
     /// Client can render canvases and host client-declared canvas providers — it
     /// can render an opaque canvas URL in an isolated surface, and it can answer
-    /// `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for canvases
+    /// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for canvases
     /// it declares via {@link SessionActiveClient.canvasProviders}.
     ///
     /// Hosts SHOULD only populate {@link SessionState.canvases} /
@@ -1262,8 +1262,8 @@ pub struct CanvasOpenParams {
     pub channel: Uri,
     /// Provider-local canvas id to open.
     pub canvas_id: String,
-    /// Owning provider id.
-    pub extension_id: String,
+    /// Owning provider id (opaque to AHP).
+    pub provider_id: String,
     /// Caller-minted handle for the new instance.
     pub instance_id: String,
     /// Open input, validated by the provider against its declared schema.
@@ -1286,35 +1286,35 @@ pub struct CanvasOpenResult {
     pub status: Option<String>,
 }
 
-/// Invokes one of a canvas's declared actions against its provider.
+/// Invokes one of a canvas's declared operations against its provider.
 ///
 /// Sent by the host to the providing client (or resolved host-internally for a
 /// server-side provider) when the agent invokes a
-/// {@link SessionCanvasAction | declared action} on an open instance. The
+/// {@link SessionCanvasOperation | declared operation} on an open instance. The
 /// provider returns an opaque, provider-defined value. Registered symmetrically
 /// with the rest of the provider family (see {@link CanvasOpenParams}).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CanvasInvokeActionParams {
+pub struct CanvasInvokeOperationParams {
     /// Channel URI this command targets.
     pub channel: Uri,
-    /// Instance handle the action targets.
+    /// Instance handle the operation targets.
     pub instance_id: String,
     /// Provider-local canvas id of the instance.
     pub canvas_id: String,
-    /// Owning provider id.
-    pub extension_id: String,
-    /// Declared action name to invoke.
-    pub action_name: String,
-    /// Action input, validated by the provider against its declared schema.
+    /// Owning provider id (opaque to AHP).
+    pub provider_id: String,
+    /// Declared operation name to invoke.
+    pub operation_name: String,
+    /// Operation input, validated by the provider against its declared schema.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input: Option<JsonObject>,
 }
 
-/// Result of the `canvasInvokeAction` command.
+/// Result of the `canvasInvokeOperation` command.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct CanvasInvokeActionResult {
+pub struct CanvasInvokeOperationResult {
     /// Opaque, provider-defined return value.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<AnyValue>,
@@ -1336,55 +1336,8 @@ pub struct CanvasCloseParams {
     pub instance_id: String,
     /// Provider-local canvas id of the instance.
     pub canvas_id: String,
-    /// Owning provider id.
-    pub extension_id: String,
-}
-
-/// Reads channel-served canvas content by `ahp-canvas-content:` URI.
-///
-/// A client → host request, modeled on MCP's `resources/read`. When a canvas's
-/// {@link CanvasState.url} (or a sub-resource the rendered document references)
-/// is an `ahp-canvas-content:/<instanceId>/<path>` address, the renderer cannot
-/// dial the host directly — for example in a relayed deployment behind a broker
-/// — so it resolves the bytes over the instance's existing `ahp-canvas:/<id>`
-/// channel with this request instead of loading a network URL. The `<instanceId>`
-/// segment of the URI identifies which canvas channel to read from. See
-/// {@link /specification/canvas-channel | Canvas Channel}.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CanvasReadResourceParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// An `ahp-canvas-content:/<instanceId>/<path>` content URI to read.
-    pub uri: String,
-}
-
-/// Result of the `canvasReadResource` command.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CanvasReadResourceResult {
-    /// The resolved content parts, wrapped for forward compatibility.
-    pub contents: Vec<CanvasResourceContent>,
-}
-
-/// One resolved piece of channel-served canvas content.
-///
-/// Carries exactly one of {@link text} (text payloads) or {@link blob}
-/// (base64-encoded binary payloads).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CanvasResourceContent {
-    /// The content URI this part resolves.
-    pub uri: String,
-    /// MIME type of the content, when known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mime_type: Option<String>,
-    /// UTF-8 text content, for text payloads.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
-    /// Base64-encoded content, for binary payloads.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub blob: Option<String>,
+    /// Owning provider id (opaque to AHP).
+    pub provider_id: String,
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

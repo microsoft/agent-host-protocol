@@ -8,10 +8,10 @@ The channel concept is woven into every wire message. **Every command and every 
 
 | Direction | Methods | `channel` value |
 |---|---|---|
-| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, `canvasReadResource` | The target channel's URI (e.g. `ahp-session:/<uuid>`, or `ahp-canvas:/<id>` for `canvasReadResource`). |
+| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation` | The target channel's URI (e.g. `ahp-session:/<uuid>`). |
 | Client → Server commands (connection-level) | `initialize`, `ping`, `reconnect`, `listSessions`, `authenticate`, `resolveSessionConfig`, `sessionConfigCompletions`, `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | Literal `'ahp-root://'`. |
 | Server → Client commands (bidirectional `resource*` family) | The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins). | Literal `'ahp-root://'`. |
-| Server → Client commands (canvas provider family) | `canvasOpen`, `canvasInvokeAction`, `canvasClose` — initiated by the host against the client that declared the target canvas provider; mirrored in the client → server map for symmetry. See [Canvas Channel](/specification/canvas-channel). | The owning `ahp-session:/<uuid>` URI. |
+| Server → Client commands (canvas provider family) | `canvasOpen`, `canvasInvokeOperation`, `canvasClose` — initiated by the host against the client that declared the target canvas provider; mirrored in the client → server map for symmetry. See [Canvas Channel](/specification/canvas-channel). | The owning `ahp-session:/<uuid>` URI. |
 | Client → Server `dispatchAction` | The channel the action targets. |
 | Client → Server `unsubscribe` | The channel being unsubscribed. |
 | Server → Client `action` | The channel that owns the action envelope. |

@@ -208,7 +208,7 @@ export interface ClientCapabilities {
   /**
    * Client can render canvases and host client-declared canvas providers — it
    * can render an opaque canvas URL in an isolated surface, and it can answer
-   * `canvasOpen` / `canvasInvokeAction` / `canvasClose` requests for canvases
+   * `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for canvases
    * it declares via {@link SessionActiveClient.canvasProviders}.
    *
    * Hosts SHOULD only populate {@link SessionState.canvases} /

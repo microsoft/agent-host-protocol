@@ -27,25 +27,22 @@ Both lists are published with full-replacement actions (`session/canvasesChanged
 The defining idea: **a renderer renders from state, not from requests.** Subscribing to a canvas instance yields a `CanvasState` with a `url`, and the renderer resolves that address:
 
 - a directly-loadable `https:`, in-process, or `http://localhost` address is loaded straight into the surface; or
-- an `ahp-canvas-content:/<instanceId>/<path>` address is resolved over the instance's own channel with `canvasReadResource` — the escape hatch for relayed deployments where the renderer can't reach the host's network directly.
+- a content-reference address is resolved over the general `resourceRead` command — which keeps content flowing over the AHP transport itself, the escape hatch for relayed deployments where the renderer can't reach the host's network directly.
 
 When the canvas changes, the provider emits a `canvas/updated` action that sparse-merges the new `title` / `status` / `url` / `availability` into state, and every subscriber re-renders. There is no imperative "draw this" message anywhere in the protocol.
 
 ## Interaction
 
-Two paths carry interaction back to the provider:
+Interaction travels back to the provider through **declared operations.** A canvas can declare named operations (with input schemas) the agent may invoke; the host issues a `canvasInvokeOperation` request to the provider and returns its opaque result. Opening and closing are the same shape (`canvasOpen`, `canvasClose`). For a host-provided canvas the host resolves these internally and sends no request.
 
-- **Declared actions.** A canvas can declare named actions (with input schemas) the agent may invoke; the host issues a `canvasInvokeAction` request to the provider and returns its opaque result. Opening and closing are the same shape (`canvasOpen`, `canvasClose`). For a host-provided canvas the host resolves these internally and sends no request.
-- **The message bridge.** `canvas/message` relays an opaque payload between the rendered View and the provider in either direction — the relay-carried analogue of a `postMessage` bridge. Like `terminal/input`, it is a pure signal with a no-op reducer, so it never accumulates in state.
-
-Closing follows the same signal-then-request pattern: the user hits ✕, the renderer dispatches `canvas/closeRequested`, and the host runs the close flow — resolving `canvasClose` against the provider and dropping the instance from `openCanvases`.
+Closing follows a signal-then-request pattern: the user hits ✕, the renderer dispatches `canvas/closeRequested`, and the host runs the close flow — resolving `canvasClose` against the provider and dropping the instance from `openCanvases`.
 
 ## Lifecycle
 
 1. A client declares `ClientCapabilities.canvas` and publishes any `canvasProviders`. The host folds them into `SessionState.canvases`.
 2. The agent opens a canvas. The host mints an instance, sends `canvasOpen` to the provider (or resolves it internally), and adds an `OpenCanvasRef` to `SessionState.openCanvases`.
 3. A renderer subscribes to the instance's `ahp-canvas:/<id>` channel, receives the `CanvasState` snapshot, and loads its `url`.
-4. The provider pushes `canvas/updated` as the canvas evolves; the agent invokes declared actions; the View and provider exchange `canvas/message` payloads.
+4. The provider pushes `canvas/updated` as the canvas evolves, and the agent invokes declared operations.
 5. The user (or the agent) closes the canvas. The host resolves `canvasClose` and republishes `openCanvases` without the instance; subscribers see the channel go away.
 
 See the [Canvas Channel specification](/specification/canvas-channel) for the exact state shapes, action semantics, command signatures, and error codes.

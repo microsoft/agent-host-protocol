@@ -86,7 +86,6 @@ import type {
   SessionOpenCanvasesChangedAction,
   CanvasUpdatedAction,
   CanvasCloseRequestedAction,
-  CanvasMessageAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -346,14 +345,12 @@ export type ServerResourceWatchAction =
 export type CanvasAction =
   | CanvasUpdatedAction
   | CanvasCloseRequestedAction
-  | CanvasMessageAction
 ;
 
 /** Union of canvas actions that clients may dispatch. */
 export type ClientCanvasAction =
   | CanvasUpdatedAction
   | CanvasCloseRequestedAction
-  | CanvasMessageAction
 ;
 
 /** Union of canvas actions that only the server may produce. */
@@ -451,5 +448,4 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionOpenCanvasesChanged]: false,
   [ActionType.CanvasUpdated]: true,
   [ActionType.CanvasCloseRequested]: true,
-  [ActionType.CanvasMessage]: true,
 };

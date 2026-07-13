@@ -194,8 +194,6 @@ pub enum ActionType {
     CanvasUpdated,
     #[serde(rename = "canvas/closeRequested")]
     CanvasCloseRequested,
-    #[serde(rename = "canvas/message")]
-    CanvasMessage,
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -1632,22 +1630,6 @@ pub struct CanvasUpdatedAction {
 #[serde(rename_all = "camelCase")]
 pub struct CanvasCloseRequestedAction {}
 
-/// An opaque message relayed between the rendered canvas View and the
-/// instance's provider — the relay-carried analogue of a `postMessage` bridge.
-///
-/// Bidirectional: a client dispatches it to carry a View→provider message, and
-/// the host emits it to carry a provider→View message (routed to the provider
-/// resolved for the instance, or handled host-internally for a server-side
-/// provider). Like `terminal/input` and {@link CanvasCloseRequestedAction} it
-/// is a pure signal with a no-op reducer, so it never bloats channel state. See
-/// {@link /specification/canvas-channel | Canvas Channel}.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CanvasMessageAction {
-    /// Opaque, provider-defined message payload.
-    pub payload: AnyValue,
-}
-
 // ─── Partial Summaries ────────────────────────────────────────────────
 
 /// Partial equivalent of ChatSummary — every field is optional for delta updates.
@@ -1860,8 +1842,6 @@ pub enum StateAction {
     CanvasUpdated(CanvasUpdatedAction),
     #[serde(rename = "canvas/closeRequested")]
     CanvasCloseRequested(CanvasCloseRequestedAction),
-    #[serde(rename = "canvas/message")]
-    CanvasMessage(CanvasMessageAction),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

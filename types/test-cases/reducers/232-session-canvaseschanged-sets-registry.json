@@ -14,19 +14,18 @@
       "type": "session/canvasesChanged",
       "canvases": [
         {
-          "extensionId": "acme.editors",
-          "extensionName": "Acme Editors",
+          "providerId": "acme.editors",
           "canvasId": "markdown",
           "displayName": "Markdown Editor",
           "description": "Edit and preview Markdown documents.",
           "source": { "kind": "server" }
         },
         {
-          "extensionId": "acme.viewers",
+          "providerId": "acme.viewers",
           "canvasId": "image",
           "displayName": "Image Viewer",
           "description": "Preview raster and vector images.",
-          "actions": [
+          "operations": [
             { "name": "zoom", "description": "Zoom the image to a factor." }
           ],
           "source": { "kind": "client", "clientId": "client-42" }
@@ -41,19 +40,18 @@
     "lifecycle": "ready",
     "canvases": [
       {
-        "extensionId": "acme.editors",
-        "extensionName": "Acme Editors",
+        "providerId": "acme.editors",
         "canvasId": "markdown",
         "displayName": "Markdown Editor",
         "description": "Edit and preview Markdown documents.",
         "source": { "kind": "server" }
       },
       {
-        "extensionId": "acme.viewers",
+        "providerId": "acme.viewers",
         "canvasId": "image",
         "displayName": "Image Viewer",
         "description": "Preview raster and vector images.",
-        "actions": [
+        "operations": [
           { "name": "zoom", "description": "Zoom the image to a factor." }
         ],
         "source": { "kind": "client", "clientId": "client-42" }

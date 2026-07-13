@@ -1302,11 +1302,11 @@ public func resourceWatchReducer(state: ResourceWatchState, action: StateAction)
 ///
 /// `canvas/updated` is a sparse merge — a presented field (title, status, url,
 /// availability) overwrites the corresponding `CanvasState` field while an
-/// absent field preserves the current value. `canvas/closeRequested` and
-/// `canvas/message` are pure client→host signals the host acts on out of band,
-/// mirroring how `terminal/input` is side-effect-only, so they leave the state
-/// unchanged. Unknown action types degrade gracefully so a client speaking an
-/// older protocol stays correct if the server adds new `canvas/*` actions in a
+/// absent field preserves the current value. `canvas/closeRequested` is a
+/// pure client→host signal the host acts on out of band, mirroring how
+/// `terminal/input` is side-effect-only, so it leaves the state unchanged.
+/// Unknown action types degrade gracefully so a client speaking an older
+/// protocol stays correct if the server adds new `canvas/*` actions in a
 /// future version.
 public func canvasReducer(state: CanvasState, action: StateAction) -> CanvasState {
     switch action {
@@ -1319,9 +1319,6 @@ public func canvasReducer(state: CanvasState, action: StateAction) -> CanvasStat
         return next
 
     case .canvasCloseRequested:
-        return state
-
-    case .canvasMessage:
         return state
 
     default:

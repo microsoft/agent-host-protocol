@@ -89,7 +89,6 @@ public enum ActionType: String, Codable, Sendable {
     case sessionOpenCanvasesChanged = "session/openCanvasesChanged"
     case canvasUpdated = "canvas/updated"
     case canvasCloseRequested = "canvas/closeRequested"
-    case canvasMessage = "canvas/message"
 }
 
 // MARK: - Action Infrastructure
@@ -1855,20 +1854,6 @@ public struct CanvasCloseRequestedAction: Codable, Sendable {
     }
 }
 
-public struct CanvasMessageAction: Codable, Sendable {
-    public var type: ActionType
-    /// Opaque, provider-defined message payload.
-    public var payload: AnyCodable
-
-    public init(
-        type: ActionType,
-        payload: AnyCodable
-    ) {
-        self.type = type
-        self.payload = payload
-    }
-}
-
 // MARK: - Partial Summary Types
 
 public struct PartialChatSummary: Codable, Sendable {
@@ -2005,7 +1990,6 @@ public enum StateAction: Codable, Sendable {
     case resourceWatchChanged(ResourceWatchChangedAction)
     case canvasUpdated(CanvasUpdatedAction)
     case canvasCloseRequested(CanvasCloseRequestedAction)
-    case canvasMessage(CanvasMessageAction)
     /// Unknown or future action type; reducers treat this as a no-op.
     /// The raw payload (including its `type` discriminant) is preserved
     /// as an `AnyCodable` so a decode→encode round-trip re-emits it
@@ -2184,8 +2168,6 @@ public enum StateAction: Codable, Sendable {
             self = .canvasUpdated(try CanvasUpdatedAction(from: decoder))
         case "canvas/closeRequested":
             self = .canvasCloseRequested(try CanvasCloseRequestedAction(from: decoder))
-        case "canvas/message":
-            self = .canvasMessage(try CanvasMessageAction(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -2276,7 +2258,6 @@ public enum StateAction: Codable, Sendable {
         case .resourceWatchChanged(let v): try v.encode(to: encoder)
         case .canvasUpdated(let v): try v.encode(to: encoder)
         case .canvasCloseRequested(let v): try v.encode(to: encoder)
-        case .canvasMessage(let v): try v.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

@@ -772,7 +772,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
   { name: 'ResourceChange' },
-  { name: 'SessionCanvasAction' },
+  { name: 'SessionCanvasOperation' },
   { name: 'SessionCanvasDeclaration' },
   { name: 'ClientCanvasDeclaration' },
   { name: 'OpenCanvasRef' },
@@ -1356,7 +1356,6 @@ const ACTION_VARIANTS: {
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
   { type: 'canvas/updated', variantName: 'CanvasUpdated', tsInterface: 'CanvasUpdatedAction' },
   { type: 'canvas/closeRequested', variantName: 'CanvasCloseRequested', tsInterface: 'CanvasCloseRequestedAction' },
-  { type: 'canvas/message', variantName: 'CanvasMessage', tsInterface: 'CanvasMessageAction' },
 ];
 
 function generateMergedChatToolCallConfirmedStruct(): string {
@@ -1493,10 +1492,8 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'InvokeChangesetOperationParams' }, { name: 'InvokeChangesetOperationResult' },
   { name: 'ChangesetOperationFollowUp' },
   { name: 'CanvasOpenParams' }, { name: 'CanvasOpenResult' },
-  { name: 'CanvasInvokeActionParams' }, { name: 'CanvasInvokeActionResult' },
+  { name: 'CanvasInvokeOperationParams' }, { name: 'CanvasInvokeOperationResult' },
   { name: 'CanvasCloseParams' },
-  { name: 'CanvasReadResourceParams' }, { name: 'CanvasReadResourceResult' },
-  { name: 'CanvasResourceContent' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {

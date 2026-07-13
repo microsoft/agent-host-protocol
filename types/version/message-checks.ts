@@ -78,9 +78,8 @@ type _ExpectedCommands =
   | 'completions'
   | 'invokeChangesetOperation'
   | 'canvasOpen'
-  | 'canvasInvokeAction'
-  | 'canvasClose'
-  | 'canvasReadResource';
+  | 'canvasInvokeOperation'
+  | 'canvasClose';
 
 /** All methods annotated `@messageType Notification` (client → server). */
 type _ExpectedClientNotifications =
@@ -112,7 +111,7 @@ type _ExpectedServerCommands =
   | 'resourceRequest'
   | 'createResourceWatch'
   | 'canvasOpen'
-  | 'canvasInvokeAction'
+  | 'canvasInvokeOperation'
   | 'canvasClose';
 
 // ─── Assertions ──────────────────────────────────────────────────────────────

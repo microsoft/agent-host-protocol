@@ -73,11 +73,9 @@ import type {
 import type {
   CanvasOpenParams,
   CanvasOpenResult,
-  CanvasInvokeActionParams,
-  CanvasInvokeActionResult,
+  CanvasInvokeOperationParams,
+  CanvasInvokeOperationResult,
   CanvasCloseParams,
-  CanvasReadResourceParams,
-  CanvasReadResourceResult,
 } from '../channels-canvas/commands.js';
 
 import type { ActionEnvelope } from './actions.js';
@@ -184,9 +182,8 @@ export interface CommandMap {
   'completions': { params: CompletionsParams; result: CompletionsResult };
   'invokeChangesetOperation': { params: InvokeChangesetOperationParams; result: InvokeChangesetOperationResult };
   'canvasOpen': { params: CanvasOpenParams; result: CanvasOpenResult };
-  'canvasInvokeAction': { params: CanvasInvokeActionParams; result: CanvasInvokeActionResult };
+  'canvasInvokeOperation': { params: CanvasInvokeOperationParams; result: CanvasInvokeOperationResult };
   'canvasClose': { params: CanvasCloseParams; result: null };
-  'canvasReadResource': { params: CanvasReadResourceParams; result: CanvasReadResourceResult };
 }
 
 /**
@@ -201,7 +198,7 @@ export interface CommandMap {
  * `virtual://my-client/...` plugins) and to drive per-session filesystem
  * providers without the client having to re-implement the wire schema.
  *
- * The `canvas*` provider family (`canvasOpen` / `canvasInvokeAction` /
+ * The `canvas*` provider family (`canvasOpen` / `canvasInvokeOperation` /
  * `canvasClose`) is server → client: the host drives a client-declared
  * canvas provider. It is mirrored in {@link CommandMap} for symmetry with
  * the `resource*` precedent; a client normally never initiates it, and a
@@ -222,7 +219,7 @@ export interface ServerCommandMap {
   'resourceRequest': { params: ResourceRequestParams; result: ResourceRequestResult };
   'createResourceWatch': { params: CreateResourceWatchParams; result: CreateResourceWatchResult };
   'canvasOpen': { params: CanvasOpenParams; result: CanvasOpenResult };
-  'canvasInvokeAction': { params: CanvasInvokeActionParams; result: CanvasInvokeActionResult };
+  'canvasInvokeOperation': { params: CanvasInvokeOperationParams; result: CanvasInvokeOperationResult };
   'canvasClose': { params: CanvasCloseParams; result: null };
 }
 

@@ -96,12 +96,13 @@ export const AhpErrorCodes = {
    */
   Conflict: -32011,
   /**
-   * A canvas provider request (`canvasOpen`, `canvasInvokeAction`, or
+   * A canvas provider request (`canvasOpen`, `canvasInvokeOperation`, or
    * `canvasClose`) failed. The `data` field of the JSON-RPC error MUST be a
    * {@link CanvasProviderErrorData} carrying the provider-defined
    * `{ code, message }` — for example a `canvas_action_no_handler` code when
    * the provider declared the canvas but has no handler for the requested
-   * action, or `canvas_provider_unavailable` when the provider is disconnected.
+   * operation, or `canvas_provider_unavailable` when the provider is
+   * disconnected.
    */
   CanvasProviderError: -32012,
 } as const;
