@@ -181,7 +181,7 @@ func touchChatModified(state *ahptypes.ChatState) {
 
 // ─── Active-turn helpers ───────────────────────────────────────────────
 
-func endTurn(state *ahptypes.ChatState, turnID string, turnState ahptypes.TurnState, terminalStatus *ahptypes.SessionStatus, errInfo *ahptypes.ErrorInfo) ReduceOutcome {
+func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState ahptypes.TurnState, terminalStatus *ahptypes.SessionStatus, errInfo *ahptypes.ErrorInfo) ReduceOutcome {
 	if state.ActiveTurn == nil || state.ActiveTurn.Id != turnID {
 		return ReduceOutcomeNoOp
 	}
@@ -220,8 +220,16 @@ func endTurn(state *ahptypes.ChatState, turnID string, turnState ahptypes.TurnSt
 		}})
 	}
 
+	// Defensive clamp: duration is producer-supplied and opaque to this
+	// reducer, but a negative value would be nonsensical to display.
+	if duration < 0 {
+		duration = 0
+	}
+	startedAt := active.StartedAt
 	turn := ahptypes.Turn{
 		Id:            active.Id,
+		StartedAt:     &startedAt,
+		Duration:      &duration,
 		Message:       active.Message,
 		ResponseParts: parts,
 		Usage:         active.Usage,
@@ -231,7 +239,7 @@ func endTurn(state *ahptypes.ChatState, turnID string, turnState ahptypes.TurnSt
 
 	state.Turns = append(state.Turns, turn)
 	state.InputRequests = nil
-	touchChatModified(state)
+	state.ModifiedAt = nowISOString()
 	state.Status = summaryStatus(state, terminalStatus)
 	return ReduceOutcomeApplied
 }
@@ -464,13 +472,13 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		state.ActiveTurn.ResponseParts = append(state.ActiveTurn.ResponseParts, a.Part)
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatTurnCompleteAction:
-		return endTurn(state, a.TurnId, ahptypes.TurnStateComplete, nil, nil)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateComplete, nil, nil)
 	case *ahptypes.ChatTurnCancelledAction:
-		return endTurn(state, a.TurnId, ahptypes.TurnStateCancelled, nil, nil)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateCancelled, nil, nil)
 	case *ahptypes.ChatErrorAction:
 		errCopy := a.Error
 		errStatus := ahptypes.SessionStatusError
-		return endTurn(state, a.TurnId, ahptypes.TurnStateError, &errStatus, &errCopy)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateError, &errStatus, &errCopy)
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
@@ -930,11 +938,12 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 func applyTurnStarted(state *ahptypes.ChatState, a *ahptypes.ChatTurnStartedAction) ReduceOutcome {
 	state.ActiveTurn = &ahptypes.ActiveTurn{
 		Id:            a.TurnId,
+		StartedAt:     a.StartedAt,
 		Message:       a.Message,
 		ResponseParts: []ahptypes.ResponsePart{},
 	}
 	state.Status = summaryStatus(state, nil)
-	touchChatModified(state)
+	state.ModifiedAt = nowISOString()
 	state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsRead, false)
 
 	if a.QueuedMessageId != nil {
@@ -1428,9 +1437,9 @@ func ApplyActionToChangeset(state *ahptypes.ChangesetState, action ahptypes.Stat
 		}
 		return ReduceOutcomeNoOp
 
-	case *ahptypes.ChangesetFilesReviewedChangedAction:
-		ids := make(map[string]struct{}, len(a.FileIds))
-		for _, id := range a.FileIds {
+	case *ahptypes.ChangesetFilesReviewChangedAction:
+		ids := make(map[string]struct{}, len(a.Files))
+		for _, id := range a.Files {
 			ids[id] = struct{}{}
 		}
 		changed := false

@@ -1,0 +1,29 @@
+{
+  "description": "changeset/filesReviewChanged is a no-op when none of the listed ids match a current file",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": { "after": { "uri": "file:///src/a.ts", "content": { "uri": "content:/a" } } }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/filesReviewChanged",
+      "files": ["file:///src/missing.ts", "file:///src/other.ts"],
+      "reviewed": true
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": { "after": { "uri": "file:///src/a.ts", "content": { "uri": "content:/a" } } }
+      }
+    ]
+  }
+}

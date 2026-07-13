@@ -12,6 +12,7 @@
     {
       "type": "chat/turnStarted",
       "turnId": "t1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
       "message": {
         "text": "Fix the bug",
         "origin": {
@@ -137,13 +138,16 @@
     },
     {
       "type": "chat/turnComplete",
-      "turnId": "t1"
+      "turnId": "t1",
+      "duration": 8999
     }
   ],
   "expected": {
     "turns": [
       {
         "id": "t1",
+        "startedAt": "1970-01-01T00:00:01.000Z",
+        "duration": 8999,
         "message": {
           "text": "Fix the bug",
           "origin": {

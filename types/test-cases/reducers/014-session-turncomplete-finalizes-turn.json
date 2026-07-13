@@ -5,6 +5,7 @@
     "turns": [],
     "activeTurn": {
       "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
       "message": {
         "text": "Hello",
         "origin": {
@@ -37,13 +38,16 @@
     },
     {
       "type": "chat/turnComplete",
-      "turnId": "turn-1"
+      "turnId": "turn-1",
+      "duration": 8999
     }
   ],
   "expected": {
     "turns": [
       {
         "id": "turn-1",
+        "startedAt": "1970-01-01T00:00:01.000Z",
+        "duration": 8999,
         "message": {
           "text": "Hello",
           "origin": {

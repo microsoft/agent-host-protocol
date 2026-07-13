@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`chat/turnStarted` carries a `startedAt` timestamp, `chat/turnComplete`/`chat/turnCancelled`/`chat/error` carry an elapsed `duration` (milliseconds, producer's own clock), and completed turns expose their start time and duration."
+}

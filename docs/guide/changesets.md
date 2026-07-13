@@ -33,6 +33,11 @@ Changeset {
    * `'turn'`, or `'compare-turns'`. Other values allowed.
    */
   changeKind: string
+  /** Optional capability declarations (presence-flag objects). */
+  capabilities?: {
+    /** Present ⇒ this changeset supports the per-file review workflow. */
+    review?: {}
+  }
 }
 ```
 
@@ -65,7 +70,7 @@ ChangesetState {
 ChangesetFile {
   id: string                               // typically `after.uri` (or `before.uri` for deletions)
   edit: FileEdit                           // reuses the existing FileEdit shape
-  reviewed?: boolean                       // omit when the server has no "review" support
+  reviewed?: boolean                       // GitHub-style "Viewed" flag; absent ⇒ not reviewed
   _meta?: Record<string, unknown>
 }
 ```
@@ -78,11 +83,52 @@ of the changeset URI:
 | `changeset/statusChanged`           | No                   | `status` transitioned (e.g. `computing → ready`).                            |
 | `changeset/fileSet`                 | No                   | Upsert a `ChangesetFile` (new or replacing existing by `id`).                |
 | `changeset/fileRemoved`             | No                   | A file is no longer in the changeset.                                        |
-| `changeset/filesReviewedChanged`    | No                   | The `reviewed` flag for one or more files changed (servers with review support). |
+| `changeset/filesReviewChanged`      | Yes                  | A reviewer toggled the `reviewed` flag on one or more files.                 |
 | `changeset/contentChanged`          | No                   | Full replacement of files, optionally with operations or error details.      |
 | `changeset/operationsChanged`       | No                   | The set of available `operations` changed.                                   |
 | `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |
 | `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched, or the owning session ended).       |
+
+### File Review
+
+**Review is a capability of the changeset.** A changeset advertises support for
+the review workflow on its catalogue `Changeset` entry via
+`capabilities.review` (a presence-flag object). Clients see this up-front on the
+session's changeset list, so they can decide whether to surface review UI
+without first subscribing. When the capability is absent, the changeset is not
+reviewable.
+
+For a reviewable changeset, each `ChangesetFile` carries an optional `reviewed`
+flag — the equivalent of GitHub's per-file **"Viewed"** checkbox. A missing
+value is treated as **not reviewed**.
+
+Unlike the rest of the `changeset/*` family, the
+`changeset/filesReviewChanged` action is **client-dispatchable**: a reviewer
+toggles files' review state directly, applying it optimistically through the
+write-ahead reducer and letting the server echo it back on the normal `action`
+envelope stream. The server MAY also originate it (e.g. an agent marking its own
+output reviewed). The action is **batched** — it carries a list of file ids that
+all move to the same `reviewed` value.
+
+```typescript
+// dispatched by a client (or the server)
+{
+  type: 'changeset/filesReviewChanged'
+  files: string[]       // ChangesetFile.id values
+  reviewed: boolean     // true marks the files reviewed, false clears them
+}
+```
+
+The reducer sets `reviewed` on every listed file that is present in the
+changeset, leaving each file's `edit` and `_meta` untouched. Ids that don't
+match a current file are ignored; the action is a no-op when none match.
+
+**Reset on edit.** The protocol has no per-file content version, so review is
+**not** reset automatically when a file's contents change under a stable id. The
+server, which is the authority on what changed, resets review explicitly —
+either by re-emitting the file (via `changeset/fileSet` or
+`changeset/contentChanged`) without `reviewed: true`, or by dispatching
+`changeset/filesReviewChanged` with `reviewed: false`.
 
 ### Changeset Operations
 

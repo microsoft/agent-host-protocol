@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`Changeset.capabilities` with a `review` presence flag (`ChangesetCapabilities`) so a changeset can advertise support for the per-file review workflow up-front on the session's changeset list.",
+  "issues": [328]
+}

@@ -3062,6 +3062,14 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Turn duration in milliseconds."
+        },
         "message": {
           "$ref": "#/$defs/Message",
           "description": "The message that initiated the turn"
@@ -3102,6 +3110,10 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
         "message": {
           "$ref": "#/$defs/Message",
           "description": "The message that initiated the turn"
@@ -3120,6 +3132,7 @@
       },
       "required": [
         "id",
+        "startedAt",
         "message",
         "responseParts",
         "usage"
@@ -4530,6 +4543,10 @@
         "changeKind": {
           "type": "string",
           "description": "Advisory hint describing what kind of changeset this is, so clients can\ngroup, sort, or render an appropriate icon without parsing\n{@link uriTemplate}. Recognized values include:\n\n- `'session'`: a static, session-wide changeset covering all changes the\n  agent has produced in this session.\n- `'branch'`: changes relative to a base branch (e.g. a feature branch\n  diffed against `main`).\n- `'uncommitted'`: the workspace's current uncommitted changes.\n- `'turn'`: changes produced by a single turn. Typically paired with a\n  `{turnId}` variable in {@link uriTemplate}.\n- `'compare-turns'`: a diff between two turns. Typically paired with\n  `{originalTurnId}` and `{modifiedTurnId}` variables in\n  {@link uriTemplate}.\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "capabilities": {
+          "$ref": "#/$defs/ChangesetCapabilities",
+          "description": "Optional capability declarations for this changeset. Absent (or an empty\nobject) means the changeset advertises no optional capabilities.\n\nBecause the catalogue entry is delivered up-front on\n{@link ChangesetState | the session's changeset list}, clients can decide\nwhether to surface capability-gated UI (such as review checkboxes) without\nfirst subscribing to the changeset URI. Mirrors the presence-flag\nconvention of `ClientCapabilities`."
         }
       },
       "required": [
@@ -4537,6 +4554,17 @@
         "uriTemplate",
         "changeKind"
       ]
+    },
+    "ChangesetCapabilities": {
+      "type": "object",
+      "description": "Optional capabilities a changeset advertises on its catalogue\n{@link Changeset} entry.\n\nEach field is a presence flag: an empty object `{}` means \"supported\",\nabsence means \"not supported\". Sub-fields on individual capabilities are\nreserved for future per-capability options.",
+      "properties": {
+        "review": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The changeset supports the per-file **review** workflow. When declared,\nclients MAY surface a GitHub-style \"Viewed\" toggle per file and dispatch\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to\nset each file's {@link ChangesetFile.reviewed} flag. Clients that omit\nhandling MUST treat the changeset as non-reviewable."
+        }
+      }
     },
     "ChangesetState": {
       "type": "object",
@@ -4584,7 +4612,7 @@
         },
         "reviewed": {
           "type": "boolean",
-          "description": "Whether the user has reviewed this file. Omit (or set to `undefined`)\nto indicate that the server does not support the \"review\" functionality;\nin that case clients should not surface any reviewed/unreviewed\naffordance for this file."
+          "description": "Whether a reviewer has marked this file as reviewed (the GitHub-style\n\"Viewed\" checkbox). Absent is equivalent to `false` — clients MUST treat\na missing value as not-yet-reviewed.\n\nRequires the changeset to advertise {@link ChangesetCapabilities.review}.\nClients toggle it by dispatching\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};\nthe server MAY also originate it (e.g. an agent self-reviewing its own\noutput).\n\nThere is no content version in the protocol, so review is **not** reset\nautomatically when a file's contents change under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either\nby re-emitting the file (via {@link ChangesetFileSetAction} or\n{@link ChangesetContentChangedAction}) without `reviewed: true`, or by\ndispatching `changeset/filesReviewChanged` with `reviewed: false`."
         },
         "_meta": {
           "type": "object",
@@ -7062,7 +7090,7 @@
           "$ref": "#/$defs/ChangesetFileRemovedAction"
         },
         {
-          "$ref": "#/$defs/ChangesetFilesReviewedChangedAction"
+          "$ref": "#/$defs/ChangesetFilesReviewChangedAction"
         },
         {
           "$ref": "#/$defs/ChangesetContentChangedAction"
@@ -7813,6 +7841,10 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
         "message": {
           "$ref": "#/$defs/Message",
           "description": "The new message"
@@ -7830,6 +7862,7 @@
       "required": [
         "type",
         "turnId",
+        "startedAt",
         "message"
       ]
     },
@@ -8165,6 +8198,10 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "duration": {
+          "type": "number",
+          "description": "Elapsed turn duration in milliseconds, measured by the producer's own\nclock. Clients MUST NOT derive this by subtracting timestamps — cross-\nclient clocks may differ — and MUST treat it as opaque, producer-supplied\ndata."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -8173,7 +8210,8 @@
       },
       "required": [
         "type",
-        "turnId"
+        "turnId",
+        "duration"
       ]
     },
     "ChatTurnCancelledAction": {
@@ -8187,6 +8225,10 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "duration": {
+          "type": "number",
+          "description": "Elapsed turn duration in milliseconds, measured by the producer's own\nclock. Clients MUST NOT derive this by subtracting timestamps — cross-\nclient clocks may differ — and MUST treat it as opaque, producer-supplied\ndata."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -8195,7 +8237,8 @@
       },
       "required": [
         "type",
-        "turnId"
+        "turnId",
+        "duration"
       ]
     },
     "ChatErrorAction": {
@@ -8208,6 +8251,10 @@
         "turnId": {
           "type": "string",
           "description": "Turn identifier"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Elapsed turn duration in milliseconds, measured by the producer's own\nclock. Clients MUST NOT derive this by subtracting timestamps — cross-\nclient clocks may differ — and MUST treat it as opaque, producer-supplied\ndata."
         },
         "error": {
           "$ref": "#/$defs/ErrorInfo",
@@ -8222,6 +8269,7 @@
       "required": [
         "type",
         "turnId",
+        "duration",
         "error"
       ]
     },
@@ -8552,28 +8600,28 @@
         "fileId"
       ]
     },
-    "ChangesetFilesReviewedChangedAction": {
+    "ChangesetFilesReviewChangedAction": {
       "type": "object",
-      "description": "Update the {@link ChangesetFile.reviewed} flag for one or more files,\nidentified by their {@link ChangesetFile.id}.\n\nDispatched by the server as the user marks files reviewed or unreviewed\n(e.g. toggling a single file, or a \"mark all as reviewed\" affordance).\nOnly servers that support the \"review\" functionality dispatch this; a\nserver that leaves {@link ChangesetFile.reviewed} `undefined` never does.\n\nThe reducer sets `reviewed` on every matching file and ignores any\n`fileIds` entry that does not correspond to a current file.",
+      "description": "Set the {@link ChangesetFile.reviewed} flag for one or more files — the\nGitHub-style \"Viewed\" toggle, applied in a single batch.\n\nTargets files by their {@link ChangesetFile.id}. Ids in {@link files} that\ndo not match a file currently present in the changeset are ignored; if none\nmatch, the action is a no-op. Only the {@link ChangesetFile.reviewed} field\nof each matched file is affected; the files' {@link ChangesetFile.edit | edit}\nand {@link ChangesetFile._meta | _meta} are left untouched.\n\nOnly meaningful on a changeset that advertises\n{@link ChangesetCapabilities.review}. Unlike every other `changeset/*` action\nthis one is **client-dispatchable**: a reviewer toggles review state directly,\napplying it optimistically through the write-ahead reducer and letting the\nserver echo it back on the normal `action` envelope stream. The server MAY\nalso originate it (e.g. an agent marking its own output reviewed).\n\nThere is no protocol-level content version, so review is not reset\nautomatically when a file's contents change under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either by\nre-emitting the file without `reviewed: true`, or by dispatching this action\nwith `reviewed: false`.",
       "properties": {
         "type": {
-          "const": "changeset/filesReviewedChanged"
+          "const": "changeset/filesReviewChanged"
         },
-        "fileIds": {
+        "files": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "The {@link ChangesetFile.id}s whose reviewed state changed."
+          "description": "The {@link ChangesetFile.id | ids} of the files whose review state changed."
         },
         "reviewed": {
           "type": "boolean",
-          "description": "The new reviewed state to apply to each listed file."
+          "description": "New review state applied to every listed file: `true` once reviewed, `false` to clear it."
         }
       },
       "required": [
         "type",
-        "fileIds",
+        "files",
         "reviewed"
       ]
     },

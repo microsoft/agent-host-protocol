@@ -20,9 +20,10 @@ func main() {
 
 	actions := []ahptypes.StateAction{
 		{Value: &ahptypes.ChatTurnStartedAction{
-			Type:    ahptypes.ActionTypeChatTurnStarted,
-			TurnId:  "t1",
-			Message: ahptypes.Message{Text: "Hello!", Origin: ahptypes.MessageOrigin{Kind: ahptypes.MessageKindUser}},
+			Type:      ahptypes.ActionTypeChatTurnStarted,
+			TurnId:    "t1",
+			StartedAt: "2026-07-09T20:00:00.000Z",
+			Message:   ahptypes.Message{Text: "Hello!", Origin: ahptypes.MessageOrigin{Kind: ahptypes.MessageKindUser}},
 		}},
 		{Value: &ahptypes.ChatResponsePartAction{
 			Type:   ahptypes.ActionTypeChatResponsePart,
@@ -40,8 +41,9 @@ func main() {
 			Content: "there!",
 		}},
 		{Value: &ahptypes.ChatTurnCompleteAction{
-			Type:   ahptypes.ActionTypeChatTurnComplete,
-			TurnId: "t1",
+			Type:     ahptypes.ActionTypeChatTurnComplete,
+			TurnId:   "t1",
+			Duration: 1000,
 		}},
 	}
 

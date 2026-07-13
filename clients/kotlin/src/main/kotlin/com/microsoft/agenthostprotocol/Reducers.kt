@@ -332,6 +332,7 @@ private fun updateResponsePart(
 private fun endTurn(
     state: ChatState,
     turnId: String,
+    duration: Long,
     turnState: TurnState,
     terminalStatus: SessionStatus? = null,
     error: ErrorInfo? = null,
@@ -386,8 +387,12 @@ private fun endTurn(
         )
     }
 
+    // Defensive clamp: `duration` is producer-supplied and opaque to this
+    // reducer, but a negative value would be nonsensical to display.
     val turn = Turn(
         id = active.id,
+        startedAt = active.startedAt,
+        duration = maxOf(0L, duration),
         message = active.message,
         responseParts = finalizedParts,
         usage = active.usage,
@@ -751,6 +756,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val withTurn = state.copy(
             activeTurn = ActiveTurn(
                 id = a.turnId,
+                startedAt = a.startedAt,
                 message = a.message,
                 responseParts = emptyList(),
                 usage = null,
@@ -800,13 +806,13 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     }
 
     is StateActionChatTurnComplete ->
-        endTurn(state, action.value.turnId, TurnState.COMPLETE)
+        endTurn(state, action.value.turnId, action.value.duration, TurnState.COMPLETE)
 
     is StateActionChatTurnCancelled ->
-        endTurn(state, action.value.turnId, TurnState.CANCELLED)
+        endTurn(state, action.value.turnId, action.value.duration, TurnState.CANCELLED)
 
     is StateActionChatError ->
-        endTurn(state, action.value.turnId, TurnState.ERROR, SessionStatus.ERROR, action.value.error)
+        endTurn(state, action.value.turnId, action.value.duration, TurnState.ERROR, SessionStatus.ERROR, action.value.error)
 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)
@@ -1398,8 +1404,8 @@ public fun changesetReducer(state: ChangesetState, action: StateAction): Changes
         }
     }
 
-    is StateActionChangesetFilesReviewedChanged -> {
-        val ids = action.value.fileIds.toSet()
+    is StateActionChangesetFilesReviewChanged -> {
+        val ids = action.value.files.toSet()
         var changed = false
         val next = state.files.map { file ->
             if (file.id !in ids || file.reviewed == action.value.reviewed) {

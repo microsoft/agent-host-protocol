@@ -3200,6 +3200,14 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Turn duration in milliseconds."
+        },
         "message": {
           "$ref": "#/$defs/Message",
           "description": "The message that initiated the turn"
@@ -3240,6 +3248,10 @@
           "type": "string",
           "description": "Turn identifier"
         },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when this turn started."
+        },
         "message": {
           "$ref": "#/$defs/Message",
           "description": "The message that initiated the turn"
@@ -3258,6 +3270,7 @@
       },
       "required": [
         "id",
+        "startedAt",
         "message",
         "responseParts",
         "usage"
@@ -4668,6 +4681,10 @@
         "changeKind": {
           "type": "string",
           "description": "Advisory hint describing what kind of changeset this is, so clients can\ngroup, sort, or render an appropriate icon without parsing\n{@link uriTemplate}. Recognized values include:\n\n- `'session'`: a static, session-wide changeset covering all changes the\n  agent has produced in this session.\n- `'branch'`: changes relative to a base branch (e.g. a feature branch\n  diffed against `main`).\n- `'uncommitted'`: the workspace's current uncommitted changes.\n- `'turn'`: changes produced by a single turn. Typically paired with a\n  `{turnId}` variable in {@link uriTemplate}.\n- `'compare-turns'`: a diff between two turns. Typically paired with\n  `{originalTurnId}` and `{modifiedTurnId}` variables in\n  {@link uriTemplate}.\n\nImplementations MAY provide additional values; clients SHOULD fall back\nto a reasonable default when an unknown value is encountered."
+        },
+        "capabilities": {
+          "$ref": "#/$defs/ChangesetCapabilities",
+          "description": "Optional capability declarations for this changeset. Absent (or an empty\nobject) means the changeset advertises no optional capabilities.\n\nBecause the catalogue entry is delivered up-front on\n{@link ChangesetState | the session's changeset list}, clients can decide\nwhether to surface capability-gated UI (such as review checkboxes) without\nfirst subscribing to the changeset URI. Mirrors the presence-flag\nconvention of `ClientCapabilities`."
         }
       },
       "required": [
@@ -4675,6 +4692,17 @@
         "uriTemplate",
         "changeKind"
       ]
+    },
+    "ChangesetCapabilities": {
+      "type": "object",
+      "description": "Optional capabilities a changeset advertises on its catalogue\n{@link Changeset} entry.\n\nEach field is a presence flag: an empty object `{}` means \"supported\",\nabsence means \"not supported\". Sub-fields on individual capabilities are\nreserved for future per-capability options.",
+      "properties": {
+        "review": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The changeset supports the per-file **review** workflow. When declared,\nclients MAY surface a GitHub-style \"Viewed\" toggle per file and dispatch\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to\nset each file's {@link ChangesetFile.reviewed} flag. Clients that omit\nhandling MUST treat the changeset as non-reviewable."
+        }
+      }
     },
     "ChangesetState": {
       "type": "object",
@@ -4722,7 +4750,7 @@
         },
         "reviewed": {
           "type": "boolean",
-          "description": "Whether the user has reviewed this file. Omit (or set to `undefined`)\nto indicate that the server does not support the \"review\" functionality;\nin that case clients should not surface any reviewed/unreviewed\naffordance for this file."
+          "description": "Whether a reviewer has marked this file as reviewed (the GitHub-style\n\"Viewed\" checkbox). Absent is equivalent to `false` — clients MUST treat\na missing value as not-yet-reviewed.\n\nRequires the changeset to advertise {@link ChangesetCapabilities.review}.\nClients toggle it by dispatching\n{@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};\nthe server MAY also originate it (e.g. an agent self-reviewing its own\noutput).\n\nThere is no content version in the protocol, so review is **not** reset\nautomatically when a file's contents change under a stable id. The server,\nwhich is the authority on what changed, resets review explicitly — either\nby re-emitting the file (via {@link ChangesetFileSetAction} or\n{@link ChangesetContentChangedAction}) without `reviewed: true`, or by\ndispatching `changeset/filesReviewChanged` with `reviewed: false`."
         },
         "_meta": {
           "type": "object",

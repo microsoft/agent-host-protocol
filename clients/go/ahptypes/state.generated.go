@@ -1200,6 +1200,10 @@ type SessionConfigState struct {
 type Turn struct {
 	// Turn identifier
 	Id string `json:"id"`
+	// ISO 8601 timestamp when this turn started.
+	StartedAt *string `json:"startedAt,omitempty"`
+	// Turn duration in milliseconds.
+	Duration *int64 `json:"duration,omitempty"`
 	// The message that initiated the turn
 	Message Message `json:"message"`
 	// All response content in stream order: text, tool calls, reasoning, and content refs.
@@ -1219,6 +1223,8 @@ type Turn struct {
 type ActiveTurn struct {
 	// Turn identifier
 	Id string `json:"id"`
+	// ISO 8601 timestamp when this turn started.
+	StartedAt string `json:"startedAt"`
 	// The message that initiated the turn
 	Message Message `json:"message"`
 	// All response content in stream order: text, tool calls, reasoning, and content refs.
@@ -2995,6 +3001,30 @@ type Changeset struct {
 	// Implementations MAY provide additional values; clients SHOULD fall back
 	// to a reasonable default when an unknown value is encountered.
 	ChangeKind string `json:"changeKind"`
+	// Optional capability declarations for this changeset. Absent (or an empty
+	// object) means the changeset advertises no optional capabilities.
+	//
+	// Because the catalogue entry is delivered up-front on
+	// {@link ChangesetState | the session's changeset list}, clients can decide
+	// whether to surface capability-gated UI (such as review checkboxes) without
+	// first subscribing to the changeset URI. Mirrors the presence-flag
+	// convention of `ClientCapabilities`.
+	Capabilities *ChangesetCapabilities `json:"capabilities,omitempty"`
+}
+
+// Optional capabilities a changeset advertises on its catalogue
+// {@link Changeset} entry.
+//
+// Each field is a presence flag: an empty object `{}` means "supported",
+// absence means "not supported". Sub-fields on individual capabilities are
+// reserved for future per-capability options.
+type ChangesetCapabilities struct {
+	// The changeset supports the per-file **review** workflow. When declared,
+	// clients MAY surface a GitHub-style "Viewed" toggle per file and dispatch
+	// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
+	// set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
+	// handling MUST treat the changeset as non-reviewable.
+	Review map[string]json.RawMessage `json:"review,omitempty"`
 }
 
 // Full state for a single changeset, returned when a client subscribes to
@@ -3024,10 +3054,22 @@ type ChangesetFile struct {
 	// Reuses the existing {@link FileEdit} shape. Clients derive line
 	// additions, deletions, and rename/create/delete semantics from this.
 	Edit FileEdit `json:"edit"`
-	// Whether the user has reviewed this file. Omit (or set to `undefined`)
-	// to indicate that the server does not support the "review" functionality;
-	// in that case clients should not surface any reviewed/unreviewed
-	// affordance for this file.
+	// Whether a reviewer has marked this file as reviewed (the GitHub-style
+	// "Viewed" checkbox). Absent is equivalent to `false` — clients MUST treat
+	// a missing value as not-yet-reviewed.
+	//
+	// Requires the changeset to advertise {@link ChangesetCapabilities.review}.
+	// Clients toggle it by dispatching
+	// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};
+	// the server MAY also originate it (e.g. an agent self-reviewing its own
+	// output).
+	//
+	// There is no content version in the protocol, so review is **not** reset
+	// automatically when a file's contents change under a stable id. The server,
+	// which is the authority on what changed, resets review explicitly — either
+	// by re-emitting the file (via {@link ChangesetFileSetAction} or
+	// {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
+	// dispatching `changeset/filesReviewChanged` with `reviewed: false`.
 	Reviewed *bool `json:"reviewed,omitempty"`
 	// Server-defined opaque metadata, surfaced to operations and tooling
 	// but not interpreted by the protocol.

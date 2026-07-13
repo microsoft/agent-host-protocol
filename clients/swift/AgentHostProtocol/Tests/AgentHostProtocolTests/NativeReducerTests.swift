@@ -50,6 +50,7 @@ final class NativeReducerTests: XCTestCase {
             turns: [],
             activeTurn: ActiveTurn(
                 id: T,
+                startedAt: "2026-07-09T20:00:00.000Z",
                 message: Message(text: "Hello", origin: MessageOrigin(kind: .user)),
                 responseParts: [],
                 usage: nil

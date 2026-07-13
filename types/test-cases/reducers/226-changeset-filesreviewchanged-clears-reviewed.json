@@ -1,0 +1,41 @@
+{
+  "description": "changeset/filesReviewChanged sets reviewed=false, clearing review on a subset of files",
+  "reducer": "changeset",
+  "initial": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": { "after": { "uri": "file:///src/a.ts", "content": { "uri": "content:/a" } } },
+        "reviewed": true
+      },
+      {
+        "id": "file:///src/b.ts",
+        "edit": { "after": { "uri": "file:///src/b.ts", "content": { "uri": "content:/b" } } },
+        "reviewed": true
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "changeset/filesReviewChanged",
+      "files": ["file:///src/a.ts"],
+      "reviewed": false
+    }
+  ],
+  "expected": {
+    "status": "ready",
+    "files": [
+      {
+        "id": "file:///src/a.ts",
+        "edit": { "after": { "uri": "file:///src/a.ts", "content": { "uri": "content:/a" } } },
+        "reviewed": false
+      },
+      {
+        "id": "file:///src/b.ts",
+        "edit": { "after": { "uri": "file:///src/b.ts", "content": { "uri": "content:/b" } } },
+        "reviewed": true
+      }
+    ]
+  }
+}

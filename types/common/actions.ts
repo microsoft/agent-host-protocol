@@ -77,7 +77,7 @@ import type {
   ChangesetStatusChangedAction,
   ChangesetFileSetAction,
   ChangesetFileRemovedAction,
-  ChangesetFilesReviewedChangedAction,
+  ChangesetFilesReviewChangedAction,
   ChangesetContentChangedAction,
   ChangesetOperationsChangedAction,
   ChangesetOperationStatusChangedAction,
@@ -178,7 +178,7 @@ export const enum ActionType {
   ChangesetStatusChanged = 'changeset/statusChanged',
   ChangesetFileSet = 'changeset/fileSet',
   ChangesetFileRemoved = 'changeset/fileRemoved',
-  ChangesetFilesReviewedChanged = 'changeset/filesReviewedChanged',
+  ChangesetFilesReviewChanged = 'changeset/filesReviewChanged',
   ChangesetContentChanged = 'changeset/contentChanged',
   ChangesetOperationsChanged = 'changeset/operationsChanged',
   ChangesetOperationStatusChanged = 'changeset/operationStatusChanged',
@@ -299,7 +299,7 @@ export type StateAction =
   | ChangesetStatusChangedAction
   | ChangesetFileSetAction
   | ChangesetFileRemovedAction
-  | ChangesetFilesReviewedChangedAction
+  | ChangesetFilesReviewChangedAction
   | ChangesetContentChangedAction
   | ChangesetOperationsChangedAction
   | ChangesetOperationStatusChangedAction

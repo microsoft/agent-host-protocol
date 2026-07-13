@@ -209,23 +209,20 @@ class ReducersTest {
     }
 
     @Test
-    fun `currentTimestampProvider override flows through to reducer outputs`() {
-        currentTimestampProvider = { 12345L }
-
-        // The chat reducer stamps `modifiedAt` from the injected timestamp
-        // provider. (The session reducer no longer stamps a timestamp — the
-        // host owns the root-channel summary's `modifiedAt`.)
+    fun `turn start stores producer timestamp while modifiedAt uses local clock`() {
         val chatResult = chatReducer(
             newChat(),
             StateActionChatTurnStarted(
                 ChatTurnStartedAction(
                     type = ActionType.CHAT_TURN_STARTED,
                     turnId = "turn-1",
+                    startedAt = "1970-01-01T00:00:12.345Z",
                     message = userMessage("hello"),
                 ),
             ),
         )
-        assertEquals("1970-01-01T00:00:12.345Z", chatResult.modifiedAt)
+        assertEquals("1970-01-01T00:00:09.999Z", chatResult.modifiedAt)
+        assertEquals("1970-01-01T00:00:12.345Z", chatResult.activeTurn?.startedAt)
     }
 
     @Test

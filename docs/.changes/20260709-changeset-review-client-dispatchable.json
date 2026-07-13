@@ -1,0 +1,5 @@
+{
+  "type": "changed",
+  "message": "Renamed the changeset review action `changeset/filesReviewedChanged` to `changeset/filesReviewChanged` (field `fileIds` → `files`) and made it client-dispatchable, so a reviewer can toggle a file's `reviewed` flag directly through the write-ahead reducer.",
+  "issues": [328]
+}

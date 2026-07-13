@@ -132,7 +132,7 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.ChangesetStatusChanged]: '0.2.0',
   [ActionType.ChangesetFileSet]: '0.2.0',
   [ActionType.ChangesetFileRemoved]: '0.2.0',
-  [ActionType.ChangesetFilesReviewedChanged]: '0.5.2',
+  [ActionType.ChangesetFilesReviewChanged]: '0.6.0',
   [ActionType.ChangesetContentChanged]: '0.4.0',
   [ActionType.ChangesetOperationsChanged]: '0.2.0',
   [ActionType.ChangesetOperationStatusChanged]: '0.3.0',

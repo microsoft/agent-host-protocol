@@ -215,7 +215,7 @@ describe('IS_CLIENT_DISPATCHABLE', () => {
 
 describe('isClientDispatchable', () => {
   it('returns true for client-dispatchable actions', () => {
-    const action = { type: ActionType.ChatTurnStarted, turnId: 't', message: { text: 'Hello', origin: { kind: MessageKind.User } } } as const;
+    const action = { type: ActionType.ChatTurnStarted, turnId: 't', startedAt: '2026-07-10T00:00:00.000Z', message: { text: 'Hello', origin: { kind: MessageKind.User } } } as const;
     assert.equal(isClientDispatchable(action), true);
   });
 

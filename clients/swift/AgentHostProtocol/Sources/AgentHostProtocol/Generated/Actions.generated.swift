@@ -61,7 +61,7 @@ public enum ActionType: String, Codable, Sendable {
     case changesetStatusChanged = "changeset/statusChanged"
     case changesetFileSet = "changeset/fileSet"
     case changesetFileRemoved = "changeset/fileRemoved"
-    case changesetFilesReviewedChanged = "changeset/filesReviewedChanged"
+    case changesetFilesReviewChanged = "changeset/filesReviewChanged"
     case changesetContentChanged = "changeset/contentChanged"
     case changesetOperationsChanged = "changeset/operationsChanged"
     case changesetOperationStatusChanged = "changeset/operationStatusChanged"
@@ -250,6 +250,8 @@ public struct ChatTurnStartedAction: Codable, Sendable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
+    /// ISO 8601 timestamp when this turn started.
+    public var startedAt: String
     /// The new message
     public var message: Message
     /// If this turn was auto-started from a queued message, the ID of that message
@@ -266,6 +268,7 @@ public struct ChatTurnStartedAction: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case type
         case turnId
+        case startedAt
         case message
         case queuedMessageId
         case meta = "_meta"
@@ -274,12 +277,14 @@ public struct ChatTurnStartedAction: Codable, Sendable {
     public init(
         type: ActionType,
         turnId: String,
+        startedAt: String,
         message: Message,
         queuedMessageId: String? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
         self.turnId = turnId
+        self.startedAt = startedAt
         self.message = message
         self.queuedMessageId = queuedMessageId
         self.meta = meta
@@ -715,6 +720,11 @@ public struct ChatTurnCompleteAction: Codable, Sendable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
+    /// Elapsed turn duration in milliseconds, measured by the producer's own
+    /// clock. Clients MUST NOT derive this by subtracting timestamps — cross-
+    /// client clocks may differ — and MUST treat it as opaque, producer-supplied
+    /// data.
+    public var duration: Int
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -727,16 +737,19 @@ public struct ChatTurnCompleteAction: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case type
         case turnId
+        case duration
         case meta = "_meta"
     }
 
     public init(
         type: ActionType,
         turnId: String,
+        duration: Int,
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
         self.turnId = turnId
+        self.duration = duration
         self.meta = meta
     }
 }
@@ -745,6 +758,11 @@ public struct ChatTurnCancelledAction: Codable, Sendable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
+    /// Elapsed turn duration in milliseconds, measured by the producer's own
+    /// clock. Clients MUST NOT derive this by subtracting timestamps — cross-
+    /// client clocks may differ — and MUST treat it as opaque, producer-supplied
+    /// data.
+    public var duration: Int
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -757,16 +775,19 @@ public struct ChatTurnCancelledAction: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case type
         case turnId
+        case duration
         case meta = "_meta"
     }
 
     public init(
         type: ActionType,
         turnId: String,
+        duration: Int,
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
         self.turnId = turnId
+        self.duration = duration
         self.meta = meta
     }
 }
@@ -775,6 +796,11 @@ public struct ChatErrorAction: Codable, Sendable {
     public var type: ActionType
     /// Turn identifier
     public var turnId: String
+    /// Elapsed turn duration in milliseconds, measured by the producer's own
+    /// clock. Clients MUST NOT derive this by subtracting timestamps — cross-
+    /// client clocks may differ — and MUST treat it as opaque, producer-supplied
+    /// data.
+    public var duration: Int
     /// Error details
     public var error: ErrorInfo
     /// Additional provider-specific metadata for this action.
@@ -789,6 +815,7 @@ public struct ChatErrorAction: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case type
         case turnId
+        case duration
         case error
         case meta = "_meta"
     }
@@ -796,11 +823,13 @@ public struct ChatErrorAction: Codable, Sendable {
     public init(
         type: ActionType,
         turnId: String,
+        duration: Int,
         error: ErrorInfo,
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
         self.turnId = turnId
+        self.duration = duration
         self.error = error
         self.meta = meta
     }
@@ -1416,20 +1445,20 @@ public struct ChangesetFileRemovedAction: Codable, Sendable {
     }
 }
 
-public struct ChangesetFilesReviewedChangedAction: Codable, Sendable {
+public struct ChangesetFilesReviewChangedAction: Codable, Sendable {
     public var type: ActionType
-    /// The {@link ChangesetFile.id}s whose reviewed state changed.
-    public var fileIds: [String]
-    /// The new reviewed state to apply to each listed file.
+    /// The {@link ChangesetFile.id | ids} of the files whose review state changed.
+    public var files: [String]
+    /// New review state applied to every listed file: `true` once reviewed, `false` to clear it.
     public var reviewed: Bool
 
     public init(
         type: ActionType,
-        fileIds: [String],
+        files: [String],
         reviewed: Bool
     ) {
         self.type = type
-        self.fileIds = fileIds
+        self.files = files
         self.reviewed = reviewed
     }
 }
@@ -1964,7 +1993,7 @@ public enum StateAction: Codable, Sendable {
     case changesetStatusChanged(ChangesetStatusChangedAction)
     case changesetFileSet(ChangesetFileSetAction)
     case changesetFileRemoved(ChangesetFileRemovedAction)
-    case changesetFilesReviewedChanged(ChangesetFilesReviewedChangedAction)
+    case changesetFilesReviewChanged(ChangesetFilesReviewChangedAction)
     case changesetContentChanged(ChangesetContentChangedAction)
     case changesetOperationsChanged(ChangesetOperationsChangedAction)
     case changesetOperationStatusChanged(ChangesetOperationStatusChangedAction)
@@ -2116,8 +2145,8 @@ public enum StateAction: Codable, Sendable {
             self = .changesetFileSet(try ChangesetFileSetAction(from: decoder))
         case "changeset/fileRemoved":
             self = .changesetFileRemoved(try ChangesetFileRemovedAction(from: decoder))
-        case "changeset/filesReviewedChanged":
-            self = .changesetFilesReviewedChanged(try ChangesetFilesReviewedChangedAction(from: decoder))
+        case "changeset/filesReviewChanged":
+            self = .changesetFilesReviewChanged(try ChangesetFilesReviewChangedAction(from: decoder))
         case "changeset/contentChanged":
             self = .changesetContentChanged(try ChangesetContentChangedAction(from: decoder))
         case "changeset/operationsChanged":
@@ -2232,7 +2261,7 @@ public enum StateAction: Codable, Sendable {
         case .changesetStatusChanged(let v): try v.encode(to: encoder)
         case .changesetFileSet(let v): try v.encode(to: encoder)
         case .changesetFileRemoved(let v): try v.encode(to: encoder)
-        case .changesetFilesReviewedChanged(let v): try v.encode(to: encoder)
+        case .changesetFilesReviewChanged(let v): try v.encode(to: encoder)
         case .changesetContentChanged(let v): try v.encode(to: encoder)
         case .changesetOperationsChanged(let v): try v.encode(to: encoder)
         case .changesetOperationStatusChanged(let v): try v.encode(to: encoder)

@@ -30,6 +30,7 @@
     ],
     "activeTurn": {
       "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
       "message": {
         "text": "Hello",
         "origin": {

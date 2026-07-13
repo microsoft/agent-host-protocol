@@ -136,8 +136,8 @@ enum class ActionType {
     CHANGESET_FILE_SET,
     @SerialName("changeset/fileRemoved")
     CHANGESET_FILE_REMOVED,
-    @SerialName("changeset/filesReviewedChanged")
-    CHANGESET_FILES_REVIEWED_CHANGED,
+    @SerialName("changeset/filesReviewChanged")
+    CHANGESET_FILES_REVIEW_CHANGED,
     @SerialName("changeset/contentChanged")
     CHANGESET_CONTENT_CHANGED,
     @SerialName("changeset/operationsChanged")
@@ -298,6 +298,10 @@ data class ChatTurnStartedAction(
      * Turn identifier
      */
     val turnId: String,
+    /**
+     * ISO 8601 timestamp when this turn started.
+     */
+    val startedAt: String,
     /**
      * The new message
      */
@@ -618,6 +622,13 @@ data class ChatTurnCompleteAction(
      */
     val turnId: String,
     /**
+     * Elapsed turn duration in milliseconds, measured by the producer's own
+     * clock. Clients MUST NOT derive this by subtracting timestamps — cross-
+     * client clocks may differ — and MUST treat it as opaque, producer-supplied
+     * data.
+     */
+    val duration: Long,
+    /**
      * Additional provider-specific metadata for this action.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -638,6 +649,13 @@ data class ChatTurnCancelledAction(
      */
     val turnId: String,
     /**
+     * Elapsed turn duration in milliseconds, measured by the producer's own
+     * clock. Clients MUST NOT derive this by subtracting timestamps — cross-
+     * client clocks may differ — and MUST treat it as opaque, producer-supplied
+     * data.
+     */
+    val duration: Long,
+    /**
      * Additional provider-specific metadata for this action.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -657,6 +675,13 @@ data class ChatErrorAction(
      * Turn identifier
      */
     val turnId: String,
+    /**
+     * Elapsed turn duration in milliseconds, measured by the producer's own
+     * clock. Clients MUST NOT derive this by subtracting timestamps — cross-
+     * client clocks may differ — and MUST treat it as opaque, producer-supplied
+     * data.
+     */
+    val duration: Long,
     /**
      * Error details
      */
@@ -1088,14 +1113,14 @@ data class ChangesetFileRemovedAction(
 )
 
 @Serializable
-data class ChangesetFilesReviewedChangedAction(
+data class ChangesetFilesReviewChangedAction(
     val type: ActionType,
     /**
-     * The {@link ChangesetFile.id}s whose reviewed state changed.
+     * The {@link ChangesetFile.id | ids} of the files whose review state changed.
      */
-    val fileIds: List<String>,
+    val files: List<String>,
     /**
-     * The new reviewed state to apply to each listed file.
+     * New review state applied to every listed file: `true` once reviewed, `false` to clear it.
      */
     val reviewed: Boolean
 )
@@ -1512,7 +1537,7 @@ sealed interface StateAction
 @JvmInline value class StateActionChangesetStatusChanged(val value: ChangesetStatusChangedAction) : StateAction
 @JvmInline value class StateActionChangesetFileSet(val value: ChangesetFileSetAction) : StateAction
 @JvmInline value class StateActionChangesetFileRemoved(val value: ChangesetFileRemovedAction) : StateAction
-@JvmInline value class StateActionChangesetFilesReviewedChanged(val value: ChangesetFilesReviewedChangedAction) : StateAction
+@JvmInline value class StateActionChangesetFilesReviewChanged(val value: ChangesetFilesReviewChangedAction) : StateAction
 @JvmInline value class StateActionChangesetContentChanged(val value: ChangesetContentChangedAction) : StateAction
 @JvmInline value class StateActionChangesetOperationsChanged(val value: ChangesetOperationsChangedAction) : StateAction
 @JvmInline value class StateActionChangesetOperationStatusChanged(val value: ChangesetOperationStatusChangedAction) : StateAction
@@ -1610,7 +1635,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "changeset/statusChanged" -> StateActionChangesetStatusChanged(input.json.decodeFromJsonElement(ChangesetStatusChangedAction.serializer(), element))
             "changeset/fileSet" -> StateActionChangesetFileSet(input.json.decodeFromJsonElement(ChangesetFileSetAction.serializer(), element))
             "changeset/fileRemoved" -> StateActionChangesetFileRemoved(input.json.decodeFromJsonElement(ChangesetFileRemovedAction.serializer(), element))
-            "changeset/filesReviewedChanged" -> StateActionChangesetFilesReviewedChanged(input.json.decodeFromJsonElement(ChangesetFilesReviewedChangedAction.serializer(), element))
+            "changeset/filesReviewChanged" -> StateActionChangesetFilesReviewChanged(input.json.decodeFromJsonElement(ChangesetFilesReviewChangedAction.serializer(), element))
             "changeset/contentChanged" -> StateActionChangesetContentChanged(input.json.decodeFromJsonElement(ChangesetContentChangedAction.serializer(), element))
             "changeset/operationsChanged" -> StateActionChangesetOperationsChanged(input.json.decodeFromJsonElement(ChangesetOperationsChangedAction.serializer(), element))
             "changeset/operationStatusChanged" -> StateActionChangesetOperationStatusChanged(input.json.decodeFromJsonElement(ChangesetOperationStatusChangedAction.serializer(), element))
@@ -1701,7 +1726,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChangesetStatusChanged -> output.json.encodeToJsonElement(ChangesetStatusChangedAction.serializer(), value.value)
             is StateActionChangesetFileSet -> output.json.encodeToJsonElement(ChangesetFileSetAction.serializer(), value.value)
             is StateActionChangesetFileRemoved -> output.json.encodeToJsonElement(ChangesetFileRemovedAction.serializer(), value.value)
-            is StateActionChangesetFilesReviewedChanged -> output.json.encodeToJsonElement(ChangesetFilesReviewedChangedAction.serializer(), value.value)
+            is StateActionChangesetFilesReviewChanged -> output.json.encodeToJsonElement(ChangesetFilesReviewChangedAction.serializer(), value.value)
             is StateActionChangesetContentChanged -> output.json.encodeToJsonElement(ChangesetContentChangedAction.serializer(), value.value)
             is StateActionChangesetOperationsChanged -> output.json.encodeToJsonElement(ChangesetOperationsChangedAction.serializer(), value.value)
             is StateActionChangesetOperationStatusChanged -> output.json.encodeToJsonElement(ChangesetOperationStatusChangedAction.serializer(), value.value)

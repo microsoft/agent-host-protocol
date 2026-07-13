@@ -1468,6 +1468,10 @@ public struct SessionConfigState: Codable, Sendable {
 public struct Turn: Codable, Sendable {
     /// Turn identifier
     public var id: String
+    /// ISO 8601 timestamp when this turn started.
+    public var startedAt: String?
+    /// Turn duration in milliseconds.
+    public var duration: Int?
     /// The message that initiated the turn
     public var message: Message
     /// All response content in stream order: text, tool calls, reasoning, and content refs.
@@ -1484,6 +1488,8 @@ public struct Turn: Codable, Sendable {
 
     public init(
         id: String,
+        startedAt: String? = nil,
+        duration: Int? = nil,
         message: Message,
         responseParts: [ResponsePart],
         usage: UsageInfo? = nil,
@@ -1491,6 +1497,8 @@ public struct Turn: Codable, Sendable {
         error: ErrorInfo? = nil
     ) {
         self.id = id
+        self.startedAt = startedAt
+        self.duration = duration
         self.message = message
         self.responseParts = responseParts
         self.usage = usage
@@ -1502,6 +1510,8 @@ public struct Turn: Codable, Sendable {
 public struct ActiveTurn: Codable, Sendable {
     /// Turn identifier
     public var id: String
+    /// ISO 8601 timestamp when this turn started.
+    public var startedAt: String
     /// The message that initiated the turn
     public var message: Message
     /// All response content in stream order: text, tool calls, reasoning, and content refs.
@@ -1513,11 +1523,13 @@ public struct ActiveTurn: Codable, Sendable {
 
     public init(
         id: String,
+        startedAt: String,
         message: Message,
         responseParts: [ResponsePart],
         usage: UsageInfo? = nil
     ) {
         self.id = id
+        self.startedAt = startedAt
         self.message = message
         self.responseParts = responseParts
         self.usage = usage
@@ -4511,17 +4523,43 @@ public struct Changeset: Codable, Sendable {
     /// Implementations MAY provide additional values; clients SHOULD fall back
     /// to a reasonable default when an unknown value is encountered.
     public var changeKind: String
+    /// Optional capability declarations for this changeset. Absent (or an empty
+    /// object) means the changeset advertises no optional capabilities.
+    ///
+    /// Because the catalogue entry is delivered up-front on
+    /// {@link ChangesetState | the session's changeset list}, clients can decide
+    /// whether to surface capability-gated UI (such as review checkboxes) without
+    /// first subscribing to the changeset URI. Mirrors the presence-flag
+    /// convention of `ClientCapabilities`.
+    public var capabilities: ChangesetCapabilities?
 
     public init(
         label: String,
         uriTemplate: String,
         description: String? = nil,
-        changeKind: String
+        changeKind: String,
+        capabilities: ChangesetCapabilities? = nil
     ) {
         self.label = label
         self.uriTemplate = uriTemplate
         self.description = description
         self.changeKind = changeKind
+        self.capabilities = capabilities
+    }
+}
+
+public struct ChangesetCapabilities: Codable, Sendable {
+    /// The changeset supports the per-file **review** workflow. When declared,
+    /// clients MAY surface a GitHub-style "Viewed" toggle per file and dispatch
+    /// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
+    /// set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
+    /// handling MUST treat the changeset as non-reviewable.
+    public var review: [String: AnyCodable]?
+
+    public init(
+        review: [String: AnyCodable]? = nil
+    ) {
+        self.review = review
     }
 }
 
@@ -4556,10 +4594,22 @@ public struct ChangesetFile: Codable, Sendable {
     /// Reuses the existing {@link FileEdit} shape. Clients derive line
     /// additions, deletions, and rename/create/delete semantics from this.
     public var edit: FileEdit
-    /// Whether the user has reviewed this file. Omit (or set to `undefined`)
-    /// to indicate that the server does not support the "review" functionality;
-    /// in that case clients should not surface any reviewed/unreviewed
-    /// affordance for this file.
+    /// Whether a reviewer has marked this file as reviewed (the GitHub-style
+    /// "Viewed" checkbox). Absent is equivalent to `false` — clients MUST treat
+    /// a missing value as not-yet-reviewed.
+    ///
+    /// Requires the changeset to advertise {@link ChangesetCapabilities.review}.
+    /// Clients toggle it by dispatching
+    /// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};
+    /// the server MAY also originate it (e.g. an agent self-reviewing its own
+    /// output).
+    ///
+    /// There is no content version in the protocol, so review is **not** reset
+    /// automatically when a file's contents change under a stable id. The server,
+    /// which is the authority on what changed, resets review explicitly — either
+    /// by re-emitting the file (via {@link ChangesetFileSetAction} or
+    /// {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
+    /// dispatching `changeset/filesReviewChanged` with `reviewed: false`.
     public var reviewed: Bool?
     /// Server-defined opaque metadata, surfaced to operations and tooling
     /// but not interpreted by the protocol.

@@ -279,6 +279,7 @@ fn touch_chat_modified(state: &mut ChatState) {
 fn end_turn(
     state: &mut ChatState,
     turn_id: &str,
+    duration: i64,
     turn_state: TurnState,
     terminal_status: Option<SessionStatus>,
     error: Option<ErrorInfo>,
@@ -345,8 +346,12 @@ fn end_turn(
         })
         .collect();
 
+    // Defensive clamp: `duration` is producer-supplied and opaque to this
+    // reducer, but a negative value would be nonsensical to display.
     let turn = Turn {
         id: active.id,
+        started_at: Some(active.started_at),
+        duration: Some(duration.max(0)),
         message: active.message,
         response_parts,
         usage: active.usage,
@@ -356,7 +361,7 @@ fn end_turn(
 
     state.turns.push(turn);
     state.input_requests = None;
-    touch_chat_modified(state);
+    state.modified_at = now_iso();
     state.status = summary_status(state, terminal_status);
     ReduceOutcome::Applied
 }
@@ -883,15 +888,26 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             active.response_parts.push(a.part.clone());
             ReduceOutcome::Applied
         }
-        StateAction::ChatTurnComplete(a) => {
-            end_turn(state, &a.turn_id, TurnState::Complete, None, None)
-        }
-        StateAction::ChatTurnCancelled(a) => {
-            end_turn(state, &a.turn_id, TurnState::Cancelled, None, None)
-        }
+        StateAction::ChatTurnComplete(a) => end_turn(
+            state,
+            &a.turn_id,
+            a.duration,
+            TurnState::Complete,
+            None,
+            None,
+        ),
+        StateAction::ChatTurnCancelled(a) => end_turn(
+            state,
+            &a.turn_id,
+            a.duration,
+            TurnState::Cancelled,
+            None,
+            None,
+        ),
         StateAction::ChatError(a) => end_turn(
             state,
             &a.turn_id,
+            a.duration,
             TurnState::Error,
             Some(SessionStatus::Error),
             Some(a.error.clone()),
@@ -1106,6 +1122,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
 fn apply_turn_started(state: &mut ChatState, a: &ChatTurnStartedAction) -> ReduceOutcome {
     state.active_turn = Some(ActiveTurn {
         id: a.turn_id.clone(),
+        started_at: a.started_at.clone(),
         message: a.message.clone(),
         response_parts: Vec::new(),
         usage: None,
@@ -1541,8 +1558,8 @@ pub fn apply_action_to_changeset(
             state.files.remove(idx);
             ReduceOutcome::Applied
         }
-        StateAction::ChangesetFilesReviewedChanged(a) => {
-            let ids: std::collections::HashSet<&String> = a.file_ids.iter().collect();
+        StateAction::ChangesetFilesReviewChanged(a) => {
+            let ids: std::collections::HashSet<&String> = a.files.iter().collect();
             let mut changed = false;
             for file in state.files.iter_mut() {
                 if !ids.contains(&file.id) || file.reviewed == Some(a.reviewed) {
@@ -1810,6 +1827,7 @@ mod tests {
         let mut s = empty_chat("copilot:/s1/chat/1");
         let action = StateAction::ChatTurnStarted(ChatTurnStartedAction {
             turn_id: "t1".into(),
+            started_at: "2026-07-09T20:00:00.000Z".into(),
             message: user_message("hi"),
             queued_message_id: None,
             meta: None,
@@ -1827,6 +1845,7 @@ mod tests {
         let mut s = empty_chat("copilot:/s1/chat/1");
         s.active_turn = Some(ActiveTurn {
             id: "t1".into(),
+            started_at: "2026-07-09T20:00:00.000Z".into(),
             message: user_message("hi"),
             response_parts: vec![ResponsePart::Markdown(MarkdownResponsePart {
                 id: "p1".into(),
@@ -1852,6 +1871,7 @@ mod tests {
         let mut s = empty_chat("copilot:/s1/chat/1");
         s.active_turn = Some(ActiveTurn {
             id: "t1".into(),
+            started_at: "2026-07-09T20:00:00.000Z".into(),
             message: user_message("hi"),
             response_parts: Vec::new(),
             usage: None,
@@ -1859,6 +1879,7 @@ mod tests {
         s.status = SessionStatus::InProgress.bits();
         let a = StateAction::ChatTurnComplete(ahp_types::actions::ChatTurnCompleteAction {
             turn_id: "t1".into(),
+            duration: 1000,
             meta: None,
         });
         assert_eq!(apply_action_to_chat(&mut s, &a), ReduceOutcome::Applied);
@@ -1928,6 +1949,7 @@ mod tests {
         // A chat-scoped action is out of scope for the session reducer.
         let turn = StateAction::ChatTurnComplete(ahp_types::actions::ChatTurnCompleteAction {
             turn_id: "t1".into(),
+            duration: 1000,
             meta: None,
         });
         assert_eq!(

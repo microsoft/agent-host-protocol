@@ -46,6 +46,7 @@ final class ReducersTests: XCTestCase {
             turns: [],
             activeTurn: ActiveTurn(
                 id: T,
+                startedAt: "2026-07-09T20:00:00.000Z",
                 message: Message(text: "Hello", origin: MessageOrigin(kind: .user)),
                 responseParts: [],
                 usage: nil
@@ -88,7 +89,8 @@ final class ReducersTests: XCTestCase {
 
     func testClientDispatchableReturnsTrue() {
         let action: StateAction = .chatTurnStarted(ChatTurnStartedAction(
-            type: .chatTurnStarted, turnId: T, message: Message(text: "Hello", origin: MessageOrigin(kind: .user))
+            type: .chatTurnStarted, turnId: T, startedAt: "2026-07-09T20:00:00.000Z",
+            message: Message(text: "Hello", origin: MessageOrigin(kind: .user))
         ))
         XCTAssertTrue(isClientDispatchable(action))
     }
@@ -101,6 +103,10 @@ final class ReducersTests: XCTestCase {
     // MARK: - Timestamp Behavior
 
     func testChatTurnStartedUpdatesModifiedAt() {
+        let originalProvider = currentTimestampProvider
+        currentTimestampProvider = { 9_999 }
+        defer { currentTimestampProvider = originalProvider }
+
         let state = ChatState(
             resource: C,
             title: "Test Chat",
@@ -111,10 +117,12 @@ final class ReducersTests: XCTestCase {
         let next = chatReducer(
             state: state,
             action: .chatTurnStarted(ChatTurnStartedAction(
-                type: .chatTurnStarted, turnId: T, message: Message(text: "Hello", origin: MessageOrigin(kind: .user))
+                type: .chatTurnStarted, turnId: T, startedAt: "2026-07-09T20:00:00.000Z",
+                message: Message(text: "Hello", origin: MessageOrigin(kind: .user))
             ))
         )
-        XCTAssertGreaterThan(next.modifiedAt, state.modifiedAt)
+        XCTAssertEqual(next.modifiedAt, "1970-01-01T00:00:09.999Z")
+        XCTAssertEqual(next.activeTurn?.startedAt, "2026-07-09T20:00:00.000Z")
     }
 
     func testTitleChangedUpdatesTitle() {

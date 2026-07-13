@@ -1649,6 +1649,14 @@ data class Turn(
      */
     val id: String,
     /**
+     * ISO 8601 timestamp when this turn started.
+     */
+    val startedAt: String? = null,
+    /**
+     * Turn duration in milliseconds.
+     */
+    val duration: Long? = null,
+    /**
      * The message that initiated the turn
      */
     val message: Message,
@@ -1679,6 +1687,10 @@ data class ActiveTurn(
      * Turn identifier
      */
     val id: String,
+    /**
+     * ISO 8601 timestamp when this turn started.
+     */
+    val startedAt: String,
     /**
      * The message that initiated the turn
      */
@@ -4069,7 +4081,30 @@ data class Changeset(
      * Implementations MAY provide additional values; clients SHOULD fall back
      * to a reasonable default when an unknown value is encountered.
      */
-    val changeKind: String
+    val changeKind: String,
+    /**
+     * Optional capability declarations for this changeset. Absent (or an empty
+     * object) means the changeset advertises no optional capabilities.
+     *
+     * Because the catalogue entry is delivered up-front on
+     * {@link ChangesetState | the session's changeset list}, clients can decide
+     * whether to surface capability-gated UI (such as review checkboxes) without
+     * first subscribing to the changeset URI. Mirrors the presence-flag
+     * convention of `ClientCapabilities`.
+     */
+    val capabilities: ChangesetCapabilities? = null
+)
+
+@Serializable
+data class ChangesetCapabilities(
+    /**
+     * The changeset supports the per-file **review** workflow. When declared,
+     * clients MAY surface a GitHub-style "Viewed" toggle per file and dispatch
+     * {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
+     * set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
+     * handling MUST treat the changeset as non-reviewable.
+     */
+    val review: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -4106,10 +4141,22 @@ data class ChangesetFile(
      */
     val edit: FileEdit,
     /**
-     * Whether the user has reviewed this file. Omit (or set to `undefined`)
-     * to indicate that the server does not support the "review" functionality;
-     * in that case clients should not surface any reviewed/unreviewed
-     * affordance for this file.
+     * Whether a reviewer has marked this file as reviewed (the GitHub-style
+     * "Viewed" checkbox). Absent is equivalent to `false` — clients MUST treat
+     * a missing value as not-yet-reviewed.
+     *
+     * Requires the changeset to advertise {@link ChangesetCapabilities.review}.
+     * Clients toggle it by dispatching
+     * {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`};
+     * the server MAY also originate it (e.g. an agent self-reviewing its own
+     * output).
+     *
+     * There is no content version in the protocol, so review is **not** reset
+     * automatically when a file's contents change under a stable id. The server,
+     * which is the authority on what changed, resets review explicitly — either
+     * by re-emitting the file (via {@link ChangesetFileSetAction} or
+     * {@link ChangesetContentChangedAction}) without `reviewed: true`, or by
+     * dispatching `changeset/filesReviewChanged` with `reviewed: false`.
      */
     val reviewed: Boolean? = null,
     /**
