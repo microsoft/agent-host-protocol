@@ -1,6 +1,6 @@
 # Canvas Channel
 
-A canvas is a rich, interactive UI surface the agent can open alongside a session — a document editor, a diff view, a live preview, a spreadsheet, a browser pane. Each open canvas is a first-class subscribable resource with its own `ahp-canvas:/<id>` channel, mirroring the "one channel per resource" convention used by terminals, changesets, and resource watches.
+A canvas is a rich, interactive UI surface the agent can open alongside a session — a document editor, a live preview, a spreadsheet, a browser pane. Each open canvas is a first-class subscribable resource with its own `ahp-canvas:/<id>` channel, mirroring the "one channel per resource" convention used by terminals, changesets, and resource watches.
 
 Rendering is **state-driven**: a client renders a canvas by reading its [`CanvasState.contentUri`](#state) and resolving that address per the renderer's URL policy. The host never sends a "render this" request — it publishes state, and the renderer reacts. Interaction flows back to whichever peer *provides* the canvas through a small server ↔ client request family (`canvasOpen` / `canvasInvokeOperation` / `canvasClose`).
 
@@ -162,7 +162,7 @@ sequenceDiagram
     C->>H: dispatchAction session/activeClientSet (canvasProviders)
     H->>C: action session/canvasesChanged (registry)
 
-    A->>H: open canvas "diff"
+    A->>H: open canvas "editor"
     H->>C: canvasOpen { channel: "ahp-canvas:/abc", canvasId, providerId, input }
     C-->>H: { contentUri, title }
     H->>C: action session/openCanvasesChanged (instance added)

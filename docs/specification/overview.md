@@ -83,6 +83,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Session Channel](/specification/session-channel)** — `ahp-session:/<uuid>` — per-session state: the `chats` catalog, default chat, active clients, customizations, changesets, and aggregated status.
 - **[Chat Channel](/specification/chat-channel)** — `ahp-chat:/<cid>` — per-chat conversation state: turns, streaming, tool calls, pending messages, and input requests.
 - **[Terminal Channel](/specification/terminal-channel)** — per-terminal pty state, data flow, claims, command detection.
+- **[Canvas Channel](/specification/canvas-channel)** — `ahp-canvas:/<id>` — per-instance state for rich, interactive UI surfaces the agent opens alongside a session.
 - **[Telemetry Channel](/specification/telemetry-channel)** — `ahp-otlp:` — OpenTelemetry logs, traces, and metrics emitted by the agent host.
 - **[Versioning](/specification/versioning)** — Protocol version negotiation and compatibility.
 - **[Common Types](/reference/common)** — Cross-cutting types, base command/notification shapes, and JSON-RPC wire types.
@@ -91,6 +92,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Chat Channel Reference](/reference/chat)** — `ChatState`, chat actions, and chat commands.
 - **[Terminal Channel Reference](/reference/terminal)** — `TerminalState`, terminal actions, and terminal commands.
 - **[Changeset Channel Reference](/reference/changeset)** — `ChangesetState`, changeset actions, and changeset commands.
+- **[Canvas Channel Reference](/reference/canvas)** — `CanvasState`, canvas actions, and canvas commands.
 - **[Messages](/reference/messages)** — Index of every JSON-RPC method with links to the channel page that documents it.
 - **[Error Codes](/reference/error-codes)** — Application-specific error codes.
 

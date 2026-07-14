@@ -45,7 +45,7 @@ import type { BaseParams } from '../common/commands.js';
  * { "jsonrpc": "2.0", "id": 41, "method": "canvasOpen",
  *   "params": {
  *     "channel": "ahp-canvas:/inst-7",
- *     "canvasId": "diff",
+ *     "canvasId": "editor",
  *     "providerId": "acme.canvases",
  *     "input": { "path": "src/app.ts" }
  *   } }

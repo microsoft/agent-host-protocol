@@ -92,6 +92,7 @@ export default withMermaid(defineConfig({
             { text: 'Chat Channel', link: '/reference/chat' },
             { text: 'Terminal Channel', link: '/reference/terminal' },
             { text: 'Changeset Channel', link: '/reference/changeset' },
+            { text: 'Canvas Channel', link: '/reference/canvas' },
             { text: 'Annotations Channel', link: '/reference/annotations' },
             { text: 'Telemetry Channel', link: '/reference/otlp' },
           ],
