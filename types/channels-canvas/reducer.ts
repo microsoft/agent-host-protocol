@@ -25,7 +25,7 @@ export function canvasReducer(state: CanvasState, action: CanvasAction, log?: (m
         ...state,
         title: action.title ?? state.title,
         status: action.status ?? state.status,
-        url: action.url ?? state.url,
+        contentUri: action.contentUri ?? state.contentUri,
         availability: action.availability ?? state.availability,
       };
 

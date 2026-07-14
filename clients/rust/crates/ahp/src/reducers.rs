@@ -1743,8 +1743,8 @@ pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> 
             if let Some(status) = &a.status {
                 state.status = Some(status.clone());
             }
-            if let Some(url) = &a.url {
-                state.url = Some(url.clone());
+            if let Some(content_uri) = &a.content_uri {
+                state.content_uri = Some(content_uri.clone());
             }
             if let Some(availability) = &a.availability {
                 state.availability = *availability;

@@ -21,6 +21,12 @@ import type { BaseParams } from '../common/commands.js';
  * the initial render target and presentation fields, which the host folds into
  * the new instance's {@link CanvasState}.
  *
+ * The host mints the instance's own `ahp-canvas:/<id>` channel URI and passes
+ * it as {@link channel} — the canvas comes into existence at that URI, mirroring
+ * how {@link CreateTerminalParams} names the new terminal's channel. That URI is
+ * the instance's sole identity for the {@link canvasInvokeOperation} /
+ * {@link canvasClose} that follow.
+ *
  * Mirrors the `resource*` precedent: registered in `ServerCommandMap` and
  * mirrored in `CommandMap` for symmetry. A client normally never initiates it —
  * the host is not a canvas provider — and a receiver SHOULD reject a request
@@ -38,29 +44,29 @@ import type { BaseParams } from '../common/commands.js';
  * // Server → Client
  * { "jsonrpc": "2.0", "id": 41, "method": "canvasOpen",
  *   "params": {
- *     "channel": "ahp-session:/2f9c…",
+ *     "channel": "ahp-canvas:/inst-7",
  *     "canvasId": "diff",
  *     "providerId": "acme.canvases",
- *     "instanceId": "inst-7",
  *     "input": { "path": "src/app.ts" }
  *   } }
  *
  * // Client → Server
  * { "jsonrpc": "2.0", "id": 41, "result": {
- *   "url": "https://acme.example/canvas/inst-7",
+ *   "contentUri": "https://acme.example/canvas/inst-7",
  *   "title": "src/app.ts"
  * } }
  * ```
  */
 export interface CanvasOpenParams extends BaseParams {
-  /** The owning session channel URI (`ahp-session:/<uuid>`). */
+  /**
+   * The new instance's own channel URI (`ahp-canvas:/<id>`), minted by the host
+   * for this open. Identifies the instance for every subsequent request.
+   */
   channel: URI;
   /** Provider-local canvas id to open. */
   canvasId: string;
   /** Owning provider id (opaque to AHP). */
   providerId: string;
-  /** Caller-minted handle for the new instance. */
-  instanceId: string;
   /** Open input, validated by the provider against its declared schema. */
   input?: Record<string, unknown>;
 }
@@ -69,8 +75,8 @@ export interface CanvasOpenParams extends BaseParams {
  * Result of the `canvasOpen` command.
  */
 export interface CanvasOpenResult {
-  /** Initial content address for the instance (see {@link CanvasState.url}). */
-  url?: string;
+  /** Initial content address for the instance (see {@link CanvasState.contentUri}). */
+  contentUri?: URI;
   /** Initial title. */
   title?: string;
   /** Initial provider-defined status. */
@@ -88,6 +94,11 @@ export interface CanvasOpenResult {
  * provider returns an opaque, provider-defined value. Registered symmetrically
  * with the rest of the provider family (see {@link CanvasOpenParams}).
  *
+ * Targets the instance's `ahp-canvas:/<id>` channel — the host resolves that URI
+ * back to its provider and canvas id — so the request carries only the
+ * operation name and input, mirroring how {@link InvokeChangesetOperationParams}
+ * targets a changeset's own channel URI.
+ *
  * @category Commands
  * @method canvasInvokeOperation
  * @direction Client ↔ Server
@@ -98,14 +109,8 @@ export interface CanvasOpenResult {
  * `{ code, message }`.
  */
 export interface CanvasInvokeOperationParams extends BaseParams {
-  /** The owning session channel URI (`ahp-session:/<uuid>`). */
+  /** The instance's channel URI (`ahp-canvas:/<id>`). */
   channel: URI;
-  /** Instance handle the operation targets. */
-  instanceId: string;
-  /** Provider-local canvas id of the instance. */
-  canvasId: string;
-  /** Owning provider id (opaque to AHP). */
-  providerId: string;
   /** Declared operation name to invoke. */
   operationName: string;
   /** Operation input, validated by the provider against its declared schema. */
@@ -131,6 +136,9 @@ export interface CanvasInvokeOperationResult {
  * {@link SessionState.openCanvases}. Registered symmetrically with the rest of
  * the provider family (see {@link CanvasOpenParams}).
  *
+ * Targets the instance's `ahp-canvas:/<id>` channel, which the host resolves
+ * back to its provider — so the request carries nothing else.
+ *
  * @category Commands
  * @method canvasClose
  * @direction Client ↔ Server
@@ -138,12 +146,6 @@ export interface CanvasInvokeOperationResult {
  * @version 1
  */
 export interface CanvasCloseParams extends BaseParams {
-  /** The owning session channel URI (`ahp-session:/<uuid>`). */
+  /** The instance's channel URI (`ahp-canvas:/<id>`) to close. */
   channel: URI;
-  /** Instance handle to close. */
-  instanceId: string;
-  /** Provider-local canvas id of the instance. */
-  canvasId: string;
-  /** Owning provider id (opaque to AHP). */
-  providerId: string;
 }

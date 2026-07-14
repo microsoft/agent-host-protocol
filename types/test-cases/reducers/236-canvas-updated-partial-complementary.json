@@ -1,15 +1,13 @@
 {
-  "description": "canvas/updated with only status and availability present preserves the absent title and url",
+  "description": "canvas/updated with only status and availability present preserves the absent title and contentUri",
   "reducer": "canvas",
   "initial": {
-    "instanceId": "canvas-1",
     "canvasId": "markdown",
     "providerId": "acme.editors",
     "title": "Draft",
     "status": "idle",
-    "url": "ahp-session:/2f9c/content/canvas-1",
-    "availability": "ready",
-    "provider": { "kind": "server" }
+    "contentUri": "ahp-session:/2f9c/content/canvas-1",
+    "availability": "ready"
   },
   "actions": [
     {
@@ -19,13 +17,11 @@
     }
   ],
   "expected": {
-    "instanceId": "canvas-1",
     "canvasId": "markdown",
     "providerId": "acme.editors",
     "title": "Draft",
     "status": "error",
-    "url": "ahp-session:/2f9c/content/canvas-1",
-    "availability": "stale",
-    "provider": { "kind": "server" }
+    "contentUri": "ahp-session:/2f9c/content/canvas-1",
+    "availability": "stale"
   }
 }

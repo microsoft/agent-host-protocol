@@ -1030,6 +1030,12 @@ type ChangesetOperationFollowUp struct {
 // the initial render target and presentation fields, which the host folds into
 // the new instance's {@link CanvasState}.
 //
+// The host mints the instance's own `ahp-canvas:/<id>` channel URI and passes
+// it as {@link channel} — the canvas comes into existence at that URI, mirroring
+// how {@link CreateTerminalParams} names the new terminal's channel. That URI is
+// the instance's sole identity for the {@link canvasInvokeOperation} /
+// {@link canvasClose} that follow.
+//
 // Mirrors the `resource*` precedent: registered in `ServerCommandMap` and
 // mirrored in `CommandMap` for symmetry. A client normally never initiates it —
 // the host is not a canvas provider — and a receiver SHOULD reject a request
@@ -1041,16 +1047,14 @@ type CanvasOpenParams struct {
 	CanvasId string `json:"canvasId"`
 	// Owning provider id (opaque to AHP).
 	ProviderId string `json:"providerId"`
-	// Caller-minted handle for the new instance.
-	InstanceId string `json:"instanceId"`
 	// Open input, validated by the provider against its declared schema.
 	Input map[string]json.RawMessage `json:"input,omitempty"`
 }
 
 // Result of the `canvasOpen` command.
 type CanvasOpenResult struct {
-	// Initial content address for the instance (see {@link CanvasState.url}).
-	Url *string `json:"url,omitempty"`
+	// Initial content address for the instance (see {@link CanvasState.contentUri}).
+	ContentUri *URI `json:"contentUri,omitempty"`
 	// Initial title.
 	Title *string `json:"title,omitempty"`
 	// Initial provider-defined status.
@@ -1064,15 +1068,14 @@ type CanvasOpenResult struct {
 // {@link SessionCanvasOperation | declared operation} on an open instance. The
 // provider returns an opaque, provider-defined value. Registered symmetrically
 // with the rest of the provider family (see {@link CanvasOpenParams}).
+//
+// Targets the instance's `ahp-canvas:/<id>` channel — the host resolves that URI
+// back to its provider and canvas id — so the request carries only the
+// operation name and input, mirroring how {@link InvokeChangesetOperationParams}
+// targets a changeset's own channel URI.
 type CanvasInvokeOperationParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
-	// Instance handle the operation targets.
-	InstanceId string `json:"instanceId"`
-	// Provider-local canvas id of the instance.
-	CanvasId string `json:"canvasId"`
-	// Owning provider id (opaque to AHP).
-	ProviderId string `json:"providerId"`
 	// Declared operation name to invoke.
 	OperationName string `json:"operationName"`
 	// Operation input, validated by the provider against its declared schema.
@@ -1092,15 +1095,12 @@ type CanvasInvokeOperationResult struct {
 // dispatches `canvas/closeRequested`. The host then drops the instance from
 // {@link SessionState.openCanvases}. Registered symmetrically with the rest of
 // the provider family (see {@link CanvasOpenParams}).
+//
+// Targets the instance's `ahp-canvas:/<id>` channel, which the host resolves
+// back to its provider — so the request carries nothing else.
 type CanvasCloseParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
-	// Instance handle to close.
-	InstanceId string `json:"instanceId"`
-	// Provider-local canvas id of the instance.
-	CanvasId string `json:"canvasId"`
-	// Owning provider id (opaque to AHP).
-	ProviderId string `json:"providerId"`
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

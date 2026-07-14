@@ -1392,8 +1392,8 @@ type CanvasUpdatedAction struct {
 	Title *string `json:"title,omitempty"`
 	// New provider-defined status. Absent preserves the current status.
 	Status *string `json:"status,omitempty"`
-	// New content address. Absent preserves the current url.
-	Url *string `json:"url,omitempty"`
+	// New content address. Absent preserves the current contentUri.
+	ContentUri *URI `json:"contentUri,omitempty"`
 	// New availability. Absent preserves the current availability.
 	Availability *CanvasAvailability `json:"availability,omitempty"`
 }

@@ -1609,8 +1609,8 @@ func ApplyActionToCanvas(state *ahptypes.CanvasState, action ahptypes.StateActio
 		if a.Status != nil {
 			state.Status = a.Status
 		}
-		if a.Url != nil {
-			state.Url = a.Url
+		if a.ContentUri != nil {
+			state.ContentUri = a.ContentUri
 		}
 		if a.Availability != nil {
 			state.Availability = *a.Availability

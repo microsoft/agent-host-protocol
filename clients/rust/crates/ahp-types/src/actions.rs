@@ -1639,9 +1639,9 @@ pub struct CanvasUpdatedAction {
     /// New provider-defined status. Absent preserves the current status.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
-    /// New content address. Absent preserves the current url.
+    /// New content address. Absent preserves the current contentUri.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
+    pub content_uri: Option<Uri>,
     /// New availability. Absent preserves the current availability.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub availability: Option<CanvasAvailability>,

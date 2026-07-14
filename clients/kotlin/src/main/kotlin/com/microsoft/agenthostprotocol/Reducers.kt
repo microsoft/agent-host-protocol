@@ -1574,7 +1574,7 @@ public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState =
     is StateActionCanvasUpdated -> state.copy(
         title = action.value.title ?: state.title,
         status = action.value.status ?: state.status,
-        url = action.value.url ?: state.url,
+        contentUri = action.value.contentUri ?: state.contentUri,
         availability = action.value.availability ?: state.availability,
     )
     is StateActionCanvasCloseRequested -> state

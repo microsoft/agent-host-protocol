@@ -2,7 +2,7 @@
 
 A canvas is a rich, interactive UI surface the agent can open alongside a session — a document editor, a diff view, a live preview, a spreadsheet, a browser pane. Each open canvas is a first-class subscribable resource with its own `ahp-canvas:/<id>` channel, mirroring the "one channel per resource" convention used by terminals, changesets, and resource watches.
 
-Rendering is **state-driven**: a client renders a canvas by reading its [`CanvasState.url`](#state) and resolving that address per the renderer's URL policy. The host never sends a "render this" request — it publishes state, and the renderer reacts. Interaction flows back to whichever peer *provides* the canvas through a small server ↔ client request family (`canvasOpen` / `canvasInvokeOperation` / `canvasClose`).
+Rendering is **state-driven**: a client renders a canvas by reading its [`CanvasState.contentUri`](#state) and resolving that address per the renderer's URL policy. The host never sends a "render this" request — it publishes state, and the renderer reacts. Interaction flows back to whichever peer *provides* the canvas through a small server ↔ client request family (`canvasOpen` / `canvasInvokeOperation` / `canvasClose`).
 
 ## Capability
 
@@ -47,7 +47,7 @@ The host folds each `ClientCanvasDeclaration` into `canvases`, filling in the ow
 SessionCanvasDeclaration {
   providerId: string            // owning provider id (opaque to AHP)
   canvasId: string              // provider-local id, unique within providerId
-  displayName: string
+  title: string
   description: string
   inputSchema?: object          // JSON Schema for the open input (opaque to AHP)
   operations?: SessionCanvasOperation[]
@@ -57,7 +57,7 @@ SessionCanvasDeclaration {
 // The lighter shape a client publishes; the host derives providerId + source.
 ClientCanvasDeclaration {
   canvasId: string
-  displayName: string
+  title: string
   description: string
   inputSchema?: object
   operations?: SessionCanvasOperation[]
@@ -82,7 +82,7 @@ CanvasClientProviderSource { kind: 'client', clientId }    // a connected client
 
 ### Open-instance catalogue
 
-Each open instance is summarised by an `OpenCanvasRef`. The instance is identified solely by its channel URI; the other identity fields (`instanceId`, `providerId`) live on the full [`CanvasState`](#state):
+Each open instance is summarised by an `OpenCanvasRef`. The instance is identified solely by its channel URI; the other identity field (`providerId`) lives on the full [`CanvasState`](#state):
 
 ```typescript
 OpenCanvasRef {
@@ -107,24 +107,25 @@ Subscribing to an instance's channel yields the authoritative, mutable per-insta
 
 ```typescript
 CanvasState {
-  instanceId: string            // server-assigned handle, unique within the session
   canvasId: string              // provider-local id this instance was opened from
   providerId: string            // owning provider id (opaque to AHP)
-  displayName?: string
   input?: object                // the open input, retained for resume/rebind
   title?: string
   status?: string               // provider-defined, opaque to AHP
-  url?: string                  // renderer-targeted content address (see Rendering)
+  contentUri?: URI              // renderer-targeted content address (see Rendering)
   availability: CanvasAvailability
-  provider: CanvasProviderSource // which provider owns this instance's callbacks
 }
 
 CanvasAvailability = 'ready' | 'stale'   // 'stale' = provider currently unavailable
 ```
 
+The instance's provider `source` — server-side or a specific client — is not
+repeated here; it lives on the matching [`SessionCanvasDeclaration`](#declarations)
+in `SessionState.canvases`, keyed by `(providerId, canvasId)`.
+
 ## Rendering and content
 
-A renderer displays a canvas by dispatching on the scheme of `CanvasState.url`:
+A renderer displays a canvas by dispatching on the scheme of `CanvasState.contentUri`:
 
 - A **directly-loadable** address — `https:`, an in-process scheme, or `http://localhost` — is loaded straight into the isolated surface, subject to the renderer's own URL policy.
 - A **content-reference** address is resolved over the general [`resourceRead`](/reference/common#resourceread) command rather than dialed directly. This keeps content flowing entirely over the AHP transport, so a relayed or brokered deployment — where the host is reachable only over AHP and cannot be dialed directly — can still serve every byte, with no port or direct connection required. Sub-resources the loaded document references (stylesheets, images) are fetched the same way.
@@ -133,11 +134,11 @@ The canvas content itself is opaque to AHP — the protocol carries only the add
 
 ## Actions
 
-Two actions travel on the per-instance channel. Because the channel is scoped to a single instance by the action envelope, neither carries an `instanceId`.
+Two actions travel on the per-instance channel. Because the channel URI already scopes them to a single instance through the action envelope, neither repeats any instance identifier.
 
 | Action | Client-dispatchable | Reducer effect |
 |---|:---:|---|
-| `canvas/updated` | Yes | Sparse-merges `title` / `status` / `url` / `availability` into `CanvasState`. |
+| `canvas/updated` | Yes | Sparse-merges `title` / `status` / `contentUri` / `availability` into `CanvasState`. |
 | `canvas/closeRequested` | Yes | No-op — signals the host to run the close flow. |
 
 `canvas/updated` is dispatched by the server for a server-side provider, or by the client that provides an instance to push its own presentation changes — the same client-dispatchable pattern as `terminal/titleChanged`, and the only way a client-side provider updates the structured `CanvasState` (and the `OpenCanvasRef` fields mirrored from it) that other subscribers render. The host stays the authoritative reducer: it SHOULD reject an update from a client that is not the instance's resolved provider, then applies the merge and re-broadcasts.
@@ -162,20 +163,20 @@ sequenceDiagram
     H->>C: action session/canvasesChanged (registry)
 
     A->>H: open canvas "diff"
-    H->>C: canvasOpen { canvasId, providerId, instanceId, input }
-    C-->>H: { url, title }
+    H->>C: canvasOpen { channel: "ahp-canvas:/abc", canvasId, providerId, input }
+    C-->>H: { contentUri, title }
     H->>C: action session/openCanvasesChanged (instance added)
     C->>H: subscribe { channel: "ahp-canvas:/abc" }
     H-->>C: snapshot { state: CanvasState }
 
-    Note over C: renderer loads CanvasState.url
+    Note over C: renderer loads CanvasState.contentUri
     A->>H: invoke operation "format"
-    H->>C: canvasInvokeOperation { instanceId, operationName, input }
+    H->>C: canvasInvokeOperation { channel: "ahp-canvas:/abc", operationName, input }
     C-->>H: { value }
     C-->>H: action canvas/updated { status }
 
     C->>H: action canvas/closeRequested
-    H->>C: canvasClose { instanceId }
+    H->>C: canvasClose { channel: "ahp-canvas:/abc" }
     H->>C: action session/openCanvasesChanged (instance removed)
 ```
 
@@ -183,11 +184,11 @@ sequenceDiagram
 
 | Method | Channel | Direction | Purpose |
 |---|---|---|---|
-| `canvasOpen` | `ahp-session:/<uuid>` | Client ↔ Server | Open an instance against its provider. Returns the initial `url` / `title` / `status`. |
-| `canvasInvokeOperation` | `ahp-session:/<uuid>` | Client ↔ Server | Invoke a declared operation on an open instance. Returns an opaque provider value. |
-| `canvasClose` | `ahp-session:/<uuid>` | Client ↔ Server | Close an instance against its provider, as part of the close flow. |
+| `canvasOpen` | `ahp-canvas:/<id>` | Client ↔ Server | Open an instance against its provider. Names the new instance's channel and returns the initial `contentUri` / `title` / `status`. |
+| `canvasInvokeOperation` | `ahp-canvas:/<id>` | Client ↔ Server | Invoke a declared operation on an open instance. Returns an opaque provider value. |
+| `canvasClose` | `ahp-canvas:/<id>` | Client ↔ Server | Close an instance against its provider, as part of the close flow. |
 
-The three provider operations are session-scoped RPCs and travel on the session channel (`ahp-session:/<uuid>`). Content the renderer needs is resolved separately over the general [`resourceRead`](/reference/common#resourceread) command, so the canvas family carries no content-fetch method of its own.
+All three operations travel on the instance's own `ahp-canvas:/<id>` channel — `canvasOpen` names the new instance's channel, and invoke/close address the existing one — mirroring how terminal and changeset operations target their own channel URI. The host resolves that URI back to the owning provider, so invoke and close carry no other identifiers. Content the renderer needs is resolved separately over the general [`resourceRead`](/reference/common#resourceread) command, so the canvas family carries no content-fetch method of its own.
 
 ### Actions
 

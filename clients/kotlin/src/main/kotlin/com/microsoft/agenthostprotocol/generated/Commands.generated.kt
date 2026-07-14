@@ -1198,10 +1198,6 @@ data class CanvasOpenParams(
      */
     val providerId: String,
     /**
-     * Caller-minted handle for the new instance.
-     */
-    val instanceId: String,
-    /**
      * Open input, validated by the provider against its declared schema.
      */
     val input: Map<String, JsonElement>? = null
@@ -1210,9 +1206,9 @@ data class CanvasOpenParams(
 @Serializable
 data class CanvasOpenResult(
     /**
-     * Initial content address for the instance (see {@link CanvasState.url}).
+     * Initial content address for the instance (see {@link CanvasState.contentUri}).
      */
-    val url: String? = null,
+    val contentUri: String? = null,
     /**
      * Initial title.
      */
@@ -1229,18 +1225,6 @@ data class CanvasInvokeOperationParams(
      * Channel URI this command targets.
      */
     val channel: String,
-    /**
-     * Instance handle the operation targets.
-     */
-    val instanceId: String,
-    /**
-     * Provider-local canvas id of the instance.
-     */
-    val canvasId: String,
-    /**
-     * Owning provider id (opaque to AHP).
-     */
-    val providerId: String,
     /**
      * Declared operation name to invoke.
      */
@@ -1264,19 +1248,7 @@ data class CanvasCloseParams(
     /**
      * Channel URI this command targets.
      */
-    val channel: String,
-    /**
-     * Instance handle to close.
-     */
-    val instanceId: String,
-    /**
-     * Provider-local canvas id of the instance.
-     */
-    val canvasId: String,
-    /**
-     * Owning provider id (opaque to AHP).
-     */
-    val providerId: String
+    val channel: String
 )
 
 // ─── ReconnectResult Union ──────────────────────────────────────────────────

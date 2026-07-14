@@ -360,7 +360,7 @@ export interface SessionCanvasDeclaration {
   /** Provider-local canvas id. Unique within `providerId`. */
   canvasId: string;
   /** Human-readable canvas name. */
-  displayName: string;
+  title: string;
   /** Human-readable description of the canvas. */
   description: string;
   /**
@@ -386,7 +386,7 @@ export interface ClientCanvasDeclaration {
   /** Provider-local canvas id, unique within the publishing client. */
   canvasId: string;
   /** Human-readable canvas name. */
-  displayName: string;
+  title: string;
   /** Human-readable description of the canvas. */
   description: string;
   /** JSON Schema for the canvas's open input. Opaque to AHP. */
@@ -403,8 +403,7 @@ export interface ClientCanvasDeclaration {
  * subscribing to every instance.
  *
  * The instance is identified solely by its {@link channel} URI — the other
- * identity fields (`instanceId`, `providerId`) live on the full
- * {@link CanvasState}, not here.
+ * identity field (`providerId`) lives on the full {@link CanvasState}, not here.
  *
  * @category Canvas Types
  */

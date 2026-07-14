@@ -1320,7 +1320,7 @@ public func canvasReducer(state: CanvasState, action: StateAction) -> CanvasStat
         var next = state
         if let title = a.title { next.title = title }
         if let status = a.status { next.status = status }
-        if let url = a.url { next.url = url }
+        if let contentUri = a.contentUri { next.contentUri = contentUri }
         if let availability = a.availability { next.availability = availability }
         return next
 

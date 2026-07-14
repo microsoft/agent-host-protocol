@@ -2,11 +2,9 @@
   "description": "canvas unknown action type is no-op",
   "reducer": "canvas",
   "initial": {
-    "instanceId": "canvas-1",
     "canvasId": "markdown",
     "providerId": "acme.editors",
-    "availability": "ready",
-    "provider": { "kind": "server" }
+    "availability": "ready"
   },
   "actions": [
     {
@@ -14,10 +12,8 @@
     }
   ],
   "expected": {
-    "instanceId": "canvas-1",
     "canvasId": "markdown",
     "providerId": "acme.editors",
-    "availability": "ready",
-    "provider": { "kind": "server" }
+    "availability": "ready"
   }
 }

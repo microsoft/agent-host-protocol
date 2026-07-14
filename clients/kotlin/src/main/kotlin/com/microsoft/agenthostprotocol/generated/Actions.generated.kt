@@ -1406,9 +1406,9 @@ data class CanvasUpdatedAction(
      */
     val status: String? = null,
     /**
-     * New content address. Absent preserves the current url.
+     * New content address. Absent preserves the current contentUri.
      */
-    val url: String? = null,
+    val contentUri: String? = null,
     /**
      * New availability. Absent preserves the current availability.
      */

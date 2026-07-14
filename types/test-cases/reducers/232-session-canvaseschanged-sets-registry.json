@@ -16,14 +16,14 @@
         {
           "providerId": "acme.editors",
           "canvasId": "markdown",
-          "displayName": "Markdown Editor",
+          "title": "Markdown Editor",
           "description": "Edit and preview Markdown documents.",
           "source": { "kind": "server" }
         },
         {
           "providerId": "acme.viewers",
           "canvasId": "image",
-          "displayName": "Image Viewer",
+          "title": "Image Viewer",
           "description": "Preview raster and vector images.",
           "operations": [
             { "name": "zoom", "description": "Zoom the image to a factor." }
@@ -42,14 +42,14 @@
       {
         "providerId": "acme.editors",
         "canvasId": "markdown",
-        "displayName": "Markdown Editor",
+        "title": "Markdown Editor",
         "description": "Edit and preview Markdown documents.",
         "source": { "kind": "server" }
       },
       {
         "providerId": "acme.viewers",
         "canvasId": "image",
-        "displayName": "Image Viewer",
+        "title": "Image Viewer",
         "description": "Preview raster and vector images.",
         "operations": [
           { "name": "zoom", "description": "Zoom the image to a factor." }

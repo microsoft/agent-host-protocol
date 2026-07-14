@@ -904,7 +904,7 @@
           "type": "string",
           "description": "Provider-local canvas id. Unique within `providerId`."
         },
-        "displayName": {
+        "title": {
           "type": "string",
           "description": "Human-readable canvas name."
         },
@@ -932,7 +932,7 @@
       "required": [
         "providerId",
         "canvasId",
-        "displayName",
+        "title",
         "description",
         "source"
       ]
@@ -945,7 +945,7 @@
           "type": "string",
           "description": "Provider-local canvas id, unique within the publishing client."
         },
-        "displayName": {
+        "title": {
           "type": "string",
           "description": "Human-readable canvas name."
         },
@@ -968,13 +968,13 @@
       },
       "required": [
         "canvasId",
-        "displayName",
+        "title",
         "description"
       ]
     },
     "OpenCanvasRef": {
       "type": "object",
-      "description": "A lightweight catalogue entry for one open canvas instance, surfaced on\n{@link SessionState.openCanvases}. The authoritative, mutable per-instance\nstate lives on the instance's own {@link CanvasState} channel; this entry\nexists so a subscriber can discover the channel URI and render it without\nsubscribing to every instance.\n\nThe instance is identified solely by its {@link channel} URI — the other\nidentity fields (`instanceId`, `providerId`) live on the full\n{@link CanvasState}, not here.",
+      "description": "A lightweight catalogue entry for one open canvas instance, surfaced on\n{@link SessionState.openCanvases}. The authoritative, mutable per-instance\nstate lives on the instance's own {@link CanvasState} channel; this entry\nexists so a subscriber can discover the channel URI and render it without\nsubscribing to every instance.\n\nThe instance is identified solely by its {@link channel} URI — the other\nidentity field (`providerId`) lives on the full {@link CanvasState}, not here.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -4752,23 +4752,15 @@
     },
     "CanvasState": {
       "type": "object",
-      "description": "Full state for a single open canvas instance, delivered when a client\nsubscribes to the instance's `ahp-canvas:/<id>` channel.\n\nOne channel exists per open instance — the same \"one channel per resource\"\nconvention used by terminals, changesets, and resource watches. The\nlightweight catalogue entry that advertises this channel is\n{@link OpenCanvasRef} on {@link SessionState.openCanvases}; this state is the\nauthoritative, mutable per-instance view a renderer reads.\n\nRendering is state-driven: a client renders the canvas by reading\n{@link url} and resolving it per the renderer's URL policy — directly for a\nreachable address, or over the general `resourceRead` command for a\ncontent-reference address. It never receives a \"render this\" request.",
+      "description": "Full state for a single open canvas instance, delivered when a client\nsubscribes to the instance's `ahp-canvas:/<id>` channel.\n\nOne channel exists per open instance — the same \"one channel per resource\"\nconvention used by terminals, changesets, and resource watches. The instance\nis identified by that channel URI alone, so this state carries no separate\ninstance handle. The lightweight catalogue entry that advertises the channel\nis {@link OpenCanvasRef} on {@link SessionState.openCanvases}; this state is\nthe authoritative, mutable per-instance view a renderer reads. The provider\nsource that backs the instance lives on its\n{@link SessionCanvasDeclaration} in {@link SessionState.canvases}, keyed by\n`(providerId, canvasId)`.\n\nRendering is state-driven: a client renders the canvas by reading\n{@link contentUri} and resolving it per the renderer's URL policy — directly\nfor a reachable address, or over the general `resourceRead` command for a\ncontent-reference address. It never receives a \"render this\" request.",
       "properties": {
-        "instanceId": {
-          "type": "string",
-          "description": "Server-assigned instance handle, unique within the session."
-        },
         "canvasId": {
           "type": "string",
           "description": "Provider-local canvas id this instance was opened from."
         },
         "providerId": {
           "type": "string",
-          "description": "Owning provider id — an opaque namespace string AHP does not interpret,\ncarried so a provider-local {@link canvasId} stays unique across providers."
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable canvas name."
+          "description": "Owning provider id — an opaque namespace string AHP does not interpret,\ncarried so a provider-local {@link canvasId} stays unique across providers.\nDistinct from the provider's client connection: one client can proxy\nseveral providers."
         },
         "input": {
           "type": "object",
@@ -4783,25 +4775,19 @@
           "type": "string",
           "description": "Provider-defined status string (opaque to AHP)."
         },
-        "url": {
-          "type": "string",
-          "description": "Renderer-targeted address for the opaque canvas content — either a\ndirectly-loadable URL (`https:`, an in-process scheme, `http://localhost`)\nor a content-reference URI the renderer resolves with the general\n`resourceRead` command. Resolving over `resourceRead` keeps content flowing\nentirely over the AHP transport, so a relayed or brokered deployment —\nwhere the host is reachable only over AHP and cannot be dialed directly —\ncan still serve every byte, with no port or direct connection required. The\nrenderer dispatches on the scheme and enforces its URL policy. See\n{@link /specification/canvas-channel | Canvas Channel}."
+        "contentUri": {
+          "$ref": "#/$defs/URI",
+          "description": "Renderer-targeted address for the opaque canvas content. Clients MAY load a\ndirectly-reachable address (`https:`, an in-process scheme,\n`http://localhost`) themselves; any other scheme — or an address the\nrenderer cannot reach directly — is resolved with the general `resourceRead`\ncommand. Resolving over `resourceRead` keeps content flowing entirely over\nthe AHP transport, so a relayed or brokered deployment — where the host is\nreachable only over AHP and cannot be dialed directly — can still serve\nevery byte, with no port or direct connection required. The renderer\ndispatches on the scheme and enforces its URL policy. See\n{@link /specification/canvas-channel | Canvas Channel}."
         },
         "availability": {
           "$ref": "#/$defs/CanvasAvailability",
           "description": "Whether this instance's provider is currently available."
-        },
-        "provider": {
-          "$ref": "#/$defs/CanvasProviderSource",
-          "description": "Which provider owns the callbacks (`canvasOpen` / … ) for this instance."
         }
       },
       "required": [
-        "instanceId",
         "canvasId",
         "providerId",
-        "availability",
-        "provider"
+        "availability"
       ]
     },
     "StringOrMarkdown": {

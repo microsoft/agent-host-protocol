@@ -1,35 +1,29 @@
 {
-  "description": "canvas/updated overwrites every presented field (title, status, url, availability)",
+  "description": "canvas/updated overwrites every presented field (title, status, contentUri, availability)",
   "reducer": "canvas",
   "initial": {
-    "instanceId": "canvas-1",
     "canvasId": "markdown",
     "providerId": "acme.editors",
-    "displayName": "Markdown Editor",
     "title": "Draft",
     "status": "idle",
-    "url": "ahp-session:/2f9c/content/canvas-1",
-    "availability": "ready",
-    "provider": { "kind": "server" }
+    "contentUri": "ahp-session:/2f9c/content/canvas-1",
+    "availability": "ready"
   },
   "actions": [
     {
       "type": "canvas/updated",
       "title": "Published",
       "status": "saved",
-      "url": "https://example.com/docs/published.html",
+      "contentUri": "https://example.com/docs/published.html",
       "availability": "stale"
     }
   ],
   "expected": {
-    "instanceId": "canvas-1",
     "canvasId": "markdown",
     "providerId": "acme.editors",
-    "displayName": "Markdown Editor",
     "title": "Published",
     "status": "saved",
-    "url": "https://example.com/docs/published.html",
-    "availability": "stale",
-    "provider": { "kind": "server" }
+    "contentUri": "https://example.com/docs/published.html",
+    "availability": "stale"
   }
 }

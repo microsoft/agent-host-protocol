@@ -1310,11 +1310,11 @@
     },
     "CanvasOpenParams": {
       "type": "object",
-      "description": "Opens a canvas instance against its provider.\n\nSent by the host to the client that declared the target canvas via\n{@link SessionActiveClient.canvasProviders} (a client that also declared\n{@link ClientCapabilities.canvas}). For a server-side provider the host\nresolves the open host-internally and emits no request. The provider returns\nthe initial render target and presentation fields, which the host folds into\nthe new instance's {@link CanvasState}.\n\nMirrors the `resource*` precedent: registered in `ServerCommandMap` and\nmirrored in `CommandMap` for symmetry. A client normally never initiates it —\nthe host is not a canvas provider — and a receiver SHOULD reject a request\nwhose target is not one of its declared providers.",
+      "description": "Opens a canvas instance against its provider.\n\nSent by the host to the client that declared the target canvas via\n{@link SessionActiveClient.canvasProviders} (a client that also declared\n{@link ClientCapabilities.canvas}). For a server-side provider the host\nresolves the open host-internally and emits no request. The provider returns\nthe initial render target and presentation fields, which the host folds into\nthe new instance's {@link CanvasState}.\n\nThe host mints the instance's own `ahp-canvas:/<id>` channel URI and passes\nit as {@link channel} — the canvas comes into existence at that URI, mirroring\nhow {@link CreateTerminalParams} names the new terminal's channel. That URI is\nthe instance's sole identity for the {@link canvasInvokeOperation} /\n{@link canvasClose} that follow.\n\nMirrors the `resource*` precedent: registered in `ServerCommandMap` and\nmirrored in `CommandMap` for symmetry. A client normally never initiates it —\nthe host is not a canvas provider — and a receiver SHOULD reject a request\nwhose target is not one of its declared providers.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
-          "description": "The owning session channel URI (`ahp-session:/<uuid>`)."
+          "description": "The new instance's own channel URI (`ahp-canvas:/<id>`), minted by the host\nfor this open. Identifies the instance for every subsequent request."
         },
         "canvasId": {
           "type": "string",
@@ -1323,10 +1323,6 @@
         "providerId": {
           "type": "string",
           "description": "Owning provider id (opaque to AHP)."
-        },
-        "instanceId": {
-          "type": "string",
-          "description": "Caller-minted handle for the new instance."
         },
         "input": {
           "type": "object",
@@ -1337,17 +1333,16 @@
       "required": [
         "channel",
         "canvasId",
-        "providerId",
-        "instanceId"
+        "providerId"
       ]
     },
     "CanvasOpenResult": {
       "type": "object",
       "description": "Result of the `canvasOpen` command.",
       "properties": {
-        "url": {
-          "type": "string",
-          "description": "Initial content address for the instance (see {@link CanvasState.url})."
+        "contentUri": {
+          "$ref": "#/$defs/URI",
+          "description": "Initial content address for the instance (see {@link CanvasState.contentUri})."
         },
         "title": {
           "type": "string",
@@ -1361,23 +1356,11 @@
     },
     "CanvasInvokeOperationParams": {
       "type": "object",
-      "description": "Invokes one of a canvas's declared operations against its provider.\n\nSent by the host to the providing client (or resolved host-internally for a\nserver-side provider) when the agent invokes a\n{@link SessionCanvasOperation | declared operation} on an open instance. The\nprovider returns an opaque, provider-defined value. Registered symmetrically\nwith the rest of the provider family (see {@link CanvasOpenParams}).",
+      "description": "Invokes one of a canvas's declared operations against its provider.\n\nSent by the host to the providing client (or resolved host-internally for a\nserver-side provider) when the agent invokes a\n{@link SessionCanvasOperation | declared operation} on an open instance. The\nprovider returns an opaque, provider-defined value. Registered symmetrically\nwith the rest of the provider family (see {@link CanvasOpenParams}).\n\nTargets the instance's `ahp-canvas:/<id>` channel — the host resolves that URI\nback to its provider and canvas id — so the request carries only the\noperation name and input, mirroring how {@link InvokeChangesetOperationParams}\ntargets a changeset's own channel URI.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
-          "description": "The owning session channel URI (`ahp-session:/<uuid>`)."
-        },
-        "instanceId": {
-          "type": "string",
-          "description": "Instance handle the operation targets."
-        },
-        "canvasId": {
-          "type": "string",
-          "description": "Provider-local canvas id of the instance."
-        },
-        "providerId": {
-          "type": "string",
-          "description": "Owning provider id (opaque to AHP)."
+          "description": "The instance's channel URI (`ahp-canvas:/<id>`)."
         },
         "operationName": {
           "type": "string",
@@ -1391,9 +1374,6 @@
       },
       "required": [
         "channel",
-        "instanceId",
-        "canvasId",
-        "providerId",
         "operationName"
       ]
     },
@@ -1408,30 +1388,15 @@
     },
     "CanvasCloseParams": {
       "type": "object",
-      "description": "Closes a canvas instance against its provider.\n\nSent by the host to the providing client (or resolved host-internally for a\nserver-side provider) as part of the close flow — typically after a client\ndispatches `canvas/closeRequested`. The host then drops the instance from\n{@link SessionState.openCanvases}. Registered symmetrically with the rest of\nthe provider family (see {@link CanvasOpenParams}).",
+      "description": "Closes a canvas instance against its provider.\n\nSent by the host to the providing client (or resolved host-internally for a\nserver-side provider) as part of the close flow — typically after a client\ndispatches `canvas/closeRequested`. The host then drops the instance from\n{@link SessionState.openCanvases}. Registered symmetrically with the rest of\nthe provider family (see {@link CanvasOpenParams}).\n\nTargets the instance's `ahp-canvas:/<id>` channel, which the host resolves\nback to its provider — so the request carries nothing else.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
-          "description": "The owning session channel URI (`ahp-session:/<uuid>`)."
-        },
-        "instanceId": {
-          "type": "string",
-          "description": "Instance handle to close."
-        },
-        "canvasId": {
-          "type": "string",
-          "description": "Provider-local canvas id of the instance."
-        },
-        "providerId": {
-          "type": "string",
-          "description": "Owning provider id (opaque to AHP)."
+          "description": "The instance's channel URI (`ahp-canvas:/<id>`) to close."
         }
       },
       "required": [
-        "channel",
-        "instanceId",
-        "canvasId",
-        "providerId"
+        "channel"
       ]
     },
     "Icon": {
@@ -2333,7 +2298,7 @@
           "type": "string",
           "description": "Provider-local canvas id. Unique within `providerId`."
         },
-        "displayName": {
+        "title": {
           "type": "string",
           "description": "Human-readable canvas name."
         },
@@ -2361,7 +2326,7 @@
       "required": [
         "providerId",
         "canvasId",
-        "displayName",
+        "title",
         "description",
         "source"
       ]
@@ -2374,7 +2339,7 @@
           "type": "string",
           "description": "Provider-local canvas id, unique within the publishing client."
         },
-        "displayName": {
+        "title": {
           "type": "string",
           "description": "Human-readable canvas name."
         },
@@ -2397,13 +2362,13 @@
       },
       "required": [
         "canvasId",
-        "displayName",
+        "title",
         "description"
       ]
     },
     "OpenCanvasRef": {
       "type": "object",
-      "description": "A lightweight catalogue entry for one open canvas instance, surfaced on\n{@link SessionState.openCanvases}. The authoritative, mutable per-instance\nstate lives on the instance's own {@link CanvasState} channel; this entry\nexists so a subscriber can discover the channel URI and render it without\nsubscribing to every instance.\n\nThe instance is identified solely by its {@link channel} URI — the other\nidentity fields (`instanceId`, `providerId`) live on the full\n{@link CanvasState}, not here.",
+      "description": "A lightweight catalogue entry for one open canvas instance, surfaced on\n{@link SessionState.openCanvases}. The authoritative, mutable per-instance\nstate lives on the instance's own {@link CanvasState} channel; this entry\nexists so a subscriber can discover the channel URI and render it without\nsubscribing to every instance.\n\nThe instance is identified solely by its {@link channel} URI — the other\nidentity field (`providerId`) lives on the full {@link CanvasState}, not here.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -6181,23 +6146,15 @@
     },
     "CanvasState": {
       "type": "object",
-      "description": "Full state for a single open canvas instance, delivered when a client\nsubscribes to the instance's `ahp-canvas:/<id>` channel.\n\nOne channel exists per open instance — the same \"one channel per resource\"\nconvention used by terminals, changesets, and resource watches. The\nlightweight catalogue entry that advertises this channel is\n{@link OpenCanvasRef} on {@link SessionState.openCanvases}; this state is the\nauthoritative, mutable per-instance view a renderer reads.\n\nRendering is state-driven: a client renders the canvas by reading\n{@link url} and resolving it per the renderer's URL policy — directly for a\nreachable address, or over the general `resourceRead` command for a\ncontent-reference address. It never receives a \"render this\" request.",
+      "description": "Full state for a single open canvas instance, delivered when a client\nsubscribes to the instance's `ahp-canvas:/<id>` channel.\n\nOne channel exists per open instance — the same \"one channel per resource\"\nconvention used by terminals, changesets, and resource watches. The instance\nis identified by that channel URI alone, so this state carries no separate\ninstance handle. The lightweight catalogue entry that advertises the channel\nis {@link OpenCanvasRef} on {@link SessionState.openCanvases}; this state is\nthe authoritative, mutable per-instance view a renderer reads. The provider\nsource that backs the instance lives on its\n{@link SessionCanvasDeclaration} in {@link SessionState.canvases}, keyed by\n`(providerId, canvasId)`.\n\nRendering is state-driven: a client renders the canvas by reading\n{@link contentUri} and resolving it per the renderer's URL policy — directly\nfor a reachable address, or over the general `resourceRead` command for a\ncontent-reference address. It never receives a \"render this\" request.",
       "properties": {
-        "instanceId": {
-          "type": "string",
-          "description": "Server-assigned instance handle, unique within the session."
-        },
         "canvasId": {
           "type": "string",
           "description": "Provider-local canvas id this instance was opened from."
         },
         "providerId": {
           "type": "string",
-          "description": "Owning provider id — an opaque namespace string AHP does not interpret,\ncarried so a provider-local {@link canvasId} stays unique across providers."
-        },
-        "displayName": {
-          "type": "string",
-          "description": "Human-readable canvas name."
+          "description": "Owning provider id — an opaque namespace string AHP does not interpret,\ncarried so a provider-local {@link canvasId} stays unique across providers.\nDistinct from the provider's client connection: one client can proxy\nseveral providers."
         },
         "input": {
           "type": "object",
@@ -6212,25 +6169,19 @@
           "type": "string",
           "description": "Provider-defined status string (opaque to AHP)."
         },
-        "url": {
-          "type": "string",
-          "description": "Renderer-targeted address for the opaque canvas content — either a\ndirectly-loadable URL (`https:`, an in-process scheme, `http://localhost`)\nor a content-reference URI the renderer resolves with the general\n`resourceRead` command. Resolving over `resourceRead` keeps content flowing\nentirely over the AHP transport, so a relayed or brokered deployment —\nwhere the host is reachable only over AHP and cannot be dialed directly —\ncan still serve every byte, with no port or direct connection required. The\nrenderer dispatches on the scheme and enforces its URL policy. See\n{@link /specification/canvas-channel | Canvas Channel}."
+        "contentUri": {
+          "$ref": "#/$defs/URI",
+          "description": "Renderer-targeted address for the opaque canvas content. Clients MAY load a\ndirectly-reachable address (`https:`, an in-process scheme,\n`http://localhost`) themselves; any other scheme — or an address the\nrenderer cannot reach directly — is resolved with the general `resourceRead`\ncommand. Resolving over `resourceRead` keeps content flowing entirely over\nthe AHP transport, so a relayed or brokered deployment — where the host is\nreachable only over AHP and cannot be dialed directly — can still serve\nevery byte, with no port or direct connection required. The renderer\ndispatches on the scheme and enforces its URL policy. See\n{@link /specification/canvas-channel | Canvas Channel}."
         },
         "availability": {
           "$ref": "#/$defs/CanvasAvailability",
           "description": "Whether this instance's provider is currently available."
-        },
-        "provider": {
-          "$ref": "#/$defs/CanvasProviderSource",
-          "description": "Which provider owns the callbacks (`canvasOpen` / … ) for this instance."
         }
       },
       "required": [
-        "instanceId",
         "canvasId",
         "providerId",
-        "availability",
-        "provider"
+        "availability"
       ]
     },
     "ActionOrigin": {
@@ -8228,9 +8179,9 @@
           "type": "string",
           "description": "New provider-defined status. Absent preserves the current status."
         },
-        "url": {
-          "type": "string",
-          "description": "New content address. Absent preserves the current url."
+        "contentUri": {
+          "$ref": "#/$defs/URI",
+          "description": "New content address. Absent preserves the current contentUri."
         },
         "availability": {
           "$ref": "#/$defs/CanvasAvailability",

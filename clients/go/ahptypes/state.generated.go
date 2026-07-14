@@ -3298,7 +3298,7 @@ type SessionCanvasDeclaration struct {
 	// Provider-local canvas id. Unique within `providerId`.
 	CanvasId string `json:"canvasId"`
 	// Human-readable canvas name.
-	DisplayName string `json:"displayName"`
+	Title string `json:"title"`
 	// Human-readable description of the canvas.
 	Description string `json:"description"`
 	// JSON Schema for the canvas's open input. Opaque to AHP; mirrors the
@@ -3318,7 +3318,7 @@ type ClientCanvasDeclaration struct {
 	// Provider-local canvas id, unique within the publishing client.
 	CanvasId string `json:"canvasId"`
 	// Human-readable canvas name.
-	DisplayName string `json:"displayName"`
+	Title string `json:"title"`
 	// Human-readable description of the canvas.
 	Description string `json:"description"`
 	// JSON Schema for the canvas's open input. Opaque to AHP.
@@ -3334,8 +3334,7 @@ type ClientCanvasDeclaration struct {
 // subscribing to every instance.
 //
 // The instance is identified solely by its {@link channel} URI — the other
-// identity fields (`instanceId`, `providerId`) live on the full
-// {@link CanvasState}, not here.
+// identity field (`providerId`) lives on the full {@link CanvasState}, not here.
 type OpenCanvasRef struct {
 	// The instance's channel URI (`ahp-canvas:/<id>`). Uniquely identifies the
 	// open canvas; subscribe to it to load the full {@link CanvasState}.
@@ -3368,25 +3367,27 @@ type CanvasClientProviderSource struct {
 // subscribes to the instance's `ahp-canvas:/<id>` channel.
 //
 // One channel exists per open instance — the same "one channel per resource"
-// convention used by terminals, changesets, and resource watches. The
-// lightweight catalogue entry that advertises this channel is
-// {@link OpenCanvasRef} on {@link SessionState.openCanvases}; this state is the
-// authoritative, mutable per-instance view a renderer reads.
+// convention used by terminals, changesets, and resource watches. The instance
+// is identified by that channel URI alone, so this state carries no separate
+// instance handle. The lightweight catalogue entry that advertises the channel
+// is {@link OpenCanvasRef} on {@link SessionState.openCanvases}; this state is
+// the authoritative, mutable per-instance view a renderer reads. The provider
+// source that backs the instance lives on its
+// {@link SessionCanvasDeclaration} in {@link SessionState.canvases}, keyed by
+// `(providerId, canvasId)`.
 //
 // Rendering is state-driven: a client renders the canvas by reading
-// {@link url} and resolving it per the renderer's URL policy — directly for a
-// reachable address, or over the general `resourceRead` command for a
+// {@link contentUri} and resolving it per the renderer's URL policy — directly
+// for a reachable address, or over the general `resourceRead` command for a
 // content-reference address. It never receives a "render this" request.
 type CanvasState struct {
-	// Server-assigned instance handle, unique within the session.
-	InstanceId string `json:"instanceId"`
 	// Provider-local canvas id this instance was opened from.
 	CanvasId string `json:"canvasId"`
 	// Owning provider id — an opaque namespace string AHP does not interpret,
 	// carried so a provider-local {@link canvasId} stays unique across providers.
+	// Distinct from the provider's client connection: one client can proxy
+	// several providers.
 	ProviderId string `json:"providerId"`
-	// Human-readable canvas name.
-	DisplayName *string `json:"displayName,omitempty"`
 	// Input the agent supplied when opening the instance. Retained so the
 	// instance can be resumed or rebound after a reconnect.
 	Input map[string]json.RawMessage `json:"input,omitempty"`
@@ -3394,20 +3395,19 @@ type CanvasState struct {
 	Title *string `json:"title,omitempty"`
 	// Provider-defined status string (opaque to AHP).
 	Status *string `json:"status,omitempty"`
-	// Renderer-targeted address for the opaque canvas content — either a
-	// directly-loadable URL (`https:`, an in-process scheme, `http://localhost`)
-	// or a content-reference URI the renderer resolves with the general
-	// `resourceRead` command. Resolving over `resourceRead` keeps content flowing
-	// entirely over the AHP transport, so a relayed or brokered deployment —
-	// where the host is reachable only over AHP and cannot be dialed directly —
-	// can still serve every byte, with no port or direct connection required. The
-	// renderer dispatches on the scheme and enforces its URL policy. See
+	// Renderer-targeted address for the opaque canvas content. Clients MAY load a
+	// directly-reachable address (`https:`, an in-process scheme,
+	// `http://localhost`) themselves; any other scheme — or an address the
+	// renderer cannot reach directly — is resolved with the general `resourceRead`
+	// command. Resolving over `resourceRead` keeps content flowing entirely over
+	// the AHP transport, so a relayed or brokered deployment — where the host is
+	// reachable only over AHP and cannot be dialed directly — can still serve
+	// every byte, with no port or direct connection required. The renderer
+	// dispatches on the scheme and enforces its URL policy. See
 	// {@link /specification/canvas-channel | Canvas Channel}.
-	Url *string `json:"url,omitempty"`
+	ContentUri *URI `json:"contentUri,omitempty"`
 	// Whether this instance's provider is currently available.
 	Availability CanvasAvailability `json:"availability"`
-	// Which provider owns the callbacks (`canvasOpen` / … ) for this instance.
-	Provider CanvasProviderSource `json:"provider"`
 }
 
 // ─── Discriminated Unions ─────────────────────────────────────────────

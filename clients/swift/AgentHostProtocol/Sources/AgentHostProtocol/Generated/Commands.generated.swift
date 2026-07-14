@@ -1363,8 +1363,6 @@ public struct CanvasOpenParams: Codable, Sendable {
     public var canvasId: String
     /// Owning provider id (opaque to AHP).
     public var providerId: String
-    /// Caller-minted handle for the new instance.
-    public var instanceId: String
     /// Open input, validated by the provider against its declared schema.
     public var input: [String: AnyCodable]?
 
@@ -1372,31 +1370,29 @@ public struct CanvasOpenParams: Codable, Sendable {
         channel: String,
         canvasId: String,
         providerId: String,
-        instanceId: String,
         input: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
         self.canvasId = canvasId
         self.providerId = providerId
-        self.instanceId = instanceId
         self.input = input
     }
 }
 
 public struct CanvasOpenResult: Codable, Sendable {
-    /// Initial content address for the instance (see {@link CanvasState.url}).
-    public var url: String?
+    /// Initial content address for the instance (see {@link CanvasState.contentUri}).
+    public var contentUri: String?
     /// Initial title.
     public var title: String?
     /// Initial provider-defined status.
     public var status: String?
 
     public init(
-        url: String? = nil,
+        contentUri: String? = nil,
         title: String? = nil,
         status: String? = nil
     ) {
-        self.url = url
+        self.contentUri = contentUri
         self.title = title
         self.status = status
     }
@@ -1405,12 +1401,6 @@ public struct CanvasOpenResult: Codable, Sendable {
 public struct CanvasInvokeOperationParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
-    /// Instance handle the operation targets.
-    public var instanceId: String
-    /// Provider-local canvas id of the instance.
-    public var canvasId: String
-    /// Owning provider id (opaque to AHP).
-    public var providerId: String
     /// Declared operation name to invoke.
     public var operationName: String
     /// Operation input, validated by the provider against its declared schema.
@@ -1418,16 +1408,10 @@ public struct CanvasInvokeOperationParams: Codable, Sendable {
 
     public init(
         channel: String,
-        instanceId: String,
-        canvasId: String,
-        providerId: String,
         operationName: String,
         input: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
-        self.instanceId = instanceId
-        self.canvasId = canvasId
-        self.providerId = providerId
         self.operationName = operationName
         self.input = input
     }
@@ -1447,23 +1431,11 @@ public struct CanvasInvokeOperationResult: Codable, Sendable {
 public struct CanvasCloseParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
-    /// Instance handle to close.
-    public var instanceId: String
-    /// Provider-local canvas id of the instance.
-    public var canvasId: String
-    /// Owning provider id (opaque to AHP).
-    public var providerId: String
 
     public init(
-        channel: String,
-        instanceId: String,
-        canvasId: String,
-        providerId: String
+        channel: String
     ) {
         self.channel = channel
-        self.instanceId = instanceId
-        self.canvasId = canvasId
-        self.providerId = providerId
     }
 }
 

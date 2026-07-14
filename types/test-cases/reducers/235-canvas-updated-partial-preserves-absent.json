@@ -1,31 +1,27 @@
 {
-  "description": "canvas/updated with only title and url present preserves the absent status and availability",
+  "description": "canvas/updated with only title and contentUri present preserves the absent status and availability",
   "reducer": "canvas",
   "initial": {
-    "instanceId": "canvas-1",
     "canvasId": "markdown",
     "providerId": "acme.editors",
     "title": "Draft",
     "status": "idle",
-    "url": "ahp-session:/2f9c/content/canvas-1",
-    "availability": "ready",
-    "provider": { "kind": "client", "clientId": "client-42" }
+    "contentUri": "ahp-session:/2f9c/content/canvas-1",
+    "availability": "ready"
   },
   "actions": [
     {
       "type": "canvas/updated",
       "title": "Renamed",
-      "url": "https://example.com/docs/renamed.html"
+      "contentUri": "https://example.com/docs/renamed.html"
     }
   ],
   "expected": {
-    "instanceId": "canvas-1",
     "canvasId": "markdown",
     "providerId": "acme.editors",
     "title": "Renamed",
     "status": "idle",
-    "url": "https://example.com/docs/renamed.html",
-    "availability": "ready",
-    "provider": { "kind": "client", "clientId": "client-42" }
+    "contentUri": "https://example.com/docs/renamed.html",
+    "availability": "ready"
   }
 }

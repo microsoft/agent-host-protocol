@@ -4921,7 +4921,7 @@ public struct SessionCanvasDeclaration: Codable, Sendable {
     /// Provider-local canvas id. Unique within `providerId`.
     public var canvasId: String
     /// Human-readable canvas name.
-    public var displayName: String
+    public var title: String
     /// Human-readable description of the canvas.
     public var description: String
     /// JSON Schema for the canvas's open input. Opaque to AHP; mirrors the
@@ -4935,7 +4935,7 @@ public struct SessionCanvasDeclaration: Codable, Sendable {
     public init(
         providerId: String,
         canvasId: String,
-        displayName: String,
+        title: String,
         description: String,
         inputSchema: [String: AnyCodable]? = nil,
         operations: [SessionCanvasOperation]? = nil,
@@ -4943,7 +4943,7 @@ public struct SessionCanvasDeclaration: Codable, Sendable {
     ) {
         self.providerId = providerId
         self.canvasId = canvasId
-        self.displayName = displayName
+        self.title = title
         self.description = description
         self.inputSchema = inputSchema
         self.operations = operations
@@ -4955,7 +4955,7 @@ public struct ClientCanvasDeclaration: Codable, Sendable {
     /// Provider-local canvas id, unique within the publishing client.
     public var canvasId: String
     /// Human-readable canvas name.
-    public var displayName: String
+    public var title: String
     /// Human-readable description of the canvas.
     public var description: String
     /// JSON Schema for the canvas's open input. Opaque to AHP.
@@ -4965,13 +4965,13 @@ public struct ClientCanvasDeclaration: Codable, Sendable {
 
     public init(
         canvasId: String,
-        displayName: String,
+        title: String,
         description: String,
         inputSchema: [String: AnyCodable]? = nil,
         operations: [SessionCanvasOperation]? = nil
     ) {
         self.canvasId = canvasId
-        self.displayName = displayName
+        self.title = title
         self.description = description
         self.inputSchema = inputSchema
         self.operations = operations
@@ -5028,15 +5028,13 @@ public struct CanvasClientProviderSource: Codable, Sendable {
 }
 
 public struct CanvasState: Codable, Sendable {
-    /// Server-assigned instance handle, unique within the session.
-    public var instanceId: String
     /// Provider-local canvas id this instance was opened from.
     public var canvasId: String
     /// Owning provider id — an opaque namespace string AHP does not interpret,
     /// carried so a provider-local {@link canvasId} stays unique across providers.
+    /// Distinct from the provider's client connection: one client can proxy
+    /// several providers.
     public var providerId: String
-    /// Human-readable canvas name.
-    public var displayName: String?
     /// Input the agent supplied when opening the instance. Retained so the
     /// instance can be resumed or rebound after a reconnect.
     public var input: [String: AnyCodable]?
@@ -5044,43 +5042,36 @@ public struct CanvasState: Codable, Sendable {
     public var title: String?
     /// Provider-defined status string (opaque to AHP).
     public var status: String?
-    /// Renderer-targeted address for the opaque canvas content — either a
-    /// directly-loadable URL (`https:`, an in-process scheme, `http://localhost`)
-    /// or a content-reference URI the renderer resolves with the general
-    /// `resourceRead` command. Resolving over `resourceRead` keeps content flowing
-    /// entirely over the AHP transport, so a relayed or brokered deployment —
-    /// where the host is reachable only over AHP and cannot be dialed directly —
-    /// can still serve every byte, with no port or direct connection required. The
-    /// renderer dispatches on the scheme and enforces its URL policy. See
+    /// Renderer-targeted address for the opaque canvas content. Clients MAY load a
+    /// directly-reachable address (`https:`, an in-process scheme,
+    /// `http://localhost`) themselves; any other scheme — or an address the
+    /// renderer cannot reach directly — is resolved with the general `resourceRead`
+    /// command. Resolving over `resourceRead` keeps content flowing entirely over
+    /// the AHP transport, so a relayed or brokered deployment — where the host is
+    /// reachable only over AHP and cannot be dialed directly — can still serve
+    /// every byte, with no port or direct connection required. The renderer
+    /// dispatches on the scheme and enforces its URL policy. See
     /// {@link /specification/canvas-channel | Canvas Channel}.
-    public var url: String?
+    public var contentUri: String?
     /// Whether this instance's provider is currently available.
     public var availability: CanvasAvailability
-    /// Which provider owns the callbacks (`canvasOpen` / … ) for this instance.
-    public var provider: CanvasProviderSource
 
     public init(
-        instanceId: String,
         canvasId: String,
         providerId: String,
-        displayName: String? = nil,
         input: [String: AnyCodable]? = nil,
         title: String? = nil,
         status: String? = nil,
-        url: String? = nil,
-        availability: CanvasAvailability,
-        provider: CanvasProviderSource
+        contentUri: String? = nil,
+        availability: CanvasAvailability
     ) {
-        self.instanceId = instanceId
         self.canvasId = canvasId
         self.providerId = providerId
-        self.displayName = displayName
         self.input = input
         self.title = title
         self.status = status
-        self.url = url
+        self.contentUri = contentUri
         self.availability = availability
-        self.provider = provider
     }
 }
 

@@ -1251,6 +1251,12 @@ pub struct ChangesetOperationFollowUp {
 /// the initial render target and presentation fields, which the host folds into
 /// the new instance's {@link CanvasState}.
 ///
+/// The host mints the instance's own `ahp-canvas:/<id>` channel URI and passes
+/// it as {@link channel} — the canvas comes into existence at that URI, mirroring
+/// how {@link CreateTerminalParams} names the new terminal's channel. That URI is
+/// the instance's sole identity for the {@link canvasInvokeOperation} /
+/// {@link canvasClose} that follow.
+///
 /// Mirrors the `resource*` precedent: registered in `ServerCommandMap` and
 /// mirrored in `CommandMap` for symmetry. A client normally never initiates it —
 /// the host is not a canvas provider — and a receiver SHOULD reject a request
@@ -1264,8 +1270,6 @@ pub struct CanvasOpenParams {
     pub canvas_id: String,
     /// Owning provider id (opaque to AHP).
     pub provider_id: String,
-    /// Caller-minted handle for the new instance.
-    pub instance_id: String,
     /// Open input, validated by the provider against its declared schema.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input: Option<JsonObject>,
@@ -1275,9 +1279,9 @@ pub struct CanvasOpenParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasOpenResult {
-    /// Initial content address for the instance (see {@link CanvasState.url}).
+    /// Initial content address for the instance (see {@link CanvasState.contentUri}).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
+    pub content_uri: Option<Uri>,
     /// Initial title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -1293,17 +1297,16 @@ pub struct CanvasOpenResult {
 /// {@link SessionCanvasOperation | declared operation} on an open instance. The
 /// provider returns an opaque, provider-defined value. Registered symmetrically
 /// with the rest of the provider family (see {@link CanvasOpenParams}).
+///
+/// Targets the instance's `ahp-canvas:/<id>` channel — the host resolves that URI
+/// back to its provider and canvas id — so the request carries only the
+/// operation name and input, mirroring how {@link InvokeChangesetOperationParams}
+/// targets a changeset's own channel URI.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasInvokeOperationParams {
     /// Channel URI this command targets.
     pub channel: Uri,
-    /// Instance handle the operation targets.
-    pub instance_id: String,
-    /// Provider-local canvas id of the instance.
-    pub canvas_id: String,
-    /// Owning provider id (opaque to AHP).
-    pub provider_id: String,
     /// Declared operation name to invoke.
     pub operation_name: String,
     /// Operation input, validated by the provider against its declared schema.
@@ -1327,17 +1330,14 @@ pub struct CanvasInvokeOperationResult {
 /// dispatches `canvas/closeRequested`. The host then drops the instance from
 /// {@link SessionState.openCanvases}. Registered symmetrically with the rest of
 /// the provider family (see {@link CanvasOpenParams}).
+///
+/// Targets the instance's `ahp-canvas:/<id>` channel, which the host resolves
+/// back to its provider — so the request carries nothing else.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanvasCloseParams {
     /// Channel URI this command targets.
     pub channel: Uri,
-    /// Instance handle to close.
-    pub instance_id: String,
-    /// Provider-local canvas id of the instance.
-    pub canvas_id: String,
-    /// Owning provider id (opaque to AHP).
-    pub provider_id: String,
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

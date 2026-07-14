@@ -5,6 +5,7 @@
  */
 
 import { ActionType } from '../common/actions.js';
+import type { URI } from '../common/state.js';
 import type { CanvasAvailability } from '../channels-session/state.js';
 
 // ─── Canvas Actions ──────────────────────────────────────────────────────────
@@ -38,8 +39,8 @@ export interface CanvasUpdatedAction {
   title?: string;
   /** New provider-defined status. Absent preserves the current status. */
   status?: string;
-  /** New content address. Absent preserves the current url. */
-  url?: string;
+  /** New content address. Absent preserves the current contentUri. */
+  contentUri?: URI;
   /** New availability. Absent preserves the current availability. */
   availability?: CanvasAvailability;
 }
