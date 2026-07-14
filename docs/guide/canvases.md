@@ -194,10 +194,10 @@ sequenceDiagram
   Note over P: Provider client disconnects
   H->>R: session/openCanvasesChanged (availability: 'stale')
   H->>R: canvas/updated { availability: 'stale' }
-  Note over R: Surface shown as unavailable;<br/>invocations fail until the provider returns
+  Note over R: Surface shown as unavailable,<br/>invocations fail until the provider returns
   R->>H: canvas/closeRequested
   H->>R: session/openCanvasesChanged (instance removed)
-  Note over R: Channel goes away; subscription ends
+  Note over R: Channel goes away, subscription ends
 ```
 
 See the [Canvas Channel specification](/specification/canvas-channel) for the exact state shapes, action semantics, command signatures, and error codes.
