@@ -114,6 +114,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | CanvasState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -546,6 +547,7 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'CanvasAvailability', 'CanvasProviderKind',
 ];
 
 const STATE_STRUCTS = [
@@ -597,6 +599,8 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
+  'SessionCanvasOperation', 'SessionCanvasDeclaration', 'ClientCanvasDeclaration', 'OpenCanvasRef',
+  'CanvasServerProviderSource', 'CanvasClientProviderSource', 'CanvasState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -797,6 +801,17 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   ],
 };
 
+const CANVAS_PROVIDER_SOURCE_UNION: UnionConfig = {
+  name: 'CanvasProviderSource',
+  discriminantField: 'kind',
+  // Open union: future protocol versions may add new canvas provider kinds.
+  allowUnknown: true,
+  variants: [
+    { caseName: 'server', structName: 'CanvasServerProviderSource', discriminantValue: 'server' },
+    { caseName: 'client', structName: 'CanvasClientProviderSource', discriminantValue: 'client' },
+  ],
+};
+
 function generateToolResultContentUnion(): string {
   return `public enum ToolResultContent: Codable, Sendable {
     case text(ToolResultTextContent)
@@ -891,7 +906,7 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, or annotations state.
+  return `/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, canvas, or annotations state.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
@@ -899,6 +914,7 @@ public enum SnapshotState: Codable, Sendable {
     case terminal(TerminalState)
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
+    case canvas(CanvasState)
     case annotations(AnnotationsState)
 
     public init(from decoder: Decoder) throws {
@@ -916,6 +932,8 @@ public enum SnapshotState: Codable, Sendable {
             self = .changeset(changeset)
         } else if let resourceWatch = try? ResourceWatchState(from: decoder) {
             self = .resourceWatch(resourceWatch)
+        } else if let canvas = try? CanvasState(from: decoder) {
+            self = .canvas(canvas)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
         } else {
@@ -931,6 +949,7 @@ public enum SnapshotState: Codable, Sendable {
         case .terminal(let state): try state.encode(to: encoder)
         case .changeset(let state): try state.encode(to: encoder)
         case .resourceWatch(let state): try state.encode(to: encoder)
+        case .canvas(let state): try state.encode(to: encoder)
         case .annotations(let state): try state.encode(to: encoder)
         }
     }
@@ -1063,6 +1082,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_PROVIDER_SOURCE_UNION));
+  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1105,6 +1126,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/activityChanged', caseName: 'sessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
   { type: 'session/changesetsChanged', caseName: 'sessionChangesetsChanged', tsInterface: 'SessionChangesetsChangedAction' },
   { type: 'session/serverToolsChanged', caseName: 'sessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
+  { type: 'session/canvasesChanged', caseName: 'sessionCanvasesChanged', tsInterface: 'SessionCanvasesChangedAction' },
+  { type: 'session/openCanvasesChanged', caseName: 'sessionOpenCanvasesChanged', tsInterface: 'SessionOpenCanvasesChangedAction' },
   { type: 'session/activeClientSet', caseName: 'sessionActiveClientSet', tsInterface: 'SessionActiveClientSetAction' },
   { type: 'session/activeClientRemoved', caseName: 'sessionActiveClientRemoved', tsInterface: 'SessionActiveClientRemovedAction' },
   { type: 'session/inputNeededSet', caseName: 'sessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },
@@ -1154,6 +1177,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'terminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'terminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'resourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'canvas/updated', caseName: 'canvasUpdated', tsInterface: 'CanvasUpdatedAction' },
+  { type: 'canvas/closeRequested', caseName: 'canvasCloseRequested', tsInterface: 'CanvasCloseRequestedAction' },
 ];
 
 /** Merged struct for the approved/denied tool call confirmed action */
@@ -1350,6 +1375,9 @@ const COMMAND_STRUCTS = [
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
+  'CanvasOpenParams', 'CanvasOpenResult',
+  'CanvasInvokeOperationParams', 'CanvasInvokeOperationResult',
+  'CanvasCloseParams',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1579,11 +1607,15 @@ function generateErrorsFile(project: Project): string {
   lines.push('    public static let permissionDenied = -32009');
   lines.push('    /// The target resource already exists and the operation does not allow overwriting');
   lines.push('    public static let alreadyExists = -32010');
+  lines.push('    /// An optimistic-concurrency precondition failed: a request precondition token no longer matches the resource state');
+  lines.push('    public static let conflict = -32011');
+  lines.push('    /// A canvas provider request (canvasOpen, canvasInvokeOperation, or canvasClose) failed; `data` carries a provider-defined `{ code, message }`');
+  lines.push('    public static let canvasProviderError = -32012');
   lines.push('}');
   lines.push('');
 
   lines.push('// MARK: - Error Detail Payloads\n');
-  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData']) {
+  for (const ifaceName of ['AuthRequiredErrorData', 'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData', 'CanvasProviderErrorData']) {
     try {
       lines.push(generateStructFromInterface(project, ifaceName));
       lines.push('');
@@ -1941,10 +1973,12 @@ function checkExhaustiveness(project: Project): void {
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
+    'CanvasProviderSource',         // CANVAS_PROVIDER_SOURCE_UNION discriminated union
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'AuthRequiredErrorData',        // emitted by generateErrorsFile()
     'PermissionDeniedErrorData',    // emitted by generateErrorsFile()
     'UnsupportedProtocolVersionErrorData', // emitted by generateErrorsFile()
+    'CanvasProviderErrorData',      // emitted by generateErrorsFile()
     'AhpError',                     // typed via JsonRpcError; not a Swift struct
     'AhpErrorDetailsMap',           // type-level mapping; not a Swift struct
     'AhpErrorCode',                 // type-level alias over AhpErrorCodes const enum

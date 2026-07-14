@@ -174,6 +174,16 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	// Client can render canvases and host client-declared canvas providers — it
+	// can render an opaque canvas URL in an isolated surface, and it can answer
+	// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for canvases
+	// it declares via {@link SessionActiveClient.canvasProviders}.
+	//
+	// Hosts SHOULD only populate {@link SessionState.canvases} /
+	// {@link SessionState.openCanvases} and only route canvas requests to a
+	// client that declared this capability. Clients that omit it see no canvas
+	// surface. See {@link /specification/canvas-channel | Canvas Channel}.
+	Canvas map[string]json.RawMessage `json:"canvas,omitempty"`
 }
 
 // Identifies a protocol implementation — the software (and build) on one end
@@ -1009,6 +1019,88 @@ type ChangesetOperationFollowUp struct {
 	Content ContentRef `json:"content"`
 	// When `true`, open in an external handler rather than inline.
 	External *bool `json:"external,omitempty"`
+}
+
+// Opens a canvas instance against its provider.
+//
+// Sent by the host to the client that declared the target canvas via
+// {@link SessionActiveClient.canvasProviders} (a client that also declared
+// {@link ClientCapabilities.canvas}). For a server-side provider the host
+// resolves the open host-internally and emits no request. The provider returns
+// the initial render target and presentation fields, which the host folds into
+// the new instance's {@link CanvasState}.
+//
+// The host mints the instance's own `ahp-canvas:/<id>` channel URI and passes
+// it as {@link channel} — the canvas comes into existence at that URI, mirroring
+// how {@link CreateTerminalParams} names the new terminal's channel. That URI is
+// the instance's sole identity for the {@link canvasInvokeOperation} /
+// {@link canvasClose} that follow.
+//
+// Mirrors the `resource*` precedent: registered in `ServerCommandMap` and
+// mirrored in `CommandMap` for symmetry. A client normally never initiates it —
+// the host is not a canvas provider — and a receiver SHOULD reject a request
+// whose target is not one of its declared providers.
+type CanvasOpenParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Provider-local canvas id to open.
+	CanvasId string `json:"canvasId"`
+	// Owning provider id (opaque to AHP).
+	ProviderId string `json:"providerId"`
+	// Open input, validated by the provider against its declared schema.
+	Input map[string]json.RawMessage `json:"input,omitempty"`
+}
+
+// Result of the `canvasOpen` command.
+type CanvasOpenResult struct {
+	// Initial content address for the instance (see {@link CanvasState.contentUri}).
+	ContentUri *URI `json:"contentUri,omitempty"`
+	// Initial title.
+	Title *string `json:"title,omitempty"`
+	// Initial provider-defined status.
+	Status *string `json:"status,omitempty"`
+}
+
+// Invokes one of a canvas's declared operations against its provider.
+//
+// Sent by the host to the providing client (or resolved host-internally for a
+// server-side provider) when the agent invokes a
+// {@link SessionCanvasOperation | declared operation} on an open instance. The
+// provider returns an opaque, provider-defined value. Registered symmetrically
+// with the rest of the provider family (see {@link CanvasOpenParams}).
+//
+// Targets the instance's `ahp-canvas:/<id>` channel — the host resolves that URI
+// back to its provider and canvas id — so the request carries only the
+// operation name and input, mirroring how {@link InvokeChangesetOperationParams}
+// targets a changeset's own channel URI.
+type CanvasInvokeOperationParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Declared operation name to invoke.
+	OperationName string `json:"operationName"`
+	// Operation input, validated by the provider against its declared schema.
+	Input map[string]json.RawMessage `json:"input,omitempty"`
+}
+
+// Result of the `canvasInvokeOperation` command.
+type CanvasInvokeOperationResult struct {
+	// Opaque, provider-defined return value.
+	Value *json.RawMessage `json:"value,omitempty"`
+}
+
+// Closes a canvas instance against its provider.
+//
+// Sent by the host to the providing client (or resolved host-internally for a
+// server-side provider) as part of the close flow — typically after a client
+// dispatches `canvas/closeRequested`. The host then drops the instance from
+// {@link SessionState.openCanvases}. Registered symmetrically with the rest of
+// the provider family (see {@link CanvasOpenParams}).
+//
+// Targets the instance's `ahp-canvas:/<id>` channel, which the host resolves
+// back to its provider — so the request carries nothing else.
+type CanvasCloseParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

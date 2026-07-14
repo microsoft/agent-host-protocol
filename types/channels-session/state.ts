@@ -187,6 +187,29 @@ export interface SessionState extends SessionMetadata {
    */
   inputNeeded?: SessionInputRequest[];
   /**
+   * Aggregated canvas registry currently exposed to the agent — the union of
+   * every connected provider (server-side and client-declared). Each entry
+   * describes a canvas the agent can open; the host folds
+   * {@link SessionActiveClient.canvasProviders | client-declared providers}
+   * into this list alongside its own server-side providers.
+   *
+   * Full-replacement via `session/canvasesChanged`. Populated only when at
+   * least one connected client declared {@link ClientCapabilities.canvas};
+   * absent for sessions with no canvas surface. See
+   * {@link /specification/canvas-channel | Canvas Channel}.
+   */
+  canvases?: SessionCanvasDeclaration[];
+  /**
+   * Lightweight catalogue of currently-open canvas instances. Each entry
+   * carries the instance's `ahp-canvas:/<id>` channel URI so a subscriber can
+   * subscribe to the full {@link CanvasState} and render it — analogous to how
+   * {@link RootState.terminals} catalogues live terminals whose full state
+   * lives on each terminal channel.
+   *
+   * Full-replacement via `session/openCanvasesChanged`.
+   */
+  openCanvases?: OpenCanvasRef[];
+  /**
    * Additional provider-specific metadata for this session.
    *
    * Clients MAY look for well-known keys here to provide enhanced UI.
@@ -221,9 +244,185 @@ export interface SessionActiveClient {
    * children inside {@link SessionState.customizations}.
    */
   customizations?: ClientPluginCustomization[];
+  /**
+   * Canvas declarations this client contributes as a provider. Published
+   * atomically with the rest of the active-client entry via
+   * `session/activeClientSet` — exactly like {@link tools} — so there is no
+   * separate canvas-provider change action. The host folds these into
+   * {@link SessionState.canvases} with
+   * {@link SessionCanvasDeclaration.source | `source`} set to
+   * `{ kind: 'client', clientId }` and routes
+   * `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for them
+   * back to this client. Only meaningful for a client that declared
+   * {@link ClientCapabilities.canvas}.
+   */
+  canvasProviders?: ClientCanvasDeclaration[];
 }
 
-// ─── Session Input Requests ──────────────────────────────────────────────────
+// ─── Canvas Declarations ─────────────────────────────────────────────────────
+
+/**
+ * Availability of a canvas provider or open instance.
+ *
+ * @category Canvas Types
+ */
+export const enum CanvasAvailability {
+  /** The provider is connected and can service requests for this canvas. */
+  Ready = 'ready',
+  /**
+   * The provider is temporarily unavailable (for example, a client provider
+   * that disconnected). The entry is retained so it can be restored when the
+   * provider reconnects; in-flight requests fail until then.
+   */
+  Stale = 'stale',
+}
+
+/**
+ * Discriminant for {@link CanvasProviderSource}.
+ *
+ * @category Canvas Types
+ */
+export const enum CanvasProviderKind {
+  /** The canvas is provided by the host itself. */
+  Server = 'server',
+  /** The canvas is provided by a connected client. */
+  Client = 'client',
+}
+
+/**
+ * A canvas provided by the host. Carries no `clientId` — server-side provider
+ * requests are resolved host-internally rather than routed to a peer.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasServerProviderSource {
+  kind: CanvasProviderKind.Server;
+}
+
+/**
+ * A canvas provided by a connected client. The host routes
+ * `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for this
+ * canvas to the identified client.
+ *
+ * @category Canvas Types
+ */
+export interface CanvasClientProviderSource {
+  kind: CanvasProviderKind.Client;
+  /** `clientId` of the providing client (matches `initialize`). */
+  clientId: string;
+}
+
+/**
+ * Where a canvas declaration came from — used for request routing and for
+ * cleaning the entry up when its provider disconnects. Modeled as a
+ * discriminated union so the `clientId` is only present (and required) for the
+ * client variant.
+ *
+ * @category Canvas Types
+ */
+export type CanvasProviderSource =
+  | CanvasServerProviderSource
+  | CanvasClientProviderSource;
+
+/**
+ * One named operation a canvas exposes to the agent, mirroring the shape of a
+ * {@link ToolDefinition} entry. Unique within its owning
+ * `(providerId, canvasId)`. Named "operation" to match the changeset channel's
+ * operation vocabulary.
+ *
+ * @category Canvas Types
+ */
+export interface SessionCanvasOperation {
+  /** Operation name, unique within the owning `(providerId, canvasId)`. */
+  name: string;
+  /** Human-readable description of what the operation does. */
+  description?: string;
+  /**
+   * JSON Schema for the operation's input. Opaque to AHP; mirrors the
+   * {@link ToolDefinition.inputSchema} shape.
+   */
+  inputSchema?: Record<string, unknown>;
+}
+
+/**
+ * One entry in the aggregated {@link SessionState.canvases} registry — a canvas
+ * the agent can open, contributed by a server-side or client-declared provider.
+ *
+ * @category Canvas Types
+ */
+export interface SessionCanvasDeclaration {
+  /**
+   * Owning provider id — an opaque namespace string AHP does not interpret,
+   * carried so a provider-local {@link canvasId} stays unique across providers.
+   * Stable across declarations and instances.
+   */
+  providerId: string;
+  /** Provider-local canvas id. Unique within `providerId`. */
+  canvasId: string;
+  /** Human-readable canvas name. */
+  title: string;
+  /** Human-readable description of the canvas. */
+  description: string;
+  /**
+   * JSON Schema for the canvas's open input. Opaque to AHP; mirrors the
+   * {@link ToolDefinition.inputSchema} shape.
+   */
+  inputSchema?: Record<string, unknown>;
+  /** Operations this canvas exposes to the agent. */
+  operations?: SessionCanvasOperation[];
+  /** Where the declaration came from — for routing and cleanup. */
+  source: CanvasProviderSource;
+}
+
+/**
+ * The lighter declaration shape a client publishes on
+ * {@link SessionActiveClient.canvasProviders}. The host derives the
+ * `providerId` and {@link SessionCanvasDeclaration.source | `source`} when
+ * folding it into {@link SessionState.canvases}.
+ *
+ * @category Canvas Types
+ */
+export interface ClientCanvasDeclaration {
+  /** Provider-local canvas id, unique within the publishing client. */
+  canvasId: string;
+  /** Human-readable canvas name. */
+  title: string;
+  /** Human-readable description of the canvas. */
+  description: string;
+  /** JSON Schema for the canvas's open input. Opaque to AHP. */
+  inputSchema?: Record<string, unknown>;
+  /** Operations this canvas exposes to the agent. */
+  operations?: SessionCanvasOperation[];
+}
+
+/**
+ * A lightweight catalogue entry for one open canvas instance, surfaced on
+ * {@link SessionState.openCanvases}. The authoritative, mutable per-instance
+ * state lives on the instance's own {@link CanvasState} channel; this entry
+ * exists so a subscriber can discover the channel URI and render it without
+ * subscribing to every instance.
+ *
+ * The instance is identified solely by its {@link channel} URI — the other
+ * identity field (`providerId`) lives on the full {@link CanvasState}, not here.
+ *
+ * @category Canvas Types
+ */
+export interface OpenCanvasRef {
+  /**
+   * The instance's channel URI (`ahp-canvas:/<id>`). Uniquely identifies the
+   * open canvas; subscribe to it to load the full {@link CanvasState}.
+   */
+  channel: URI;
+  /**
+   * Provider-local canvas id this instance was opened from. Retained so a
+   * catalogue view can pick the right native renderer without subscribing.
+   */
+  canvasId: string;
+  /** Current instance title, mirrored from {@link CanvasState.title}. */
+  title?: string;
+  /** Whether the instance's provider is currently available. */
+  availability: CanvasAvailability;
+}
 
 /**
  * Discriminant for the kinds of outstanding input a session can surface in

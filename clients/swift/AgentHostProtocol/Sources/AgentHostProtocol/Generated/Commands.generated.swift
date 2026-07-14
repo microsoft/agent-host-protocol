@@ -177,11 +177,23 @@ public struct ClientCapabilities: Codable, Sendable {
     /// capability is declared. Clients that omit it MUST treat
     /// App-bearing tool calls as ordinary MCP tool calls.
     public var mcpApps: [String: AnyCodable]?
+    /// Client can render canvases and host client-declared canvas providers — it
+    /// can render an opaque canvas URL in an isolated surface, and it can answer
+    /// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for canvases
+    /// it declares via {@link SessionActiveClient.canvasProviders}.
+    ///
+    /// Hosts SHOULD only populate {@link SessionState.canvases} /
+    /// {@link SessionState.openCanvases} and only route canvas requests to a
+    /// client that declared this capability. Clients that omit it see no canvas
+    /// surface. See {@link /specification/canvas-channel | Canvas Channel}.
+    public var canvas: [String: AnyCodable]?
 
     public init(
-        mcpApps: [String: AnyCodable]? = nil
+        mcpApps: [String: AnyCodable]? = nil,
+        canvas: [String: AnyCodable]? = nil
     ) {
         self.mcpApps = mcpApps
+        self.canvas = canvas
     }
 }
 
@@ -1341,6 +1353,89 @@ public struct ChangesetOperationFollowUp: Codable, Sendable {
     ) {
         self.content = content
         self.external = external
+    }
+}
+
+public struct CanvasOpenParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Provider-local canvas id to open.
+    public var canvasId: String
+    /// Owning provider id (opaque to AHP).
+    public var providerId: String
+    /// Open input, validated by the provider against its declared schema.
+    public var input: [String: AnyCodable]?
+
+    public init(
+        channel: String,
+        canvasId: String,
+        providerId: String,
+        input: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.canvasId = canvasId
+        self.providerId = providerId
+        self.input = input
+    }
+}
+
+public struct CanvasOpenResult: Codable, Sendable {
+    /// Initial content address for the instance (see {@link CanvasState.contentUri}).
+    public var contentUri: String?
+    /// Initial title.
+    public var title: String?
+    /// Initial provider-defined status.
+    public var status: String?
+
+    public init(
+        contentUri: String? = nil,
+        title: String? = nil,
+        status: String? = nil
+    ) {
+        self.contentUri = contentUri
+        self.title = title
+        self.status = status
+    }
+}
+
+public struct CanvasInvokeOperationParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Declared operation name to invoke.
+    public var operationName: String
+    /// Operation input, validated by the provider against its declared schema.
+    public var input: [String: AnyCodable]?
+
+    public init(
+        channel: String,
+        operationName: String,
+        input: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.operationName = operationName
+        self.input = input
+    }
+}
+
+public struct CanvasInvokeOperationResult: Codable, Sendable {
+    /// Opaque, provider-defined return value.
+    public var value: AnyCodable?
+
+    public init(
+        value: AnyCodable? = nil
+    ) {
+        self.value = value
+    }
+}
+
+public struct CanvasCloseParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+
+    public init(
+        channel: String
+    ) {
+        self.channel = channel
     }
 }
 

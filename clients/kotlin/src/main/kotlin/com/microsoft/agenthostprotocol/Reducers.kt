@@ -552,6 +552,10 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
 
     is StateActionSessionServerToolsChanged -> state.copy(serverTools = action.value.tools)
 
+    is StateActionSessionCanvasesChanged -> state.copy(canvases = action.value.canvases)
+
+    is StateActionSessionOpenCanvasesChanged -> state.copy(openCanvases = action.value.openCanvases)
+
     is StateActionSessionActiveClientSet -> {
         val client = action.value.activeClient
         val idx = state.activeClients.indexOfFirst { it.clientId == client.clientId }
@@ -1554,5 +1558,25 @@ public fun annotationsReducer(state: AnnotationsState, action: StateAction): Ann
  */
 public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction): ResourceWatchState = when (action) {
     is StateActionResourceWatchChanged -> state
+    else -> state
+}
+
+/**
+ * Pure reducer for a [CanvasState]. `canvas/updated` is a sparse merge —
+ * a presented field (title, status, url, availability) overwrites the
+ * corresponding [CanvasState] field while an absent field preserves the
+ * current value. `canvas/closeRequested` is a pure client→host signal the
+ * host acts on out of band, mirroring how `terminal/input` is
+ * side-effect-only, so it returns [state] unchanged. Actions belonging to
+ * other channels (or unknown variants) are no-ops.
+ */
+public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState = when (action) {
+    is StateActionCanvasUpdated -> state.copy(
+        title = action.value.title ?: state.title,
+        status = action.value.status ?: state.status,
+        contentUri = action.value.contentUri ?: state.contentUri,
+        availability = action.value.availability ?: state.availability,
+    )
+    is StateActionCanvasCloseRequested -> state
     else -> state
 }

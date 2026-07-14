@@ -1,0 +1,19 @@
+{
+  "description": "canvas unknown action type is no-op",
+  "reducer": "canvas",
+  "initial": {
+    "canvasId": "markdown",
+    "providerId": "acme.editors",
+    "availability": "ready"
+  },
+  "actions": [
+    {
+      "type": "canvas/nonExistentAction"
+    }
+  ],
+  "expected": {
+    "canvasId": "markdown",
+    "providerId": "acme.editors",
+    "availability": "ready"
+  }
+}

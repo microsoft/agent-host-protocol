@@ -95,6 +95,16 @@ export const AhpErrorCodes = {
    * fresh token or surface the conflict to the user.
    */
   Conflict: -32011,
+  /**
+   * A canvas provider request (`canvasOpen`, `canvasInvokeOperation`, or
+   * `canvasClose`) failed. The `data` field of the JSON-RPC error MUST be a
+   * {@link CanvasProviderErrorData} carrying the provider-defined
+   * `{ code, message }` — for example a `canvas_action_no_handler` code when
+   * the provider declared the canvas but has no handler for the requested
+   * operation, or `canvas_provider_unavailable` when the provider is
+   * disconnected.
+   */
+  CanvasProviderError: -32012,
 } as const;
 
 /** Union type of all AHP application error codes. */
@@ -158,6 +168,24 @@ export interface UnsupportedProtocolVersionErrorData {
 }
 
 /**
+ * Details carried in the `data` field of a `CanvasProviderError` (-32012)
+ * error.
+ *
+ * The `code` is a provider-defined string (opaque to AHP) identifying the
+ * failure — observed values include `canvas_action_no_handler` and
+ * `canvas_provider_unavailable`. `message` is a human-readable description.
+ *
+ * @category Error Details
+ * @version 1
+ */
+export interface CanvasProviderErrorData {
+  /** Provider-defined error code identifying the failure. */
+  code: string;
+  /** Human-readable error message. */
+  message: string;
+}
+
+/**
  * Maps each AHP error code that carries structured `data` to the type of
  * that data.
  *
@@ -171,6 +199,7 @@ export interface AhpErrorDetailsMap {
   [AhpErrorCodes.AuthRequired]: AuthRequiredErrorData;
   [AhpErrorCodes.PermissionDenied]: PermissionDeniedErrorData;
   [AhpErrorCodes.UnsupportedProtocolVersion]: UnsupportedProtocolVersionErrorData;
+  [AhpErrorCodes.CanvasProviderError]: CanvasProviderErrorData;
 }
 
 /** AHP error codes that carry a structured `data` payload. */

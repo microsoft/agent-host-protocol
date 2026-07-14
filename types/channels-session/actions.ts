@@ -10,6 +10,8 @@ import type {
   ToolDefinition,
   SessionActiveClient,
   SessionInputRequest,
+  SessionCanvasDeclaration,
+  OpenCanvasRef,
   Customization,
   McpServerState,
 } from './state.js';
@@ -253,6 +255,41 @@ export interface SessionActiveClientRemovedAction {
   type: ActionType.SessionActiveClientRemoved;
   /** The `clientId` of the active client to remove. */
   clientId: string;
+}
+
+// ─── Canvas Actions ──────────────────────────────────────────────────────────
+
+/**
+ * The aggregated canvas registry for this session changed.
+ *
+ * Full-replacement semantics: the `canvases` array replaces
+ * {@link SessionState.canvases} entirely, mirroring
+ * `session/serverToolsChanged`. The host republishes the union of every
+ * connected provider (server-side and client-declared) whenever it changes.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionCanvasesChangedAction {
+  type: ActionType.SessionCanvasesChanged;
+  /** Updated canvas registry (full replacement). */
+  canvases: SessionCanvasDeclaration[];
+}
+
+/**
+ * The catalogue of open canvas instances for this session changed.
+ *
+ * Full-replacement semantics: the `openCanvases` array replaces
+ * {@link SessionState.openCanvases} entirely. The host republishes the
+ * catalogue as instances open and close.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionOpenCanvasesChangedAction {
+  type: ActionType.SessionOpenCanvasesChanged;
+  /** Updated open-instance catalogue (full replacement). */
+  openCanvases: OpenCanvasRef[];
 }
 
 // ─── Input Needed Actions ────────────────────────────────────────────────────

@@ -40,6 +40,10 @@ public enum AhpErrorCodes {
     public static let permissionDenied = -32009
     /// The target resource already exists and the operation does not allow overwriting
     public static let alreadyExists = -32010
+    /// An optimistic-concurrency precondition failed: a request precondition token no longer matches the resource state
+    public static let conflict = -32011
+    /// A canvas provider request (canvasOpen, canvasInvokeOperation, or canvasClose) failed; `data` carries a provider-defined `{ code, message }`
+    public static let canvasProviderError = -32012
 }
 
 // MARK: - Error Detail Payloads
@@ -80,5 +84,20 @@ public struct UnsupportedProtocolVersionErrorData: Codable, Sendable {
         supportedVersions: [String]
     ) {
         self.supportedVersions = supportedVersions
+    }
+}
+
+public struct CanvasProviderErrorData: Codable, Sendable {
+    /// Provider-defined error code identifying the failure.
+    public var code: String
+    /// Human-readable error message.
+    public var message: String
+
+    public init(
+        code: String,
+        message: String
+    ) {
+        self.code = code
+        self.message = message
     }
 }

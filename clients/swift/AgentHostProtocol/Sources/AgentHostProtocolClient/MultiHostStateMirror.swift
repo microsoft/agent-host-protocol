@@ -50,6 +50,7 @@ public actor MultiHostStateMirror {
     public private(set) var changesets: [HostedResourceKey: ChangesetState] = [:]
     public private(set) var annotations: [HostedResourceKey: AnnotationsState] = [:]
     public private(set) var resourceWatches: [HostedResourceKey: ResourceWatchState] = [:]
+    public private(set) var canvases: [HostedResourceKey: CanvasState] = [:]
 
     public init() {}
 
@@ -90,6 +91,11 @@ public actor MultiHostStateMirror {
             terminals[key] = terminal
             return
         }
+        if channel.hasPrefix("ahp-canvas:"), var canvas = canvases[key] {
+            canvas = canvasReducer(state: canvas, action: action)
+            canvases[key] = canvas
+            return
+        }
         if changesets[key] != nil {
             // Changesets are also seeded by `applySnapshot` and currently
             // mutated only when fresh snapshots arrive.
@@ -128,6 +134,8 @@ public actor MultiHostStateMirror {
             changesets[key] = state
         case .resourceWatch(let state):
             resourceWatches[key] = state
+        case .canvas(let state):
+            canvases[key] = state
         case .annotations(let state):
             annotations[key] = state
         }
@@ -145,6 +153,7 @@ public actor MultiHostStateMirror {
         changesets = changesets.filter { $0.key.hostId != host }
         annotations = annotations.filter { $0.key.hostId != host }
         resourceWatches = resourceWatches.filter { $0.key.hostId != host }
+        canvases = canvases.filter { $0.key.hostId != host }
     }
 
     /// Reset every host's state.
@@ -156,5 +165,6 @@ public actor MultiHostStateMirror {
         changesets.removeAll()
         annotations.removeAll()
         resourceWatches.removeAll()
+        canvases.removeAll()
     }
 }

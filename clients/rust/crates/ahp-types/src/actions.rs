@@ -13,13 +13,14 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[allow(unused_imports)]
 use crate::state::{
-    AgentInfo, AgentSelection, Annotation, AnnotationEntry, Changeset, ChangesetFile,
-    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
+    AgentInfo, AgentSelection, Annotation, AnnotationEntry, CanvasAvailability, Changeset,
+    ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, Customization, ErrorInfo, McpServerState, Message, ModelSelection,
-    PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest, TerminalClaim,
-    TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallResult, ToolDefinition, ToolResultContent, Turn, UsageInfo,
+    OpenCanvasRef, PendingMessageKind, ResponsePart, SessionActiveClient, SessionCanvasDeclaration,
+    SessionInputRequest, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolDefinition,
+    ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -185,6 +186,14 @@ pub enum ActionType {
     TerminalCommandFinished,
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged,
+    #[serde(rename = "session/canvasesChanged")]
+    SessionCanvasesChanged,
+    #[serde(rename = "session/openCanvasesChanged")]
+    SessionOpenCanvasesChanged,
+    #[serde(rename = "canvas/updated")]
+    CanvasUpdated,
+    #[serde(rename = "canvas/closeRequested")]
+    CanvasCloseRequested,
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -804,6 +813,31 @@ pub struct SessionChangesetsChangedAction {
 pub struct SessionServerToolsChangedAction {
     /// Updated server tools list (full replacement)
     pub tools: Vec<ToolDefinition>,
+}
+
+/// The aggregated canvas registry for this session changed.
+///
+/// Full-replacement semantics: the `canvases` array replaces
+/// {@link SessionState.canvases} entirely, mirroring
+/// `session/serverToolsChanged`. The host republishes the union of every
+/// connected provider (server-side and client-declared) whenever it changes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasesChangedAction {
+    /// Updated canvas registry (full replacement).
+    pub canvases: Vec<SessionCanvasDeclaration>,
+}
+
+/// The catalogue of open canvas instances for this session changed.
+///
+/// Full-replacement semantics: the `openCanvases` array replaces
+/// {@link SessionState.openCanvases} entirely. The host republishes the
+/// catalogue as instances open and close.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionOpenCanvasesChangedAction {
+    /// Updated open-instance catalogue (full replacement).
+    pub open_canvases: Vec<OpenCanvasRef>,
 }
 
 /// An active client for this session was added or updated.
@@ -1579,6 +1613,51 @@ pub struct ResourceWatchChangedAction {
     pub changes: AnyValue,
 }
 
+/// The canvas instance's presentation state changed.
+///
+/// Emitted by the server for a server-side provider, or dispatched by the client
+/// that provides the instance to push its own presentation changes — mirroring
+/// how `terminal/titleChanged` lets a client-owned terminal rename itself. This
+/// is the only path a client-side provider has to update the structured
+/// {@link CanvasState} (and the {@link OpenCanvasRef} fields mirrored from it)
+/// that other subscribers render. The host stays the authoritative reducer: it
+/// SHOULD reject an update from a client that is not the instance's resolved
+/// provider, then applies the merge and re-broadcasts to subscribers.
+///
+/// Sparse-merge semantics: each present field overwrites the corresponding
+/// {@link CanvasState} field, and an absent field preserves the current value.
+/// There is no clear-to-absent via this action — that three-state distinction
+/// cannot survive JSON transport uniformly across languages, so a provider that
+/// needs to reset a field re-publishes it, and a full reset arrives as a fresh
+/// {@link CanvasState} snapshot on (re)subscribe.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasUpdatedAction {
+    /// New title. Absent preserves the current title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// New provider-defined status. Absent preserves the current status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// New content address. Absent preserves the current contentUri.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_uri: Option<Uri>,
+    /// New availability. Absent preserves the current availability.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub availability: Option<CanvasAvailability>,
+}
+
+/// The user asked to close this canvas (e.g. hit the ✕ on the surface).
+///
+/// A pure client→host signal with a no-op reducer, mirroring how
+/// `terminal/input` is a side-effect-only client action. The host runs the
+/// close flow in response — resolving `canvasClose` against the provider and
+/// dropping the instance from {@link SessionState.openCanvases} — rather than
+/// the reducer mutating channel state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasCloseRequestedAction {}
+
 // ─── Partial Summaries ────────────────────────────────────────────────
 
 /// Partial equivalent of ChatSummary — every field is optional for delta updates.
@@ -1687,6 +1766,10 @@ pub enum StateAction {
     SessionChangesetsChanged(SessionChangesetsChangedAction),
     #[serde(rename = "session/serverToolsChanged")]
     SessionServerToolsChanged(SessionServerToolsChangedAction),
+    #[serde(rename = "session/canvasesChanged")]
+    SessionCanvasesChanged(SessionCanvasesChangedAction),
+    #[serde(rename = "session/openCanvasesChanged")]
+    SessionOpenCanvasesChanged(SessionOpenCanvasesChangedAction),
     #[serde(rename = "session/activeClientSet")]
     SessionActiveClientSet(SessionActiveClientSetAction),
     #[serde(rename = "session/activeClientRemoved")]
@@ -1783,6 +1866,10 @@ pub enum StateAction {
     TerminalCommandFinished(TerminalCommandFinishedAction),
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged(ResourceWatchChangedAction),
+    #[serde(rename = "canvas/updated")]
+    CanvasUpdated(CanvasUpdatedAction),
+    #[serde(rename = "canvas/closeRequested")]
+    CanvasCloseRequested(CanvasCloseRequestedAction),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

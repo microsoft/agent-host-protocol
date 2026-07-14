@@ -70,6 +70,13 @@ import type {
   InvokeChangesetOperationParams,
   InvokeChangesetOperationResult,
 } from '../channels-changeset/commands.js';
+import type {
+  CanvasOpenParams,
+  CanvasOpenResult,
+  CanvasInvokeOperationParams,
+  CanvasInvokeOperationResult,
+  CanvasCloseParams,
+} from '../channels-canvas/commands.js';
 
 import type { ActionEnvelope } from './actions.js';
 import type {
@@ -174,6 +181,9 @@ export interface CommandMap {
   'sessionConfigCompletions': { params: SessionConfigCompletionsParams; result: SessionConfigCompletionsResult };
   'completions': { params: CompletionsParams; result: CompletionsResult };
   'invokeChangesetOperation': { params: InvokeChangesetOperationParams; result: InvokeChangesetOperationResult };
+  'canvasOpen': { params: CanvasOpenParams; result: CanvasOpenResult };
+  'canvasInvokeOperation': { params: CanvasInvokeOperationParams; result: CanvasInvokeOperationResult };
+  'canvasClose': { params: CanvasCloseParams; result: null };
 }
 
 /**
@@ -188,6 +198,13 @@ export interface CommandMap {
  * `virtual://my-client/...` plugins) and to drive per-session filesystem
  * providers without the client having to re-implement the wire schema.
  *
+ * The `canvas*` provider family (`canvasOpen` / `canvasInvokeOperation` /
+ * `canvasClose`) is server → client: the host drives a client-declared
+ * canvas provider. It is mirrored in {@link CommandMap} for symmetry with
+ * the `resource*` precedent; a client normally never initiates it, and a
+ * receiver SHOULD reject a request whose target is not one of its declared
+ * providers.
+ *
  * @category Commands
  */
 export interface ServerCommandMap {
@@ -201,6 +218,9 @@ export interface ServerCommandMap {
   'resourceMkdir': { params: ResourceMkdirParams; result: ResourceMkdirResult };
   'resourceRequest': { params: ResourceRequestParams; result: ResourceRequestResult };
   'createResourceWatch': { params: CreateResourceWatchParams; result: CreateResourceWatchResult };
+  'canvasOpen': { params: CanvasOpenParams; result: CanvasOpenResult };
+  'canvasInvokeOperation': { params: CanvasInvokeOperationParams; result: CanvasInvokeOperationResult };
+  'canvasClose': { params: CanvasCloseParams; result: null };
 }
 
 // ─── Notification Maps ───────────────────────────────────────────────────────

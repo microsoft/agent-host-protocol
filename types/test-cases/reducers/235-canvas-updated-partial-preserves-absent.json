@@ -1,0 +1,27 @@
+{
+  "description": "canvas/updated with only title and contentUri present preserves the absent status and availability",
+  "reducer": "canvas",
+  "initial": {
+    "canvasId": "markdown",
+    "providerId": "acme.editors",
+    "title": "Draft",
+    "status": "idle",
+    "contentUri": "ahp-session:/2f9c/content/canvas-1",
+    "availability": "ready"
+  },
+  "actions": [
+    {
+      "type": "canvas/updated",
+      "title": "Renamed",
+      "contentUri": "https://example.com/docs/renamed.html"
+    }
+  ],
+  "expected": {
+    "canvasId": "markdown",
+    "providerId": "acme.editors",
+    "title": "Renamed",
+    "status": "idle",
+    "contentUri": "https://example.com/docs/renamed.html",
+    "availability": "ready"
+  }
+}

@@ -710,6 +710,42 @@ enum class ResourceChangeType {
     DELETED
 }
 
+/**
+ * Availability of a canvas provider or open instance.
+ */
+@Serializable
+enum class CanvasAvailability {
+    /**
+     * The provider is connected and can service requests for this canvas.
+     */
+    @SerialName("ready")
+    READY,
+    /**
+     * The provider is temporarily unavailable (for example, a client provider
+     * that disconnected). The entry is retained so it can be restored when the
+     * provider reconnects; in-flight requests fail until then.
+     */
+    @SerialName("stale")
+    STALE
+}
+
+/**
+ * Discriminant for {@link CanvasProviderSource}.
+ */
+@Serializable
+enum class CanvasProviderKind {
+    /**
+     * The canvas is provided by the host itself.
+     */
+    @SerialName("server")
+    SERVER,
+    /**
+     * The canvas is provided by a connected client.
+     */
+    @SerialName("client")
+    CLIENT
+}
+
 // ─── State Types ────────────────────────────────────────────────────────────
 
 @Serializable
@@ -1346,6 +1382,29 @@ data class SessionState(
      */
     val inputNeeded: List<SessionInputRequest>? = null,
     /**
+     * Aggregated canvas registry currently exposed to the agent — the union of
+     * every connected provider (server-side and client-declared). Each entry
+     * describes a canvas the agent can open; the host folds
+     * {@link SessionActiveClient.canvasProviders | client-declared providers}
+     * into this list alongside its own server-side providers.
+     *
+     * Full-replacement via `session/canvasesChanged`. Populated only when at
+     * least one connected client declared {@link ClientCapabilities.canvas};
+     * absent for sessions with no canvas surface. See
+     * {@link /specification/canvas-channel | Canvas Channel}.
+     */
+    val canvases: List<SessionCanvasDeclaration>? = null,
+    /**
+     * Lightweight catalogue of currently-open canvas instances. Each entry
+     * carries the instance's `ahp-canvas:/<id>` channel URI so a subscriber can
+     * subscribe to the full {@link CanvasState} and render it — analogous to how
+     * {@link RootState.terminals} catalogues live terminals whose full state
+     * lives on each terminal channel.
+     *
+     * Full-replacement via `session/openCanvasesChanged`.
+     */
+    val openCanvases: List<OpenCanvasRef>? = null,
+    /**
      * Additional provider-specific metadata for this session.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1378,7 +1437,20 @@ data class SessionActiveClient(
      * plugins in memory and rely on the host to expand them into concrete
      * children inside {@link SessionState.customizations}.
      */
-    val customizations: List<ClientPluginCustomization>? = null
+    val customizations: List<ClientPluginCustomization>? = null,
+    /**
+     * Canvas declarations this client contributes as a provider. Published
+     * atomically with the rest of the active-client entry via
+     * `session/activeClientSet` — exactly like {@link tools} — so there is no
+     * separate canvas-provider change action. The host folds these into
+     * {@link SessionState.canvases} with
+     * {@link SessionCanvasDeclaration.source | `source`} set to
+     * `{ kind: 'client', clientId }` and routes
+     * `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for them
+     * back to this client. Only meaningful for a client that declared
+     * {@link ClientCapabilities.canvas}.
+     */
+    val canvasProviders: List<ClientCanvasDeclaration>? = null
 )
 
 @Serializable
@@ -4315,6 +4387,163 @@ data class ResourceChange(
     val type: ResourceChangeType
 )
 
+@Serializable
+data class SessionCanvasOperation(
+    /**
+     * Operation name, unique within the owning `(providerId, canvasId)`.
+     */
+    val name: String,
+    /**
+     * Human-readable description of what the operation does.
+     */
+    val description: String? = null,
+    /**
+     * JSON Schema for the operation's input. Opaque to AHP; mirrors the
+     * {@link ToolDefinition.inputSchema} shape.
+     */
+    val inputSchema: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class SessionCanvasDeclaration(
+    /**
+     * Owning provider id — an opaque namespace string AHP does not interpret,
+     * carried so a provider-local {@link canvasId} stays unique across providers.
+     * Stable across declarations and instances.
+     */
+    val providerId: String,
+    /**
+     * Provider-local canvas id. Unique within `providerId`.
+     */
+    val canvasId: String,
+    /**
+     * Human-readable canvas name.
+     */
+    val title: String,
+    /**
+     * Human-readable description of the canvas.
+     */
+    val description: String,
+    /**
+     * JSON Schema for the canvas's open input. Opaque to AHP; mirrors the
+     * {@link ToolDefinition.inputSchema} shape.
+     */
+    val inputSchema: Map<String, JsonElement>? = null,
+    /**
+     * Operations this canvas exposes to the agent.
+     */
+    val operations: List<SessionCanvasOperation>? = null,
+    /**
+     * Where the declaration came from — for routing and cleanup.
+     */
+    val source: CanvasProviderSource
+)
+
+@Serializable
+data class ClientCanvasDeclaration(
+    /**
+     * Provider-local canvas id, unique within the publishing client.
+     */
+    val canvasId: String,
+    /**
+     * Human-readable canvas name.
+     */
+    val title: String,
+    /**
+     * Human-readable description of the canvas.
+     */
+    val description: String,
+    /**
+     * JSON Schema for the canvas's open input. Opaque to AHP.
+     */
+    val inputSchema: Map<String, JsonElement>? = null,
+    /**
+     * Operations this canvas exposes to the agent.
+     */
+    val operations: List<SessionCanvasOperation>? = null
+)
+
+@Serializable
+data class OpenCanvasRef(
+    /**
+     * The instance's channel URI (`ahp-canvas:/<id>`). Uniquely identifies the
+     * open canvas; subscribe to it to load the full {@link CanvasState}.
+     */
+    val channel: String,
+    /**
+     * Provider-local canvas id this instance was opened from. Retained so a
+     * catalogue view can pick the right native renderer without subscribing.
+     */
+    val canvasId: String,
+    /**
+     * Current instance title, mirrored from {@link CanvasState.title}.
+     */
+    val title: String? = null,
+    /**
+     * Whether the instance's provider is currently available.
+     */
+    val availability: CanvasAvailability
+)
+
+@Serializable
+data class CanvasServerProviderSource(
+    val kind: CanvasProviderKind
+)
+
+@Serializable
+data class CanvasClientProviderSource(
+    val kind: CanvasProviderKind,
+    /**
+     * `clientId` of the providing client (matches `initialize`).
+     */
+    val clientId: String
+)
+
+@Serializable
+data class CanvasState(
+    /**
+     * Provider-local canvas id this instance was opened from.
+     */
+    val canvasId: String,
+    /**
+     * Owning provider id — an opaque namespace string AHP does not interpret,
+     * carried so a provider-local {@link canvasId} stays unique across providers.
+     * Distinct from the provider's client connection: one client can proxy
+     * several providers.
+     */
+    val providerId: String,
+    /**
+     * Input the agent supplied when opening the instance. Retained so the
+     * instance can be resumed or rebound after a reconnect.
+     */
+    val input: Map<String, JsonElement>? = null,
+    /**
+     * Current instance title.
+     */
+    val title: String? = null,
+    /**
+     * Provider-defined status string (opaque to AHP).
+     */
+    val status: String? = null,
+    /**
+     * Renderer-targeted address for the opaque canvas content. Clients MAY load a
+     * directly-reachable address (`https:`, an in-process scheme,
+     * `http://localhost`) themselves; any other scheme — or an address the
+     * renderer cannot reach directly — is resolved with the general `resourceRead`
+     * command. Resolving over `resourceRead` keeps content flowing entirely over
+     * the AHP transport, so a relayed or brokered deployment — where the host is
+     * reachable only over AHP and cannot be dialed directly — can still serve
+     * every byte, with no port or direct connection required. The renderer
+     * dispatches on the scheme and enforces its URL policy. See
+     * {@link /specification/canvas-channel | Canvas Channel}.
+     */
+    val contentUri: String? = null,
+    /**
+     * Whether this instance's provider is currently available.
+     */
+    val availability: CanvasAvailability
+)
+
 // ─── Discriminated Unions ───────────────────────────────────────────────────
 
 @Serializable(with = ChatOriginSerializer::class)
@@ -5216,6 +5445,55 @@ internal object SessionInputRequestSerializer : KSerializer<SessionInputRequest>
     }
 }
 
+@Serializable(with = CanvasProviderSourceSerializer::class)
+sealed interface CanvasProviderSource
+
+@JvmInline
+value class CanvasProviderSourceServer(val value: CanvasServerProviderSource) : CanvasProviderSource
+@JvmInline
+value class CanvasProviderSourceClient(val value: CanvasClientProviderSource) : CanvasProviderSource
+/**
+ * Forward-compat catch-all for unknown CanvasProviderSource discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class CanvasProviderSourceUnknown(val raw: JsonObject) : CanvasProviderSource
+
+internal object CanvasProviderSourceSerializer : KSerializer<CanvasProviderSource> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CanvasProviderSource")
+
+    override fun deserialize(decoder: Decoder): CanvasProviderSource {
+        val input = decoder as? JsonDecoder
+            ?: error("CanvasProviderSource can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CanvasProviderSource")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return CanvasProviderSourceUnknown(obj)
+        return when (discriminant) {
+            "server" -> CanvasProviderSourceServer(input.json.decodeFromJsonElement(CanvasServerProviderSource.serializer(), element))
+            "client" -> CanvasProviderSourceClient(input.json.decodeFromJsonElement(CanvasClientProviderSource.serializer(), element))
+            else -> CanvasProviderSourceUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CanvasProviderSource) {
+        val output = encoder as? JsonEncoder
+            ?: error("CanvasProviderSource can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CanvasProviderSourceServer -> output.json.encodeToJsonElement(CanvasServerProviderSource.serializer(), value.value)
+            is CanvasProviderSourceClient -> output.json.encodeToJsonElement(CanvasClientProviderSource.serializer(), value.value)
+            is CanvasProviderSourceUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
 @Serializable(with = ToolResultContentSerializer::class)
 sealed interface ToolResultContent {
     @JvmInline value class Text(val value: ToolResultTextContent) : ToolResultContent
@@ -5278,7 +5556,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 
 /**
  * The state payload of a snapshot — root, session, chat, terminal, changeset,
- * resource-watch, or annotations state.
+ * resource-watch, canvas, or annotations state.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
@@ -5288,6 +5566,7 @@ sealed interface SnapshotState {
     @JvmInline value class Terminal(val value: TerminalState) : SnapshotState
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
+    @JvmInline value class Canvas(val value: CanvasState) : SnapshotState
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
 }
 
@@ -5304,7 +5583,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // Try the most distinctive shape first. SessionState has required
         // `lifecycle`; ChatState has required `turns`; ChangesetState has
         // required `status` + `files`; ResourceWatchState has required
-        // `root` + `recursive`; AnnotationsState has required `annotations`
+        // `root` + `recursive`; CanvasState has required `canvasId` +
+        // `provider`; AnnotationsState has required `annotations`
         // (checked after session, whose optional annotations summary reuses the
         // key); TerminalState has required `content`; RootState is the
         // catch-all.
@@ -5315,6 +5595,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.Changeset(input.json.decodeFromJsonElement(ChangesetState.serializer(), element))
             obj.containsKey("root") && obj.containsKey("recursive") ->
                 SnapshotState.ResourceWatch(input.json.decodeFromJsonElement(ResourceWatchState.serializer(), element))
+            obj.containsKey("canvasId") && obj.containsKey("provider") ->
+                SnapshotState.Canvas(input.json.decodeFromJsonElement(CanvasState.serializer(), element))
             obj.containsKey("annotations") ->
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
             obj.containsKey("content") ->
@@ -5333,6 +5615,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Terminal -> output.json.encodeToJsonElement(TerminalState.serializer(), value.value)
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)
+            is SnapshotState.Canvas -> output.json.encodeToJsonElement(CanvasState.serializer(), value.value)
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
         }
         output.encodeJsonElement(element)

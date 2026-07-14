@@ -1,0 +1,63 @@
+{
+  "description": "session/canvasesChanged replaces state.canvases with the new registry",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/canvasesChanged",
+      "canvases": [
+        {
+          "providerId": "acme.editors",
+          "canvasId": "markdown",
+          "title": "Markdown Editor",
+          "description": "Edit and preview Markdown documents.",
+          "source": { "kind": "server" }
+        },
+        {
+          "providerId": "acme.viewers",
+          "canvasId": "image",
+          "title": "Image Viewer",
+          "description": "Preview raster and vector images.",
+          "operations": [
+            { "name": "zoom", "description": "Zoom the image to a factor." }
+          ],
+          "source": { "kind": "client", "clientId": "client-42" }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "canvases": [
+      {
+        "providerId": "acme.editors",
+        "canvasId": "markdown",
+        "title": "Markdown Editor",
+        "description": "Edit and preview Markdown documents.",
+        "source": { "kind": "server" }
+      },
+      {
+        "providerId": "acme.viewers",
+        "canvasId": "image",
+        "title": "Image Viewer",
+        "description": "Preview raster and vector images.",
+        "operations": [
+          { "name": "zoom", "description": "Zoom the image to a factor." }
+        ],
+        "source": { "kind": "client", "clientId": "client-42" }
+      }
+    ],
+    "activeClients": [],
+    "chats": []
+  }
+}

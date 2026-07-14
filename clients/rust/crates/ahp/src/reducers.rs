@@ -3,8 +3,9 @@
 //! Reducers mutate state in place and return a [`ReduceOutcome`]. Use
 //! [`apply_action_to_root`], [`apply_action_to_session`],
 //! [`apply_action_to_chat`], [`apply_action_to_terminal`],
-//! [`apply_action_to_changeset`], [`apply_action_to_annotations`], and
-//! [`apply_action_to_resource_watch`] to dispatch any [`StateAction`]
+//! [`apply_action_to_changeset`], [`apply_action_to_annotations`],
+//! [`apply_action_to_resource_watch`], and [`apply_action_to_canvas`] to
+//! dispatch any [`StateAction`]
 //! against the matching scope; unrelated actions short-circuit as
 //! [`ReduceOutcome::OutOfScope`] so a client holding every state tree can
 //! blindly fan each action out.
@@ -57,16 +58,16 @@ use ahp_types::actions::{
     ChatToolCallResultConfirmedAction, ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
-    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization, ErrorInfo,
-    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalState, TerminalUnclassifiedPart, ToolCallCancellationReason,
-    ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
-    ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStreamingState, Turn,
-    TurnState,
+    ActiveTurn, AnnotationsState, CanvasState, ChangesetOperationStatus, ChangesetState,
+    ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption,
+    Customization, ErrorInfo, InputRequestResponsePart, McpServerStartingState, McpServerState,
+    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
+    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalState, TerminalUnclassifiedPart,
+    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallPendingConfirmationState,
+    ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
+    ToolCallState, ToolCallStreamingState, Turn, TurnState,
 };
 
 /// What happened when an action was applied.
@@ -675,6 +676,14 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
         }
         StateAction::SessionServerToolsChanged(a) => {
             state.server_tools = Some(a.tools.clone());
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasesChanged(a) => {
+            state.canvases = Some(a.canvases.clone());
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionOpenCanvasesChanged(a) => {
+            state.open_canvases = Some(a.open_canvases.clone());
             ReduceOutcome::Applied
         }
         StateAction::SessionActiveClientSet(a) => {
@@ -1715,6 +1724,38 @@ pub fn apply_action_to_resource_watch(
     }
 }
 
+// ─── Canvas Reducer ───────────────────────────────────────────────
+
+/// Apply a [`StateAction`] to a [`CanvasState`] in place.
+///
+/// `canvas/updated` is a sparse merge — each present field overwrites the
+/// corresponding [`CanvasState`] field and an absent field preserves the
+/// current value. `canvas/closeRequested` is a pure signal with no state
+/// effect (the host acts on it out of band), mirroring how `terminal/input`
+/// is side-effect-only. Actions targeting a different scope short-circuit as
+/// [`ReduceOutcome::OutOfScope`].
+pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::CanvasUpdated(a) => {
+            if let Some(title) = &a.title {
+                state.title = Some(title.clone());
+            }
+            if let Some(status) = &a.status {
+                state.status = Some(status.clone());
+            }
+            if let Some(content_uri) = &a.content_uri {
+                state.content_uri = Some(content_uri.clone());
+            }
+            if let Some(availability) = &a.availability {
+                state.availability = *availability;
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::CanvasCloseRequested(_) => ReduceOutcome::NoOp,
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1747,6 +1788,8 @@ mod tests {
             lifecycle: SessionLifecycle::Creating,
             creation_error: None,
             server_tools: None,
+            canvases: None,
+            open_canvases: None,
             active_clients: Vec::new(),
             chats: Vec::new(),
             default_chat: None,
@@ -2162,6 +2205,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_resource_watch,
+                    &file_name,
+                    description,
+                ),
+                "canvas" => run_fixture::<CanvasState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_canvas,
                     &file_name,
                     description,
                 ),

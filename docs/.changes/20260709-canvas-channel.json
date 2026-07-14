@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Canvas channel — an opt-in surface for the agent to open rich, interactive UI surfaces (document/spreadsheet editors, diff views, live previews) alongside a session, following the \"one channel per resource\" model of terminals and changesets. Adds the `ClientCapabilities.canvas` capability; the `SessionState.canvases` registry and `SessionState.openCanvases` catalogue (`session/canvasesChanged` / `session/openCanvasesChanged`) plus `SessionActiveClient.canvasProviders` and the `SessionCanvasDeclaration` / `ClientCanvasDeclaration` / `SessionCanvasOperation` / `OpenCanvasRef` / `CanvasProviderSource` discovery types; the per-instance `ahp-canvas:/<id>` channel and its `CanvasState`; the `canvas/updated` and `canvas/closeRequested` actions; the `canvasOpen` / `canvasInvokeOperation` / `canvasClose` provider request family; and the `CanvasProviderError` (`-32012`) error. Canvas content is resolved over the general `resourceRead` command, so it works over a relay with no direct host connection.",
+  "issues": [297]
+}

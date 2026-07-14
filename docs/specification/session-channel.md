@@ -86,6 +86,15 @@ Each entry is a [`SessionInputRequest`](/reference/session#sessioninputrequest) 
 
 Every entry carries the owning `chat` URI plus the identifiers (`request.id`, or `turnId` + `toolCall.toolCallId`) needed to construct the response. A client therefore answers by dispatching the ordinary `chat/*` action **to that chat's channel** — it does **not** need to have subscribed to the chat first. `inputNeeded` is a read/respond convenience surface, not a separate response protocol: the chat channel remains the source of truth and the host removes the aggregate entry once the chat-level request resolves.
 
+### Canvas discovery
+
+When at least one connected client declares [`ClientCapabilities.canvas`](/specification/canvas-channel#capability), the session surfaces the canvas registry and the open-instance catalogue in its state:
+
+- `SessionState.canvases` — the aggregated registry of every canvas the agent may open, replaced wholesale via `session/canvasesChanged`. The host builds it from server-side declarations plus the providers each client publishes on [`SessionActiveClient.canvasProviders`](/reference/session#sessionactiveclient).
+- `SessionState.openCanvases` — the catalogue of currently-open instances, replaced wholesale via `session/openCanvasesChanged`. Each `OpenCanvasRef` carries an `ahp-canvas:/<id>` channel URI a subscriber renders without subscribing to every instance.
+
+Both actions are server-only; a client contributes to the registry by publishing `canvasProviders` on its active-client entry, not by dispatching either action. The per-instance channel, its `CanvasState`, and the provider request family are specified on the [Canvas Channel](/specification/canvas-channel) page.
+
 ### Disposal
 
 ```jsonc

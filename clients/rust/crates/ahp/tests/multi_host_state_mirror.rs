@@ -56,6 +56,8 @@ fn session_state(title: &str, _resource: &str) -> SessionState {
         lifecycle: SessionLifecycle::Ready,
         creation_error: None,
         server_tools: None,
+        canvases: None,
+        open_canvases: None,
         active_clients: vec![],
         chats: vec![],
         default_chat: None,

@@ -1,0 +1,51 @@
+{
+  "description": "session/openCanvasesChanged replaces state.openCanvases with the new catalogue",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/openCanvasesChanged",
+      "openCanvases": [
+        {
+          "channel": "ahp-canvas:/canvas-1",
+          "canvasId": "markdown",
+          "title": "README.md",
+          "availability": "ready"
+        },
+        {
+          "channel": "ahp-canvas:/canvas-2",
+          "canvasId": "image",
+          "availability": "stale"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "openCanvases": [
+      {
+        "channel": "ahp-canvas:/canvas-1",
+        "canvasId": "markdown",
+        "title": "README.md",
+        "availability": "ready"
+      },
+      {
+        "channel": "ahp-canvas:/canvas-2",
+        "canvasId": "image",
+        "availability": "stale"
+      }
+    ],
+    "activeClients": [],
+    "chats": []
+  }
+}

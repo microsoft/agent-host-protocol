@@ -380,6 +380,24 @@ public enum ResourceChangeType: String, Codable, Sendable {
     case deleted = "deleted"
 }
 
+/// Availability of a canvas provider or open instance.
+public enum CanvasAvailability: String, Codable, Sendable {
+    /// The provider is connected and can service requests for this canvas.
+    case ready = "ready"
+    /// The provider is temporarily unavailable (for example, a client provider
+    /// that disconnected). The entry is retained so it can be restored when the
+    /// provider reconnects; in-flight requests fail until then.
+    case stale = "stale"
+}
+
+/// Discriminant for {@link CanvasProviderSource}.
+public enum CanvasProviderKind: String, Codable, Sendable {
+    /// The canvas is provided by the host itself.
+    case server = "server"
+    /// The canvas is provided by a connected client.
+    case client = "client"
+}
+
 // MARK: - State Types
 
 public struct Icon: Codable, Sendable {
@@ -1082,6 +1100,25 @@ public struct SessionState: Codable, Sendable {
     /// chats raise requests and removes them with `session/inputNeededRemoved`
     /// once the underlying request resolves.
     public var inputNeeded: [SessionInputRequest]?
+    /// Aggregated canvas registry currently exposed to the agent — the union of
+    /// every connected provider (server-side and client-declared). Each entry
+    /// describes a canvas the agent can open; the host folds
+    /// {@link SessionActiveClient.canvasProviders | client-declared providers}
+    /// into this list alongside its own server-side providers.
+    ///
+    /// Full-replacement via `session/canvasesChanged`. Populated only when at
+    /// least one connected client declared {@link ClientCapabilities.canvas};
+    /// absent for sessions with no canvas surface. See
+    /// {@link /specification/canvas-channel | Canvas Channel}.
+    public var canvases: [SessionCanvasDeclaration]?
+    /// Lightweight catalogue of currently-open canvas instances. Each entry
+    /// carries the instance's `ahp-canvas:/<id>` channel URI so a subscriber can
+    /// subscribe to the full {@link CanvasState} and render it — analogous to how
+    /// {@link RootState.terminals} catalogues live terminals whose full state
+    /// lives on each terminal channel.
+    ///
+    /// Full-replacement via `session/openCanvasesChanged`.
+    public var openCanvases: [OpenCanvasRef]?
     /// Additional provider-specific metadata for this session.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI.
@@ -1107,6 +1144,8 @@ public struct SessionState: Codable, Sendable {
         case customizations
         case changesets
         case inputNeeded
+        case canvases
+        case openCanvases
         case meta = "_meta"
     }
 
@@ -1128,6 +1167,8 @@ public struct SessionState: Codable, Sendable {
         customizations: [Customization]? = nil,
         changesets: [Changeset]? = nil,
         inputNeeded: [SessionInputRequest]? = nil,
+        canvases: [SessionCanvasDeclaration]? = nil,
+        openCanvases: [OpenCanvasRef]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.provider = provider
@@ -1147,6 +1188,8 @@ public struct SessionState: Codable, Sendable {
         self.customizations = customizations
         self.changesets = changesets
         self.inputNeeded = inputNeeded
+        self.canvases = canvases
+        self.openCanvases = openCanvases
         self.meta = meta
     }
 }
@@ -1165,17 +1208,30 @@ public struct SessionActiveClient: Codable, Sendable {
     /// plugins in memory and rely on the host to expand them into concrete
     /// children inside {@link SessionState.customizations}.
     public var customizations: [ClientPluginCustomization]?
+    /// Canvas declarations this client contributes as a provider. Published
+    /// atomically with the rest of the active-client entry via
+    /// `session/activeClientSet` — exactly like {@link tools} — so there is no
+    /// separate canvas-provider change action. The host folds these into
+    /// {@link SessionState.canvases} with
+    /// {@link SessionCanvasDeclaration.source | `source`} set to
+    /// `{ kind: 'client', clientId }` and routes
+    /// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for them
+    /// back to this client. Only meaningful for a client that declared
+    /// {@link ClientCapabilities.canvas}.
+    public var canvasProviders: [ClientCanvasDeclaration]?
 
     public init(
         clientId: String,
         displayName: String? = nil,
         tools: [ToolDefinition],
-        customizations: [ClientPluginCustomization]? = nil
+        customizations: [ClientPluginCustomization]? = nil,
+        canvasProviders: [ClientCanvasDeclaration]? = nil
     ) {
         self.clientId = clientId
         self.displayName = displayName
         self.tools = tools
         self.customizations = customizations
+        self.canvasProviders = canvasProviders
     }
 }
 
@@ -4837,6 +4893,188 @@ public struct ResourceChange: Codable, Sendable {
     }
 }
 
+public struct SessionCanvasOperation: Codable, Sendable {
+    /// Operation name, unique within the owning `(providerId, canvasId)`.
+    public var name: String
+    /// Human-readable description of what the operation does.
+    public var description: String?
+    /// JSON Schema for the operation's input. Opaque to AHP; mirrors the
+    /// {@link ToolDefinition.inputSchema} shape.
+    public var inputSchema: [String: AnyCodable]?
+
+    public init(
+        name: String,
+        description: String? = nil,
+        inputSchema: [String: AnyCodable]? = nil
+    ) {
+        self.name = name
+        self.description = description
+        self.inputSchema = inputSchema
+    }
+}
+
+public struct SessionCanvasDeclaration: Codable, Sendable {
+    /// Owning provider id — an opaque namespace string AHP does not interpret,
+    /// carried so a provider-local {@link canvasId} stays unique across providers.
+    /// Stable across declarations and instances.
+    public var providerId: String
+    /// Provider-local canvas id. Unique within `providerId`.
+    public var canvasId: String
+    /// Human-readable canvas name.
+    public var title: String
+    /// Human-readable description of the canvas.
+    public var description: String
+    /// JSON Schema for the canvas's open input. Opaque to AHP; mirrors the
+    /// {@link ToolDefinition.inputSchema} shape.
+    public var inputSchema: [String: AnyCodable]?
+    /// Operations this canvas exposes to the agent.
+    public var operations: [SessionCanvasOperation]?
+    /// Where the declaration came from — for routing and cleanup.
+    public var source: CanvasProviderSource
+
+    public init(
+        providerId: String,
+        canvasId: String,
+        title: String,
+        description: String,
+        inputSchema: [String: AnyCodable]? = nil,
+        operations: [SessionCanvasOperation]? = nil,
+        source: CanvasProviderSource
+    ) {
+        self.providerId = providerId
+        self.canvasId = canvasId
+        self.title = title
+        self.description = description
+        self.inputSchema = inputSchema
+        self.operations = operations
+        self.source = source
+    }
+}
+
+public struct ClientCanvasDeclaration: Codable, Sendable {
+    /// Provider-local canvas id, unique within the publishing client.
+    public var canvasId: String
+    /// Human-readable canvas name.
+    public var title: String
+    /// Human-readable description of the canvas.
+    public var description: String
+    /// JSON Schema for the canvas's open input. Opaque to AHP.
+    public var inputSchema: [String: AnyCodable]?
+    /// Operations this canvas exposes to the agent.
+    public var operations: [SessionCanvasOperation]?
+
+    public init(
+        canvasId: String,
+        title: String,
+        description: String,
+        inputSchema: [String: AnyCodable]? = nil,
+        operations: [SessionCanvasOperation]? = nil
+    ) {
+        self.canvasId = canvasId
+        self.title = title
+        self.description = description
+        self.inputSchema = inputSchema
+        self.operations = operations
+    }
+}
+
+public struct OpenCanvasRef: Codable, Sendable {
+    /// The instance's channel URI (`ahp-canvas:/<id>`). Uniquely identifies the
+    /// open canvas; subscribe to it to load the full {@link CanvasState}.
+    public var channel: String
+    /// Provider-local canvas id this instance was opened from. Retained so a
+    /// catalogue view can pick the right native renderer without subscribing.
+    public var canvasId: String
+    /// Current instance title, mirrored from {@link CanvasState.title}.
+    public var title: String?
+    /// Whether the instance's provider is currently available.
+    public var availability: CanvasAvailability
+
+    public init(
+        channel: String,
+        canvasId: String,
+        title: String? = nil,
+        availability: CanvasAvailability
+    ) {
+        self.channel = channel
+        self.canvasId = canvasId
+        self.title = title
+        self.availability = availability
+    }
+}
+
+public struct CanvasServerProviderSource: Codable, Sendable {
+    public var kind: CanvasProviderKind
+
+    public init(
+        kind: CanvasProviderKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct CanvasClientProviderSource: Codable, Sendable {
+    public var kind: CanvasProviderKind
+    /// `clientId` of the providing client (matches `initialize`).
+    public var clientId: String
+
+    public init(
+        kind: CanvasProviderKind,
+        clientId: String
+    ) {
+        self.kind = kind
+        self.clientId = clientId
+    }
+}
+
+public struct CanvasState: Codable, Sendable {
+    /// Provider-local canvas id this instance was opened from.
+    public var canvasId: String
+    /// Owning provider id — an opaque namespace string AHP does not interpret,
+    /// carried so a provider-local {@link canvasId} stays unique across providers.
+    /// Distinct from the provider's client connection: one client can proxy
+    /// several providers.
+    public var providerId: String
+    /// Input the agent supplied when opening the instance. Retained so the
+    /// instance can be resumed or rebound after a reconnect.
+    public var input: [String: AnyCodable]?
+    /// Current instance title.
+    public var title: String?
+    /// Provider-defined status string (opaque to AHP).
+    public var status: String?
+    /// Renderer-targeted address for the opaque canvas content. Clients MAY load a
+    /// directly-reachable address (`https:`, an in-process scheme,
+    /// `http://localhost`) themselves; any other scheme — or an address the
+    /// renderer cannot reach directly — is resolved with the general `resourceRead`
+    /// command. Resolving over `resourceRead` keeps content flowing entirely over
+    /// the AHP transport, so a relayed or brokered deployment — where the host is
+    /// reachable only over AHP and cannot be dialed directly — can still serve
+    /// every byte, with no port or direct connection required. The renderer
+    /// dispatches on the scheme and enforces its URL policy. See
+    /// {@link /specification/canvas-channel | Canvas Channel}.
+    public var contentUri: String?
+    /// Whether this instance's provider is currently available.
+    public var availability: CanvasAvailability
+
+    public init(
+        canvasId: String,
+        providerId: String,
+        input: [String: AnyCodable]? = nil,
+        title: String? = nil,
+        status: String? = nil,
+        contentUri: String? = nil,
+        availability: CanvasAvailability
+    ) {
+        self.canvasId = canvasId
+        self.providerId = providerId
+        self.input = input
+        self.title = title
+        self.status = status
+        self.contentUri = contentUri
+        self.availability = availability
+    }
+}
+
 // MARK: - Discriminated Unions
 
 public struct ChatOriginUser: Codable, Sendable {
@@ -5502,6 +5740,39 @@ public enum SessionInputRequest: Codable, Sendable {
     }
 }
 
+public enum CanvasProviderSource: Codable, Sendable {
+    case server(CanvasServerProviderSource)
+    case client(CanvasClientProviderSource)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "server":
+            self = .server(try CanvasServerProviderSource(from: decoder))
+        case "client":
+            self = .client(try CanvasClientProviderSource(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .server(let value): try value.encode(to: encoder)
+        case .client(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
 public enum ToolResultContent: Codable, Sendable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
@@ -5561,7 +5832,7 @@ public enum ToolResultContent: Codable, Sendable {
     }
 }
 
-/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, or annotations state.
+/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, canvas, or annotations state.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
@@ -5569,6 +5840,7 @@ public enum SnapshotState: Codable, Sendable {
     case terminal(TerminalState)
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
+    case canvas(CanvasState)
     case annotations(AnnotationsState)
 
     public init(from decoder: Decoder) throws {
@@ -5586,6 +5858,8 @@ public enum SnapshotState: Codable, Sendable {
             self = .changeset(changeset)
         } else if let resourceWatch = try? ResourceWatchState(from: decoder) {
             self = .resourceWatch(resourceWatch)
+        } else if let canvas = try? CanvasState(from: decoder) {
+            self = .canvas(canvas)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
         } else {
@@ -5601,6 +5875,7 @@ public enum SnapshotState: Codable, Sendable {
         case .terminal(let state): try state.encode(to: encoder)
         case .changeset(let state): try state.encode(to: encoder)
         case .resourceWatch(let state): try state.encode(to: encoder)
+        case .canvas(let state): try state.encode(to: encoder)
         case .annotations(let state): try state.encode(to: encoder)
         }
     }

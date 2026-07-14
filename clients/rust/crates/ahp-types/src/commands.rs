@@ -203,6 +203,17 @@ pub struct ClientCapabilities {
     /// App-bearing tool calls as ordinary MCP tool calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
+    /// Client can render canvases and host client-declared canvas providers — it
+    /// can render an opaque canvas URL in an isolated surface, and it can answer
+    /// `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for canvases
+    /// it declares via {@link SessionActiveClient.canvasProviders}.
+    ///
+    /// Hosts SHOULD only populate {@link SessionState.canvases} /
+    /// {@link SessionState.openCanvases} and only route canvas requests to a
+    /// client that declared this capability. Clients that omit it see no canvas
+    /// surface. See {@link /specification/canvas-channel | Canvas Channel}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvas: Option<JsonObject>,
 }
 
 /// Identifies a protocol implementation — the software (and build) on one end
@@ -1229,6 +1240,104 @@ pub struct ChangesetOperationFollowUp {
     /// When `true`, open in an external handler rather than inline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external: Option<bool>,
+}
+
+/// Opens a canvas instance against its provider.
+///
+/// Sent by the host to the client that declared the target canvas via
+/// {@link SessionActiveClient.canvasProviders} (a client that also declared
+/// {@link ClientCapabilities.canvas}). For a server-side provider the host
+/// resolves the open host-internally and emits no request. The provider returns
+/// the initial render target and presentation fields, which the host folds into
+/// the new instance's {@link CanvasState}.
+///
+/// The host mints the instance's own `ahp-canvas:/<id>` channel URI and passes
+/// it as {@link channel} — the canvas comes into existence at that URI, mirroring
+/// how {@link CreateTerminalParams} names the new terminal's channel. That URI is
+/// the instance's sole identity for the {@link canvasInvokeOperation} /
+/// {@link canvasClose} that follow.
+///
+/// Mirrors the `resource*` precedent: registered in `ServerCommandMap` and
+/// mirrored in `CommandMap` for symmetry. A client normally never initiates it —
+/// the host is not a canvas provider — and a receiver SHOULD reject a request
+/// whose target is not one of its declared providers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasOpenParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Provider-local canvas id to open.
+    pub canvas_id: String,
+    /// Owning provider id (opaque to AHP).
+    pub provider_id: String,
+    /// Open input, validated by the provider against its declared schema.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<JsonObject>,
+}
+
+/// Result of the `canvasOpen` command.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasOpenResult {
+    /// Initial content address for the instance (see {@link CanvasState.contentUri}).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_uri: Option<Uri>,
+    /// Initial title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Initial provider-defined status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+}
+
+/// Invokes one of a canvas's declared operations against its provider.
+///
+/// Sent by the host to the providing client (or resolved host-internally for a
+/// server-side provider) when the agent invokes a
+/// {@link SessionCanvasOperation | declared operation} on an open instance. The
+/// provider returns an opaque, provider-defined value. Registered symmetrically
+/// with the rest of the provider family (see {@link CanvasOpenParams}).
+///
+/// Targets the instance's `ahp-canvas:/<id>` channel — the host resolves that URI
+/// back to its provider and canvas id — so the request carries only the
+/// operation name and input, mirroring how {@link InvokeChangesetOperationParams}
+/// targets a changeset's own channel URI.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasInvokeOperationParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Declared operation name to invoke.
+    pub operation_name: String,
+    /// Operation input, validated by the provider against its declared schema.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<JsonObject>,
+}
+
+/// Result of the `canvasInvokeOperation` command.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasInvokeOperationResult {
+    /// Opaque, provider-defined return value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<AnyValue>,
+}
+
+/// Closes a canvas instance against its provider.
+///
+/// Sent by the host to the providing client (or resolved host-internally for a
+/// server-side provider) as part of the close flow — typically after a client
+/// dispatches `canvas/closeRequested`. The host then drops the instance from
+/// {@link SessionState.openCanvases}. Registered symmetrically with the rest of
+/// the provider family (see {@link CanvasOpenParams}).
+///
+/// Targets the instance's `ahp-canvas:/<id>` channel, which the host resolves
+/// back to its provider — so the request carries nothing else.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasCloseParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
 }
 
 // ─── ReconnectResult Union ────────────────────────────────────────────

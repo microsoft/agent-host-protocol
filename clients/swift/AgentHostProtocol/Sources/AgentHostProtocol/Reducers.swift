@@ -630,6 +630,16 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         next.serverTools = a.tools
         return next
 
+    case .sessionCanvasesChanged(let a):
+        var next = state
+        next.canvases = a.canvases
+        return next
+
+    case .sessionOpenCanvasesChanged(let a):
+        var next = state
+        next.openCanvases = a.openCanvases
+        return next
+
     case .sessionActiveClientSet(let a):
         var next = state
         if let idx = next.activeClients.firstIndex(where: { $0.clientId == a.activeClient.clientId }) {
@@ -1285,6 +1295,36 @@ public func annotationsReducer(state: AnnotationsState, action: StateAction) -> 
 public func resourceWatchReducer(state: ResourceWatchState, action: StateAction) -> ResourceWatchState {
     switch action {
     case .resourceWatchChanged:
+        return state
+
+    default:
+        return state
+    }
+}
+
+// MARK: - Canvas Reducer
+
+/// Pure reducer for canvas state. Handles every canvas action.
+///
+/// `canvas/updated` is a sparse merge — a presented field (title, status, url,
+/// availability) overwrites the corresponding `CanvasState` field while an
+/// absent field preserves the current value. `canvas/closeRequested` is a
+/// pure client→host signal the host acts on out of band, mirroring how
+/// `terminal/input` is side-effect-only, so it leaves the state unchanged.
+/// Unknown action types degrade gracefully so a client speaking an older
+/// protocol stays correct if the server adds new `canvas/*` actions in a
+/// future version.
+public func canvasReducer(state: CanvasState, action: StateAction) -> CanvasState {
+    switch action {
+    case .canvasUpdated(let a):
+        var next = state
+        if let title = a.title { next.title = title }
+        if let status = a.status { next.status = status }
+        if let contentUri = a.contentUri { next.contentUri = contentUri }
+        if let availability = a.availability { next.availability = availability }
+        return next
+
+    case .canvasCloseRequested:
         return state
 
     default:

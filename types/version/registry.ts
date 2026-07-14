@@ -156,6 +156,10 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.TerminalCommandExecuted]: '0.1.0',
   [ActionType.TerminalCommandFinished]: '0.1.0',
   [ActionType.ResourceWatchChanged]: '0.2.0',
+  [ActionType.SessionCanvasesChanged]: '0.6.0',
+  [ActionType.SessionOpenCanvasesChanged]: '0.6.0',
+  [ActionType.CanvasUpdated]: '0.6.0',
+  [ActionType.CanvasCloseRequested]: '0.6.0',
 };
 
 /**

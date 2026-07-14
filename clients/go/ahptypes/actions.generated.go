@@ -98,6 +98,10 @@ const (
 	ActionTypeTerminalCommandExecuted           ActionType = "terminal/commandExecuted"
 	ActionTypeTerminalCommandFinished           ActionType = "terminal/commandFinished"
 	ActionTypeResourceWatchChanged              ActionType = "resourceWatch/changed"
+	ActionTypeSessionCanvasesChanged            ActionType = "session/canvasesChanged"
+	ActionTypeSessionOpenCanvasesChanged        ActionType = "session/openCanvasesChanged"
+	ActionTypeCanvasUpdated                     ActionType = "canvas/updated"
+	ActionTypeCanvasCloseRequested              ActionType = "canvas/closeRequested"
 )
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -764,6 +768,29 @@ type SessionServerToolsChangedAction struct {
 	Tools []ToolDefinition `json:"tools"`
 }
 
+// The aggregated canvas registry for this session changed.
+//
+// Full-replacement semantics: the `canvases` array replaces
+// {@link SessionState.canvases} entirely, mirroring
+// `session/serverToolsChanged`. The host republishes the union of every
+// connected provider (server-side and client-declared) whenever it changes.
+type SessionCanvasesChangedAction struct {
+	Type ActionType `json:"type"`
+	// Updated canvas registry (full replacement).
+	Canvases []SessionCanvasDeclaration `json:"canvases"`
+}
+
+// The catalogue of open canvas instances for this session changed.
+//
+// Full-replacement semantics: the `openCanvases` array replaces
+// {@link SessionState.openCanvases} entirely. The host republishes the
+// catalogue as instances open and close.
+type SessionOpenCanvasesChangedAction struct {
+	Type ActionType `json:"type"`
+	// Updated open-instance catalogue (full replacement).
+	OpenCanvases []OpenCanvasRef `json:"openCanvases"`
+}
+
 // An active client for this session was added or updated.
 //
 // Upsert semantics keyed by {@link SessionActiveClient.clientId | `clientId`}:
@@ -1342,6 +1369,46 @@ type ResourceWatchChangedAction struct {
 	Changes json.RawMessage `json:"changes"`
 }
 
+// The canvas instance's presentation state changed.
+//
+// Emitted by the server for a server-side provider, or dispatched by the client
+// that provides the instance to push its own presentation changes — mirroring
+// how `terminal/titleChanged` lets a client-owned terminal rename itself. This
+// is the only path a client-side provider has to update the structured
+// {@link CanvasState} (and the {@link OpenCanvasRef} fields mirrored from it)
+// that other subscribers render. The host stays the authoritative reducer: it
+// SHOULD reject an update from a client that is not the instance's resolved
+// provider, then applies the merge and re-broadcasts to subscribers.
+//
+// Sparse-merge semantics: each present field overwrites the corresponding
+// {@link CanvasState} field, and an absent field preserves the current value.
+// There is no clear-to-absent via this action — that three-state distinction
+// cannot survive JSON transport uniformly across languages, so a provider that
+// needs to reset a field re-publishes it, and a full reset arrives as a fresh
+// {@link CanvasState} snapshot on (re)subscribe.
+type CanvasUpdatedAction struct {
+	Type ActionType `json:"type"`
+	// New title. Absent preserves the current title.
+	Title *string `json:"title,omitempty"`
+	// New provider-defined status. Absent preserves the current status.
+	Status *string `json:"status,omitempty"`
+	// New content address. Absent preserves the current contentUri.
+	ContentUri *URI `json:"contentUri,omitempty"`
+	// New availability. Absent preserves the current availability.
+	Availability *CanvasAvailability `json:"availability,omitempty"`
+}
+
+// The user asked to close this canvas (e.g. hit the ✕ on the surface).
+//
+// A pure client→host signal with a no-op reducer, mirroring how
+// `terminal/input` is a side-effect-only client action. The host runs the
+// close flow in response — resolving `canvasClose` against the provider and
+// dropping the instance from {@link SessionState.openCanvases} — rather than
+// the reducer mutating channel state.
+type CanvasCloseRequestedAction struct {
+	Type ActionType `json:"type"`
+}
+
 // ─── StateAction Union ───────────────────────────────────────────────
 
 // StateAction is the discriminated union of every state action.
@@ -1393,6 +1460,8 @@ func (*SessionIsArchivedChangedAction) isStateAction()          {}
 func (*SessionActivityChangedAction) isStateAction()            {}
 func (*SessionChangesetsChangedAction) isStateAction()          {}
 func (*SessionServerToolsChangedAction) isStateAction()         {}
+func (*SessionCanvasesChangedAction) isStateAction()            {}
+func (*SessionOpenCanvasesChangedAction) isStateAction()        {}
 func (*SessionActiveClientSetAction) isStateAction()            {}
 func (*SessionActiveClientRemovedAction) isStateAction()        {}
 func (*SessionInputNeededSetAction) isStateAction()             {}
@@ -1432,6 +1501,8 @@ func (*TerminalCommandDetectionAvailableAction) isStateAction() {}
 func (*TerminalCommandExecutedAction) isStateAction()           {}
 func (*TerminalCommandFinishedAction) isStateAction()           {}
 func (*ResourceWatchChangedAction) isStateAction()              {}
+func (*CanvasUpdatedAction) isStateAction()                     {}
+func (*CanvasCloseRequestedAction) isStateAction()              {}
 
 // StateActionUnknown carries an unrecognized StateAction variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type StateActionUnknown struct {
@@ -1687,6 +1758,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
+	case "session/canvasesChanged":
+		var value SessionCanvasesChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/openCanvasesChanged":
+		var value SessionOpenCanvasesChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
 	case "session/activeClientSet":
 		var value SessionActiveClientSetAction
 		if err := json.Unmarshal(data, &value); err != nil {
@@ -1917,6 +2000,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "resourceWatch/changed":
 		var value ResourceWatchChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/updated":
+		var value CanvasUpdatedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/closeRequested":
+		var value CanvasCloseRequestedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

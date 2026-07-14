@@ -2,9 +2,9 @@
  * Markdown Generator — Generates VitePress-compatible reference markdown from
  * TypeScript type definitions parsed via ts-morph.
  *
- * Emits one page per channel (common, root, session, terminal, changeset)
- * plus error-codes and a flat messages overview. Each per-channel page has
- * sections in this fixed order, only emitting sections with content:
+ * Emits one page per channel (common, root, session, terminal, changeset,
+ * canvas) plus error-codes and a flat messages overview. Each per-channel page
+ * has sections in this fixed order, only emitting sections with content:
  *
  * 1. State Types  — interfaces, type aliases, and const enums declared in
  *    the channel's `state.ts` (plus a few cross-cutting types on the common
@@ -54,6 +54,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-chat': 'chat',
   'channels-terminal': 'terminal',
   'channels-changeset': 'changeset',
+  'channels-canvas': 'canvas',
   'channels-annotations': 'annotations',
   'channels-otlp': 'otlp',
 };
@@ -1034,6 +1035,35 @@ function generateChangesetChannelPage(project: Project): string {
   return lines.join('\n');
 }
 
+function generateCanvasChannelPage(project: Project): string {
+  currentPage = 'canvas';
+  const stateSf = findChannelSourceFile(project, 'channels-canvas', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-canvas', 'actions.ts');
+  const commandsSf = findChannelSourceFile(project, 'channels-canvas', 'commands.ts');
+
+  const lines: string[] = [GENERATED_HEADER];
+  lines.push('# Canvas Channel\n');
+  lines.push('Reference for the `ahp-canvas:/<id>` channel — rich, interactive UI surfaces the agent can open alongside a session (document editors, live previews, data dashboards) that clients render from state and drive through a small provider request family. The discovery types (`SessionCanvasDeclaration`, `OpenCanvasRef`, `CanvasProviderSource`) live on the [Session Channel](/reference/session). See the [Canvases guide](/guide/canvases) and [Canvas Channel specification](/specification/canvas-channel) for an overview of the model.\n');
+  lines.push(schemaLink('state.schema.json'));
+
+  if (stateSf) {
+    lines.push('## State Types\n');
+    lines.push(emitStateTypesSection([stateSf]));
+  }
+  if (actionsSf) {
+    lines.push('## Actions\n');
+    lines.push('Mutate `CanvasState`. Scoped to a canvas instance URI via the enclosing `ActionEnvelope.channel`.\n');
+    lines.push(schemaLink('actions.schema.json'));
+    lines.push(emitActionsSection([actionsSf]));
+  }
+  if (commandsSf) {
+    lines.push('## Commands\n');
+    lines.push(schemaLink('commands.schema.json'));
+    lines.push(emitCommandsSection(project, [commandsSf]));
+  }
+  return lines.join('\n');
+}
+
 function generateAnnotationsChannelPage(project: Project): string {
   currentPage = 'annotations';
   const stateSf = findChannelSourceFile(project, 'channels-annotations', 'state.ts');
@@ -1304,6 +1334,7 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'chat.md', generator: generateChatChannelPage },
     { filename: 'terminal.md', generator: generateTerminalChannelPage },
     { filename: 'changeset.md', generator: generateChangesetChannelPage },
+    { filename: 'canvas.md', generator: generateCanvasChannelPage },
     { filename: 'annotations.md', generator: generateAnnotationsChannelPage },
     { filename: 'otlp.md', generator: generateOtlpChannelPage },
     { filename: 'messages.md', generator: generateMessagesPage },

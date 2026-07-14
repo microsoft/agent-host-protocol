@@ -218,7 +218,19 @@ data class ClientCapabilities(
      * capability is declared. Clients that omit it MUST treat
      * App-bearing tool calls as ordinary MCP tool calls.
      */
-    val mcpApps: Map<String, JsonElement>? = null
+    val mcpApps: Map<String, JsonElement>? = null,
+    /**
+     * Client can render canvases and host client-declared canvas providers — it
+     * can render an opaque canvas URL in an isolated surface, and it can answer
+     * `canvasOpen` / `canvasInvokeOperation` / `canvasClose` requests for canvases
+     * it declares via {@link SessionActiveClient.canvasProviders}.
+     *
+     * Hosts SHOULD only populate {@link SessionState.canvases} /
+     * {@link SessionState.openCanvases} and only route canvas requests to a
+     * client that declared this capability. Clients that omit it see no canvas
+     * surface. See {@link /specification/canvas-channel | Canvas Channel}.
+     */
+    val canvas: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -1169,6 +1181,74 @@ data class ChangesetOperationFollowUp(
      * When `true`, open in an external handler rather than inline.
      */
     val external: Boolean? = null
+)
+
+@Serializable
+data class CanvasOpenParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Provider-local canvas id to open.
+     */
+    val canvasId: String,
+    /**
+     * Owning provider id (opaque to AHP).
+     */
+    val providerId: String,
+    /**
+     * Open input, validated by the provider against its declared schema.
+     */
+    val input: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class CanvasOpenResult(
+    /**
+     * Initial content address for the instance (see {@link CanvasState.contentUri}).
+     */
+    val contentUri: String? = null,
+    /**
+     * Initial title.
+     */
+    val title: String? = null,
+    /**
+     * Initial provider-defined status.
+     */
+    val status: String? = null
+)
+
+@Serializable
+data class CanvasInvokeOperationParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Declared operation name to invoke.
+     */
+    val operationName: String,
+    /**
+     * Operation input, validated by the provider against its declared schema.
+     */
+    val input: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class CanvasInvokeOperationResult(
+    /**
+     * Opaque, provider-defined return value.
+     */
+    val value: JsonElement? = null
+)
+
+@Serializable
+data class CanvasCloseParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String
 )
 
 // ─── ReconnectResult Union ──────────────────────────────────────────────────

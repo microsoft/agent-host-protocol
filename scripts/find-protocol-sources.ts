@@ -24,6 +24,7 @@ export const PROTOCOL_SOURCE_DIRS: readonly string[] = [
   'channels-annotations',
   'channels-otlp',
   'channels-resource-watch',
+  'channels-canvas',
 ];
 
 /**

@@ -158,6 +158,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | CanvasState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -659,6 +660,7 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'CanvasAvailability', 'CanvasProviderKind',
 ];
 
 /**
@@ -802,6 +804,13 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
   { name: 'ResourceChange' },
+  { name: 'SessionCanvasOperation' },
+  { name: 'SessionCanvasDeclaration' },
+  { name: 'ClientCanvasDeclaration' },
+  { name: 'OpenCanvasRef' },
+  { name: 'CanvasServerProviderSource', omitDiscriminants: true },
+  { name: 'CanvasClientProviderSource', omitDiscriminants: true },
+  { name: 'CanvasState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1019,6 +1028,17 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const CANVAS_PROVIDER_SOURCE_UNION: UnionConfig = {
+  name: 'CanvasProviderSource',
+  discriminantField: 'kind',
+  doc: 'Where a canvas declaration came from — used for request routing and cleanup when its provider disconnects.',
+  variants: [
+    { variantName: 'Server', innerType: 'CanvasServerProviderSource', wireValue: 'server' },
+    { variantName: 'Client', innerType: 'CanvasClientProviderSource', wireValue: 'client' },
+  ],
+  unknown: true,
+};
+
 function generateChatOrigin(): string {
   return `/// How a chat came into existence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1054,12 +1074,13 @@ pub enum ChatOrigin {
 
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot — root, session, chat, terminal,
-/// changeset, resource-watch, or annotations state.
+/// changeset, resource-watch, canvas, or annotations state.
 ///
 /// Deserialized by trying session first (has required \`lifecycle\`), then
 /// chat (has required \`turns\`), then terminal (has required \`content\`),
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
-/// (has required \`root\` and \`recursive\`), then annotations (has required
+/// (has required \`root\` and \`recursive\`), then canvas (has required
+/// \`canvasId\` and \`provider\`), then annotations (has required
 /// \`annotations\`), then root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -1069,6 +1090,7 @@ pub enum SnapshotState {
     Terminal(Box<TerminalState>),
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
+    Canvas(Box<CanvasState>),
     Annotations(Box<AnnotationsState>),
     Root(Box<RootState>),
 }`;
@@ -1141,6 +1163,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(CANVAS_PROVIDER_SOURCE_UNION));
+  lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
 
@@ -1188,6 +1212,8 @@ const ACTION_VARIANTS: {
   { type: 'session/activityChanged', variantName: 'SessionActivityChanged', tsInterface: 'SessionActivityChangedAction' },
   { type: 'session/changesetsChanged', variantName: 'SessionChangesetsChanged', tsInterface: 'SessionChangesetsChangedAction' },
   { type: 'session/serverToolsChanged', variantName: 'SessionServerToolsChanged', tsInterface: 'SessionServerToolsChangedAction' },
+  { type: 'session/canvasesChanged', variantName: 'SessionCanvasesChanged', tsInterface: 'SessionCanvasesChangedAction' },
+  { type: 'session/openCanvasesChanged', variantName: 'SessionOpenCanvasesChanged', tsInterface: 'SessionOpenCanvasesChangedAction' },
   { type: 'session/activeClientSet', variantName: 'SessionActiveClientSet', tsInterface: 'SessionActiveClientSetAction' },
   { type: 'session/activeClientRemoved', variantName: 'SessionActiveClientRemoved', tsInterface: 'SessionActiveClientRemovedAction' },
   { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction', boxed: true },
@@ -1236,6 +1262,8 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'canvas/updated', variantName: 'CanvasUpdated', tsInterface: 'CanvasUpdatedAction' },
+  { type: 'canvas/closeRequested', variantName: 'CanvasCloseRequested', tsInterface: 'CanvasCloseRequestedAction' },
 ];
 
 function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Session'): string {
@@ -1274,7 +1302,7 @@ pub struct ${scope}ToolCallConfirmedAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary, CanvasAvailability, OpenCanvasRef, SessionCanvasDeclaration};');
   lines.push('');
 
   // ActionType enum
@@ -1408,6 +1436,9 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'CompletionsParams' }, { name: 'CompletionItem' }, { name: 'CompletionsResult' },
   { name: 'InvokeChangesetOperationParams' }, { name: 'InvokeChangesetOperationResult' },
   { name: 'ChangesetOperationFollowUp' },
+  { name: 'CanvasOpenParams' }, { name: 'CanvasOpenResult' },
+  { name: 'CanvasInvokeOperationParams' }, { name: 'CanvasInvokeOperationResult' },
+  { name: 'CanvasCloseParams' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1630,6 +1661,8 @@ pub mod ahp_error_codes {
     pub const ALREADY_EXISTS: i32 = -32010;
     /// An optimistic-concurrency precondition failed: a request's precondition token (e.g. \`ResourceWriteParams.if_match\`) no longer matches the resource's current state.
     pub const CONFLICT: i32 = -32011;
+    /// A canvas provider request (\`canvasOpen\`, \`canvasInvokeOperation\`, or \`canvasClose\`) failed; the error \`data\` carries a provider-defined \`{ code, message }\`.
+    pub const CANVAS_PROVIDER_ERROR: i32 = -32012;
 }
 
 /// Type alias: AHP application error code.
@@ -1667,6 +1700,17 @@ pub struct UnsupportedProtocolVersionErrorData {
     /// either a SemVer \`MAJOR.MINOR.PATCH\` string (e.g. \`"0.1.0"\`) or a
     /// SemVer range constraint (e.g. \`">=0.1.0 <0.3.0"\` or \`"^0.2.0"\`).
     pub supported_versions: Vec<String>,
+}
+
+/// Details carried in the \`data\` field of a \`CanvasProviderError\` (-32012)
+/// error.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasProviderErrorData {
+    /// Provider-defined error code identifying the failure.
+    pub code: String,
+    /// Human-readable error message.
+    pub message: String,
 }
 `;
 }
@@ -1840,11 +1884,13 @@ function checkExhaustiveness(project: Project): void {
     'McpServerState',              // MCP_SERVER_STATUS_UNION discriminated union
     'ToolCallContributor',          // TOOL_CALL_CONTRIBUTOR_UNION discriminated union
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
+    'CanvasProviderSource',         // CANVAS_PROVIDER_SOURCE_UNION discriminated union
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ReconnectResult',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',
+    'CanvasProviderErrorData',
     'AhpError',
     'AhpErrorDetailsMap',
     'AhpErrorCode',
