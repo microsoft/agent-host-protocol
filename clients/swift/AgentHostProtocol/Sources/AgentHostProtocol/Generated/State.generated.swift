@@ -5040,8 +5040,8 @@ public struct CanvasState: Codable, Sendable {
     public var input: [String: AnyCodable]?
     /// Current instance title.
     public var title: String?
-    /// Provider-defined status string (opaque to AHP).
-    public var status: String?
+    /// Human-readable description of what the canvas is currently doing; provider-defined and opaque to AHP.
+    public var activity: String?
     /// Renderer-targeted address for the opaque canvas content. Clients MAY load a
     /// directly-reachable address (`https:`, an in-process scheme,
     /// `http://localhost`) themselves; any other scheme — or an address the
@@ -5061,7 +5061,7 @@ public struct CanvasState: Codable, Sendable {
         providerId: String,
         input: [String: AnyCodable]? = nil,
         title: String? = nil,
-        status: String? = nil,
+        activity: String? = nil,
         contentUri: String? = nil,
         availability: CanvasAvailability
     ) {
@@ -5069,7 +5069,7 @@ public struct CanvasState: Codable, Sendable {
         self.providerId = providerId
         self.input = input
         self.title = title
-        self.status = status
+        self.activity = activity
         self.contentUri = contentUri
         self.availability = availability
     }

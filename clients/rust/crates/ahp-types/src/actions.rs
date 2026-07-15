@@ -1636,9 +1636,9 @@ pub struct CanvasUpdatedAction {
     /// New title. Absent preserves the current title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// New provider-defined status. Absent preserves the current status.
+    /// New activity description. Absent preserves the current activity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub activity: Option<String>,
     /// New content address. Absent preserves the current contentUri.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_uri: Option<Uri>,

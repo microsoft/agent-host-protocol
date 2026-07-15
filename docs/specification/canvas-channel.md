@@ -111,7 +111,7 @@ CanvasState {
   providerId: string            // owning provider id (opaque to AHP)
   input?: object                // the open input, retained for resume/rebind
   title?: string
-  status?: string               // provider-defined, opaque to AHP
+  activity?: string             // provider-defined, opaque to AHP
   contentUri?: URI              // renderer-targeted content address (see Rendering)
   availability: CanvasAvailability
 }
@@ -138,7 +138,7 @@ Two actions travel on the per-instance channel. Because the channel URI already 
 
 | Action | Client-dispatchable | Reducer effect |
 |---|:---:|---|
-| `canvas/updated` | Yes | Sparse-merges `title` / `status` / `contentUri` / `availability` into `CanvasState`. |
+| `canvas/updated` | Yes | Sparse-merges `title` / `activity` / `contentUri` / `availability` into `CanvasState`. |
 | `canvas/closeRequested` | Yes | No-op — signals the host to run the close flow. |
 
 `canvas/updated` is dispatched by the server for a server-side provider, or by the client that provides an instance to push its own presentation changes — the same client-dispatchable pattern as `terminal/titleChanged`, and the only way a client-side provider updates the structured `CanvasState` (and the `OpenCanvasRef` fields mirrored from it) that other subscribers render. The host stays the authoritative reducer: it SHOULD reject an update from a client that is not the instance's resolved provider, then applies the merge and re-broadcasts.
@@ -173,7 +173,7 @@ sequenceDiagram
     A->>H: invoke operation "format"
     H->>C: canvasInvokeOperation { channel: "ahp-canvas:/abc", operationName, input }
     C-->>H: { value }
-    C-->>H: action canvas/updated { status }
+    C-->>H: action canvas/updated { activity }
 
     C->>H: action canvas/closeRequested
     H->>C: canvasClose { channel: "ahp-canvas:/abc" }
@@ -184,7 +184,7 @@ sequenceDiagram
 
 | Method | Channel | Direction | Purpose |
 |---|---|---|---|
-| `canvasOpen` | `ahp-canvas:/<id>` | Client ↔ Server | Open an instance against its provider. Names the new instance's channel and returns the initial `contentUri` / `title` / `status`. |
+| `canvasOpen` | `ahp-canvas:/<id>` | Client ↔ Server | Open an instance against its provider. Names the new instance's channel and returns the initial `contentUri` / `title` / `activity`. |
 | `canvasInvokeOperation` | `ahp-canvas:/<id>` | Client ↔ Server | Invoke a declared operation on an open instance. Returns an opaque provider value. |
 | `canvasClose` | `ahp-canvas:/<id>` | Client ↔ Server | Close an instance against its provider, as part of the close flow. |
 

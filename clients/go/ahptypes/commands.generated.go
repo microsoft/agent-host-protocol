@@ -1057,8 +1057,8 @@ type CanvasOpenResult struct {
 	ContentUri *URI `json:"contentUri,omitempty"`
 	// Initial title.
 	Title *string `json:"title,omitempty"`
-	// Initial provider-defined status.
-	Status *string `json:"status,omitempty"`
+	// Initial activity description.
+	Activity *string `json:"activity,omitempty"`
 }
 
 // Invokes one of a canvas's declared operations against its provider.

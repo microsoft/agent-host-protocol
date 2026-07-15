@@ -37,8 +37,8 @@ export interface CanvasUpdatedAction {
   type: ActionType.CanvasUpdated;
   /** New title. Absent preserves the current title. */
   title?: string;
-  /** New provider-defined status. Absent preserves the current status. */
-  status?: string;
+  /** New activity description. Absent preserves the current activity. */
+  activity?: string;
   /** New content address. Absent preserves the current contentUri. */
   contentUri?: URI;
   /** New availability. Absent preserves the current availability. */

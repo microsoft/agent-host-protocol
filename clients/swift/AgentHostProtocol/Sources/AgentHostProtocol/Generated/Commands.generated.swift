@@ -1384,17 +1384,17 @@ public struct CanvasOpenResult: Codable, Sendable {
     public var contentUri: String?
     /// Initial title.
     public var title: String?
-    /// Initial provider-defined status.
-    public var status: String?
+    /// Initial activity description.
+    public var activity: String?
 
     public init(
         contentUri: String? = nil,
         title: String? = nil,
-        status: String? = nil
+        activity: String? = nil
     ) {
         self.contentUri = contentUri
         self.title = title
-        self.status = status
+        self.activity = activity
     }
 }
 

@@ -1851,8 +1851,8 @@ public struct CanvasUpdatedAction: Codable, Sendable {
     public var type: ActionType
     /// New title. Absent preserves the current title.
     public var title: String?
-    /// New provider-defined status. Absent preserves the current status.
-    public var status: String?
+    /// New activity description. Absent preserves the current activity.
+    public var activity: String?
     /// New content address. Absent preserves the current contentUri.
     public var contentUri: String?
     /// New availability. Absent preserves the current availability.
@@ -1861,13 +1861,13 @@ public struct CanvasUpdatedAction: Codable, Sendable {
     public init(
         type: ActionType,
         title: String? = nil,
-        status: String? = nil,
+        activity: String? = nil,
         contentUri: String? = nil,
         availability: CanvasAvailability? = nil
     ) {
         self.type = type
         self.title = title
-        self.status = status
+        self.activity = activity
         self.contentUri = contentUri
         self.availability = availability
     }

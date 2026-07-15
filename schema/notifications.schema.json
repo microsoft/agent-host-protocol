@@ -5020,9 +5020,9 @@
           "type": "string",
           "description": "Current instance title."
         },
-        "status": {
+        "activity": {
           "type": "string",
-          "description": "Provider-defined status string (opaque to AHP)."
+          "description": "Human-readable description of what the canvas is currently doing; provider-defined and opaque to AHP."
         },
         "contentUri": {
           "$ref": "#/$defs/URI",

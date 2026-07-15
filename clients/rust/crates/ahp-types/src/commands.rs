@@ -1285,9 +1285,9 @@ pub struct CanvasOpenResult {
     /// Initial title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Initial provider-defined status.
+    /// Initial activity description.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub activity: Option<String>,
 }
 
 /// Invokes one of a canvas's declared operations against its provider.

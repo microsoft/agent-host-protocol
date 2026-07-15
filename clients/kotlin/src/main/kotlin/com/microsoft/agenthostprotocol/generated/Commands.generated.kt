@@ -1214,9 +1214,9 @@ data class CanvasOpenResult(
      */
     val title: String? = null,
     /**
-     * Initial provider-defined status.
+     * Initial activity description.
      */
-    val status: String? = null
+    val activity: String? = null
 )
 
 @Serializable

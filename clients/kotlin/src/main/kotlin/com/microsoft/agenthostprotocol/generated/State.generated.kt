@@ -4522,9 +4522,9 @@ data class CanvasState(
      */
     val title: String? = null,
     /**
-     * Provider-defined status string (opaque to AHP).
+     * Human-readable description of what the canvas is currently doing; provider-defined and opaque to AHP.
      */
-    val status: String? = null,
+    val activity: String? = null,
     /**
      * Renderer-targeted address for the opaque canvas content. Clients MAY load a
      * directly-reachable address (`https:`, an in-process scheme,

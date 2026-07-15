@@ -1,11 +1,11 @@
 {
-  "description": "canvas/updated overwrites every presented field (title, status, contentUri, availability)",
+  "description": "canvas/updated overwrites every presented field (title, activity, contentUri, availability)",
   "reducer": "canvas",
   "initial": {
     "canvasId": "markdown",
     "providerId": "acme.editors",
     "title": "Draft",
-    "status": "idle",
+    "activity": "idle",
     "contentUri": "ahp-session:/2f9c/content/canvas-1",
     "availability": "ready"
   },
@@ -13,7 +13,7 @@
     {
       "type": "canvas/updated",
       "title": "Published",
-      "status": "saved",
+      "activity": "saved",
       "contentUri": "https://example.com/docs/published.html",
       "availability": "stale"
     }
@@ -22,7 +22,7 @@
     "canvasId": "markdown",
     "providerId": "acme.editors",
     "title": "Published",
-    "status": "saved",
+    "activity": "saved",
     "contentUri": "https://example.com/docs/published.html",
     "availability": "stale"
   }

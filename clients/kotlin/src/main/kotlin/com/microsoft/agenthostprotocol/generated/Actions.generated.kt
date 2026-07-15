@@ -1402,9 +1402,9 @@ data class CanvasUpdatedAction(
      */
     val title: String? = null,
     /**
-     * New provider-defined status. Absent preserves the current status.
+     * New activity description. Absent preserves the current activity.
      */
-    val status: String? = null,
+    val activity: String? = null,
     /**
      * New content address. Absent preserves the current contentUri.
      */

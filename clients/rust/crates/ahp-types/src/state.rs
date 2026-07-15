@@ -4090,9 +4090,9 @@ pub struct CanvasState {
     /// Current instance title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Provider-defined status string (opaque to AHP).
+    /// Human-readable description of what the canvas is currently doing; provider-defined and opaque to AHP.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub activity: Option<String>,
     /// Renderer-targeted address for the opaque canvas content. Clients MAY load a
     /// directly-reachable address (`https:`, an in-process scheme,
     /// `http://localhost`) themselves; any other scheme — or an address the

@@ -3393,8 +3393,8 @@ type CanvasState struct {
 	Input map[string]json.RawMessage `json:"input,omitempty"`
 	// Current instance title.
 	Title *string `json:"title,omitempty"`
-	// Provider-defined status string (opaque to AHP).
-	Status *string `json:"status,omitempty"`
+	// Human-readable description of what the canvas is currently doing; provider-defined and opaque to AHP.
+	Activity *string `json:"activity,omitempty"`
 	// Renderer-targeted address for the opaque canvas content. Clients MAY load a
 	// directly-reachable address (`https:`, an in-process scheme,
 	// `http://localhost`) themselves; any other scheme — or an address the

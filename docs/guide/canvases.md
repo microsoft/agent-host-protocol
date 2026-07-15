@@ -75,7 +75,7 @@ CanvasState {
   providerId: string
   input?: Record<string, unknown> // the open input, retained for resume/rebind
   title?: string
-  status?: string                 // provider-defined, opaque to AHP
+  activity?: string               // provider-defined, opaque to AHP
   contentUri?: URI                // renderer-targeted content address
   availability: CanvasAvailability // 'ready' | 'stale'
 }
@@ -90,7 +90,7 @@ State changes flow through two canvas-scoped actions, broadcast to subscribers o
 
 | Type | Client-dispatchable? | When |
 | --- | --- | --- |
-| `canvas/updated` | Yes | The provider changed the instance's `title` / `status` / `contentUri` / `availability`. |
+| `canvas/updated` | Yes | The provider changed the instance's `title` / `activity` / `contentUri` / `availability`. |
 | `canvas/closeRequested` | Yes | The user asked to close the surface (e.g. hit ✕). |
 
 `canvas/updated` is a **sparse merge**: each present field overwrites the corresponding `CanvasState` field, and an absent field preserves the current value. There is no clear-to-absent via this action — that three-state distinction can't survive JSON transport uniformly across languages — so a provider that needs to reset a field re-publishes it, and a full reset arrives as a fresh `CanvasState` snapshot on (re)subscribe. `canvas/closeRequested` is a pure signal with a no-op reducer; the host runs the close flow in response.
@@ -112,7 +112,7 @@ canvasOpen(params: {
 }) → {
   contentUri?: URI
   title?: string
-  status?: string
+  activity?: string
 }
 
 canvasInvokeOperation(params: {
@@ -176,8 +176,8 @@ sequenceDiagram
   A->>H: invoke operation "format" on ahp-canvas:/c1
   H->>P: canvasInvokeOperation({ channel, operationName: "format", input })
   P-->>H: { value }
-  P->>H: canvas/updated { status: "formatted" }
-  H->>R: canvas/updated { status: "formatted" }
+  P->>H: canvas/updated { activity: "formatted" }
+  H->>R: canvas/updated { activity: "formatted" }
   Note over R: Subscribers re-render from the merged state
 ```
 

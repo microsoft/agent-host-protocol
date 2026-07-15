@@ -48,8 +48,8 @@ export interface CanvasState {
   input?: Record<string, unknown>;
   /** Current instance title. */
   title?: string;
-  /** Provider-defined status string (opaque to AHP). */
-  status?: string;
+  /** Human-readable description of what the canvas is currently doing; provider-defined and opaque to AHP. */
+  activity?: string;
   /**
    * Renderer-targeted address for the opaque canvas content. Clients MAY load a
    * directly-reachable address (`https:`, an in-process scheme,

@@ -79,8 +79,8 @@ export interface CanvasOpenResult {
   contentUri?: URI;
   /** Initial title. */
   title?: string;
-  /** Initial provider-defined status. */
-  status?: string;
+  /** Initial activity description. */
+  activity?: string;
 }
 
 // ─── canvasInvokeOperation ───────────────────────────────────────────────────
