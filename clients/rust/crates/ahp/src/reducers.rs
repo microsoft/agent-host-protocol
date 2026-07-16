@@ -263,8 +263,7 @@ fn with_input_needed_status(status: u32, input_needed: &[SessionInputRequest]) -
 fn summary_status(state: &ChatState, terminal: Option<SessionStatus>) -> u32 {
     let activity: u32 = if let Some(t) = terminal {
         t.bits()
-    } else if has_open_input_request(state) || has_blocking_tool_call(state)
-    {
+    } else if has_open_input_request(state) || has_blocking_tool_call(state) {
         SessionStatus::InputNeeded.bits()
     } else if state.active_turn.is_some() {
         SessionStatus::InProgress.bits()
@@ -389,14 +388,18 @@ fn upsert_input_request(state: &mut ChatState, request: ChatInputRequest) -> Red
     let Some(active) = state.active_turn.as_mut() else {
         return ReduceOutcome::NoOp;
     };
-    if let Some(existing) = active.response_parts.iter_mut().find_map(|part| match part {
-        ResponsePart::InputRequest(input)
-            if input.response.is_none() && input.request.id == request.id =>
-        {
-            Some(input)
-        }
-        _ => None,
-    }) {
+    if let Some(existing) = active
+        .response_parts
+        .iter_mut()
+        .find_map(|part| match part {
+            ResponsePart::InputRequest(input)
+                if input.response.is_none() && input.request.id == request.id =>
+            {
+                Some(input)
+            }
+            _ => None,
+        })
+    {
         let answers = request
             .answers
             .clone()
@@ -1041,22 +1044,24 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.turns_next_cursor = a.turns_next_cursor.clone();
             ReduceOutcome::Applied
         }
-        StateAction::ChatInputRequested(a) => {
-            upsert_input_request(state, a.request.clone())
-        }
+        StateAction::ChatInputRequested(a) => upsert_input_request(state, a.request.clone()),
         StateAction::ChatInputAnswerChanged(a) => apply_input_answer_changed(state, a),
         StateAction::ChatInputCompleted(a) => {
             let Some(active) = state.active_turn.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
-            let Some(part) = active.response_parts.iter_mut().find_map(|part| match part {
-                ResponsePart::InputRequest(input)
-                    if input.response.is_none() && input.request.id == a.request_id =>
-                {
-                    Some(input)
-                }
-                _ => None,
-            }) else {
+            let Some(part) = active
+                .response_parts
+                .iter_mut()
+                .find_map(|part| match part {
+                    ResponsePart::InputRequest(input)
+                        if input.response.is_none() && input.request.id == a.request_id =>
+                    {
+                        Some(input)
+                    }
+                    _ => None,
+                })
+            else {
                 return ReduceOutcome::NoOp;
             };
             let mut final_answers = part.request.answers.clone().unwrap_or_default();
@@ -1559,14 +1564,18 @@ fn apply_input_answer_changed(
     let Some(active) = state.active_turn.as_mut() else {
         return ReduceOutcome::NoOp;
     };
-    let Some(part) = active.response_parts.iter_mut().find_map(|part| match part {
-        ResponsePart::InputRequest(input)
-            if input.response.is_none() && input.request.id == a.request_id =>
-        {
-            Some(input)
-        }
-        _ => None,
-    }) else {
+    let Some(part) = active
+        .response_parts
+        .iter_mut()
+        .find_map(|part| match part {
+            ResponsePart::InputRequest(input)
+                if input.response.is_none() && input.request.id == a.request_id =>
+            {
+                Some(input)
+            }
+            _ => None,
+        })
+    else {
         return ReduceOutcome::NoOp;
     };
     let req = &mut part.request;
