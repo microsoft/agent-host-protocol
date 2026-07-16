@@ -263,12 +263,7 @@ fn with_input_needed_status(status: u32, input_needed: &[SessionInputRequest]) -
 fn summary_status(state: &ChatState, terminal: Option<SessionStatus>) -> u32 {
     let activity: u32 = if let Some(t) = terminal {
         t.bits()
-    } else if state
-        .input_requests
-        .as_ref()
-        .map(|r| !r.is_empty())
-        .unwrap_or(false)
-        || has_blocking_tool_call(state)
+    } else if has_open_input_request(state) || has_blocking_tool_call(state)
     {
         SessionStatus::InputNeeded.bits()
     } else if state.active_turn.is_some() {
@@ -277,6 +272,18 @@ fn summary_status(state: &ChatState, terminal: Option<SessionStatus>) -> u32 {
         SessionStatus::Idle.bits()
     };
     (state.status & !STATUS_ACTIVITY_MASK) | activity
+}
+
+fn has_open_input_request(state: &ChatState) -> bool {
+    state
+        .active_turn
+        .as_ref()
+        .map(|turn| {
+            turn.response_parts.iter().any(|part| {
+                matches!(part, ResponsePart::InputRequest(input) if input.response.is_none())
+            })
+        })
+        .unwrap_or(false)
 }
 
 fn refresh_summary_status(state: &mut ChatState) {
@@ -373,28 +380,43 @@ fn end_turn(
     };
 
     state.turns.push(turn);
-    state.input_requests = None;
     state.modified_at = now_iso();
     state.status = summary_status(state, terminal_status);
     ReduceOutcome::Applied
 }
 
-fn upsert_input_request(state: &mut ChatState, request: ChatInputRequest) {
-    let existing = state.input_requests.get_or_insert_with(Vec::new);
-    if let Some(idx) = existing.iter().position(|r| r.id == request.id) {
+fn upsert_input_request(state: &mut ChatState, request: ChatInputRequest) -> ReduceOutcome {
+    let Some(active) = state.active_turn.as_mut() else {
+        return ReduceOutcome::NoOp;
+    };
+    if let Some(existing) = active.response_parts.iter_mut().find_map(|part| match part {
+        ResponsePart::InputRequest(input)
+            if input.response.is_none() && input.request.id == request.id =>
+        {
+            Some(input)
+        }
+        _ => None,
+    }) {
         let answers = request
             .answers
             .clone()
-            .or_else(|| existing[idx].answers.clone());
+            .or_else(|| existing.request.answers.clone());
         let mut next = request;
         next.answers = answers;
-        existing[idx] = next;
+        existing.request = next;
+        existing.response = None;
     } else {
-        existing.push(request);
+        active
+            .response_parts
+            .push(ResponsePart::InputRequest(InputRequestResponsePart {
+                request,
+                response: None,
+            }));
     }
     state.status = summary_status(state, None);
     touch_chat_modified(state);
     state.status = with_status_flag(state.status, SessionStatus::IsRead, false);
+    ReduceOutcome::Applied
 }
 
 // ─── Customization Helpers ───────────────────────────────────────────────────
@@ -1020,48 +1042,35 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             ReduceOutcome::Applied
         }
         StateAction::ChatInputRequested(a) => {
-            upsert_input_request(state, a.request.clone());
-            ReduceOutcome::Applied
+            upsert_input_request(state, a.request.clone())
         }
         StateAction::ChatInputAnswerChanged(a) => apply_input_answer_changed(state, a),
         StateAction::ChatInputCompleted(a) => {
-            let Some(list) = state.input_requests.as_ref() else {
+            let Some(active) = state.active_turn.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
-            let Some(completed) = list.iter().find(|r| r.id == a.request_id).cloned() else {
+            let Some(part) = active.response_parts.iter_mut().find_map(|part| match part {
+                ResponsePart::InputRequest(input)
+                    if input.response.is_none() && input.request.id == a.request_id =>
+                {
+                    Some(input)
+                }
+                _ => None,
+            }) else {
                 return ReduceOutcome::NoOp;
             };
-            if let Some(list) = state.input_requests.as_mut() {
-                list.retain(|r| r.id != a.request_id);
-                if list.is_empty() {
-                    state.input_requests = None;
+            let mut final_answers = part.request.answers.clone().unwrap_or_default();
+            if let Some(answers) = &a.answers {
+                for (k, v) in answers {
+                    final_answers.insert(k.clone(), v.clone());
                 }
             }
-            // Project the resolved request into the active turn's transcript so
-            // the decision survives after the live request is gone. Abandoned
-            // requests (turn end/truncate) are removed without a part.
-            if let Some(active) = state.active_turn.as_mut() {
-                let mut final_answers = completed.answers.clone().unwrap_or_default();
-                if let Some(answers) = &a.answers {
-                    for (k, v) in answers {
-                        final_answers.insert(k.clone(), v.clone());
-                    }
-                }
-                let request = ChatInputRequest {
-                    answers: if final_answers.is_empty() {
-                        None
-                    } else {
-                        Some(final_answers)
-                    },
-                    ..completed
-                };
-                active
-                    .response_parts
-                    .push(ResponsePart::InputRequest(InputRequestResponsePart {
-                        request,
-                        response: a.response,
-                    }));
-            }
+            part.request.answers = if final_answers.is_empty() {
+                None
+            } else {
+                Some(final_answers)
+            };
+            part.response = Some(a.response);
             refresh_summary_status(state);
             touch_chat_modified(state);
             ReduceOutcome::Applied
@@ -1538,7 +1547,6 @@ fn apply_truncated(state: &mut ChatState, turn_id: Option<&str>) -> ReduceOutcom
         }
     }
     state.active_turn = None;
-    state.input_requests = None;
     touch_chat_modified(state);
     state.status = summary_status(state, None);
     ReduceOutcome::Applied
@@ -1548,13 +1556,20 @@ fn apply_input_answer_changed(
     state: &mut ChatState,
     a: &ChatInputAnswerChangedAction,
 ) -> ReduceOutcome {
-    let Some(list) = state.input_requests.as_mut() else {
+    let Some(active) = state.active_turn.as_mut() else {
         return ReduceOutcome::NoOp;
     };
-    let Some(idx) = list.iter().position(|r| r.id == a.request_id) else {
+    let Some(part) = active.response_parts.iter_mut().find_map(|part| match part {
+        ResponsePart::InputRequest(input)
+            if input.response.is_none() && input.request.id == a.request_id =>
+        {
+            Some(input)
+        }
+        _ => None,
+    }) else {
         return ReduceOutcome::NoOp;
     };
-    let req = &mut list[idx];
+    let req = &mut part.request;
     let answers = req.answers.get_or_insert_with(HashMap::new);
     match &a.answer {
         None => {
@@ -1919,7 +1934,6 @@ mod tests {
             active_turn: None,
             steering_message: None,
             queued_messages: None,
-            input_requests: None,
             draft: None,
             meta: None,
         }

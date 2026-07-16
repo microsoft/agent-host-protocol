@@ -59,31 +59,33 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
-      "usage": null
-    },
-    "inputRequests": [
-      {
-        "id": "input-1",
-        "message": "Clarify requirements",
-        "questions": [
-          {
-            "id": "q1",
-            "kind": "number",
-            "message": "How many?"
-          }
-        ],
-        "answers": {
-          "q1": {
-            "state": "draft",
-            "value": {
-              "kind": "number",
-              "value": 1.5
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "input-1",
+            "message": "Clarify requirements",
+            "questions": [
+              {
+                "id": "q1",
+                "kind": "number",
+                "message": "How many?"
+              }
+            ],
+            "answers": {
+              "q1": {
+                "state": "draft",
+                "value": {
+                  "kind": "number",
+                  "value": 1.5
+                }
+              }
             }
           }
         }
-      }
-    ],
+      ],
+      "usage": null
+    },
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 24,

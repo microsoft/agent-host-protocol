@@ -1,5 +1,5 @@
 {
-  "description": "session input completion without an active turn removes the request and records no transcript part",
+  "description": "session input request and completion without an active turn are no-ops",
   "reducer": "chat",
   "initial": {
     "turns": [
@@ -16,18 +16,19 @@
         "state": "complete"
       }
     ],
-    "inputRequests": [
-      {
-        "id": "orphan-1",
-        "message": "Standalone request"
-      }
-    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
-    "status": 24,
+    "status": 1,
     "modifiedAt": "1970-01-01T00:00:01.000Z"
   },
   "actions": [
+    {
+      "type": "chat/inputRequested",
+      "request": {
+        "id": "orphan-1",
+        "message": "Standalone request"
+      }
+    },
     {
       "type": "chat/inputCompleted",
       "requestId": "orphan-1",
@@ -52,6 +53,6 @@
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 1,
-    "modifiedAt": "1970-01-01T00:00:09.999Z"
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
   }
 }

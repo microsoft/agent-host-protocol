@@ -12,24 +12,26 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
-      "usage": null
-    },
-    "inputRequests": [
-      {
-        "id": "input-1",
-        "message": "Old message",
-        "answers": {
-          "q1": {
-            "state": "draft",
-            "value": {
-              "kind": "text",
-              "value": "draft"
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "input-1",
+            "message": "Old message",
+            "answers": {
+              "q1": {
+                "state": "draft",
+                "value": {
+                  "kind": "text",
+                  "value": "draft"
+                }
+              }
             }
           }
         }
-      }
-    ],
+      ],
+      "usage": null
+    },
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 24,
@@ -72,16 +74,18 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "input-1",
+            "message": "New message",
+            "answers": null
+          }
+        }
+      ],
       "usage": null
     },
-    "inputRequests": [
-      {
-        "id": "input-1",
-        "message": "New message",
-        "answers": null
-      }
-    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 24,

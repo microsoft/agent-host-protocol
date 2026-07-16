@@ -489,7 +489,6 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             next.turnsNextCursor = nil
         }
         next.activeTurn = nil
-        next.inputRequests = nil
         next.status = chatSummaryStatus(next)
         next.modifiedAt = currentTimestamp()
         return next
@@ -508,11 +507,15 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         return upsertInputRequest(state: state, request: a.request)
 
     case .chatInputAnswerChanged(let a):
-        guard var existing = state.inputRequests,
-              let idx = existing.firstIndex(where: { $0.id == a.requestId }) else {
+        guard var activeTurn = state.activeTurn,
+              let idx = activeTurn.responseParts.firstIndex(where: { part in
+                  guard case .inputRequest(let input) = part else { return false }
+                  return input.response == nil && input.request.id == a.requestId
+              }),
+              case .inputRequest(var part) = activeTurn.responseParts[idx] else {
             return state
         }
-        var request = existing[idx]
+        var request = part.request
         var answers = request.answers ?? [:]
         if let answer = a.answer {
             answers[a.questionId] = answer
@@ -520,39 +523,33 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             answers.removeValue(forKey: a.questionId)
         }
         request.answers = answers.isEmpty ? nil : answers
-        existing[idx] = request
+        part.request = request
+        activeTurn.responseParts[idx] = .inputRequest(part)
         var next = state
-        next.inputRequests = existing
+        next.activeTurn = activeTurn
         next.modifiedAt = currentTimestamp()
         return next
 
     case .chatInputCompleted(let a):
-        guard var existing = state.inputRequests,
-              let completed = existing.first(where: { $0.id == a.requestId }) else {
+        guard var activeTurn = state.activeTurn,
+              let idx = activeTurn.responseParts.firstIndex(where: { part in
+                  guard case .inputRequest(let input) = part else { return false }
+                  return input.response == nil && input.request.id == a.requestId
+              }),
+              case .inputRequest(var part) = activeTurn.responseParts[idx] else {
             return state
         }
-        existing.removeAll { $0.id == a.requestId }
-        var next = state
-        next.inputRequests = existing.isEmpty ? nil : existing
-        // Project the resolved request into the active turn's transcript so the
-        // decision survives after the live request is gone. Abandoned requests
-        // (turn end/truncate) are removed without a part.
-        if var activeTurn = next.activeTurn {
-            var finalAnswers = completed.answers ?? [:]
-            if let answers = a.answers {
-                for (k, v) in answers {
-                    finalAnswers[k] = v
-                }
+        var finalAnswers = part.request.answers ?? [:]
+        if let answers = a.answers {
+            for (k, v) in answers {
+                finalAnswers[k] = v
             }
-            var request = completed
-            request.answers = finalAnswers.isEmpty ? nil : finalAnswers
-            activeTurn.responseParts.append(.inputRequest(InputRequestResponsePart(
-                kind: .inputRequest,
-                request: request,
-                response: a.response
-            )))
-            next.activeTurn = activeTurn
         }
+        part.request.answers = finalAnswers.isEmpty ? nil : finalAnswers
+        part.response = a.response
+        activeTurn.responseParts[idx] = .inputRequest(part)
+        var next = state
+        next.activeTurn = activeTurn
         next.status = chatSummaryStatus(next)
         next.modifiedAt = currentTimestamp()
         return next
@@ -915,7 +912,7 @@ private func chatSummaryStatus(_ state: ChatState, terminalStatus: SessionStatus
     let activity: SessionStatus
     if let terminalStatus {
         activity = terminalStatus
-    } else if state.inputRequests?.isEmpty == false || hasBlockingToolCall(state) {
+    } else if hasOpenInputRequest(state) || hasBlockingToolCall(state) {
         activity = .inputNeeded
     } else if state.activeTurn != nil {
         activity = .inProgress
@@ -923,6 +920,14 @@ private func chatSummaryStatus(_ state: ChatState, terminalStatus: SessionStatus
         activity = .idle
     }
     return state.status.subtracting(statusActivityMask).union(activity)
+}
+
+private func hasOpenInputRequest(_ state: ChatState) -> Bool {
+    guard let activeTurn = state.activeTurn else { return false }
+    return activeTurn.responseParts.contains { part in
+        guard case .inputRequest(let input) = part else { return false }
+        return input.response == nil
+    }
 }
 
 /// Returns `true` if the active turn has any tool call blocked on external input.
@@ -949,16 +954,25 @@ private func refreshChatSummaryStatus(_ state: ChatState) -> ChatState {
 }
 
 private func upsertInputRequest(state: ChatState, request: ChatInputRequest) -> ChatState {
-    var next = state
-    var existing = next.inputRequests ?? []
-    if let idx = existing.firstIndex(where: { $0.id == request.id }) {
+    guard var activeTurn = state.activeTurn else { return state }
+    if let idx = activeTurn.responseParts.firstIndex(where: { part in
+        guard case .inputRequest(let input) = part else { return false }
+        return input.response == nil && input.request.id == request.id
+    }), case .inputRequest(let existing) = activeTurn.responseParts[idx] {
         var replacement = request
-        replacement.answers = request.answers ?? existing[idx].answers
-        existing[idx] = replacement
+        replacement.answers = request.answers ?? existing.request.answers
+        activeTurn.responseParts[idx] = .inputRequest(InputRequestResponsePart(
+            kind: .inputRequest,
+            request: replacement
+        ))
     } else {
-        existing.append(request)
+        activeTurn.responseParts.append(.inputRequest(InputRequestResponsePart(
+            kind: .inputRequest,
+            request: request
+        )))
     }
-    next.inputRequests = existing
+    var next = state
+    next.activeTurn = activeTurn
     next.status = withStatusFlag(chatSummaryStatus(next), .isRead, false)
     next.modifiedAt = currentTimestamp()
     return next
@@ -1042,7 +1056,6 @@ private func endTurn(
     var next = state
     next.turns.append(turn)
     next.activeTurn = nil
-    next.inputRequests = nil
     next.status = chatSummaryStatus(next, terminalStatus: terminalStatus)
     next.modifiedAt = currentTimestamp()
     return next

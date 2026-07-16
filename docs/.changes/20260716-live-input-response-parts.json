@@ -1,0 +1,5 @@
+{
+  "type": "changed",
+  "message": "Input requests now live in turn `responseParts`, with an optional `response` until `chat/inputCompleted` submits the result.",
+  "issues": [327]
+}

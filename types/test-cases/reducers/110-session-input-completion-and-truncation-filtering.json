@@ -37,20 +37,25 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "complete-me",
+            "message": "Complete me"
+          }
+        },
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "remaining-input",
+            "message": "Remaining request",
+            "url": "https://example.com/form"
+          }
+        }
+      ],
       "usage": null
     },
-    "inputRequests": [
-      {
-        "id": "complete-me",
-        "message": "Complete me"
-      },
-      {
-        "id": "remaining-input",
-        "message": "Remaining request",
-        "url": "https://example.com/form"
-      }
-    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 24,

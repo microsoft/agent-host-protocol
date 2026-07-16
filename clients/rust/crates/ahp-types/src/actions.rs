@@ -1029,9 +1029,9 @@ pub struct ChatDraftChangedAction {
 
 /// A session requested input from the user.
 ///
-/// Full-request upsert semantics: the `request` replaces any existing request
-/// with the same `id`, or is appended if it is new. Answer drafts are preserved
-/// unless `request.answers` is provided.
+/// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
+/// or replaces the unresolved part with the same request `id`. Answer drafts
+/// are preserved unless `request.answers` is provided.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatInputRequestedAction {
@@ -1054,10 +1054,11 @@ pub struct ChatInputAnswerChangedAction {
     pub answer: Option<ChatInputAnswer>,
 }
 
-/// A client accepted, declined, or cancelled a session input request.
+/// A client submitted an accept, decline, or cancel response to an input request.
 ///
 /// If accepted, the server uses `answers` (when provided) plus the request's
-/// synced answer state to resume the blocked operation.
+/// synced answer state to resume the blocked operation. The reducer records the
+/// response and final answers on the existing {@link InputRequestResponsePart}.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatInputCompletedAction {

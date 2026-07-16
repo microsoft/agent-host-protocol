@@ -1086,7 +1086,7 @@
     },
     "SessionChatInputRequest": {
       "type": "object",
-      "description": "A user-input elicitation surfaced at the session level, mirroring one entry\nof the owning chat's {@link ChatState.inputRequests}.\n\nRespond by dispatching `chat/inputCompleted` (or syncing drafts with\n`chat/inputAnswerChanged`) to {@link SessionInputRequestBase.chat | `chat`},\nkeyed by {@link ChatInputRequest.id | `request.id`}.",
+      "description": "A user-input elicitation surfaced at the session level, mirroring the request\nfrom an unresolved {@link InputRequestResponsePart} in the owning chat.\n\nRespond by dispatching `chat/inputCompleted` (or syncing drafts with\n`chat/inputAnswerChanged`) to {@link SessionInputRequestBase.chat | `chat`},\nkeyed by {@link ChatInputRequest.id | `request.id`}.",
       "properties": {
         "id": {
           "type": "string",
@@ -2541,13 +2541,6 @@
           },
           "description": "Messages to send automatically as new turns after the current turn finishes"
         },
-        "inputRequests": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ChatInputRequest"
-          },
-          "description": "Requests for user input that are currently blocking or informing chat progress"
-        },
         "draft": {
           "$ref": "#/$defs/Message",
           "description": "The user's in-progress draft input for this chat — the message they are\ncomposing but have not sent yet, including its\n{@link Message.model | model} / {@link Message.agent | agent} selection\nand attachments.\n\nClients MAY periodically sync their local input state into this field so\na draft survives reloads and is visible to other clients viewing the same\nchat. Eager syncing is **not** required — clients SHOULD debounce and MAY\nsync only at convenient points. When presenting input UI for an existing\nchat, clients SHOULD use any `draft` to initialize their input state.\nCleared (set to `undefined`) once the message is sent."
@@ -2902,7 +2895,7 @@
     },
     "ChatInputRequest": {
       "type": "object",
-      "description": "A live request for user input.\n\nThe server creates or replaces requests with `chat/inputRequested`.\nClients sync drafts with `chat/inputAnswerChanged` and complete requests\nwith `chat/inputCompleted`.",
+      "description": "The request payload carried by an {@link InputRequestResponsePart}.\n\nThe server creates or replaces the containing response part with\n`chat/inputRequested`. Clients sync drafts with `chat/inputAnswerChanged`\nand submit responses with `chat/inputCompleted`.",
       "properties": {
         "id": {
           "type": "string",
@@ -3502,7 +3495,7 @@
     },
     "InputRequestResponsePart": {
       "type": "object",
-      "description": "A resolved input request (elicitation) recorded in the turn transcript.\n\nWhile an input request is open it lives in {@link ChatState.inputRequests}\nas live, interactive state (see {@link ChatInputRequest}). When the request\ncompletes via `chat/inputCompleted`, the reducer removes it from\n`inputRequests` and appends this part to the active turn so the decision\nsurvives in history. This mirrors how a tool-call confirmation persists in\nits {@link ToolCallResponsePart} (via `confirmed` / `selectedOption` on the\nterminal {@link ToolCallState}): the live surface drives in-flight UX, the\nterminal outcome is durable and backfillable via `fetchTurns`.\n\nNo part is recorded when an outstanding request is *abandoned* (the turn\ncompletes, is cancelled, errors, or is truncated) rather than *completed*.",
+      "description": "A live or resolved input request (elicitation) in the turn response stream.\n\nThe server inserts the part with `chat/inputRequested`. While\n{@link response} is absent, clients can update answer drafts with\n`chat/inputAnswerChanged` and submit a response with `chat/inputCompleted`.\nCompletion updates this part in place so its stream position is stable and\nthe full interaction remains durable and backfillable via `fetchTurns`.\n\nIf the turn ends without a submitted response, the unresolved part remains\nin the completed turn transcript with {@link response} absent.",
       "properties": {
         "kind": {
           "const": "inputRequest",
@@ -3510,17 +3503,16 @@
         },
         "request": {
           "$ref": "#/$defs/ChatInputRequest",
-          "description": "The resolved request, carrying its `id`, `message`, `url`, `questions`,\nand the final `answers` synced/submitted at completion."
+          "description": "The request, carrying its `id`, `message`, `url`, `questions`, and current\ndraft or submitted `answers`."
         },
         "response": {
           "$ref": "#/$defs/ChatInputResponseKind",
-          "description": "How the request was resolved: `accept`, `decline`, or `cancel`."
+          "description": "How the request was resolved. Absent until a client submits `accept`,\n`decline`, or `cancel` with `chat/inputCompleted`."
         }
       },
       "required": [
         "kind",
-        "request",
-        "response"
+        "request"
       ]
     },
     "SystemNotificationResponsePart": {

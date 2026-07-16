@@ -153,7 +153,7 @@ const (
 type SessionInputRequestKind string
 
 const (
-	// A user-facing elicitation mirrored from a chat's `inputRequests`.
+	// A user-facing elicitation mirrored from an unresolved chat response part.
 	SessionInputRequestKindChatInput SessionInputRequestKind = "chatInput"
 	// A tool call awaiting parameter- or result-confirmation.
 	SessionInputRequestKindToolConfirmation SessionInputRequestKind = "toolConfirmation"
@@ -819,8 +819,8 @@ type SessionActiveClient struct {
 	Customizations []ClientPluginCustomization `json:"customizations,omitempty"`
 }
 
-// A user-input elicitation surfaced at the session level, mirroring one entry
-// of the owning chat's {@link ChatState.inputRequests}.
+// A user-input elicitation surfaced at the session level, mirroring the request
+// from an unresolved {@link InputRequestResponsePart} in the owning chat.
 //
 // Respond by dispatching `chat/inputCompleted` (or syncing drafts with
 // `chat/inputAnswerChanged`) to {@link SessionInputRequestBase.chat | `chat`},
@@ -1069,8 +1069,6 @@ type ChatState struct {
 	SteeringMessage *PendingMessage `json:"steeringMessage,omitempty"`
 	// Messages to send automatically as new turns after the current turn finishes
 	QueuedMessages []PendingMessage `json:"queuedMessages,omitempty"`
-	// Requests for user input that are currently blocking or informing chat progress
-	InputRequests []ChatInputRequest `json:"inputRequests,omitempty"`
 	// The user's in-progress draft input for this chat — the message they are
 	// composing but have not sent yet, including its
 	// {@link Message.model | model} / {@link Message.agent | agent} selection
@@ -1428,11 +1426,11 @@ type ChatInputMultiSelectQuestion struct {
 	Max *int64 `json:"max,omitempty"`
 }
 
-// A live request for user input.
+// The request payload carried by an {@link InputRequestResponsePart}.
 //
-// The server creates or replaces requests with `chat/inputRequested`.
-// Clients sync drafts with `chat/inputAnswerChanged` and complete requests
-// with `chat/inputCompleted`.
+// The server creates or replaces the containing response part with
+// `chat/inputRequested`. Clients sync drafts with `chat/inputAnswerChanged`
+// and submit responses with `chat/inputCompleted`.
 type ChatInputRequest struct {
 	// Stable request identifier
 	Id string `json:"id"`
@@ -1713,27 +1711,25 @@ type SystemNotificationResponsePart struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// A resolved input request (elicitation) recorded in the turn transcript.
+// A live or resolved input request (elicitation) in the turn response stream.
 //
-// While an input request is open it lives in {@link ChatState.inputRequests}
-// as live, interactive state (see {@link ChatInputRequest}). When the request
-// completes via `chat/inputCompleted`, the reducer removes it from
-// `inputRequests` and appends this part to the active turn so the decision
-// survives in history. This mirrors how a tool-call confirmation persists in
-// its {@link ToolCallResponsePart} (via `confirmed` / `selectedOption` on the
-// terminal {@link ToolCallState}): the live surface drives in-flight UX, the
-// terminal outcome is durable and backfillable via `fetchTurns`.
+// The server inserts the part with `chat/inputRequested`. While
+// {@link response} is absent, clients can update answer drafts with
+// `chat/inputAnswerChanged` and submit a response with `chat/inputCompleted`.
+// Completion updates this part in place so its stream position is stable and
+// the full interaction remains durable and backfillable via `fetchTurns`.
 //
-// No part is recorded when an outstanding request is *abandoned* (the turn
-// completes, is cancelled, errors, or is truncated) rather than *completed*.
+// If the turn ends without a submitted response, the unresolved part remains
+// in the completed turn transcript with {@link response} absent.
 type InputRequestResponsePart struct {
 	// Discriminant
 	Kind ResponsePartKind `json:"kind"`
-	// The resolved request, carrying its `id`, `message`, `url`, `questions`,
-	// and the final `answers` synced/submitted at completion.
+	// The request, carrying its `id`, `message`, `url`, `questions`, and current
+	// draft or submitted `answers`.
 	Request ChatInputRequest `json:"request"`
-	// How the request was resolved: `accept`, `decline`, or `cancel`.
-	Response ChatInputResponseKind `json:"response"`
+	// How the request was resolved. Absent until a client submits `accept`,
+	// `decline`, or `cancel` with `chat/inputCompleted`.
+	Response *ChatInputResponseKind `json:"response,omitempty"`
 }
 
 // Tool execution result details, available after execution completes.

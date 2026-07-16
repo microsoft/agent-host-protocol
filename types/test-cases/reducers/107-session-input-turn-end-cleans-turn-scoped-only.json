@@ -1,5 +1,5 @@
 {
-  "description": "turn end clears outstanding session input requests",
+  "description": "turn end preserves unresolved input request parts in the completed transcript",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -12,27 +12,32 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "url-input",
+            "message": "Review this URL",
+            "url": "https://example.com/form"
+          }
+        },
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "form-input",
+            "message": "Answer this form",
+            "questions": [
+              {
+                "id": "q1",
+                "kind": "boolean",
+                "message": "Continue?"
+              }
+            ]
+          }
+        }
+      ],
       "usage": null
     },
-    "inputRequests": [
-      {
-        "id": "url-input",
-        "message": "Review this URL",
-        "url": "https://example.com/form"
-      },
-      {
-        "id": "form-input",
-        "message": "Answer this form",
-        "questions": [
-          {
-            "id": "q1",
-            "kind": "boolean",
-            "message": "Continue?"
-          }
-        ]
-      }
-    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 24,
@@ -57,7 +62,30 @@
             "kind": "user"
           }
         },
-        "responseParts": [],
+        "responseParts": [
+          {
+            "kind": "inputRequest",
+            "request": {
+              "id": "url-input",
+              "message": "Review this URL",
+              "url": "https://example.com/form"
+            }
+          },
+          {
+            "kind": "inputRequest",
+            "request": {
+              "id": "form-input",
+              "message": "Answer this form",
+              "questions": [
+                {
+                  "id": "q1",
+                  "kind": "boolean",
+                  "message": "Continue?"
+                }
+              ]
+            }
+          }
+        ],
         "usage": null,
         "state": "complete",
         "error": null

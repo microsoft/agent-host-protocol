@@ -12,15 +12,17 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "present-1",
+            "message": "Still open"
+          }
+        }
+      ],
       "usage": null
     },
-    "inputRequests": [
-      {
-        "id": "present-1",
-        "message": "Still open"
-      }
-    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 24,
@@ -44,15 +46,17 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "present-1",
+            "message": "Still open"
+          }
+        }
+      ],
       "usage": null
     },
-    "inputRequests": [
-      {
-        "id": "present-1",
-        "message": "Still open"
-      }
-    ],
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 24,

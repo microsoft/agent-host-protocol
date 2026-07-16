@@ -153,7 +153,7 @@ public enum ChatInputResponseKind: String, Codable, Sendable {
 /// This is a general/typological union (not a lifecycle), so the discriminant is
 /// a `*Kind`.
 public enum SessionInputRequestKind: String, Codable, Sendable {
-    /// A user-facing elicitation mirrored from a chat's `inputRequests`.
+    /// A user-facing elicitation mirrored from an unresolved chat response part.
     case chatInput = "chatInput"
     /// A tool call awaiting parameter- or result-confirmation.
     case toolConfirmation = "toolConfirmation"
@@ -892,8 +892,6 @@ public struct ChatState: Codable, Sendable {
     public var steeringMessage: PendingMessage?
     /// Messages to send automatically as new turns after the current turn finishes
     public var queuedMessages: [PendingMessage]?
-    /// Requests for user input that are currently blocking or informing chat progress
-    public var inputRequests: [ChatInputRequest]?
     /// The user's in-progress draft input for this chat — the message they are
     /// composing but have not sent yet, including its
     /// {@link Message.model | model} / {@link Message.agent | agent} selection
@@ -923,7 +921,6 @@ public struct ChatState: Codable, Sendable {
         case activeTurn
         case steeringMessage
         case queuedMessages
-        case inputRequests
         case draft
         case meta = "_meta"
     }
@@ -942,7 +939,6 @@ public struct ChatState: Codable, Sendable {
         activeTurn: ActiveTurn? = nil,
         steeringMessage: PendingMessage? = nil,
         queuedMessages: [PendingMessage]? = nil,
-        inputRequests: [ChatInputRequest]? = nil,
         draft: Message? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
@@ -959,7 +955,6 @@ public struct ChatState: Codable, Sendable {
         self.activeTurn = activeTurn
         self.steeringMessage = steeringMessage
         self.queuedMessages = queuedMessages
-        self.inputRequests = inputRequests
         self.draft = draft
         self.meta = meta
     }
@@ -2381,16 +2376,17 @@ public struct SystemNotificationResponsePart: Codable, Sendable {
 public struct InputRequestResponsePart: Codable, Sendable {
     /// Discriminant
     public var kind: ResponsePartKind
-    /// The resolved request, carrying its `id`, `message`, `url`, `questions`,
-    /// and the final `answers` synced/submitted at completion.
+    /// The request, carrying its `id`, `message`, `url`, `questions`, and current
+    /// draft or submitted `answers`.
     public var request: ChatInputRequest
-    /// How the request was resolved: `accept`, `decline`, or `cancel`.
-    public var response: ChatInputResponseKind
+    /// How the request was resolved. Absent until a client submits `accept`,
+    /// `decline`, or `cancel` with `chat/inputCompleted`.
+    public var response: ChatInputResponseKind?
 
     public init(
         kind: ResponsePartKind,
         request: ChatInputRequest,
-        response: ChatInputResponseKind
+        response: ChatInputResponseKind? = nil
     ) {
         self.kind = kind
         self.request = request

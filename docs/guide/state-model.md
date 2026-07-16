@@ -139,7 +139,7 @@ For example, `(status & SessionStatus.InProgress) !== 0` is true for both `InPro
 
 ## Chat State
 
-Subscribable on a [Chat Channel](/specification/chat-channel) at `ahp-chat:/<cid>`. A session is a catalog of chats (`SessionState.chats`); each chat carries the per-conversation state — the turn history, the active turn and its streaming response parts, tool calls, steering/queued messages, outstanding input requests, and the user's in-progress draft. A session starts with a default chat (`SessionState.defaultChat`); hosts advertising the `multipleChats` capability let clients open more via `createChat`.
+Subscribable on a [Chat Channel](/specification/chat-channel) at `ahp-chat:/<cid>`. A session is a catalog of chats (`SessionState.chats`); each chat carries the per-conversation state — the turn history, the active turn and its streaming response parts (including live input requests), tool calls, steering/queued messages, and the user's in-progress draft. A session starts with a default chat (`SessionState.defaultChat`); hosts advertising the `multipleChats` capability let clients open more via `createChat`.
 
 ```typescript
 ChatState {
@@ -157,7 +157,6 @@ ChatState {
   activeTurn?: ActiveTurn             // the in-progress turn, if any
   steeringMessage?: PendingMessage
   queuedMessages?: PendingMessage[]
-  inputRequests?: ChatInputRequest[]
   draft?: Message                     // user's in-progress input
 }
 ```
@@ -423,24 +422,17 @@ For example, a server might offer `"Approve"`, `"Approve in this Session"`, `"De
 
 ## Input Requests
 
-A chat can request structured input from the user by storing live requests in its chat state (on the chat channel):
+A chat can request structured input from the user with a live response part in its active turn:
 
 ```typescript
-ChatState {
-  // ...existing fields...
-  inputRequests?: ChatInputRequest[]
-}
-
-ChatInputRequest {
-  id: string
-  message?: string
-  url?: URI
-  questions?: ChatInputQuestion[]
-  answers?: Record<string, ChatInputAnswer>
+InputRequestResponsePart {
+  kind: 'inputRequest'
+  request: ChatInputRequest
+  response?: 'accept' | 'decline' | 'cancel'
 }
 ```
 
-See [Elicitation](/guide/elicitation) for the request lifecycle, question and answer shapes, URL requests, multi-client draft synchronization, and validation rules.
+An absent `response` marks a live request. `chat/inputCompleted` sets the response on the same part, preserving its response-stream position and transcript history. See [Elicitation](/guide/elicitation) for the request lifecycle, question and answer shapes, URL requests, multi-client draft synchronization, and validation rules.
 
 ## Usage Info
 

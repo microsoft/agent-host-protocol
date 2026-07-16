@@ -293,7 +293,7 @@ enum class ChatInputResponseKind {
 @Serializable
 enum class SessionInputRequestKind {
     /**
-     * A user-facing elicitation mirrored from a chat's `inputRequests`.
+     * A user-facing elicitation mirrored from an unresolved chat response part.
      */
     @SerialName("chatInput")
     CHAT_INPUT,
@@ -1186,10 +1186,6 @@ data class ChatState(
      * Messages to send automatically as new turns after the current turn finishes
      */
     val queuedMessages: List<PendingMessage>? = null,
-    /**
-     * Requests for user input that are currently blocking or informing chat progress
-     */
-    val inputRequests: List<ChatInputRequest>? = null,
     /**
      * The user's in-progress draft input for this chat — the message they are
      * composing but have not sent yet, including its
@@ -2381,14 +2377,15 @@ data class InputRequestResponsePart(
      */
     val kind: ResponsePartKind,
     /**
-     * The resolved request, carrying its `id`, `message`, `url`, `questions`,
-     * and the final `answers` synced/submitted at completion.
+     * The request, carrying its `id`, `message`, `url`, `questions`, and current
+     * draft or submitted `answers`.
      */
     val request: ChatInputRequest,
     /**
-     * How the request was resolved: `accept`, `decline`, or `cancel`.
+     * How the request was resolved. Absent until a client submits `accept`,
+     * `decline`, or `cancel` with `chat/inputCompleted`.
      */
-    val response: ChatInputResponseKind
+    val response: ChatInputResponseKind? = null
 )
 
 @Serializable

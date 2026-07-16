@@ -12,33 +12,35 @@
           "kind": "user"
         }
       },
-      "responseParts": [],
-      "usage": null
-    },
-    "inputRequests": [
-      {
-        "id": "review-1",
-        "message": "Review before continuing",
-        "url": "https://example.com/plan",
-        "questions": [
-          {
-            "id": "approve",
-            "kind": "boolean",
-            "message": "Approve the plan?",
-            "required": true
-          }
-        ],
-        "answers": {
-          "approve": {
-            "state": "draft",
-            "value": {
-              "kind": "boolean",
-              "value": true
+      "responseParts": [
+        {
+          "kind": "inputRequest",
+          "request": {
+            "id": "review-1",
+            "message": "Review before continuing",
+            "url": "https://example.com/plan",
+            "questions": [
+              {
+                "id": "approve",
+                "kind": "boolean",
+                "message": "Approve the plan?",
+                "required": true
+              }
+            ],
+            "answers": {
+              "approve": {
+                "state": "draft",
+                "value": {
+                  "kind": "boolean",
+                  "value": true
+                }
+              }
             }
           }
         }
-      }
-    ],
+      ],
+      "usage": null
+    },
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 24,

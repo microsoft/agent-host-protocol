@@ -115,7 +115,7 @@ private fun withInputNeededStatus(status: SessionStatus, inputNeeded: List<Sessi
 private fun chatSummaryStatus(state: ChatState, terminalStatus: SessionStatus? = null): SessionStatus {
     val activity: SessionStatus = when {
         terminalStatus != null -> terminalStatus
-        (state.inputRequests?.size ?: 0) > 0 || hasBlockingToolCall(state) ->
+        hasOpenInputRequest(state) || hasBlockingToolCall(state) ->
             SessionStatus.INPUT_NEEDED
         state.activeTurn != null -> SessionStatus.IN_PROGRESS
         else -> SessionStatus.IDLE
@@ -123,6 +123,11 @@ private fun chatSummaryStatus(state: ChatState, terminalStatus: SessionStatus? =
     val preserved = state.status.rawValue and STATUS_ACTIVITY_MASK.inv()
     return SessionStatus(preserved or activity.rawValue)
 }
+
+private fun hasOpenInputRequest(state: ChatState): Boolean =
+    state.activeTurn?.responseParts?.any { part ->
+        part is ResponsePartInputRequest && part.value.response == null
+    } == true
 
 /**
  * Returns a state with chat [ChatState.status] recomputed. Use after reducers that
@@ -414,22 +419,36 @@ private fun endTurn(
     val withoutTurn = state.copy(
         turns = state.turns + turn,
         activeTurn = null,
-        inputRequests = null,
         modifiedAt = nowIsoString(),
     )
     return withoutTurn.copy(status = chatSummaryStatus(withoutTurn, terminalStatus))
 }
 
 private fun upsertInputRequest(state: ChatState, request: ChatInputRequest): ChatState {
-    val existing = state.inputRequests ?: emptyList()
-    val idx = existing.indexOfFirst { it.id == request.id }
-    val updated: List<ChatInputRequest> = if (idx >= 0) {
-        val priorAnswers = existing[idx].answers
-        existing.toMutableList().also { it[idx] = request.copy(answers = request.answers ?: priorAnswers) }
-    } else {
-        existing + request
+    val activeTurn = state.activeTurn ?: return state
+    val idx = activeTurn.responseParts.indexOfFirst { part ->
+        part is ResponsePartInputRequest
+            && part.value.response == null
+            && part.value.request.id == request.id
     }
-    val next = state.copy(inputRequests = updated)
+    val updated = activeTurn.responseParts.toMutableList()
+    if (idx >= 0) {
+        val existing = (updated[idx] as ResponsePartInputRequest).value
+        updated[idx] = ResponsePartInputRequest(
+            InputRequestResponsePart(
+                kind = ResponsePartKind.INPUT_REQUEST,
+                request = request.copy(answers = request.answers ?: existing.request.answers),
+            ),
+        )
+    } else {
+        updated += ResponsePartInputRequest(
+            InputRequestResponsePart(
+                kind = ResponsePartKind.INPUT_REQUEST,
+                request = request,
+            ),
+        )
+    }
+    val next = state.copy(activeTurn = activeTurn.copy(responseParts = updated))
     return next.copy(
         status = withStatusFlag(chatSummaryStatus(next), SessionStatus.IS_READ, false),
         modifiedAt = nowIsoString(),
@@ -1220,7 +1239,6 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             turns = turns,
             turnsNextCursor = if (a.turnId == null) null else state.turnsNextCursor,
             activeTurn = null,
-            inputRequests = null,
             modifiedAt = nowIsoString(),
         )
         next.copy(status = chatSummaryStatus(next))
@@ -1243,12 +1261,17 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatInputAnswerChanged -> {
         val a = action.value
-        val existing = state.inputRequests
-        val idx = existing?.indexOfFirst { it.id == a.requestId } ?: -1
-        if (existing == null || idx < 0) {
+        val activeTurn = state.activeTurn
+        val idx = activeTurn?.responseParts?.indexOfFirst { part ->
+            part is ResponsePartInputRequest
+                && part.value.response == null
+                && part.value.request.id == a.requestId
+        } ?: -1
+        if (activeTurn == null || idx < 0) {
             state
         } else {
-            val request = existing[idx]
+            val part = (activeTurn.responseParts[idx] as ResponsePartInputRequest).value
+            val request = part.request
             val answers = (request.answers ?: emptyMap()).toMutableMap()
             if (a.answer == null) {
                 answers.remove(a.questionId)
@@ -1256,9 +1279,11 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                 answers[a.questionId] = a.answer
             }
             val newRequest = request.copy(answers = if (answers.isEmpty()) null else answers)
-            val updated = existing.toMutableList().also { it[idx] = newRequest }
+            val updated = activeTurn.responseParts.toMutableList().also {
+                it[idx] = ResponsePartInputRequest(part.copy(request = newRequest))
+            }
             state.copy(
-                inputRequests = updated,
+                activeTurn = activeTurn.copy(responseParts = updated),
                 modifiedAt = nowIsoString(),
             )
         }
@@ -1266,31 +1291,26 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatInputCompleted -> {
         val a = action.value
-        val existing = state.inputRequests
-        val completed = existing?.firstOrNull { it.id == a.requestId }
-        if (existing == null || completed == null) {
+        val activeTurn = state.activeTurn
+        val idx = activeTurn?.responseParts?.indexOfFirst { part ->
+            part is ResponsePartInputRequest
+                && part.value.response == null
+                && part.value.request.id == a.requestId
+        } ?: -1
+        if (activeTurn == null || idx < 0) {
             state
         } else {
-            val remaining = existing.filter { it.id != a.requestId }
-            var next = state.copy(inputRequests = remaining.ifEmpty { null })
-            // Project the resolved request into the active turn's transcript so
-            // the decision survives after the live request is gone. Abandoned
-            // requests (turn end/truncate) are removed without a part.
-            val activeTurn = next.activeTurn
-            if (activeTurn != null) {
-                val finalAnswers = (completed.answers ?: emptyMap()) + (a.answers ?: emptyMap())
-                val request = completed.copy(answers = finalAnswers.ifEmpty { null })
-                val newPart = ResponsePartInputRequest(
-                    InputRequestResponsePart(
-                        kind = ResponsePartKind.INPUT_REQUEST,
-                        request = request,
+            val part = (activeTurn.responseParts[idx] as ResponsePartInputRequest).value
+            val finalAnswers = (part.request.answers ?: emptyMap()) + (a.answers ?: emptyMap())
+            val updated = activeTurn.responseParts.toMutableList().also {
+                it[idx] = ResponsePartInputRequest(
+                    part.copy(
+                        request = part.request.copy(answers = finalAnswers.ifEmpty { null }),
                         response = a.response,
                     ),
                 )
-                next = next.copy(
-                    activeTurn = activeTurn.copy(responseParts = activeTurn.responseParts + newPart),
-                )
             }
+            val next = state.copy(activeTurn = activeTurn.copy(responseParts = updated))
             next.copy(
                 status = chatSummaryStatus(next),
                 modifiedAt = nowIsoString(),
