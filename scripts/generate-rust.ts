@@ -835,7 +835,7 @@ const TOOL_CALL_STATE_UNION: UnionConfig = {
     { variantName: 'Streaming', innerType: 'ToolCallStreamingState', wireValue: 'streaming' },
     { variantName: 'PendingConfirmation', innerType: 'ToolCallPendingConfirmationState', wireValue: 'pending-confirmation' },
     { variantName: 'Running', innerType: 'ToolCallRunningState', wireValue: 'running' },
-    { variantName: 'AuthRequired', innerType: 'ToolCallAuthRequiredState', wireValue: 'auth-required' },
+    { variantName: 'AuthRequired', innerType: 'ToolCallAuthRequiredState', wireValue: 'auth-required', boxed: true },
     { variantName: 'PendingResultConfirmation', innerType: 'ToolCallPendingResultConfirmationState', wireValue: 'pending-result-confirmation' },
     { variantName: 'Completed', innerType: 'ToolCallCompletedState', wireValue: 'completed' },
     { variantName: 'Cancelled', innerType: 'ToolCallCancelledState', wireValue: 'cancelled' },

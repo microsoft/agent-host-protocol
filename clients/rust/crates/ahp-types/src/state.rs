@@ -4159,7 +4159,7 @@ pub enum ToolCallState {
     #[serde(rename = "running")]
     Running(ToolCallRunningState),
     #[serde(rename = "auth-required")]
-    AuthRequired(ToolCallAuthRequiredState),
+    AuthRequired(Box<ToolCallAuthRequiredState>),
     #[serde(rename = "pending-result-confirmation")]
     PendingResultConfirmation(ToolCallPendingResultConfirmationState),
     #[serde(rename = "completed")]

@@ -1491,7 +1491,7 @@ fn apply_tool_call_auth_required(
                 if !matches!(s.contributor, Some(ToolCallContributor::Mcp(_))) {
                     return ToolCallState::Running(s);
                 }
-                ToolCallState::AuthRequired(ToolCallAuthRequiredState {
+                ToolCallState::AuthRequired(Box::new(ToolCallAuthRequiredState {
                     tool_call_id: base.tool_call_id,
                     tool_name: base.tool_name,
                     display_name: base.display_name,
@@ -1505,7 +1505,7 @@ fn apply_tool_call_auth_required(
                     status: ToolCallStatus::AuthRequired,
                     auth: a.auth.clone(),
                     content: s.content,
-                })
+                }))
             }
             other => other,
         }
