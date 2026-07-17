@@ -4233,6 +4233,9 @@ public struct McpServerReadyState: Codable, Sendable {
 public struct McpServerAuthRequiredState: Codable, Sendable {
     /// Why authentication is required.
     public var reason: McpAuthRequiredReason
+    /// Pre-registered OAuth client to use for authorization. When present, clients
+    /// MUST use these credentials instead of dynamic client registration.
+    public var oauthClient: McpOAuthClient?
     /// RFC 9728 Protected Resource Metadata. The `resource` field is the
     /// canonical MCP server URI per RFC 8707, used as the OAuth `resource`
     /// indicator. `authorization_servers` is REQUIRED by the MCP
@@ -4250,12 +4253,14 @@ public struct McpServerAuthRequiredState: Codable, Sendable {
 
     public init(
         reason: McpAuthRequiredReason,
+        oauthClient: McpOAuthClient? = nil,
         resource: ProtectedResourceMetadata,
         requiredScopes: [String]? = nil,
         description: String? = nil,
         kind: McpServerStatus
     ) {
         self.reason = reason
+        self.oauthClient = oauthClient
         self.resource = resource
         self.requiredScopes = requiredScopes
         self.description = description
@@ -4287,9 +4292,28 @@ public struct McpServerStoppedState: Codable, Sendable {
     }
 }
 
+public struct McpOAuthClient: Codable, Sendable {
+    /// OAuth client identifier registered with the authorization server.
+    public var clientId: String
+    /// OAuth client secret for a confidential client. Absence means the client is
+    /// public and uses a secretless flow such as authorization code with PKCE.
+    public var clientSecret: String?
+
+    public init(
+        clientId: String,
+        clientSecret: String? = nil
+    ) {
+        self.clientId = clientId
+        self.clientSecret = clientSecret
+    }
+}
+
 public struct McpAuthRequirement: Codable, Sendable {
     /// Why authentication is required.
     public var reason: McpAuthRequiredReason
+    /// Pre-registered OAuth client to use for authorization. When present, clients
+    /// MUST use these credentials instead of dynamic client registration.
+    public var oauthClient: McpOAuthClient?
     /// RFC 9728 Protected Resource Metadata. The `resource` field is the
     /// canonical MCP server URI per RFC 8707, used as the OAuth `resource`
     /// indicator. `authorization_servers` is REQUIRED by the MCP
@@ -4306,11 +4330,13 @@ public struct McpAuthRequirement: Codable, Sendable {
 
     public init(
         reason: McpAuthRequiredReason,
+        oauthClient: McpOAuthClient? = nil,
         resource: ProtectedResourceMetadata,
         requiredScopes: [String]? = nil,
         description: String? = nil
     ) {
         self.reason = reason
+        self.oauthClient = oauthClient
         self.resource = resource
         self.requiredScopes = requiredScopes
         self.description = description

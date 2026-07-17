@@ -842,7 +842,7 @@ const STATE_STRUCTS = [
   'RuleCustomization', 'HookCustomization', 'McpServerCustomization',
   'McpServerCustomizationApps', 'AhpMcpUiHostCapabilities',
   'McpServerStartingState', 'McpServerReadyState', 'McpServerAuthRequiredState',
-  'McpServerErrorState', 'McpServerStoppedState', 'McpAuthRequirement',
+  'McpServerErrorState', 'McpServerStoppedState', 'McpOAuthClient', 'McpAuthRequirement',
   'ToolCallClientContributor', 'ToolCallMcpContributor',
   'FileEdit', 'TerminalInfo',
   'TerminalClientClaim', 'TerminalSessionClaim', 'TerminalState',

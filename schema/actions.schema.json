@@ -4238,6 +4238,23 @@
         "kind"
       ]
     },
+    "McpOAuthClient": {
+      "type": "object",
+      "description": "A pre-registered OAuth client that clients use instead of dynamic client\nregistration when resolving an MCP authentication challenge.",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "OAuth client identifier registered with the authorization server."
+        },
+        "clientSecret": {
+          "type": "string",
+          "description": "OAuth client secret for a confidential client. Absence means the client is\npublic and uses a secretless flow such as authorization code with PKCE."
+        }
+      },
+      "required": [
+        "clientId"
+      ]
+    },
     "McpAuthRequirement": {
       "type": "object",
       "description": "Reusable MCP authentication challenge — the RFC 9728 discovery info a\nclient needs to obtain a token and push it via the `authenticate` command.\nDeliberately carries **no token**: this describes what is being asked for,\nnever the ****** itself.\n\nShared by two independent state machines that describe the same OAuth\nchallenge from different vantage points:\n\n- {@link McpServerAuthRequiredState} — the MCP server itself cannot serve\n  *any* request until the client authenticates.\n- {@link ToolCallAuthRequiredState} — a specific in-flight tool call is\n  paused pending authentication (typically\n  {@link McpAuthRequiredReason.InsufficientScope} step-up auth\n  mid-execution). The server state and the tool-call state remain\n  separate on purpose: the server saying \"I need auth\" and a tool\n  invocation saying \"I am waiting on that auth\" are different facts that\n  can be true independently.",
@@ -4245,6 +4262,10 @@
         "reason": {
           "$ref": "#/$defs/McpAuthRequiredReason",
           "description": "Why authentication is required."
+        },
+        "oauthClient": {
+          "$ref": "#/$defs/McpOAuthClient",
+          "description": "Pre-registered OAuth client to use for authorization. When present, clients\nMUST use these credentials instead of dynamic client registration."
         },
         "resource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",
@@ -4274,6 +4295,10 @@
         "reason": {
           "$ref": "#/$defs/McpAuthRequiredReason",
           "description": "Why authentication is required."
+        },
+        "oauthClient": {
+          "$ref": "#/$defs/McpOAuthClient",
+          "description": "Pre-registered OAuth client to use for authorization. When present, clients\nMUST use these credentials instead of dynamic client registration."
         },
         "resource": {
           "$ref": "#/$defs/ProtectedResourceMetadata",

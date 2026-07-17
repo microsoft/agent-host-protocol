@@ -3817,6 +3817,11 @@ data class McpServerAuthRequiredState(
      */
     val reason: McpAuthRequiredReason,
     /**
+     * Pre-registered OAuth client to use for authorization. When present, clients
+     * MUST use these credentials instead of dynamic client registration.
+     */
+    val oauthClient: McpOAuthClient? = null,
+    /**
      * RFC 9728 Protected Resource Metadata. The `resource` field is the
      * canonical MCP server URI per RFC 8707, used as the OAuth `resource`
      * indicator. `authorization_servers` is REQUIRED by the MCP
@@ -3853,11 +3858,29 @@ data class McpServerStoppedState(
 )
 
 @Serializable
+data class McpOAuthClient(
+    /**
+     * OAuth client identifier registered with the authorization server.
+     */
+    val clientId: String,
+    /**
+     * OAuth client secret for a confidential client. Absence means the client is
+     * public and uses a secretless flow such as authorization code with PKCE.
+     */
+    val clientSecret: String? = null
+)
+
+@Serializable
 data class McpAuthRequirement(
     /**
      * Why authentication is required.
      */
     val reason: McpAuthRequiredReason,
+    /**
+     * Pre-registered OAuth client to use for authorization. When present, clients
+     * MUST use these credentials instead of dynamic client registration.
+     */
+    val oauthClient: McpOAuthClient? = null,
     /**
      * RFC 9728 Protected Resource Metadata. The `resource` field is the
      * canonical MCP server URI per RFC 8707, used as the OAuth `resource`

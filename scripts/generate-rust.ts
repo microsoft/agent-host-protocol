@@ -784,6 +784,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'McpServerAuthRequiredState', omitDiscriminants: true },
   { name: 'McpServerErrorState', omitDiscriminants: true },
   { name: 'McpServerStoppedState', omitDiscriminants: true },
+  { name: 'McpOAuthClient' },
   { name: 'McpAuthRequirement' },
   { name: 'ToolCallClientContributor', omitDiscriminants: true },
   { name: 'ToolCallMcpContributor', omitDiscriminants: true },

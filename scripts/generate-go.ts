@@ -753,6 +753,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'McpServerAuthRequiredState' },
   { name: 'McpServerErrorState' },
   { name: 'McpServerStoppedState' },
+  { name: 'McpOAuthClient' },
   { name: 'McpAuthRequirement' },
   { name: 'ToolCallClientContributor' },
   { name: 'ToolCallMcpContributor' },

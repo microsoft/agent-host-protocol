@@ -76,6 +76,7 @@ export type {
   SessionToolConfirmationRequest,
   SessionToolClientExecutionRequest,
   SessionToolAuthenticationRequest,
+  McpOAuthClient,
   McpAuthRequirement,
   PendingMessage,
   ChatInputAnswer,

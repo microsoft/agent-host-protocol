@@ -3439,6 +3439,10 @@ pub struct McpServerReadyState {}
 pub struct McpServerAuthRequiredState {
     /// Why authentication is required.
     pub reason: McpAuthRequiredReason,
+    /// Pre-registered OAuth client to use for authorization. When present, clients
+    /// MUST use these credentials instead of dynamic client registration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth_client: Option<McpOAuthClient>,
     /// RFC 9728 Protected Resource Metadata. The `resource` field is the
     /// canonical MCP server URI per RFC 8707, used as the OAuth `resource`
     /// indicator. `authorization_servers` is REQUIRED by the MCP
@@ -3472,6 +3476,19 @@ pub struct McpServerErrorState {
 #[serde(rename_all = "camelCase")]
 pub struct McpServerStoppedState {}
 
+/// A pre-registered OAuth client that clients use instead of dynamic client
+/// registration when resolving an MCP authentication challenge.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpOAuthClient {
+    /// OAuth client identifier registered with the authorization server.
+    pub client_id: String,
+    /// OAuth client secret for a confidential client. Absence means the client is
+    /// public and uses a secretless flow such as authorization code with PKCE.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<String>,
+}
+
 /// Reusable MCP authentication challenge — the RFC 9728 discovery info a
 /// client needs to obtain a token and push it via the `authenticate` command.
 /// Deliberately carries **no token**: this describes what is being asked for,
@@ -3494,6 +3511,10 @@ pub struct McpServerStoppedState {}
 pub struct McpAuthRequirement {
     /// Why authentication is required.
     pub reason: McpAuthRequiredReason,
+    /// Pre-registered OAuth client to use for authorization. When present, clients
+    /// MUST use these credentials instead of dynamic client registration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth_client: Option<McpOAuthClient>,
     /// RFC 9728 Protected Resource Metadata. The `resource` field is the
     /// canonical MCP server URI per RFC 8707, used as the OAuth `resource`
     /// indicator. `authorization_servers` is REQUIRED by the MCP

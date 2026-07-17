@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`McpAuthRequirement.oauthClient` metadata for pre-registered public and confidential OAuth clients."
+}
