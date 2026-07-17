@@ -1404,6 +1404,10 @@
         "sessionMutable": {
           "type": "boolean",
           "description": "When `true`, the user may change this property after session creation"
+        },
+        "chatScoped": {
+          "type": "boolean",
+          "description": "When `true`, each chat may override this property in `ChatState.config`.\nA chat without an override inherits the current value from\n`SessionState.config`."
         }
       },
       "required": [
@@ -2514,6 +2518,10 @@
         "workingDirectory": {
           "$ref": "#/$defs/URI",
           "description": "Optional per-chat working directory.\n\nIf absent, the chat inherits\n{@link SessionState.workingDirectory | the session's working directory}.\nHosts MAY override this for individual chats — for example, to give a\nsubordinate chat its own git worktree so multiple chats in a session can\nmake independent edits that the orchestrator later merges back."
+        },
+        "config": {
+          "$ref": "#/$defs/SessionConfigState",
+          "description": "Configuration overrides owned by this chat.\n\nOnly properties whose schema declares `chatScoped: true` may appear in\n`values`. A property absent from `values` inherits the current value from\n`SessionState.config`. Presence of this state advertises support for\nper-chat config overrides."
         },
         "turns": {
           "type": "array",

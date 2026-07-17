@@ -819,6 +819,20 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
     case ActionType.ChatDraftChanged:
       return { ...state, draft: action.draft };
 
+    // ── Config ────────────────────────────────────────────────────────────
+
+    case ActionType.ChatConfigChanged:
+      if (!state.config) {
+        return state;
+      }
+      return {
+        ...state,
+        config: {
+          ...state.config,
+          values: action.replace ? { ...action.config } : { ...state.config.values, ...action.config },
+        },
+      };
+
     default:
       softAssertNever(action, log);
       return state;

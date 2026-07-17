@@ -1162,6 +1162,15 @@ data class ChatState(
      */
     val workingDirectory: String? = null,
     /**
+     * Configuration overrides owned by this chat.
+     *
+     * Only properties whose schema declares `chatScoped: true` may appear in
+     * `values`. A property absent from `values` inherits the current value from
+     * `SessionState.config`. Presence of this state advertises support for
+     * per-chat config overrides.
+     */
+    val config: SessionConfigState? = null,
+    /**
      * Completed turns
      */
     val turns: List<Turn>,

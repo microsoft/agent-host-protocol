@@ -1012,7 +1012,13 @@ data class SessionConfigPropertySchema(
     /**
      * When `true`, the user may change this property after session creation
      */
-    val sessionMutable: Boolean? = null
+    val sessionMutable: Boolean? = null,
+    /**
+     * When `true`, each chat may override this property in `ChatState.config`.
+     * A chat without an override inherits the current value from
+     * `SessionState.config`.
+     */
+    val chatScoped: Boolean? = null
 )
 
 @Serializable

@@ -98,6 +98,8 @@ enum class ActionType {
     CHAT_QUEUED_MESSAGES_REORDERED,
     @SerialName("chat/draftChanged")
     CHAT_DRAFT_CHANGED,
+    @SerialName("chat/configChanged")
+    CHAT_CONFIG_CHANGED,
     @SerialName("chat/inputRequested")
     CHAT_INPUT_REQUESTED,
     @SerialName("chat/inputAnswerChanged")
@@ -949,6 +951,20 @@ data class ChatDraftChangedAction(
 )
 
 @Serializable
+data class ChatConfigChangedAction(
+    val type: ActionType,
+    /**
+     * Updated chat-scoped config overrides
+     */
+    val config: Map<String, JsonElement>,
+    /**
+     * When `true`, replaces all chat config overrides instead of merging.
+     * Omitted properties resume inheriting from the session.
+     */
+    val replace: Boolean? = null
+)
+
+@Serializable
 data class ChatInputRequestedAction(
     val type: ActionType,
     /**
@@ -1526,6 +1542,7 @@ sealed interface StateAction
 @JvmInline value class StateActionChatPendingMessageRemoved(val value: ChatPendingMessageRemovedAction) : StateAction
 @JvmInline value class StateActionChatQueuedMessagesReordered(val value: ChatQueuedMessagesReorderedAction) : StateAction
 @JvmInline value class StateActionChatDraftChanged(val value: ChatDraftChangedAction) : StateAction
+@JvmInline value class StateActionChatConfigChanged(val value: ChatConfigChangedAction) : StateAction
 @JvmInline value class StateActionChatInputRequested(val value: ChatInputRequestedAction) : StateAction
 @JvmInline value class StateActionChatInputAnswerChanged(val value: ChatInputAnswerChangedAction) : StateAction
 @JvmInline value class StateActionChatInputCompleted(val value: ChatInputCompletedAction) : StateAction
@@ -1622,6 +1639,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/pendingMessageRemoved" -> StateActionChatPendingMessageRemoved(input.json.decodeFromJsonElement(ChatPendingMessageRemovedAction.serializer(), element))
             "chat/queuedMessagesReordered" -> StateActionChatQueuedMessagesReordered(input.json.decodeFromJsonElement(ChatQueuedMessagesReorderedAction.serializer(), element))
             "chat/draftChanged" -> StateActionChatDraftChanged(input.json.decodeFromJsonElement(ChatDraftChangedAction.serializer(), element))
+            "chat/configChanged" -> StateActionChatConfigChanged(input.json.decodeFromJsonElement(ChatConfigChangedAction.serializer(), element))
             "chat/inputRequested" -> StateActionChatInputRequested(input.json.decodeFromJsonElement(ChatInputRequestedAction.serializer(), element))
             "chat/inputAnswerChanged" -> StateActionChatInputAnswerChanged(input.json.decodeFromJsonElement(ChatInputAnswerChangedAction.serializer(), element))
             "chat/inputCompleted" -> StateActionChatInputCompleted(input.json.decodeFromJsonElement(ChatInputCompletedAction.serializer(), element))
@@ -1711,6 +1729,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatPendingMessageRemoved -> output.json.encodeToJsonElement(ChatPendingMessageRemovedAction.serializer(), value.value)
             is StateActionChatQueuedMessagesReordered -> output.json.encodeToJsonElement(ChatQueuedMessagesReorderedAction.serializer(), value.value)
             is StateActionChatDraftChanged -> output.json.encodeToJsonElement(ChatDraftChangedAction.serializer(), value.value)
+            is StateActionChatConfigChanged -> output.json.encodeToJsonElement(ChatConfigChangedAction.serializer(), value.value)
             is StateActionChatInputRequested -> output.json.encodeToJsonElement(ChatInputRequestedAction.serializer(), value.value)
             is StateActionChatInputAnswerChanged -> output.json.encodeToJsonElement(ChatInputAnswerChangedAction.serializer(), value.value)
             is StateActionChatInputCompleted -> output.json.encodeToJsonElement(ChatInputCompletedAction.serializer(), value.value)

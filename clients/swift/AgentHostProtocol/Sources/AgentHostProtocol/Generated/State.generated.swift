@@ -877,6 +877,13 @@ public struct ChatState: Codable, Sendable {
     /// subordinate chat its own git worktree so multiple chats in a session can
     /// make independent edits that the orchestrator later merges back.
     public var workingDirectory: String?
+    /// Configuration overrides owned by this chat.
+    ///
+    /// Only properties whose schema declares `chatScoped: true` may appear in
+    /// `values`. A property absent from `values` inherits the current value from
+    /// `SessionState.config`. Presence of this state advertises support for
+    /// per-chat config overrides.
+    public var config: SessionConfigState?
     /// Completed turns
     public var turns: [Turn]
     /// Cursor for loading older completed turns into this chat state.
@@ -916,6 +923,7 @@ public struct ChatState: Codable, Sendable {
         case origin
         case interactivity
         case workingDirectory
+        case config
         case turns
         case turnsNextCursor
         case activeTurn
@@ -934,6 +942,7 @@ public struct ChatState: Codable, Sendable {
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectory: String? = nil,
+        config: SessionConfigState? = nil,
         turns: [Turn],
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
@@ -950,6 +959,7 @@ public struct ChatState: Codable, Sendable {
         self.origin = origin
         self.interactivity = interactivity
         self.workingDirectory = workingDirectory
+        self.config = config
         self.turns = turns
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn

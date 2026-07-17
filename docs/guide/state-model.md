@@ -151,6 +151,7 @@ ChatState {
   modifiedAt: string
   origin?: ChatOrigin      // how the chat came to exist (user / fork / tool)
   workingDirectory?: URI
+  config?: SessionConfigState
 
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
@@ -160,6 +161,18 @@ ChatState {
   draft?: Message                     // user's in-progress input
 }
 ```
+
+`ChatState.config` contains values for properties whose
+`SessionConfigPropertySchema.chatScoped` flag is `true`. Hosts seed each chat's
+`config.values` with only the properties that chat overrides. An absent
+chat-scoped value inherits dynamically from `SessionState.config.values`, so a
+later `session/configChanged` updates every chat that has not overridden that
+property. Properties without `chatScoped: true` always resolve from
+`SessionState.config`. Clients dispatch `chat/configChanged` on the chat channel
+to set per-chat overrides and `session/configChanged` on the session channel to
+change session values, including the inherited defaults of chat-scoped
+properties. With `replace: true`, properties omitted from `chat/configChanged`
+resume inheriting from the session.
 
 The sections below — turns, response parts, tool calls, pending messages, and input requests — describe the contents of `ChatState`.
 

@@ -1005,6 +1005,14 @@ pub struct ChatState {
     /// make independent edits that the orchestrator later merges back.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
+    /// Configuration overrides owned by this chat.
+    ///
+    /// Only properties whose schema declares `chatScoped: true` may appear in
+    /// `values`. A property absent from `values` inherits the current value from
+    /// `SessionState.config`. Presence of this state advertises support for
+    /// per-chat config overrides.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<SessionConfigState>,
     /// Completed turns
     pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
@@ -1493,6 +1501,11 @@ pub struct SessionConfigPropertySchema {
     /// When `true`, the user may change this property after session creation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_mutable: Option<bool>,
+    /// When `true`, each chat may override this property in `ChatState.config`.
+    /// A chat without an override inherits the current value from
+    /// `SessionState.config`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_scoped: Option<bool>,
 }
 
 /// A JSON Schema object describing available session configuration metadata.

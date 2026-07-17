@@ -190,6 +190,7 @@ export type {
   ChatPendingMessageRemovedAction,
   ChatQueuedMessagesReorderedAction,
   ChatDraftChangedAction,
+  ChatConfigChangedAction,
   ChatInputAnswerChangedAction,
   ChatInputCompletedAction,
   ChatInputRequestedAction,

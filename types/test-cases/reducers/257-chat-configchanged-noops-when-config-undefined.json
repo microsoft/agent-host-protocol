@@ -1,0 +1,26 @@
+{
+  "description": "chat/configChanged is a no-op when config is undefined",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/one",
+    "title": "Chat one",
+    "status": 1,
+    "modifiedAt": "2026-07-16T00:00:00.000Z",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "chat/configChanged",
+      "config": {
+        "permissionMode": "bypassPermissions"
+      }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/one",
+    "title": "Chat one",
+    "status": 1,
+    "modifiedAt": "2026-07-16T00:00:00.000Z",
+    "turns": []
+  }
+}
