@@ -1244,6 +1244,10 @@
         "sessionMutable": {
           "type": "boolean",
           "description": "When `true`, the user may change this property after session creation"
+        },
+        "chatScoped": {
+          "type": "boolean",
+          "description": "When `true`, each chat may override this property in `ChatState.config`.\nA chat without an override inherits the current value from\n`SessionState.config`."
         }
       },
       "required": [
@@ -2379,6 +2383,10 @@
         "workingDirectory": {
           "$ref": "#/$defs/URI",
           "description": "Optional per-chat working directory.\n\nIf absent, the chat inherits\n{@link SessionState.workingDirectory | the session's working directory}.\nHosts MAY override this for individual chats — for example, to give a\nsubordinate chat its own git worktree so multiple chats in a session can\nmake independent edits that the orchestrator later merges back."
+        },
+        "config": {
+          "$ref": "#/$defs/SessionConfigState",
+          "description": "Configuration overrides owned by this chat.\n\nOnly properties whose schema declares `chatScoped: true` may appear in\n`values`. A property absent from `values` inherits the current value from\n`SessionState.config`. Presence of this state advertises support for\nper-chat config overrides."
         },
         "turns": {
           "type": "array",
@@ -6916,6 +6924,9 @@
           "$ref": "#/$defs/ChatDraftChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatConfigChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatInputRequestedAction"
         },
         {
@@ -7630,7 +7641,7 @@
     },
     "SessionConfigChangedAction": {
       "type": "object",
-      "description": "Client changed a mutable config value mid-session.\n\nOnly properties with `sessionMutable: true` in the config schema may be\nchanged. The server validates and broadcasts the action; the reducer merges\nthe new values into `state.config.values`.",
+      "description": "Client changed a mutable config value mid-session.\n\nOnly properties with `sessionMutable: true` in the config schema may be\nchanged. For a property with `chatScoped: true`, this changes the inherited\ndefault for chats that do not have their own override. The server validates\nand broadcasts the action; the reducer merges the new values into\n`state.config.values`.",
       "properties": {
         "type": {
           "const": "session/configChanged"
@@ -8332,6 +8343,28 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "ChatConfigChangedAction": {
+      "type": "object",
+      "description": "Client changed mutable, chat-scoped config values.\n\nOnly properties with both `chatScoped: true` and `sessionMutable: true` in\nthe config schema may be changed. The server validates and broadcasts the\naction; the reducer merges the new overrides into `state.config.values`.\nProperties without a chat override inherit their current value from\n`SessionState.config`.",
+      "properties": {
+        "type": {
+          "const": "chat/configChanged"
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Updated chat-scoped config overrides"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "When `true`, replaces all chat config overrides instead of merging.\nOmitted properties resume inheriting from the session."
+        }
+      },
+      "required": [
+        "type",
+        "config"
       ]
     },
     "ChatInputRequestedAction": {

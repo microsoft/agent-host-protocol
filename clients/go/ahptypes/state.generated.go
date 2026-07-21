@@ -1054,6 +1054,13 @@ type ChatState struct {
 	// subordinate chat its own git worktree so multiple chats in a session can
 	// make independent edits that the orchestrator later merges back.
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+	// Configuration overrides owned by this chat.
+	//
+	// Only properties whose schema declares `chatScoped: true` may appear in
+	// `values`. A property absent from `values` inherits the current value from
+	// `SessionState.config`. Presence of this state advertises support for
+	// per-chat config overrides.
+	Config *SessionConfigState `json:"config,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.
@@ -1171,6 +1178,10 @@ type SessionConfigPropertySchema struct {
 	EnumDynamic *bool `json:"enumDynamic,omitempty"`
 	// When `true`, the user may change this property after session creation
 	SessionMutable *bool `json:"sessionMutable,omitempty"`
+	// When `true`, each chat may override this property in `ChatState.config`.
+	// A chat without an override inherits the current value from
+	// `SessionState.config`.
+	ChatScoped *bool `json:"chatScoped,omitempty"`
 }
 
 // A JSON Schema object describing available session configuration metadata.

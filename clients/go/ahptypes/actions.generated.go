@@ -55,6 +55,7 @@ const (
 	ActionTypeChatPendingMessageRemoved         ActionType = "chat/pendingMessageRemoved"
 	ActionTypeChatQueuedMessagesReordered       ActionType = "chat/queuedMessagesReordered"
 	ActionTypeChatDraftChanged                  ActionType = "chat/draftChanged"
+	ActionTypeChatConfigChanged                 ActionType = "chat/configChanged"
 	ActionTypeChatInputRequested                ActionType = "chat/inputRequested"
 	ActionTypeChatInputAnswerChanged            ActionType = "chat/inputAnswerChanged"
 	ActionTypeChatInputCompleted                ActionType = "chat/inputCompleted"
@@ -713,6 +714,22 @@ type ChatDraftChangedAction struct {
 	Draft *Message `json:"draft,omitempty"`
 }
 
+// Client changed mutable, chat-scoped config values.
+//
+// Only properties with both `chatScoped: true` and `sessionMutable: true` in
+// the config schema may be changed. The server validates and broadcasts the
+// action; the reducer merges the new overrides into `state.config.values`.
+// Properties without a chat override inherit their current value from
+// `SessionState.config`.
+type ChatConfigChangedAction struct {
+	Type ActionType `json:"type"`
+	// Updated chat-scoped config overrides
+	Config map[string]json.RawMessage `json:"config"`
+	// When `true`, replaces all chat config overrides instead of merging.
+	// Omitted properties resume inheriting from the session.
+	Replace *bool `json:"replace,omitempty"`
+}
+
 // A session requested input from the user.
 //
 // Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -1035,8 +1052,10 @@ type SessionMcpServerStopRequestedAction struct {
 // Client changed a mutable config value mid-session.
 //
 // Only properties with `sessionMutable: true` in the config schema may be
-// changed. The server validates and broadcasts the action; the reducer merges
-// the new values into `state.config.values`.
+// changed. For a property with `chatScoped: true`, this changes the inherited
+// default for chats that do not have their own override. The server validates
+// and broadcasts the action; the reducer merges the new values into
+// `state.config.values`.
 type SessionConfigChangedAction struct {
 	Type ActionType `json:"type"`
 	// Updated config values
@@ -1458,6 +1477,7 @@ func (*ChatPendingMessageSetAction) isStateAction()             {}
 func (*ChatPendingMessageRemovedAction) isStateAction()         {}
 func (*ChatQueuedMessagesReorderedAction) isStateAction()       {}
 func (*ChatDraftChangedAction) isStateAction()                  {}
+func (*ChatConfigChangedAction) isStateAction()                 {}
 func (*ChatInputRequestedAction) isStateAction()                {}
 func (*ChatInputAnswerChangedAction) isStateAction()            {}
 func (*ChatInputCompletedAction) isStateAction()                {}
@@ -1710,6 +1730,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/draftChanged":
 		var value ChatDraftChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/configChanged":
+		var value ChatConfigChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

@@ -1,0 +1,72 @@
+{
+  "description": "chat/configChanged with replace replaces all chat config overrides",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/one",
+    "title": "Chat one",
+    "status": 1,
+    "modifiedAt": "2026-07-16T00:00:00.000Z",
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "permissionMode": {
+            "type": "string",
+            "title": "Permission mode",
+            "chatScoped": true,
+            "sessionMutable": true
+          },
+          "autoApprove": {
+            "type": "boolean",
+            "title": "Auto approve",
+            "chatScoped": true,
+            "sessionMutable": true
+          }
+        }
+      },
+      "values": {
+        "permissionMode": "default",
+        "autoApprove": false
+      }
+    },
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "chat/configChanged",
+      "config": {
+        "autoApprove": true
+      },
+      "replace": true
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/one",
+    "title": "Chat one",
+    "status": 1,
+    "modifiedAt": "2026-07-16T00:00:00.000Z",
+    "config": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "permissionMode": {
+            "type": "string",
+            "title": "Permission mode",
+            "chatScoped": true,
+            "sessionMutable": true
+          },
+          "autoApprove": {
+            "type": "boolean",
+            "title": "Auto approve",
+            "chatScoped": true,
+            "sessionMutable": true
+          }
+        }
+      },
+      "values": {
+        "autoApprove": true
+      }
+    },
+    "turns": []
+  }
+}

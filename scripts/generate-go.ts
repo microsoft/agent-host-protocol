@@ -1299,6 +1299,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/pendingMessageRemoved', variantName: 'ChatPendingMessageRemoved', tsInterface: 'ChatPendingMessageRemovedAction' },
   { type: 'chat/queuedMessagesReordered', variantName: 'ChatQueuedMessagesReordered', tsInterface: 'ChatQueuedMessagesReorderedAction' },
   { type: 'chat/draftChanged', variantName: 'ChatDraftChanged', tsInterface: 'ChatDraftChangedAction' },
+  { type: 'chat/configChanged', variantName: 'ChatConfigChanged', tsInterface: 'ChatConfigChangedAction' },
   { type: 'chat/inputRequested', variantName: 'ChatInputRequested', tsInterface: 'ChatInputRequestedAction' },
   { type: 'chat/inputAnswerChanged', variantName: 'ChatInputAnswerChanged', tsInterface: 'ChatInputAnswerChangedAction' },
   { type: 'chat/inputCompleted', variantName: 'ChatInputCompleted', tsInterface: 'ChatInputCompletedAction' },

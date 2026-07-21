@@ -42,6 +42,7 @@ public enum ActionType: String, Codable, Sendable {
     case chatPendingMessageRemoved = "chat/pendingMessageRemoved"
     case chatQueuedMessagesReordered = "chat/queuedMessagesReordered"
     case chatDraftChanged = "chat/draftChanged"
+    case chatConfigChanged = "chat/configChanged"
     case chatInputRequested = "chat/inputRequested"
     case chatInputAnswerChanged = "chat/inputAnswerChanged"
     case chatInputCompleted = "chat/inputCompleted"
@@ -1208,6 +1209,25 @@ public struct ChatDraftChangedAction: Codable, Sendable {
     }
 }
 
+public struct ChatConfigChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Updated chat-scoped config overrides
+    public var config: [String: AnyCodable]
+    /// When `true`, replaces all chat config overrides instead of merging.
+    /// Omitted properties resume inheriting from the session.
+    public var replace: Bool?
+
+    public init(
+        type: ActionType,
+        config: [String: AnyCodable],
+        replace: Bool? = nil
+    ) {
+        self.type = type
+        self.config = config
+        self.replace = replace
+    }
+}
+
 public struct ChatInputRequestedAction: Codable, Sendable {
     public var type: ActionType
     /// Input request to create or replace
@@ -1988,6 +2008,7 @@ public enum StateAction: Codable, Sendable {
     case chatPendingMessageRemoved(ChatPendingMessageRemovedAction)
     case chatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction)
     case chatDraftChanged(ChatDraftChangedAction)
+    case chatConfigChanged(ChatConfigChangedAction)
     case chatInputRequested(ChatInputRequestedAction)
     case chatInputAnswerChanged(ChatInputAnswerChangedAction)
     case chatInputCompleted(ChatInputCompletedAction)
@@ -2121,6 +2142,8 @@ public enum StateAction: Codable, Sendable {
             self = .chatQueuedMessagesReordered(try ChatQueuedMessagesReorderedAction(from: decoder))
         case "chat/draftChanged":
             self = .chatDraftChanged(try ChatDraftChangedAction(from: decoder))
+        case "chat/configChanged":
+            self = .chatConfigChanged(try ChatConfigChangedAction(from: decoder))
         case "chat/inputRequested":
             self = .chatInputRequested(try ChatInputRequestedAction(from: decoder))
         case "chat/inputAnswerChanged":
@@ -2250,6 +2273,7 @@ public enum StateAction: Codable, Sendable {
         case .chatPendingMessageRemoved(let v): try v.encode(to: encoder)
         case .chatQueuedMessagesReordered(let v): try v.encode(to: encoder)
         case .chatDraftChanged(let v): try v.encode(to: encoder)
+        case .chatConfigChanged(let v): try v.encode(to: encoder)
         case .chatInputRequested(let v): try v.encode(to: encoder)
         case .chatInputAnswerChanged(let v): try v.encode(to: encoder)
         case .chatInputCompleted(let v): try v.encode(to: encoder)

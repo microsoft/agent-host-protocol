@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Per-chat configuration state and `chat/configChanged` for overriding inherited mutable config values.",
+  "issues": [335]
+}

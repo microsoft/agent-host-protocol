@@ -54,6 +54,7 @@ import type {
   ChatPendingMessageRemovedAction,
   ChatQueuedMessagesReorderedAction,
   ChatDraftChangedAction,
+  ChatConfigChangedAction,
   ChatInputRequestedAction,
   ChatInputAnswerChangedAction,
   ChatInputCompletedAction,
@@ -196,6 +197,7 @@ export type ChatAction =
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
+  | ChatConfigChangedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction
@@ -215,6 +217,7 @@ export type ClientChatAction =
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
+  | ChatConfigChangedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction
   | ChatTruncatedAction
@@ -396,6 +399,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatPendingMessageRemoved]: true,
   [ActionType.ChatQueuedMessagesReordered]: true,
   [ActionType.ChatDraftChanged]: true,
+  [ActionType.ChatConfigChanged]: true,
   [ActionType.ChatInputRequested]: false,
   [ActionType.ChatInputAnswerChanged]: true,
   [ActionType.ChatInputCompleted]: true,

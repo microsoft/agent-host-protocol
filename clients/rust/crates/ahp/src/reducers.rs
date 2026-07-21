@@ -1149,6 +1149,19 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.draft = a.draft.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatConfigChanged(a) => {
+            let Some(config) = state.config.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            if a.replace.unwrap_or(false) {
+                config.values = a.config.clone();
+            } else {
+                for (k, v) in &a.config {
+                    config.values.insert(k.clone(), v.clone());
+                }
+            }
+            ReduceOutcome::Applied
+        }
         _ => ReduceOutcome::OutOfScope,
     }
 }
@@ -1938,6 +1951,7 @@ mod tests {
             origin: None,
             interactivity: None,
             working_directory: None,
+            config: None,
             turns: Vec::new(),
             turns_next_cursor: None,
             active_turn: None,

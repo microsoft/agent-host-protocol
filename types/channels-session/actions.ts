@@ -472,8 +472,10 @@ export interface SessionMcpServerStopRequestedAction {
  * Client changed a mutable config value mid-session.
  *
  * Only properties with `sessionMutable: true` in the config schema may be
- * changed. The server validates and broadcasts the action; the reducer merges
- * the new values into `state.config.values`.
+ * changed. For a property with `chatScoped: true`, this changes the inherited
+ * default for chats that do not have their own override. The server validates
+ * and broadcasts the action; the reducer merges the new values into
+ * `state.config.values`.
  *
  * @category Session Actions
  * @version 1

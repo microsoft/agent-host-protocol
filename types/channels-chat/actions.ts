@@ -690,6 +690,32 @@ export interface ChatDraftChangedAction {
   draft?: Message;
 }
 
+// ─── Config Actions ──────────────────────────────────────────────────────────
+
+/**
+ * Client changed mutable, chat-scoped config values.
+ *
+ * Only properties with both `chatScoped: true` and `sessionMutable: true` in
+ * the config schema may be changed. The server validates and broadcasts the
+ * action; the reducer merges the new overrides into `state.config.values`.
+ * Properties without a chat override inherit their current value from
+ * `SessionState.config`.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ChatConfigChangedAction {
+  type: ActionType.ChatConfigChanged;
+  /** Updated chat-scoped config overrides */
+  config: Record<string, unknown>;
+  /**
+   * When `true`, replaces all chat config overrides instead of merging.
+   * Omitted properties resume inheriting from the session.
+   */
+  replace?: boolean;
+}
+
 // ─── Session Input Actions ──────────────────────────────────────────────────
 
 /**
@@ -774,6 +800,7 @@ export type ChatAction =
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
+  | ChatConfigChangedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction

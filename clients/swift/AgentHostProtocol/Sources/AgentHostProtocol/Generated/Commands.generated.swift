@@ -1105,6 +1105,10 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     public var enumDynamic: Bool?
     /// When `true`, the user may change this property after session creation
     public var sessionMutable: Bool?
+    /// When `true`, each chat may override this property in `ChatState.config`.
+    /// A chat without an override inherits the current value from
+    /// `SessionState.config`.
+    public var chatScoped: Bool?
 
     enum CodingKeys: String, CodingKey {
         case type
@@ -1121,6 +1125,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         case additionalProperties
         case enumDynamic
         case sessionMutable
+        case chatScoped
     }
 
     public init(
@@ -1137,7 +1142,8 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         required: [String]? = nil,
         additionalProperties: ConfigPropertySchema? = nil,
         enumDynamic: Bool? = nil,
-        sessionMutable: Bool? = nil
+        sessionMutable: Bool? = nil,
+        chatScoped: Bool? = nil
     ) {
         self.type = type
         self.title = title
@@ -1153,6 +1159,7 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
         self.additionalProperties = additionalProperties
         self.enumDynamic = enumDynamic
         self.sessionMutable = sessionMutable
+        self.chatScoped = chatScoped
     }
 }
 

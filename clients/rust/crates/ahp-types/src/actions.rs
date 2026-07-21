@@ -100,6 +100,8 @@ pub enum ActionType {
     ChatQueuedMessagesReordered,
     #[serde(rename = "chat/draftChanged")]
     ChatDraftChanged,
+    #[serde(rename = "chat/configChanged")]
+    ChatConfigChanged,
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested,
     #[serde(rename = "chat/inputAnswerChanged")]
@@ -1027,6 +1029,24 @@ pub struct ChatDraftChangedAction {
     pub draft: Option<Message>,
 }
 
+/// Client changed mutable, chat-scoped config values.
+///
+/// Only properties with both `chatScoped: true` and `sessionMutable: true` in
+/// the config schema may be changed. The server validates and broadcasts the
+/// action; the reducer merges the new overrides into `state.config.values`.
+/// Properties without a chat override inherit their current value from
+/// `SessionState.config`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatConfigChangedAction {
+    /// Updated chat-scoped config overrides
+    pub config: JsonObject,
+    /// When `true`, replaces all chat config overrides instead of merging.
+    /// Omitted properties resume inheriting from the session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replace: Option<bool>,
+}
+
 /// A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -1241,8 +1261,10 @@ pub struct ChatTurnsLoadedAction {
 /// Client changed a mutable config value mid-session.
 ///
 /// Only properties with `sessionMutable: true` in the config schema may be
-/// changed. The server validates and broadcasts the action; the reducer merges
-/// the new values into `state.config.values`.
+/// changed. For a property with `chatScoped: true`, this changes the inherited
+/// default for chats that do not have their own override. The server validates
+/// and broadcasts the action; the reducer merges the new values into
+/// `state.config.values`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionConfigChangedAction {
@@ -1788,6 +1810,8 @@ pub enum StateAction {
     ChatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction),
     #[serde(rename = "chat/draftChanged")]
     ChatDraftChanged(ChatDraftChangedAction),
+    #[serde(rename = "chat/configChanged")]
+    ChatConfigChanged(ChatConfigChangedAction),
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested(ChatInputRequestedAction),
     #[serde(rename = "chat/inputAnswerChanged")]

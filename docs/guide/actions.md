@@ -87,7 +87,8 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `session/changesetsChanged` | No | The catalog of changesets the host advertises for this session changed (full replacement) |
 | `session/isReadChanged` | **Yes** | Client marked session as read or unread |
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |
-| `session/configChanged` | **Yes** | Mutable session config values changed |
+| `session/configChanged` | **Yes** | Mutable session config values or inherited chat defaults changed |
+| `chat/configChanged` | **Yes** | Mutable per-chat config overrides changed |
 | `session/metaChanged` | No | The session's `_meta` side-channel was replaced |
 
 ### Server & Active-Client Tools (session channel)

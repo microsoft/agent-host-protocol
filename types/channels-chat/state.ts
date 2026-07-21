@@ -6,7 +6,12 @@
  */
 
 import type { ModelSelection } from '../channels-root/state.js';
-import type { AgentSelection, McpAuthRequirement, SessionStatus } from '../channels-session/state.js';
+import type {
+  AgentSelection,
+  McpAuthRequirement,
+  SessionConfigState,
+  SessionStatus,
+} from '../channels-session/state.js';
 import type {
   ContentRef,
   ErrorInfo,
@@ -67,6 +72,15 @@ export interface ChatState {
    * make independent edits that the orchestrator later merges back.
    */
   workingDirectory?: URI;
+  /**
+   * Configuration overrides owned by this chat.
+   *
+   * Only properties whose schema declares `chatScoped: true` may appear in
+   * `values`. A property absent from `values` inherits the current value from
+   * `SessionState.config`. Presence of this state advertises support for
+   * per-chat config overrides.
+   */
+  config?: SessionConfigState;
 
   // ── Conversation contents ──────────────────────────────────────────
   /** Completed turns */
