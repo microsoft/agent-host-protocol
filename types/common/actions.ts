@@ -47,6 +47,7 @@ import type {
 
 import type {
   ChatTurnStartedAction,
+  ChatTurnResumedAction,
   ChatDeltaAction,
   ChatResponsePartAction,
   ChatToolCallStartAction,
@@ -131,6 +132,7 @@ export const enum ActionType {
   SessionChatUpdated = 'session/chatUpdated',
   SessionDefaultChatChanged = 'session/defaultChatChanged',
   ChatTurnStarted = 'chat/turnStarted',
+  ChatTurnResumed = 'chat/turnResumed',
   ChatDelta = 'chat/delta',
   ChatResponsePart = 'chat/responsePart',
   ChatToolCallStart = 'chat/toolCallStart',
@@ -275,6 +277,7 @@ export type StateAction =
   | SessionConfigChangedAction
   | SessionMetaChangedAction
   | ChatTurnStartedAction
+  | ChatTurnResumedAction
   | ChatDeltaAction
   | ChatResponsePartAction
   | ChatToolCallStartAction

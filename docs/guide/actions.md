@@ -50,6 +50,7 @@ When a client dispatches an action, the server applies it to the state and also 
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `chat/turnStarted` | **Yes** | User sent a message; server starts processing |
+| `chat/turnResumed` | **Yes** | The most recent resumable failed turn is reopened without another user message |
 | `chat/delta` | No | Streaming text chunk appended to a response part by `partId` |
 | `chat/responsePart` | No | New response part created (markdown, reasoning, content ref, tool call) |
 | `chat/reasoning` | No | Reasoning/thinking text appended to a reasoning part by `partId` |
@@ -187,6 +188,7 @@ The client applies the action **optimistically** to its local state before sendi
 | Action | Server-side effect |
 |---|---|
 | `chat/turnStarted` | Begins agent processing for the new turn |
+| `chat/turnResumed` | Continues agent processing for the most recent resumable failed turn without adding user input |
 | `chat/toolCallConfirmed` | Approves or denies a pending tool call; unblocks or cancels tool execution |
 | `chat/turnCancelled` | Aborts the in-progress turn |
 | `session/titleChanged` | Updates the session title (rename) |

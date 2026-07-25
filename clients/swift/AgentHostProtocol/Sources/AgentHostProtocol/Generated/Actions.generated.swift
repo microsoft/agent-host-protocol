@@ -15,6 +15,7 @@ public enum ActionType: String, Codable, Sendable {
     case sessionChatUpdated = "session/chatUpdated"
     case sessionDefaultChatChanged = "session/defaultChatChanged"
     case chatTurnStarted = "chat/turnStarted"
+    case chatTurnResumed = "chat/turnResumed"
     case chatDelta = "chat/delta"
     case chatResponsePart = "chat/responsePart"
     case chatToolCallStart = "chat/toolCallStart"
@@ -290,6 +291,20 @@ public struct ChatTurnStartedAction: Codable, Sendable {
         self.message = message
         self.queuedMessageId = queuedMessageId
         self.meta = meta
+    }
+}
+
+public struct ChatTurnResumedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Identifier of the resumable failed turn.
+    public var turnId: String
+
+    public init(
+        type: ActionType,
+        turnId: String
+    ) {
+        self.type = type
+        self.turnId = turnId
     }
 }
 
@@ -2026,6 +2041,7 @@ public enum StateAction: Codable, Sendable {
     case sessionChatUpdated(SessionChatUpdatedAction)
     case sessionDefaultChatChanged(SessionDefaultChatChangedAction)
     case chatTurnStarted(ChatTurnStartedAction)
+    case chatTurnResumed(ChatTurnResumedAction)
     case chatDelta(ChatDeltaAction)
     case chatResponsePart(ChatResponsePartAction)
     case chatToolCallStart(ChatToolCallStartAction)
@@ -2132,6 +2148,8 @@ public enum StateAction: Codable, Sendable {
             self = .sessionDefaultChatChanged(try SessionDefaultChatChangedAction(from: decoder))
         case "chat/turnStarted":
             self = .chatTurnStarted(try ChatTurnStartedAction(from: decoder))
+        case "chat/turnResumed":
+            self = .chatTurnResumed(try ChatTurnResumedAction(from: decoder))
         case "chat/delta":
             self = .chatDelta(try ChatDeltaAction(from: decoder))
         case "chat/responsePart":
@@ -2300,6 +2318,7 @@ public enum StateAction: Codable, Sendable {
         case .sessionChatUpdated(let v): try v.encode(to: encoder)
         case .sessionDefaultChatChanged(let v): try v.encode(to: encoder)
         case .chatTurnStarted(let v): try v.encode(to: encoder)
+        case .chatTurnResumed(let v): try v.encode(to: encoder)
         case .chatDelta(let v): try v.encode(to: encoder)
         case .chatResponsePart(let v): try v.encode(to: encoder)
         case .chatToolCallStart(let v): try v.encode(to: encoder)

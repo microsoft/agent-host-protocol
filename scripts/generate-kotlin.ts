@@ -1270,6 +1270,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/chatUpdated', caseName: 'SessionChatUpdated', tsInterface: 'SessionChatUpdatedAction' },
   { type: 'session/defaultChatChanged', caseName: 'SessionDefaultChatChanged', tsInterface: 'SessionDefaultChatChangedAction' },
   { type: 'chat/turnStarted', caseName: 'ChatTurnStarted', tsInterface: 'ChatTurnStartedAction' },
+  { type: 'chat/turnResumed', caseName: 'ChatTurnResumed', tsInterface: 'ChatTurnResumedAction' },
   { type: 'chat/delta', caseName: 'ChatDelta', tsInterface: 'ChatDeltaAction' },
   { type: 'chat/responsePart', caseName: 'ChatResponsePart', tsInterface: 'ChatResponsePartAction' },
   { type: 'chat/toolCallStart', caseName: 'ChatToolCallStart', tsInterface: 'ChatToolCallStartAction' },

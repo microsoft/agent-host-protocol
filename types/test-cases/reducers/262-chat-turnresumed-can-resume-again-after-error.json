@@ -1,0 +1,74 @@
+{
+  "description": "a resumed turn can be resumed again after another resumable error",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 2,
+    "modifiedAt": "1970-01-01T00:00:02.000Z",
+    "origin": {
+      "kind": "user"
+    },
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "Hello",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "First failure",
+          "resumable": true
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/turnResumed",
+      "turnId": "turn-1"
+    },
+    {
+      "type": "chat/error",
+      "turnId": "turn-1",
+      "duration": 1000,
+      "error": {
+        "errorType": "runtime",
+        "message": "Second failure",
+        "resumable": true
+      }
+    },
+    {
+      "type": "chat/turnResumed",
+      "turnId": "turn-1"
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:09.999Z",
+    "origin": {
+      "kind": "user"
+    },
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:02.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    }
+  }
+}

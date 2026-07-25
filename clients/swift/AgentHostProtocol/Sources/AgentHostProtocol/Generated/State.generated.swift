@@ -635,13 +635,17 @@ public struct AgentCapabilities: Codable, Sendable {
     /// set and MUST NOT set more than one entry in
     /// {@link CreateSessionParams.workingDirectories}.
     public var multipleWorkingDirectories: MultipleWorkingDirectoriesCapability?
+    /// The agent can resume a failed turn without adding another message.
+    public var resumeTurn: AnyCodable?
 
     public init(
         multipleChats: MultipleChatsCapability? = nil,
-        multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = nil
+        multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = nil,
+        resumeTurn: AnyCodable? = nil
     ) {
         self.multipleChats = multipleChats
         self.multipleWorkingDirectories = multipleWorkingDirectories
+        self.resumeTurn = resumeTurn
     }
 }
 
@@ -4741,6 +4745,8 @@ public struct ErrorInfo: Codable, Sendable {
     public var message: String
     /// Stack trace
     public var stack: String?
+    /// Whether the failed operation can be resumed without adding new user input.
+    public var resumable: Bool?
     /// Additional provider-specific metadata for this error.
     /// Clients MAY look for well-known optional keys here to provide enhanced UI
     /// (e.g. a structured chat fetch error for richer, localized messaging).
@@ -4750,6 +4756,7 @@ public struct ErrorInfo: Codable, Sendable {
         case errorType
         case message
         case stack
+        case resumable
         case meta = "_meta"
     }
 
@@ -4757,11 +4764,13 @@ public struct ErrorInfo: Codable, Sendable {
         errorType: String,
         message: String,
         stack: String? = nil,
+        resumable: Bool? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.errorType = errorType
         self.message = message
         self.stack = stack
+        self.resumable = resumable
         self.meta = meta
     }
 }

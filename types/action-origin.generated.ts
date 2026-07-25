@@ -35,6 +35,7 @@ import type {
   SessionConfigChangedAction,
   SessionMetaChangedAction,
   ChatTurnStartedAction,
+  ChatTurnResumedAction,
   ChatDeltaAction,
   ChatResponsePartAction,
   ChatToolCallStartAction,
@@ -183,6 +184,7 @@ export type ServerSessionAction =
 /** Union of all chat-scoped actions. */
 export type ChatAction =
   | ChatTurnStartedAction
+  | ChatTurnResumedAction
   | ChatDeltaAction
   | ChatResponsePartAction
   | ChatToolCallStartAction
@@ -216,6 +218,7 @@ export type ChatAction =
 /** Union of chat actions that clients may dispatch. */
 export type ClientChatAction =
   | ChatTurnStartedAction
+  | ChatTurnResumedAction
   | ChatToolCallConfirmedAction
   | ChatToolCallCompleteAction
   | ChatToolCallResultConfirmedAction
@@ -389,6 +392,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionConfigChanged]: true,
   [ActionType.SessionMetaChanged]: false,
   [ActionType.ChatTurnStarted]: true,
+  [ActionType.ChatTurnResumed]: true,
   [ActionType.ChatDelta]: false,
   [ActionType.ChatResponsePart]: false,
   [ActionType.ChatToolCallStart]: false,

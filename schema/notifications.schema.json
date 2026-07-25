@@ -629,6 +629,10 @@
           "type": "string",
           "description": "Stack trace"
         },
+        "resumable": {
+          "type": "boolean",
+          "description": "Whether the failed operation can be resumed without adding new user input."
+        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -780,6 +784,11 @@
         "multipleWorkingDirectories": {
           "$ref": "#/$defs/MultipleWorkingDirectoriesCapability",
           "description": "The session's agent can be granted tool access to more than one working\ndirectory. The directories are treated as equal peers except where the\nagent advertises {@link MultipleWorkingDirectoriesCapability.immutablePrimary}\n(some backends pin their first directory as a fixed process root).\n\nWhen absent, clients MUST NOT mutate a session's or chat's working-directory\nset and MUST NOT set more than one entry in\n{@link CreateSessionParams.workingDirectories}."
+        },
+        "resumeTurn": {
+          "type": "object",
+          "properties": {},
+          "description": "The agent can resume a failed turn without adding another message."
         }
       }
     },

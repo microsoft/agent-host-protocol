@@ -170,6 +170,7 @@ the host already materialized when it accepted the containing message.
 Once a chat exists and its session is `lifecycle: 'ready'`, the chat accepts turns. The wire shape mirrors the legacy single-chat session shape:
 
 - The client dispatches `chat/turnStarted` to begin a turn.
+- After the most recent turn ends in a resumable error, the client may dispatch `chat/turnResumed` to continue it without adding another message.
 - The server streams `chat/delta`, `chat/responsePart`, `chat/toolCallStart`, `chat/toolCallReady`, and related actions.
 - The client dispatches `chat/toolCallConfirmed` / `chat/toolCallResultConfirmed` to approve or deny tool calls, or `chat/turnCancelled` to abort.
 - The server dispatches `chat/turnComplete` or `chat/error` when the turn ends.
@@ -224,6 +225,7 @@ When the server receives a client-dispatched action on this channel, it MUST val
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | Any action referencing a non-existent chat | Channel URI not found                                                                                                      | Server MUST silently ignore the action (no echo)                                                 |
 | `chat/toolCallConfirmed`                   | Tool call not in `pending-confirmation` state                                                                              | Server MUST reject the action                                                                    |
+| `chat/turnResumed`                         | The target is not the most recent turn, it is not failed with `error.resumable: true`, or another turn is active            | Server MUST reject the action                                                                    |
 | `chat/turnCancelled`                       | No active turn                                                                                                             | Server MUST reject the action                                                                    |
 | `chat/inputAnswerChanged`                  | No input request with matching `requestId`                                                                                 | Server SHOULD reject the action                                                                  |
 | `chat/inputAnswerChanged`                  | `answer.state` requires a value but `answer.value` is absent, or `answer.value.kind` is missing the matching payload field | Server SHOULD reject the action                                                                  |

@@ -1,0 +1,64 @@
+{
+  "description": "chat/turnResumed is a no-op for a non-resumable error",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 2,
+    "modifiedAt": "1970-01-01T00:00:02.000Z",
+    "origin": {
+      "kind": "user"
+    },
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "Hello",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "Request failed"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/turnResumed",
+      "turnId": "turn-1"
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/c1",
+    "title": "Chat 1",
+    "status": 2,
+    "modifiedAt": "1970-01-01T00:00:02.000Z",
+    "origin": {
+      "kind": "user"
+    },
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "Hello",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "Request failed"
+        }
+      }
+    ]
+  }
+}
