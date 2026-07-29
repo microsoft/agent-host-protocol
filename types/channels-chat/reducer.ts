@@ -15,6 +15,7 @@ import type {
   Turn,
   PendingMessage,
   ConfirmationOption,
+  ToolCallContributor,
 } from './state.js';
 import {
   TurnState,
@@ -48,6 +49,28 @@ function tcBaseWithMeta(tc: ToolCallState, meta: Record<string, unknown> | undef
     ...tcBase(tc),
     _meta: meta ?? tc._meta,
   };
+}
+
+function refineToolCallContributor(
+  current: ToolCallContributor | undefined,
+  next: ToolCallContributor | undefined,
+  log?: (msg: string) => void,
+): ToolCallContributor | undefined {
+  if (!next) {
+    return current;
+  }
+  if (current?.kind === ToolCallContributorKind.Client) {
+    if (next.kind === ToolCallContributorKind.Client && next.clientId === current.clientId) {
+      return next;
+    }
+    log?.(`Ignoring contributor change for client tool call from '${current.clientId}'`);
+    return current;
+  }
+  if (next.kind === ToolCallContributorKind.Client) {
+    log?.(`Ignoring late client contributor '${next.clientId}' because client execution ownership must be established at tool call start`);
+    return current;
+  }
+  return next;
 }
 
 /** Resolves a selected option from the confirmation options array by ID. */
@@ -456,7 +479,11 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         ) {
           return tc;
         }
-        const base = tcBaseWithMeta(tc, action._meta);
+        const base = {
+          ...tcBaseWithMeta(tc, action._meta),
+          contributor: refineToolCallContributor(tc.contributor, action.contributor, log),
+          intention: action.intention ?? tc.intention,
+        };
         if (action.confirmed) {
           return {
             status: ToolCallStatus.Running,

@@ -137,6 +137,27 @@ struct ToolCallBase {
     meta: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
+fn refine_tool_call_contributor(
+    current: Option<ToolCallContributor>,
+    next: Option<ToolCallContributor>,
+) -> Option<ToolCallContributor> {
+    let Some(next) = next else {
+        return current;
+    };
+    if let Some(ToolCallContributor::Client(current_client)) = current.as_ref() {
+        if let ToolCallContributor::Client(next_client) = &next {
+            if next_client.client_id == current_client.client_id {
+                return Some(next);
+            }
+        }
+        return current;
+    }
+    if matches!(next, ToolCallContributor::Client(_)) {
+        return current;
+    }
+    Some(next)
+}
+
 fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
     match tc {
         ToolCallState::Streaming(s) => ToolCallBase {
@@ -1234,7 +1255,9 @@ fn apply_tool_call_delta(state: &mut ChatState, a: &ChatToolCallDeltaAction) -> 
 
 fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
-        let base = tool_call_meta(&tc);
+        let mut base = tool_call_meta(&tc);
+        base.intention = a.intention.clone().or(base.intention);
+        base.contributor = refine_tool_call_contributor(base.contributor, a.contributor.clone());
         let meta = a.meta.clone().or(base.meta);
         let pending = match &tc {
             ToolCallState::PendingConfirmation(value) => Some(value.clone()),

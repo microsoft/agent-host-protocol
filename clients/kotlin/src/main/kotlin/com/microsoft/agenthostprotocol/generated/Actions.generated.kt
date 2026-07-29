@@ -472,6 +472,16 @@ data class ChatToolCallReadyAction(
     val meta: Map<String, JsonElement>? = null,
     val type: ActionType,
     /**
+     * Final contributor metadata. MUST NOT change execution ownership established
+     * at `chat/toolCallStart`; a client contributor must keep the same `clientId`.
+     */
+    val contributor: ToolCallContributor? = null,
+    /**
+     * Final human-readable description of what the tool invocation intends to do.
+     * When present, replaces the provisional intention from `chat/toolCallStart`.
+     */
+    val intention: String? = null,
+    /**
      * Message describing what the tool will do or what confirmation is needed
      */
     val invocationMessage: StringOrMarkdown,

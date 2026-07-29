@@ -481,6 +481,14 @@ pub struct ChatToolCallReadyAction {
     /// contain escape sequences).
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Final contributor metadata. MUST NOT change execution ownership established
+    /// at `chat/toolCallStart`; a client contributor must keep the same `clientId`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contributor: Option<ToolCallContributor>,
+    /// Final human-readable description of what the tool invocation intends to do.
+    /// When present, replaces the provisional intention from `chat/toolCallStart`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intention: Option<String>,
     /// Message describing what the tool will do or what confirmation is needed
     pub invocation_message: StringOrMarkdown,
     /// Raw tool input

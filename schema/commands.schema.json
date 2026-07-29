@@ -7125,6 +7125,14 @@
         "type": {
           "const": "chat/toolCallReady"
         },
+        "contributor": {
+          "$ref": "#/$defs/ToolCallContributor",
+          "description": "Final contributor metadata. MUST NOT change execution ownership established\nat `chat/toolCallStart`; a client contributor must keep the same `clientId`."
+        },
+        "intention": {
+          "type": "string",
+          "description": "Final human-readable description of what the tool invocation intends to do.\nWhen present, replaces the provisional intention from `chat/toolCallStart`."
+        },
         "invocationMessage": {
           "$ref": "#/$defs/StringOrMarkdown",
           "description": "Message describing what the tool will do or what confirmation is needed"

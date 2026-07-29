@@ -177,6 +177,20 @@ Once a chat exists and its session is `lifecycle: 'ready'`, the chat accepts tur
 
 All actions dispatched on this channel travel on `ActionEnvelope`s whose `channel` is the chat URI. Action payloads do NOT carry their own chat URI — the channel comes from the envelope.
 
+### Tool call metadata refinement
+
+A host MAY open a tool call before all display metadata is known so clients can
+render progress while the model is still generating parameters. In that case,
+`chat/toolCallStart` carries the metadata available at discovery time and
+`chat/toolCallReady` MAY provide a final `contributor` and `intention`.
+
+Ready-time contributor refinement MUST NOT change execution ownership. A tool
+that started as client-contributed remains owned by the same `clientId`, and a
+tool that did not start as client-contributed cannot become client-owned at
+Ready. Other refinements, such as discovering the MCP customization that owns a
+server-executed tool, are allowed. Reducers ignore contributor changes that
+would violate this invariant.
+
 ### Disposal
 
 A chat is implicitly disposed when its owning session is disposed. The protocol does not currently expose a `disposeChat` command; chats live for the life of their session unless the server prunes them. When a chat is removed (whether explicitly or because its session was torn down), the server MUST update the session's `chats` catalog via `session/chatRemoved` so subscribers can release their per-chat subscriptions.

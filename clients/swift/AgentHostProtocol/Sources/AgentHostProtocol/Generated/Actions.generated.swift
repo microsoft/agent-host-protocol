@@ -480,6 +480,12 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
     /// contain escape sequences).
     public var meta: [String: AnyCodable]?
     public var type: ActionType
+    /// Final contributor metadata. MUST NOT change execution ownership established
+    /// at `chat/toolCallStart`; a client contributor must keep the same `clientId`.
+    public var contributor: ToolCallContributor?
+    /// Final human-readable description of what the tool invocation intends to do.
+    /// When present, replaces the provisional intention from `chat/toolCallStart`.
+    public var intention: String?
     /// Message describing what the tool will do or what confirmation is needed
     public var invocationMessage: StringOrMarkdown
     /// Raw tool input
@@ -505,6 +511,8 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         case toolCallId
         case meta = "_meta"
         case type
+        case contributor
+        case intention
         case invocationMessage
         case toolInput
         case confirmationTitle
@@ -520,6 +528,8 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         toolCallId: String,
         meta: [String: AnyCodable]? = nil,
         type: ActionType,
+        contributor: ToolCallContributor? = nil,
+        intention: String? = nil,
         invocationMessage: StringOrMarkdown,
         toolInput: String? = nil,
         confirmationTitle: StringOrMarkdown? = nil,
@@ -533,6 +543,8 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         self.toolCallId = toolCallId
         self.meta = meta
         self.type = type
+        self.contributor = contributor
+        self.intention = intention
         self.invocationMessage = invocationMessage
         self.toolInput = toolInput
         self.confirmationTitle = confirmationTitle

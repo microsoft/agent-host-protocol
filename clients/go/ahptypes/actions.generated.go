@@ -350,6 +350,12 @@ type ChatToolCallReadyAction struct {
 	// contain escape sequences).
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	Type ActionType                 `json:"type"`
+	// Final contributor metadata. MUST NOT change execution ownership established
+	// at `chat/toolCallStart`; a client contributor must keep the same `clientId`.
+	Contributor *ToolCallContributor `json:"contributor,omitempty"`
+	// Final human-readable description of what the tool invocation intends to do.
+	// When present, replaces the provisional intention from `chat/toolCallStart`.
+	Intention *string `json:"intention,omitempty"`
 	// Message describing what the tool will do or what confirmation is needed
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
 	// Raw tool input

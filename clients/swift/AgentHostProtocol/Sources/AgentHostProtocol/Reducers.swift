@@ -47,6 +47,22 @@ private func resolveSelectedOption(_ options: [ConfirmationOption]?, id: String?
     return options.first { $0.id == id }
 }
 
+private func refineToolCallContributor(_ current: ToolCallContributor?, _ next: ToolCallContributor?) -> ToolCallContributor? {
+    guard let next else {
+        return current
+    }
+    if let current, case .client(let currentClient) = current {
+        if case .client(let nextClient) = next, nextClient.clientId == currentClient.clientId {
+            return next
+        }
+        return current
+    }
+    if case .client = next {
+        return current
+    }
+    return next
+}
+
 /// Extracts the stable `id` of a session input request, or `nil` for unknown variants.
 private func sessionInputRequestID(_ r: SessionInputRequest) -> String? {
     switch r {
@@ -206,6 +222,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             default: return tc
             }
             let base = tc.baseFields
+            let intention = a.intention ?? base.intention
+            let contributor = refineToolCallContributor(base.contributor, a.contributor)
             let meta = a.meta ?? base.meta
             let pending: ToolCallPendingConfirmationState?
             if case .pendingConfirmation(let value) = tc {
@@ -218,8 +236,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
                     displayName: base.displayName,
-                    intention: base.intention,
-                    contributor: base.contributor,
+                    intention: intention,
+                    contributor: contributor,
                     meta: meta,
                     invocationMessage: a.invocationMessage,
                     toolInput: a.toolInput,
@@ -231,8 +249,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolCallId: base.toolCallId,
                 toolName: base.toolName,
                 displayName: base.displayName,
-                intention: base.intention,
-                contributor: base.contributor,
+                intention: intention,
+                contributor: contributor,
                 meta: meta,
                 invocationMessage: a.invocationMessage,
                 toolInput: a.toolInput ?? pending?.toolInput,

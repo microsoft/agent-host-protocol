@@ -171,6 +171,21 @@ private data class ToolCallBase(
     fun withMeta(meta: Map<String, JsonElement>?): ToolCallBase = copy(meta = meta ?: this.meta)
 }
 
+private fun refineToolCallContributor(
+    current: ToolCallContributor?,
+    next: ToolCallContributor?,
+): ToolCallContributor? {
+    if (next == null) return current
+    if (current is ToolCallContributorClient) {
+        if (next is ToolCallContributorClient && next.value.clientId == current.value.clientId) {
+            return next
+        }
+        return current
+    }
+    if (next is ToolCallContributorClient) return current
+    return next
+}
+
 private fun toolCallBase(tc: ToolCallState): ToolCallBase = when (tc) {
     is ToolCallStateStreaming -> tc.value.let {
         ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.contributor, it.meta)
@@ -939,7 +954,11 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                 ) {
                     tc
                 } else {
-                    val base = toolCallBase(tc).withMeta(a.meta)
+                    val initialBase = toolCallBase(tc)
+                    val base = initialBase.copy(
+                        intention = a.intention ?: initialBase.intention,
+                        contributor = refineToolCallContributor(initialBase.contributor, a.contributor),
+                    ).withMeta(a.meta)
                     val pending = (tc as? ToolCallStatePendingConfirmation)?.value
                     if (a.confirmed != null) {
                         ToolCallStateRunning(

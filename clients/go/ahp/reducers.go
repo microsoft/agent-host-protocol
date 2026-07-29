@@ -1043,9 +1043,31 @@ func applyToolCallDelta(state *ahptypes.ChatState, a *ahptypes.ChatToolCallDelta
 	})
 }
 
+func refineToolCallContributor(current, next *ahptypes.ToolCallContributor) *ahptypes.ToolCallContributor {
+	if next == nil {
+		return current
+	}
+	if current != nil {
+		if currentClient, ok := current.Value.(*ahptypes.ToolCallClientContributor); ok {
+			if nextClient, ok := next.Value.(*ahptypes.ToolCallClientContributor); ok && nextClient.ClientId == currentClient.ClientId {
+				return next
+			}
+			return current
+		}
+	}
+	if _, ok := next.Value.(*ahptypes.ToolCallClientContributor); ok {
+		return current
+	}
+	return next
+}
+
 func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReadyAction) ReduceOutcome {
 	return updateToolCall(state, a.TurnId, a.ToolCallId, func(tc ahptypes.ToolCallState) ahptypes.ToolCallState {
 		common := toolCallMeta(tc)
+		if a.Intention != nil {
+			common.intention = a.Intention
+		}
+		common.contributor = refineToolCallContributor(common.contributor, a.Contributor)
 		if a.Meta != nil {
 			common.meta = a.Meta
 		}

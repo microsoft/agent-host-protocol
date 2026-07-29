@@ -1,0 +1,236 @@
+{
+  "description": "toolCallReady refines contributor and intention without changing client execution ownership",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-mcp",
+      "toolName": "lookup",
+      "displayName": "Lookup",
+      "intention": "Query"
+    },
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-mcp",
+      "contributor": {
+        "kind": "mcp",
+        "customizationId": "mcp-1"
+      },
+      "intention": "Query project metadata",
+      "invocationMessage": "Querying project metadata",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "chat/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-client-same",
+      "toolName": "client-tool",
+      "displayName": "Client Tool",
+      "contributor": {
+        "kind": "client",
+        "clientId": "client-1"
+      }
+    },
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-client-same",
+      "contributor": {
+        "kind": "client",
+        "clientId": "client-1"
+      },
+      "invocationMessage": "Running client tool",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "chat/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-client-change",
+      "toolName": "client-tool",
+      "displayName": "Client Tool",
+      "contributor": {
+        "kind": "client",
+        "clientId": "client-1"
+      }
+    },
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-client-change",
+      "contributor": {
+        "kind": "client",
+        "clientId": "client-2"
+      },
+      "invocationMessage": "Running client tool",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "chat/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-client-to-mcp",
+      "toolName": "client-tool",
+      "displayName": "Client Tool",
+      "contributor": {
+        "kind": "client",
+        "clientId": "client-1"
+      }
+    },
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-client-to-mcp",
+      "contributor": {
+        "kind": "mcp",
+        "customizationId": "mcp-1"
+      },
+      "invocationMessage": "Running client tool",
+      "confirmed": "not-needed"
+    },
+    {
+      "type": "chat/toolCallStart",
+      "turnId": "turn-1",
+      "toolCallId": "tc-late-client",
+      "toolName": "host-tool",
+      "displayName": "Host Tool"
+    },
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-late-client",
+      "contributor": {
+        "kind": "client",
+        "clientId": "client-1"
+      },
+      "invocationMessage": "Running host tool",
+      "confirmed": "not-needed"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-mcp",
+            "toolName": "lookup",
+            "displayName": "Lookup",
+            "intention": "Query project metadata",
+            "contributor": {
+              "kind": "mcp",
+              "customizationId": "mcp-1"
+            },
+            "_meta": null,
+            "invocationMessage": "Querying project metadata",
+            "toolInput": null,
+            "confirmed": "not-needed"
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-client-same",
+            "toolName": "client-tool",
+            "displayName": "Client Tool",
+            "intention": null,
+            "contributor": {
+              "kind": "client",
+              "clientId": "client-1"
+            },
+            "_meta": null,
+            "invocationMessage": "Running client tool",
+            "toolInput": null,
+            "confirmed": "not-needed"
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-client-change",
+            "toolName": "client-tool",
+            "displayName": "Client Tool",
+            "intention": null,
+            "contributor": {
+              "kind": "client",
+              "clientId": "client-1"
+            },
+            "_meta": null,
+            "invocationMessage": "Running client tool",
+            "toolInput": null,
+            "confirmed": "not-needed"
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-client-to-mcp",
+            "toolName": "client-tool",
+            "displayName": "Client Tool",
+            "intention": null,
+            "contributor": {
+              "kind": "client",
+              "clientId": "client-1"
+            },
+            "_meta": null,
+            "invocationMessage": "Running client tool",
+            "toolInput": null,
+            "confirmed": "not-needed"
+          }
+        },
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-late-client",
+            "toolName": "host-tool",
+            "displayName": "Host Tool",
+            "intention": null,
+            "contributor": null,
+            "_meta": null,
+            "invocationMessage": "Running host tool",
+            "toolInput": null,
+            "confirmed": "not-needed"
+          }
+        }
+      ],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}
