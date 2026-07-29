@@ -3205,7 +3205,6 @@
         "id",
         "message",
         "responseParts",
-        "usage",
         "state"
       ]
     },
@@ -3241,8 +3240,7 @@
         "id",
         "startedAt",
         "message",
-        "responseParts",
-        "usage"
+        "responseParts"
       ]
     },
     "MessageOrigin": {

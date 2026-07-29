@@ -254,6 +254,26 @@ function splitUnionType(typeText: string): string[] {
   return parts;
 }
 
+/**
+ * Whether a declared property type admits `undefined` — i.e. it is written as
+ * an explicit `T | undefined` union rather than with a `?` question token.
+ *
+ * The protocol uses `T | undefined` (instead of `T?`) for fields whose "cleared"
+ * state is semantically meaningful, so that a producer constructing the object
+ * literal in TypeScript is forced to mention the key and consciously decide
+ * between a value and a clear. That is purely an authoring-time constraint: at
+ * runtime `JSON.stringify` drops `undefined` members, so such a field is
+ * **absent** on the wire exactly like an optional one, and every language
+ * generator emits it as optional (`Option<T>` + `skip_serializing_if`,
+ * `*T` + `omitempty`, `T? = null`).
+ *
+ * The emitted JSON Schema therefore MUST NOT list these properties as
+ * `required`, or it would reject the very messages the clients produce.
+ */
+function typeAdmitsUndefined(typeText: string): boolean {
+  return splitUnionType(typeText.trim()).some(part => part === 'undefined');
+}
+
 function enumMemberToSchema(typeText: string, project: Project): JsonSchema | undefined {
   const match = typeText.match(/^([A-Z]\w*)\.(\w+)$/);
   if (!match) return undefined;
@@ -276,7 +296,7 @@ function inlineObjectToSchema(text: string, project: Project): JsonSchema {
       const [, name, optional, type] = match;
       const fieldType = type.trim();
       schema.properties![name] = typeTextToSchema(fieldType, project);
-      if (!optional) {
+      if (!optional && !typeAdmitsUndefined(fieldType)) {
         schema.required!.push(name);
       }
     }
@@ -303,7 +323,7 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
     const propSchema = typeTextToSchema(typeText, project);
     if (desc) propSchema.description = desc;
     schema.properties![name] = propSchema;
-    if (!prop.hasQuestionToken()) {
+    if (!prop.hasQuestionToken() && !typeAdmitsUndefined(typeText)) {
       if (!schema.required!.includes(name)) {
         schema.required!.push(name);
       }

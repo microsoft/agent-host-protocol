@@ -4306,7 +4306,6 @@
         "id",
         "message",
         "responseParts",
-        "usage",
         "state"
       ]
     },
@@ -4342,8 +4341,7 @@
         "id",
         "startedAt",
         "message",
-        "responseParts",
-        "usage"
+        "responseParts"
       ]
     },
     "MessageOrigin": {
@@ -6299,8 +6297,7 @@
       "required": [
         "channel",
         "action",
-        "serverSeq",
-        "origin"
+        "serverSeq"
       ]
     },
     "RootAgentsChangedAction": {
@@ -6584,8 +6581,7 @@
         }
       },
       "required": [
-        "type",
-        "activity"
+        "type"
       ]
     },
     "SessionChangesetsChangedAction": {
@@ -6604,8 +6600,7 @@
         }
       },
       "required": [
-        "type",
-        "changesets"
+        "type"
       ]
     },
     "SessionServerToolsChangedAction": {
@@ -6902,8 +6897,7 @@
         }
       },
       "required": [
-        "type",
-        "_meta"
+        "type"
       ]
     },
     "ToolCallActionBase": {
@@ -8166,8 +8160,7 @@
         }
       },
       "required": [
-        "type",
-        "operations"
+        "type"
       ]
     },
     "ChangesetOperationStatusChangedAction": {

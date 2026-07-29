@@ -15,6 +15,7 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Project } from 'ts-morph';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILES = [
@@ -265,6 +266,95 @@ describe('generated JSON schemas', () => {
           false,
         );
       });
+    });
+  }
+});
+
+describe('`T | undefined` properties are not schema-required', () => {
+  // The protocol writes a handful of properties as an explicit `T | undefined`
+  // union rather than with a `?` question token, so that a producer building the
+  // object literal in TypeScript is forced to mention the key and consciously
+  // choose between a value and a clear (e.g. `session/activityChanged` clearing
+  // the activity string).
+  //
+  // That is an authoring-time constraint only. `JSON.stringify` drops
+  // `undefined` members, so on the wire such a property is simply **absent**,
+  // exactly like an optional one — and every language generator emits it as
+  // optional (`Option<T>` + `skip_serializing_if`, `*T` + `omitempty`,
+  // `T? = null`). Listing them under `required` made the published schemas
+  // reject the very traffic all five clients produce.
+  //
+  // Derived from the canonical sources rather than hardcoded, so a newly added
+  // `T | undefined` property is covered automatically.
+
+  const project = new Project({
+    tsConfigFilePath: resolve(root, 'types/tsconfig.json'),
+    skipAddingFilesFromTsConfig: false,
+  });
+
+  /** `interface name` → property names declared as an explicit `T | undefined` union. */
+  const undefinedProps = new Map<string, Set<string>>();
+  for (const sourceFile of project.getSourceFiles()) {
+    for (const iface of sourceFile.getInterfaces()) {
+      for (const prop of iface.getProperties()) {
+        if (prop.hasQuestionToken()) {
+          continue;
+        }
+        const typeText = prop.getTypeNode()?.getText() ?? '';
+        // Top-level `| undefined` member; generics/inline objects never contain
+        // a bare `undefined` union member at depth 0 in this codebase.
+        if (!/(^|\|)\s*undefined\s*(\||$)/.test(typeText)) {
+          continue;
+        }
+        let set = undefinedProps.get(iface.getName());
+        if (!set) {
+          set = new Set();
+          undefinedProps.set(iface.getName(), set);
+        }
+        set.add(prop.getName());
+      }
+    }
+  }
+
+  it('finds the known `T | undefined` properties in types/', () => {
+    // Sanity-check the derivation itself: if this drops to zero because the
+    // extraction broke, the per-schema assertions below would vacuously pass.
+    assert.ok(
+      undefinedProps.size > 0,
+      'expected to find at least one `T | undefined` property in types/ — the extraction is probably broken',
+    );
+  });
+
+  for (const file of SCHEMA_FILES) {
+    it(`${file} marks none of them required`, () => {
+      const schema = loadSchema(file);
+      const defs = (schema.$defs as Record<string, Record<string, unknown>>) ?? {};
+      const offenders: string[] = [];
+
+      for (const [typeName, properties] of undefinedProps) {
+        const def = defs[typeName];
+        if (!def) {
+          continue;
+        }
+        const required = Array.isArray(def.required) ? (def.required as string[]) : [];
+        const declared = (def.properties as Record<string, unknown> | undefined) ?? {};
+        for (const property of properties) {
+          if (required.includes(property)) {
+            offenders.push(`${typeName}.${property} is listed as required`);
+          }
+          // It must still be *declared* — dropping it from `required` is only
+          // correct if the property itself is still described.
+          if (!(property in declared)) {
+            offenders.push(`${typeName}.${property} is missing from properties`);
+          }
+        }
+      }
+
+      assert.deepEqual(
+        offenders.sort(),
+        [],
+        `${file}: a \`T | undefined\` property must be optional-but-declared, since it is absent on the wire and every client emits it as optional:\n  ${offenders.join('\n  ')}`,
+      );
     });
   }
 });
