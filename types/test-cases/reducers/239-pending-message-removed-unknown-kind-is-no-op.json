@@ -1,0 +1,65 @@
+{
+  "description": "pending message removed with an unknown kind is no-op",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "steeringMessage": {
+      "id": "shared",
+      "message": {
+        "text": "Steering",
+        "origin": {
+          "kind": "user"
+        }
+      }
+    },
+    "queuedMessages": [
+      {
+        "id": "shared",
+        "message": {
+          "text": "Queued",
+          "origin": {
+            "kind": "user"
+          }
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/pendingMessageRemoved",
+      "kind": "future-kind",
+      "id": "shared"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "steeringMessage": {
+      "id": "shared",
+      "message": {
+        "text": "Steering",
+        "origin": {
+          "kind": "user"
+        }
+      }
+    },
+    "queuedMessages": [
+      {
+        "id": "shared",
+        "message": {
+          "text": "Queued",
+          "origin": {
+            "kind": "user"
+          }
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

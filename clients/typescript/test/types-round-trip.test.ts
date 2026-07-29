@@ -52,7 +52,9 @@ import type {
   StateAction,
 } from '../src/types/common/actions.js';
 import type { StringOrMarkdown } from '../src/types/common/state.js';
+import type { AuthRequiredParams } from '../src/types/common/notifications.js';
 import type { ChangesetOperationTarget } from '../src/types/channels-changeset/commands.js';
+import type { Turn } from '../src/types/channels-chat/state.js';
 import type {
   ChatInputQuestion,
   Customization,
@@ -244,6 +246,8 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'Implementation':     void (parsed as Implementation); break;
     case 'InitializeResult':    void (parsed as InitializeResult); break;
     case 'ChatSource':          void (parsed as ChatSource); break;
+    case 'AuthRequiredParams':  void (parsed as AuthRequiredParams); break;
+    case 'Turn':                void (parsed as Turn); break;
     default:
       throw new Error(
         `${file}: unknown wire type "${type}". Add a decode entry to bindToType.`,

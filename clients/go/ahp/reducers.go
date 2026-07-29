@@ -681,6 +681,8 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 				list = append(list, entry)
 			}
 			state.QueuedMessages = list
+		default:
+			return ReduceOutcomeNoOp
 		}
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatPendingMessageRemovedAction:

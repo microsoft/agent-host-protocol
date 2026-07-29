@@ -24,178 +24,106 @@ import kotlinx.serialization.json.contentOrNull
 /**
  * Discriminant values for all state actions.
  */
-@Serializable
-enum class ActionType {
-    @SerialName("root/agentsChanged")
-    ROOT_AGENTS_CHANGED,
-    @SerialName("root/activeSessionsChanged")
-    ROOT_ACTIVE_SESSIONS_CHANGED,
-    @SerialName("session/ready")
-    SESSION_READY,
-    @SerialName("session/creationFailed")
-    SESSION_CREATION_FAILED,
-    @SerialName("session/chatAdded")
-    SESSION_CHAT_ADDED,
-    @SerialName("session/chatRemoved")
-    SESSION_CHAT_REMOVED,
-    @SerialName("session/chatUpdated")
-    SESSION_CHAT_UPDATED,
-    @SerialName("session/defaultChatChanged")
-    SESSION_DEFAULT_CHAT_CHANGED,
-    @SerialName("chat/turnStarted")
-    CHAT_TURN_STARTED,
-    @SerialName("chat/delta")
-    CHAT_DELTA,
-    @SerialName("chat/responsePart")
-    CHAT_RESPONSE_PART,
-    @SerialName("chat/toolCallStart")
-    CHAT_TOOL_CALL_START,
-    @SerialName("chat/toolCallDelta")
-    CHAT_TOOL_CALL_DELTA,
-    @SerialName("chat/toolCallReady")
-    CHAT_TOOL_CALL_READY,
-    @SerialName("chat/toolCallConfirmed")
-    CHAT_TOOL_CALL_CONFIRMED,
-    @SerialName("chat/toolCallComplete")
-    CHAT_TOOL_CALL_COMPLETE,
-    @SerialName("chat/toolCallResultConfirmed")
-    CHAT_TOOL_CALL_RESULT_CONFIRMED,
-    @SerialName("chat/toolCallContentChanged")
-    CHAT_TOOL_CALL_CONTENT_CHANGED,
-    @SerialName("chat/toolCallAuthRequired")
-    CHAT_TOOL_CALL_AUTH_REQUIRED,
-    @SerialName("chat/toolCallAuthResolved")
-    CHAT_TOOL_CALL_AUTH_RESOLVED,
-    @SerialName("chat/turnComplete")
-    CHAT_TURN_COMPLETE,
-    @SerialName("chat/turnCancelled")
-    CHAT_TURN_CANCELLED,
-    @SerialName("chat/error")
-    CHAT_ERROR,
-    @SerialName("chat/activityChanged")
-    CHAT_ACTIVITY_CHANGED,
-    @SerialName("chat/workingDirectorySet")
-    CHAT_WORKING_DIRECTORY_SET,
-    @SerialName("chat/workingDirectoryRemoved")
-    CHAT_WORKING_DIRECTORY_REMOVED,
-    @SerialName("session/titleChanged")
-    SESSION_TITLE_CHANGED,
-    @SerialName("chat/usage")
-    CHAT_USAGE,
-    @SerialName("chat/reasoning")
-    CHAT_REASONING,
-    @SerialName("session/serverToolsChanged")
-    SESSION_SERVER_TOOLS_CHANGED,
-    @SerialName("session/activeClientSet")
-    SESSION_ACTIVE_CLIENT_SET,
-    @SerialName("session/activeClientRemoved")
-    SESSION_ACTIVE_CLIENT_REMOVED,
-    @SerialName("session/workingDirectorySet")
-    SESSION_WORKING_DIRECTORY_SET,
-    @SerialName("session/workingDirectoryRemoved")
-    SESSION_WORKING_DIRECTORY_REMOVED,
-    @SerialName("session/inputNeededSet")
-    SESSION_INPUT_NEEDED_SET,
-    @SerialName("session/inputNeededRemoved")
-    SESSION_INPUT_NEEDED_REMOVED,
-    @SerialName("chat/pendingMessageSet")
-    CHAT_PENDING_MESSAGE_SET,
-    @SerialName("chat/pendingMessageRemoved")
-    CHAT_PENDING_MESSAGE_REMOVED,
-    @SerialName("chat/queuedMessagesReordered")
-    CHAT_QUEUED_MESSAGES_REORDERED,
-    @SerialName("chat/draftChanged")
-    CHAT_DRAFT_CHANGED,
-    @SerialName("chat/inputRequested")
-    CHAT_INPUT_REQUESTED,
-    @SerialName("chat/inputAnswerChanged")
-    CHAT_INPUT_ANSWER_CHANGED,
-    @SerialName("chat/inputCompleted")
-    CHAT_INPUT_COMPLETED,
-    @SerialName("session/customizationsChanged")
-    SESSION_CUSTOMIZATIONS_CHANGED,
-    @SerialName("session/customizationToggled")
-    SESSION_CUSTOMIZATION_TOGGLED,
-    @SerialName("session/customizationUpdated")
-    SESSION_CUSTOMIZATION_UPDATED,
-    @SerialName("session/customizationRemoved")
-    SESSION_CUSTOMIZATION_REMOVED,
-    @SerialName("session/mcpServerStateChanged")
-    SESSION_MCP_SERVER_STATE_CHANGED,
-    @SerialName("session/mcpServerStartRequested")
-    SESSION_MCP_SERVER_START_REQUESTED,
-    @SerialName("session/mcpServerStopRequested")
-    SESSION_MCP_SERVER_STOP_REQUESTED,
-    @SerialName("chat/truncated")
-    CHAT_TRUNCATED,
-    @SerialName("chat/turnsLoaded")
-    CHAT_TURNS_LOADED,
-    @SerialName("session/isReadChanged")
-    SESSION_IS_READ_CHANGED,
-    @SerialName("session/isArchivedChanged")
-    SESSION_IS_ARCHIVED_CHANGED,
-    @SerialName("session/activityChanged")
-    SESSION_ACTIVITY_CHANGED,
-    @SerialName("session/changesetsChanged")
-    SESSION_CHANGESETS_CHANGED,
-    @SerialName("session/configChanged")
-    SESSION_CONFIG_CHANGED,
-    @SerialName("session/metaChanged")
-    SESSION_META_CHANGED,
-    @SerialName("changeset/statusChanged")
-    CHANGESET_STATUS_CHANGED,
-    @SerialName("changeset/fileSet")
-    CHANGESET_FILE_SET,
-    @SerialName("changeset/fileRemoved")
-    CHANGESET_FILE_REMOVED,
-    @SerialName("changeset/filesReviewChanged")
-    CHANGESET_FILES_REVIEW_CHANGED,
-    @SerialName("changeset/contentChanged")
-    CHANGESET_CONTENT_CHANGED,
-    @SerialName("changeset/operationsChanged")
-    CHANGESET_OPERATIONS_CHANGED,
-    @SerialName("changeset/operationStatusChanged")
-    CHANGESET_OPERATION_STATUS_CHANGED,
-    @SerialName("changeset/cleared")
-    CHANGESET_CLEARED,
-    @SerialName("annotations/set")
-    ANNOTATIONS_SET,
-    @SerialName("annotations/updated")
-    ANNOTATIONS_UPDATED,
-    @SerialName("annotations/removed")
-    ANNOTATIONS_REMOVED,
-    @SerialName("annotations/entrySet")
-    ANNOTATIONS_ENTRY_SET,
-    @SerialName("annotations/entryRemoved")
-    ANNOTATIONS_ENTRY_REMOVED,
-    @SerialName("root/terminalsChanged")
-    ROOT_TERMINALS_CHANGED,
-    @SerialName("root/configChanged")
-    ROOT_CONFIG_CHANGED,
-    @SerialName("terminal/data")
-    TERMINAL_DATA,
-    @SerialName("terminal/input")
-    TERMINAL_INPUT,
-    @SerialName("terminal/resized")
-    TERMINAL_RESIZED,
-    @SerialName("terminal/claimed")
-    TERMINAL_CLAIMED,
-    @SerialName("terminal/titleChanged")
-    TERMINAL_TITLE_CHANGED,
-    @SerialName("terminal/cwdChanged")
-    TERMINAL_CWD_CHANGED,
-    @SerialName("terminal/exited")
-    TERMINAL_EXITED,
-    @SerialName("terminal/cleared")
-    TERMINAL_CLEARED,
-    @SerialName("terminal/commandDetectionAvailable")
-    TERMINAL_COMMAND_DETECTION_AVAILABLE,
-    @SerialName("terminal/commandExecuted")
-    TERMINAL_COMMAND_EXECUTED,
-    @SerialName("terminal/commandFinished")
-    TERMINAL_COMMAND_FINISHED,
-    @SerialName("resourceWatch/changed")
-    RESOURCE_WATCH_CHANGED
+@Serializable(with = ActionTypeSerializer::class)
+@JvmInline
+value class ActionType(val rawValue: String) {
+    companion object {
+        val ROOT_AGENTS_CHANGED: ActionType = ActionType("root/agentsChanged")
+        val ROOT_ACTIVE_SESSIONS_CHANGED: ActionType = ActionType("root/activeSessionsChanged")
+        val SESSION_READY: ActionType = ActionType("session/ready")
+        val SESSION_CREATION_FAILED: ActionType = ActionType("session/creationFailed")
+        val SESSION_CHAT_ADDED: ActionType = ActionType("session/chatAdded")
+        val SESSION_CHAT_REMOVED: ActionType = ActionType("session/chatRemoved")
+        val SESSION_CHAT_UPDATED: ActionType = ActionType("session/chatUpdated")
+        val SESSION_DEFAULT_CHAT_CHANGED: ActionType = ActionType("session/defaultChatChanged")
+        val CHAT_TURN_STARTED: ActionType = ActionType("chat/turnStarted")
+        val CHAT_DELTA: ActionType = ActionType("chat/delta")
+        val CHAT_RESPONSE_PART: ActionType = ActionType("chat/responsePart")
+        val CHAT_TOOL_CALL_START: ActionType = ActionType("chat/toolCallStart")
+        val CHAT_TOOL_CALL_DELTA: ActionType = ActionType("chat/toolCallDelta")
+        val CHAT_TOOL_CALL_READY: ActionType = ActionType("chat/toolCallReady")
+        val CHAT_TOOL_CALL_CONFIRMED: ActionType = ActionType("chat/toolCallConfirmed")
+        val CHAT_TOOL_CALL_COMPLETE: ActionType = ActionType("chat/toolCallComplete")
+        val CHAT_TOOL_CALL_RESULT_CONFIRMED: ActionType = ActionType("chat/toolCallResultConfirmed")
+        val CHAT_TOOL_CALL_CONTENT_CHANGED: ActionType = ActionType("chat/toolCallContentChanged")
+        val CHAT_TOOL_CALL_AUTH_REQUIRED: ActionType = ActionType("chat/toolCallAuthRequired")
+        val CHAT_TOOL_CALL_AUTH_RESOLVED: ActionType = ActionType("chat/toolCallAuthResolved")
+        val CHAT_TURN_COMPLETE: ActionType = ActionType("chat/turnComplete")
+        val CHAT_TURN_CANCELLED: ActionType = ActionType("chat/turnCancelled")
+        val CHAT_ERROR: ActionType = ActionType("chat/error")
+        val CHAT_ACTIVITY_CHANGED: ActionType = ActionType("chat/activityChanged")
+        val CHAT_WORKING_DIRECTORY_SET: ActionType = ActionType("chat/workingDirectorySet")
+        val CHAT_WORKING_DIRECTORY_REMOVED: ActionType = ActionType("chat/workingDirectoryRemoved")
+        val SESSION_TITLE_CHANGED: ActionType = ActionType("session/titleChanged")
+        val CHAT_USAGE: ActionType = ActionType("chat/usage")
+        val CHAT_REASONING: ActionType = ActionType("chat/reasoning")
+        val SESSION_SERVER_TOOLS_CHANGED: ActionType = ActionType("session/serverToolsChanged")
+        val SESSION_ACTIVE_CLIENT_SET: ActionType = ActionType("session/activeClientSet")
+        val SESSION_ACTIVE_CLIENT_REMOVED: ActionType = ActionType("session/activeClientRemoved")
+        val SESSION_WORKING_DIRECTORY_SET: ActionType = ActionType("session/workingDirectorySet")
+        val SESSION_WORKING_DIRECTORY_REMOVED: ActionType = ActionType("session/workingDirectoryRemoved")
+        val SESSION_INPUT_NEEDED_SET: ActionType = ActionType("session/inputNeededSet")
+        val SESSION_INPUT_NEEDED_REMOVED: ActionType = ActionType("session/inputNeededRemoved")
+        val CHAT_PENDING_MESSAGE_SET: ActionType = ActionType("chat/pendingMessageSet")
+        val CHAT_PENDING_MESSAGE_REMOVED: ActionType = ActionType("chat/pendingMessageRemoved")
+        val CHAT_QUEUED_MESSAGES_REORDERED: ActionType = ActionType("chat/queuedMessagesReordered")
+        val CHAT_DRAFT_CHANGED: ActionType = ActionType("chat/draftChanged")
+        val CHAT_INPUT_REQUESTED: ActionType = ActionType("chat/inputRequested")
+        val CHAT_INPUT_ANSWER_CHANGED: ActionType = ActionType("chat/inputAnswerChanged")
+        val CHAT_INPUT_COMPLETED: ActionType = ActionType("chat/inputCompleted")
+        val SESSION_CUSTOMIZATIONS_CHANGED: ActionType = ActionType("session/customizationsChanged")
+        val SESSION_CUSTOMIZATION_TOGGLED: ActionType = ActionType("session/customizationToggled")
+        val SESSION_CUSTOMIZATION_UPDATED: ActionType = ActionType("session/customizationUpdated")
+        val SESSION_CUSTOMIZATION_REMOVED: ActionType = ActionType("session/customizationRemoved")
+        val SESSION_MCP_SERVER_STATE_CHANGED: ActionType = ActionType("session/mcpServerStateChanged")
+        val SESSION_MCP_SERVER_START_REQUESTED: ActionType = ActionType("session/mcpServerStartRequested")
+        val SESSION_MCP_SERVER_STOP_REQUESTED: ActionType = ActionType("session/mcpServerStopRequested")
+        val CHAT_TRUNCATED: ActionType = ActionType("chat/truncated")
+        val CHAT_TURNS_LOADED: ActionType = ActionType("chat/turnsLoaded")
+        val SESSION_IS_READ_CHANGED: ActionType = ActionType("session/isReadChanged")
+        val SESSION_IS_ARCHIVED_CHANGED: ActionType = ActionType("session/isArchivedChanged")
+        val SESSION_ACTIVITY_CHANGED: ActionType = ActionType("session/activityChanged")
+        val SESSION_CHANGESETS_CHANGED: ActionType = ActionType("session/changesetsChanged")
+        val SESSION_CONFIG_CHANGED: ActionType = ActionType("session/configChanged")
+        val SESSION_META_CHANGED: ActionType = ActionType("session/metaChanged")
+        val CHANGESET_STATUS_CHANGED: ActionType = ActionType("changeset/statusChanged")
+        val CHANGESET_FILE_SET: ActionType = ActionType("changeset/fileSet")
+        val CHANGESET_FILE_REMOVED: ActionType = ActionType("changeset/fileRemoved")
+        val CHANGESET_FILES_REVIEW_CHANGED: ActionType = ActionType("changeset/filesReviewChanged")
+        val CHANGESET_CONTENT_CHANGED: ActionType = ActionType("changeset/contentChanged")
+        val CHANGESET_OPERATIONS_CHANGED: ActionType = ActionType("changeset/operationsChanged")
+        val CHANGESET_OPERATION_STATUS_CHANGED: ActionType = ActionType("changeset/operationStatusChanged")
+        val CHANGESET_CLEARED: ActionType = ActionType("changeset/cleared")
+        val ANNOTATIONS_SET: ActionType = ActionType("annotations/set")
+        val ANNOTATIONS_UPDATED: ActionType = ActionType("annotations/updated")
+        val ANNOTATIONS_REMOVED: ActionType = ActionType("annotations/removed")
+        val ANNOTATIONS_ENTRY_SET: ActionType = ActionType("annotations/entrySet")
+        val ANNOTATIONS_ENTRY_REMOVED: ActionType = ActionType("annotations/entryRemoved")
+        val ROOT_TERMINALS_CHANGED: ActionType = ActionType("root/terminalsChanged")
+        val ROOT_CONFIG_CHANGED: ActionType = ActionType("root/configChanged")
+        val TERMINAL_DATA: ActionType = ActionType("terminal/data")
+        val TERMINAL_INPUT: ActionType = ActionType("terminal/input")
+        val TERMINAL_RESIZED: ActionType = ActionType("terminal/resized")
+        val TERMINAL_CLAIMED: ActionType = ActionType("terminal/claimed")
+        val TERMINAL_TITLE_CHANGED: ActionType = ActionType("terminal/titleChanged")
+        val TERMINAL_CWD_CHANGED: ActionType = ActionType("terminal/cwdChanged")
+        val TERMINAL_EXITED: ActionType = ActionType("terminal/exited")
+        val TERMINAL_CLEARED: ActionType = ActionType("terminal/cleared")
+        val TERMINAL_COMMAND_DETECTION_AVAILABLE: ActionType = ActionType("terminal/commandDetectionAvailable")
+        val TERMINAL_COMMAND_EXECUTED: ActionType = ActionType("terminal/commandExecuted")
+        val TERMINAL_COMMAND_FINISHED: ActionType = ActionType("terminal/commandFinished")
+        val RESOURCE_WATCH_CHANGED: ActionType = ActionType("resourceWatch/changed")
+    }
+}
+
+internal object ActionTypeSerializer : KSerializer<ActionType> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ActionType", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: ActionType) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): ActionType =
+        ActionType(decoder.decodeString())
 }
 
 // ─── Action Infrastructure ──────────────────────────────────────────────────

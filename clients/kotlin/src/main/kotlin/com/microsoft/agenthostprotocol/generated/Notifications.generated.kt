@@ -24,18 +24,29 @@ import kotlinx.serialization.json.contentOrNull
 /**
  * Reason why authentication is required.
  */
-@Serializable
-enum class AuthRequiredReason {
-    /**
-     * The client has not yet authenticated for the resource
-     */
-    @SerialName("required")
-    REQUIRED,
-    /**
-     * A previously valid token has expired or been revoked
-     */
-    @SerialName("expired")
-    EXPIRED
+@Serializable(with = AuthRequiredReasonSerializer::class)
+@JvmInline
+value class AuthRequiredReason(val rawValue: String) {
+    companion object {
+        /**
+         * The client has not yet authenticated for the resource
+         */
+        val REQUIRED: AuthRequiredReason = AuthRequiredReason("required")
+        /**
+         * A previously valid token has expired or been revoked
+         */
+        val EXPIRED: AuthRequiredReason = AuthRequiredReason("expired")
+    }
+}
+
+internal object AuthRequiredReasonSerializer : KSerializer<AuthRequiredReason> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AuthRequiredReason", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AuthRequiredReason) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AuthRequiredReason =
+        AuthRequiredReason(decoder.decodeString())
 }
 
 // ─── Notification Types ─────────────────────────────────────────────────────

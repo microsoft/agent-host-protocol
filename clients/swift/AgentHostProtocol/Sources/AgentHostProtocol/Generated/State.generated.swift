@@ -41,25 +41,113 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 // MARK: - Enums
 
 /// Policy configuration state for a model.
-public enum PolicyState: String, Codable, Sendable {
-    case enabled = "enabled"
-    case disabled = "disabled"
-    case unconfigured = "unconfigured"
+public enum PolicyState: Codable, Sendable, Hashable, RawRepresentable {
+    case enabled
+    case disabled
+    case unconfigured
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "enabled": self = .enabled
+        case "disabled": self = .disabled
+        case "unconfigured": self = .unconfigured
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .enabled: return "enabled"
+        case .disabled: return "disabled"
+        case .unconfigured: return "unconfigured"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for pending message kinds.
-public enum PendingMessageKind: String, Codable, Sendable {
+public enum PendingMessageKind: Codable, Sendable, Hashable, RawRepresentable {
     /// Injected into the current turn at a convenient point
-    case steering = "steering"
+    case steering
     /// Sent automatically as a new turn after the current turn finishes
-    case queued = "queued"
+    case queued
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "steering": self = .steering
+        case "queued": self = .queued
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .steering: return "steering"
+        case .queued: return "queued"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Session initialization state.
-public enum SessionLifecycle: String, Codable, Sendable {
-    case creating = "creating"
-    case ready = "ready"
-    case creationFailed = "creationFailed"
+public enum SessionLifecycle: Codable, Sendable, Hashable, RawRepresentable {
+    case creating
+    case ready
+    case creationFailed
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "creating": self = .creating
+        case "ready": self = .ready
+        case "creationFailed": self = .creationFailed
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .creating: return "creating"
+        case .ready: return "ready"
+        case .creationFailed: return "creationFailed"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Bitset of summary-level session status flags.
@@ -86,15 +174,47 @@ public struct SessionStatus: OptionSet, Codable, Sendable, Hashable {
 }
 
 /// Discriminant for {@link ChatOrigin} — how a chat came into existence.
-public enum ChatOriginKind: String, Codable, Sendable {
+public enum ChatOriginKind: Codable, Sendable, Hashable, RawRepresentable {
     /// User created the chat explicitly (e.g. via the host UI).
-    case user = "user"
+    case user
     /// Forked from an existing chat at a specific turn.
-    case fork = "fork"
+    case fork
     /// Created as an independent side conversation from a specific turn.
-    case sideChat = "sideChat"
+    case sideChat
     /// Spawned by a tool call running in another chat (e.g. a sub-agent delegation).
-    case tool = "tool"
+    case tool
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "user": self = .user
+        case "fork": self = .fork
+        case "sideChat": self = .sideChat
+        case "tool": self = .tool
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .user: return "user"
+        case .fork: return "fork"
+        case .sideChat: return "sideChat"
+        case .tool: return "tool"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// How a user can interact with a chat.
@@ -107,46 +227,206 @@ public enum ChatOriginKind: String, Codable, Sendable {
 /// worker chats are read-only (visible for observability) or hidden (internal
 /// implementation detail). The harness sets this based on the chat's role;
 /// the UI uses it to show appropriate controls.
-public enum ChatInteractivity: String, Codable, Sendable {
+public enum ChatInteractivity: Codable, Sendable, Hashable, RawRepresentable {
     /// User can send messages and watch (default when absent)
-    case full = "full"
+    case full
     /// User can watch but not send messages
-    case readOnly = "read-only"
+    case readOnly
     /// Internal worker not shown in UI at all
-    case hidden = "hidden"
+    case hidden
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "full": self = .full
+        case "read-only": self = .readOnly
+        case "hidden": self = .hidden
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .full: return "full"
+        case .readOnly: return "read-only"
+        case .hidden: return "hidden"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Answer lifecycle state.
-public enum ChatInputAnswerState: String, Codable, Sendable {
-    case draft = "draft"
-    case submitted = "submitted"
-    case skipped = "skipped"
+public enum ChatInputAnswerState: Codable, Sendable, Hashable, RawRepresentable {
+    case draft
+    case submitted
+    case skipped
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "draft": self = .draft
+        case "submitted": self = .submitted
+        case "skipped": self = .skipped
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .draft: return "draft"
+        case .submitted: return "submitted"
+        case .skipped: return "skipped"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Answer value kind.
-public enum ChatInputAnswerValueKind: String, Codable, Sendable {
-    case text = "text"
-    case number = "number"
-    case boolean = "boolean"
-    case selected = "selected"
-    case selectedMany = "selected-many"
+public enum ChatInputAnswerValueKind: Codable, Sendable, Hashable, RawRepresentable {
+    case text
+    case number
+    case boolean
+    case selected
+    case selectedMany
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "text": self = .text
+        case "number": self = .number
+        case "boolean": self = .boolean
+        case "selected": self = .selected
+        case "selected-many": self = .selectedMany
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .text: return "text"
+        case .number: return "number"
+        case .boolean: return "boolean"
+        case .selected: return "selected"
+        case .selectedMany: return "selected-many"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Question/input control kind.
-public enum ChatInputQuestionKind: String, Codable, Sendable {
-    case text = "text"
-    case number = "number"
-    case integer = "integer"
-    case boolean = "boolean"
-    case singleSelect = "single-select"
-    case multiSelect = "multi-select"
+public enum ChatInputQuestionKind: Codable, Sendable, Hashable, RawRepresentable {
+    case text
+    case number
+    case integer
+    case boolean
+    case singleSelect
+    case multiSelect
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "text": self = .text
+        case "number": self = .number
+        case "integer": self = .integer
+        case "boolean": self = .boolean
+        case "single-select": self = .singleSelect
+        case "multi-select": self = .multiSelect
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .text: return "text"
+        case .number: return "number"
+        case .integer: return "integer"
+        case .boolean: return "boolean"
+        case .singleSelect: return "single-select"
+        case .multiSelect: return "multi-select"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// How a client completed an input request.
-public enum ChatInputResponseKind: String, Codable, Sendable {
-    case accept = "accept"
-    case decline = "decline"
-    case cancel = "cancel"
+public enum ChatInputResponseKind: Codable, Sendable, Hashable, RawRepresentable {
+    case accept
+    case decline
+    case cancel
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "accept": self = .accept
+        case "decline": self = .decline
+        case "cancel": self = .cancel
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .accept: return "accept"
+        case .decline: return "decline"
+        case .cancel: return "cancel"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for the kinds of outstanding input a session can surface in
@@ -154,74 +434,276 @@ public enum ChatInputResponseKind: String, Codable, Sendable {
 ///
 /// This is a general/typological union (not a lifecycle), so the discriminant is
 /// a `*Kind`.
-public enum SessionInputRequestKind: String, Codable, Sendable {
+public enum SessionInputRequestKind: Codable, Sendable, Hashable, RawRepresentable {
     /// A user-facing elicitation mirrored from an unresolved chat response part.
-    case chatInput = "chatInput"
+    case chatInput
     /// A tool call awaiting parameter- or result-confirmation.
-    case toolConfirmation = "toolConfirmation"
+    case toolConfirmation
     /// A running tool the session wants an active client to execute.
-    case toolClientExecution = "toolClientExecution"
+    case toolClientExecution
     /// A tool call blocked on MCP authentication mid-execution.
-    case toolAuthentication = "toolAuthentication"
+    case toolAuthentication
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "chatInput": self = .chatInput
+        case "toolConfirmation": self = .toolConfirmation
+        case "toolClientExecution": self = .toolClientExecution
+        case "toolAuthentication": self = .toolAuthentication
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .chatInput: return "chatInput"
+        case .toolConfirmation: return "toolConfirmation"
+        case .toolClientExecution: return "toolClientExecution"
+        case .toolAuthentication: return "toolAuthentication"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// How a turn ended.
-public enum TurnState: String, Codable, Sendable {
-    case complete = "complete"
-    case cancelled = "cancelled"
-    case error = "error"
+public enum TurnState: Codable, Sendable, Hashable, RawRepresentable {
+    case complete
+    case cancelled
+    case error
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "complete": self = .complete
+        case "cancelled": self = .cancelled
+        case "error": self = .error
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .complete: return "complete"
+        case .cancelled: return "cancelled"
+        case .error: return "error"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for {@link MessageOrigin} — identifies who produced a message.
-public enum MessageKind: String, Codable, Sendable {
+public enum MessageKind: Codable, Sendable, Hashable, RawRepresentable {
     /// Sent directly by the user.
-    case user = "user"
+    case user
     /// Produced by the agent itself rather than the user — for example, an agent
     /// that seeds the first message of a chat it spawned.
-    case agent = "agent"
+    case agent
     /// Produced by a tool rather than the user — for example, a tool that spawns a
     /// worker chat whose first message carries a seed prompt.
-    case tool = "tool"
+    case tool
     /// A system-generated notification rather than a direct user message.
-    case systemNotification = "systemNotification"
+    case systemNotification
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "user": self = .user
+        case "agent": self = .agent
+        case "tool": self = .tool
+        case "systemNotification": self = .systemNotification
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .user: return "user"
+        case .agent: return "agent"
+        case .tool: return "tool"
+        case .systemNotification: return "systemNotification"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for {@link MessageAttachment} variants.
-public enum MessageAttachmentKind: String, Codable, Sendable {
+public enum MessageAttachmentKind: Codable, Sendable, Hashable, RawRepresentable {
     /// A simple, opaque attachment whose representation is described by the producer.
-    case simple = "simple"
+    case simple
     /// An attachment whose data is embedded inline as a base64 string.
-    case embeddedResource = "embeddedResource"
+    case embeddedResource
     /// An attachment that references a resource by URI.
-    case resource = "resource"
+    case resource
     /// An attachment that references annotations on an annotations channel.
-    case annotations = "annotations"
+    case annotations
     /// An attachment that references a bounded transcript from another chat.
-    case chat = "chat"
+    case chat
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "simple": self = .simple
+        case "embeddedResource": self = .embeddedResource
+        case "resource": self = .resource
+        case "annotations": self = .annotations
+        case "chat": self = .chat
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .simple: return "simple"
+        case .embeddedResource: return "embeddedResource"
+        case .resource: return "resource"
+        case .annotations: return "annotations"
+        case .chat: return "chat"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for response part types.
-public enum ResponsePartKind: String, Codable, Sendable {
-    case markdown = "markdown"
-    case contentRef = "contentRef"
-    case toolCall = "toolCall"
-    case reasoning = "reasoning"
-    case systemNotification = "systemNotification"
-    case inputRequest = "inputRequest"
+public enum ResponsePartKind: Codable, Sendable, Hashable, RawRepresentable {
+    case markdown
+    case contentRef
+    case toolCall
+    case reasoning
+    case systemNotification
+    case inputRequest
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "markdown": self = .markdown
+        case "contentRef": self = .contentRef
+        case "toolCall": self = .toolCall
+        case "reasoning": self = .reasoning
+        case "systemNotification": self = .systemNotification
+        case "inputRequest": self = .inputRequest
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .markdown: return "markdown"
+        case .contentRef: return "contentRef"
+        case .toolCall: return "toolCall"
+        case .reasoning: return "reasoning"
+        case .systemNotification: return "systemNotification"
+        case .inputRequest: return "inputRequest"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Status of a tool call in the lifecycle state machine.
-public enum ToolCallStatus: String, Codable, Sendable {
-    case streaming = "streaming"
-    case pendingConfirmation = "pending-confirmation"
-    case running = "running"
+public enum ToolCallStatus: Codable, Sendable, Hashable, RawRepresentable {
+    case streaming
+    case pendingConfirmation
+    case running
     /// Running paused because the MCP server backing this call needs
     /// authentication (typically step-up auth for insufficient scope,
     /// surfacing mid-execution). See {@link ToolCallAuthRequiredState}.
-    case authRequired = "auth-required"
-    case pendingResultConfirmation = "pending-result-confirmation"
-    case completed = "completed"
-    case cancelled = "cancelled"
+    case authRequired
+    case pendingResultConfirmation
+    case completed
+    case cancelled
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "streaming": self = .streaming
+        case "pending-confirmation": self = .pendingConfirmation
+        case "running": self = .running
+        case "auth-required": self = .authRequired
+        case "pending-result-confirmation": self = .pendingResultConfirmation
+        case "completed": self = .completed
+        case "cancelled": self = .cancelled
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .streaming: return "streaming"
+        case .pendingConfirmation: return "pending-confirmation"
+        case .running: return "running"
+        case .authRequired: return "auth-required"
+        case .pendingResultConfirmation: return "pending-result-confirmation"
+        case .completed: return "completed"
+        case .cancelled: return "cancelled"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// How a tool call was confirmed for execution.
@@ -229,49 +711,255 @@ public enum ToolCallStatus: String, Codable, Sendable {
 /// - `NotNeeded` — No confirmation required (auto-approved)
 /// - `UserAction` — User explicitly approved
 /// - `Setting` — Approved by a persistent user setting
-public enum ToolCallConfirmationReason: String, Codable, Sendable {
-    case notNeeded = "not-needed"
-    case userAction = "user-action"
-    case setting = "setting"
+public enum ToolCallConfirmationReason: Codable, Sendable, Hashable, RawRepresentable {
+    case notNeeded
+    case userAction
+    case setting
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "not-needed": self = .notNeeded
+        case "user-action": self = .userAction
+        case "setting": self = .setting
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .notNeeded: return "not-needed"
+        case .userAction: return "user-action"
+        case .setting: return "setting"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Identifies a model judge as the source of a confirmation requirement.
-public enum ToolCallRiskAssessmentKind: String, Codable, Sendable {
-    case judge = "judge"
+public enum ToolCallRiskAssessmentKind: Codable, Sendable, Hashable, RawRepresentable {
+    case judge
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "judge": self = .judge
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .judge: return "judge"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Lifecycle status of an asynchronous model-judge confirmation decision.
-public enum ToolCallRiskAssessmentStatus: String, Codable, Sendable {
-    case loading = "loading"
-    case complete = "complete"
+public enum ToolCallRiskAssessmentStatus: Codable, Sendable, Hashable, RawRepresentable {
+    case loading
+    case complete
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "loading": self = .loading
+        case "complete": self = .complete
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .loading: return "loading"
+        case .complete: return "complete"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Why a tool call was cancelled.
-public enum ToolCallCancellationReason: String, Codable, Sendable {
-    case denied = "denied"
-    case skipped = "skipped"
-    case resultDenied = "result-denied"
+public enum ToolCallCancellationReason: Codable, Sendable, Hashable, RawRepresentable {
+    case denied
+    case skipped
+    case resultDenied
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "denied": self = .denied
+        case "skipped": self = .skipped
+        case "result-denied": self = .resultDenied
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .denied: return "denied"
+        case .skipped: return "skipped"
+        case .resultDenied: return "result-denied"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Whether a confirmation option represents an approval or denial action.
-public enum ConfirmationOptionKind: String, Codable, Sendable {
-    case approve = "approve"
-    case deny = "deny"
+public enum ConfirmationOptionKind: Codable, Sendable, Hashable, RawRepresentable {
+    case approve
+    case deny
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "approve": self = .approve
+        case "deny": self = .deny
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .approve: return "approve"
+        case .deny: return "deny"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
-public enum ToolCallContributorKind: String, Codable, Sendable {
-    case client = "client"
-    case mCP = "mcp"
+public enum ToolCallContributorKind: Codable, Sendable, Hashable, RawRepresentable {
+    case client
+    case mCP
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "client": self = .client
+        case "mcp": self = .mCP
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .client: return "client"
+        case .mCP: return "mcp"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for tool result content types.
-public enum ToolResultContentType: String, Codable, Sendable {
-    case text = "text"
-    case embeddedResource = "embeddedResource"
-    case resource = "resource"
-    case fileEdit = "fileEdit"
-    case terminal = "terminal"
-    case subagent = "subagent"
+public enum ToolResultContentType: Codable, Sendable, Hashable, RawRepresentable {
+    case text
+    case embeddedResource
+    case resource
+    case fileEdit
+    case terminal
+    case subagent
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "text": self = .text
+        case "embeddedResource": self = .embeddedResource
+        case "resource": self = .resource
+        case "fileEdit": self = .fileEdit
+        case "terminal": self = .terminal
+        case "subagent": self = .subagent
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .text: return "text"
+        case .embeddedResource: return "embeddedResource"
+        case .resource: return "resource"
+        case .fileEdit: return "fileEdit"
+        case .terminal: return "terminal"
+        case .subagent: return "subagent"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for the kind of customization.
@@ -283,57 +971,191 @@ public enum ToolResultContentType: String, Codable, Sendable {
 /// {@link CustomizationType.McpServer | `McpServer`} entries surfaced
 /// directly by the host. The remaining types appear only as children of
 /// a container.
-public enum CustomizationType: String, Codable, Sendable {
-    case plugin = "plugin"
-    case directory = "directory"
-    case agent = "agent"
-    case skill = "skill"
-    case prompt = "prompt"
-    case rule = "rule"
-    case hook = "hook"
-    case mcpServer = "mcpServer"
+public enum CustomizationType: Codable, Sendable, Hashable, RawRepresentable {
+    case plugin
+    case directory
+    case agent
+    case skill
+    case prompt
+    case rule
+    case hook
+    case mcpServer
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "plugin": self = .plugin
+        case "directory": self = .directory
+        case "agent": self = .agent
+        case "skill": self = .skill
+        case "prompt": self = .prompt
+        case "rule": self = .rule
+        case "hook": self = .hook
+        case "mcpServer": self = .mcpServer
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .plugin: return "plugin"
+        case .directory: return "directory"
+        case .agent: return "agent"
+        case .skill: return "skill"
+        case .prompt: return "prompt"
+        case .rule: return "rule"
+        case .hook: return "hook"
+        case .mcpServer: return "mcpServer"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant values for {@link CustomizationLoadState}.
-public enum CustomizationLoadStatus: String, Codable, Sendable {
-    case loading = "loading"
-    case loaded = "loaded"
-    case degraded = "degraded"
-    case error = "error"
+public enum CustomizationLoadStatus: Codable, Sendable, Hashable, RawRepresentable {
+    case loading
+    case loaded
+    case degraded
+    case error
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "loading": self = .loading
+        case "loaded": self = .loaded
+        case "degraded": self = .degraded
+        case "error": self = .error
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .loading: return "loading"
+        case .loaded: return "loaded"
+        case .degraded: return "degraded"
+        case .error: return "error"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for terminal claim kinds.
-public enum TerminalClaimKind: String, Codable, Sendable {
-    case client = "client"
-    case session = "session"
+public enum TerminalClaimKind: Codable, Sendable, Hashable, RawRepresentable {
+    case client
+    case session
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "client": self = .client
+        case "session": self = .session
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .client: return "client"
+        case .session: return "session"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for the {@link McpServerState} union.
-public enum McpServerStatus: String, Codable, Sendable {
+public enum McpServerStatus: Codable, Sendable, Hashable, RawRepresentable {
     /// Server has been registered but is not yet running.
-    case starting = "starting"
+    case starting
     /// Server is running and serving requests.
-    case ready = "ready"
+    case ready
     /// Server is reachable but requires additional authentication before it
     /// can start, or before it can serve a particular request. Carries the
     /// RFC 9728 Protected Resource Metadata the client needs to obtain a
     /// token; the client then pushes the token via the existing
     /// `authenticate` command.
-    case authRequired = "authRequired"
+    case authRequired
     /// Server failed to start, crashed, or otherwise transitioned to a fatal error.
-    case error = "error"
+    case error
     /// Server has been shut down.
-    case stopped = "stopped"
+    case stopped
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "starting": self = .starting
+        case "ready": self = .ready
+        case "authRequired": self = .authRequired
+        case "error": self = .error
+        case "stopped": self = .stopped
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .starting: return "starting"
+        case .ready: return "ready"
+        case .authRequired: return "authRequired"
+        case .error: return "error"
+        case .stopped: return "stopped"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}
 /// state. Mirrors the three failure modes defined by the
 /// [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md).
-public enum McpAuthRequiredReason: String, Codable, Sendable {
+public enum McpAuthRequiredReason: Codable, Sendable, Hashable, RawRepresentable {
     /// No token has been provided yet (HTTP 401, no prior token).
-    case required = "required"
+    case required
     /// A previously valid token expired or was revoked (HTTP 401).
-    case expired = "expired"
+    case expired
     /// Step-up auth: a token is present but its scopes are insufficient for
     /// the requested operation (HTTP 403 with
     /// `WWW-Authenticate: Bearer error="insufficient_scope"`).
@@ -350,18 +1172,78 @@ public enum McpAuthRequiredReason: String, Codable, Sendable {
     /// {@link McpServerCustomization | MCP server} backing a running tool
     /// call so they can present an explicit "grant more access" affordance
     /// tied to the blocked tool call.
-    case insufficientScope = "insufficientScope"
+    case insufficientScope
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "required": self = .required
+        case "expired": self = .expired
+        case "insufficientScope": self = .insufficientScope
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .required: return "required"
+        case .expired: return "expired"
+        case .insufficientScope: return "insufficientScope"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Computation lifecycle of a {@link ChangesetState}.
-public enum ChangesetStatus: String, Codable, Sendable {
+public enum ChangesetStatus: Codable, Sendable, Hashable, RawRepresentable {
     /// The server is still computing the contents of this changeset.
-    case computing = "computing"
+    case computing
     /// The changeset has been fully computed and is up-to-date.
-    case ready = "ready"
+    case ready
     /// Computation failed. The cause is described by
     /// {@link ChangesetState.error}.
-    case error = "error"
+    case error
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "computing": self = .computing
+        case "ready": self = .ready
+        case "error": self = .error
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .computing: return "computing"
+        case .ready: return "ready"
+        case .error: return "error"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Execution lifecycle of a {@link ChangesetOperation}.
@@ -370,34 +1252,126 @@ public enum ChangesetStatus: String, Codable, Sendable {
 /// its progress and outcome are reflected back into changeset state so that
 /// every subscriber observes a consistent view (e.g. a spinner on a "Create
 /// Pull Request" button, or an inline error after a failed "revert").
-public enum ChangesetOperationStatus: String, Codable, Sendable {
+public enum ChangesetOperationStatus: Codable, Sendable, Hashable, RawRepresentable {
     /// The operation is ready to be invoked. This is the default when
     /// {@link ChangesetOperation.status} is omitted.
-    case idle = "idle"
+    case idle
     /// An invocation of this operation is currently in flight.
-    case running = "running"
+    case running
     /// The most recent invocation failed. The cause is described by
     /// {@link ChangesetOperation.error}.
-    case error = "error"
+    case error
     /// The operation is currently disabled and cannot be invoked.
-    case disabled = "disabled"
+    case disabled
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "idle": self = .idle
+        case "running": self = .running
+        case "error": self = .error
+        case "disabled": self = .disabled
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .idle: return "idle"
+        case .running: return "running"
+        case .error: return "error"
+        case .disabled: return "disabled"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Where a {@link ChangesetOperation} can be invoked.
-public enum ChangesetOperationScope: String, Codable, Sendable {
+public enum ChangesetOperationScope: Codable, Sendable, Hashable, RawRepresentable {
     /// Applies to the whole changeset.
-    case changeset = "changeset"
+    case changeset
     /// Applies to a single file within the changeset.
-    case resource = "resource"
+    case resource
     /// Applies to a line range within a single file.
-    case range = "range"
+    case range
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "changeset": self = .changeset
+        case "resource": self = .resource
+        case "range": self = .range
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .changeset: return "changeset"
+        case .resource: return "resource"
+        case .range: return "range"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for {@link ResourceChange.type}.
-public enum ResourceChangeType: String, Codable, Sendable {
-    case added = "added"
-    case updated = "updated"
-    case deleted = "deleted"
+public enum ResourceChangeType: Codable, Sendable, Hashable, RawRepresentable {
+    case added
+    case updated
+    case deleted
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "added": self = .added
+        case "updated": self = .updated
+        case "deleted": self = .deleted
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .added: return "added"
+        case .updated: return "updated"
+        case .deleted: return "deleted"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 // MARK: - State Types

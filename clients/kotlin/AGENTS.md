@@ -43,8 +43,8 @@ CI verifies the committed generated files match the output of `npm run generate:
 | `T[]` / `Array<T>`            | `List<T>`                                                         |
 | `Record<string, T>`           | `Map<String, T>`                                                  |
 | `Partial<T>`                  | `PartialT` data class with all fields nullable                    |
-| `enum E { A = "a" }`          | `@Serializable enum class E { @SerialName("a") A }`               |
-| Bitset enum (JSDoc "Bitset")  | `@JvmInline value class` over `Int` w/ companion-object constants |
+| `enum E { A = "a" }`          | string-backed `@JvmInline value class E` with known constants     |
+| Bitset enum (JSDoc "Bitset")  | `@JvmInline value class` over `UInt` w/ companion-object constants |
 | Interface struct              | `@Serializable data class`                                        |
 | Discriminated union           | sealed interface + custom `KSerializer` (mirrors Swift)           |
 | `URI`                         | `typealias URI = String`                                          |
@@ -78,12 +78,19 @@ The TS source models `ChangesetOperationTarget` as a discriminated union over tw
 
 ### Bitset enums
 
-`SessionStatus` is currently the only bitset enum in the protocol. It's emitted as a `@JvmInline value class` over `Int` so that **unknown future flags survive a decode/encode round-trip** without being silently dropped. Use `or`/`and`/`in` for combinator/containment ops:
+`SessionStatus` is currently the only bitset enum in the protocol. It's emitted as a `@JvmInline value class` over `UInt` so that **unknown future flags survive a decode/encode round-trip** without being silently dropped. Use `or`/`and`/`in` for combinator/containment ops:
 
 ```kotlin
 val combined = SessionStatus.IDLE or SessionStatus.IS_READ
 SessionStatus.IDLE in combined   // true
 ```
+
+### String enums
+
+String enums are emitted as `@JvmInline value class` wrappers with a string
+`rawValue` and companion-object constants for known values. This keeps familiar
+references such as `TurnState.COMPLETE` while allowing unknown future values to
+decode and round-trip without failing the containing message.
 
 ## Distribution
 

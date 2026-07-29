@@ -24,7 +24,14 @@ AHP follows standard SemVer compatibility:
 - Two peers speaking versions `0.X.y` and `0.X.y'` (same pre-1.0 `MINOR`) are compatible.
 - Any other combination is **not** guaranteed to be compatible.
 
-Within a compatible range, additive changes — new optional fields on existing types, new action types, new commands — are introduced in `PATCH` (or `MINOR`, while `MAJOR` is `0`) bumps and MUST be ignored by older peers that do not understand them.
+Within a compatible range, additive changes — new optional fields on existing types, new enum values, new discriminated-union variants, new action types, and new commands — are introduced in `PATCH` (or `MINOR`, while `MAJOR` is `0`) bumps and MUST be ignored by older peers that do not understand them.
+
+This requirement applies at every level of a message:
+
+- Unknown fields on objects, including command parameters and results, MUST NOT cause decoding to fail. A peer MAY discard fields it does not understand.
+- Unknown string enum values MUST NOT cause the containing message to fail. Generated clients preserve the raw string when re-encoding; consumers MUST treat its semantics as unknown.
+- Unknown discriminated-union variants, including action types, MUST NOT cause the containing message to fail. Generated clients preserve the raw variant for re-encoding and reducers treat unknown actions as no-ops.
+- Unknown numeric error codes MUST be accepted and surfaced as their raw integer value.
 
 ## Capabilities First, Then Required
 
@@ -51,7 +58,7 @@ When a newer client connects to an older host:
 2. The host picks the newest entry it understands and returns it.
 3. The client checks the capability set advertised by the host before using newer features.
 4. If a feature is unavailable, the client degrades gracefully — disabling UI affordances, falling back to older code paths, or surfacing a clear message to the user.
-5. The host only sends action types known to the negotiated version. As a safety net, clients SHOULD silently ignore actions with unrecognized `type` values.
+5. The host only sends action types known to the negotiated version. As a safety net, clients MUST silently ignore actions with unrecognized `type` values while preserving their raw wire representation.
 
 ## Backward Compatibility
 

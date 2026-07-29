@@ -589,32 +589,40 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatPendingMessageSet(let a):
         let entry = PendingMessage(id: a.id, message: a.message)
         var next = state
-        if a.kind == .steering {
+        switch a.kind {
+        case .steering:
             next.steeringMessage = entry
             return next
+        case .queued:
+            var existing = next.queuedMessages ?? []
+            if let idx = existing.firstIndex(where: { $0.id == a.id }) {
+                existing[idx] = entry
+            } else {
+                existing.append(entry)
+            }
+            next.queuedMessages = existing
+            return next
+        case .unknown:
+            return state
         }
-        var existing = next.queuedMessages ?? []
-        if let idx = existing.firstIndex(where: { $0.id == a.id }) {
-            existing[idx] = entry
-        } else {
-            existing.append(entry)
-        }
-        next.queuedMessages = existing
-        return next
 
     case .chatPendingMessageRemoved(let a):
         var next = state
-        if a.kind == .steering {
+        switch a.kind {
+        case .steering:
             guard next.steeringMessage?.id == a.id else { return state }
             next.steeringMessage = nil
             return next
+        case .queued:
+            guard var existing = next.queuedMessages else { return state }
+            let before = existing.count
+            existing.removeAll { $0.id == a.id }
+            guard existing.count != before else { return state }
+            next.queuedMessages = existing.isEmpty ? nil : existing
+            return next
+        case .unknown:
+            return state
         }
-        guard var existing = next.queuedMessages else { return state }
-        let before = existing.count
-        existing.removeAll { $0.id == a.id }
-        guard existing.count != before else { return state }
-        next.queuedMessages = existing.isEmpty ? nil : existing
-        return next
 
     case .chatQueuedMessagesReordered(let a):
         guard let existing = state.queuedMessages else { return state }

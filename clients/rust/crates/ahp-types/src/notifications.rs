@@ -20,14 +20,51 @@ use crate::state::{
 // ─── Enums ────────────────────────────────────────────────────────────
 
 /// Reason why authentication is required.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AuthRequiredReason {
     /// The client has not yet authenticated for the resource
-    #[serde(rename = "required")]
     Required,
     /// A previously valid token has expired or been revoked
-    #[serde(rename = "expired")]
     Expired,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl AuthRequiredReason {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Required => "required",
+            Self::Expired => "expired",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for AuthRequiredReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for AuthRequiredReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "required" => Self::Required,
+            "expired" => Self::Expired,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 // ─── Notification Payloads ────────────────────────────────────────────

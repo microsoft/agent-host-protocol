@@ -1386,7 +1386,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         val entry = PendingMessage(id = a.id, message = a.message)
         if (a.kind == PendingMessageKind.STEERING) {
             state.copy(steeringMessage = entry)
-        } else {
+        } else if (a.kind == PendingMessageKind.QUEUED) {
             val existing = state.queuedMessages ?: emptyList()
             val idx = existing.indexOfFirst { it.id == a.id }
             val updated = if (idx >= 0) {
@@ -1395,6 +1395,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                 existing + entry
             }
             state.copy(queuedMessages = updated)
+        } else {
+            state
         }
     }
 
@@ -1407,7 +1409,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             } else {
                 state.copy(steeringMessage = null)
             }
-        } else {
+        } else if (a.kind == PendingMessageKind.QUEUED) {
             val existing = state.queuedMessages ?: return@chatReducer state
             val filtered = existing.filter { it.id != a.id }
             if (filtered.size == existing.size) {
@@ -1415,6 +1417,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             } else {
                 state.copy(queuedMessages = filtered.ifEmpty { null })
             }
+        } else {
+            state
         }
     }
 
