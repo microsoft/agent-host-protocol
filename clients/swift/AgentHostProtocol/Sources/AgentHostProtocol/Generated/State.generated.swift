@@ -456,10 +456,6 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
     public var bearerMethodsSupported: [String]?
     /// OPTIONAL. JSON array of JWS signing algorithms supported.
     public var resourceSigningAlgValuesSupported: [String]?
-    /// OPTIONAL. JSON array of JWE encryption algorithms (alg) supported.
-    public var resourceEncryptionAlgValuesSupported: [String]?
-    /// OPTIONAL. JSON array of JWE encryption algorithms (enc) supported.
-    public var resourceEncryptionEncValuesSupported: [String]?
     /// OPTIONAL. URL of human-readable documentation for the resource.
     public var resourceDocumentation: String?
     /// OPTIONAL. URL of the resource's data-usage policy.
@@ -485,8 +481,6 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
         case scopesSupported = "scopes_supported"
         case bearerMethodsSupported = "bearer_methods_supported"
         case resourceSigningAlgValuesSupported = "resource_signing_alg_values_supported"
-        case resourceEncryptionAlgValuesSupported = "resource_encryption_alg_values_supported"
-        case resourceEncryptionEncValuesSupported = "resource_encryption_enc_values_supported"
         case resourceDocumentation = "resource_documentation"
         case resourcePolicyUri = "resource_policy_uri"
         case resourceTosUri = "resource_tos_uri"
@@ -501,8 +495,6 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
         scopesSupported: [String]? = nil,
         bearerMethodsSupported: [String]? = nil,
         resourceSigningAlgValuesSupported: [String]? = nil,
-        resourceEncryptionAlgValuesSupported: [String]? = nil,
-        resourceEncryptionEncValuesSupported: [String]? = nil,
         resourceDocumentation: String? = nil,
         resourcePolicyUri: String? = nil,
         resourceTosUri: String? = nil,
@@ -515,8 +507,6 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
         self.scopesSupported = scopesSupported
         self.bearerMethodsSupported = bearerMethodsSupported
         self.resourceSigningAlgValuesSupported = resourceSigningAlgValuesSupported
-        self.resourceEncryptionAlgValuesSupported = resourceEncryptionAlgValuesSupported
-        self.resourceEncryptionEncValuesSupported = resourceEncryptionEncValuesSupported
         self.resourceDocumentation = resourceDocumentation
         self.resourcePolicyUri = resourcePolicyUri
         self.resourceTosUri = resourceTosUri

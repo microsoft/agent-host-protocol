@@ -1,0 +1,5 @@
+{
+  "type": "removed",
+  "message": "Non-standard `resource_encryption_alg_values_supported` and `resource_encryption_enc_values_supported` fields from `ProtectedResourceMetadata`.",
+  "issues": [368]
+}

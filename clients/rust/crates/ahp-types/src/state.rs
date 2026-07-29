@@ -670,20 +670,6 @@ pub struct ProtectedResourceMetadata {
         skip_serializing_if = "Option::is_none"
     )]
     pub resource_signing_alg_values_supported: Option<Vec<String>>,
-    /// OPTIONAL. JSON array of JWE encryption algorithms (alg) supported.
-    #[serde(
-        rename = "resource_encryption_alg_values_supported",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub resource_encryption_alg_values_supported: Option<Vec<String>>,
-    /// OPTIONAL. JSON array of JWE encryption algorithms (enc) supported.
-    #[serde(
-        rename = "resource_encryption_enc_values_supported",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub resource_encryption_enc_values_supported: Option<Vec<String>>,
     /// OPTIONAL. URL of human-readable documentation for the resource.
     #[serde(
         rename = "resource_documentation",
