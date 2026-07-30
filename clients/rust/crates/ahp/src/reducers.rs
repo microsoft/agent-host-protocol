@@ -55,7 +55,7 @@ use ahp_types::actions::{
     ChatInputAnswerChangedAction, ChatToolCallAuthRequiredAction, ChatToolCallAuthResolvedAction,
     ChatToolCallCompleteAction, ChatToolCallConfirmedAction, ChatToolCallContentChangedAction,
     ChatToolCallDeltaAction, ChatToolCallReadyAction, ChatToolCallResultConfirmedAction,
-    ChatTurnStartedAction, StateAction,
+    ChatTurnResumedAction, ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
@@ -943,6 +943,7 @@ fn update_mcp_server_customization_state(
 pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> ReduceOutcome {
     match action {
         StateAction::ChatTurnStarted(a) => apply_turn_started(state, a),
+        StateAction::ChatTurnResumed(a) => apply_turn_resumed(state, a),
         StateAction::ChatDelta(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
             if let ResponsePart::Markdown(m) = p {
                 m.content.push_str(&a.content);
@@ -1233,6 +1234,34 @@ fn apply_turn_started(state: &mut ChatState, a: &ChatTurnStartedAction) -> Reduc
             }
         }
     }
+    ReduceOutcome::Applied
+}
+
+fn apply_turn_resumed(state: &mut ChatState, a: &ChatTurnResumedAction) -> ReduceOutcome {
+    if state.active_turn.is_some() {
+        return ReduceOutcome::NoOp;
+    }
+    let Some(turn) = state.turns.last() else {
+        return ReduceOutcome::NoOp;
+    };
+    if turn.id != a.turn_id
+        || turn.state != TurnState::Error
+        || turn.error.as_ref().and_then(|error| error.resumable) != Some(true)
+    {
+        return ReduceOutcome::NoOp;
+    }
+
+    let turn = state.turns.pop().expect("last turn must exist");
+    state.active_turn = Some(ActiveTurn {
+        id: turn.id,
+        started_at: turn.started_at.unwrap_or_else(|| state.modified_at.clone()),
+        message: turn.message,
+        response_parts: turn.response_parts,
+        usage: turn.usage,
+    });
+    state.status = summary_status(state, None);
+    touch_chat_modified(state);
+    state.status = with_status_flag(state.status, SessionStatus::IsRead, false);
     ReduceOutcome::Applied
 }
 

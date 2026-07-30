@@ -491,6 +491,8 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	switch a := action.Value.(type) {
 	case *ahptypes.ChatTurnStartedAction:
 		return applyTurnStarted(state, a)
+	case *ahptypes.ChatTurnResumedAction:
+		return applyTurnResumed(state, a)
 	case *ahptypes.ChatDeltaAction:
 		return updateResponsePart(state, a.TurnId, a.PartId, func(p *ahptypes.ResponsePart) {
 			if m, ok := p.Value.(*ahptypes.MarkdownResponsePart); ok {
@@ -1017,6 +1019,35 @@ func applyTurnStarted(state *ahptypes.ChatState, a *ahptypes.ChatTurnStartedActi
 			}
 		}
 	}
+	return ReduceOutcomeApplied
+}
+
+func applyTurnResumed(state *ahptypes.ChatState, a *ahptypes.ChatTurnResumedAction) ReduceOutcome {
+	if state.ActiveTurn != nil || len(state.Turns) == 0 {
+		return ReduceOutcomeNoOp
+	}
+	turnIndex := len(state.Turns) - 1
+	turn := state.Turns[turnIndex]
+	if turn.Id != a.TurnId || turn.State != ahptypes.TurnStateError ||
+		turn.Error == nil || turn.Error.Resumable == nil || !*turn.Error.Resumable {
+		return ReduceOutcomeNoOp
+	}
+
+	startedAt := state.ModifiedAt
+	if turn.StartedAt != nil {
+		startedAt = *turn.StartedAt
+	}
+	state.Turns = state.Turns[:turnIndex]
+	state.ActiveTurn = &ahptypes.ActiveTurn{
+		Id:            turn.Id,
+		StartedAt:     startedAt,
+		Message:       turn.Message,
+		ResponseParts: turn.ResponseParts,
+		Usage:         turn.Usage,
+	}
+	state.Status = summaryStatus(state, nil)
+	state.ModifiedAt = nowISOString()
+	state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsRead, false)
 	return ReduceOutcomeApplied
 }
 

@@ -139,6 +139,27 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.status = withStatusFlag(chatSummaryStatus(next), .isRead, false)
         return next
 
+    case .chatTurnResumed(let a):
+        guard state.activeTurn == nil,
+              let turn = state.turns.last,
+              turn.id == a.turnId,
+              turn.state == .error,
+              turn.error?.resumable == true else {
+            return state
+        }
+        var next = state
+        next.turns.removeLast()
+        next.activeTurn = ActiveTurn(
+            id: turn.id,
+            startedAt: turn.startedAt ?? state.modifiedAt,
+            message: turn.message,
+            responseParts: turn.responseParts,
+            usage: turn.usage
+        )
+        next.modifiedAt = currentTimestamp()
+        next.status = withStatusFlag(chatSummaryStatus(next), .isRead, false)
+        return next
+
     case .chatDelta(let a):
         return updateResponsePart(state: state, turnId: a.turnId, partId: a.partId) { part in
             guard case .markdown(var md) = part else { return part }
