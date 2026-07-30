@@ -10,6 +10,7 @@ public enum ActionType: String, Codable, Sendable {
     case rootActiveSessionsChanged = "root/activeSessionsChanged"
     case sessionReady = "session/ready"
     case sessionCreationFailed = "session/creationFailed"
+    case sessionStateReplaced = "session/stateReplaced"
     case sessionChatAdded = "session/chatAdded"
     case sessionChatRemoved = "session/chatRemoved"
     case sessionChatUpdated = "session/chatUpdated"
@@ -1338,6 +1339,20 @@ public struct ChatInputCompletedAction: Codable, Sendable {
     }
 }
 
+public struct SessionStateReplacedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Complete authoritative state for the session.
+    public var state: SessionState
+
+    public init(
+        type: ActionType,
+        state: SessionState
+    ) {
+        self.type = type
+        self.state = state
+    }
+}
+
 public struct SessionCustomizationsChangedAction: Codable, Sendable {
     public var type: ActionType
     /// Updated customization list (full replacement).
@@ -2064,6 +2079,7 @@ public enum StateAction: Codable, Sendable {
     case chatInputRequested(ChatInputRequestedAction)
     case chatInputAnswerChanged(ChatInputAnswerChangedAction)
     case chatInputCompleted(ChatInputCompletedAction)
+    case sessionStateReplaced(SessionStateReplacedAction)
     case sessionCustomizationsChanged(SessionCustomizationsChangedAction)
     case sessionCustomizationToggled(SessionCustomizationToggledAction)
     case sessionCustomizationUpdated(SessionCustomizationUpdatedAction)
@@ -2208,6 +2224,8 @@ public enum StateAction: Codable, Sendable {
             self = .chatInputAnswerChanged(try ChatInputAnswerChangedAction(from: decoder))
         case "chat/inputCompleted":
             self = .chatInputCompleted(try ChatInputCompletedAction(from: decoder))
+        case "session/stateReplaced":
+            self = .sessionStateReplaced(try SessionStateReplacedAction(from: decoder))
         case "session/customizationsChanged":
             self = .sessionCustomizationsChanged(try SessionCustomizationsChangedAction(from: decoder))
         case "session/customizationToggled":
@@ -2338,6 +2356,7 @@ public enum StateAction: Codable, Sendable {
         case .chatInputRequested(let v): try v.encode(to: encoder)
         case .chatInputAnswerChanged(let v): try v.encode(to: encoder)
         case .chatInputCompleted(let v): try v.encode(to: encoder)
+        case .sessionStateReplaced(let v): try v.encode(to: encoder)
         case .sessionCustomizationsChanged(let v): try v.encode(to: encoder)
         case .sessionCustomizationToggled(let v): try v.encode(to: encoder)
         case .sessionCustomizationUpdated(let v): try v.encode(to: encoder)

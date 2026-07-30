@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`session/stateReplaced` action for replacing session state while its channel remains subscribed."
+}

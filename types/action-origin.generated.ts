@@ -9,6 +9,7 @@ import type {
   RootConfigChangedAction,
   SessionReadyAction,
   SessionCreationFailedAction,
+  SessionStateReplacedAction,
   SessionChatAddedAction,
   SessionChatRemovedAction,
   SessionChatUpdatedAction,
@@ -118,6 +119,7 @@ export type ServerRootAction =
 export type SessionAction =
   | SessionReadyAction
   | SessionCreationFailedAction
+  | SessionStateReplacedAction
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
@@ -164,6 +166,7 @@ export type ClientSessionAction =
 export type ServerSessionAction =
   | SessionReadyAction
   | SessionCreationFailedAction
+  | SessionStateReplacedAction
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction
@@ -363,6 +366,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.RootConfigChanged]: true,
   [ActionType.SessionReady]: false,
   [ActionType.SessionCreationFailed]: false,
+  [ActionType.SessionStateReplaced]: false,
   [ActionType.SessionChatAdded]: false,
   [ActionType.SessionChatRemoved]: false,
   [ActionType.SessionChatUpdated]: false,

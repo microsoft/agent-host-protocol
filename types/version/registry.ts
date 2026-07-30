@@ -82,6 +82,7 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.RootActiveSessionsChanged]: '0.1.0',
   [ActionType.SessionReady]: '0.1.0',
   [ActionType.SessionCreationFailed]: '0.1.0',
+  [ActionType.SessionStateReplaced]: '0.7.0',
   [ActionType.SessionChatAdded]: '0.4.0',
   [ActionType.SessionChatRemoved]: '0.4.0',
   [ActionType.SessionChatUpdated]: '0.4.0',

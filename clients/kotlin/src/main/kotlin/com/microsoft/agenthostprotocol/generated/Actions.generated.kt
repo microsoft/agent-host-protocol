@@ -34,6 +34,8 @@ enum class ActionType {
     SESSION_READY,
     @SerialName("session/creationFailed")
     SESSION_CREATION_FAILED,
+    @SerialName("session/stateReplaced")
+    SESSION_STATE_REPLACED,
     @SerialName("session/chatAdded")
     SESSION_CHAT_ADDED,
     @SerialName("session/chatRemoved")
@@ -1046,6 +1048,15 @@ data class ChatInputCompletedAction(
 )
 
 @Serializable
+data class SessionStateReplacedAction(
+    val type: ActionType,
+    /**
+     * Complete authoritative state for the session.
+     */
+    val state: SessionState
+)
+
+@Serializable
 data class SessionCustomizationsChangedAction(
     val type: ActionType,
     /**
@@ -1584,6 +1595,7 @@ sealed interface StateAction
 @JvmInline value class StateActionChatInputRequested(val value: ChatInputRequestedAction) : StateAction
 @JvmInline value class StateActionChatInputAnswerChanged(val value: ChatInputAnswerChangedAction) : StateAction
 @JvmInline value class StateActionChatInputCompleted(val value: ChatInputCompletedAction) : StateAction
+@JvmInline value class StateActionSessionStateReplaced(val value: SessionStateReplacedAction) : StateAction
 @JvmInline value class StateActionSessionCustomizationsChanged(val value: SessionCustomizationsChangedAction) : StateAction
 @JvmInline value class StateActionSessionCustomizationToggled(val value: SessionCustomizationToggledAction) : StateAction
 @JvmInline value class StateActionSessionCustomizationUpdated(val value: SessionCustomizationUpdatedAction) : StateAction
@@ -1684,6 +1696,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/inputRequested" -> StateActionChatInputRequested(input.json.decodeFromJsonElement(ChatInputRequestedAction.serializer(), element))
             "chat/inputAnswerChanged" -> StateActionChatInputAnswerChanged(input.json.decodeFromJsonElement(ChatInputAnswerChangedAction.serializer(), element))
             "chat/inputCompleted" -> StateActionChatInputCompleted(input.json.decodeFromJsonElement(ChatInputCompletedAction.serializer(), element))
+            "session/stateReplaced" -> StateActionSessionStateReplaced(input.json.decodeFromJsonElement(SessionStateReplacedAction.serializer(), element))
             "session/customizationsChanged" -> StateActionSessionCustomizationsChanged(input.json.decodeFromJsonElement(SessionCustomizationsChangedAction.serializer(), element))
             "session/customizationToggled" -> StateActionSessionCustomizationToggled(input.json.decodeFromJsonElement(SessionCustomizationToggledAction.serializer(), element))
             "session/customizationUpdated" -> StateActionSessionCustomizationUpdated(input.json.decodeFromJsonElement(SessionCustomizationUpdatedAction.serializer(), element))
@@ -1777,6 +1790,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatInputRequested -> output.json.encodeToJsonElement(ChatInputRequestedAction.serializer(), value.value)
             is StateActionChatInputAnswerChanged -> output.json.encodeToJsonElement(ChatInputAnswerChangedAction.serializer(), value.value)
             is StateActionChatInputCompleted -> output.json.encodeToJsonElement(ChatInputCompletedAction.serializer(), value.value)
+            is StateActionSessionStateReplaced -> output.json.encodeToJsonElement(SessionStateReplacedAction.serializer(), value.value)
             is StateActionSessionCustomizationsChanged -> output.json.encodeToJsonElement(SessionCustomizationsChangedAction.serializer(), value.value)
             is StateActionSessionCustomizationToggled -> output.json.encodeToJsonElement(SessionCustomizationToggledAction.serializer(), value.value)
             is StateActionSessionCustomizationUpdated -> output.json.encodeToJsonElement(SessionCustomizationUpdatedAction.serializer(), value.value)

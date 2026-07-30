@@ -118,6 +118,9 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
         creationError: action.error,
       };
 
+    case ActionType.SessionStateReplaced:
+      return { ...action.state };
+
     case ActionType.SessionChatAdded: {
       const list = state.chats;
       const idx = list.findIndex(c => c.resource === action.summary.resource);

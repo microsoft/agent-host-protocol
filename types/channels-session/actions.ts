@@ -12,6 +12,7 @@ import type {
   SessionInputRequest,
   Customization,
   McpServerState,
+  SessionState,
 } from './state.js';
 import type { URI } from '../common/state.js';
 import type { Changeset } from '../channels-changeset/state.js';
@@ -39,6 +40,22 @@ export interface SessionCreationFailedAction {
   type: ActionType.SessionCreationFailed;
   /** Error details */
   error: ErrorInfo;
+}
+
+/**
+ * The authoritative state for this session was replaced while the channel
+ * remained subscribed.
+ *
+ * Full-replacement semantics: the supplied state replaces the previous session
+ * state entirely.
+ *
+ * @category Session Actions
+ * @version 1
+ */
+export interface SessionStateReplacedAction {
+  type: ActionType.SessionStateReplaced;
+  /** Complete authoritative state for the session. */
+  state: SessionState;
 }
 
 /**
