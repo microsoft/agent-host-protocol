@@ -110,10 +110,10 @@ export interface AgentCapabilities {
    * source-based creation; set {@link MultipleChatsCapability.fork} or
    * {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.
    */
-   multipleChats?: MultipleChatsCapability;
-   /**
-    * The session's agent can be granted tool access to more than one working
-    * directory. The directories are treated as equal peers except where the
+  multipleChats?: MultipleChatsCapability;
+  /**
+   * The session's agent can be granted tool access to more than one working
+   * directory. The directories are treated as equal peers except where the
    * agent advertises {@link MultipleWorkingDirectoriesCapability.immutablePrimary}
    * (some backends pin their first directory as a fixed process root).
    *
