@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "Unknown string enum values no longer fail containing messages, round-trip unchanged, and are treated as no-ops when their semantics are unknown.",
+  "issues": [366]
+}

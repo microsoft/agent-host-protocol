@@ -1,0 +1,24 @@
+{
+  "name": "jsonrpc-unknown-error-code",
+  "group": "A",
+  "description": "A JSON-RPC error response with a code introduced by a newer peer decodes without failing and preserves the raw integer on re-encode.",
+  "type": "JsonRpcMessage",
+  "input": {
+    "jsonrpc": "2.0",
+    "id": 27,
+    "error": {
+      "code": -32999,
+      "message": "Future error"
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "jsonrpc": "2.0",
+      "id": 27,
+      "error": {
+        "code": -32999,
+        "message": "Future error"
+      }
+    }
+  ]
+}

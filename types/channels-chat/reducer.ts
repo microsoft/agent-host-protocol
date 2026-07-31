@@ -813,6 +813,9 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
       if (action.kind === PendingMessageKind.Steering) {
         return { ...state, steeringMessage: entry };
       }
+      if (action.kind !== PendingMessageKind.Queued) {
+        return state;
+      }
       const existing = state.queuedMessages ?? [];
       const idx = existing.findIndex(m => m.id === action.id);
       if (idx >= 0) {
@@ -829,6 +832,9 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           return state;
         }
         return { ...state, steeringMessage: undefined };
+      }
+      if (action.kind !== PendingMessageKind.Queued) {
+        return state;
       }
       const existing = state.queuedMessages;
       if (!existing) {

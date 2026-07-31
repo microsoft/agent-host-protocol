@@ -18,8 +18,11 @@
  *     `@JsonClassDiscriminator`, because that mode forbids the discriminator
  *     field from existing on the variant data class — but our TS variant
  *     interfaces include it (e.g. `MarkdownResponsePart.kind = 'markdown'`).
+ *   - String enums → `@JvmInline value class` wrapping `String`, with
+ *     companion-object constants, so unknown future values decode/encode
+ *     losslessly.
  *   - Bitset enums (JSDoc starts with "Bitset") → `@JvmInline value class`
- *     wrapping `Int`, with companion-object flag constants and bitwise ops,
+ *     wrapping `UInt`, with companion-object flag constants and bitwise ops,
  *     so unknown future bits decode/encode losslessly.
  *   - Recursive structs → plain data classes (Kotlin classes are heap-
  *     allocated by default, so self-reference Just Works).
@@ -401,6 +404,35 @@ function generateKotlinEnum(enumDecl: EnumDeclaration): string {
     lines.push('    }');
     lines.push(`    override fun deserialize(decoder: Decoder): ${name} =`);
     lines.push(`        ${name}(decoder.decodeLong().toUInt())`);
+    lines.push('}');
+    return lines.join('\n');
+  }
+
+  if (!isNumeric) {
+    lines.push(`@Serializable(with = ${name}Serializer::class)`);
+    lines.push('@JvmInline');
+    lines.push(`value class ${name}(val rawValue: String) {`);
+    lines.push('    companion object {');
+    for (const member of enumDecl.getMembers()) {
+      const memberName = toScreamingSnake(member.getName());
+      const value = member.getValue();
+      const memberDoc = member.getJsDocs()[0]?.getDescription().trim();
+      if (memberDoc) {
+        lines.push(...emitKDoc(memberDoc, '        '));
+      }
+      lines.push(`        val ${memberName}: ${name} = ${name}(${JSON.stringify(String(value))})`);
+    }
+    lines.push('    }');
+    lines.push('}');
+    lines.push('');
+    lines.push(`internal object ${name}Serializer : KSerializer<${name}> {`);
+    lines.push(`    override val descriptor: SerialDescriptor =`);
+    lines.push(`        PrimitiveSerialDescriptor("${name}", PrimitiveKind.STRING)`);
+    lines.push(`    override fun serialize(encoder: Encoder, value: ${name}) {`);
+    lines.push('        encoder.encodeString(value.rawValue)');
+    lines.push('    }');
+    lines.push(`    override fun deserialize(decoder: Decoder): ${name} =`);
+    lines.push(`        ${name}(decoder.decodeString())`);
     lines.push('}');
     return lines.join('\n');
   }

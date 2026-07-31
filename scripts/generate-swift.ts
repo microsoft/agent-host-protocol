@@ -332,6 +332,55 @@ function generateSwiftEnum(enumDecl: EnumDeclaration): string {
     return lines.join('\n');
   }
 
+  if (rawType === 'String') {
+    lines.push(`public enum ${name}: Codable, Sendable, Hashable, RawRepresentable {`);
+
+    for (const member of enumDecl.getMembers()) {
+      const memberName = swiftIdentifier(toCamelCase(member.getName()));
+      const memberDoc = member.getJsDocs()[0]?.getDescription().trim();
+      if (memberDoc) {
+        for (const docLine of memberDoc.split('\n')) {
+          lines.push(emitSwiftDocLine(docLine, '    '));
+        }
+      }
+      lines.push(`    case ${memberName}`);
+    }
+    lines.push('    /// An unknown or future wire value, preserved verbatim.');
+    lines.push('    case unknown(String)');
+    lines.push('');
+    lines.push('    public init(rawValue: String) {');
+    lines.push('        switch rawValue {');
+    for (const member of enumDecl.getMembers()) {
+      const memberName = swiftIdentifier(toCamelCase(member.getName()));
+      lines.push(`        case ${JSON.stringify(member.getValue())}: self = .${memberName}`);
+    }
+    lines.push('        default: self = .unknown(rawValue)');
+    lines.push('        }');
+    lines.push('    }');
+    lines.push('');
+    lines.push('    public var rawValue: String {');
+    lines.push('        switch self {');
+    for (const member of enumDecl.getMembers()) {
+      const memberName = swiftIdentifier(toCamelCase(member.getName()));
+      lines.push(`        case .${memberName}: return ${JSON.stringify(member.getValue())}`);
+    }
+    lines.push('        case .unknown(let value): return value');
+    lines.push('        }');
+    lines.push('    }');
+    lines.push('');
+    lines.push('    public init(from decoder: Decoder) throws {');
+    lines.push('        let container = try decoder.singleValueContainer()');
+    lines.push('        self.init(rawValue: try container.decode(String.self))');
+    lines.push('    }');
+    lines.push('');
+    lines.push('    public func encode(to encoder: Encoder) throws {');
+    lines.push('        var container = encoder.singleValueContainer()');
+    lines.push('        try container.encode(rawValue)');
+    lines.push('    }');
+    lines.push('}');
+    return lines.join('\n');
+  }
+
   lines.push(`public enum ${name}: ${rawType}, Codable, Sendable {`);
 
   for (const member of enumDecl.getMembers()) {

@@ -29,8 +29,8 @@ use ahp_types::{
     commands::{ChangesetOperationTarget, ChatSource, Implementation, InitializeResult},
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
-    notifications::{PartialSessionSummary, SessionAddedParams},
-    state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary},
+    notifications::{AuthRequiredParams, PartialSessionSummary, SessionAddedParams},
+    state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary, Turn},
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
 };
 use serde_json::{Number, Value};
@@ -222,6 +222,8 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "Implementation" => round_trip!(Implementation),
         "InitializeResult" => round_trip!(InitializeResult),
         "ChatSource" => round_trip!(ChatSource),
+        "AuthRequiredParams" => round_trip!(AuthRequiredParams),
+        "Turn" => round_trip!(Turn),
         other => Err(format!(
             "{}: unknown wire type {:?}. Add a decode entry to decode_and_reencode.",
             file, other

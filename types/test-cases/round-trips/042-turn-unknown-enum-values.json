@@ -1,0 +1,30 @@
+{
+  "name": "turn-unknown-enum-values",
+  "group": "A",
+  "description": "A turn with unknown required and nested enum values decodes without failing and preserves both values on re-encode.",
+  "type": "Turn",
+  "input": {
+    "id": "turn-future-enums",
+    "message": {
+      "text": "Hello",
+      "origin": {
+        "kind": "integration"
+      }
+    },
+    "responseParts": [],
+    "state": "paused"
+  },
+  "acceptableOutputs": [
+    {
+      "id": "turn-future-enums",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "integration"
+        }
+      },
+      "responseParts": [],
+      "state": "paused"
+    }
+  ]
+}

@@ -23,53 +23,238 @@ use crate::state::{
 // ─── Enums ────────────────────────────────────────────────────────────
 
 /// Discriminant for reconnect result types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ReconnectResultType {
-    #[serde(rename = "replay")]
     Replay,
-    #[serde(rename = "snapshot")]
     Snapshot,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ReconnectResultType {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Replay => "replay",
+            Self::Snapshot => "snapshot",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ReconnectResultType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ReconnectResultType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "replay" => Self::Replay,
+            "snapshot" => Self::Snapshot,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// How a new chat uses its source chat and turn.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChatSourceKind {
     /// Copy source history through the referenced turn into the new chat.
-    #[serde(rename = "fork")]
     Fork,
     /// Supply source context without copying it into the new chat's visible history.
-    #[serde(rename = "sideChat")]
     SideChat,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChatSourceKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Fork => "fork",
+            Self::SideChat => "sideChat",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChatSourceKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatSourceKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "fork" => Self::Fork,
+            "sideChat" => Self::SideChat,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Encoding of fetched content data.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ContentEncoding {
-    #[serde(rename = "base64")]
     Base64,
-    #[serde(rename = "utf-8")]
     Utf8,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ContentEncoding {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Base64 => "base64",
+            Self::Utf8 => "utf-8",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ContentEncoding {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ContentEncoding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "base64" => Self::Base64,
+            "utf-8" => Self::Utf8,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// The kind of completion items being requested.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CompletionItemKind {
     /// Completions for the text of a {@link Message} the user is composing.
     /// Each returned item carries an attachment that gets associated with the
     /// message when accepted.
-    #[serde(rename = "userMessage")]
     UserMessage,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl CompletionItemKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::UserMessage => "userMessage",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for CompletionItemKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for CompletionItemKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "userMessage" => Self::UserMessage,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for {@link ResourceResolveResult.type}.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResourceType {
-    #[serde(rename = "file")]
     File,
-    #[serde(rename = "directory")]
     Directory,
-    #[serde(rename = "symlink")]
     Symlink,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ResourceType {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::File => "file",
+            Self::Directory => "directory",
+            Self::Symlink => "symlink",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ResourceType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ResourceType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "file" => Self::File,
+            "directory" => Self::Directory,
+            "symlink" => Self::Symlink,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// How {@link ResourceWriteParams.data} is placed within the target file.
@@ -91,14 +276,52 @@ pub enum ResourceType {
 ///   is the byte offset at which `data` is spliced in; bytes at or after
 ///   `position` are shifted right by `data.length`. `insert` always grows
 ///   the file — use `truncate` to overwrite bytes in place.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResourceWriteMode {
-    #[serde(rename = "truncate")]
     Truncate,
-    #[serde(rename = "append")]
     Append,
-    #[serde(rename = "insert")]
     Insert,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ResourceWriteMode {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Truncate => "truncate",
+            Self::Append => "append",
+            Self::Insert => "insert",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ResourceWriteMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ResourceWriteMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "truncate" => Self::Truncate,
+            "append" => Self::Append,
+            "insert" => Self::Insert,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 // ─── Command Payloads ─────────────────────────────────────────────────

@@ -14,36 +14,149 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 // ─── Enums ────────────────────────────────────────────────────────────
 
 /// Policy configuration state for a model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PolicyState {
-    #[serde(rename = "enabled")]
     Enabled,
-    #[serde(rename = "disabled")]
     Disabled,
-    #[serde(rename = "unconfigured")]
     Unconfigured,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl PolicyState {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Enabled => "enabled",
+            Self::Disabled => "disabled",
+            Self::Unconfigured => "unconfigured",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for PolicyState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for PolicyState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "enabled" => Self::Enabled,
+            "disabled" => Self::Disabled,
+            "unconfigured" => Self::Unconfigured,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for pending message kinds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PendingMessageKind {
     /// Injected into the current turn at a convenient point
-    #[serde(rename = "steering")]
     Steering,
     /// Sent automatically as a new turn after the current turn finishes
-    #[serde(rename = "queued")]
     Queued,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl PendingMessageKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Steering => "steering",
+            Self::Queued => "queued",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for PendingMessageKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for PendingMessageKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "steering" => Self::Steering,
+            "queued" => Self::Queued,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Session initialization state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SessionLifecycle {
-    #[serde(rename = "creating")]
     Creating,
-    #[serde(rename = "ready")]
     Ready,
-    #[serde(rename = "creationFailed")]
     CreationFailed,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl SessionLifecycle {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Creating => "creating",
+            Self::Ready => "ready",
+            Self::CreationFailed => "creationFailed",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for SessionLifecycle {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for SessionLifecycle {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "creating" => Self::Creating,
+            "ready" => Self::Ready,
+            "creationFailed" => Self::CreationFailed,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Bitset of summary-level session status flags.
@@ -138,20 +251,59 @@ impl std::ops::Not for SessionStatus {
 }
 
 /// Discriminant for {@link ChatOrigin} — how a chat came into existence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChatOriginKind {
     /// User created the chat explicitly (e.g. via the host UI).
-    #[serde(rename = "user")]
     User,
     /// Forked from an existing chat at a specific turn.
-    #[serde(rename = "fork")]
     Fork,
     /// Created as an independent side conversation from a specific turn.
-    #[serde(rename = "sideChat")]
     SideChat,
     /// Spawned by a tool call running in another chat (e.g. a sub-agent delegation).
-    #[serde(rename = "tool")]
     Tool,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChatOriginKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::User => "user",
+            Self::Fork => "fork",
+            Self::SideChat => "sideChat",
+            Self::Tool => "tool",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChatOriginKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatOriginKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "user" => Self::User,
+            "fork" => Self::Fork,
+            "sideChat" => Self::SideChat,
+            "tool" => Self::Tool,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// How a user can interact with a chat.
@@ -164,71 +316,266 @@ pub enum ChatOriginKind {
 /// worker chats are read-only (visible for observability) or hidden (internal
 /// implementation detail). The harness sets this based on the chat's role;
 /// the UI uses it to show appropriate controls.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChatInteractivity {
     /// User can send messages and watch (default when absent)
-    #[serde(rename = "full")]
     Full,
     /// User can watch but not send messages
-    #[serde(rename = "read-only")]
     ReadOnly,
     /// Internal worker not shown in UI at all
-    #[serde(rename = "hidden")]
     Hidden,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChatInteractivity {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Full => "full",
+            Self::ReadOnly => "read-only",
+            Self::Hidden => "hidden",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChatInteractivity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatInteractivity {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "full" => Self::Full,
+            "read-only" => Self::ReadOnly,
+            "hidden" => Self::Hidden,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Answer lifecycle state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChatInputAnswerState {
-    #[serde(rename = "draft")]
     Draft,
-    #[serde(rename = "submitted")]
     Submitted,
-    #[serde(rename = "skipped")]
     Skipped,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChatInputAnswerState {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Draft => "draft",
+            Self::Submitted => "submitted",
+            Self::Skipped => "skipped",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChatInputAnswerState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatInputAnswerState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "draft" => Self::Draft,
+            "submitted" => Self::Submitted,
+            "skipped" => Self::Skipped,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Answer value kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChatInputAnswerValueKind {
-    #[serde(rename = "text")]
     Text,
-    #[serde(rename = "number")]
     Number,
-    #[serde(rename = "boolean")]
     Boolean,
-    #[serde(rename = "selected")]
     Selected,
-    #[serde(rename = "selected-many")]
     SelectedMany,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChatInputAnswerValueKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Text => "text",
+            Self::Number => "number",
+            Self::Boolean => "boolean",
+            Self::Selected => "selected",
+            Self::SelectedMany => "selected-many",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChatInputAnswerValueKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatInputAnswerValueKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "text" => Self::Text,
+            "number" => Self::Number,
+            "boolean" => Self::Boolean,
+            "selected" => Self::Selected,
+            "selected-many" => Self::SelectedMany,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Question/input control kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChatInputQuestionKind {
-    #[serde(rename = "text")]
     Text,
-    #[serde(rename = "number")]
     Number,
-    #[serde(rename = "integer")]
     Integer,
-    #[serde(rename = "boolean")]
     Boolean,
-    #[serde(rename = "single-select")]
     SingleSelect,
-    #[serde(rename = "multi-select")]
     MultiSelect,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChatInputQuestionKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Text => "text",
+            Self::Number => "number",
+            Self::Integer => "integer",
+            Self::Boolean => "boolean",
+            Self::SingleSelect => "single-select",
+            Self::MultiSelect => "multi-select",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChatInputQuestionKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatInputQuestionKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "text" => Self::Text,
+            "number" => Self::Number,
+            "integer" => Self::Integer,
+            "boolean" => Self::Boolean,
+            "single-select" => Self::SingleSelect,
+            "multi-select" => Self::MultiSelect,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// How a client completed an input request.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChatInputResponseKind {
-    #[serde(rename = "accept")]
     Accept,
-    #[serde(rename = "decline")]
     Decline,
-    #[serde(rename = "cancel")]
     Cancel,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChatInputResponseKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Accept => "accept",
+            Self::Decline => "decline",
+            Self::Cancel => "cancel",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChatInputResponseKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChatInputResponseKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "accept" => Self::Accept,
+            "decline" => Self::Decline,
+            "cancel" => Self::Cancel,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for the kinds of outstanding input a session can surface in
@@ -236,109 +583,348 @@ pub enum ChatInputResponseKind {
 ///
 /// This is a general/typological union (not a lifecycle), so the discriminant is
 /// a `*Kind`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SessionInputRequestKind {
     /// A user-facing elicitation mirrored from an unresolved chat response part.
-    #[serde(rename = "chatInput")]
     ChatInput,
     /// A tool call awaiting parameter- or result-confirmation.
-    #[serde(rename = "toolConfirmation")]
     ToolConfirmation,
     /// A running tool the session wants an active client to execute.
-    #[serde(rename = "toolClientExecution")]
     ToolClientExecution,
     /// A tool call blocked on MCP authentication mid-execution.
-    #[serde(rename = "toolAuthentication")]
     ToolAuthentication,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl SessionInputRequestKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::ChatInput => "chatInput",
+            Self::ToolConfirmation => "toolConfirmation",
+            Self::ToolClientExecution => "toolClientExecution",
+            Self::ToolAuthentication => "toolAuthentication",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for SessionInputRequestKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for SessionInputRequestKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "chatInput" => Self::ChatInput,
+            "toolConfirmation" => Self::ToolConfirmation,
+            "toolClientExecution" => Self::ToolClientExecution,
+            "toolAuthentication" => Self::ToolAuthentication,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// How a turn ended.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TurnState {
-    #[serde(rename = "complete")]
     Complete,
-    #[serde(rename = "cancelled")]
     Cancelled,
-    #[serde(rename = "error")]
     Error,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl TurnState {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Complete => "complete",
+            Self::Cancelled => "cancelled",
+            Self::Error => "error",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for TurnState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for TurnState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "complete" => Self::Complete,
+            "cancelled" => Self::Cancelled,
+            "error" => Self::Error,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for {@link MessageOrigin} — identifies who produced a message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MessageKind {
     /// Sent directly by the user.
-    #[serde(rename = "user")]
     User,
     /// Produced by the agent itself rather than the user — for example, an agent
     /// that seeds the first message of a chat it spawned.
-    #[serde(rename = "agent")]
     Agent,
     /// Produced by a tool rather than the user — for example, a tool that spawns a
     /// worker chat whose first message carries a seed prompt.
-    #[serde(rename = "tool")]
     Tool,
     /// A system-generated notification rather than a direct user message.
-    #[serde(rename = "systemNotification")]
     SystemNotification,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl MessageKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::User => "user",
+            Self::Agent => "agent",
+            Self::Tool => "tool",
+            Self::SystemNotification => "systemNotification",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for MessageKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for MessageKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "user" => Self::User,
+            "agent" => Self::Agent,
+            "tool" => Self::Tool,
+            "systemNotification" => Self::SystemNotification,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for {@link MessageAttachment} variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MessageAttachmentKind {
     /// A simple, opaque attachment whose representation is described by the producer.
-    #[serde(rename = "simple")]
     Simple,
     /// An attachment whose data is embedded inline as a base64 string.
-    #[serde(rename = "embeddedResource")]
     EmbeddedResource,
     /// An attachment that references a resource by URI.
-    #[serde(rename = "resource")]
     Resource,
     /// An attachment that references annotations on an annotations channel.
-    #[serde(rename = "annotations")]
     Annotations,
     /// An attachment that references a bounded transcript from another chat.
-    #[serde(rename = "chat")]
     Chat,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl MessageAttachmentKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Simple => "simple",
+            Self::EmbeddedResource => "embeddedResource",
+            Self::Resource => "resource",
+            Self::Annotations => "annotations",
+            Self::Chat => "chat",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for MessageAttachmentKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for MessageAttachmentKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "simple" => Self::Simple,
+            "embeddedResource" => Self::EmbeddedResource,
+            "resource" => Self::Resource,
+            "annotations" => Self::Annotations,
+            "chat" => Self::Chat,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for response part types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResponsePartKind {
-    #[serde(rename = "markdown")]
     Markdown,
-    #[serde(rename = "contentRef")]
     ContentRef,
-    #[serde(rename = "toolCall")]
     ToolCall,
-    #[serde(rename = "reasoning")]
     Reasoning,
-    #[serde(rename = "systemNotification")]
     SystemNotification,
-    #[serde(rename = "inputRequest")]
     InputRequest,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ResponsePartKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Markdown => "markdown",
+            Self::ContentRef => "contentRef",
+            Self::ToolCall => "toolCall",
+            Self::Reasoning => "reasoning",
+            Self::SystemNotification => "systemNotification",
+            Self::InputRequest => "inputRequest",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ResponsePartKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ResponsePartKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "markdown" => Self::Markdown,
+            "contentRef" => Self::ContentRef,
+            "toolCall" => Self::ToolCall,
+            "reasoning" => Self::Reasoning,
+            "systemNotification" => Self::SystemNotification,
+            "inputRequest" => Self::InputRequest,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Status of a tool call in the lifecycle state machine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ToolCallStatus {
-    #[serde(rename = "streaming")]
     Streaming,
-    #[serde(rename = "pending-confirmation")]
     PendingConfirmation,
-    #[serde(rename = "running")]
     Running,
     /// Running paused because the MCP server backing this call needs
     /// authentication (typically step-up auth for insufficient scope,
     /// surfacing mid-execution). See {@link ToolCallAuthRequiredState}.
-    #[serde(rename = "auth-required")]
     AuthRequired,
-    #[serde(rename = "pending-result-confirmation")]
     PendingResultConfirmation,
-    #[serde(rename = "completed")]
     Completed,
-    #[serde(rename = "cancelled")]
     Cancelled,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ToolCallStatus {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Streaming => "streaming",
+            Self::PendingConfirmation => "pending-confirmation",
+            Self::Running => "running",
+            Self::AuthRequired => "auth-required",
+            Self::PendingResultConfirmation => "pending-result-confirmation",
+            Self::Completed => "completed",
+            Self::Cancelled => "cancelled",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ToolCallStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ToolCallStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "streaming" => Self::Streaming,
+            "pending-confirmation" => Self::PendingConfirmation,
+            "running" => Self::Running,
+            "auth-required" => Self::AuthRequired,
+            "pending-result-confirmation" => Self::PendingResultConfirmation,
+            "completed" => Self::Completed,
+            "cancelled" => Self::Cancelled,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// How a tool call was confirmed for execution.
@@ -346,75 +932,339 @@ pub enum ToolCallStatus {
 /// - `NotNeeded` — No confirmation required (auto-approved)
 /// - `UserAction` — User explicitly approved
 /// - `Setting` — Approved by a persistent user setting
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ToolCallConfirmationReason {
-    #[serde(rename = "not-needed")]
     NotNeeded,
-    #[serde(rename = "user-action")]
     UserAction,
-    #[serde(rename = "setting")]
     Setting,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ToolCallConfirmationReason {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::NotNeeded => "not-needed",
+            Self::UserAction => "user-action",
+            Self::Setting => "setting",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ToolCallConfirmationReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ToolCallConfirmationReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "not-needed" => Self::NotNeeded,
+            "user-action" => Self::UserAction,
+            "setting" => Self::Setting,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Identifies a model judge as the source of a confirmation requirement.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ToolCallRiskAssessmentKind {
-    #[serde(rename = "judge")]
     Judge,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ToolCallRiskAssessmentKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Judge => "judge",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ToolCallRiskAssessmentKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ToolCallRiskAssessmentKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "judge" => Self::Judge,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Lifecycle status of an asynchronous model-judge confirmation decision.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ToolCallRiskAssessmentStatus {
-    #[serde(rename = "loading")]
     Loading,
-    #[serde(rename = "complete")]
     Complete,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ToolCallRiskAssessmentStatus {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Loading => "loading",
+            Self::Complete => "complete",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ToolCallRiskAssessmentStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ToolCallRiskAssessmentStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "loading" => Self::Loading,
+            "complete" => Self::Complete,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Why a tool call was cancelled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ToolCallCancellationReason {
-    #[serde(rename = "denied")]
     Denied,
-    #[serde(rename = "skipped")]
     Skipped,
-    #[serde(rename = "result-denied")]
     ResultDenied,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ToolCallCancellationReason {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Denied => "denied",
+            Self::Skipped => "skipped",
+            Self::ResultDenied => "result-denied",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ToolCallCancellationReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ToolCallCancellationReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "denied" => Self::Denied,
+            "skipped" => Self::Skipped,
+            "result-denied" => Self::ResultDenied,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Whether a confirmation option represents an approval or denial action.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConfirmationOptionKind {
-    #[serde(rename = "approve")]
     Approve,
-    #[serde(rename = "deny")]
     Deny,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+impl ConfirmationOptionKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Approve => "approve",
+            Self::Deny => "deny",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ConfirmationOptionKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ConfirmationOptionKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "approve" => Self::Approve,
+            "deny" => Self::Deny,
+            _ => Self::Unknown(value),
+        })
+    }
+}
+
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ToolCallContributorKind {
-    #[serde(rename = "client")]
     Client,
-    #[serde(rename = "mcp")]
     MCP,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ToolCallContributorKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Client => "client",
+            Self::MCP => "mcp",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ToolCallContributorKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ToolCallContributorKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "client" => Self::Client,
+            "mcp" => Self::MCP,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for tool result content types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ToolResultContentType {
-    #[serde(rename = "text")]
     Text,
-    #[serde(rename = "embeddedResource")]
     EmbeddedResource,
-    #[serde(rename = "resource")]
     Resource,
-    #[serde(rename = "fileEdit")]
     FileEdit,
-    #[serde(rename = "terminal")]
     Terminal,
-    #[serde(rename = "subagent")]
     Subagent,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ToolResultContentType {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Text => "text",
+            Self::EmbeddedResource => "embeddedResource",
+            Self::Resource => "resource",
+            Self::FileEdit => "fileEdit",
+            Self::Terminal => "terminal",
+            Self::Subagent => "subagent",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ToolResultContentType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ToolResultContentType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "text" => Self::Text,
+            "embeddedResource" => Self::EmbeddedResource,
+            "resource" => Self::Resource,
+            "fileEdit" => Self::FileEdit,
+            "terminal" => Self::Terminal,
+            "subagent" => Self::Subagent,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for the kind of customization.
@@ -426,82 +1276,242 @@ pub enum ToolResultContentType {
 /// {@link CustomizationType.McpServer | `McpServer`} entries surfaced
 /// directly by the host. The remaining types appear only as children of
 /// a container.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CustomizationType {
-    #[serde(rename = "plugin")]
     Plugin,
-    #[serde(rename = "directory")]
     Directory,
-    #[serde(rename = "agent")]
     Agent,
-    #[serde(rename = "skill")]
     Skill,
-    #[serde(rename = "prompt")]
     Prompt,
-    #[serde(rename = "rule")]
     Rule,
-    #[serde(rename = "hook")]
     Hook,
-    #[serde(rename = "mcpServer")]
     McpServer,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl CustomizationType {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Plugin => "plugin",
+            Self::Directory => "directory",
+            Self::Agent => "agent",
+            Self::Skill => "skill",
+            Self::Prompt => "prompt",
+            Self::Rule => "rule",
+            Self::Hook => "hook",
+            Self::McpServer => "mcpServer",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for CustomizationType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for CustomizationType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "plugin" => Self::Plugin,
+            "directory" => Self::Directory,
+            "agent" => Self::Agent,
+            "skill" => Self::Skill,
+            "prompt" => Self::Prompt,
+            "rule" => Self::Rule,
+            "hook" => Self::Hook,
+            "mcpServer" => Self::McpServer,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant values for {@link CustomizationLoadState}.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CustomizationLoadStatus {
-    #[serde(rename = "loading")]
     Loading,
-    #[serde(rename = "loaded")]
     Loaded,
-    #[serde(rename = "degraded")]
     Degraded,
-    #[serde(rename = "error")]
     Error,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl CustomizationLoadStatus {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Loading => "loading",
+            Self::Loaded => "loaded",
+            Self::Degraded => "degraded",
+            Self::Error => "error",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for CustomizationLoadStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for CustomizationLoadStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "loading" => Self::Loading,
+            "loaded" => Self::Loaded,
+            "degraded" => Self::Degraded,
+            "error" => Self::Error,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for terminal claim kinds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TerminalClaimKind {
-    #[serde(rename = "client")]
     Client,
-    #[serde(rename = "session")]
     Session,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl TerminalClaimKind {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Client => "client",
+            Self::Session => "session",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for TerminalClaimKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for TerminalClaimKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "client" => Self::Client,
+            "session" => Self::Session,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for the {@link McpServerState} union.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum McpServerStatus {
     /// Server has been registered but is not yet running.
-    #[serde(rename = "starting")]
     Starting,
     /// Server is running and serving requests.
-    #[serde(rename = "ready")]
     Ready,
     /// Server is reachable but requires additional authentication before it
     /// can start, or before it can serve a particular request. Carries the
     /// RFC 9728 Protected Resource Metadata the client needs to obtain a
     /// token; the client then pushes the token via the existing
     /// `authenticate` command.
-    #[serde(rename = "authRequired")]
     AuthRequired,
     /// Server failed to start, crashed, or otherwise transitioned to a fatal error.
-    #[serde(rename = "error")]
     Error,
     /// Server has been shut down.
-    #[serde(rename = "stopped")]
     Stopped,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl McpServerStatus {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Starting => "starting",
+            Self::Ready => "ready",
+            Self::AuthRequired => "authRequired",
+            Self::Error => "error",
+            Self::Stopped => "stopped",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for McpServerStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for McpServerStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "starting" => Self::Starting,
+            "ready" => Self::Ready,
+            "authRequired" => Self::AuthRequired,
+            "error" => Self::Error,
+            "stopped" => Self::Stopped,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}
 /// state. Mirrors the three failure modes defined by the
 /// [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum McpAuthRequiredReason {
     /// No token has been provided yet (HTTP 401, no prior token).
-    #[serde(rename = "required")]
     Required,
     /// A previously valid token expired or was revoked (HTTP 401).
-    #[serde(rename = "expired")]
     Expired,
     /// Step-up auth: a token is present but its scopes are insufficient for
     /// the requested operation (HTTP 403 with
@@ -519,23 +1529,98 @@ pub enum McpAuthRequiredReason {
     /// {@link McpServerCustomization | MCP server} backing a running tool
     /// call so they can present an explicit "grant more access" affordance
     /// tied to the blocked tool call.
-    #[serde(rename = "insufficientScope")]
     InsufficientScope,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl McpAuthRequiredReason {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Required => "required",
+            Self::Expired => "expired",
+            Self::InsufficientScope => "insufficientScope",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for McpAuthRequiredReason {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for McpAuthRequiredReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "required" => Self::Required,
+            "expired" => Self::Expired,
+            "insufficientScope" => Self::InsufficientScope,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Computation lifecycle of a {@link ChangesetState}.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChangesetStatus {
     /// The server is still computing the contents of this changeset.
-    #[serde(rename = "computing")]
     Computing,
     /// The changeset has been fully computed and is up-to-date.
-    #[serde(rename = "ready")]
     Ready,
     /// Computation failed. The cause is described by
     /// {@link ChangesetState.error}.
-    #[serde(rename = "error")]
     Error,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChangesetStatus {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Computing => "computing",
+            Self::Ready => "ready",
+            Self::Error => "error",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChangesetStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChangesetStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "computing" => Self::Computing,
+            "ready" => Self::Ready,
+            "error" => Self::Error,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Execution lifecycle of a {@link ChangesetOperation}.
@@ -544,47 +1629,162 @@ pub enum ChangesetStatus {
 /// its progress and outcome are reflected back into changeset state so that
 /// every subscriber observes a consistent view (e.g. a spinner on a "Create
 /// Pull Request" button, or an inline error after a failed "revert").
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChangesetOperationStatus {
     /// The operation is ready to be invoked. This is the default when
     /// {@link ChangesetOperation.status} is omitted.
-    #[serde(rename = "idle")]
     Idle,
     /// An invocation of this operation is currently in flight.
-    #[serde(rename = "running")]
     Running,
     /// The most recent invocation failed. The cause is described by
     /// {@link ChangesetOperation.error}.
-    #[serde(rename = "error")]
     Error,
     /// The operation is currently disabled and cannot be invoked.
-    #[serde(rename = "disabled")]
     Disabled,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChangesetOperationStatus {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Idle => "idle",
+            Self::Running => "running",
+            Self::Error => "error",
+            Self::Disabled => "disabled",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChangesetOperationStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChangesetOperationStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "idle" => Self::Idle,
+            "running" => Self::Running,
+            "error" => Self::Error,
+            "disabled" => Self::Disabled,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Where a {@link ChangesetOperation} can be invoked.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ChangesetOperationScope {
     /// Applies to the whole changeset.
-    #[serde(rename = "changeset")]
     Changeset,
     /// Applies to a single file within the changeset.
-    #[serde(rename = "resource")]
     Resource,
     /// Applies to a line range within a single file.
-    #[serde(rename = "range")]
     Range,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ChangesetOperationScope {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Changeset => "changeset",
+            Self::Resource => "resource",
+            Self::Range => "range",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ChangesetOperationScope {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ChangesetOperationScope {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "changeset" => Self::Changeset,
+            "resource" => Self::Resource,
+            "range" => Self::Range,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 /// Discriminant for {@link ResourceChange.type}.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+///
+/// Unknown values are preserved so newer peers can extend this enum without
+/// making older clients fail the containing message.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ResourceChangeType {
-    #[serde(rename = "added")]
     Added,
-    #[serde(rename = "updated")]
     Updated,
-    #[serde(rename = "deleted")]
     Deleted,
+    /// An unknown or future wire value, preserved verbatim.
+    Unknown(String),
+}
+
+impl ResourceChangeType {
+    /// Returns the exact string used on the wire.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Added => "added",
+            Self::Updated => "updated",
+            Self::Deleted => "deleted",
+            Self::Unknown(value) => value.as_str(),
+        }
+    }
+}
+
+impl Serialize for ResourceChangeType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ResourceChangeType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            "added" => Self::Added,
+            "updated" => Self::Updated,
+            "deleted" => Self::Deleted,
+            _ => Self::Unknown(value),
+        })
+    }
 }
 
 // ─── Structs ──────────────────────────────────────────────────────────

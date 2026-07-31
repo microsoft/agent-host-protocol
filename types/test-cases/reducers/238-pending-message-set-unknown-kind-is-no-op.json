@@ -1,0 +1,53 @@
+{
+  "description": "pending message set with an unknown kind is no-op",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "existing",
+        "message": {
+          "text": "Existing",
+          "origin": {
+            "kind": "user"
+          }
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/pendingMessageSet",
+      "kind": "future-kind",
+      "id": "future",
+      "message": {
+        "text": "Future",
+        "origin": {
+          "kind": "user"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "queuedMessages": [
+      {
+        "id": "existing",
+        "message": {
+          "text": "Existing",
+          "origin": {
+            "kind": "user"
+          }
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

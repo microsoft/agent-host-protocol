@@ -5,38 +5,178 @@ import Foundation
 // MARK: - Command Enums
 
 /// Discriminant for reconnect result types.
-public enum ReconnectResultType: String, Codable, Sendable {
-    case replay = "replay"
-    case snapshot = "snapshot"
+public enum ReconnectResultType: Codable, Sendable, Hashable, RawRepresentable {
+    case replay
+    case snapshot
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "replay": self = .replay
+        case "snapshot": self = .snapshot
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .replay: return "replay"
+        case .snapshot: return "snapshot"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// How a new chat uses its source chat and turn.
-public enum ChatSourceKind: String, Codable, Sendable {
+public enum ChatSourceKind: Codable, Sendable, Hashable, RawRepresentable {
     /// Copy source history through the referenced turn into the new chat.
-    case fork = "fork"
+    case fork
     /// Supply source context without copying it into the new chat's visible history.
-    case sideChat = "sideChat"
+    case sideChat
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "fork": self = .fork
+        case "sideChat": self = .sideChat
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .fork: return "fork"
+        case .sideChat: return "sideChat"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Encoding of fetched content data.
-public enum ContentEncoding: String, Codable, Sendable {
-    case base64 = "base64"
-    case utf8 = "utf-8"
+public enum ContentEncoding: Codable, Sendable, Hashable, RawRepresentable {
+    case base64
+    case utf8
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "base64": self = .base64
+        case "utf-8": self = .utf8
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .base64: return "base64"
+        case .utf8: return "utf-8"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// The kind of completion items being requested.
-public enum CompletionItemKind: String, Codable, Sendable {
+public enum CompletionItemKind: Codable, Sendable, Hashable, RawRepresentable {
     /// Completions for the text of a {@link Message} the user is composing.
     /// Each returned item carries an attachment that gets associated with the
     /// message when accepted.
-    case userMessage = "userMessage"
+    case userMessage
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "userMessage": self = .userMessage
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .userMessage: return "userMessage"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Discriminant for {@link ResourceResolveResult.type}.
-public enum ResourceType: String, Codable, Sendable {
-    case file = "file"
-    case directory = "directory"
-    case symlink = "symlink"
+public enum ResourceType: Codable, Sendable, Hashable, RawRepresentable {
+    case file
+    case directory
+    case symlink
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "file": self = .file
+        case "directory": self = .directory
+        case "symlink": self = .symlink
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .file: return "file"
+        case .directory: return "directory"
+        case .symlink: return "symlink"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// How {@link ResourceWriteParams.data} is placed within the target file.
@@ -58,10 +198,40 @@ public enum ResourceType: String, Codable, Sendable {
 /// is the byte offset at which `data` is spliced in; bytes at or after
 /// `position` are shifted right by `data.length`. `insert` always grows
 /// the file — use `truncate` to overwrite bytes in place.
-public enum ResourceWriteMode: String, Codable, Sendable {
-    case truncate = "truncate"
-    case append = "append"
-    case insert = "insert"
+public enum ResourceWriteMode: Codable, Sendable, Hashable, RawRepresentable {
+    case truncate
+    case append
+    case insert
+    /// An unknown or future wire value, preserved verbatim.
+    case unknown(String)
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "truncate": self = .truncate
+        case "append": self = .append
+        case "insert": self = .insert
+        default: self = .unknown(rawValue)
+        }
+    }
+
+    public var rawValue: String {
+        switch self {
+        case .truncate: return "truncate"
+        case .append: return "append"
+        case .insert: return "insert"
+        case .unknown(let value): return value
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 // MARK: - Command Types

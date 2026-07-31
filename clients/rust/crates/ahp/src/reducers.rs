@@ -1132,7 +1132,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             } else {
                 Some(final_answers)
             };
-            part.response = Some(a.response);
+            part.response = Some(a.response.clone());
             refresh_summary_status(state);
             touch_chat_modified(state);
             ReduceOutcome::Applied
@@ -1142,9 +1142,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                 id: a.id.clone(),
                 message: a.message.clone(),
             };
-            match a.kind {
+            match &a.kind {
                 PendingMessageKind::Steering => {
                     state.steering_message = Some(entry);
+                    ReduceOutcome::Applied
                 }
                 PendingMessageKind::Queued => {
                     let list = state.queued_messages.get_or_insert_with(Vec::new);
@@ -1153,11 +1154,12 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                     } else {
                         list.push(entry);
                     }
+                    ReduceOutcome::Applied
                 }
+                PendingMessageKind::Unknown(_) => ReduceOutcome::NoOp,
             }
-            ReduceOutcome::Applied
         }
-        StateAction::ChatPendingMessageRemoved(a) => match a.kind {
+        StateAction::ChatPendingMessageRemoved(a) => match &a.kind {
             PendingMessageKind::Steering => match &state.steering_message {
                 Some(m) if m.id == a.id => {
                     state.steering_message = None;
@@ -1179,6 +1181,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                 }
                 ReduceOutcome::Applied
             }
+            PendingMessageKind::Unknown(_) => ReduceOutcome::NoOp,
         },
         StateAction::ChatQueuedMessagesReordered(a) => {
             let Some(list) = state.queued_messages.as_mut() else {
@@ -1267,7 +1270,7 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
             ToolCallState::Streaming(_)
             | ToolCallState::Running(_)
             | ToolCallState::PendingConfirmation(_) => {
-                if let Some(confirmed) = a.confirmed {
+                if let Some(confirmed) = a.confirmed.clone() {
                     ToolCallState::Running(ToolCallRunningState {
                         tool_call_id: base.tool_call_id,
                         tool_name: base.tool_name,
@@ -1357,7 +1360,10 @@ fn apply_tool_call_confirmed(
                 meta,
                 invocation_message,
                 tool_input: a.edited_tool_input.clone().or(tool_input),
-                confirmed: a.confirmed.unwrap_or(ToolCallConfirmationReason::NotNeeded),
+                confirmed: a
+                    .confirmed
+                    .clone()
+                    .unwrap_or(ToolCallConfirmationReason::NotNeeded),
                 selected_option,
                 content: None,
             })
@@ -1371,7 +1377,10 @@ fn apply_tool_call_confirmed(
                 meta,
                 invocation_message,
                 tool_input,
-                reason: a.reason.unwrap_or(ToolCallCancellationReason::Denied),
+                reason: a
+                    .reason
+                    .clone()
+                    .unwrap_or(ToolCallCancellationReason::Denied),
                 reason_message: a.reason_message.clone(),
                 user_suggestion: a.user_suggestion.clone(),
                 selected_option,
@@ -1755,10 +1764,10 @@ pub fn apply_action_to_changeset(
             // Carry `error` only when the new status is `Error` so we don't
             // leave a stale error sitting on a recovered changeset.
             if a.status == ChangesetStatus::Error {
-                state.status = a.status;
+                state.status = a.status.clone();
                 state.error = a.error.clone();
             } else {
-                state.status = a.status;
+                state.status = a.status.clone();
                 state.error = None;
             }
             ReduceOutcome::Applied
@@ -1816,10 +1825,10 @@ pub fn apply_action_to_changeset(
             // Carry `error` only when the new status is `Error` so we don't
             // leave a stale error on an operation that recovered or started running.
             if a.status == ChangesetOperationStatus::Error {
-                ops[idx].status = a.status;
+                ops[idx].status = a.status.clone();
                 ops[idx].error = a.error.clone();
             } else {
-                ops[idx].status = a.status;
+                ops[idx].status = a.status.clone();
                 ops[idx].error = None;
             }
             ReduceOutcome::Applied

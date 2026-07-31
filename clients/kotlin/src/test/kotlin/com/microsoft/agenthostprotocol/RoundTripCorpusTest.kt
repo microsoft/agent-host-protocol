@@ -29,6 +29,7 @@ package com.microsoft.agenthostprotocol
 // generated types and re-encodes with Ahp.json.
 
 import com.microsoft.agenthostprotocol.generated.ActionEnvelope
+import com.microsoft.agenthostprotocol.generated.AuthRequiredParams
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
 import com.microsoft.agenthostprotocol.generated.ChatSource
 import com.microsoft.agenthostprotocol.generated.Customization
@@ -45,6 +46,7 @@ import com.microsoft.agenthostprotocol.generated.SessionStatus
 import com.microsoft.agenthostprotocol.generated.SessionSummary
 import com.microsoft.agenthostprotocol.generated.StateAction
 import com.microsoft.agenthostprotocol.generated.StringOrMarkdown
+import com.microsoft.agenthostprotocol.generated.Turn
 import java.io.File
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -253,6 +255,8 @@ class RoundTripCorpusTest {
             "Implementation" -> rt(Implementation.serializer())
             "InitializeResult" -> rt(InitializeResult.serializer())
             "ChatSource" -> rt(ChatSource.serializer())
+            "AuthRequiredParams" -> rt(AuthRequiredParams.serializer())
+            "Turn" -> rt(Turn.serializer())
             else -> fail(
                 "$file: unknown wire type \"$typeName\". " +
                     "Add a decode entry to decodeAndReencode.",

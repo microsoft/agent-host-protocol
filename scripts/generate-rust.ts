@@ -490,16 +490,56 @@ function generateRustEnum(enumDecl: EnumDeclaration): string {
     }
     lines.push('}');
   } else {
-    lines.push('#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]');
+    lines.push('///');
+    lines.push('/// Unknown values are preserved so newer peers can extend this enum without');
+    lines.push('/// making older clients fail the containing message.');
+    lines.push('#[derive(Debug, Clone, PartialEq, Eq, Hash)]');
     lines.push(`pub enum ${name} {`);
     for (const mem of enumDecl.getMembers()) {
       const doc = mem.getJsDocs()[0]?.getDescription().trim();
       if (doc) {
         for (const d of doc.split('\n')) lines.push(`    /// ${d.trimEnd()}`);
       }
-      lines.push(`    #[serde(rename = ${JSON.stringify(String(mem.getValue()))})]`);
       lines.push(`    ${mem.getName()},`);
     }
+    lines.push('    /// An unknown or future wire value, preserved verbatim.');
+    lines.push('    Unknown(String),');
+    lines.push('}');
+    lines.push('');
+    lines.push(`impl ${name} {`);
+    lines.push('    /// Returns the exact string used on the wire.');
+    lines.push('    pub fn as_str(&self) -> &str {');
+    lines.push('        match self {');
+    for (const mem of enumDecl.getMembers()) {
+      lines.push(`            Self::${mem.getName()} => ${JSON.stringify(String(mem.getValue()))},`);
+    }
+    lines.push('            Self::Unknown(value) => value.as_str(),');
+    lines.push('        }');
+    lines.push('    }');
+    lines.push('}');
+    lines.push('');
+    lines.push(`impl Serialize for ${name} {`);
+    lines.push('    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>');
+    lines.push('    where');
+    lines.push('        S: serde::Serializer,');
+    lines.push('    {');
+    lines.push('        serializer.serialize_str(self.as_str())');
+    lines.push('    }');
+    lines.push('}');
+    lines.push('');
+    lines.push(`impl<'de> Deserialize<'de> for ${name} {`);
+    lines.push('    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>');
+    lines.push('    where');
+    lines.push(`        D: serde::Deserializer<'de>,`);
+    lines.push('    {');
+    lines.push('        let value = String::deserialize(deserializer)?;');
+    lines.push('        Ok(match value.as_str() {');
+    for (const mem of enumDecl.getMembers()) {
+      lines.push(`            ${JSON.stringify(String(mem.getValue()))} => Self::${mem.getName()},`);
+    }
+    lines.push('            _ => Self::Unknown(value),');
+    lines.push('        })');
+    lines.push('    }');
     lines.push('}');
   }
   return lines.join('\n');
