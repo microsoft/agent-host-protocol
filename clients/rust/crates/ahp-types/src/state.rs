@@ -1367,12 +1367,17 @@ pub struct SessionToolClientExecutionRequest {
     /// The `clientId` expected to execute the tool. Matches the `clientId` of the
     /// tool call's client {@link ToolCallContributor}.
     pub client_id: String,
-    /// The running tool call the session wants the owning client to execute.
-    /// Always a {@link ToolCallRunningState} (i.e. a {@link ToolCallState} in
-    /// `running` status), matching the narrowed `toolCall` on the sibling
-    /// {@link SessionToolConfirmationRequest} and
-    /// {@link SessionToolAuthenticationRequest} variants.
-    pub tool_call: ToolCallRunningState,
+    /// The running tool call the session wants the owning client to execute. The
+    /// host only ever populates this with a {@link ToolCallRunningState} (i.e. a
+    /// {@link ToolCallState} in `running` status).
+    ///
+    /// Declared as the full union rather than narrowed to
+    /// `ToolCallRunningState` because the per-language generators emit
+    /// tagged-union *variants* without their discriminant (the `status` tag is
+    /// written by the enum wrapper). Referencing the variant directly would drop
+    /// `status` from the wire in Rust/Kotlin/Swift/Go while TypeScript still
+    /// emitted it. Narrowing this needs generator support first.
+    pub tool_call: ToolCallState,
 }
 
 /// A tool call blocked on MCP authentication mid-execution, surfaced at the

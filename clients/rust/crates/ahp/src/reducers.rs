@@ -674,7 +674,7 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
                 return ReduceOutcome::NoOp;
             };
             if let Some(title) = &a.changes.title {
-                chat.title = title.clone();
+                chat.title = Some(title.clone());
             }
             if let Some(status) = a.changes.status {
                 chat.status = status;
@@ -1990,7 +1990,7 @@ mod tests {
     fn empty_chat(resource: &str) -> ChatState {
         ChatState {
             resource: resource.to_string(),
-            title: String::new(),
+            title: None,
             status: SessionStatus::Idle.bits(),
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
@@ -2086,7 +2086,7 @@ mod tests {
 
         let chat = ChatSummary {
             resource: "copilot:/s1/chat/1".into(),
-            title: "c1".into(),
+            title: Some("c1".into()),
             status: SessionStatus::Idle.bits(),
             activity: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
@@ -2116,7 +2116,7 @@ mod tests {
             apply_action_to_session(&mut s, &updated),
             ReduceOutcome::Applied
         );
-        assert_eq!(s.chats[0].title, "renamed");
+        assert_eq!(s.chats[0].title.as_deref(), Some("renamed"));
         assert_eq!(s.chats[0].modified_at, "1970-01-01T00:00:09.999Z");
 
         s.default_chat = Some(chat.resource.clone());

@@ -39,9 +39,14 @@ Clients MAY periodically sync their local input state into the draft by dispatch
 
 ### Chat title
 
-`ChatState.title` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is **optional**. When absent, the chat has no title of its own and consumers SHOULD fall back to the owning session's [`title`](/reference/session#sessionsummary). This is the normal case for a session's default chat, which usually has no identity separate from the session itself; hosts typically set a title only on additional chats (forks, side chats, tool-spawned workers) where distinguishing them in a list is useful.
+`ChatState.title` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is **optional**. When absent, the chat has no title of its own and consumers SHOULD fall back to the owning session's [`title`](/reference/session#sessionsummary).
 
-Producers MUST NOT use an empty string to mean "inherit" — omit the field instead, so that a deliberately blank title and an absent one remain distinguishable.
+Two situations produce an untitled chat:
+
+- A session's **default chat**, which usually has no identity separate from the session itself. Hosts commonly leave it untitled for the life of the session, and give it a title only once the session holds more than one chat and the default chat needs its own label in a list.
+- **Any newly created chat**, between `createChat` and the point where a title is known. Titles are typically derived from the conversation, so they are not available at creation. A client that already knows the name — for a fork, a side chat, or a tool-spawned worker — MAY supply [`CreateChatParams.title`](/reference/chat#createchat) to skip the untitled window; otherwise the host assigns one later with [`session/chatUpdated`](/reference/session#actions).
+
+Producers MUST NOT use an empty string to mean "inherit" — omit the field instead, so that a deliberately blank title and an absent one remain distinguishable, and so a host can tell which chats are still tracking the session's title.
 
 ### Per-chat working directory
 

@@ -3118,8 +3118,8 @@
           "description": "The `clientId` expected to execute the tool. Matches the `clientId` of the\ntool call's client {@link ToolCallContributor}."
         },
         "toolCall": {
-          "$ref": "#/$defs/ToolCallRunningState",
-          "description": "The running tool call the session wants the owning client to execute.\nAlways a {@link ToolCallRunningState} (i.e. a {@link ToolCallState} in\n`running` status), matching the narrowed `toolCall` on the sibling\n{@link SessionToolConfirmationRequest} and\n{@link SessionToolAuthenticationRequest} variants."
+          "$ref": "#/$defs/ToolCallState",
+          "description": "The running tool call the session wants the owning client to execute. The\nhost only ever populates this with a {@link ToolCallRunningState} (i.e. a\n{@link ToolCallState} in `running` status).\n\nDeclared as the full union rather than narrowed to\n`ToolCallRunningState` because the per-language generators emit\ntagged-union *variants* without their discriminant (the `status` tag is\nwritten by the enum wrapper). Referencing the variant directly would drop\n`status` from the wire in Rust/Kotlin/Swift/Go while TypeScript still\nemitted it. Narrowing this needs generator support first."
         }
       },
       "required": [

@@ -753,7 +753,7 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 
 func mergeChatSummaryPartial(summary *ahptypes.ChatSummary, changes ahptypes.PartialChatSummary) {
 	if changes.Title != nil {
-		summary.Title = *changes.Title
+		summary.Title = changes.Title
 	}
 	if changes.Status != nil {
 		summary.Status = *changes.Status

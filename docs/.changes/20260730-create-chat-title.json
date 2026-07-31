@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`CreateChatParams.title`, so a client can name a chat at creation instead of creating it untitled and following up with a `session/chatUpdated`."
+}
