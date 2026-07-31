@@ -1186,7 +1186,7 @@ interface ToolCallParameterFields {
   /** Message describing what the tool will do */
   invocationMessage: StringOrMarkdown;
   /**
-   * Final raw tool input, either inline or readable with `resourceRead`.
+   * Final tool input.
    *
    * Referenced input is mutable until the tool call leaves
    * `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -1197,7 +1197,7 @@ interface ToolCallParameterFields {
 }
 
 /**
- * Raw tool input represented inline or by reference, at the host's discretion.
+ * Tool input represented inline or by reference.
  *
  * @category Tool Call Types
  */
@@ -1236,7 +1236,7 @@ export interface ToolCallResult {
  */
 export interface ToolCallStreamingState extends ToolCallBase {
   status: ToolCallStatus.Streaming;
-  /** Partial raw parameters accumulated from optional tool-call deltas. */
+  /** Partial parameters accumulated from tool-call deltas. */
   partialInput?: string;
   /** Progress message shown while parameters are streaming */
   invocationMessage?: StringOrMarkdown;

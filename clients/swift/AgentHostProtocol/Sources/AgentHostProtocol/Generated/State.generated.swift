@@ -2576,7 +2576,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
     /// with the {@link contributor} to serve MCP Apps.
     public var meta: [String: AnyCodable]?
     public var status: ToolCallStatus
-    /// Partial raw parameters accumulated from optional tool-call deltas.
+    /// Partial parameters accumulated from tool-call deltas.
     public var partialInput: String?
     /// Progress message shown while parameters are streaming
     public var invocationMessage: StringOrMarkdown?
@@ -2635,7 +2635,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2726,7 +2726,7 @@ public struct ToolCallRunningState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2807,7 +2807,7 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2890,7 +2890,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2992,7 +2992,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -3094,7 +3094,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,

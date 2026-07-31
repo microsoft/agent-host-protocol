@@ -1920,7 +1920,7 @@ type ToolCallStreamingState struct {
 	// with the {@link contributor} to serve MCP Apps.
 	Meta   map[string]json.RawMessage `json:"_meta,omitempty"`
 	Status ToolCallStatus             `json:"status"`
-	// Partial raw parameters accumulated from optional tool-call deltas.
+	// Partial parameters accumulated from tool-call deltas.
 	PartialInput *string `json:"partialInput,omitempty"`
 	// Progress message shown while parameters are streaming
 	InvocationMessage *StringOrMarkdown `json:"invocationMessage,omitempty"`
@@ -1947,7 +1947,7 @@ type ToolCallPendingConfirmationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Final raw tool input, either inline or readable with `resourceRead`.
+	// Final tool input.
 	//
 	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -1990,7 +1990,7 @@ type ToolCallRunningState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Final raw tool input, either inline or readable with `resourceRead`.
+	// Final tool input.
 	//
 	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2055,7 +2055,7 @@ type ToolCallAuthRequiredState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Final raw tool input, either inline or readable with `resourceRead`.
+	// Final tool input.
 	//
 	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2093,7 +2093,7 @@ type ToolCallPendingResultConfirmationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Final raw tool input, either inline or readable with `resourceRead`.
+	// Final tool input.
 	//
 	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2141,7 +2141,7 @@ type ToolCallCompletedState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Final raw tool input, either inline or readable with `resourceRead`.
+	// Final tool input.
 	//
 	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2189,7 +2189,7 @@ type ToolCallCancelledState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Final raw tool input, either inline or readable with `resourceRead`.
+	// Final tool input.
 	//
 	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,

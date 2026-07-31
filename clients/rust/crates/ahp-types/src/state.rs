@@ -2361,7 +2361,7 @@ pub struct ToolCallStreamingState {
     /// with the {@link contributor} to serve MCP Apps.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Partial raw parameters accumulated from optional tool-call deltas.
+    /// Partial parameters accumulated from tool-call deltas.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub partial_input: Option<String>,
     /// Progress message shown while parameters are streaming
@@ -2395,7 +2395,7 @@ pub struct ToolCallPendingConfirmationState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2448,7 +2448,7 @@ pub struct ToolCallRunningState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2520,7 +2520,7 @@ pub struct ToolCallAuthRequiredState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2566,7 +2566,7 @@ pub struct ToolCallPendingResultConfirmationState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2623,7 +2623,7 @@ pub struct ToolCallCompletedState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2680,7 +2680,7 @@ pub struct ToolCallCancelledState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Final raw tool input, either inline or readable with `resourceRead`.
+    /// Final tool input.
     ///
     /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,

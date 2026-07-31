@@ -436,9 +436,9 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
     /// contain escape sequences).
     public var meta: [String: AnyCodable]?
     public var type: ActionType
-    /// Optional partial raw parameter content to append.
+    /// Partial parameter content to append, if provided by the host.
     public var content: String?
-    /// Updated display-ready progress message
+    /// Updated progress message
     public var invocationMessage: StringOrMarkdown
 
     enum CodingKeys: String, CodingKey {
@@ -488,7 +488,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
     public var intention: String?
     /// Message describing what the tool will do or what confirmation is needed
     public var invocationMessage: StringOrMarkdown
-    /// Final raw tool input, inline or readable with `resourceRead`
+    /// Final tool input
     public var toolInput: ToolInput?
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
     public var confirmationTitle: StringOrMarkdown?

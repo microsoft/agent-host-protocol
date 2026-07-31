@@ -174,9 +174,9 @@ export interface ChatToolCallStartAction extends ToolCallActionBase {
  */
 export interface ChatToolCallDeltaAction extends ToolCallActionBase {
   type: ActionType.ChatToolCallDelta;
-  /** Optional partial raw parameter content to append. */
+  /** Partial parameter content to append, if provided by the host. */
   content?: string;
-  /** Updated display-ready progress message */
+  /** Updated progress message */
   invocationMessage: StringOrMarkdown;
 }
 
@@ -212,7 +212,7 @@ export interface ChatToolCallReadyAction extends ToolCallActionBase {
   intention?: string;
   /** Message describing what the tool will do or what confirmation is needed */
   invocationMessage: StringOrMarkdown;
-  /** Final raw tool input, inline or readable with `resourceRead` */
+  /** Final tool input */
   toolInput?: ToolInput;
   /** Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`) */
   confirmationTitle?: StringOrMarkdown;

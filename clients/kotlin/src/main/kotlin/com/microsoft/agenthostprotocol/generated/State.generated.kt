@@ -2569,7 +2569,7 @@ data class ToolCallStreamingState(
     val meta: Map<String, JsonElement>? = null,
     val status: ToolCallStatus,
     /**
-     * Partial raw parameters accumulated from optional tool-call deltas.
+     * Partial parameters accumulated from tool-call deltas.
      */
     val partialInput: String? = null,
     /**
@@ -2614,7 +2614,7 @@ data class ToolCallPendingConfirmationState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Final raw tool input, either inline or readable with `resourceRead`.
+     * Final tool input.
      *
      * Referenced input is mutable until the tool call leaves
      * `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2684,7 +2684,7 @@ data class ToolCallRunningState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Final raw tool input, either inline or readable with `resourceRead`.
+     * Final tool input.
      *
      * Referenced input is mutable until the tool call leaves
      * `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2746,7 +2746,7 @@ data class ToolCallAuthRequiredState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Final raw tool input, either inline or readable with `resourceRead`.
+     * Final tool input.
      *
      * Referenced input is mutable until the tool call leaves
      * `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2809,7 +2809,7 @@ data class ToolCallPendingResultConfirmationState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Final raw tool input, either inline or readable with `resourceRead`.
+     * Final tool input.
      *
      * Referenced input is mutable until the tool call leaves
      * `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2888,7 +2888,7 @@ data class ToolCallCompletedState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Final raw tool input, either inline or readable with `resourceRead`.
+     * Final tool input.
      *
      * Referenced input is mutable until the tool call leaves
      * `pending-confirmation`. When the client confirms with `editedToolInput`,
@@ -2967,7 +2967,7 @@ data class ToolCallCancelledState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Final raw tool input, either inline or readable with `resourceRead`.
+     * Final tool input.
      *
      * Referenced input is mutable until the tool call leaves
      * `pending-confirmation`. When the client confirms with `editedToolInput`,

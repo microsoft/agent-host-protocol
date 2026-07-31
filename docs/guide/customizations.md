@@ -300,7 +300,7 @@ sequenceDiagram
 
 1. **`chat/toolCallStart`** — The server dispatches this with the tool call's `contributor` set to a client contributor whose `clientId` is the owning client's. This tells the client it owns the tool call.
 
-2. **`chat/toolCallDelta`** (zero or more) — The server updates the display-ready invocation message while parameters stream and MAY include partial raw arguments.
+2. **`chat/toolCallDelta`** (zero or more) — The server updates the invocation message while parameters stream and MAY include partial arguments.
 
 3. **`chat/toolCallReady`** — Parameters are complete. For client-provided tools, the server typically sets `confirmed: 'not-needed'` so the tool transitions directly to `running`. If the server wants user confirmation first, it omits `confirmed` and the standard confirmation flow applies.
 

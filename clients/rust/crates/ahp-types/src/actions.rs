@@ -446,10 +446,10 @@ pub struct ChatToolCallDeltaAction {
     /// contain escape sequences).
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Optional partial raw parameter content to append.
+    /// Partial parameter content to append, if provided by the host.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
-    /// Updated display-ready progress message
+    /// Updated progress message
     pub invocation_message: StringOrMarkdown,
 }
 
@@ -491,7 +491,7 @@ pub struct ChatToolCallReadyAction {
     pub intention: Option<String>,
     /// Message describing what the tool will do or what confirmation is needed
     pub invocation_message: StringOrMarkdown,
-    /// Final raw tool input, inline or readable with `resourceRead`
+    /// Final tool input
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_input: Option<ToolInput>,
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)

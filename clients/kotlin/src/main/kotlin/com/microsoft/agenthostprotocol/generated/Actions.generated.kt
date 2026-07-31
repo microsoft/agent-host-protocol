@@ -441,11 +441,11 @@ data class ChatToolCallDeltaAction(
     val meta: Map<String, JsonElement>? = null,
     val type: ActionType,
     /**
-     * Optional partial raw parameter content to append.
+     * Partial parameter content to append, if provided by the host.
      */
     val content: String? = null,
     /**
-     * Updated display-ready progress message
+     * Updated progress message
      */
     val invocationMessage: StringOrMarkdown
 )
@@ -486,7 +486,7 @@ data class ChatToolCallReadyAction(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Final raw tool input, inline or readable with `resourceRead`
+     * Final tool input
      */
     val toolInput: ToolInput? = null,
     /**

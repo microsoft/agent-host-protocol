@@ -350,7 +350,7 @@ InputRequestResponsePart {
 
 Text content uses a **create-then-append** pattern: the server first emits a `chat/responsePart` action to create a new markdown (or reasoning) part with an `id`, then streams text into it via `chat/delta` (or `chat/reasoning`) actions targeting that `partId`. This pattern is extensible to future streaming content types.
 
-Clients fetch `ContentRef` content separately via the `resourceRead(uri)` command. This keeps large content out of state snapshots and action traffic.
+Clients fetch `ContentRef` content separately via the `resourceRead(uri)` command. This keeps the state tree small and serializable.
 
 Consumers can derive display text by concatenating all `markdown` parts, find tool calls by filtering for `toolCall` parts, and access reasoning by filtering for `reasoning` parts.
 
@@ -387,7 +387,7 @@ stateDiagram-v2
 
 | Status                        | Key Fields                                                           | Description                                                                                                                                                                                                                                                                            |
 | ----------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `streaming`                   | `partialInput?`, `invocationMessage?`                                | LM is streaming tool call parameters. Hosts may include partial raw arguments on deltas; clients that do not need them can ignore the field. |
+| `streaming`                   | `partialInput?`, `invocationMessage?`                                | LM is streaming tool call parameters. `partialInput` accumulates when deltas include parameter content. |
 | `pending-confirmation`        | `invocationMessage`, `toolInput?`, `edits?`, `editable?`, `options?` | Parameters complete or mid-execution confirmation needed. `toolInput` may be inline or a `ContentRef`, at the host's discretion. `edits` previews file changes. `editable` indicates the client may edit parameters before confirming. `options` provides server-defined choices beyond simple approve/deny (see below). Uses `_meta` for additional context. |
 | `running`                     | `confirmed`, `selectedOption?`                                       | Tool is executing. `confirmed` records how it was approved. `selectedOption` holds the chosen confirmation option, if any.                                                                                                                                                             |
 | `auth-required`               | `confirmed`, `selectedOption?`, `contributor` (MCP), `auth`          | Execution paused pending MCP authentication (see below). Only reachable for MCP-contributed tool calls.                                                                                                                                                                               |
