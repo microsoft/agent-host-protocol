@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "The package entry point now re-exports every public protocol declaration. 60 were unreachable from it — including the whole customization subsystem (`Customization`, `CustomizationType` and every variant), the whole MCP-server state machine (`McpServerState`, `McpServerStatus`, `McpAuthRequiredReason` and the state variants), 13 action types, and `Icon`, `ChatInteractivity`, `InputRequestResponsePart`, `ToolCallContributor` and `SessionMetadata`.",
+  "targets": ["typescript"]
+}
