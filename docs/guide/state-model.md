@@ -323,7 +323,7 @@ ToolCallResponsePart {
 }
 
 // Response-part wrapper around a large content reference
-ResourceReponsePart {
+ResourceResponsePart {
   kind: 'contentRef'
   uri: string
   sizeHint?: number

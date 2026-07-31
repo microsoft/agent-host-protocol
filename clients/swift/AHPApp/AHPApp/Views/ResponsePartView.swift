@@ -733,7 +733,7 @@ struct TerminalToolResultView: View {
 // MARK: - ContentRefView
 
 struct ContentRefView: View {
-    let ref: ResourceReponsePart
+    let ref: ResourceResponsePart
 
     var body: some View {
         HStack {
@@ -892,7 +892,7 @@ struct ContentRefView: View {
 
             // Content Ref
             Text("Content Ref").font(.caption.bold()).foregroundStyle(.secondary)
-            ContentRefView(ref: ResourceReponsePart(
+            ContentRefView(ref: ResourceResponsePart(
                 uri: "file:///Users/me/project/README.md",
                 contentType: "text/markdown",
                 kind: .contentRef
