@@ -2281,8 +2281,8 @@
           "description": "The `clientId` expected to execute the tool. Matches the `clientId` of the\ntool call's client {@link ToolCallContributor}."
         },
         "toolCall": {
-          "$ref": "#/$defs/ToolCallState",
-          "description": "The running tool call the session wants the owning client to execute. The\nhost only ever populates this with a {@link ToolCallRunningState} (i.e. a\n{@link ToolCallState} in `running` status)."
+          "$ref": "#/$defs/ToolCallRunningState",
+          "description": "The running tool call the session wants the owning client to execute.\nAlways a {@link ToolCallRunningState} (i.e. a {@link ToolCallState} in\n`running` status), matching the narrowed `toolCall` on the sibling\n{@link SessionToolConfirmationRequest} and\n{@link SessionToolAuthenticationRequest} variants."
         }
       },
       "required": [
@@ -3650,7 +3650,7 @@
         },
         "title": {
           "type": "string",
-          "description": "Chat title"
+          "description": "Chat title.\n\nAbsent means the chat has no title of its own and consumers SHOULD fall\nback to the owning {@link SessionState.title | session's title}. This is\nthe normal case for a session's default chat, which typically has no\nidentity separate from the session itself. Producers MUST NOT use an empty\nstring to mean \"inherit\" — omit the field instead."
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
@@ -3717,7 +3717,6 @@
       },
       "required": [
         "resource",
-        "title",
         "status",
         "modifiedAt",
         "turns"
@@ -3733,7 +3732,7 @@
         },
         "title": {
           "type": "string",
-          "description": "Chat title"
+          "description": "Chat title. Absent means the chat has no title of its own and consumers\nSHOULD fall back to the owning session's title — see\n{@link ChatState.title} for the full semantics."
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
@@ -3765,7 +3764,6 @@
       },
       "required": [
         "resource",
-        "title",
         "status",
         "modifiedAt"
       ]
@@ -4646,7 +4644,7 @@
         "content"
       ]
     },
-    "ResourceReponsePart": {
+    "ResourceResponsePart": {
       "type": "object",
       "description": "A content part that's a reference to large content stored outside the state tree.",
       "properties": {
@@ -6451,7 +6449,7 @@
             },
             "title": {
               "type": "string",
-              "description": "Chat title"
+              "description": "Chat title. Absent means the chat has no title of its own and consumers\nSHOULD fall back to the owning session's title — see\n{@link ChatState.title} for the full semantics."
             },
             "status": {
               "$ref": "#/$defs/SessionStatus",
@@ -8833,32 +8831,6 @@
       ],
       "description": "The two tool-call states that block on a client confirmation: parameter\nconfirmation before execution ({@link ToolCallPendingConfirmationState}) and\nresult confirmation after execution\n({@link ToolCallPendingResultConfirmationState}).\n\n{@link ToolCallAuthRequiredState} is intentionally **not** part of this\nunion: it doesn't block on a `chat/toolCallConfirmed`-style client\ndecision, it blocks on the client completing an OAuth flow and calling\n`authenticate`. See {@link SessionToolAuthenticationRequest} for its\nsession-level surfacing.\n\nSurfaced at the session level by {@link SessionToolConfirmationRequest}."
     },
-    "ToolCallState": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/ToolCallStreamingState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallPendingConfirmationState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallRunningState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallAuthRequiredState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallPendingResultConfirmationState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallCompletedState"
-        },
-        {
-          "$ref": "#/$defs/ToolCallCancelledState"
-        }
-      ],
-      "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
-    },
     "CustomizationLoadState": {
       "oneOf": [
         {
@@ -9092,7 +9064,7 @@
           "$ref": "#/$defs/MarkdownResponsePart"
         },
         {
-          "$ref": "#/$defs/ResourceReponsePart"
+          "$ref": "#/$defs/ResourceResponsePart"
         },
         {
           "$ref": "#/$defs/ToolCallResponsePart"
@@ -9126,6 +9098,32 @@
       ],
       "type": "string",
       "description": "Discriminant for {@link MessageOrigin} — identifies who produced a message."
+    },
+    "ToolCallState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ToolCallStreamingState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPendingConfirmationState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallRunningState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallAuthRequiredState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallPendingResultConfirmationState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallCompletedState"
+        },
+        {
+          "$ref": "#/$defs/ToolCallCancelledState"
+        }
+      ],
+      "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
     },
     "ChatInputResponseKind": {
       "enum": [

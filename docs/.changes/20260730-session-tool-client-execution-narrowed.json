@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "`SessionToolClientExecutionRequest.toolCall` is now typed `ToolCallRunningState` instead of the full `ToolCallState` union, matching the already-narrowed `toolCall` on the sibling `SessionToolConfirmationRequest` and `SessionToolAuthenticationRequest` variants. The documented contract is unchanged — hosts only ever populated it with a running tool call."
+}

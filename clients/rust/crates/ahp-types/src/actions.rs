@@ -1744,7 +1744,9 @@ pub struct PartialChatSummary {
     /// Chat URI
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource: Option<Uri>,
-    /// Chat title
+    /// Chat title. Absent means the chat has no title of its own and consumers
+    /// SHOULD fall back to the owning session's title — see
+    /// {@link ChatState.title} for the full semantics.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// Current chat status (reuses SessionStatus shape)

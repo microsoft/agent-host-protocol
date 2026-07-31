@@ -1165,9 +1165,15 @@ data class ChatState(
      */
     val resource: String,
     /**
-     * Chat title
+     * Chat title.
+     *
+     * Absent means the chat has no title of its own and consumers SHOULD fall
+     * back to the owning {@link SessionState.title | session's title}. This is
+     * the normal case for a session's default chat, which typically has no
+     * identity separate from the session itself. Producers MUST NOT use an empty
+     * string to mean "inherit" — omit the field instead.
      */
-    val title: String,
+    val title: String? = null,
     /**
      * Current chat status (reuses SessionStatus shape)
      */
@@ -1259,9 +1265,11 @@ data class ChatSummary(
      */
     val resource: String,
     /**
-     * Chat title
+     * Chat title. Absent means the chat has no title of its own and consumers
+     * SHOULD fall back to the owning session's title — see
+     * {@link ChatState.title} for the full semantics.
      */
-    val title: String,
+    val title: String? = null,
     /**
      * Current chat status (reuses SessionStatus shape)
      */
@@ -1551,11 +1559,13 @@ data class SessionToolClientExecutionRequest(
      */
     val clientId: String,
     /**
-     * The running tool call the session wants the owning client to execute. The
-     * host only ever populates this with a {@link ToolCallRunningState} (i.e. a
-     * {@link ToolCallState} in `running` status).
+     * The running tool call the session wants the owning client to execute.
+     * Always a {@link ToolCallRunningState} (i.e. a {@link ToolCallState} in
+     * `running` status), matching the narrowed `toolCall` on the sibling
+     * {@link SessionToolConfirmationRequest} and
+     * {@link SessionToolAuthenticationRequest} variants.
      */
-    val toolCall: ToolCallState
+    val toolCall: ToolCallRunningState
 )
 
 @Serializable
@@ -2416,7 +2426,7 @@ data class ContentRef(
 )
 
 @Serializable
-data class ResourceReponsePart(
+data class ResourceResponsePart(
     /**
      * Content URI
      */
@@ -4702,7 +4712,7 @@ sealed interface ResponsePart
 @JvmInline
 value class ResponsePartMarkdown(val value: MarkdownResponsePart) : ResponsePart
 @JvmInline
-value class ResponsePartContentRef(val value: ResourceReponsePart) : ResponsePart
+value class ResponsePartContentRef(val value: ResourceResponsePart) : ResponsePart
 @JvmInline
 value class ResponsePartToolCall(val value: ToolCallResponsePart) : ResponsePart
 @JvmInline
@@ -4736,7 +4746,7 @@ internal object ResponsePartSerializer : KSerializer<ResponsePart> {
             ?: return ResponsePartUnknown(obj)
         return when (discriminant) {
             "markdown" -> ResponsePartMarkdown(input.json.decodeFromJsonElement(MarkdownResponsePart.serializer(), element))
-            "contentRef" -> ResponsePartContentRef(input.json.decodeFromJsonElement(ResourceReponsePart.serializer(), element))
+            "contentRef" -> ResponsePartContentRef(input.json.decodeFromJsonElement(ResourceResponsePart.serializer(), element))
             "toolCall" -> ResponsePartToolCall(input.json.decodeFromJsonElement(ToolCallResponsePart.serializer(), element))
             "reasoning" -> ResponsePartReasoning(input.json.decodeFromJsonElement(ReasoningResponsePart.serializer(), element))
             "systemNotification" -> ResponsePartSystemNotification(input.json.decodeFromJsonElement(SystemNotificationResponsePart.serializer(), element))
@@ -4750,7 +4760,7 @@ internal object ResponsePartSerializer : KSerializer<ResponsePart> {
             ?: error("ResponsePart can only be serialized to JSON")
         val element: JsonElement = when (value) {
             is ResponsePartMarkdown -> output.json.encodeToJsonElement(MarkdownResponsePart.serializer(), value.value)
-            is ResponsePartContentRef -> output.json.encodeToJsonElement(ResourceReponsePart.serializer(), value.value)
+            is ResponsePartContentRef -> output.json.encodeToJsonElement(ResourceResponsePart.serializer(), value.value)
             is ResponsePartToolCall -> output.json.encodeToJsonElement(ToolCallResponsePart.serializer(), value.value)
             is ResponsePartReasoning -> output.json.encodeToJsonElement(ReasoningResponsePart.serializer(), value.value)
             is ResponsePartSystemNotification -> output.json.encodeToJsonElement(SystemNotificationResponsePart.serializer(), value.value)

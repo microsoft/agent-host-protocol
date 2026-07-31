@@ -37,6 +37,12 @@ older turn).
 
 Clients MAY periodically sync their local input state into the draft by dispatching [`chat/draftChanged`](/reference/chat#actions). Eager syncing is not required — clients SHOULD debounce and MAY sync only at convenient points (for example, on blur). When presenting input UI for an existing chat, clients SHOULD use any `draft` to initialize their input state. Dispatch `chat/draftChanged` with no `draft` to clear it once the message is sent.
 
+### Chat title
+
+`ChatState.title` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is **optional**. When absent, the chat has no title of its own and consumers SHOULD fall back to the owning session's [`title`](/reference/session#sessionsummary). This is the normal case for a session's default chat, which usually has no identity separate from the session itself; hosts typically set a title only on additional chats (forks, side chats, tool-spawned workers) where distinguishing them in a list is useful.
+
+Producers MUST NOT use an empty string to mean "inherit" — omit the field instead, so that a deliberately blank title and an absent one remain distinguishable.
+
 ### Per-chat working directory
 
 `ChatState.workingDirectory` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is **optional**. When absent, the chat inherits the session's [`workingDirectory`](/reference/session#sessionsummary). Hosts MAY set a per-chat working directory to give individual chats their own filesystem context — for example, allocating a separate git worktree per chat so multiple chats in the same session can make independent edits that the orchestrating chat later merges back. The session-level `workingDirectory` is then the default/primary location for chats that do not override it.

@@ -39,8 +39,16 @@ export interface ChatState {
   // ── Summary fields (denormalized from ChatSummary) ─────────────────
   /** Chat URI */
   resource: URI;
-  /** Chat title */
-  title: string;
+  /**
+   * Chat title.
+   *
+   * Absent means the chat has no title of its own and consumers SHOULD fall
+   * back to the owning {@link SessionState.title | session's title}. This is
+   * the normal case for a session's default chat, which typically has no
+   * identity separate from the session itself. Producers MUST NOT use an empty
+   * string to mean "inherit" — omit the field instead.
+   */
+  title?: string;
   /** Current chat status (reuses SessionStatus shape) */
   status: SessionStatus;
   /** Human-readable description of what the chat is currently doing */
@@ -120,8 +128,12 @@ export interface ChatState {
 export interface ChatSummary {
   /** Chat URI */
   resource: URI;
-  /** Chat title */
-  title: string;
+  /**
+   * Chat title. Absent means the chat has no title of its own and consumers
+   * SHOULD fall back to the owning session's title — see
+   * {@link ChatState.title} for the full semantics.
+   */
+  title?: string;
   /** Current chat status (reuses SessionStatus shape) */
   status: SessionStatus;
   /** Human-readable description of what the chat is currently doing */
@@ -881,7 +893,7 @@ export interface MarkdownResponsePart {
  *
  * @category Response Parts
  */
-export interface ResourceReponsePart extends ContentRef {
+export interface ResourceResponsePart extends ContentRef {
   /** Discriminant */
   kind: ResponsePartKind.ContentRef;
 }
@@ -921,7 +933,7 @@ export interface ReasoningResponsePart {
  */
 export type ResponsePart =
   | MarkdownResponsePart
-  | ResourceReponsePart
+  | ResourceResponsePart
   | ToolCallResponsePart
   | ReasoningResponsePart
   | SystemNotificationResponsePart

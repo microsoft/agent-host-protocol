@@ -892,8 +892,14 @@ public struct PendingMessage: Codable, Sendable {
 public struct ChatState: Codable, Sendable {
     /// Chat URI
     public var resource: String
-    /// Chat title
-    public var title: String
+    /// Chat title.
+    ///
+    /// Absent means the chat has no title of its own and consumers SHOULD fall
+    /// back to the owning {@link SessionState.title | session's title}. This is
+    /// the normal case for a session's default chat, which typically has no
+    /// identity separate from the session itself. Producers MUST NOT use an empty
+    /// string to mean "inherit" — omit the field instead.
+    public var title: String?
     /// Current chat status (reuses SessionStatus shape)
     public var status: SessionStatus
     /// Human-readable description of what the chat is currently doing
@@ -970,7 +976,7 @@ public struct ChatState: Codable, Sendable {
 
     public init(
         resource: String,
-        title: String,
+        title: String? = nil,
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
@@ -1006,8 +1012,10 @@ public struct ChatState: Codable, Sendable {
 public struct ChatSummary: Codable, Sendable {
     /// Chat URI
     public var resource: String
-    /// Chat title
-    public var title: String
+    /// Chat title. Absent means the chat has no title of its own and consumers
+    /// SHOULD fall back to the owning session's title — see
+    /// {@link ChatState.title} for the full semantics.
+    public var title: String?
     /// Current chat status (reuses SessionStatus shape)
     public var status: SessionStatus
     /// Human-readable description of what the chat is currently doing
@@ -1028,7 +1036,7 @@ public struct ChatSummary: Codable, Sendable {
 
     public init(
         resource: String,
-        title: String,
+        title: String? = nil,
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
@@ -1334,10 +1342,12 @@ public struct SessionToolClientExecutionRequest: Codable, Sendable {
     /// The `clientId` expected to execute the tool. Matches the `clientId` of the
     /// tool call's client {@link ToolCallContributor}.
     public var clientId: String
-    /// The running tool call the session wants the owning client to execute. The
-    /// host only ever populates this with a {@link ToolCallRunningState} (i.e. a
-    /// {@link ToolCallState} in `running` status).
-    public var toolCall: ToolCallState
+    /// The running tool call the session wants the owning client to execute.
+    /// Always a {@link ToolCallRunningState} (i.e. a {@link ToolCallState} in
+    /// `running` status), matching the narrowed `toolCall` on the sibling
+    /// {@link SessionToolConfirmationRequest} and
+    /// {@link SessionToolAuthenticationRequest} variants.
+    public var toolCall: ToolCallRunningState
 
     public init(
         id: String,
@@ -1345,7 +1355,7 @@ public struct SessionToolClientExecutionRequest: Codable, Sendable {
         kind: SessionInputRequestKind,
         turnId: String,
         clientId: String,
-        toolCall: ToolCallState
+        toolCall: ToolCallRunningState
     ) {
         self.id = id
         self.chat = chat
@@ -2414,7 +2424,7 @@ public struct ContentRef: Codable, Sendable {
     }
 }
 
-public struct ResourceReponsePart: Codable, Sendable {
+public struct ResourceResponsePart: Codable, Sendable {
     /// Content URI
     public var uri: String
     /// Approximate size in bytes
@@ -5275,7 +5285,7 @@ public enum ChatOrigin: Codable, Sendable {
 
 public enum ResponsePart: Codable, Sendable {
     case markdown(MarkdownResponsePart)
-    case contentRef(ResourceReponsePart)
+    case contentRef(ResourceResponsePart)
     case toolCall(ToolCallResponsePart)
     case reasoning(ReasoningResponsePart)
     case systemNotification(SystemNotificationResponsePart)
@@ -5295,7 +5305,7 @@ public enum ResponsePart: Codable, Sendable {
         case "markdown":
             self = .markdown(try MarkdownResponsePart(from: decoder))
         case "contentRef":
-            self = .contentRef(try ResourceReponsePart(from: decoder))
+            self = .contentRef(try ResourceResponsePart(from: decoder))
         case "toolCall":
             self = .toolCall(try ToolCallResponsePart(from: decoder))
         case "reasoning":

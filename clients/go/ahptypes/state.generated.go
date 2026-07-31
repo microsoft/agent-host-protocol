@@ -937,10 +937,12 @@ type SessionToolClientExecutionRequest struct {
 	// The `clientId` expected to execute the tool. Matches the `clientId` of the
 	// tool call's client {@link ToolCallContributor}.
 	ClientId string `json:"clientId"`
-	// The running tool call the session wants the owning client to execute. The
-	// host only ever populates this with a {@link ToolCallRunningState} (i.e. a
-	// {@link ToolCallState} in `running` status).
-	ToolCall ToolCallState `json:"toolCall"`
+	// The running tool call the session wants the owning client to execute.
+	// Always a {@link ToolCallRunningState} (i.e. a {@link ToolCallState} in
+	// `running` status), matching the narrowed `toolCall` on the sibling
+	// {@link SessionToolConfirmationRequest} and
+	// {@link SessionToolAuthenticationRequest} variants.
+	ToolCall ToolCallRunningState `json:"toolCall"`
 }
 
 // A tool call blocked on MCP authentication mid-execution, surfaced at the
@@ -1076,8 +1078,14 @@ type ChangesSummary struct {
 type ChatState struct {
 	// Chat URI
 	Resource URI `json:"resource"`
-	// Chat title
-	Title string `json:"title"`
+	// Chat title.
+	//
+	// Absent means the chat has no title of its own and consumers SHOULD fall
+	// back to the owning {@link SessionState.title | session's title}. This is
+	// the normal case for a session's default chat, which typically has no
+	// identity separate from the session itself. Producers MUST NOT use an empty
+	// string to mean "inherit" — omit the field instead.
+	Title *string `json:"title,omitempty"`
 	// Current chat status (reuses SessionStatus shape)
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the chat is currently doing
@@ -1141,8 +1149,10 @@ type ChatState struct {
 type ChatSummary struct {
 	// Chat URI
 	Resource URI `json:"resource"`
-	// Chat title
-	Title string `json:"title"`
+	// Chat title. Absent means the chat has no title of its own and consumers
+	// SHOULD fall back to the owning session's title — see
+	// {@link ChatState.title} for the full semantics.
+	Title *string `json:"title,omitempty"`
 	// Current chat status (reuses SessionStatus shape)
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the chat is currently doing

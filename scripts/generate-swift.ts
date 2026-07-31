@@ -637,7 +637,7 @@ const STATE_STRUCTS = [
   'SimpleMessageAttachment', 'MessageEmbeddedResourceAttachment', 'MessageResourceAttachment',
   'MessageAnnotationsAttachment', 'MessageChatAttachment',
   'MarkdownResponsePart', 'ContentRef',
-  'ResourceReponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
+  'ResourceResponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
   'SystemNotificationResponsePart', 'InputRequestResponsePart',
   'ToolCallResult', 'ToolCallStreamingState',
   'ToolCallPendingConfirmationState', 'ToolCallRunningState', 'ToolCallAuthRequiredState',
@@ -678,7 +678,7 @@ const RESPONSE_PART_UNION: UnionConfig = {
   allowUnknown: true,
   variants: [
     { caseName: 'markdown', structName: 'MarkdownResponsePart', discriminantValue: 'markdown' },
-    { caseName: 'contentRef', structName: 'ResourceReponsePart', discriminantValue: 'contentRef' },
+    { caseName: 'contentRef', structName: 'ResourceResponsePart', discriminantValue: 'contentRef' },
     { caseName: 'toolCall', structName: 'ToolCallResponsePart', discriminantValue: 'toolCall' },
     { caseName: 'reasoning', structName: 'ReasoningResponsePart', discriminantValue: 'reasoning' },
     { caseName: 'systemNotification', structName: 'SystemNotificationResponsePart', discriminantValue: 'systemNotification' },

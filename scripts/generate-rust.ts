@@ -740,7 +740,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'MessageChatAttachment', omitDiscriminants: true },
   { name: 'MarkdownResponsePart', omitDiscriminants: true },
   { name: 'ContentRef' },
-  { name: 'ResourceReponsePart', omitDiscriminants: true, rustName: 'ResourceResponsePart' },
+  { name: 'ResourceResponsePart', omitDiscriminants: true },
   { name: 'ToolCallResponsePart', omitDiscriminants: true },
   { name: 'ReasoningResponsePart', omitDiscriminants: true },
   { name: 'SystemNotificationResponsePart', omitDiscriminants: true },

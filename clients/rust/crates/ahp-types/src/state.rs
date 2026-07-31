@@ -1009,8 +1009,15 @@ pub struct PendingMessage {
 pub struct ChatState {
     /// Chat URI
     pub resource: Uri,
-    /// Chat title
-    pub title: String,
+    /// Chat title.
+    ///
+    /// Absent means the chat has no title of its own and consumers SHOULD fall
+    /// back to the owning {@link SessionState.title | session's title}. This is
+    /// the normal case for a session's default chat, which typically has no
+    /// identity separate from the session itself. Producers MUST NOT use an empty
+    /// string to mean "inherit" — omit the field instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     /// Current chat status (reuses SessionStatus shape)
     pub status: u32,
     /// Human-readable description of what the chat is currently doing
@@ -1086,8 +1093,11 @@ pub struct ChatState {
 pub struct ChatSummary {
     /// Chat URI
     pub resource: Uri,
-    /// Chat title
-    pub title: String,
+    /// Chat title. Absent means the chat has no title of its own and consumers
+    /// SHOULD fall back to the owning session's title — see
+    /// {@link ChatState.title} for the full semantics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     /// Current chat status (reuses SessionStatus shape)
     pub status: u32,
     /// Human-readable description of what the chat is currently doing
@@ -1357,10 +1367,12 @@ pub struct SessionToolClientExecutionRequest {
     /// The `clientId` expected to execute the tool. Matches the `clientId` of the
     /// tool call's client {@link ToolCallContributor}.
     pub client_id: String,
-    /// The running tool call the session wants the owning client to execute. The
-    /// host only ever populates this with a {@link ToolCallRunningState} (i.e. a
-    /// {@link ToolCallState} in `running` status).
-    pub tool_call: ToolCallState,
+    /// The running tool call the session wants the owning client to execute.
+    /// Always a {@link ToolCallRunningState} (i.e. a {@link ToolCallState} in
+    /// `running` status), matching the narrowed `toolCall` on the sibling
+    /// {@link SessionToolConfirmationRequest} and
+    /// {@link SessionToolAuthenticationRequest} variants.
+    pub tool_call: ToolCallRunningState,
 }
 
 /// A tool call blocked on MCP authentication mid-execution, surfaced at the
