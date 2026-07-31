@@ -825,16 +825,6 @@ data class ProtectedResourceMetadata(
     @SerialName("resource_signing_alg_values_supported")
     val resourceSigningAlgValuesSupported: List<String>? = null,
     /**
-     * OPTIONAL. JSON array of JWE encryption algorithms (alg) supported.
-     */
-    @SerialName("resource_encryption_alg_values_supported")
-    val resourceEncryptionAlgValuesSupported: List<String>? = null,
-    /**
-     * OPTIONAL. JSON array of JWE encryption algorithms (enc) supported.
-     */
-    @SerialName("resource_encryption_enc_values_supported")
-    val resourceEncryptionEncValuesSupported: List<String>? = null,
-    /**
      * OPTIONAL. URL of human-readable documentation for the resource.
      */
     @SerialName("resource_documentation")

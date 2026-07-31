@@ -492,10 +492,6 @@ type ProtectedResourceMetadata struct {
 	BearerMethodsSupported []string `json:"bearer_methods_supported,omitempty"`
 	// OPTIONAL. JSON array of JWS signing algorithms supported.
 	ResourceSigningAlgValuesSupported []string `json:"resource_signing_alg_values_supported,omitempty"`
-	// OPTIONAL. JSON array of JWE encryption algorithms (alg) supported.
-	ResourceEncryptionAlgValuesSupported []string `json:"resource_encryption_alg_values_supported,omitempty"`
-	// OPTIONAL. JSON array of JWE encryption algorithms (enc) supported.
-	ResourceEncryptionEncValuesSupported []string `json:"resource_encryption_enc_values_supported,omitempty"`
 	// OPTIONAL. URL of human-readable documentation for the resource.
 	ResourceDocumentation *string `json:"resource_documentation,omitempty"`
 	// OPTIONAL. URL of the resource's data-usage policy.
