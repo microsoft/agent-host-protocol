@@ -10,12 +10,13 @@
  * Run: npx tsx --test scripts/generate-json-schema.test.ts
  */
 
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
+import { typeAdmitsUndefined } from './generate-json-schema.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILES = [
@@ -270,6 +271,48 @@ describe('generated JSON schemas', () => {
   }
 });
 
+describe('typeAdmitsUndefined', () => {
+  // Guards the depth-aware union splitting these checks depend on: only a
+  // *top-level* `undefined` member means the property may be absent on the
+  // wire. A nested one (inside a generic argument, tuple, parenthesised union
+  // or inline object) does not — the property itself is still always present.
+
+  const admits: string[] = [
+    'string | undefined',
+    'undefined | string',
+    'UsageInfo | undefined',
+    'Changeset[] | undefined',
+    'Record<string, unknown> | undefined',
+    'A | B | undefined',
+    '  string   |   undefined  ',
+  ];
+
+  const doesNotAdmit: string[] = [
+    'string',
+    'UsageInfo',
+    'A | B',
+    'Array<string | undefined>',
+    'Record<string, string | undefined>',
+    '[string | undefined]',
+    '[ string | undefined ]',
+    '{ a: string | undefined }',
+    '(string | undefined)[]',
+    'Map<string, A | undefined>',
+  ];
+
+  for (const typeText of admits) {
+    it(`treats \`${typeText.trim()}\` as admitting undefined`, () => {
+      assert.equal(typeAdmitsUndefined(typeText), true);
+    });
+  }
+
+  for (const typeText of doesNotAdmit) {
+    it(`treats \`${typeText}\` as NOT admitting undefined`, () => {
+      assert.equal(typeAdmitsUndefined(typeText), false);
+    });
+  }
+});
+
 describe('`T | undefined` properties are not schema-required', () => {
   // The protocol writes a handful of properties as an explicit `T | undefined`
   // union rather than with a `?` question token, so that a producer building the
@@ -285,36 +328,42 @@ describe('`T | undefined` properties are not schema-required', () => {
   // reject the very traffic all five clients produce.
   //
   // Derived from the canonical sources rather than hardcoded, so a newly added
-  // `T | undefined` property is covered automatically.
-
-  const project = new Project({
-    tsConfigFilePath: resolve(root, 'types/tsconfig.json'),
-    skipAddingFilesFromTsConfig: false,
-  });
+  // `T | undefined` property is covered automatically. Classification reuses the
+  // generator's own `typeAdmitsUndefined` so the test and the generator can
+  // never disagree about what qualifies (in particular, both treat only
+  // *top-level* union members as admitting `undefined`).
 
   /** `interface name` → property names declared as an explicit `T | undefined` union. */
   const undefinedProps = new Map<string, Set<string>>();
-  for (const sourceFile of project.getSourceFiles()) {
-    for (const iface of sourceFile.getInterfaces()) {
-      for (const prop of iface.getProperties()) {
-        if (prop.hasQuestionToken()) {
-          continue;
+
+  // Built lazily in `before` rather than at module load: constructing a ts-morph
+  // Project is expensive, and doing it in the describe body would pay that cost
+  // even when running a filtered subset of tests from this file.
+  before(() => {
+    const project = new Project({
+      tsConfigFilePath: resolve(root, 'types/tsconfig.json'),
+      skipAddingFilesFromTsConfig: false,
+    });
+
+    for (const sourceFile of project.getSourceFiles()) {
+      for (const iface of sourceFile.getInterfaces()) {
+        for (const prop of iface.getProperties()) {
+          if (prop.hasQuestionToken()) {
+            continue;
+          }
+          if (!typeAdmitsUndefined(prop.getTypeNode()?.getText() ?? '')) {
+            continue;
+          }
+          let set = undefinedProps.get(iface.getName());
+          if (!set) {
+            set = new Set();
+            undefinedProps.set(iface.getName(), set);
+          }
+          set.add(prop.getName());
         }
-        const typeText = prop.getTypeNode()?.getText() ?? '';
-        // Top-level `| undefined` member; generics/inline objects never contain
-        // a bare `undefined` union member at depth 0 in this codebase.
-        if (!/(^|\|)\s*undefined\s*(\||$)/.test(typeText)) {
-          continue;
-        }
-        let set = undefinedProps.get(iface.getName());
-        if (!set) {
-          set = new Set();
-          undefinedProps.set(iface.getName(), set);
-        }
-        set.add(prop.getName());
       }
     }
-  }
+  });
 
   it('finds the known `T | undefined` properties in types/', () => {
     // Sanity-check the derivation itself: if this drops to zero because the
