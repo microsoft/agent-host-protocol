@@ -327,6 +327,7 @@ ContentRef {
   uri: string
   sizeHint?: number
   contentType?: string
+  nonce?: string           // changes when the referenced content changes
 }
 
 // Harness-authored notification surfaced in the stream (e.g. "subagent finished")

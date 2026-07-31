@@ -1029,7 +1029,8 @@ func applyToolCallDelta(state *ahptypes.ChatState, a *ahptypes.ChatToolCallDelta
 		if a.Meta != nil {
 			s.Meta = a.Meta
 		}
-		s.InvocationMessage = &a.InvocationMessage
+		invocationMessage := a.InvocationMessage
+		s.InvocationMessage = &invocationMessage
 		return tc
 	})
 }
