@@ -1037,7 +1037,7 @@ pub struct DispatchActionParams {
     pub action: StateAction,
 }
 
-/// Pushes a ****** for a protected resource. The `resource` field MUST
+/// Pushes a Bearer token for a protected resource. The `resource` field MUST
 /// match a protected-resource identifier the client has discovered from the
 /// server — whether declared statically in `AgentInfo.protectedResources`,
 /// or discovered dynamically from a live `McpServerAuthRequiredState.resource`
@@ -1047,7 +1047,7 @@ pub struct DispatchActionParams {
 /// through one of these three mechanisms.
 ///
 /// Tokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)
-/// (****** Usage) semantics. The client obtains the token from the
+/// (Bearer Token Usage) semantics. The client obtains the token from the
 /// authorization server(s) listed in the resource's metadata and pushes it
 /// to the server via this command.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1060,7 +1060,7 @@ pub struct AuthenticateParams {
     /// `AgentInfo.protectedResources`, or via a live
     /// `McpServerAuthRequiredState.resource` / `ToolCallAuthRequiredState.auth.resource`.
     pub resource: String,
-    /// ***** obtained from the resource's authorization server
+    /// Bearer token obtained from the resource's authorization server
     pub token: String,
     /// OAuth scopes the token grants, when known. Lets the server determine
     /// whether a specific challenge — e.g. the `requiredScopes` on a live

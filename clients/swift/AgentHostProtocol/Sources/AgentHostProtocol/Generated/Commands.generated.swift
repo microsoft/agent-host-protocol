@@ -1093,7 +1093,7 @@ public struct AuthenticateParams: Codable, Sendable {
     /// `AgentInfo.protectedResources`, or via a live
     /// `McpServerAuthRequiredState.resource` / `ToolCallAuthRequiredState.auth.resource`.
     public var resource: String
-    /// ***** obtained from the resource's authorization server
+    /// Bearer token obtained from the resource's authorization server
     public var token: String
     /// OAuth scopes the token grants, when known. Lets the server determine
     /// whether a specific challenge — e.g. the `requiredScopes` on a live

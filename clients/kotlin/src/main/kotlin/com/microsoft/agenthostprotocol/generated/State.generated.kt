@@ -3934,7 +3934,7 @@ data class McpServerAuthRequiredState(
     val resource: ProtectedResourceMetadata,
     /**
      * Scopes required for the current challenge, parsed from the
-     * `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+     * `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
      * fallback). Authoritative for the next authorization request — clients
      * MUST NOT assume any subset/superset relationship to
      * `resource.scopes_supported`.
@@ -3994,7 +3994,7 @@ data class McpAuthRequirement(
     val resource: ProtectedResourceMetadata,
     /**
      * Scopes required for the current challenge, parsed from the
-     * `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+     * `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
      * fallback). Authoritative for the next authorization request — clients
      * MUST NOT assume any subset/superset relationship to
      * `resource.scopes_supported`.
