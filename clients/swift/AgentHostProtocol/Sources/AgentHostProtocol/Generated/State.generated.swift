@@ -1337,13 +1337,6 @@ public struct SessionToolClientExecutionRequest: Codable, Sendable {
     /// The running tool call the session wants the owning client to execute. The
     /// host only ever populates this with a {@link ToolCallRunningState} (i.e. a
     /// {@link ToolCallState} in `running` status).
-    ///
-    /// Declared as the full union rather than narrowed to
-    /// `ToolCallRunningState` because the per-language generators emit
-    /// tagged-union *variants* without their discriminant (the `status` tag is
-    /// written by the enum wrapper). Referencing the variant directly would drop
-    /// `status` from the wire in Rust/Kotlin/Swift/Go while TypeScript still
-    /// emitted it. Narrowing this needs generator support first.
     public var toolCall: ToolCallState
 
     public init(

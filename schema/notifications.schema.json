@@ -1181,7 +1181,7 @@
         },
         "toolCall": {
           "$ref": "#/$defs/ToolCallState",
-          "description": "The running tool call the session wants the owning client to execute. The\nhost only ever populates this with a {@link ToolCallRunningState} (i.e. a\n{@link ToolCallState} in `running` status).\n\nDeclared as the full union rather than narrowed to\n`ToolCallRunningState` because the per-language generators emit\ntagged-union *variants* without their discriminant (the `status` tag is\nwritten by the enum wrapper). Referencing the variant directly would drop\n`status` from the wire in Rust/Kotlin/Swift/Go while TypeScript still\nemitted it. Narrowing this needs generator support first."
+          "description": "The running tool call the session wants the owning client to execute. The\nhost only ever populates this with a {@link ToolCallRunningState} (i.e. a\n{@link ToolCallState} in `running` status)."
         }
       },
       "required": [
