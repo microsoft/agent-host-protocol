@@ -1920,6 +1920,8 @@ type ToolCallStreamingState struct {
 	// with the {@link contributor} to serve MCP Apps.
 	Meta   map[string]json.RawMessage `json:"_meta,omitempty"`
 	Status ToolCallStatus             `json:"status"`
+	// Partial raw parameters accumulated from optional tool-call deltas.
+	PartialInput *string `json:"partialInput,omitempty"`
 	// Progress message shown while parameters are streaming
 	InvocationMessage *StringOrMarkdown `json:"invocationMessage,omitempty"`
 }
@@ -1945,13 +1947,13 @@ type ToolCallPendingConfirmationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Reference to the final raw tool input, readable with `resourceRead`.
+	// Final raw tool input, either inline or readable with `resourceRead`.
 	//
-	// The referenced resource is mutable until the tool call leaves
+	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
 	// the host MUST replace the resource contents before echoing the accepted
 	// confirmation action. Clients MUST NOT cache tool input across confirmation.
-	ToolInput *ContentRef    `json:"toolInput,omitempty"`
+	ToolInput *ToolInput     `json:"toolInput,omitempty"`
 	Status    ToolCallStatus `json:"status"`
 	// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
 	ConfirmationTitle *StringOrMarkdown `json:"confirmationTitle,omitempty"`
@@ -1988,13 +1990,13 @@ type ToolCallRunningState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Reference to the final raw tool input, readable with `resourceRead`.
+	// Final raw tool input, either inline or readable with `resourceRead`.
 	//
-	// The referenced resource is mutable until the tool call leaves
+	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
 	// the host MUST replace the resource contents before echoing the accepted
 	// confirmation action. Clients MUST NOT cache tool input across confirmation.
-	ToolInput *ContentRef `json:"toolInput,omitempty"`
+	ToolInput *ToolInput `json:"toolInput,omitempty"`
 	// How the tool was confirmed for execution
 	Confirmed ToolCallConfirmationReason `json:"confirmed"`
 	// The confirmation option the user selected, if confirmation options were provided
@@ -2053,13 +2055,13 @@ type ToolCallAuthRequiredState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Reference to the final raw tool input, readable with `resourceRead`.
+	// Final raw tool input, either inline or readable with `resourceRead`.
 	//
-	// The referenced resource is mutable until the tool call leaves
+	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
 	// the host MUST replace the resource contents before echoing the accepted
 	// confirmation action. Clients MUST NOT cache tool input across confirmation.
-	ToolInput *ContentRef `json:"toolInput,omitempty"`
+	ToolInput *ToolInput `json:"toolInput,omitempty"`
 	// How the tool was confirmed for execution
 	Confirmed ToolCallConfirmationReason `json:"confirmed"`
 	// The confirmation option the user selected, if confirmation options were provided
@@ -2091,13 +2093,13 @@ type ToolCallPendingResultConfirmationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Reference to the final raw tool input, readable with `resourceRead`.
+	// Final raw tool input, either inline or readable with `resourceRead`.
 	//
-	// The referenced resource is mutable until the tool call leaves
+	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
 	// the host MUST replace the resource contents before echoing the accepted
 	// confirmation action. Clients MUST NOT cache tool input across confirmation.
-	ToolInput *ContentRef `json:"toolInput,omitempty"`
+	ToolInput *ToolInput `json:"toolInput,omitempty"`
 	// Whether the tool succeeded
 	Success bool `json:"success"`
 	// Past-tense description of what the tool did
@@ -2139,13 +2141,13 @@ type ToolCallCompletedState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Reference to the final raw tool input, readable with `resourceRead`.
+	// Final raw tool input, either inline or readable with `resourceRead`.
 	//
-	// The referenced resource is mutable until the tool call leaves
+	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
 	// the host MUST replace the resource contents before echoing the accepted
 	// confirmation action. Clients MUST NOT cache tool input across confirmation.
-	ToolInput *ContentRef `json:"toolInput,omitempty"`
+	ToolInput *ToolInput `json:"toolInput,omitempty"`
 	// Whether the tool succeeded
 	Success bool `json:"success"`
 	// Past-tense description of what the tool did
@@ -2187,13 +2189,13 @@ type ToolCallCancelledState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Reference to the final raw tool input, readable with `resourceRead`.
+	// Final raw tool input, either inline or readable with `resourceRead`.
 	//
-	// The referenced resource is mutable until the tool call leaves
+	// Referenced input is mutable until the tool call leaves
 	// `pending-confirmation`. When the client confirms with `editedToolInput`,
 	// the host MUST replace the resource contents before echoing the accepted
 	// confirmation action. Clients MUST NOT cache tool input across confirmation.
-	ToolInput *ContentRef    `json:"toolInput,omitempty"`
+	ToolInput *ToolInput     `json:"toolInput,omitempty"`
 	Status    ToolCallStatus `json:"status"`
 	// Why the tool was cancelled
 	Reason ToolCallCancellationReason `json:"reason"`
@@ -3545,6 +3547,37 @@ type ResourceChange struct {
 	Uri URI `json:"uri"`
 	// The kind of change observed.
 	Type ResourceChangeType `json:"type"`
+}
+
+// ToolInput is raw tool input represented inline or by content reference.
+type ToolInput struct {
+	Inline     *string
+	ContentRef *ContentRef
+}
+
+func (t ToolInput) MarshalJSON() ([]byte, error) {
+	if t.Inline != nil {
+		return json.Marshal(*t.Inline)
+	}
+	if t.ContentRef != nil {
+		return json.Marshal(t.ContentRef)
+	}
+	return []byte("null"), nil
+}
+
+func (t *ToolInput) UnmarshalJSON(data []byte) error {
+	*t = ToolInput{}
+	var inline string
+	if err := json.Unmarshal(data, &inline); err == nil {
+		t.Inline = &inline
+		return nil
+	}
+	var ref ContentRef
+	if err := json.Unmarshal(data, &ref); err != nil {
+		return err
+	}
+	t.ContentRef = &ref
+	return nil
 }
 
 // ─── Discriminated Unions ─────────────────────────────────────────────

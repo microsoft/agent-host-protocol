@@ -436,6 +436,8 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
     /// contain escape sequences).
     public var meta: [String: AnyCodable]?
     public var type: ActionType
+    /// Optional partial raw parameter content to append.
+    public var content: String?
     /// Updated display-ready progress message
     public var invocationMessage: StringOrMarkdown
 
@@ -444,6 +446,7 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
         case toolCallId
         case meta = "_meta"
         case type
+        case content
         case invocationMessage
     }
 
@@ -452,12 +455,14 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
         toolCallId: String,
         meta: [String: AnyCodable]? = nil,
         type: ActionType,
+        content: String? = nil,
         invocationMessage: StringOrMarkdown
     ) {
         self.turnId = turnId
         self.toolCallId = toolCallId
         self.meta = meta
         self.type = type
+        self.content = content
         self.invocationMessage = invocationMessage
     }
 }
@@ -483,8 +488,8 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
     public var intention: String?
     /// Message describing what the tool will do or what confirmation is needed
     public var invocationMessage: StringOrMarkdown
-    /// Reference to the final raw tool input, readable with `resourceRead`
-    public var toolInput: ContentRef?
+    /// Final raw tool input, inline or readable with `resourceRead`
+    public var toolInput: ToolInput?
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
     public var confirmationTitle: StringOrMarkdown?
     /// Risk assessment that informed the confirmation requirement.
@@ -526,7 +531,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         intention: String? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: ContentRef? = nil,
+        toolInput: ToolInput? = nil,
         confirmationTitle: StringOrMarkdown? = nil,
         riskAssessment: ToolCallRiskAssessment? = nil,
         edits: AnyCodable? = nil,

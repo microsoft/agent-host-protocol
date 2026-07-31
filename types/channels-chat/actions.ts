@@ -5,7 +5,7 @@
  */
 
 import { ActionType } from '../common/actions.js';
-import type { ContentRef, StringOrMarkdown, ErrorInfo, FileEdit, UsageInfo, URI } from '../common/state.js';
+import type { StringOrMarkdown, ErrorInfo, FileEdit, UsageInfo, URI } from '../common/state.js';
 import type { McpAuthRequirement } from '../channels-session/state.js';
 import type {
   Message,
@@ -18,6 +18,7 @@ import type {
   ConfirmationOption,
   ToolCallContributor,
   ToolCallRiskAssessment,
+  ToolInput,
   Turn,
 } from './state.js';
 import {
@@ -173,6 +174,8 @@ export interface ChatToolCallStartAction extends ToolCallActionBase {
  */
 export interface ChatToolCallDeltaAction extends ToolCallActionBase {
   type: ActionType.ChatToolCallDelta;
+  /** Optional partial raw parameter content to append. */
+  content?: string;
   /** Updated display-ready progress message */
   invocationMessage: StringOrMarkdown;
 }
@@ -209,8 +212,8 @@ export interface ChatToolCallReadyAction extends ToolCallActionBase {
   intention?: string;
   /** Message describing what the tool will do or what confirmation is needed */
   invocationMessage: StringOrMarkdown;
-  /** Reference to the final raw tool input, readable with `resourceRead` */
-  toolInput?: ContentRef;
+  /** Final raw tool input, inline or readable with `resourceRead` */
+  toolInput?: ToolInput;
   /** Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`) */
   confirmationTitle?: StringOrMarkdown;
   /** Risk assessment that informed the confirmation requirement. */
@@ -246,8 +249,9 @@ export interface ChatToolCallApprovedAction extends ToolCallActionBase {
   /**
    * Edited tool input parameters, if the client modified them before confirming.
    *
-   * Before echoing the accepted action, the host MUST replace the contents of
-   * the pending tool call's `toolInput` resource with this value.
+   * For inline `toolInput`, the reducer replaces the state value directly.
+   * For referenced input, the host MUST replace the resource contents before
+   * echoing the accepted action.
    */
   editedToolInput?: string;
   /** ID of the selected confirmation option, if the server provided options */

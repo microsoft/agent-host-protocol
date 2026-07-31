@@ -2576,6 +2576,8 @@ public struct ToolCallStreamingState: Codable, Sendable {
     /// with the {@link contributor} to serve MCP Apps.
     public var meta: [String: AnyCodable]?
     public var status: ToolCallStatus
+    /// Partial raw parameters accumulated from optional tool-call deltas.
+    public var partialInput: String?
     /// Progress message shown while parameters are streaming
     public var invocationMessage: StringOrMarkdown?
 
@@ -2587,6 +2589,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         case contributor
         case meta = "_meta"
         case status
+        case partialInput
         case invocationMessage
     }
 
@@ -2598,6 +2601,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         status: ToolCallStatus,
+        partialInput: String? = nil,
         invocationMessage: StringOrMarkdown? = nil
     ) {
         self.toolCallId = toolCallId
@@ -2607,6 +2611,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
         self.contributor = contributor
         self.meta = meta
         self.status = status
+        self.partialInput = partialInput
         self.invocationMessage = invocationMessage
     }
 }
@@ -2630,13 +2635,13 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Reference to the final raw tool input, readable with `resourceRead`.
+    /// Final raw tool input, either inline or readable with `resourceRead`.
     ///
-    /// The referenced resource is mutable until the tool call leaves
+    /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
     /// the host MUST replace the resource contents before echoing the accepted
     /// confirmation action. Clients MUST NOT cache tool input across confirmation.
-    public var toolInput: ContentRef?
+    public var toolInput: ToolInput?
     public var status: ToolCallStatus
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
     public var confirmationTitle: StringOrMarkdown?
@@ -2677,7 +2682,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: ContentRef? = nil,
+        toolInput: ToolInput? = nil,
         status: ToolCallStatus,
         confirmationTitle: StringOrMarkdown? = nil,
         riskAssessment: ToolCallRiskAssessment? = nil,
@@ -2721,13 +2726,13 @@ public struct ToolCallRunningState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Reference to the final raw tool input, readable with `resourceRead`.
+    /// Final raw tool input, either inline or readable with `resourceRead`.
     ///
-    /// The referenced resource is mutable until the tool call leaves
+    /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
     /// the host MUST replace the resource contents before echoing the accepted
     /// confirmation action. Clients MUST NOT cache tool input across confirmation.
-    public var toolInput: ContentRef?
+    public var toolInput: ToolInput?
     /// How the tool was confirmed for execution
     public var confirmed: ToolCallConfirmationReason
     /// The confirmation option the user selected, if confirmation options were provided
@@ -2762,7 +2767,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: ContentRef? = nil,
+        toolInput: ToolInput? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
         status: ToolCallStatus,
@@ -2802,13 +2807,13 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Reference to the final raw tool input, readable with `resourceRead`.
+    /// Final raw tool input, either inline or readable with `resourceRead`.
     ///
-    /// The referenced resource is mutable until the tool call leaves
+    /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
     /// the host MUST replace the resource contents before echoing the accepted
     /// confirmation action. Clients MUST NOT cache tool input across confirmation.
-    public var toolInput: ContentRef?
+    public var toolInput: ToolInput?
     /// How the tool was confirmed for execution
     public var confirmed: ToolCallConfirmationReason
     /// The confirmation option the user selected, if confirmation options were provided
@@ -2843,7 +2848,7 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: ContentRef? = nil,
+        toolInput: ToolInput? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
         status: ToolCallStatus,
@@ -2885,13 +2890,13 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Reference to the final raw tool input, readable with `resourceRead`.
+    /// Final raw tool input, either inline or readable with `resourceRead`.
     ///
-    /// The referenced resource is mutable until the tool call leaves
+    /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
     /// the host MUST replace the resource contents before echoing the accepted
     /// confirmation action. Clients MUST NOT cache tool input across confirmation.
-    public var toolInput: ContentRef?
+    public var toolInput: ToolInput?
     /// Whether the tool succeeded
     public var success: Bool
     /// Past-tense description of what the tool did
@@ -2939,7 +2944,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: ContentRef? = nil,
+        toolInput: ToolInput? = nil,
         success: Bool,
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
@@ -2987,13 +2992,13 @@ public struct ToolCallCompletedState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Reference to the final raw tool input, readable with `resourceRead`.
+    /// Final raw tool input, either inline or readable with `resourceRead`.
     ///
-    /// The referenced resource is mutable until the tool call leaves
+    /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
     /// the host MUST replace the resource contents before echoing the accepted
     /// confirmation action. Clients MUST NOT cache tool input across confirmation.
-    public var toolInput: ContentRef?
+    public var toolInput: ToolInput?
     /// Whether the tool succeeded
     public var success: Bool
     /// Past-tense description of what the tool did
@@ -3041,7 +3046,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: ContentRef? = nil,
+        toolInput: ToolInput? = nil,
         success: Bool,
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
@@ -3089,13 +3094,13 @@ public struct ToolCallCancelledState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Reference to the final raw tool input, readable with `resourceRead`.
+    /// Final raw tool input, either inline or readable with `resourceRead`.
     ///
-    /// The referenced resource is mutable until the tool call leaves
+    /// Referenced input is mutable until the tool call leaves
     /// `pending-confirmation`. When the client confirms with `editedToolInput`,
     /// the host MUST replace the resource contents before echoing the accepted
     /// confirmation action. Clients MUST NOT cache tool input across confirmation.
-    public var toolInput: ContentRef?
+    public var toolInput: ToolInput?
     public var status: ToolCallStatus
     /// Why the tool was cancelled
     public var reason: ToolCallCancellationReason
@@ -3130,7 +3135,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: ContentRef? = nil,
+        toolInput: ToolInput? = nil,
         status: ToolCallStatus,
         reason: ToolCallCancellationReason,
         reasonMessage: StringOrMarkdown? = nil,
@@ -5216,6 +5221,31 @@ public struct ResourceChange: Codable, Sendable {
     ) {
         self.uri = uri
         self.type = type
+    }
+}
+
+// MARK: - Tool Input
+
+/// Raw tool input represented inline or by content reference.
+public enum ToolInput: Codable, Sendable {
+    case inline(String)
+    case contentRef(ContentRef)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(String.self) {
+            self = .inline(value)
+        } else {
+            self = .contentRef(try container.decode(ContentRef.self))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .inline(let value): try container.encode(value)
+        case .contentRef(let value): try container.encode(value)
+        }
     }
 }
 

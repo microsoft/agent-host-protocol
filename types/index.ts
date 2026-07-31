@@ -50,6 +50,7 @@ export type {
   SystemNotificationResponsePart,
   ResponsePart,
   ToolCallResult,
+  ToolInput,
   ToolCallStreamingState,
   ToolCallPendingConfirmationState,
   ToolCallRunningState,

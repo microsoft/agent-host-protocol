@@ -91,7 +91,7 @@ type toolCallCommon struct {
 	name        string
 	displayName string
 	intention   *string
-	toolInput   *ahptypes.ContentRef
+	toolInput   *ahptypes.ToolInput
 	contributor *ahptypes.ToolCallContributor
 	meta        ahptypes.JSONObject
 }
@@ -1029,6 +1029,14 @@ func applyToolCallDelta(state *ahptypes.ChatState, a *ahptypes.ChatToolCallDelta
 		if a.Meta != nil {
 			s.Meta = a.Meta
 		}
+		if a.Content != nil {
+			partial := ""
+			if s.PartialInput != nil {
+				partial = *s.PartialInput
+			}
+			partial += *a.Content
+			s.PartialInput = &partial
+		}
 		invocationMessage := a.InvocationMessage
 		s.InvocationMessage = &invocationMessage
 		return tc
@@ -1148,6 +1156,11 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 		}
 		selected := resolveSelectedOption(s.Options, a.SelectedOptionId)
 		if a.Approved {
+			toolInput := s.ToolInput
+			if a.EditedToolInput != nil && toolInput != nil && toolInput.Inline != nil {
+				inline := *a.EditedToolInput
+				toolInput = &ahptypes.ToolInput{Inline: &inline}
+			}
 			meta := s.Meta
 			if a.Meta != nil {
 				meta = a.Meta
@@ -1162,7 +1175,7 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
 				Intention:         s.Intention,
-				ToolInput:         s.ToolInput,
+				ToolInput:         toolInput,
 				Contributor:       s.Contributor,
 				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
@@ -1204,7 +1217,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 		}
 		var (
 			invocation       ahptypes.StringOrMarkdown
-			toolInput        *ahptypes.ContentRef
+			toolInput        *ahptypes.ToolInput
 			confirmed        = ahptypes.ToolCallConfirmationReasonNotNeeded
 			selectedOption   *ahptypes.ConfirmationOption
 			preAuthContent   []ahptypes.ToolResultContent

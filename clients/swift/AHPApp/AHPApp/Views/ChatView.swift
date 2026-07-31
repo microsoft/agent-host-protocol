@@ -1128,7 +1128,7 @@ private struct InputBarPreviewWrapper: View {
                 toolName: "readFile",
                 displayName: "Read file",
                 invocationMessage: .string("Reading src/auth.swift"),
-                toolInput: ContentRef(uri: "file:///tool-inputs/tc1.json"),
+                toolInput: .contentRef(ContentRef(uri: "file:///tool-inputs/tc1.json")),
                 success: true,
                 pastTenseMessage: .string("Read src/auth.swift"),
                 status: .completed,
@@ -1139,7 +1139,7 @@ private struct InputBarPreviewWrapper: View {
                 toolName: "editFile",
                 displayName: "Edit file",
                 invocationMessage: .string("Editing src/auth.swift"),
-                toolInput: ContentRef(uri: "file:///tool-inputs/tc2.json"),
+                toolInput: .contentRef(ContentRef(uri: "file:///tool-inputs/tc2.json")),
                 success: true,
                 pastTenseMessage: .string("Edited src/auth.swift"),
                 status: .completed,
@@ -1161,7 +1161,7 @@ private struct InputBarPreviewWrapper: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Run: npm run deploy --production"),
-                toolInput: ContentRef(uri: "file:///tool-inputs/tc3.json"),
+                toolInput: .inline("{\"command\": \"npm run deploy --production\"}"),
                 status: .pendingConfirmation,
                 confirmationTitle: .string("Allow production deployment?")
             )))
@@ -1176,7 +1176,7 @@ private struct InputBarPreviewWrapper: View {
                 toolName: "readFile",
                 displayName: "Read file",
                 invocationMessage: .string("Reading src/auth/token.swift"),
-                toolInput: ContentRef(uri: "file:///tool-inputs/tc4.json"),
+                toolInput: .contentRef(ContentRef(uri: "file:///tool-inputs/tc4.json")),
                 status: .running,
                 confirmed: .notNeeded
             )))

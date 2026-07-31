@@ -289,8 +289,8 @@ sequenceDiagram
 
     Note over Server: LLM selects a client tool
     Server->>Client: toolCallStart (client contributor)
-    Server->>Client: toolCallDelta (invocation message)
-    Server->>Client: toolCallReady (toolInput ref, confirmed: 'not-needed')
+    Server->>Client: toolCallDelta (invocation message, optional partial args)
+    Server->>Client: toolCallReady (inline or referenced toolInput, confirmed: 'not-needed')
 
     Note over Client: Client sees contributor.clientId matches,<br/>begins execution
 
@@ -300,11 +300,11 @@ sequenceDiagram
 
 1. **`chat/toolCallStart`** — The server dispatches this with the tool call's `contributor` set to a client contributor whose `clientId` is the owning client's. This tells the client it owns the tool call.
 
-2. **`chat/toolCallDelta`** (zero or more) — The server updates the display-ready invocation message while parameters stream. Raw streaming parameters are not exposed.
+2. **`chat/toolCallDelta`** (zero or more) — The server updates the display-ready invocation message while parameters stream and MAY include partial raw arguments.
 
 3. **`chat/toolCallReady`** — Parameters are complete. For client-provided tools, the server typically sets `confirmed: 'not-needed'` so the tool transitions directly to `running`. If the server wants user confirmation first, it omits `confirmed` and the standard confirmation flow applies.
 
-4. **Client executes** — When the tool call reaches `running` status, the owning client reads the final `toolInput` reference with `resourceRead` and begins execution. Client-contributed tools MUST receive a readable input reference. If confirmation carried `editedToolInput`, the host updates that resource before echoing the accepted confirmation, so this read returns the edited parameters.
+4. **Client executes** — When the tool call reaches `running` status, the owning client uses inline `toolInput` directly or reads a referenced input with `resourceRead`. If confirmation carried `editedToolInput`, inline state is updated by the reducer; for referenced input, the host updates the resource before echoing the accepted confirmation.
 
 5. **`chat/toolCallContentChanged`** (zero or more, client-dispatched) — While executing, the client MAY stream intermediate content (e.g. terminal output, partial results) by dispatching this action. This replaces the `content` array on the running tool call state.
 

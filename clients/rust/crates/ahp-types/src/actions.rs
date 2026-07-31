@@ -20,7 +20,7 @@ use crate::state::{
     Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
     SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
     ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolCallRiskAssessment, ToolDefinition, ToolResultContent, Turn, UsageInfo,
+    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -446,6 +446,9 @@ pub struct ChatToolCallDeltaAction {
     /// contain escape sequences).
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Optional partial raw parameter content to append.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
     /// Updated display-ready progress message
     pub invocation_message: StringOrMarkdown,
 }
@@ -488,9 +491,9 @@ pub struct ChatToolCallReadyAction {
     pub intention: Option<String>,
     /// Message describing what the tool will do or what confirmation is needed
     pub invocation_message: StringOrMarkdown,
-    /// Reference to the final raw tool input, readable with `resourceRead`
+    /// Final raw tool input, inline or readable with `resourceRead`
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_input: Option<ContentRef>,
+    pub tool_input: Option<ToolInput>,
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirmation_title: Option<StringOrMarkdown>,

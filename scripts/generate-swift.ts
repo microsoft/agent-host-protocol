@@ -104,6 +104,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   // Type aliases
   if (tsType === 'URI') return 'String';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
+  if (tsType === 'ToolInput') return 'ToolInput';
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
 
@@ -968,6 +969,31 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 }`;
 }
 
+function generateToolInput(): string {
+  return `/// Raw tool input represented inline or by content reference.
+public enum ToolInput: Codable, Sendable {
+    case inline(String)
+    case contentRef(ContentRef)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(String.self) {
+            self = .inline(value)
+        } else {
+            self = .contentRef(try container.decode(ContentRef.self))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .inline(let value): try container.encode(value)
+        case .contentRef(let value): try container.encode(value)
+        }
+    }
+}`;
+}
+
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, annotations, or content state.
 public enum SnapshotState: Codable, Sendable {
@@ -1124,6 +1150,10 @@ function generateStateFile(project: Project): string {
       lines.push('');
     }
   }
+
+  lines.push('// MARK: - Tool Input\n');
+  lines.push(generateToolInput());
+  lines.push('');
 
   lines.push('// MARK: - Discriminated Unions\n');
   lines.push(generateChatOriginSwift());
@@ -2063,6 +2093,7 @@ function checkExhaustiveness(project: Project): void {
     'PaginatedParams',               // base interface; flattened into each paginated command params struct
     'PaginatedResult',               // base interface; flattened into each paginated command result struct
     'StringOrMarkdown',              // generateStringOrMarkdown()
+    'ToolInput',                     // generateToolInput()
     'ToolCallState',                // TOOL_CALL_STATE_UNION discriminated union
     'StateAction',                  // StateAction enum in generateActionsFile()
     'ActionEnvelope',               // generateStructFromInterface() call in generateActionsFile()

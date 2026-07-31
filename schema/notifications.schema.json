@@ -3817,8 +3817,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "$ref": "#/$defs/ContentRef",
-          "description": "Reference to the final raw tool input, readable with `resourceRead`.\n\nThe referenced resource is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final raw tool input, either inline or readable with `resourceRead`.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         }
       },
       "required": [
@@ -3902,6 +3902,10 @@
         "status": {
           "const": "streaming"
         },
+        "partialInput": {
+          "type": "string",
+          "description": "Partial raw parameters accumulated from optional tool-call deltas."
+        },
         "invocationMessage": {
           "$ref": "#/$defs/StringOrMarkdown",
           "description": "Progress message shown while parameters are streaming"
@@ -3948,8 +3952,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "$ref": "#/$defs/ContentRef",
-          "description": "Reference to the final raw tool input, readable with `resourceRead`.\n\nThe referenced resource is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final raw tool input, either inline or readable with `resourceRead`.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "status": {
           "const": "pending-confirmation"
@@ -4048,8 +4052,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "$ref": "#/$defs/ContentRef",
-          "description": "Reference to the final raw tool input, readable with `resourceRead`.\n\nThe referenced resource is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final raw tool input, either inline or readable with `resourceRead`.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -4113,8 +4117,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "$ref": "#/$defs/ContentRef",
-          "description": "Reference to the final raw tool input, readable with `resourceRead`.\n\nThe referenced resource is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final raw tool input, either inline or readable with `resourceRead`.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -4184,8 +4188,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "$ref": "#/$defs/ContentRef",
-          "description": "Reference to the final raw tool input, readable with `resourceRead`.\n\nThe referenced resource is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final raw tool input, either inline or readable with `resourceRead`.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "success": {
           "type": "boolean",
@@ -4279,8 +4283,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "$ref": "#/$defs/ContentRef",
-          "description": "Reference to the final raw tool input, readable with `resourceRead`.\n\nThe referenced resource is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final raw tool input, either inline or readable with `resourceRead`.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "success": {
           "type": "boolean",
@@ -4374,8 +4378,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "$ref": "#/$defs/ContentRef",
-          "description": "Reference to the final raw tool input, readable with `resourceRead`.\n\nThe referenced resource is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final raw tool input, either inline or readable with `resourceRead`.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "status": {
           "const": "cancelled"
@@ -5607,6 +5611,17 @@
           "$ref": "#/$defs/ToolCallMcpContributor"
         }
       ]
+    },
+    "ToolInput": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/ContentRef"
+        }
+      ],
+      "description": "Raw tool input represented inline or by reference, at the host's discretion."
     },
     "ToolResultContent": {
       "oneOf": [

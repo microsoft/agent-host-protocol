@@ -207,6 +207,9 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatToolCallDelta(let a):
         return updateToolCall(state: state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
             guard case .streaming(var s) = tc else { return tc }
+            if let content = a.content {
+                s.partialInput = (s.partialInput ?? "") + content
+            }
             s.invocationMessage = a.invocationMessage
             s.meta = a.meta ?? s.meta
             return .streaming(s)
@@ -268,6 +271,12 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             let meta = a.meta ?? base.meta
             let selectedOption = resolveSelectedOption(pending.options, id: a.selectedOptionId)
             if a.approved {
+                let toolInput: ToolInput?
+                if let edited = a.editedToolInput, case .inline = pending.toolInput {
+                    toolInput = .inline(edited)
+                } else {
+                    toolInput = pending.toolInput
+                }
                 return .running(ToolCallRunningState(
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
@@ -276,7 +285,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     contributor: base.contributor,
                     meta: meta,
                     invocationMessage: pending.invocationMessage,
-                    toolInput: pending.toolInput,
+                    toolInput: toolInput,
                     confirmed: a.confirmed ?? .notNeeded,
                     selectedOption: selectedOption,
                     status: .running
@@ -305,7 +314,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             let meta = a.meta ?? base.meta
             let confirmed: ToolCallConfirmationReason
             let invocationMessage: StringOrMarkdown
-            let toolInput: ContentRef?
+            let toolInput: ToolInput?
             let selectedOption: ConfirmationOption?
             let preAuthContent: [ToolResultContent]?
             let fromAuthRequired: Bool

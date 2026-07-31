@@ -59,15 +59,15 @@ use ahp_types::actions::{
 };
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
-    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, ContentRef, Customization,
-    ErrorInfo, InputRequestResponsePart, McpServerStartingState, McpServerState,
-    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
-    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
-    TerminalCommandPart, TerminalContentPart, TerminalState, TerminalUnclassifiedPart,
-    ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
-    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
-    ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
-    ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState, Turn, TurnState,
+    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization, ErrorInfo,
+    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
+    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
+    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
+    TerminalContentPart, TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState,
+    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallPendingConfirmationState,
+    ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
+    ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn, TurnState,
 };
 
 /// What happened when an action was applied.
@@ -133,7 +133,7 @@ struct ToolCallBase {
     tool_name: String,
     display_name: String,
     intention: Option<String>,
-    tool_input: Option<ContentRef>,
+    tool_input: Option<ToolInput>,
     contributor: Option<ToolCallContributor>,
     meta: Option<serde_json::Map<String, serde_json::Value>>,
 }
@@ -1022,6 +1022,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                         intention: a.intention.clone(),
                         contributor: a.contributor.clone(),
                         meta: a.meta.clone(),
+                        partial_input: None,
                         invocation_message: None,
                     }),
                 })));
@@ -1239,6 +1240,11 @@ fn apply_turn_started(state: &mut ChatState, a: &ChatTurnStartedAction) -> Reduc
 fn apply_tool_call_delta(state: &mut ChatState, a: &ChatToolCallDeltaAction) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| match tc {
         ToolCallState::Streaming(mut s) => {
+            if let Some(content) = &a.content {
+                let mut partial = s.partial_input.unwrap_or_default();
+                partial.push_str(content);
+                s.partial_input = Some(partial);
+            }
             if let Some(meta) = &a.meta {
                 s.meta = Some(meta.clone());
             }
@@ -1342,6 +1348,10 @@ fn apply_tool_call_confirmed(
         let invocation_message = s.invocation_message;
         let tool_input = s.tool_input;
         if a.approved {
+            let tool_input = match (a.edited_tool_input.clone(), tool_input) {
+                (Some(edited), Some(ToolInput::Inline(_))) => Some(ToolInput::Inline(edited)),
+                (_, tool_input) => tool_input,
+            };
             ToolCallState::Running(ToolCallRunningState {
                 tool_call_id,
                 tool_name,

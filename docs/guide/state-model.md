@@ -322,8 +322,9 @@ ToolCallResponsePart {
   toolCall: ToolCallState   // full lifecycle state
 }
 
-// Reference to large content stored outside the state tree
-ContentRef {
+// Response-part wrapper around a large content reference
+ResourceReponsePart {
+  kind: 'contentRef'
   uri: string
   sizeHint?: number
   contentType?: string
@@ -386,8 +387,8 @@ stateDiagram-v2
 
 | Status                        | Key Fields                                                           | Description                                                                                                                                                                                                                                                                            |
 | ----------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `streaming`                   | `invocationMessage?`                                                 | LM is streaming tool call parameters. Clients receive only display-ready invocation-message updates; raw parameters are unavailable until the call is ready. |
-| `pending-confirmation`        | `invocationMessage`, `toolInput?`, `edits?`, `editable?`, `options?` | Parameters complete or mid-execution confirmation needed. `toolInput` is a reference, not inline input. `edits` previews file changes. `editable` indicates the client may edit parameters before confirming. `options` provides server-defined choices beyond simple approve/deny (see below). Uses `_meta` for additional context. |
+| `streaming`                   | `partialInput?`, `invocationMessage?`                                | LM is streaming tool call parameters. Hosts may include partial raw arguments on deltas; clients that do not need them can ignore the field. |
+| `pending-confirmation`        | `invocationMessage`, `toolInput?`, `edits?`, `editable?`, `options?` | Parameters complete or mid-execution confirmation needed. `toolInput` may be inline or a `ContentRef`, at the host's discretion. `edits` previews file changes. `editable` indicates the client may edit parameters before confirming. `options` provides server-defined choices beyond simple approve/deny (see below). Uses `_meta` for additional context. |
 | `running`                     | `confirmed`, `selectedOption?`                                       | Tool is executing. `confirmed` records how it was approved. `selectedOption` holds the chosen confirmation option, if any.                                                                                                                                                             |
 | `auth-required`               | `confirmed`, `selectedOption?`, `contributor` (MCP), `auth`          | Execution paused pending MCP authentication (see below). Only reachable for MCP-contributed tool calls.                                                                                                                                                                               |
 | `pending-result-confirmation` | `success`, `pastTenseMessage`, `content?`, `selectedOption?`         | Execution finished, waiting for client to approve the result.                                                                                                                                                                                                                          |
@@ -414,7 +415,7 @@ This is deliberately **separate** from `McpServerAuthRequiredState` (the MCP ser
 
 ### Editable Parameters
 
-When `editable` is `true` on a `pending-confirmation` tool call, the client may allow the user to modify the tool's input parameters before confirming. If the user edits the parameters, the client includes inline `editedToolInput` on the `chat/toolCallConfirmed` action. Before echoing that accepted action, the host MUST replace the contents of the existing `toolInput` resource with the edited value. The reducer keeps the same reference, and subsequent `resourceRead` calls return the input that was actually executed. Clients MUST NOT cache tool input across confirmation.
+When `editable` is `true` on a `pending-confirmation` tool call, the client may allow the user to modify the tool's input parameters before confirming. If the user edits the parameters, the client includes `editedToolInput` on the `chat/toolCallConfirmed` action. For inline input, the reducer replaces the state value directly. For referenced input, the host MUST replace the resource contents before echoing the accepted action; the reducer keeps the same reference, and subsequent `resourceRead` calls return the input that was actually executed. Clients MUST NOT cache referenced tool input across confirmation.
 
 When a turn completes, non-terminal tool calls in `responseParts` are force-cancelled with reason `'skipped'`.
 

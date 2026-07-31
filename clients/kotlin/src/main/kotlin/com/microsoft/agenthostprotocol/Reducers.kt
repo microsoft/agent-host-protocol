@@ -166,7 +166,7 @@ private data class ToolCallBase(
     val toolName: String,
     val displayName: String,
     val intention: String?,
-    val toolInput: ContentRef?,
+    val toolInput: ToolInput?,
     val contributor: ToolCallContributor?,
     val meta: Map<String, JsonElement>?,
 ) {
@@ -928,6 +928,8 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                 ToolCallStateStreaming(
                     tc.value.copy(
                         meta = a.meta ?: tc.value.meta,
+                        partialInput = a.content?.let { (tc.value.partialInput ?: "") + it }
+                            ?: tc.value.partialInput,
                         invocationMessage = a.invocationMessage,
                     ),
                 )
@@ -1001,13 +1003,21 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                     val base = toolCallBase(tc).withMeta(a.meta)
                     val selectedOption = resolveSelectedOption(tc.value.options, a.selectedOptionId)
                     if (a.approved) {
+                        val toolInput = if (
+                            a.editedToolInput != null
+                            && tc.value.toolInput is ToolInput.Inline
+                        ) {
+                            ToolInput.Inline(a.editedToolInput)
+                        } else {
+                            tc.value.toolInput
+                        }
                         ToolCallStateRunning(
                             ToolCallRunningState(
                                 toolCallId = base.toolCallId,
                                 toolName = base.toolName,
                                 displayName = base.displayName,
                                 intention = base.intention,
-                                toolInput = tc.value.toolInput,
+                                toolInput = toolInput,
                                 contributor = base.contributor,
                                 meta = base.meta,
                                 invocationMessage = tc.value.invocationMessage,
@@ -1444,7 +1454,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
  */
 private data class CompleteCtx(
     val invocationMessage: com.microsoft.agenthostprotocol.generated.StringOrMarkdown,
-    val toolInput: ContentRef?,
+    val toolInput: ToolInput?,
     val confirmed: ToolCallConfirmationReason,
     val selectedOption: ConfirmationOption?,
     val preAuthContent: List<ToolResultContent>?,

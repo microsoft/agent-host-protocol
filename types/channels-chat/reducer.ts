@@ -465,6 +465,9 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         return {
           ...tc,
           ...(action._meta !== undefined ? { _meta: action._meta } : {}),
+          ...(action.content !== undefined
+            ? { partialInput: (tc.partialInput ?? '') + action.content }
+            : {}),
           invocationMessage: action.invocationMessage,
         };
       });
@@ -517,11 +520,14 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         const base = tcBaseWithMeta(tc, action._meta);
         const selectedOption = resolveSelectedOption(tc.options, action.selectedOptionId);
         if (action.approved) {
+          const toolInput = action.editedToolInput !== undefined && typeof tc.toolInput === 'string'
+            ? action.editedToolInput
+            : tc.toolInput;
           return {
             status: ToolCallStatus.Running,
             ...base,
             invocationMessage: tc.invocationMessage,
-            toolInput: tc.toolInput,
+            toolInput,
             confirmed: action.confirmed,
             ...(selectedOption ? { selectedOption } : {}),
           };

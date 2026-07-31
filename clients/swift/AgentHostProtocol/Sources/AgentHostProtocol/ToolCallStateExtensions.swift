@@ -32,7 +32,7 @@ public struct ToolCallBaseFields: Sendable {
     public let toolName: String
     public let displayName: String
     public let intention: String?
-    public let toolInput: ContentRef?
+    public let toolInput: ToolInput?
     public let contributor: ToolCallContributor?
     public let meta: [String: AnyCodable]?
 }
