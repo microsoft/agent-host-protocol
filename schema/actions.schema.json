@@ -210,7 +210,7 @@
             },
             "title": {
               "type": "string",
-              "description": "Chat title. Absent means the chat has no title of its own and consumers\nSHOULD fall back to the owning session's title — see\n{@link ChatState.title} for the full semantics."
+              "description": "Chat title"
             },
             "status": {
               "$ref": "#/$defs/SessionStatus",
@@ -4481,7 +4481,7 @@
         },
         "title": {
           "type": "string",
-          "description": "Chat title.\n\nAbsent means the chat has no title of its own and consumers SHOULD fall\nback to the owning {@link SessionState.title | session's title}. This is\nthe normal case for a session's default chat, which typically has no\nidentity separate from the session itself. Producers MUST NOT use an empty\nstring to mean \"inherit\" — omit the field instead."
+          "description": "Chat title"
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
@@ -4548,6 +4548,7 @@
       },
       "required": [
         "resource",
+        "title",
         "status",
         "modifiedAt",
         "turns"
@@ -4563,7 +4564,7 @@
         },
         "title": {
           "type": "string",
-          "description": "Chat title. Absent means the chat has no title of its own and consumers\nSHOULD fall back to the owning session's title — see\n{@link ChatState.title} for the full semantics."
+          "description": "Chat title"
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
@@ -4595,6 +4596,7 @@
       },
       "required": [
         "resource",
+        "title",
         "status",
         "modifiedAt"
       ]

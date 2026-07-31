@@ -1009,15 +1009,8 @@ pub struct PendingMessage {
 pub struct ChatState {
     /// Chat URI
     pub resource: Uri,
-    /// Chat title.
-    ///
-    /// Absent means the chat has no title of its own and consumers SHOULD fall
-    /// back to the owning {@link SessionState.title | session's title}. This is
-    /// the normal case for a session's default chat, which typically has no
-    /// identity separate from the session itself. Producers MUST NOT use an empty
-    /// string to mean "inherit" — omit the field instead.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
+    /// Chat title
+    pub title: String,
     /// Current chat status (reuses SessionStatus shape)
     pub status: u32,
     /// Human-readable description of what the chat is currently doing
@@ -1093,11 +1086,8 @@ pub struct ChatState {
 pub struct ChatSummary {
     /// Chat URI
     pub resource: Uri,
-    /// Chat title. Absent means the chat has no title of its own and consumers
-    /// SHOULD fall back to the owning session's title — see
-    /// {@link ChatState.title} for the full semantics.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
+    /// Chat title
+    pub title: String,
     /// Current chat status (reuses SessionStatus shape)
     pub status: u32,
     /// Human-readable description of what the chat is currently doing

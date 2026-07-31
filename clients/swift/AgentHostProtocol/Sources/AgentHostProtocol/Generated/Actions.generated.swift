@@ -1972,9 +1972,7 @@ public struct ResourceWatchChangedAction: Codable, Sendable {
 public struct PartialChatSummary: Codable, Sendable {
     /// Chat URI
     public var resource: String?
-    /// Chat title. Absent means the chat has no title of its own and consumers
-    /// SHOULD fall back to the owning session's title — see
-    /// {@link ChatState.title} for the full semantics.
+    /// Chat title
     public var title: String?
     /// Current chat status (reuses SessionStatus shape)
     public var status: SessionStatus?

@@ -2386,7 +2386,7 @@
         },
         "title": {
           "type": "string",
-          "description": "Chat title.\n\nAbsent means the chat has no title of its own and consumers SHOULD fall\nback to the owning {@link SessionState.title | session's title}. This is\nthe normal case for a session's default chat, which typically has no\nidentity separate from the session itself. Producers MUST NOT use an empty\nstring to mean \"inherit\" — omit the field instead."
+          "description": "Chat title"
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
@@ -2453,6 +2453,7 @@
       },
       "required": [
         "resource",
+        "title",
         "status",
         "modifiedAt",
         "turns"
@@ -2468,7 +2469,7 @@
         },
         "title": {
           "type": "string",
-          "description": "Chat title. Absent means the chat has no title of its own and consumers\nSHOULD fall back to the owning session's title — see\n{@link ChatState.title} for the full semantics."
+          "description": "Chat title"
         },
         "status": {
           "$ref": "#/$defs/SessionStatus",
@@ -2500,6 +2501,7 @@
       },
       "required": [
         "resource",
+        "title",
         "status",
         "modifiedAt"
       ]
@@ -6134,10 +6136,6 @@
           "$ref": "#/$defs/Message",
           "description": "Optional initial message for the new chat."
         },
-        "title": {
-          "type": "string",
-          "description": "Optional title for the new chat.\n\nLets a client name a chat it already has a name for — a fork, a side chat,\nor a tool-spawned worker — instead of creating it untitled and following up\nwith a `session/chatUpdated`. When omitted the chat starts with no title of\nits own and consumers fall back to the session's title until the host\nassigns one (see {@link ChatState.title})."
-        },
         "source": {
           "$ref": "#/$defs/ChatSource",
           "description": "Optional source chat and source turn.\n\nThe source chat MUST belong to this session. Clients MUST only request\n`kind: \"fork\"` when the selected agent advertises\n`capabilities.multipleChats.fork`, and `kind: \"sideChat\"` when the\nselected agent advertises `capabilities.multipleChats.sideChat`. Both\nsource forms carry a stable top-level `turnId`. Forks target completed\nturns. Side chats also carry a stable `turnId`, which the host resolves\nagainst the source chat's current active turn or retained history. If it\nresolves to the active turn, the host snapshots the currently available\npartial response when accepting `createChat`. When\n`source.kind === \"sideChat\"` and `source.selection` is present, the host\nalso snapshots and preserves that exact selected text in the created chat's\norigin; any `responsePartId` there is provenance only, not a live range."
@@ -7477,7 +7475,7 @@
             },
             "title": {
               "type": "string",
-              "description": "Chat title. Absent means the chat has no title of its own and consumers\nSHOULD fall back to the owning session's title — see\n{@link ChatState.title} for the full semantics."
+              "description": "Chat title"
             },
             "status": {
               "$ref": "#/$defs/SessionStatus",

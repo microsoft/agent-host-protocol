@@ -892,14 +892,8 @@ public struct PendingMessage: Codable, Sendable {
 public struct ChatState: Codable, Sendable {
     /// Chat URI
     public var resource: String
-    /// Chat title.
-    ///
-    /// Absent means the chat has no title of its own and consumers SHOULD fall
-    /// back to the owning {@link SessionState.title | session's title}. This is
-    /// the normal case for a session's default chat, which typically has no
-    /// identity separate from the session itself. Producers MUST NOT use an empty
-    /// string to mean "inherit" — omit the field instead.
-    public var title: String?
+    /// Chat title
+    public var title: String
     /// Current chat status (reuses SessionStatus shape)
     public var status: SessionStatus
     /// Human-readable description of what the chat is currently doing
@@ -976,7 +970,7 @@ public struct ChatState: Codable, Sendable {
 
     public init(
         resource: String,
-        title: String? = nil,
+        title: String,
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,
@@ -1012,10 +1006,8 @@ public struct ChatState: Codable, Sendable {
 public struct ChatSummary: Codable, Sendable {
     /// Chat URI
     public var resource: String
-    /// Chat title. Absent means the chat has no title of its own and consumers
-    /// SHOULD fall back to the owning session's title — see
-    /// {@link ChatState.title} for the full semantics.
-    public var title: String?
+    /// Chat title
+    public var title: String
     /// Current chat status (reuses SessionStatus shape)
     public var status: SessionStatus
     /// Human-readable description of what the chat is currently doing
@@ -1036,7 +1028,7 @@ public struct ChatSummary: Codable, Sendable {
 
     public init(
         resource: String,
-        title: String? = nil,
+        title: String,
         status: SessionStatus,
         activity: String? = nil,
         modifiedAt: String,

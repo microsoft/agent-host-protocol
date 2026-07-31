@@ -540,14 +540,6 @@ public struct CreateChatParams: Codable, Sendable {
     public var chat: String
     /// Optional initial message for the new chat.
     public var initialMessage: Message?
-    /// Optional title for the new chat.
-    ///
-    /// Lets a client name a chat it already has a name for — a fork, a side chat,
-    /// or a tool-spawned worker — instead of creating it untitled and following up
-    /// with a `session/chatUpdated`. When omitted the chat starts with no title of
-    /// its own and consumers fall back to the session's title until the host
-    /// assigns one (see {@link ChatState.title}).
-    public var title: String?
     /// Optional source chat and source turn.
     ///
     /// The source chat MUST belong to this session. Clients MUST only request
@@ -577,14 +569,12 @@ public struct CreateChatParams: Codable, Sendable {
         channel: String,
         chat: String,
         initialMessage: Message? = nil,
-        title: String? = nil,
         source: ChatSource? = nil,
         workingDirectories: [String]? = nil
     ) {
         self.channel = channel
         self.chat = chat
         self.initialMessage = initialMessage
-        self.title = title
         self.source = source
         self.workingDirectories = workingDirectories
     }

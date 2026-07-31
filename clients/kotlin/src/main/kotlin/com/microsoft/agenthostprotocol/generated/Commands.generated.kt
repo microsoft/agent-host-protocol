@@ -576,16 +576,6 @@ data class CreateChatParams(
      */
     val initialMessage: Message? = null,
     /**
-     * Optional title for the new chat.
-     *
-     * Lets a client name a chat it already has a name for — a fork, a side chat,
-     * or a tool-spawned worker — instead of creating it untitled and following up
-     * with a `session/chatUpdated`. When omitted the chat starts with no title of
-     * its own and consumers fall back to the session's title until the host
-     * assigns one (see {@link ChatState.title}).
-     */
-    val title: String? = null,
-    /**
      * Optional source chat and source turn.
      *
      * The source chat MUST belong to this session. Clients MUST only request

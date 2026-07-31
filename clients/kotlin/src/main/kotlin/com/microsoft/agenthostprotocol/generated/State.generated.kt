@@ -1165,15 +1165,9 @@ data class ChatState(
      */
     val resource: String,
     /**
-     * Chat title.
-     *
-     * Absent means the chat has no title of its own and consumers SHOULD fall
-     * back to the owning {@link SessionState.title | session's title}. This is
-     * the normal case for a session's default chat, which typically has no
-     * identity separate from the session itself. Producers MUST NOT use an empty
-     * string to mean "inherit" — omit the field instead.
+     * Chat title
      */
-    val title: String? = null,
+    val title: String,
     /**
      * Current chat status (reuses SessionStatus shape)
      */
@@ -1265,11 +1259,9 @@ data class ChatSummary(
      */
     val resource: String,
     /**
-     * Chat title. Absent means the chat has no title of its own and consumers
-     * SHOULD fall back to the owning session's title — see
-     * {@link ChatState.title} for the full semantics.
+     * Chat title
      */
-    val title: String? = null,
+    val title: String,
     /**
      * Current chat status (reuses SessionStatus shape)
      */

@@ -1489,9 +1489,7 @@ data class PartialChatSummary(
      */
     val resource: String? = null,
     /**
-     * Chat title. Absent means the chat has no title of its own and consumers
-     * SHOULD fall back to the owning session's title — see
-     * {@link ChatState.title} for the full semantics.
+     * Chat title
      */
     val title: String? = null,
     /**
