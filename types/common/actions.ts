@@ -18,6 +18,7 @@ import type {
 import type {
   SessionReadyAction,
   SessionCreationFailedAction,
+  SessionStateReplacedAction,
   SessionChatAddedAction,
   SessionChatRemovedAction,
   SessionChatUpdatedAction,
@@ -126,6 +127,7 @@ export const enum ActionType {
   RootActiveSessionsChanged = 'root/activeSessionsChanged',
   SessionReady = 'session/ready',
   SessionCreationFailed = 'session/creationFailed',
+  SessionStateReplaced = 'session/stateReplaced',
   SessionChatAdded = 'session/chatAdded',
   SessionChatRemoved = 'session/chatRemoved',
   SessionChatUpdated = 'session/chatUpdated',
@@ -249,6 +251,7 @@ export type StateAction =
   | RootConfigChangedAction
   | SessionReadyAction
   | SessionCreationFailedAction
+  | SessionStateReplacedAction
   | SessionChatAddedAction
   | SessionChatRemovedAction
   | SessionChatUpdatedAction

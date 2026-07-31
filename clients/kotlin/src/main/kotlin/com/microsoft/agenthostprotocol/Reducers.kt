@@ -671,6 +671,8 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
+    is StateActionSessionStateReplaced -> action.value.state
+
     is StateActionSessionCustomizationsChanged -> state.copy(customizations = action.value.customizations)
 
     is StateActionSessionCustomizationToggled -> {

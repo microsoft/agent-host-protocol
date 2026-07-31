@@ -18,9 +18,9 @@ use crate::state::{
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
     ConfirmationOption, Customization, ErrorInfo, McpAuthRequirement, McpServerState, Message,
     ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest,
-    SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
-    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment,
-    ToolDefinition, ToolResultContent, Turn, UsageInfo,
+    SessionState, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
+    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
+    ToolCallRiskAssessment, ToolDefinition, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -36,6 +36,8 @@ pub enum ActionType {
     SessionReady,
     #[serde(rename = "session/creationFailed")]
     SessionCreationFailed,
+    #[serde(rename = "session/stateReplaced")]
+    SessionStateReplaced,
     #[serde(rename = "session/chatAdded")]
     SessionChatAdded,
     #[serde(rename = "session/chatRemoved")]
@@ -1146,6 +1148,18 @@ pub struct ChatInputCompletedAction {
     pub answers: Option<std::collections::HashMap<String, ChatInputAnswer>>,
 }
 
+/// The authoritative state for this session was replaced while the channel
+/// remained subscribed.
+///
+/// Full-replacement semantics: the supplied state replaces the previous session
+/// state entirely.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionStateReplacedAction {
+    /// Complete authoritative state for the session.
+    pub state: SessionState,
+}
+
 /// The session's customizations have changed.
 ///
 /// Full-replacement semantics: the `customizations` array replaces the
@@ -1874,6 +1888,8 @@ pub enum StateAction {
     ChatInputAnswerChanged(ChatInputAnswerChangedAction),
     #[serde(rename = "chat/inputCompleted")]
     ChatInputCompleted(ChatInputCompletedAction),
+    #[serde(rename = "session/stateReplaced")]
+    SessionStateReplaced(Box<SessionStateReplacedAction>),
     #[serde(rename = "session/customizationsChanged")]
     SessionCustomizationsChanged(SessionCustomizationsChangedAction),
     #[serde(rename = "session/customizationToggled")]

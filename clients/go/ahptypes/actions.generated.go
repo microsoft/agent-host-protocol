@@ -23,6 +23,7 @@ const (
 	ActionTypeRootActiveSessionsChanged         ActionType = "root/activeSessionsChanged"
 	ActionTypeSessionReady                      ActionType = "session/ready"
 	ActionTypeSessionCreationFailed             ActionType = "session/creationFailed"
+	ActionTypeSessionStateReplaced              ActionType = "session/stateReplaced"
 	ActionTypeSessionChatAdded                  ActionType = "session/chatAdded"
 	ActionTypeSessionChatRemoved                ActionType = "session/chatRemoved"
 	ActionTypeSessionChatUpdated                ActionType = "session/chatUpdated"
@@ -972,6 +973,17 @@ type SessionInputNeededRemovedAction struct {
 	Id string `json:"id"`
 }
 
+// The authoritative state for this session was replaced while the channel
+// remained subscribed.
+//
+// Full-replacement semantics: the supplied state replaces the previous session
+// state entirely.
+type SessionStateReplacedAction struct {
+	Type ActionType `json:"type"`
+	// Complete authoritative state for the session.
+	State SessionState `json:"state"`
+}
+
 // The session's customizations have changed.
 //
 // Full-replacement semantics: the `customizations` array replaces the
@@ -1541,6 +1553,7 @@ func (*ChatWorkingDirectorySetAction) isStateAction()           {}
 func (*ChatWorkingDirectoryRemovedAction) isStateAction()       {}
 func (*SessionInputNeededSetAction) isStateAction()             {}
 func (*SessionInputNeededRemovedAction) isStateAction()         {}
+func (*SessionStateReplacedAction) isStateAction()              {}
 func (*SessionCustomizationsChangedAction) isStateAction()      {}
 func (*SessionCustomizationToggledAction) isStateAction()       {}
 func (*SessionCustomizationUpdatedAction) isStateAction()       {}
@@ -1887,6 +1900,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "session/inputNeededRemoved":
 		var value SessionInputNeededRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/stateReplaced":
+		var value SessionStateReplacedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

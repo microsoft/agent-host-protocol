@@ -789,6 +789,9 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
 
     // ── Customizations ──────────────────────────────────────────────────
 
+    case .sessionStateReplaced(let a):
+        return a.state
+
     case .sessionCustomizationsChanged(let a):
         var next = state
         next.customizations = a.customizations

@@ -6394,6 +6394,23 @@
         "error"
       ]
     },
+    "SessionStateReplacedAction": {
+      "type": "object",
+      "description": "The authoritative state for this session was replaced while the channel\nremained subscribed.\n\nFull-replacement semantics: the supplied state replaces the previous session\nstate entirely.",
+      "properties": {
+        "type": {
+          "const": "session/stateReplaced"
+        },
+        "state": {
+          "$ref": "#/$defs/SessionState",
+          "description": "Complete authoritative state for the session."
+        }
+      },
+      "required": [
+        "type",
+        "state"
+      ]
+    },
     "SessionChatAddedAction": {
       "type": "object",
       "description": "A chat was added to this session's catalog. Upsert semantics: if a chat\nwith the same `summary.resource` already exists, the existing entry is\nreplaced.\n\nMirrors the root-channel `root/sessionAdded` notification.",
@@ -8349,6 +8366,9 @@
         },
         {
           "$ref": "#/$defs/SessionCreationFailedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionStateReplacedAction"
         },
         {
           "$ref": "#/$defs/SessionChatAddedAction"

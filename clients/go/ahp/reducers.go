@@ -917,6 +917,9 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 			}
 		}
 		return ReduceOutcomeNoOp
+	case *ahptypes.SessionStateReplacedAction:
+		*state = a.State
+		return ReduceOutcomeApplied
 	case *ahptypes.SessionCustomizationsChangedAction:
 		state.Customizations = append([]ahptypes.Customization(nil), a.Customizations...)
 		return ReduceOutcomeApplied

@@ -161,6 +161,7 @@ export type {
   RootActiveSessionsChangedAction,
   SessionReadyAction,
   SessionCreationFailedAction,
+  SessionStateReplacedAction,
   SessionChatAddedAction,
   SessionChatRemovedAction,
   SessionChatUpdatedAction,

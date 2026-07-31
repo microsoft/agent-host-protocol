@@ -821,6 +821,10 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             state.status = new_status;
             ReduceOutcome::Applied
         }
+        StateAction::SessionStateReplaced(a) => {
+            *state = a.state.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::SessionCustomizationsChanged(a) => {
             state.customizations = Some(a.customizations.clone());
             ReduceOutcome::Applied

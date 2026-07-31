@@ -1,0 +1,51 @@
+{
+  "description": "session/stateReplaced replaces the complete session state",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Old Session",
+    "status": 1,
+    "lifecycle": "creating",
+    "workingDirectories": [
+      "file:///old"
+    ],
+    "customizations": [
+      {
+        "type": "plugin",
+        "id": "plugin-old",
+        "uri": "file:///plugin-old",
+        "name": "Old",
+        "enabled": true
+      }
+    ],
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/stateReplaced",
+      "state": {
+        "provider": "copilot",
+        "title": "New Session",
+        "status": 1,
+        "lifecycle": "creating",
+        "workingDirectories": [
+          "file:///new"
+        ],
+        "activeClients": [],
+        "chats": []
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "New Session",
+    "status": 1,
+    "lifecycle": "creating",
+    "workingDirectories": [
+      "file:///new"
+    ],
+    "activeClients": [],
+    "chats": []
+  }
+}
