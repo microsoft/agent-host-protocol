@@ -450,7 +450,8 @@ pub struct ChatToolCallDeltaAction {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
     /// Updated progress message
-    pub invocation_message: StringOrMarkdown,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invocation_message: Option<StringOrMarkdown>,
 }
 
 /// Tool call parameters are complete, or a running tool requires re-confirmation.

@@ -321,7 +321,7 @@ type ChatToolCallDeltaAction struct {
 	// Partial parameter content to append, if provided by the host.
 	Content *string `json:"content,omitempty"`
 	// Updated progress message
-	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
+	InvocationMessage *StringOrMarkdown `json:"invocationMessage,omitempty"`
 }
 
 // Tool call parameters are complete, or a running tool requires re-confirmation.

@@ -7087,8 +7087,7 @@
       "required": [
         "turnId",
         "toolCallId",
-        "type",
-        "invocationMessage"
+        "type"
       ]
     },
     "ChatToolCallReadyAction": {

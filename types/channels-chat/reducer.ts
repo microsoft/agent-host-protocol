@@ -468,7 +468,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           ...(action.content !== undefined
             ? { partialInput: (tc.partialInput ?? '') + action.content }
             : {}),
-          invocationMessage: action.invocationMessage,
+          invocationMessage: action.invocationMessage ?? tc.invocationMessage,
         };
       });
 

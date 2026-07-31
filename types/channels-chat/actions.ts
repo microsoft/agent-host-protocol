@@ -177,7 +177,7 @@ export interface ChatToolCallDeltaAction extends ToolCallActionBase {
   /** Partial parameter content to append, if provided by the host. */
   content?: string;
   /** Updated progress message */
-  invocationMessage: StringOrMarkdown;
+  invocationMessage?: StringOrMarkdown;
 }
 
 /**

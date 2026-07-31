@@ -1037,8 +1037,10 @@ func applyToolCallDelta(state *ahptypes.ChatState, a *ahptypes.ChatToolCallDelta
 			partial += *a.Content
 			s.PartialInput = &partial
 		}
-		invocationMessage := a.InvocationMessage
-		s.InvocationMessage = &invocationMessage
+		if a.InvocationMessage != nil {
+			invocationMessage := *a.InvocationMessage
+			s.InvocationMessage = &invocationMessage
+		}
 		return tc
 	})
 }

@@ -930,7 +930,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                         meta = a.meta ?: tc.value.meta,
                         partialInput = a.content?.let { (tc.value.partialInput ?: "") + it }
                             ?: tc.value.partialInput,
-                        invocationMessage = a.invocationMessage,
+                        invocationMessage = a.invocationMessage ?: tc.value.invocationMessage,
                     ),
                 )
             }

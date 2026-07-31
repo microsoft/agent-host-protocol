@@ -1248,7 +1248,9 @@ fn apply_tool_call_delta(state: &mut ChatState, a: &ChatToolCallDeltaAction) -> 
             if let Some(meta) = &a.meta {
                 s.meta = Some(meta.clone());
             }
-            s.invocation_message = Some(a.invocation_message.clone());
+            if let Some(invocation_message) = &a.invocation_message {
+                s.invocation_message = Some(invocation_message.clone());
+            }
             ToolCallState::Streaming(s)
         }
         other => other,

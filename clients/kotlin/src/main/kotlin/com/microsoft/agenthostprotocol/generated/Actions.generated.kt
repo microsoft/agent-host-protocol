@@ -447,7 +447,7 @@ data class ChatToolCallDeltaAction(
     /**
      * Updated progress message
      */
-    val invocationMessage: StringOrMarkdown
+    val invocationMessage: StringOrMarkdown? = null
 )
 
 @Serializable

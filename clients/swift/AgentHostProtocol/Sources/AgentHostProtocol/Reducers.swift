@@ -210,7 +210,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             if let content = a.content {
                 s.partialInput = (s.partialInput ?? "") + content
             }
-            s.invocationMessage = a.invocationMessage
+            s.invocationMessage = a.invocationMessage ?? s.invocationMessage
             s.meta = a.meta ?? s.meta
             return .streaming(s)
         }

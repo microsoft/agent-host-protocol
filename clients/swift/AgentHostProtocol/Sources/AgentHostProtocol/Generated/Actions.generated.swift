@@ -439,7 +439,7 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
     /// Partial parameter content to append, if provided by the host.
     public var content: String?
     /// Updated progress message
-    public var invocationMessage: StringOrMarkdown
+    public var invocationMessage: StringOrMarkdown?
 
     enum CodingKeys: String, CodingKey {
         case turnId
@@ -456,7 +456,7 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         type: ActionType,
         content: String? = nil,
-        invocationMessage: StringOrMarkdown
+        invocationMessage: StringOrMarkdown? = nil
     ) {
         self.turnId = turnId
         self.toolCallId = toolCallId

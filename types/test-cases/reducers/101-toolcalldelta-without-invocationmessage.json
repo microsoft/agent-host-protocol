@@ -1,5 +1,5 @@
 {
-  "description": "toolCallDelta appends optional partial input and replaces invocationMessage",
+  "description": "toolCallDelta appends input without changing invocationMessage when omitted",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -37,8 +37,7 @@
       "type": "chat/toolCallDelta",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
-      "content": "{\"command\":\"ls",
-      "invocationMessage": "Working"
+      "content": "{\"command\":\"ls"
     }
   ],
   "expected": {
@@ -62,7 +61,7 @@
             "displayName": "Run Command",
             "intention": null,
             "partialInput": "{\"command\":\"ls",
-            "invocationMessage": "Working"
+            "invocationMessage": "Original message"
           }
         }
       ],
