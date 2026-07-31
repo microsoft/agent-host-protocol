@@ -1,4 +1,0 @@
-{
-  "type": "changed",
-  "message": "`ChatState.title` and `ChatSummary.title` are now optional. An absent title means the chat has no title of its own and consumers should fall back to the owning session's title — the case for a session's default chat, and for any chat between creation and the host assigning it a title. Producers must omit the field rather than sending an empty string to mean \"inherit\"."
-}
