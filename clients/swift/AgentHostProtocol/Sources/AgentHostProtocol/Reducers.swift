@@ -207,10 +207,10 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatToolCallDelta(let a):
         return updateToolCall(state: state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
             guard case .streaming(var s) = tc else { return tc }
-            s.partialInput = (s.partialInput ?? "") + a.content
-            if let msg = a.invocationMessage {
-                s.invocationMessage = msg
+            if let content = a.content {
+                s.partialInput = (s.partialInput ?? "") + content
             }
+            s.invocationMessage = a.invocationMessage ?? s.invocationMessage
             s.meta = a.meta ?? s.meta
             return .streaming(s)
         }
@@ -223,6 +223,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             }
             let base = tc.baseFields
             let intention = a.intention ?? base.intention
+            let toolInput = a.toolInput ?? base.toolInput
             let contributor = refineToolCallContributor(base.contributor, a.contributor)
             let meta = a.meta ?? base.meta
             let pending: ToolCallPendingConfirmationState?
@@ -240,7 +241,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     contributor: contributor,
                     meta: meta,
                     invocationMessage: a.invocationMessage,
-                    toolInput: a.toolInput,
+                    toolInput: toolInput,
                     confirmed: confirmed,
                     status: .running
                 ))
@@ -253,7 +254,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 contributor: contributor,
                 meta: meta,
                 invocationMessage: a.invocationMessage,
-                toolInput: a.toolInput ?? pending?.toolInput,
+                toolInput: toolInput,
                 status: .pendingConfirmation,
                 confirmationTitle: a.confirmationTitle ?? pending?.confirmationTitle,
                 riskAssessment: a.riskAssessment ?? pending?.riskAssessment,
@@ -270,6 +271,12 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             let meta = a.meta ?? base.meta
             let selectedOption = resolveSelectedOption(pending.options, id: a.selectedOptionId)
             if a.approved {
+                let toolInput: ToolInput?
+                if let edited = a.editedToolInput, case .inline = pending.toolInput {
+                    toolInput = .inline(edited)
+                } else {
+                    toolInput = pending.toolInput
+                }
                 return .running(ToolCallRunningState(
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
@@ -278,7 +285,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     contributor: base.contributor,
                     meta: meta,
                     invocationMessage: pending.invocationMessage,
-                    toolInput: a.editedToolInput ?? pending.toolInput,
+                    toolInput: toolInput,
                     confirmed: a.confirmed ?? .notNeeded,
                     selectedOption: selectedOption,
                     status: .running
@@ -307,7 +314,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             let meta = a.meta ?? base.meta
             let confirmed: ToolCallConfirmationReason
             let invocationMessage: StringOrMarkdown
-            let toolInput: String?
+            let toolInput: ToolInput?
             let selectedOption: ConfirmationOption?
             let preAuthContent: [ToolResultContent]?
             let fromAuthRequired: Bool
@@ -1043,26 +1050,19 @@ private func endTurn(
         default:
             let base = tc.baseFields
             let invocationMessage: StringOrMarkdown
-            let toolInput: String?
             switch tc {
             case .streaming(let s):
                 invocationMessage = s.invocationMessage ?? .string("")
-                toolInput = nil
             case .pendingConfirmation(let p):
                 invocationMessage = p.invocationMessage
-                toolInput = p.toolInput
             case .running(let r):
                 invocationMessage = r.invocationMessage
-                toolInput = r.toolInput
             case .authRequired(let a):
                 invocationMessage = a.invocationMessage
-                toolInput = a.toolInput
             case .pendingResultConfirmation(let r):
                 invocationMessage = r.invocationMessage
-                toolInput = r.toolInput
             default:
                 invocationMessage = .string("")
-                toolInput = nil
             }
             return .toolCall(ToolCallResponsePart(
                 kind: .toolCall,
@@ -1074,7 +1074,7 @@ private func endTurn(
                     contributor: base.contributor,
                     meta: base.meta,
                     invocationMessage: invocationMessage,
-                    toolInput: toolInput,
+                    toolInput: base.toolInput,
                     status: .cancelled,
                     reason: .skipped
                 ))

@@ -16,11 +16,11 @@ use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, Changeset, ChangesetFile,
     ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
-    ConfirmationOption, Customization, ErrorInfo, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest,
-    SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
-    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment,
-    ToolDefinition, ToolResultContent, Turn, UsageInfo,
+    ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement, McpServerState,
+    Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
+    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
+    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
+    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -446,8 +446,9 @@ pub struct ChatToolCallDeltaAction {
     /// contain escape sequences).
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Partial parameter content to append
-    pub content: String,
+    /// Partial parameter content to append, if provided by the host.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
     /// Updated progress message
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invocation_message: Option<StringOrMarkdown>,
@@ -491,9 +492,9 @@ pub struct ChatToolCallReadyAction {
     pub intention: Option<String>,
     /// Message describing what the tool will do or what confirmation is needed
     pub invocation_message: StringOrMarkdown,
-    /// Raw tool input
+    /// Final tool input
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_input: Option<String>,
+    pub tool_input: Option<ToolInput>,
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirmation_title: Option<StringOrMarkdown>,

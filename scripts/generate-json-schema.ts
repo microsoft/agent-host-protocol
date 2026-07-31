@@ -241,8 +241,14 @@ function splitUnionType(typeText: string): string[] {
   let depth = 0;
   let current = '';
   for (const char of typeText) {
-    if (char === '<' || char === '(' || char === '{') depth++;
-    else if (char === '>' || char === ')' || char === '}') depth--;
+    // Track every bracket pair so a `|` nested inside a generic argument
+    // (`Array<A | B>`), a parenthesised union, an inline object
+    // (`{ a: A | B }`) or a tuple (`[A | B]`) is not mistaken for a
+    // top-level union separator. `[`/`]` matter for callers that consume the
+    // split parts as type names — `typeTextToSchema`'s `oneOf` generation
+    // would otherwise emit `[A` and `B]` as two branches of a tuple type.
+    if (char === '<' || char === '(' || char === '{' || char === '[') depth++;
+    else if (char === '>' || char === ')' || char === '}' || char === ']') depth--;
     else if (char === '|' && depth === 0) {
       parts.push(current.trim());
       current = '';
@@ -252,6 +258,34 @@ function splitUnionType(typeText: string): string[] {
   }
   if (current.trim()) parts.push(current.trim());
   return parts;
+}
+
+/**
+ * Whether a declared property type admits `undefined` — i.e. it is written as
+ * an explicit `T | undefined` union rather than with a `?` question token.
+ *
+ * Only a **top-level** union member counts: `A | undefined` does, while a
+ * nested `Array<A | undefined>` does not, since the property itself is still
+ * always present.
+ *
+ * The protocol uses `T | undefined` (instead of `T?`) for fields whose "cleared"
+ * state is semantically meaningful, so that a producer constructing the object
+ * literal in TypeScript is forced to mention the key and consciously decide
+ * between a value and a clear. That is purely an authoring-time constraint: at
+ * runtime `JSON.stringify` drops `undefined` members, so such a field is
+ * **absent** on the wire exactly like an optional one, and every language
+ * generator emits it as optional (`Option<T>` + `skip_serializing_if`,
+ * `*T` + `omitempty`, `T? = null`).
+ *
+ * The emitted JSON Schema therefore MUST NOT list these properties as
+ * `required`, or it would reject the very messages the clients produce.
+ *
+ * Exported so the schema tests classify properties with exactly the same rule
+ * the generator applies, rather than duplicating the logic in a second place
+ * where the two could drift apart.
+ */
+export function typeAdmitsUndefined(typeText: string): boolean {
+  return splitUnionType(typeText.trim()).some(part => part === 'undefined');
 }
 
 function enumMemberToSchema(typeText: string, project: Project): JsonSchema | undefined {
@@ -276,7 +310,7 @@ function inlineObjectToSchema(text: string, project: Project): JsonSchema {
       const [, name, optional, type] = match;
       const fieldType = type.trim();
       schema.properties![name] = typeTextToSchema(fieldType, project);
-      if (!optional) {
+      if (!optional && !typeAdmitsUndefined(fieldType)) {
         schema.required!.push(name);
       }
     }
@@ -303,7 +337,7 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
     const propSchema = typeTextToSchema(typeText, project);
     if (desc) propSchema.description = desc;
     schema.properties![name] = propSchema;
-    if (!prop.hasQuestionToken()) {
+    if (!prop.hasQuestionToken() && !typeAdmitsUndefined(typeText)) {
       if (!schema.required!.includes(name)) {
         schema.required!.push(name);
       }

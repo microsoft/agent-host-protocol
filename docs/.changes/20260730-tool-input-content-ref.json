@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Final tool input may be inline or a lazy `ContentRef`, and streaming deltas may include partial parameters."
+}

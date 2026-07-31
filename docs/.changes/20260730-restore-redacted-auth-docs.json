@@ -1,0 +1,4 @@
+{
+  "type": "fixed",
+  "message": "Restored authentication documentation in the `authenticate` command and `McpAuthRequirement` that a secret-scanner had redacted, including a corrupted `WWW-Authenticate: Bearer scope=\"…\"` header example."
+}

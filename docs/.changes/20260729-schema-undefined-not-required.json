@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "JSON Schema no longer marks properties declared as `T | undefined` (`ActionEnvelope.origin`, `Turn.usage`, `ActiveTurn.usage`, `SessionActivityChangedAction.activity`, `SessionMetaChangedAction._meta`, `SessionChangesetsChangedAction.changesets`, `ChangesetOperationsChangedAction.operations`) as `required`. Such properties are absent on the wire and every client emits them as optional, so the published schemas rejected valid protocol traffic.",
+  "targets": ["spec"]
+}

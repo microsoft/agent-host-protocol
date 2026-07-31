@@ -45,8 +45,7 @@
       "required": [
         "channel",
         "action",
-        "serverSeq",
-        "origin"
+        "serverSeq"
       ]
     },
     "RootAgentsChangedAction": {
@@ -330,8 +329,7 @@
         }
       },
       "required": [
-        "type",
-        "activity"
+        "type"
       ]
     },
     "SessionChangesetsChangedAction": {
@@ -350,8 +348,7 @@
         }
       },
       "required": [
-        "type",
-        "changesets"
+        "type"
       ]
     },
     "SessionServerToolsChangedAction": {
@@ -648,8 +645,7 @@
         }
       },
       "required": [
-        "type",
-        "_meta"
+        "type"
       ]
     },
     "ToolCallActionBase": {
@@ -837,7 +833,7 @@
         },
         "content": {
           "type": "string",
-          "description": "Partial parameter content to append"
+          "description": "Partial parameter content to append, if provided by the host."
         },
         "invocationMessage": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -847,8 +843,7 @@
       "required": [
         "turnId",
         "toolCallId",
-        "type",
-        "content"
+        "type"
       ]
     },
     "ChatToolCallReadyAction": {
@@ -884,8 +879,8 @@
           "description": "Message describing what the tool will do or what confirmation is needed"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input"
         },
         "confirmationTitle": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -962,7 +957,7 @@
         },
         "editedToolInput": {
           "type": "string",
-          "description": "Edited tool input parameters, if the client modified them before confirming"
+          "description": "Edited tool input parameters, if the client modified them before confirming.\n\nFor inline `toolInput`, the reducer replaces the state value directly.\nFor referenced input, the host MUST replace the resource contents before\nechoing the accepted action."
         },
         "selectedOptionId": {
           "type": "string",
@@ -1912,8 +1907,7 @@
         }
       },
       "required": [
-        "type",
-        "operations"
+        "type"
       ]
     },
     "ChangesetOperationStatusChangedAction": {
@@ -4380,7 +4374,7 @@
     },
     "McpAuthRequirement": {
       "type": "object",
-      "description": "Reusable MCP authentication challenge — the RFC 9728 discovery info a\nclient needs to obtain a token and push it via the `authenticate` command.\nDeliberately carries **no token**: this describes what is being asked for,\nnever the ****** itself.\n\nShared by two independent state machines that describe the same OAuth\nchallenge from different vantage points:\n\n- {@link McpServerAuthRequiredState} — the MCP server itself cannot serve\n  *any* request until the client authenticates.\n- {@link ToolCallAuthRequiredState} — a specific in-flight tool call is\n  paused pending authentication (typically\n  {@link McpAuthRequiredReason.InsufficientScope} step-up auth\n  mid-execution). The server state and the tool-call state remain\n  separate on purpose: the server saying \"I need auth\" and a tool\n  invocation saying \"I am waiting on that auth\" are different facts that\n  can be true independently.",
+      "description": "Reusable MCP authentication challenge — the RFC 9728 discovery info a\nclient needs to obtain a token and push it via the `authenticate` command.\nDeliberately carries **no token**: this describes what is being asked for,\nnever the bearer token itself.\n\nShared by two independent state machines that describe the same OAuth\nchallenge from different vantage points:\n\n- {@link McpServerAuthRequiredState} — the MCP server itself cannot serve\n  *any* request until the client authenticates.\n- {@link ToolCallAuthRequiredState} — a specific in-flight tool call is\n  paused pending authentication (typically\n  {@link McpAuthRequiredReason.InsufficientScope} step-up auth\n  mid-execution). The server state and the tool-call state remain\n  separate on purpose: the server saying \"I need auth\" and a tool\n  invocation saying \"I am waiting on that auth\" are different facts that\n  can be true independently.",
       "properties": {
         "reason": {
           "$ref": "#/$defs/McpAuthRequiredReason",
@@ -4399,7 +4393,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Scopes required for the current challenge, parsed from the\n`WWW-Authenticate: ******\"…\"` header (or `scopes_supported`\nfallback). Authoritative for the next authorization request — clients\nMUST NOT assume any subset/superset relationship to\n`resource.scopes_supported`."
+          "description": "Scopes required for the current challenge, parsed from the\n`WWW-Authenticate: Bearer scope=\"…\"` header (or `scopes_supported`\nfallback). Authoritative for the next authorization request — clients\nMUST NOT assume any subset/superset relationship to\n`resource.scopes_supported`."
         },
         "description": {
           "type": "string",
@@ -4432,7 +4426,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Scopes required for the current challenge, parsed from the\n`WWW-Authenticate: ******\"…\"` header (or `scopes_supported`\nfallback). Authoritative for the next authorization request — clients\nMUST NOT assume any subset/superset relationship to\n`resource.scopes_supported`."
+          "description": "Scopes required for the current challenge, parsed from the\n`WWW-Authenticate: Bearer scope=\"…\"` header (or `scopes_supported`\nfallback). Authoritative for the next authorization request — clients\nMUST NOT assume any subset/superset relationship to\n`resource.scopes_supported`."
         },
         "description": {
           "type": "string",
@@ -5127,7 +5121,6 @@
         "id",
         "message",
         "responseParts",
-        "usage",
         "state"
       ]
     },
@@ -5163,8 +5156,7 @@
         "id",
         "startedAt",
         "message",
-        "responseParts",
-        "usage"
+        "responseParts"
       ]
     },
     "MessageOrigin": {
@@ -5753,8 +5745,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         }
       },
       "required": [
@@ -5840,7 +5832,7 @@
         },
         "partialInput": {
           "type": "string",
-          "description": "Partial parameters accumulated so far"
+          "description": "Partial parameters accumulated from tool-call deltas."
         },
         "invocationMessage": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -5888,8 +5880,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "status": {
           "const": "pending-confirmation"
@@ -5988,8 +5980,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -6053,8 +6045,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -6124,8 +6116,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "success": {
           "type": "boolean",
@@ -6219,8 +6211,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "success": {
           "type": "boolean",
@@ -6314,8 +6306,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "status": {
           "const": "cancelled"
@@ -7417,6 +7409,17 @@
           "$ref": "#/$defs/ToolCallMcpContributor"
         }
       ]
+    },
+    "ToolInput": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/ContentRef"
+        }
+      ],
+      "description": "Tool input represented inline or by reference."
     },
     "ToolCallState": {
       "oneOf": [

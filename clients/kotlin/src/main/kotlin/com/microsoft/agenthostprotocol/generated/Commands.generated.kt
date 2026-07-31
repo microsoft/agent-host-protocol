@@ -1036,7 +1036,7 @@ data class AuthenticateParams(
      */
     val resource: String,
     /**
-     * ***** obtained from the resource's authorization server
+     * Bearer token obtained from the resource's authorization server
      */
     val token: String,
     /**

@@ -33,7 +33,6 @@
       "type": "chat/toolCallDelta",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
-      "content": "ls -la",
       "invocationMessage": "Listing files"
     },
     {
@@ -41,7 +40,9 @@
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run: ls -la",
-      "toolInput": "ls -la"
+      "toolInput": {
+        "uri": "file:///tool-inputs/tc-1.json"
+      }
     },
     {
       "type": "chat/toolCallConfirmed",
@@ -83,7 +84,9 @@
             "contributor": null,
             "_meta": null,
             "invocationMessage": "Run: ls -la",
-            "toolInput": "ls -la",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tc-1.json"
+            },
             "confirmed": "user-action",
             "success": true,
             "pastTenseMessage": "Ran command"

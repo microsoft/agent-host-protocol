@@ -32,6 +32,7 @@ public struct ToolCallBaseFields: Sendable {
     public let toolName: String
     public let displayName: String
     public let intention: String?
+    public let toolInput: ToolInput?
     public let contributor: ToolCallContributor?
     public let meta: [String: AnyCodable]?
 }
@@ -45,30 +46,37 @@ extension ToolCallState {
         case .streaming(let s):
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,
+                                       toolInput: nil,
                                        contributor: s.contributor, meta: s.meta)
         case .pendingConfirmation(let s):
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,
+                                       toolInput: s.toolInput,
                                        contributor: s.contributor, meta: s.meta)
         case .running(let s):
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,
+                                       toolInput: s.toolInput,
                                        contributor: s.contributor, meta: s.meta)
         case .authRequired(let s):
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,
+                                       toolInput: s.toolInput,
                                        contributor: s.contributor, meta: s.meta)
         case .pendingResultConfirmation(let s):
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,
+                                       toolInput: s.toolInput,
                                        contributor: s.contributor, meta: s.meta)
         case .completed(let s):
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,
+                                       toolInput: s.toolInput,
                                        contributor: s.contributor, meta: s.meta)
         case .cancelled(let s):
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,
+                                       toolInput: s.toolInput,
                                        contributor: s.contributor, meta: s.meta)
         case .unknown:
             // All callers guard on a known variant before reaching here.

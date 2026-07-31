@@ -145,6 +145,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
 
   if (tsType === 'URI') return 'Uri';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
+  if (tsType === 'ToolInput') return 'ToolInput';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -1088,7 +1089,7 @@ pub enum ChatOrigin {
 
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot — root, session, chat, terminal,
-/// changeset, resource-watch, or annotations state.
+/// changeset, resource-watch, annotations, or content state.
 ///
 /// Deserialized by trying session first (has required \`lifecycle\`), then
 /// chat (has required \`turns\`), then terminal (has required \`content\`),
@@ -1105,6 +1106,16 @@ pub enum SnapshotState {
     ResourceWatch(Box<ResourceWatchState>),
     Annotations(Box<AnnotationsState>),
     Root(Box<RootState>),
+}`;
+}
+
+function generateToolInput(): string {
+  return `/// Raw tool input represented inline or by content reference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ToolInput {
+    Inline(String),
+    ContentRef(ContentRef),
 }`;
 }
 
@@ -1139,6 +1150,9 @@ function generateStateFile(project: Project): string {
       lines.push('');
     }
   }
+
+  lines.push(generateToolInput());
+  lines.push('');
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
   lines.push(generateChatOrigin());
@@ -1316,7 +1330,7 @@ pub struct ${scope}ToolCallConfirmedAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1866,6 +1880,7 @@ function checkExhaustiveness(project: Project): void {
     'PaginatedParams',              // base interface; flattened into each paginated command params struct
     'PaginatedResult',              // base interface; flattened into each paginated command result struct
     'StringOrMarkdown',
+    'ToolInput',
     'ToolCallState',
     'StateAction',
     'ActionEnvelope',

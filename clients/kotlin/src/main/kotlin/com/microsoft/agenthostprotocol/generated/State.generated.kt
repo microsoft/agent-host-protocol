@@ -2584,7 +2584,7 @@ data class ToolCallStreamingState(
     val meta: Map<String, JsonElement>? = null,
     val status: ToolCallStatus,
     /**
-     * Partial parameters accumulated so far
+     * Partial parameters accumulated from tool-call deltas.
      */
     val partialInput: String? = null,
     /**
@@ -2629,9 +2629,14 @@ data class ToolCallPendingConfirmationState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Final tool input.
+     *
+     * Referenced input is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ToolInput? = null,
     val status: ToolCallStatus,
     /**
      * Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
@@ -2694,9 +2699,14 @@ data class ToolCallRunningState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Final tool input.
+     *
+     * Referenced input is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ToolInput? = null,
     /**
      * How the tool was confirmed for execution
      */
@@ -2751,9 +2761,14 @@ data class ToolCallAuthRequiredState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Final tool input.
+     *
+     * Referenced input is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ToolInput? = null,
     /**
      * How the tool was confirmed for execution
      */
@@ -2809,9 +2824,14 @@ data class ToolCallPendingResultConfirmationState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Final tool input.
+     *
+     * Referenced input is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ToolInput? = null,
     /**
      * Whether the tool succeeded
      */
@@ -2883,9 +2903,14 @@ data class ToolCallCompletedState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Final tool input.
+     *
+     * Referenced input is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ToolInput? = null,
     /**
      * Whether the tool succeeded
      */
@@ -2957,9 +2982,14 @@ data class ToolCallCancelledState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Final tool input.
+     *
+     * Referenced input is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ToolInput? = null,
     val status: ToolCallStatus,
     /**
      * Why the tool was cancelled
@@ -3949,7 +3979,7 @@ data class McpServerAuthRequiredState(
     val resource: ProtectedResourceMetadata,
     /**
      * Scopes required for the current challenge, parsed from the
-     * `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+     * `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
      * fallback). Authoritative for the next authorization request — clients
      * MUST NOT assume any subset/superset relationship to
      * `resource.scopes_supported`.
@@ -4009,7 +4039,7 @@ data class McpAuthRequirement(
     val resource: ProtectedResourceMetadata,
     /**
      * Scopes required for the current challenge, parsed from the
-     * `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+     * `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
      * fallback). Authoritative for the next authorization request — clients
      * MUST NOT assume any subset/superset relationship to
      * `resource.scopes_supported`.
@@ -4643,6 +4673,47 @@ data class ResourceChange(
      */
     val type: ResourceChangeType
 )
+
+// ─── Tool Input ──────────────────────────────────────────────────────────────
+
+/**
+ * Raw tool input represented inline or by content reference.
+ */
+@Serializable(with = ToolInputSerializer::class)
+sealed interface ToolInput {
+    @JvmInline value class Inline(val value: String) : ToolInput
+    @JvmInline value class ContentReference(val value: ContentRef) : ToolInput
+}
+
+internal object ToolInputSerializer : KSerializer<ToolInput> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ToolInput")
+
+    override fun deserialize(decoder: Decoder): ToolInput {
+        val input = decoder as? JsonDecoder
+            ?: error("ToolInput can only be deserialized from JSON")
+        return when (val element = input.decodeJsonElement()) {
+            is JsonPrimitive -> ToolInput.Inline(
+                element.contentOrNull ?: error("ToolInput string must not be null"),
+            )
+            is JsonObject -> ToolInput.ContentReference(
+                input.json.decodeFromJsonElement(ContentRef.serializer(), element),
+            )
+            else -> error("ToolInput must be a string or ContentRef object")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ToolInput) {
+        val output = encoder as? JsonEncoder
+            ?: error("ToolInput can only be serialized to JSON")
+        val element = when (value) {
+            is ToolInput.Inline -> JsonPrimitive(value.value)
+            is ToolInput.ContentReference ->
+                output.json.encodeToJsonElement(ContentRef.serializer(), value.value)
+        }
+        output.encodeJsonElement(element)
+    }
+}
 
 // ─── Discriminated Unions ───────────────────────────────────────────────────
 
@@ -5676,7 +5747,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 
 /**
  * The state payload of a snapshot — root, session, chat, terminal, changeset,
- * resource-watch, or annotations state.
+ * resource-watch, annotations, or content state.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
