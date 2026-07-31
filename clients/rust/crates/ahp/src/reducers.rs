@@ -59,15 +59,15 @@ use ahp_types::actions::{
 };
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
-    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, ContentRef, Customization, ErrorInfo,
-    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState,
-    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
-    ToolCallConfirmationReason, ToolCallContributor, ToolCallPendingConfirmationState,
-    ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
-    ToolCallState, ToolCallStatus, ToolCallStreamingState, Turn, TurnState,
+    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, ContentRef, Customization,
+    ErrorInfo, InputRequestResponsePart, McpServerStartingState, McpServerState,
+    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
+    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalState, TerminalUnclassifiedPart,
+    ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
+    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
+    ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState, Turn, TurnState,
 };
 
 /// What happened when an action was applied.
@@ -1937,7 +1937,6 @@ pub fn apply_action_to_resource_watch(
         _ => ReduceOutcome::OutOfScope,
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -135,7 +135,6 @@ impl MultiHostStateMirror {
         &self.resource_watches
     }
 
-
     /// Convenience: apply a [`HostSubscriptionEvent`] produced by
     /// [`crate::hosts::MultiHostClient::events`]. Action envelopes are
     /// routed through the reducer; non-action events (session-summary
@@ -177,7 +176,6 @@ impl MultiHostStateMirror {
         }
         if let Some(terminal) = self.terminals.get_mut(&key) {
             apply_action_to_terminal(terminal, &envelope.action);
-            return;
         }
         // Changesets are seeded by `apply_snapshot` only — there's no
         // changeset reducer in the SDK today (matching the Swift
