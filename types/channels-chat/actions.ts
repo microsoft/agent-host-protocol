@@ -5,7 +5,7 @@
  */
 
 import { ActionType } from '../common/actions.js';
-import type { StringOrMarkdown, ErrorInfo, FileEdit, UsageInfo, URI } from '../common/state.js';
+import type { ContentRef, StringOrMarkdown, ErrorInfo, FileEdit, UsageInfo, URI } from '../common/state.js';
 import type { McpAuthRequirement } from '../channels-session/state.js';
 import type {
   Message,
@@ -173,10 +173,8 @@ export interface ChatToolCallStartAction extends ToolCallActionBase {
  */
 export interface ChatToolCallDeltaAction extends ToolCallActionBase {
   type: ActionType.ChatToolCallDelta;
-  /** Partial parameter content to append */
-  content: string;
-  /** Updated progress message */
-  invocationMessage?: StringOrMarkdown;
+  /** Updated display-ready progress message */
+  invocationMessage: StringOrMarkdown;
 }
 
 /**
@@ -211,8 +209,8 @@ export interface ChatToolCallReadyAction extends ToolCallActionBase {
   intention?: string;
   /** Message describing what the tool will do or what confirmation is needed */
   invocationMessage: StringOrMarkdown;
-  /** Raw tool input */
-  toolInput?: string;
+  /** Reference to the final raw tool input, readable with `resourceRead` */
+  toolInput?: ContentRef;
   /** Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`) */
   confirmationTitle?: StringOrMarkdown;
   /** Risk assessment that informed the confirmation requirement. */
@@ -245,7 +243,12 @@ export interface ChatToolCallApprovedAction extends ToolCallActionBase {
   approved: true;
   /** How the tool was confirmed */
   confirmed: ToolCallConfirmationReason;
-  /** Edited tool input parameters, if the client modified them before confirming */
+  /**
+   * Edited tool input parameters, if the client modified them before confirming.
+   *
+   * Before echoing the accepted action, the host MUST replace the contents of
+   * the pending tool call's `toolInput` resource with this value.
+   */
   editedToolInput?: string;
   /** ID of the selected confirmation option, if the server provided options */
   selectedOptionId?: string;

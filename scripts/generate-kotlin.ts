@@ -726,7 +726,7 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 function generateSnapshotState(): string {
   return `/**
  * The state payload of a snapshot — root, session, chat, terminal, changeset,
- * resource-watch, or annotations state.
+ * resource-watch, annotations, or content state.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {

@@ -61,6 +61,7 @@ export class AhpStateMirror {
     return this.changesetsMap;
   }
 
+
   /** Look up a session by URI. */
   getSession(uri: URI): SessionState | undefined {
     return this.sessionsMap.get(uri);
@@ -70,6 +71,7 @@ export class AhpStateMirror {
   getTerminal(uri: URI): TerminalState | undefined {
     return this.terminalsMap.get(uri);
   }
+
 
   /**
    * Apply a server snapshot, replacing the state for the resource the

@@ -441,13 +441,9 @@ data class ChatToolCallDeltaAction(
     val meta: Map<String, JsonElement>? = null,
     val type: ActionType,
     /**
-     * Partial parameter content to append
+     * Updated display-ready progress message
      */
-    val content: String,
-    /**
-     * Updated progress message
-     */
-    val invocationMessage: StringOrMarkdown? = null
+    val invocationMessage: StringOrMarkdown
 )
 
 @Serializable
@@ -486,9 +482,9 @@ data class ChatToolCallReadyAction(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Reference to the final raw tool input, readable with `resourceRead`
      */
-    val toolInput: String? = null,
+    val toolInput: ContentRef? = null,
     /**
      * Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
      */

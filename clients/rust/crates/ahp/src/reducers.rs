@@ -59,7 +59,7 @@ use ahp_types::actions::{
 };
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
-    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization, ErrorInfo,
+    ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, ContentRef, Customization, ErrorInfo,
     InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
     PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
     SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
@@ -133,6 +133,7 @@ struct ToolCallBase {
     tool_name: String,
     display_name: String,
     intention: Option<String>,
+    tool_input: Option<ContentRef>,
     contributor: Option<ToolCallContributor>,
     meta: Option<serde_json::Map<String, serde_json::Value>>,
 }
@@ -165,6 +166,7 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             tool_name: s.tool_name.clone(),
             display_name: s.display_name.clone(),
             intention: s.intention.clone(),
+            tool_input: None,
             contributor: s.contributor.clone(),
             meta: s.meta.clone(),
         },
@@ -173,6 +175,7 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             tool_name: s.tool_name.clone(),
             display_name: s.display_name.clone(),
             intention: s.intention.clone(),
+            tool_input: s.tool_input.clone(),
             contributor: s.contributor.clone(),
             meta: s.meta.clone(),
         },
@@ -181,6 +184,7 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             tool_name: s.tool_name.clone(),
             display_name: s.display_name.clone(),
             intention: s.intention.clone(),
+            tool_input: s.tool_input.clone(),
             contributor: s.contributor.clone(),
             meta: s.meta.clone(),
         },
@@ -189,6 +193,7 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             tool_name: s.tool_name.clone(),
             display_name: s.display_name.clone(),
             intention: s.intention.clone(),
+            tool_input: s.tool_input.clone(),
             contributor: s.contributor.clone(),
             meta: s.meta.clone(),
         },
@@ -197,6 +202,7 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             tool_name: s.tool_name.clone(),
             display_name: s.display_name.clone(),
             intention: s.intention.clone(),
+            tool_input: s.tool_input.clone(),
             contributor: s.contributor.clone(),
             meta: s.meta.clone(),
         },
@@ -205,6 +211,7 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             tool_name: s.tool_name.clone(),
             display_name: s.display_name.clone(),
             intention: s.intention.clone(),
+            tool_input: s.tool_input.clone(),
             contributor: s.contributor.clone(),
             meta: s.meta.clone(),
         },
@@ -213,6 +220,7 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             tool_name: s.tool_name.clone(),
             display_name: s.display_name.clone(),
             intention: s.intention.clone(),
+            tool_input: s.tool_input.clone(),
             contributor: s.contributor.clone(),
             meta: s.meta.clone(),
         },
@@ -221,6 +229,7 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             tool_name: String::new(),
             display_name: String::new(),
             intention: None,
+            tool_input: None,
             contributor: None,
             meta: None,
         },
@@ -354,23 +363,15 @@ fn end_turn(
                             }
                             _ => Default::default(),
                         };
-                        let tool_input = match &tc {
-                            ToolCallState::Streaming(_) => None,
-                            ToolCallState::PendingConfirmation(s) => s.tool_input.clone(),
-                            ToolCallState::Running(s) => s.tool_input.clone(),
-                            ToolCallState::AuthRequired(s) => s.tool_input.clone(),
-                            ToolCallState::PendingResultConfirmation(s) => s.tool_input.clone(),
-                            _ => None,
-                        };
                         let cancelled = ToolCallCancelledState {
                             tool_call_id: base.tool_call_id,
                             tool_name: base.tool_name,
                             display_name: base.display_name,
                             intention: base.intention,
+                            tool_input: base.tool_input,
                             contributor: base.contributor,
                             meta: base.meta,
                             invocation_message,
-                            tool_input,
                             reason: ToolCallCancellationReason::Skipped,
                             reason_message: None,
                             user_suggestion: None,
@@ -546,10 +547,10 @@ where
                         tool_name: String::new(),
                         display_name: String::new(),
                         intention: None,
+                        tool_input: None,
                         contributor: None,
                         meta: None,
                         invocation_message: Default::default(),
-                        tool_input: None,
                         reason: ToolCallCancellationReason::Skipped,
                         reason_message: None,
                         user_suggestion: None,
@@ -1021,7 +1022,6 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
                         intention: a.intention.clone(),
                         contributor: a.contributor.clone(),
                         meta: a.meta.clone(),
-                        partial_input: None,
                         invocation_message: None,
                     }),
                 })));
@@ -1239,14 +1239,10 @@ fn apply_turn_started(state: &mut ChatState, a: &ChatTurnStartedAction) -> Reduc
 fn apply_tool_call_delta(state: &mut ChatState, a: &ChatToolCallDeltaAction) -> ReduceOutcome {
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| match tc {
         ToolCallState::Streaming(mut s) => {
-            let current = s.partial_input.unwrap_or_default();
-            s.partial_input = Some(current + &a.content);
             if let Some(meta) = &a.meta {
                 s.meta = Some(meta.clone());
             }
-            if let Some(im) = &a.invocation_message {
-                s.invocation_message = Some(im.clone());
-            }
+            s.invocation_message = Some(a.invocation_message.clone());
             ToolCallState::Streaming(s)
         }
         other => other,
@@ -1257,6 +1253,7 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
     update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| {
         let mut base = tool_call_meta(&tc);
         base.intention = a.intention.clone().or(base.intention);
+        base.tool_input = a.tool_input.clone().or(base.tool_input);
         base.contributor = refine_tool_call_contributor(base.contributor, a.contributor.clone());
         let meta = a.meta.clone().or(base.meta);
         let pending = match &tc {
@@ -1273,10 +1270,10 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
                         tool_name: base.tool_name,
                         display_name: base.display_name,
                         intention: base.intention,
+                        tool_input: base.tool_input,
                         contributor: base.contributor,
                         meta,
                         invocation_message: a.invocation_message.clone(),
-                        tool_input: a.tool_input.clone(),
                         confirmed,
                         selected_option: None,
                         content: None,
@@ -1287,13 +1284,10 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
                         tool_name: base.tool_name,
                         display_name: base.display_name,
                         intention: base.intention,
+                        tool_input: base.tool_input,
                         contributor: base.contributor,
                         meta,
                         invocation_message: a.invocation_message.clone(),
-                        tool_input: a
-                            .tool_input
-                            .clone()
-                            .or_else(|| pending.as_ref().and_then(|p| p.tool_input.clone())),
                         confirmation_title: a.confirmation_title.clone().or_else(|| {
                             pending.as_ref().and_then(|p| p.confirmation_title.clone())
                         }),
@@ -1353,10 +1347,10 @@ fn apply_tool_call_confirmed(
                 tool_name,
                 display_name,
                 intention,
+                tool_input,
                 contributor,
                 meta,
                 invocation_message,
-                tool_input: a.edited_tool_input.clone().or(tool_input),
                 confirmed: a.confirmed.unwrap_or(ToolCallConfirmationReason::NotNeeded),
                 selected_option,
                 content: None,
@@ -1367,10 +1361,10 @@ fn apply_tool_call_confirmed(
                 tool_name,
                 display_name,
                 intention,
+                tool_input,
                 contributor,
                 meta,
                 invocation_message,
-                tool_input,
                 reason: a.reason.unwrap_or(ToolCallCancellationReason::Denied),
                 reason_message: a.reason_message.clone(),
                 user_suggestion: a.user_suggestion.clone(),
@@ -1443,10 +1437,10 @@ fn apply_tool_call_complete(
                 tool_name: base.tool_name,
                 display_name: base.display_name,
                 intention: base.intention,
+                tool_input,
                 contributor: base.contributor,
                 meta,
                 invocation_message,
-                tool_input,
                 success: a.result.success,
                 past_tense_message: a.result.past_tense_message.clone(),
                 content,
@@ -1461,10 +1455,10 @@ fn apply_tool_call_complete(
                 tool_name: base.tool_name,
                 display_name: base.display_name,
                 intention: base.intention,
+                tool_input,
                 contributor: base.contributor,
                 meta,
                 invocation_message,
-                tool_input,
                 success: a.result.success,
                 past_tense_message: a.result.past_tense_message.clone(),
                 content,
@@ -1491,10 +1485,10 @@ fn apply_tool_call_result_confirmed(
                 tool_name: s.tool_name,
                 display_name: s.display_name,
                 intention: s.intention,
+                tool_input: s.tool_input,
                 contributor: s.contributor,
                 meta: a.meta.clone().or(s.meta),
                 invocation_message: s.invocation_message,
-                tool_input: s.tool_input,
                 success: s.success,
                 past_tense_message: s.past_tense_message,
                 content: s.content,
@@ -1509,10 +1503,10 @@ fn apply_tool_call_result_confirmed(
                 tool_name: s.tool_name,
                 display_name: s.display_name,
                 intention: s.intention,
+                tool_input: s.tool_input,
                 contributor: s.contributor,
                 meta: a.meta.clone().or(s.meta),
                 invocation_message: s.invocation_message,
-                tool_input: s.tool_input,
                 reason: ToolCallCancellationReason::ResultDenied,
                 reason_message: None,
                 user_suggestion: None,
@@ -1555,10 +1549,10 @@ fn apply_tool_call_auth_required(
                     tool_name: base.tool_name,
                     display_name: base.display_name,
                     intention: base.intention,
+                    tool_input: s.tool_input,
                     contributor: s.contributor,
                     meta,
                     invocation_message: s.invocation_message,
-                    tool_input: s.tool_input,
                     confirmed: s.confirmed,
                     selected_option: s.selected_option,
                     status: ToolCallStatus::AuthRequired,
@@ -1584,10 +1578,10 @@ fn apply_tool_call_auth_resolved(
                 tool_name: base.tool_name,
                 display_name: base.display_name,
                 intention: base.intention,
+                tool_input: s.tool_input,
                 contributor: s.contributor,
                 meta,
                 invocation_message: s.invocation_message,
-                tool_input: s.tool_input,
                 confirmed: s.confirmed,
                 selected_option: s.selected_option,
                 content: s.content,
@@ -1943,6 +1937,7 @@ pub fn apply_action_to_resource_watch(
         _ => ReduceOutcome::OutOfScope,
     }
 }
+
 
 #[cfg(test)]
 mod tests {

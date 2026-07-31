@@ -1,5 +1,5 @@
 {
-  "description": "toolCallConfirmed approved with editedToolInput overrides the original toolInput in the running state",
+  "description": "toolCallConfirmed preserves the input ref when edited input is handled by the host",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -33,7 +33,9 @@
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run: ls -la",
-      "toolInput": "ls -la"
+      "toolInput": {
+        "uri": "file:///tool-inputs/tool-input.json"
+      }
     },
     {
       "type": "chat/toolCallConfirmed",
@@ -76,7 +78,9 @@
             "contributor": null,
             "_meta": null,
             "invocationMessage": "Run: ls -la",
-            "toolInput": "ls -la /tmp",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmed": "user-action",
             "success": true,
             "pastTenseMessage": "Ran command"

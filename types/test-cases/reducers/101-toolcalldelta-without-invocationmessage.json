@@ -1,5 +1,5 @@
 {
-  "description": "toolCallDelta without invocationMessage preserves existing",
+  "description": "toolCallDelta replaces the streaming invocationMessage",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -37,7 +37,7 @@
       "type": "chat/toolCallDelta",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
-      "content": "data"
+      "invocationMessage": "Working"
     }
   ],
   "expected": {
@@ -60,8 +60,7 @@
             "toolName": "bash",
             "displayName": "Run Command",
             "intention": null,
-            "invocationMessage": "Original message",
-            "partialInput": "data"
+            "invocationMessage": "Working"
           }
         }
       ],

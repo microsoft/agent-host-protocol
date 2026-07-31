@@ -439,11 +439,11 @@ struct ToolCallPartView: View {
 
     private var toolInput: String? {
         switch toolCall {
-        case .streaming(let s): return s.partialInput
-        case .pendingConfirmation(let s): return s.toolInput
-        case .running(let s): return s.toolInput
-        case .pendingResultConfirmation(let s): return s.toolInput
-        case .completed(let s): return s.toolInput
+        case .pendingConfirmation(let s): return s.toolInput?.uri
+        case .running(let s): return s.toolInput?.uri
+        case .pendingResultConfirmation(let s): return s.toolInput?.uri
+        case .completed(let s): return s.toolInput?.uri
+        case .cancelled(let s): return s.toolInput?.uri
         default: return nil
         }
     }
@@ -576,11 +576,11 @@ struct ToolCallDetailSheet: View {
 
     private var toolInput: String? {
         switch toolCall {
-        case .streaming(let s): return s.partialInput
-        case .pendingConfirmation(let s): return s.toolInput
-        case .running(let s): return s.toolInput
-        case .pendingResultConfirmation(let s): return s.toolInput
-        case .completed(let s): return s.toolInput
+        case .pendingConfirmation(let s): return s.toolInput?.uri
+        case .running(let s): return s.toolInput?.uri
+        case .pendingResultConfirmation(let s): return s.toolInput?.uri
+        case .completed(let s): return s.toolInput?.uri
+        case .cancelled(let s): return s.toolInput?.uri
         default: return nil
         }
     }
@@ -796,8 +796,8 @@ struct ContentRefView: View {
                 toolCallId: "tc0",
                 toolName: "editFile",
                 displayName: "Edit file",
+                toolInput: ContentRef(uri: "file:///tool-inputs/tc0.json"),
                 status: .streaming,
-                partialInput: "{\"path\": \"src/main.ts\", \"content\": \"...",
                 invocationMessage: .string("Editing src/main.ts")
             )))
 
@@ -808,7 +808,7 @@ struct ContentRefView: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Run: npm run deploy"),
-                toolInput: "{\"command\": \"npm run deploy\"}",
+                toolInput: ContentRef(uri: "file:///tool-inputs/tc0b.json"),
                 status: .pendingConfirmation,
                 confirmationTitle: .string("Allow deployment?")
             )))
@@ -820,7 +820,7 @@ struct ContentRefView: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Running: npm test"),
-                toolInput: "{\"command\": \"npm test\"}",
+                toolInput: ContentRef(uri: "file:///tool-inputs/tc1.json"),
                 status: .running,
                 confirmed: .notNeeded
             )))
@@ -832,7 +832,7 @@ struct ContentRefView: View {
                 toolName: "readFile",
                 displayName: "Read file",
                 invocationMessage: .string("Reading package.json"),
-                toolInput: "{\"path\": \"package.json\"}",
+                toolInput: ContentRef(uri: "file:///tool-inputs/tc2.json"),
                 success: true,
                 pastTenseMessage: .string("Read package.json"),
                 content: [.text(ToolResultTextContent(type: .text, text: "{\"name\": \"my-app\"}"))],
@@ -847,7 +847,7 @@ struct ContentRefView: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Running: rm -rf /"),
-                toolInput: "{\"command\": \"rm -rf /\"}",
+                toolInput: ContentRef(uri: "file:///tool-inputs/tc3.json"),
                 success: false,
                 pastTenseMessage: .string("Command failed"),
                 status: .completed,
@@ -861,7 +861,7 @@ struct ContentRefView: View {
                 toolName: "writeFile",
                 displayName: "Write file",
                 invocationMessage: .string("Writing config.json"),
-                toolInput: "{\"path\": \"config.json\"}",
+                toolInput: ContentRef(uri: "file:///tool-inputs/tc4.json"),
                 success: true,
                 pastTenseMessage: .string("Wrote config.json"),
                 content: [.text(ToolResultTextContent(type: .text, text: "File written successfully"))],
@@ -876,7 +876,7 @@ struct ContentRefView: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Running: git push --force"),
-                toolInput: "{\"command\": \"git push --force\"}",
+                toolInput: ContentRef(uri: "file:///tool-inputs/tc5.json"),
                 status: .cancelled,
                 reason: .denied,
                 reasonMessage: .string("User denied force push")

@@ -1920,8 +1920,6 @@ type ToolCallStreamingState struct {
 	// with the {@link contributor} to serve MCP Apps.
 	Meta   map[string]json.RawMessage `json:"_meta,omitempty"`
 	Status ToolCallStatus             `json:"status"`
-	// Partial parameters accumulated so far
-	PartialInput *string `json:"partialInput,omitempty"`
 	// Progress message shown while parameters are streaming
 	InvocationMessage *StringOrMarkdown `json:"invocationMessage,omitempty"`
 }
@@ -1947,8 +1945,13 @@ type ToolCallPendingConfirmationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string        `json:"toolInput,omitempty"`
+	// Reference to the final raw tool input, readable with `resourceRead`.
+	//
+	// The referenced resource is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ContentRef    `json:"toolInput,omitempty"`
 	Status    ToolCallStatus `json:"status"`
 	// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
 	ConfirmationTitle *StringOrMarkdown `json:"confirmationTitle,omitempty"`
@@ -1985,8 +1988,13 @@ type ToolCallRunningState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Reference to the final raw tool input, readable with `resourceRead`.
+	//
+	// The referenced resource is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ContentRef `json:"toolInput,omitempty"`
 	// How the tool was confirmed for execution
 	Confirmed ToolCallConfirmationReason `json:"confirmed"`
 	// The confirmation option the user selected, if confirmation options were provided
@@ -2045,8 +2053,13 @@ type ToolCallAuthRequiredState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Reference to the final raw tool input, readable with `resourceRead`.
+	//
+	// The referenced resource is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ContentRef `json:"toolInput,omitempty"`
 	// How the tool was confirmed for execution
 	Confirmed ToolCallConfirmationReason `json:"confirmed"`
 	// The confirmation option the user selected, if confirmation options were provided
@@ -2078,8 +2091,13 @@ type ToolCallPendingResultConfirmationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Reference to the final raw tool input, readable with `resourceRead`.
+	//
+	// The referenced resource is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ContentRef `json:"toolInput,omitempty"`
 	// Whether the tool succeeded
 	Success bool `json:"success"`
 	// Past-tense description of what the tool did
@@ -2121,8 +2139,13 @@ type ToolCallCompletedState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Reference to the final raw tool input, readable with `resourceRead`.
+	//
+	// The referenced resource is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ContentRef `json:"toolInput,omitempty"`
 	// Whether the tool succeeded
 	Success bool `json:"success"`
 	// Past-tense description of what the tool did
@@ -2164,8 +2187,13 @@ type ToolCallCancelledState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string        `json:"toolInput,omitempty"`
+	// Reference to the final raw tool input, readable with `resourceRead`.
+	//
+	// The referenced resource is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ContentRef    `json:"toolInput,omitempty"`
 	Status    ToolCallStatus `json:"status"`
 	// Why the tool was cancelled
 	Reason ToolCallCancellationReason `json:"reason"`
@@ -4888,7 +4916,7 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 }
 
 // SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, or annotations state. The active
+// chat, terminal, changeset, resource-watch, annotations, or content state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
 // (session → chat → terminal → changeset → resourceWatch → annotations → root).

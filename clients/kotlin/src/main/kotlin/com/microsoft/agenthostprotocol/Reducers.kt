@@ -70,6 +70,7 @@ public object ResourceWatchReducer : Reducer<ResourceWatchState, StateAction> {
         resourceWatchReducer(state, action)
 }
 
+
 // ─── Timestamp Provider ─────────────────────────────────────────────────────
 
 /**
@@ -165,6 +166,7 @@ private data class ToolCallBase(
     val toolName: String,
     val displayName: String,
     val intention: String?,
+    val toolInput: ContentRef?,
     val contributor: ToolCallContributor?,
     val meta: Map<String, JsonElement>?,
 ) {
@@ -188,31 +190,31 @@ private fun refineToolCallContributor(
 
 private fun toolCallBase(tc: ToolCallState): ToolCallBase = when (tc) {
     is ToolCallStateStreaming -> tc.value.let {
-        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.contributor, it.meta)
+        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, null, it.contributor, it.meta)
     }
     is ToolCallStatePendingConfirmation -> tc.value.let {
-        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.contributor, it.meta)
+        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
     }
     is ToolCallStateRunning -> tc.value.let {
-        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.contributor, it.meta)
+        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
     }
     is ToolCallStateAuthRequired -> tc.value.let {
-        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.contributor, it.meta)
+        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
     }
     is ToolCallStatePendingResultConfirmation -> tc.value.let {
-        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.contributor, it.meta)
+        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
     }
     is ToolCallStateCompleted -> tc.value.let {
-        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.contributor, it.meta)
+        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
     }
     is ToolCallStateCancelled -> tc.value.let {
-        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.contributor, it.meta)
+        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
     }
     // Forward-compat: unknown lifecycle variants have no extractable base; mirror
     // Rust's `ToolCallState::Unknown(_) => (String::new(), ...)`. Combined with
     // `toolCallIdOf` returning `""`, this guarantees an unknown tool call never
     // matches a real `toolCallId` in delta/lookup paths.
-    is ToolCallStateUnknown -> ToolCallBase("", "", "", null, null, null)
+    is ToolCallStateUnknown -> ToolCallBase("", "", "", null, null, null, null)
 }
 
 /** Resolves a selected confirmation option by ID from a pending-confirmation state. */
@@ -389,15 +391,6 @@ private fun endTurn(
             // invocation message — destructive, but matches Rust parity exactly.
             is ToolCallStateUnknown -> com.microsoft.agenthostprotocol.generated.StringOrMarkdown.Plain("")
         }
-        val toolInput: String? = when (tc) {
-            is ToolCallStateStreaming -> null
-            is ToolCallStatePendingConfirmation -> tc.value.toolInput
-            is ToolCallStateRunning -> tc.value.toolInput
-            is ToolCallStateAuthRequired -> tc.value.toolInput
-            is ToolCallStatePendingResultConfirmation -> tc.value.toolInput
-            is ToolCallStateCompleted, is ToolCallStateCancelled -> error("filtered above")
-            is ToolCallStateUnknown -> null
-        }
         ResponsePartToolCall(
             part.value.copy(
                 toolCall = ToolCallStateCancelled(
@@ -406,10 +399,10 @@ private fun endTurn(
                         toolName = base.toolName,
                         displayName = base.displayName,
                         intention = base.intention,
+                        toolInput = base.toolInput,
                         contributor = base.contributor,
                         meta = base.meta,
                         invocationMessage = invocationMessage,
-                        toolInput = toolInput,
                         status = ToolCallStatus.CANCELLED,
                         reason = ToolCallCancellationReason.SKIPPED,
                     ),
@@ -935,8 +928,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                 ToolCallStateStreaming(
                     tc.value.copy(
                         meta = a.meta ?: tc.value.meta,
-                        partialInput = (tc.value.partialInput ?: "") + a.content,
-                        invocationMessage = a.invocationMessage ?: tc.value.invocationMessage,
+                        invocationMessage = a.invocationMessage,
                     ),
                 )
             }
@@ -957,6 +949,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                     val initialBase = toolCallBase(tc)
                     val base = initialBase.copy(
                         intention = a.intention ?: initialBase.intention,
+                        toolInput = a.toolInput ?: initialBase.toolInput,
                         contributor = refineToolCallContributor(initialBase.contributor, a.contributor),
                     ).withMeta(a.meta)
                     val pending = (tc as? ToolCallStatePendingConfirmation)?.value
@@ -967,10 +960,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 toolName = base.toolName,
                                 displayName = base.displayName,
                                 intention = base.intention,
+                                toolInput = base.toolInput,
                                 contributor = base.contributor,
                                 meta = base.meta,
                                 invocationMessage = a.invocationMessage,
-                                toolInput = a.toolInput,
                                 status = ToolCallStatus.RUNNING,
                                 confirmed = a.confirmed,
                             ),
@@ -982,10 +975,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 toolName = base.toolName,
                                 displayName = base.displayName,
                                 intention = base.intention,
+                                toolInput = base.toolInput,
                                 contributor = base.contributor,
                                 meta = base.meta,
                                 invocationMessage = a.invocationMessage,
-                                toolInput = a.toolInput ?: pending?.toolInput,
                                 status = ToolCallStatus.PENDING_CONFIRMATION,
                                 confirmationTitle = a.confirmationTitle ?: pending?.confirmationTitle,
                                 riskAssessment = a.riskAssessment ?: pending?.riskAssessment,
@@ -1014,10 +1007,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 toolName = base.toolName,
                                 displayName = base.displayName,
                                 intention = base.intention,
+                                toolInput = tc.value.toolInput,
                                 contributor = base.contributor,
                                 meta = base.meta,
                                 invocationMessage = tc.value.invocationMessage,
-                                toolInput = a.editedToolInput ?: tc.value.toolInput,
                                 status = ToolCallStatus.RUNNING,
                                 confirmed = a.confirmed
                                     ?: ToolCallConfirmationReason.USER_ACTION,
@@ -1031,10 +1024,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 toolName = base.toolName,
                                 displayName = base.displayName,
                                 intention = base.intention,
+                                toolInput = tc.value.toolInput,
                                 contributor = base.contributor,
                                 meta = base.meta,
                                 invocationMessage = tc.value.invocationMessage,
-                                toolInput = tc.value.toolInput,
                                 status = ToolCallStatus.CANCELLED,
                                 reason = a.reason ?: ToolCallCancellationReason.DENIED,
                                 reasonMessage = a.reasonMessage,
@@ -1102,10 +1095,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             toolName = base.toolName,
                             displayName = base.displayName,
                             intention = base.intention,
+                            toolInput = toolInput,
                             contributor = base.contributor,
                             meta = base.meta,
                             invocationMessage = invocationMessage,
-                            toolInput = toolInput,
                             success = result.success,
                             pastTenseMessage = result.pastTenseMessage,
                             content = content,
@@ -1123,10 +1116,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             toolName = base.toolName,
                             displayName = base.displayName,
                             intention = base.intention,
+                            toolInput = toolInput,
                             contributor = base.contributor,
                             meta = base.meta,
                             invocationMessage = invocationMessage,
-                            toolInput = toolInput,
                             success = result.success,
                             pastTenseMessage = result.pastTenseMessage,
                             content = content,
@@ -1155,10 +1148,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 toolName = base.toolName,
                                 displayName = base.displayName,
                                 intention = base.intention,
+                                toolInput = tc.value.toolInput,
                                 contributor = base.contributor,
                                 meta = base.meta,
                                 invocationMessage = tc.value.invocationMessage,
-                                toolInput = tc.value.toolInput,
                                 success = tc.value.success,
                                 pastTenseMessage = tc.value.pastTenseMessage,
                                 content = tc.value.content,
@@ -1176,10 +1169,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 toolName = base.toolName,
                                 displayName = base.displayName,
                                 intention = base.intention,
+                                toolInput = tc.value.toolInput,
                                 contributor = base.contributor,
                                 meta = base.meta,
                                 invocationMessage = tc.value.invocationMessage,
-                                toolInput = tc.value.toolInput,
                                 status = ToolCallStatus.CANCELLED,
                                 reason = ToolCallCancellationReason.RESULT_DENIED,
                                 selectedOption = tc.value.selectedOption,
@@ -1218,10 +1211,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 toolName = base.toolName,
                                 displayName = base.displayName,
                                 intention = base.intention,
+                                toolInput = tc.value.toolInput,
                                 contributor = contributor,
                                 meta = base.meta,
                                 invocationMessage = tc.value.invocationMessage,
-                                toolInput = tc.value.toolInput,
                                 confirmed = tc.value.confirmed,
                                 selectedOption = tc.value.selectedOption,
                                 status = ToolCallStatus.AUTH_REQUIRED,
@@ -1249,10 +1242,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                             toolName = base.toolName,
                             displayName = base.displayName,
                             intention = base.intention,
+                            toolInput = tc.value.toolInput,
                             contributor = base.contributor,
                             meta = base.meta,
                             invocationMessage = tc.value.invocationMessage,
-                            toolInput = tc.value.toolInput,
                             confirmed = tc.value.confirmed,
                             selectedOption = tc.value.selectedOption,
                             status = ToolCallStatus.RUNNING,
@@ -1451,7 +1444,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
  */
 private data class CompleteCtx(
     val invocationMessage: com.microsoft.agenthostprotocol.generated.StringOrMarkdown,
-    val toolInput: String?,
+    val toolInput: ContentRef?,
     val confirmed: ToolCallConfirmationReason,
     val selectedOption: ConfirmationOption?,
     val preAuthContent: List<ToolResultContent>?,

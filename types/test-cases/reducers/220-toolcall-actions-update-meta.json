@@ -35,7 +35,6 @@
       "type": "chat/toolCallDelta",
       "turnId": "turn-1",
       "toolCallId": "tc-delta",
-      "content": "abc",
       "invocationMessage": "Streaming input",
       "_meta": {
         "phase": "delta"
@@ -53,7 +52,9 @@
       "turnId": "turn-1",
       "toolCallId": "tc-ready-running",
       "invocationMessage": "Run now",
-      "toolInput": "{}",
+      "toolInput": {
+        "uri": "file:///tool-inputs/tool-input.json"
+      },
       "confirmed": "not-needed",
       "_meta": {
         "phase": "ready-running"
@@ -237,7 +238,6 @@
               "phase": "delta"
             },
             "status": "streaming",
-            "partialInput": "abc",
             "invocationMessage": "Streaming input"
           }
         },
@@ -254,7 +254,9 @@
               "phase": "ready-running"
             },
             "invocationMessage": "Run now",
-            "toolInput": "{}",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmed": "not-needed"
           }
         },

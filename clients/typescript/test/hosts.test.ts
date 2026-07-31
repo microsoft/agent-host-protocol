@@ -334,6 +334,7 @@ test('MultiHostStateMirror applies root snapshots scoped to host', () => {
     state: { agents: [makeAgent('copilot')] },
     fromSeq: 0,
   });
+
   mirror.applySnapshot('host-b', {
     resource: ROOT,
     state: { agents: [makeAgent('vscode')] },

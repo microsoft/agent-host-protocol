@@ -465,8 +465,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         return {
           ...tc,
           ...(action._meta !== undefined ? { _meta: action._meta } : {}),
-          partialInput: (tc.partialInput ?? '') + action.content,
-          invocationMessage: action.invocationMessage ?? tc.invocationMessage,
+          invocationMessage: action.invocationMessage,
         };
       });
 
@@ -484,12 +483,14 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           contributor: refineToolCallContributor(tc.contributor, action.contributor, log),
           intention: action.intention ?? tc.intention,
         };
+        const toolInput = action.toolInput
+          ?? (tc.status === ToolCallStatus.Streaming ? undefined : tc.toolInput);
         if (action.confirmed) {
           return {
             status: ToolCallStatus.Running,
             ...base,
             invocationMessage: action.invocationMessage,
-            toolInput: action.toolInput,
+            toolInput,
             confirmed: action.confirmed,
           };
         }
@@ -499,7 +500,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           status: ToolCallStatus.PendingConfirmation,
           ...base,
           invocationMessage: action.invocationMessage,
-          toolInput: action.toolInput ?? pending?.toolInput,
+          toolInput,
           confirmationTitle: action.confirmationTitle ?? pending?.confirmationTitle,
           riskAssessment: action.riskAssessment ?? pending?.riskAssessment,
           edits: action.edits ?? pending?.edits,
@@ -520,7 +521,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
             status: ToolCallStatus.Running,
             ...base,
             invocationMessage: tc.invocationMessage,
-            toolInput: action.editedToolInput ?? tc.toolInput,
+            toolInput: tc.toolInput,
             confirmed: action.confirmed,
             ...(selectedOption ? { selectedOption } : {}),
           };

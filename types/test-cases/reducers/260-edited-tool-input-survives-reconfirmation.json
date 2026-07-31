@@ -1,5 +1,5 @@
 {
-  "description": "tool call awaiting confirmation sets session status to input-needed",
+  "description": "tool input ref survives re-confirmation after an edited confirmation",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -32,10 +32,31 @@
       "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
-      "invocationMessage": "Run: rm -rf /tmp/test",
+      "invocationMessage": "Run",
       "toolInput": {
-        "uri": "file:///tool-inputs/tool-input.json"
+        "uri": "file:///tool-inputs/tc-1.json"
       }
+    },
+    {
+      "type": "chat/toolCallConfirmed",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "approved": true,
+      "confirmed": "user-action",
+      "editedToolInput": "{\"command\":\"echo edited\"}"
+    },
+    {
+      "type": "chat/toolCallReady",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "invocationMessage": "Additional permission needed"
+    },
+    {
+      "type": "chat/toolCallConfirmed",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "approved": true,
+      "confirmed": "user-action"
     }
   ],
   "expected": {
@@ -53,21 +74,18 @@
         {
           "kind": "toolCall",
           "toolCall": {
-            "status": "pending-confirmation",
+            "status": "running",
             "toolCallId": "tc-1",
             "toolName": "bash",
             "displayName": "Run Command",
             "intention": null,
+            "toolInput": {
+              "uri": "file:///tool-inputs/tc-1.json"
+            },
             "contributor": null,
             "_meta": null,
-            "invocationMessage": "Run: rm -rf /tmp/test",
-            "toolInput": {
-              "uri": "file:///tool-inputs/tool-input.json"
-            },
-            "confirmationTitle": null,
-            "riskAssessment": null,
-            "edits": null,
-            "editable": null
+            "invocationMessage": "Additional permission needed",
+            "confirmed": "user-action"
           }
         }
       ],
@@ -75,7 +93,7 @@
     },
     "resource": "copilot:/test-session",
     "title": "Test Session",
-    "status": 24,
+    "status": 8,
     "modifiedAt": "1970-01-01T00:00:02.000Z"
   }
 }

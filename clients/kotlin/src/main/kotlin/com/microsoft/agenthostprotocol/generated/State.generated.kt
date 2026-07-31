@@ -2569,10 +2569,6 @@ data class ToolCallStreamingState(
     val meta: Map<String, JsonElement>? = null,
     val status: ToolCallStatus,
     /**
-     * Partial parameters accumulated so far
-     */
-    val partialInput: String? = null,
-    /**
      * Progress message shown while parameters are streaming
      */
     val invocationMessage: StringOrMarkdown? = null
@@ -2614,9 +2610,14 @@ data class ToolCallPendingConfirmationState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Reference to the final raw tool input, readable with `resourceRead`.
+     *
+     * The referenced resource is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ContentRef? = null,
     val status: ToolCallStatus,
     /**
      * Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
@@ -2679,9 +2680,14 @@ data class ToolCallRunningState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Reference to the final raw tool input, readable with `resourceRead`.
+     *
+     * The referenced resource is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ContentRef? = null,
     /**
      * How the tool was confirmed for execution
      */
@@ -2736,9 +2742,14 @@ data class ToolCallAuthRequiredState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Reference to the final raw tool input, readable with `resourceRead`.
+     *
+     * The referenced resource is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ContentRef? = null,
     /**
      * How the tool was confirmed for execution
      */
@@ -2794,9 +2805,14 @@ data class ToolCallPendingResultConfirmationState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Reference to the final raw tool input, readable with `resourceRead`.
+     *
+     * The referenced resource is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ContentRef? = null,
     /**
      * Whether the tool succeeded
      */
@@ -2868,9 +2884,14 @@ data class ToolCallCompletedState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Reference to the final raw tool input, readable with `resourceRead`.
+     *
+     * The referenced resource is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ContentRef? = null,
     /**
      * Whether the tool succeeded
      */
@@ -2942,9 +2963,14 @@ data class ToolCallCancelledState(
      */
     val invocationMessage: StringOrMarkdown,
     /**
-     * Raw tool input
+     * Reference to the final raw tool input, readable with `resourceRead`.
+     *
+     * The referenced resource is mutable until the tool call leaves
+     * `pending-confirmation`. When the client confirms with `editedToolInput`,
+     * the host MUST replace the resource contents before echoing the accepted
+     * confirmation action. Clients MUST NOT cache tool input across confirmation.
      */
-    val toolInput: String? = null,
+    val toolInput: ContentRef? = null,
     val status: ToolCallStatus,
     /**
      * Why the tool was cancelled
@@ -5661,7 +5687,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 
 /**
  * The state payload of a snapshot — root, session, chat, terminal, changeset,
- * resource-watch, or annotations state.
+ * resource-watch, annotations, or content state.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {

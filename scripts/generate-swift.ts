@@ -969,7 +969,7 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, or annotations state.
+  return `/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, annotations, or content state.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)

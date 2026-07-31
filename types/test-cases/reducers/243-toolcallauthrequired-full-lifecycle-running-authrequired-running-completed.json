@@ -37,7 +37,9 @@
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Search: foo",
-      "toolInput": "foo",
+      "toolInput": {
+        "uri": "file:///tool-inputs/tool-input.json"
+      },
       "confirmed": "not-needed"
     },
     {
@@ -49,7 +51,9 @@
         "resource": {
           "resource": "https://mcp.example.com"
         },
-        "requiredScopes": ["repo:read"],
+        "requiredScopes": [
+          "repo:read"
+        ],
         "description": "Needs repo:read"
       }
     },
@@ -94,7 +98,9 @@
             },
             "_meta": null,
             "invocationMessage": "Search: foo",
-            "toolInput": "foo",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmed": "not-needed",
             "success": true,
             "pastTenseMessage": "Searched repo"

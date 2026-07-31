@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Final tool input now uses a lazy `ContentRef`, while streaming deltas carry only invocation-message updates."
+}

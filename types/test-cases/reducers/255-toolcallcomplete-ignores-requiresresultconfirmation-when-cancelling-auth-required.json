@@ -40,7 +40,9 @@
       "turnId": "turn-1",
       "toolCallId": "tc-10",
       "invocationMessage": "Search: foo",
-      "toolInput": "foo",
+      "toolInput": {
+        "uri": "file:///tool-inputs/tool-input.json"
+      },
       "confirmationTitle": "Search repo",
       "options": [
         {
@@ -78,7 +80,9 @@
         "resource": {
           "resource": "https://mcp.example.com"
         },
-        "requiredScopes": ["repo:read"]
+        "requiredScopes": [
+          "repo:read"
+        ]
       },
       "_meta": {
         "phase": "auth-required"
@@ -130,7 +134,9 @@
               "phase": "cancelled"
             },
             "invocationMessage": "Search: foo",
-            "toolInput": "foo",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmed": "user-action",
             "selectedOption": {
               "id": "opt-1",

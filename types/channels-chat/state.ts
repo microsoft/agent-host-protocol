@@ -1185,8 +1185,15 @@ interface ToolCallBase {
 interface ToolCallParameterFields {
   /** Message describing what the tool will do */
   invocationMessage: StringOrMarkdown;
-  /** Raw tool input */
-  toolInput?: string;
+  /**
+   * Reference to the final raw tool input, readable with `resourceRead`.
+   *
+   * The referenced resource is mutable until the tool call leaves
+   * `pending-confirmation`. When the client confirms with `editedToolInput`,
+   * the host MUST replace the resource contents before echoing the accepted
+   * confirmation action. Clients MUST NOT cache tool input across confirmation.
+   */
+  toolInput?: ContentRef;
 }
 
 /**
@@ -1222,8 +1229,6 @@ export interface ToolCallResult {
  */
 export interface ToolCallStreamingState extends ToolCallBase {
   status: ToolCallStatus.Streaming;
-  /** Partial parameters accumulated so far */
-  partialInput?: string;
   /** Progress message shown while parameters are streaming */
   invocationMessage?: StringOrMarkdown;
 }

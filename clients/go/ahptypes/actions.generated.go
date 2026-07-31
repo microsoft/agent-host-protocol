@@ -318,10 +318,8 @@ type ChatToolCallDeltaAction struct {
 	// contain escape sequences).
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	Type ActionType                 `json:"type"`
-	// Partial parameter content to append
-	Content string `json:"content"`
-	// Updated progress message
-	InvocationMessage *StringOrMarkdown `json:"invocationMessage,omitempty"`
+	// Updated display-ready progress message
+	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
 }
 
 // Tool call parameters are complete, or a running tool requires re-confirmation.
@@ -358,8 +356,8 @@ type ChatToolCallReadyAction struct {
 	Intention *string `json:"intention,omitempty"`
 	// Message describing what the tool will do or what confirmation is needed
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Reference to the final raw tool input, readable with `resourceRead`
+	ToolInput *ContentRef `json:"toolInput,omitempty"`
 	// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
 	ConfirmationTitle *StringOrMarkdown `json:"confirmationTitle,omitempty"`
 	// Risk assessment that informed the confirmation requirement.

@@ -37,7 +37,9 @@
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Search: foo",
-      "toolInput": "foo",
+      "toolInput": {
+        "uri": "file:///tool-inputs/tool-input.json"
+      },
       "confirmed": "not-needed"
     },
     {
@@ -76,7 +78,9 @@
             },
             "_meta": null,
             "invocationMessage": "Search: foo",
-            "toolInput": "foo",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmed": "not-needed",
             "success": true,
             "pastTenseMessage": "Searched files"

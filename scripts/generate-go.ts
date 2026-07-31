@@ -1153,7 +1153,7 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, or annotations state. The active
+// chat, terminal, changeset, resource-watch, annotations, or content state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
 // (session → chat → terminal → changeset → resourceWatch → annotations → root).

@@ -37,7 +37,9 @@
       "turnId": "turn-1",
       "toolCallId": "tc-6",
       "invocationMessage": "Search: foo",
-      "toolInput": "foo",
+      "toolInput": {
+        "uri": "file:///tool-inputs/tool-input.json"
+      },
       "options": [
         {
           "id": "opt-1",
@@ -113,7 +115,9 @@
               "phase": "resolved"
             },
             "invocationMessage": "Search: foo",
-            "toolInput": "foo",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmed": "user-action",
             "selectedOption": {
               "id": "opt-1",
