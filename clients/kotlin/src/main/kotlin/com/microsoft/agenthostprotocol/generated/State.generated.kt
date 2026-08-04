@@ -558,6 +558,19 @@ enum class CustomizationType {
 }
 
 /**
+ * Scope at which customization enablement is decided.
+ */
+@Serializable
+enum class CustomizationEnablementKind {
+    @SerialName("global")
+    GLOBAL,
+    @SerialName("workspace")
+    WORKSPACE,
+    @SerialName("session")
+    SESSION
+}
+
+/**
  * Discriminant values for {@link CustomizationLoadState}.
  */
 @Serializable
@@ -3257,6 +3270,20 @@ data class PluginCustomization(
      */
     val name: String,
     /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
+    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3332,6 +3359,20 @@ data class ClientPluginCustomization(
      * Human-readable name.
      */
     val name: String,
+    /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
     /**
      * Icons for UI display.
      */
@@ -3413,6 +3454,20 @@ data class DirectoryCustomization(
      */
     val name: String,
     /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
+    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3487,6 +3542,20 @@ data class AgentCustomization(
      * Human-readable name.
      */
     val name: String,
+    /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
     /**
      * Icons for UI display.
      */
@@ -3580,6 +3649,20 @@ data class SkillCustomization(
      */
     val name: String,
     /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
+    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3656,6 +3739,20 @@ data class PromptCustomization(
      */
     val name: String,
     /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
+    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3718,6 +3815,20 @@ data class RuleCustomization(
      * Human-readable name.
      */
     val name: String,
+    /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
     /**
      * Icons for UI display.
      */
@@ -3793,6 +3904,20 @@ data class HookCustomization(
      */
     val name: String,
     /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
+    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3852,6 +3977,20 @@ data class McpServerCustomization(
      */
     val name: String,
     /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Only the agent host publishes this; clients treat it as read-only provenance.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
+    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3873,7 +4012,8 @@ data class McpServerCustomization(
     val meta: Map<String, JsonElement>? = null,
     val type: CustomizationType,
     /**
-     * Whether this MCP server is currently enabled.
+     * Whether this MCP server is effectively enabled after resolving all scopes.
+     * {@link CustomizationBase.enablement | `enablement`} records its inputs.
      */
     val enabled: Boolean,
     /**
@@ -4661,6 +4801,76 @@ data class ResourceChange(
      */
     val type: ResourceChangeType
 )
+
+// ─── Customization Enablement Union ─────────────────────────────────────
+
+/**
+ * A single explicit customization enablement decision.
+ */
+@Serializable(with = CustomizationEnablementSerializer::class)
+sealed interface CustomizationEnablement {
+    @JvmInline value class Global(val value: CustomizationEnablementGlobal) : CustomizationEnablement
+    @JvmInline value class Workspace(val value: CustomizationEnablementWorkspace) : CustomizationEnablement
+    @JvmInline value class Session(val value: CustomizationEnablementSession) : CustomizationEnablement
+}
+
+@Serializable
+data class CustomizationEnablementGlobal(
+    val enabled: Boolean,
+    val kind: String = "global",
+)
+
+@Serializable
+data class CustomizationEnablementWorkspace(
+    val uri: URI,
+    val enabled: Boolean,
+    val kind: String = "workspace",
+)
+
+@Serializable
+data class CustomizationEnablementSession(
+    val enabled: Boolean,
+    val kind: String = "session",
+)
+
+internal object CustomizationEnablementSerializer : KSerializer<CustomizationEnablement> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CustomizationEnablement")
+
+    override fun deserialize(decoder: Decoder): CustomizationEnablement {
+        val input = decoder as? JsonDecoder
+            ?: error("CustomizationEnablement can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CustomizationEnablement")
+        return when ((obj["kind"] as? JsonPrimitive)?.contentOrNull) {
+            "global" -> CustomizationEnablement.Global(
+                input.json.decodeFromJsonElement(CustomizationEnablementGlobal.serializer(), element),
+            )
+            "workspace" -> CustomizationEnablement.Workspace(
+                input.json.decodeFromJsonElement(CustomizationEnablementWorkspace.serializer(), element),
+            )
+            "session" -> CustomizationEnablement.Session(
+                input.json.decodeFromJsonElement(CustomizationEnablementSession.serializer(), element),
+            )
+            else -> error("Unknown CustomizationEnablement kind")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CustomizationEnablement) {
+        val output = encoder as? JsonEncoder
+            ?: error("CustomizationEnablement can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CustomizationEnablement.Global ->
+                output.json.encodeToJsonElement(CustomizationEnablementGlobal.serializer(), value.value)
+            is CustomizationEnablement.Workspace ->
+                output.json.encodeToJsonElement(CustomizationEnablementWorkspace.serializer(), value.value)
+            is CustomizationEnablement.Session ->
+                output.json.encodeToJsonElement(CustomizationEnablementSession.serializer(), value.value)
+        }
+        output.encodeJsonElement(element)
+    }
+}
 
 // ─── Tool Input ──────────────────────────────────────────────────────────────
 

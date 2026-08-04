@@ -1603,6 +1603,13 @@
           "type": "string",
           "description": "Human-readable name."
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
+        },
         "icons": {
           "type": "array",
           "items": {
@@ -1700,6 +1707,13 @@
           "type": "string",
           "description": "Human-readable name."
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
+        },
         "icons": {
           "type": "array",
           "items": {
@@ -1758,6 +1772,13 @@
         "name": {
           "type": "string",
           "description": "Human-readable name."
+        },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
         },
         "icons": {
           "type": "array",
@@ -1825,6 +1846,13 @@
         "name": {
           "type": "string",
           "description": "Human-readable name."
+        },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
         },
         "icons": {
           "type": "array",
@@ -1896,6 +1924,13 @@
         "name": {
           "type": "string",
           "description": "Human-readable name."
+        },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
         },
         "icons": {
           "type": "array",
@@ -1970,6 +2005,13 @@
           "type": "string",
           "description": "Human-readable name."
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
+        },
         "icons": {
           "type": "array",
           "items": {
@@ -2012,6 +2054,13 @@
         "name": {
           "type": "string",
           "description": "Human-readable name."
+        },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
         },
         "icons": {
           "type": "array",
@@ -2083,6 +2132,13 @@
           "type": "string",
           "description": "Human-readable name."
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
+        },
         "icons": {
           "type": "array",
           "items": {
@@ -2142,6 +2198,13 @@
           "type": "string",
           "description": "Human-readable name."
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
+        },
         "icons": {
           "type": "array",
           "items": {
@@ -2192,6 +2255,13 @@
         "name": {
           "type": "string",
           "description": "Human-readable name."
+        },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
         },
         "icons": {
           "type": "array",
@@ -2255,6 +2325,13 @@
           "type": "string",
           "description": "Human-readable name."
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
+        },
         "icons": {
           "type": "array",
           "items": {
@@ -2302,6 +2379,13 @@
           "type": "string",
           "description": "Human-readable name."
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
+        },
         "icons": {
           "type": "array",
           "items": {
@@ -2323,7 +2407,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this MCP server is currently enabled."
+          "description": "Whether this MCP server is effectively enabled after resolving all scopes.\n{@link CustomizationBase.enablement | `enablement`} records its inputs."
         },
         "state": {
           "$ref": "#/$defs/McpServerState",
@@ -5268,6 +5352,60 @@
         }
       ],
       "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
+    },
+    "CustomizationEnablement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "global"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "enabled"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "workspace"
+            },
+            "uri": {
+              "$ref": "#/$defs/URI"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "uri",
+            "enabled"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "session"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "enabled"
+          ]
+        }
+      ],
+      "description": "A single explicit enablement decision."
     },
     "CustomizationLoadState": {
       "oneOf": [

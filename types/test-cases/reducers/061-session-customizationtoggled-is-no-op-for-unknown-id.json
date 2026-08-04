@@ -22,7 +22,12 @@
     {
       "type": "session/customizationToggled",
       "id": "plugin-unknown",
-      "enabled": false
+      "enablement": [
+        {
+          "kind": "session",
+          "enabled": false
+        }
+      ]
     }
   ],
   "expected": {

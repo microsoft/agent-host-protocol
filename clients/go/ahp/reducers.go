@@ -367,39 +367,68 @@ func containerChildren(c *ahptypes.Customization) *[]ahptypes.ChildCustomization
 	return nil
 }
 
-func setContainerEnabled(c *ahptypes.Customization, enabled bool) {
+func effectiveEnablement(enablement []ahptypes.CustomizationEnablement) bool {
+	if len(enablement) == 0 {
+		return true
+	}
+	switch decision := enablement[0].Value.(type) {
+	case *ahptypes.CustomizationEnablementGlobal:
+		return decision.Enabled
+	case *ahptypes.CustomizationEnablementWorkspace:
+		return decision.Enabled
+	case *ahptypes.CustomizationEnablementSession:
+		return decision.Enabled
+	default:
+		return true
+	}
+}
+
+func applyContainerEnablement(c *ahptypes.Customization, enablement []ahptypes.CustomizationEnablement) {
+	enabled := effectiveEnablement(enablement)
+	provenance := append([]ahptypes.CustomizationEnablement(nil), enablement...)
 	switch v := c.Value.(type) {
 	case *ahptypes.PluginCustomization:
 		v.Enabled = enabled
+		v.Enablement = provenance
 	case *ahptypes.DirectoryCustomization:
 		v.Enabled = enabled
+		v.Enablement = provenance
 	case *ahptypes.McpServerCustomization:
 		v.Enabled = enabled
+		v.Enablement = provenance
 	}
 }
 
-func setChildEnabled(c *ahptypes.ChildCustomization, enabled bool) {
+func applyChildEnablement(c *ahptypes.ChildCustomization, enablement []ahptypes.CustomizationEnablement) {
+	enabled := effectiveEnablement(enablement)
+	provenance := append([]ahptypes.CustomizationEnablement(nil), enablement...)
 	switch v := c.Value.(type) {
 	case *ahptypes.AgentCustomization:
 		v.Enabled = &enabled
+		v.Enablement = provenance
 	case *ahptypes.SkillCustomization:
 		v.Enabled = &enabled
+		v.Enablement = provenance
 	case *ahptypes.PromptCustomization:
 		v.Enabled = &enabled
+		v.Enablement = provenance
 	case *ahptypes.RuleCustomization:
 		v.Enabled = &enabled
+		v.Enablement = provenance
 	case *ahptypes.HookCustomization:
 		v.Enabled = &enabled
+		v.Enablement = provenance
 	case *ahptypes.McpServerCustomization:
 		v.Enabled = enabled
+		v.Enablement = provenance
 	}
 }
 
-func applyToggle(list []ahptypes.Customization, id string, enabled bool) bool {
+func applyToggle(list []ahptypes.Customization, id string, enablement []ahptypes.CustomizationEnablement) bool {
 	for i := range list {
 		got, ok := customizationID(list[i])
 		if ok && got == id {
-			setContainerEnabled(&list[i], enabled)
+			applyContainerEnablement(&list[i], enablement)
 			return true
 		}
 	}
@@ -411,7 +440,7 @@ func applyToggle(list []ahptypes.Customization, id string, enabled bool) bool {
 		for j := range *children {
 			got, ok := childCustomizationID((*children)[j])
 			if ok && got == id {
-				setChildEnabled(&(*children)[j], enabled)
+				applyChildEnablement(&(*children)[j], enablement)
 				return true
 			}
 		}
@@ -938,7 +967,7 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		if state.Customizations == nil {
 			return ReduceOutcomeNoOp
 		}
-		if applyToggle(state.Customizations, a.Id, a.Enabled) {
+		if applyToggle(state.Customizations, a.Id, a.Enablement) {
 			return ReduceOutcomeApplied
 		}
 		return ReduceOutcomeNoOp

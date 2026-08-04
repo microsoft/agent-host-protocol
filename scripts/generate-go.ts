@@ -695,7 +695,7 @@ const STATE_ENUMS = [
   'ToolCallRiskAssessmentStatus',
   'ToolCallCancellationReason',
   'ConfirmationOptionKind', 'ToolCallContributorKind',
-  'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
+  'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
 ];
@@ -1315,6 +1315,11 @@ function generateStateFile(project: Project): string {
     }
   }
 
+  lines.push('// ─── Customization Enablement Union ───────────────────────────────────────');
+  lines.push('');
+  lines.push(generateCustomizationEnablementGo());
+  lines.push('');
+
   lines.push(generateToolInput());
   lines.push('');
 
@@ -1609,6 +1614,74 @@ const CHAT_SOURCE_UNION: UnionConfig = {
     { variantName: 'SideChat', innerType: 'SideChatSource', wireValue: 'sideChat' },
   ],
 };
+
+function generateCustomizationEnablementGo(): string {
+  return `// CustomizationEnablement is a single explicit customization enablement decision.
+type CustomizationEnablement struct {
+\tValue isCustomizationEnablement
+}
+
+type isCustomizationEnablement interface{ isCustomizationEnablement() }
+
+type CustomizationEnablementGlobal struct {
+\tKind    string \`json:"kind"\`
+\tEnabled bool   \`json:"enabled"\`
+}
+
+func (*CustomizationEnablementGlobal) isCustomizationEnablement() {}
+
+type CustomizationEnablementWorkspace struct {
+\tKind    string \`json:"kind"\`
+\tURI     URI    \`json:"uri"\`
+\tEnabled bool   \`json:"enabled"\`
+}
+
+func (*CustomizationEnablementWorkspace) isCustomizationEnablement() {}
+
+type CustomizationEnablementSession struct {
+\tKind    string \`json:"kind"\`
+\tEnabled bool   \`json:"enabled"\`
+}
+
+func (*CustomizationEnablementSession) isCustomizationEnablement() {}
+
+func (e *CustomizationEnablement) UnmarshalJSON(data []byte) error {
+\tdisc, _, err := readDiscriminator(data, "kind")
+\tif err != nil {
+\t\treturn err
+\t}
+\tswitch disc {
+\tcase "global":
+\t\tvar value CustomizationEnablementGlobal
+\t\tif err := json.Unmarshal(data, &value); err != nil {
+\t\t\treturn err
+\t\t}
+\t\te.Value = &value
+\tcase "workspace":
+\t\tvar value CustomizationEnablementWorkspace
+\t\tif err := json.Unmarshal(data, &value); err != nil {
+\t\t\treturn err
+\t\t}
+\t\te.Value = &value
+\tcase "session":
+\t\tvar value CustomizationEnablementSession
+\t\tif err := json.Unmarshal(data, &value); err != nil {
+\t\t\treturn err
+\t\t}
+\t\te.Value = &value
+\tdefault:
+\t\treturn &json.UnmarshalTypeError{Value: "CustomizationEnablement"}
+\t}
+\treturn nil
+}
+
+func (e CustomizationEnablement) MarshalJSON() ([]byte, error) {
+\tif e.Value == nil {
+\t\treturn []byte("null"), nil
+\t}
+\treturn json.Marshal(e.Value)
+}`;
+}
 
 function generateChangesetOperationTargetGo(): string {
   return `// ChangesetOperationTarget identifies the file or range a
@@ -2095,6 +2168,7 @@ function checkExhaustiveness(project: Project): void {
     'AhpErrorCodeWithData',
     'JsonRpcErrorCode',
     'ChangesetOperationTarget',
+    'CustomizationEnablement',
   ]);
 
   const missing = [...imported].filter((n) => !coveredByLists.has(n) && !knownSpecial.has(n));

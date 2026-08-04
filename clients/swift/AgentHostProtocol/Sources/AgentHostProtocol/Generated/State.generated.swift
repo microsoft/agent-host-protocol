@@ -294,6 +294,13 @@ public enum CustomizationType: String, Codable, Sendable {
     case mcpServer = "mcpServer"
 }
 
+/// Scope at which customization enablement is decided.
+public enum CustomizationEnablementKind: String, Codable, Sendable {
+    case global = "global"
+    case workspace = "workspace"
+    case session = "session"
+}
+
 /// Discriminant values for {@link CustomizationLoadState}.
 public enum CustomizationLoadStatus: String, Codable, Sendable {
     case loading = "loading"
@@ -3497,6 +3504,18 @@ public struct PluginCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -3537,6 +3556,7 @@ public struct PluginCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -3552,6 +3572,7 @@ public struct PluginCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -3565,6 +3586,7 @@ public struct PluginCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -3592,6 +3614,18 @@ public struct ClientPluginCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -3634,6 +3668,7 @@ public struct ClientPluginCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -3650,6 +3685,7 @@ public struct ClientPluginCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -3664,6 +3700,7 @@ public struct ClientPluginCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -3692,6 +3729,18 @@ public struct DirectoryCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -3729,6 +3778,7 @@ public struct DirectoryCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -3745,6 +3795,7 @@ public struct DirectoryCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -3759,6 +3810,7 @@ public struct DirectoryCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -3787,6 +3839,18 @@ public struct AgentCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -3841,6 +3905,7 @@ public struct AgentCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -3857,6 +3922,7 @@ public struct AgentCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -3871,6 +3937,7 @@ public struct AgentCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -3899,6 +3966,18 @@ public struct SkillCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -3941,6 +4020,7 @@ public struct SkillCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -3955,6 +4035,7 @@ public struct SkillCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -3967,6 +4048,7 @@ public struct SkillCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -3993,6 +4075,18 @@ public struct PromptCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -4026,6 +4120,7 @@ public struct PromptCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -4038,6 +4133,7 @@ public struct PromptCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -4048,6 +4144,7 @@ public struct PromptCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -4072,6 +4169,18 @@ public struct RuleCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -4112,6 +4221,7 @@ public struct RuleCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -4126,6 +4236,7 @@ public struct RuleCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -4138,6 +4249,7 @@ public struct RuleCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -4164,6 +4276,18 @@ public struct HookCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -4195,6 +4319,7 @@ public struct HookCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -4206,6 +4331,7 @@ public struct HookCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -4215,6 +4341,7 @@ public struct HookCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -4238,6 +4365,18 @@ public struct McpServerCustomization: Codable, Sendable {
     public var uri: String
     /// Human-readable name.
     public var name: String
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    public var enablement: [CustomizationEnablement]?
     /// Icons for UI display.
     public var icons: [Icon]?
     /// Optional span within {@link CustomizationBase.uri | `uri`} when this
@@ -4252,7 +4391,8 @@ public struct McpServerCustomization: Codable, Sendable {
     /// out-of-band.
     public var meta: [String: AnyCodable]?
     public var type: CustomizationType
-    /// Whether this MCP server is currently enabled.
+    /// Whether this MCP server is effectively enabled after resolving all scopes.
+    /// {@link CustomizationBase.enablement | `enablement`} records its inputs.
     public var enabled: Bool
     /// Current lifecycle state of the MCP server.
     public var state: McpServerState
@@ -4280,6 +4420,7 @@ public struct McpServerCustomization: Codable, Sendable {
         case id
         case uri
         case name
+        case enablement
         case icons
         case range
         case meta = "_meta"
@@ -4294,6 +4435,7 @@ public struct McpServerCustomization: Codable, Sendable {
         id: String,
         uri: String,
         name: String,
+        enablement: [CustomizationEnablement]? = nil,
         icons: [Icon]? = nil,
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
@@ -4306,6 +4448,7 @@ public struct McpServerCustomization: Codable, Sendable {
         self.id = id
         self.uri = uri
         self.name = name
+        self.enablement = enablement
         self.icons = icons
         self.range = range
         self.meta = meta
@@ -5224,6 +5367,70 @@ public struct ResourceChange: Codable, Sendable {
     ) {
         self.uri = uri
         self.type = type
+    }
+}
+
+// MARK: - Customization Enablement Union
+
+/// A single explicit customization enablement decision.
+public enum CustomizationEnablement: Codable, Sendable {
+    case global(CustomizationEnablementGlobal)
+    case workspace(CustomizationEnablementWorkspace)
+    case session(CustomizationEnablementSession)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case kind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        switch try container.decode(String.self, forKey: .kind) {
+        case "global":
+            self = .global(try CustomizationEnablementGlobal(from: decoder))
+        case "workspace":
+            self = .workspace(try CustomizationEnablementWorkspace(from: decoder))
+        case "session":
+            self = .session(try CustomizationEnablementSession(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: "Unknown CustomizationEnablement kind")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .global(let value): try value.encode(to: encoder)
+        case .workspace(let value): try value.encode(to: encoder)
+        case .session(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public struct CustomizationEnablementGlobal: Codable, Sendable {
+    public var kind: String = "global"
+    public var enabled: Bool
+
+    public init(enabled: Bool) {
+        self.enabled = enabled
+    }
+}
+
+public struct CustomizationEnablementWorkspace: Codable, Sendable {
+    public var kind: String = "workspace"
+    public var uri: URI
+    public var enabled: Bool
+
+    public init(uri: URI, enabled: Bool) {
+        self.uri = uri
+        self.enabled = enabled
+    }
+}
+
+public struct CustomizationEnablementSession: Codable, Sendable {
+    public var kind: String = "session"
+    public var enabled: Bool
+
+    public init(enabled: Bool) {
+        self.enabled = enabled
     }
 }
 

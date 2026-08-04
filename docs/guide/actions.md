@@ -125,7 +125,7 @@ See [Elicitation](/guide/elicitation) for the request lifecycle.
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `session/customizationsChanged` | No | Server replaced the session's top-level customization list (full replacement) |
-| `session/customizationToggled` | **Yes** | Client toggled a container or child customization on or off by id |
+| `session/customizationToggled` | **Yes** | Client replaced a customization's explicit enablement decisions by id |
 | `session/customizationUpdated` | No | Server upserted a top-level container (plugin or directory) by id (full-entry replacement, including children) |
 | `session/customizationRemoved` | No | Server removed a customization by id (containers cascade to children) |
 
@@ -193,7 +193,7 @@ The client applies the action **optimistically** to its local state before sendi
 | `chat/pendingMessageSet` | Stores a steering or queued message (upsert); if queued and idle, auto-starts a turn |
 | `chat/pendingMessageRemoved` | Cancels a pending message before it is consumed |
 | `chat/queuedMessagesReordered` | Reorders queued messages; unknown IDs ignored, unmentioned messages kept at end |
-| `session/customizationToggled` | Toggles a container or child customization on or off by id |
+| `session/customizationToggled` | Replaces a customization's explicit enablement decisions by id |
 | `session/isReadChanged` | Marks the session as read or unread |
 | `session/isArchivedChanged` | Archives or unarchives the session |
 

@@ -29,7 +29,21 @@
     {
       "type": "session/customizationToggled",
       "id": "plugin-a",
-      "enabled": false
+      "enablement": [
+        {
+          "kind": "session",
+          "enabled": false
+        },
+        {
+          "kind": "workspace",
+          "uri": "file:///workspace",
+          "enabled": true
+        },
+        {
+          "kind": "global",
+          "enabled": true
+        }
+      ]
     }
   ],
   "expected": {
@@ -43,7 +57,22 @@
         "id": "plugin-a",
         "uri": "https://plugins.example/a",
         "name": "Plugin A",
-        "enabled": false
+        "enabled": false,
+        "enablement": [
+          {
+            "kind": "session",
+            "enabled": false
+          },
+          {
+            "kind": "workspace",
+            "uri": "file:///workspace",
+            "enabled": true
+          },
+          {
+            "kind": "global",
+            "enabled": true
+          }
+        ]
       },
       {
         "type": "plugin",
