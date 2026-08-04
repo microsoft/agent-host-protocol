@@ -1,0 +1,62 @@
+{
+  "description": "session/customizationToggled clears enablement and restores the default",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "creating",
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "server-a",
+        "uri": "file:///workspace/.vscode/mcp.json",
+        "name": "Server A",
+        "enabled": false,
+        "enablement": [
+          {
+            "kind": "workspace",
+            "uri": "file:///workspace",
+            "enabled": false
+          },
+          {
+            "kind": "global",
+            "enabled": true
+          }
+        ],
+        "state": {
+          "kind": "stopped"
+        }
+      }
+    ],
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/customizationToggled",
+      "id": "server-a",
+      "enablement": []
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "creating",
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "server-a",
+        "uri": "file:///workspace/.vscode/mcp.json",
+        "name": "Server A",
+        "enabled": true,
+        "state": {
+          "kind": "stopped"
+        }
+      }
+    ],
+    "activeClients": [],
+    "chats": []
+  }
+}

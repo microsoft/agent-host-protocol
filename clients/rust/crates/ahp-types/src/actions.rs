@@ -16,11 +16,12 @@ use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, Changeset, ChangesetFile,
     ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
     ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
-    ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement, McpServerState,
-    Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
-    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
-    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
+    McpAuthRequirement, McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart,
+    SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo,
+    TextRange, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn,
+    UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -1168,13 +1169,16 @@ pub struct SessionCustomizationsChangedAction {
 /// `container.enabled && (child.enabled ?? true)` — so toggling a child
 /// only matters while its container is enabled. Is a no-op when no
 /// customization has the given `id`.
+///
+/// The `enablement` array completely replaces all explicit decisions. A caller
+/// changing one scope must include every decision it intends to preserve.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionCustomizationToggledAction {
-    /// The id of the container or child to toggle.
+    /// The id of the container or child to update.
     pub id: String,
-    /// Whether to enable or disable the targeted customization.
-    pub enabled: bool,
+    /// The complete set of explicit decisions, replacing any existing set.
+    pub enablement: Vec<CustomizationEnablement>,
 }
 
 /// Upserts a top-level customization (plugin or directory).

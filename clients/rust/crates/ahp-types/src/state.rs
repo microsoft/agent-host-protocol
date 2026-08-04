@@ -446,6 +446,17 @@ pub enum CustomizationType {
     McpServer,
 }
 
+/// Scope at which customization enablement is decided.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CustomizationEnablementKind {
+    #[serde(rename = "global")]
+    Global,
+    #[serde(rename = "workspace")]
+    Workspace,
+    #[serde(rename = "session")]
+    Session,
+}
+
 /// Discriminant values for {@link CustomizationLoadState}.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CustomizationLoadStatus {
@@ -2913,6 +2924,19 @@ pub struct PluginCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -2982,6 +3006,19 @@ pub struct ClientPluginCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3054,6 +3091,19 @@ pub struct DirectoryCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3115,6 +3165,19 @@ pub struct AgentCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3197,6 +3260,19 @@ pub struct SkillCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3260,6 +3336,19 @@ pub struct PromptCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3320,6 +3409,19 @@ pub struct RuleCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3381,6 +3483,19 @@ pub struct HookCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3437,6 +3552,19 @@ pub struct McpServerCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Only the agent host publishes this; clients treat it as read-only provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3453,7 +3581,8 @@ pub struct McpServerCustomization {
     /// out-of-band.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Whether this MCP server is currently enabled.
+    /// Whether this MCP server is effectively enabled after resolving all scopes.
+    /// {@link CustomizationBase.enablement | `enablement`} records its inputs.
     pub enabled: bool,
     /// Current lifecycle state of the MCP server.
     pub state: McpServerState,
@@ -4256,6 +4385,20 @@ pub struct ResourceChange {
     pub uri: Uri,
     /// The kind of change observed.
     pub r#type: ResourceChangeType,
+}
+
+// ─── Customization Enablement Union ───────────────────────────────────────
+
+/// A single explicit customization enablement decision.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum CustomizationEnablement {
+    #[serde(rename = "global")]
+    Global { enabled: bool },
+    #[serde(rename = "workspace")]
+    Workspace { uri: Uri, enabled: bool },
+    #[serde(rename = "session")]
+    Session { enabled: bool },
 }
 
 /// Raw tool input represented inline or by content reference.

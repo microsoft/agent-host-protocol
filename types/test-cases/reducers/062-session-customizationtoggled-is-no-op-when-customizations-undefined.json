@@ -13,7 +13,12 @@
     {
       "type": "session/customizationToggled",
       "id": "plugin-a",
-      "enabled": false
+      "enablement": [
+        {
+          "kind": "session",
+          "enabled": false
+        }
+      ]
     }
   ],
   "expected": {

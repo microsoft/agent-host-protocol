@@ -992,12 +992,15 @@ type SessionCustomizationsChangedAction struct {
 // `container.enabled && (child.enabled ?? true)` — so toggling a child
 // only matters while its container is enabled. Is a no-op when no
 // customization has the given `id`.
+//
+// The `enablement` array completely replaces all explicit decisions. A caller
+// changing one scope must include every decision it intends to preserve.
 type SessionCustomizationToggledAction struct {
 	Type ActionType `json:"type"`
-	// The id of the container or child to toggle.
+	// The id of the container or child to update.
 	Id string `json:"id"`
-	// Whether to enable or disable the targeted customization.
-	Enabled bool `json:"enabled"`
+	// The complete set of explicit decisions, replacing any existing set.
+	Enablement []CustomizationEnablement `json:"enablement"`
 }
 
 // Upserts a top-level customization (plugin or directory).

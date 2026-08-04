@@ -8,6 +8,9 @@ import { ActionType } from '../common/actions.js';
 import type {
   SessionState,
   SessionInputRequest,
+  ChildCustomization,
+  Customization,
+  CustomizationEnablement,
   McpServerCustomization,
 } from './state.js';
 import {
@@ -103,6 +106,23 @@ function updateMcpServerCustomization(
     return state;
   }
   return { ...state, customizations: updated };
+}
+
+/**
+ * Replaces a customization's explicit enablement decisions and recomputes its
+ * effective {@link CustomizationBase.enabled | `enabled`} value. An empty set
+ * drops the field entirely, so a customization at its default carries no
+ * provenance.
+ */
+function applyCustomizationEnablement<T extends Customization | ChildCustomization>(customization: T, enablement: readonly CustomizationEnablement[]): T {
+  const next = { ...customization };
+  next.enabled = enablement[0]?.enabled ?? true;
+  if (enablement.length > 0) {
+    next.enablement = [...enablement];
+  } else {
+    delete next.enablement;
+  }
+  return next;
 }
 
 // ─── Session Reducer ─────────────────────────────────────────────────────────
@@ -308,7 +328,7 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
       const topIdx = list.findIndex(c => c.id === action.id);
       if (topIdx >= 0) {
         const updated = list.slice();
-        updated[topIdx] = { ...list[topIdx], enabled: action.enabled };
+        updated[topIdx] = applyCustomizationEnablement(list[topIdx], action.enablement);
         return { ...state, customizations: updated };
       }
       for (let i = 0; i < list.length; i++) {
@@ -325,7 +345,7 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
           continue;
         }
         const newChildren = children.slice();
-        newChildren[childIdx] = { ...children[childIdx], enabled: action.enabled };
+        newChildren[childIdx] = applyCustomizationEnablement(children[childIdx], action.enablement);
         const updated = list.slice();
         updated[i] = { ...container, children: newChildren };
         return { ...state, customizations: updated };

@@ -11,6 +11,7 @@ import type {
   SessionActiveClient,
   SessionInputRequest,
   Customization,
+  CustomizationEnablement,
   McpServerState,
 } from './state.js';
 import type { URI } from '../common/state.js';
@@ -370,16 +371,19 @@ export interface SessionCustomizationsChangedAction {
  * only matters while its container is enabled. Is a no-op when no
  * customization has the given `id`.
  *
+ * The `enablement` array completely replaces all explicit decisions. A caller
+ * changing one scope must include every decision it intends to preserve.
+ *
  * @category Session Actions
  * @version 1
  * @clientDispatchable
  */
 export interface SessionCustomizationToggledAction {
   type: ActionType.SessionCustomizationToggled;
-  /** The id of the container or child to toggle. */
+  /** The id of the container or child to update. */
   id: string;
-  /** Whether to enable or disable the targeted customization. */
-  enabled: boolean;
+  /** The complete set of explicit decisions, replacing any existing set. */
+  enablement: CustomizationEnablement[];
 }
 
 /**
