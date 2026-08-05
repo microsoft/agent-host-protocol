@@ -67,7 +67,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `chat/toolCallStart` | No | Tool call created; LM begins streaming parameters |
-| `chat/toolCallDelta` | No | Streaming partial parameters appended |
+| `chat/toolCallDelta` | No | Invocation message updated, optionally with partial parameters |
 | `chat/toolCallReady` | No | Parameters complete (or running tool needs re-confirmation) |
 | `chat/toolCallConfirmed` | **Yes** | Client approves or denies a pending tool call |
 | `chat/toolCallComplete` | **Yes**¹ | Tool execution finished |

@@ -1,5 +1,0 @@
-{
-  "type": "removed",
-  "message": "`ToolResultTerminalCompleteContent`; command completion data now lives on `ToolResultTerminalContent`.",
-  "issues": [322, 323]
-}

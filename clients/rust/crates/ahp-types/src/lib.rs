@@ -63,6 +63,7 @@
 //!
 //! let params = InitializeParams {
 //!     channel: "ahp-root://".into(),
+//!     meta: None,
 //!     protocol_versions: vec![ahp_types::PROTOCOL_VERSION.to_string()],
 //!     client_id: "my-host/1.0".into(),
 //!     initial_subscriptions: Some(vec!["ahp-root://".into()]),

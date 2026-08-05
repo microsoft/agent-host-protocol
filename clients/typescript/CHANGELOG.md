@@ -20,6 +20,36 @@ hotfix escape hatch.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-31
+
+Implements AHP 0.7.0.
+
+### Added
+
+- Capability-gated side chats can start from a chat turn and return bounded chat transcripts as message attachments.
+- Multiroot session support: `AgentCapabilities.multipleWorkingDirectories` capability (with `immutablePrimary`, which pins `workingDirectories[0]` as a fixed primary root that clients MUST NOT remove or reorder), `CreateSessionParams.workingDirectories` and `SessionMetadata.workingDirectories` (equal-peer set, mirrored onto `SessionState`/`SessionSummary`), `CreateChatParams.workingDirectories` and `ChatState`/`ChatSummary.workingDirectories` (a subset of the session's set), and the client-dispatchable `session/workingDirectorySet` / `session/workingDirectoryRemoved` and `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` actions for mutating those sets. (#337)
+- `AhpClient.completions()` and `AhpClient.sessionConfigCompletions()` typed wrappers for the `completions` / `sessionConfigCompletions` commands, matching the existing `resource*` convenience methods. (#340)
+- `result` on `ToolResultTerminalContent` (`exitCode`, `preview`, `truncated`), present once the command exits. (#323)
+- Optional `isPty` metadata on `ToolResultTerminalContent` and `TerminalState` indicating whether a terminal resource is PTY-backed. (#322)
+- Side-chat sources and origins can now carry an immutable selected-text snapshot with optional response-part provenance.
+
+### Changed
+
+- Side-chat sources and origins now carry stable `turnId` references instead of nested active/completed turn snapshots.
+- `MessageChatAttachment.endTurn` is optional; hosts pin the latest completed turn when it is omitted, and chat attachments may reference chats in other sessions.
+- `chat/toolCallReady` may finalize a tool call's provisional contributor and intention without changing client execution ownership.
+- Final tool input may be inline or a lazy `ContentRef`, and streaming deltas may include partial parameters.
+
+### Removed
+
+- `ToolResultTerminalCompleteContent`; command completion data now lives on `ToolResultTerminalContent`. (#322, #323)
+- Non-standard `resource_encryption_alg_values_supported` and `resource_encryption_enc_values_supported` fields from `ProtectedResourceMetadata`. (#368)
+
+### Fixed
+
+- `createChat.source` is once again a fully discriminated union: fork and side-chat sources both require a `kind`, and missing or unknown kinds are rejected.
+- Restored authentication documentation in the `authenticate` command and `McpAuthRequirement` that a secret-scanner had redacted, including a corrupted `WWW-Authenticate: Bearer scope="…"` header example.
+
 ## [0.6.0] — 2026-07-20
 
 Implements AHP 0.6.0.

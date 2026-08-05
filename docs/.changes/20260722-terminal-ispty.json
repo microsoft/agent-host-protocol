@@ -1,5 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional `isPty` metadata on `ToolResultTerminalContent` and `TerminalState` indicating whether a terminal resource is PTY-backed.",
-  "issues": [322]
-}

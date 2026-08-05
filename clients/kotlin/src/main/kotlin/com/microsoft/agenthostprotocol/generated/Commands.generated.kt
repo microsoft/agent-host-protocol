@@ -243,6 +243,12 @@ data class InitializeParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Protocol versions the client is willing to speak, ordered from most
      * preferred to least preferred. Each entry is a [SemVer](https://semver.org)
      * `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
@@ -378,6 +384,12 @@ data class ReconnectParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Client identifier from the original connection
      */
     val clientId: String,
@@ -428,6 +440,12 @@ data class SubscribeParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Optional delivery preferences for this subscription.
      *
@@ -498,6 +516,12 @@ data class CreateSessionParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Agent provider ID
      */
     val provider: String? = null,
@@ -558,7 +582,13 @@ data class DisposeSessionParams(
     /**
      * Channel URI this command targets.
      */
-    val channel: String
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -567,6 +597,12 @@ data class CreateChatParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`).
      */
@@ -610,7 +646,13 @@ data class DisposeChatParams(
     /**
      * Channel URI this command targets.
      */
-    val channel: String
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -619,6 +661,12 @@ data class ListSessionsParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Maximum number of entries to return in this page. The server SHOULD respect
      * this bound but MAY return fewer entries and MAY impose its own upper cap.
@@ -656,6 +704,12 @@ data class ResourceReadParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Content URI from a `ContentRef`
      */
     val uri: String,
@@ -687,6 +741,12 @@ data class ResourceWriteParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Target file URI on the server filesystem
      */
@@ -742,6 +802,12 @@ data class ResourceListParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Directory URI on the server filesystem
      */
     val uri: String
@@ -774,6 +840,12 @@ data class ResourceCopyParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Source URI to copy from
      */
     val source: String,
@@ -798,6 +870,12 @@ data class ResourceDeleteParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * URI of the resource to delete
      */
     val uri: String,
@@ -817,6 +895,12 @@ data class ResourceMoveParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Source URI to move from
      */
@@ -841,6 +925,12 @@ data class ResourceResolveParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * URI to resolve
      */
@@ -897,6 +987,12 @@ data class ResourceMkdirParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Directory URI to create (parents created as needed).
      */
     val uri: String
@@ -911,6 +1007,12 @@ data class ResourceRequestParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Resource URI being requested. Typically a `file:` URI on the receiver's
      * filesystem, but any URI scheme that the receiver mediates access to is
@@ -936,6 +1038,12 @@ data class CreateResourceWatchParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * URI to watch.
      */
@@ -975,6 +1083,12 @@ data class FetchTurnsParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Opaque cursor from `ChatState.turnsNextCursor`.
      *
@@ -1019,6 +1133,12 @@ data class AuthenticateParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * The protected resource identifier. MUST match a `resource` value the
      * server has advertised — via `ProtectedResourceMetadata` in
      * `AgentInfo.protectedResources`, or via a live
@@ -1026,7 +1146,7 @@ data class AuthenticateParams(
      */
     val resource: String,
     /**
-     * ***** obtained from the resource's authorization server
+     * Bearer token obtained from the resource's authorization server
      */
     val token: String,
     /**
@@ -1049,6 +1169,12 @@ data class CreateTerminalParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Initial owner of the terminal
      */
@@ -1076,7 +1202,13 @@ data class DisposeTerminalParams(
     /**
      * Channel URI this command targets.
      */
-    val channel: String
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -1085,6 +1217,12 @@ data class ResolveSessionConfigParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Agent provider ID
      */
@@ -1197,6 +1335,12 @@ data class SessionConfigCompletionsParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Agent provider ID
      */
     val provider: String? = null,
@@ -1248,6 +1392,12 @@ data class CompletionsParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * What kind of completion is being requested.
      */
@@ -1309,6 +1459,12 @@ data class InvokeChangesetOperationParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     /**
      * Matches {@link ChangesetOperation.id} from the changeset's `operations` list.
      */

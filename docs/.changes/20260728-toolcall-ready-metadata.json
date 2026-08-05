@@ -1,4 +1,0 @@
-{
-  "type": "changed",
-  "message": "`chat/toolCallReady` may finalize a tool call's provisional contributor and intention without changing client execution ownership."
-}

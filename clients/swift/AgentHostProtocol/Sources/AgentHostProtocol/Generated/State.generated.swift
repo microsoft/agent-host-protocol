@@ -1156,9 +1156,12 @@ public struct SessionState: Codable, Sendable {
     /// Each entry is self-sufficient: it carries the owning chat's URI plus every
     /// identifier the client needs to respond. A client answers by dispatching the
     /// ordinary `chat/*` action to that chat's channel — see
-    /// {@link SessionInputRequest} for the per-variant response path. A present,
-    /// non-empty list implies {@link SessionStatus.InputNeeded} on
-    /// {@link SessionSummary.status}.
+    /// {@link SessionInputRequest} for the per-variant response path. A list
+    /// holding any entry other than
+    /// {@link SessionInputRequestKind.ToolClientExecution} implies
+    /// {@link SessionStatus.InputNeeded} on {@link SessionSummary.status};
+    /// client-execution entries are work delegated to a client rather than a
+    /// prompt, so they leave the session's activity unchanged.
     ///
     /// Host-managed: the host upserts entries with `session/inputNeededSet` as
     /// chats raise requests and removes them with `session/inputNeededRemoved`
@@ -2418,7 +2421,7 @@ public struct ContentRef: Codable, Sendable {
     }
 }
 
-public struct ResourceReponsePart: Codable, Sendable {
+public struct ResourceResponsePart: Codable, Sendable {
     /// Content URI
     public var uri: String
     /// Approximate size in bytes
@@ -2580,7 +2583,7 @@ public struct ToolCallStreamingState: Codable, Sendable {
     /// with the {@link contributor} to serve MCP Apps.
     public var meta: [String: AnyCodable]?
     public var status: ToolCallStatus
-    /// Partial parameters accumulated so far
+    /// Partial parameters accumulated from tool-call deltas.
     public var partialInput: String?
     /// Progress message shown while parameters are streaming
     public var invocationMessage: StringOrMarkdown?
@@ -2639,8 +2642,13 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Raw tool input
-    public var toolInput: String?
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
+    public var toolInput: ToolInput?
     public var status: ToolCallStatus
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
     public var confirmationTitle: StringOrMarkdown?
@@ -2681,7 +2689,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: String? = nil,
+        toolInput: ToolInput? = nil,
         status: ToolCallStatus,
         confirmationTitle: StringOrMarkdown? = nil,
         riskAssessment: ToolCallRiskAssessment? = nil,
@@ -2725,8 +2733,13 @@ public struct ToolCallRunningState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Raw tool input
-    public var toolInput: String?
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
+    public var toolInput: ToolInput?
     /// How the tool was confirmed for execution
     public var confirmed: ToolCallConfirmationReason
     /// The confirmation option the user selected, if confirmation options were provided
@@ -2761,7 +2774,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: String? = nil,
+        toolInput: ToolInput? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
         status: ToolCallStatus,
@@ -2801,8 +2814,13 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Raw tool input
-    public var toolInput: String?
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
+    public var toolInput: ToolInput?
     /// How the tool was confirmed for execution
     public var confirmed: ToolCallConfirmationReason
     /// The confirmation option the user selected, if confirmation options were provided
@@ -2837,7 +2855,7 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: String? = nil,
+        toolInput: ToolInput? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
         status: ToolCallStatus,
@@ -2879,8 +2897,13 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Raw tool input
-    public var toolInput: String?
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
+    public var toolInput: ToolInput?
     /// Whether the tool succeeded
     public var success: Bool
     /// Past-tense description of what the tool did
@@ -2928,7 +2951,7 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: String? = nil,
+        toolInput: ToolInput? = nil,
         success: Bool,
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
@@ -2976,8 +2999,13 @@ public struct ToolCallCompletedState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Raw tool input
-    public var toolInput: String?
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
+    public var toolInput: ToolInput?
     /// Whether the tool succeeded
     public var success: Bool
     /// Past-tense description of what the tool did
@@ -3025,7 +3053,7 @@ public struct ToolCallCompletedState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: String? = nil,
+        toolInput: ToolInput? = nil,
         success: Bool,
         pastTenseMessage: StringOrMarkdown,
         content: [ToolResultContent]? = nil,
@@ -3073,8 +3101,13 @@ public struct ToolCallCancelledState: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Message describing what the tool will do
     public var invocationMessage: StringOrMarkdown
-    /// Raw tool input
-    public var toolInput: String?
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
+    public var toolInput: ToolInput?
     public var status: ToolCallStatus
     /// Why the tool was cancelled
     public var reason: ToolCallCancellationReason
@@ -3109,7 +3142,7 @@ public struct ToolCallCancelledState: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: String? = nil,
+        toolInput: ToolInput? = nil,
         status: ToolCallStatus,
         reason: ToolCallCancellationReason,
         reasonMessage: StringOrMarkdown? = nil,
@@ -4358,7 +4391,7 @@ public struct McpServerAuthRequiredState: Codable, Sendable {
     /// authorization spec.
     public var resource: ProtectedResourceMetadata
     /// Scopes required for the current challenge, parsed from the
-    /// `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+    /// `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
     /// fallback). Authoritative for the next authorization request — clients
     /// MUST NOT assume any subset/superset relationship to
     /// `resource.scopes_supported`.
@@ -4436,7 +4469,7 @@ public struct McpAuthRequirement: Codable, Sendable {
     /// authorization spec.
     public var resource: ProtectedResourceMetadata
     /// Scopes required for the current challenge, parsed from the
-    /// `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+    /// `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
     /// fallback). Authoritative for the next authorization request — clients
     /// MUST NOT assume any subset/superset relationship to
     /// `resource.scopes_supported`.
@@ -5203,6 +5236,31 @@ public struct ResourceChange: Codable, Sendable {
     }
 }
 
+// MARK: - Tool Input
+
+/// Raw tool input represented inline or by content reference.
+public enum ToolInput: Codable, Sendable {
+    case inline(String)
+    case contentRef(ContentRef)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(String.self) {
+            self = .inline(value)
+        } else {
+            self = .contentRef(try container.decode(ContentRef.self))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .inline(let value): try container.encode(value)
+        case .contentRef(let value): try container.encode(value)
+        }
+    }
+}
+
 // MARK: - Discriminated Unions
 
 public struct ChatOriginUser: Codable, Sendable {
@@ -5284,7 +5342,7 @@ public enum ChatOrigin: Codable, Sendable {
 
 public enum ResponsePart: Codable, Sendable {
     case markdown(MarkdownResponsePart)
-    case contentRef(ResourceReponsePart)
+    case contentRef(ResourceResponsePart)
     case toolCall(ToolCallResponsePart)
     case reasoning(ReasoningResponsePart)
     case systemNotification(SystemNotificationResponsePart)
@@ -5304,7 +5362,7 @@ public enum ResponsePart: Codable, Sendable {
         case "markdown":
             self = .markdown(try MarkdownResponsePart(from: decoder))
         case "contentRef":
-            self = .contentRef(try ResourceReponsePart(from: decoder))
+            self = .contentRef(try ResourceResponsePart(from: decoder))
         case "toolCall":
             self = .toolCall(try ToolCallResponsePart(from: decoder))
         case "reasoning":
@@ -5985,7 +6043,7 @@ public enum ToolResultContent: Codable, Sendable {
     }
 }
 
-/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, or annotations state.
+/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, annotations, or content state.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)

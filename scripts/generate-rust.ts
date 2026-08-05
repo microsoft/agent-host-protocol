@@ -145,6 +145,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
 
   if (tsType === 'URI') return 'Uri';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
+  if (tsType === 'ToolInput') return 'ToolInput';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -740,7 +741,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'MessageChatAttachment', omitDiscriminants: true },
   { name: 'MarkdownResponsePart', omitDiscriminants: true },
   { name: 'ContentRef' },
-  { name: 'ResourceReponsePart', omitDiscriminants: true, rustName: 'ResourceResponsePart' },
+  { name: 'ResourceResponsePart', omitDiscriminants: true },
   { name: 'ToolCallResponsePart', omitDiscriminants: true },
   { name: 'ReasoningResponsePart', omitDiscriminants: true },
   { name: 'SystemNotificationResponsePart', omitDiscriminants: true },
@@ -1088,7 +1089,7 @@ pub enum ChatOrigin {
 
 function generateSnapshotState(): string {
   return `/// The state payload of a snapshot — root, session, chat, terminal,
-/// changeset, resource-watch, or annotations state.
+/// changeset, resource-watch, annotations, or content state.
 ///
 /// Deserialized by trying session first (has required \`lifecycle\`), then
 /// chat (has required \`turns\`), then terminal (has required \`content\`),
@@ -1105,6 +1106,16 @@ pub enum SnapshotState {
     ResourceWatch(Box<ResourceWatchState>),
     Annotations(Box<AnnotationsState>),
     Root(Box<RootState>),
+}`;
+}
+
+function generateToolInput(): string {
+  return `/// Raw tool input represented inline or by content reference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ToolInput {
+    Inline(String),
+    ContentRef(ContentRef),
 }`;
 }
 
@@ -1139,6 +1150,9 @@ function generateStateFile(project: Project): string {
       lines.push('');
     }
   }
+
+  lines.push(generateToolInput());
+  lines.push('');
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
   lines.push(generateChatOrigin());
@@ -1317,7 +1331,7 @@ pub struct ${scope}ToolCallConfirmedAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, Customization, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1531,6 +1545,7 @@ function generateSubscribeParamsImplRust(): string {
     pub fn new(channel: impl Into<Uri>) -> Self {
         Self {
             channel: channel.into(),
+            meta: None,
             delivery: None,
             view: None,
         }
@@ -1540,6 +1555,7 @@ function generateSubscribeParamsImplRust(): string {
     pub fn with_delivery(channel: impl Into<Uri>, delivery: SubscriptionDeliveryOptions) -> Self {
         Self {
             channel: channel.into(),
+            meta: None,
             delivery: Some(delivery),
             view: None,
         }
@@ -1549,6 +1565,7 @@ function generateSubscribeParamsImplRust(): string {
     pub fn with_view(channel: impl Into<Uri>, view: SubscribeView) -> Self {
         Self {
             channel: channel.into(),
+            meta: None,
             delivery: None,
             view: Some(view),
         }
@@ -1867,6 +1884,7 @@ function checkExhaustiveness(project: Project): void {
     'PaginatedParams',              // base interface; flattened into each paginated command params struct
     'PaginatedResult',              // base interface; flattened into each paginated command result struct
     'StringOrMarkdown',
+    'ToolInput',
     'ToolCallState',
     'StateAction',
     'ActionEnvelope',

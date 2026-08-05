@@ -155,6 +155,7 @@ function mapType(tsType: string): string {
 
   if (tsType === 'URI') return 'URI';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
+  if (tsType === 'ToolInput') return 'ToolInput';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -757,7 +758,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'MessageChatAttachment' },
   { name: 'MarkdownResponsePart' },
   { name: 'ContentRef' },
-  { name: 'ResourceReponsePart', goName: 'ResourceResponsePart' },
+  { name: 'ResourceResponsePart' },
   { name: 'ToolCallResponsePart' },
   { name: 'ReasoningResponsePart' },
   { name: 'SystemNotificationResponsePart' },
@@ -1153,7 +1154,7 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, or annotations state. The active
+// chat, terminal, changeset, resource-watch, annotations, or content state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
 // (session → chat → terminal → changeset → resourceWatch → annotations → root).
@@ -1254,6 +1255,39 @@ func containsAll(m map[string]json.RawMessage, keys ...string) bool {
 }`;
 }
 
+function generateToolInput(): string {
+  return `// ToolInput is raw tool input represented inline or by content reference.
+type ToolInput struct {
+\tInline     *string
+\tContentRef *ContentRef
+}
+
+func (t ToolInput) MarshalJSON() ([]byte, error) {
+\tif t.Inline != nil {
+\t\treturn json.Marshal(*t.Inline)
+\t}
+\tif t.ContentRef != nil {
+\t\treturn json.Marshal(t.ContentRef)
+\t}
+\treturn []byte("null"), nil
+}
+
+func (t *ToolInput) UnmarshalJSON(data []byte) error {
+\t*t = ToolInput{}
+\tvar inline string
+\tif err := json.Unmarshal(data, &inline); err == nil {
+\t\tt.Inline = &inline
+\t\treturn nil
+\t}
+\tvar ref ContentRef
+\tif err := json.Unmarshal(data, &ref); err != nil {
+\t\treturn err
+\t}
+\tt.ContentRef = &ref
+\treturn nil
+}`;
+}
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [HEADER_WITH_IMPORTS];
 
@@ -1280,6 +1314,9 @@ function generateStateFile(project: Project): string {
       lines.push('');
     }
   }
+
+  lines.push(generateToolInput());
+  lines.push('');
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
   lines.push(generateDiscriminatedUnion(RESPONSE_PART_UNION));
@@ -2015,6 +2052,7 @@ function checkExhaustiveness(project: Project): void {
     'PaginatedParams',
     'PaginatedResult',
     'StringOrMarkdown',
+    'ToolInput',
     'ToolCallState',
     'StateAction',
     'ActionEnvelope',

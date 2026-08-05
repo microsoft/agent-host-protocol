@@ -136,6 +136,7 @@ function mapType(tsType: string): string {
   // Type aliases
   if (tsType === 'URI') return 'String';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
+  if (tsType === 'ToolInput') return 'ToolInput';
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
 
@@ -723,10 +724,51 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 }`;
 }
 
+function generateToolInput(): string {
+  return `/**
+ * Raw tool input represented inline or by content reference.
+ */
+@Serializable(with = ToolInputSerializer::class)
+sealed interface ToolInput {
+    @JvmInline value class Inline(val value: String) : ToolInput
+    @JvmInline value class ContentReference(val value: ContentRef) : ToolInput
+}
+
+internal object ToolInputSerializer : KSerializer<ToolInput> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ToolInput")
+
+    override fun deserialize(decoder: Decoder): ToolInput {
+        val input = decoder as? JsonDecoder
+            ?: error("ToolInput can only be deserialized from JSON")
+        return when (val element = input.decodeJsonElement()) {
+            is JsonPrimitive -> ToolInput.Inline(
+                element.contentOrNull ?: error("ToolInput string must not be null"),
+            )
+            is JsonObject -> ToolInput.ContentReference(
+                input.json.decodeFromJsonElement(ContentRef.serializer(), element),
+            )
+            else -> error("ToolInput must be a string or ContentRef object")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ToolInput) {
+        val output = encoder as? JsonEncoder
+            ?: error("ToolInput can only be serialized to JSON")
+        val element = when (value) {
+            is ToolInput.Inline -> JsonPrimitive(value.value)
+            is ToolInput.ContentReference ->
+                output.json.encodeToJsonElement(ContentRef.serializer(), value.value)
+        }
+        output.encodeJsonElement(element)
+    }
+}`;
+}
+
 function generateSnapshotState(): string {
   return `/**
  * The state payload of a snapshot — root, session, chat, terminal, changeset,
- * resource-watch, or annotations state.
+ * resource-watch, annotations, or content state.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
@@ -887,7 +929,7 @@ const STATE_STRUCTS = [
   'SimpleMessageAttachment', 'MessageEmbeddedResourceAttachment', 'MessageResourceAttachment',
   'MessageAnnotationsAttachment', 'MessageChatAttachment',
   'MarkdownResponsePart', 'ContentRef',
-  'ResourceReponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
+  'ResourceResponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
   'SystemNotificationResponsePart', 'InputRequestResponsePart',
   'ToolCallResult', 'ToolCallStreamingState',
   'ToolCallPendingConfirmationState', 'ToolCallRunningState', 'ToolCallAuthRequiredState',
@@ -923,7 +965,7 @@ const RESPONSE_PART_UNION: UnionConfig = {
   discriminantField: 'kind',
   variants: [
     { caseName: 'Markdown', structName: 'MarkdownResponsePart', discriminantValue: 'markdown' },
-    { caseName: 'ContentRef', structName: 'ResourceReponsePart', discriminantValue: 'contentRef' },
+    { caseName: 'ContentRef', structName: 'ResourceResponsePart', discriminantValue: 'contentRef' },
     { caseName: 'ToolCall', structName: 'ToolCallResponsePart', discriminantValue: 'toolCall' },
     { caseName: 'Reasoning', structName: 'ReasoningResponsePart', discriminantValue: 'reasoning' },
     { caseName: 'SystemNotification', structName: 'SystemNotificationResponsePart', discriminantValue: 'systemNotification' },
@@ -1213,6 +1255,11 @@ function generateStateFile(project: Project): string {
       lines.push('');
     }
   }
+
+  lines.push('// ─── Tool Input ──────────────────────────────────────────────────────────────');
+  lines.push('');
+  lines.push(generateToolInput());
+  lines.push('');
 
   lines.push('// ─── Discriminated Unions ───────────────────────────────────────────────────');
   lines.push('');
@@ -2029,6 +2076,7 @@ function checkExhaustiveness(project: Project): void {
     'ActionType',                   // emitted directly by generateActionsFile(), not via STATE_ENUMS
     'ChangesetOperationTargetKind', // discriminator enum embedded in the hand-rolled ChangesetOperationTarget union
     'StringOrMarkdown',              // generateStringOrMarkdown()
+    'ToolInput',                     // generateToolInput()
     'ToolCallState',                // TOOL_CALL_STATE_UNION discriminated union
     'StateAction',                  // StateAction enum in generateActionsFile()
     'ActionEnvelope',               // generateDataClassFromInterface() call in generateActionsFile()

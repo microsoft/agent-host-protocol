@@ -881,7 +881,7 @@ export interface MarkdownResponsePart {
  *
  * @category Response Parts
  */
-export interface ResourceReponsePart extends ContentRef {
+export interface ResourceResponsePart extends ContentRef {
   /** Discriminant */
   kind: ResponsePartKind.ContentRef;
 }
@@ -921,7 +921,7 @@ export interface ReasoningResponsePart {
  */
 export type ResponsePart =
   | MarkdownResponsePart
-  | ResourceReponsePart
+  | ResourceResponsePart
   | ToolCallResponsePart
   | ReasoningResponsePart
   | SystemNotificationResponsePart
@@ -1185,9 +1185,23 @@ interface ToolCallBase {
 interface ToolCallParameterFields {
   /** Message describing what the tool will do */
   invocationMessage: StringOrMarkdown;
-  /** Raw tool input */
-  toolInput?: string;
+  /**
+   * Final tool input.
+   *
+   * Referenced input is mutable until the tool call leaves
+   * `pending-confirmation`. When the client confirms with `editedToolInput`,
+   * the host MUST replace the resource contents before echoing the accepted
+   * confirmation action. Clients MUST NOT cache tool input across confirmation.
+   */
+  toolInput?: ToolInput;
 }
+
+/**
+ * Tool input represented inline or by reference.
+ *
+ * @category Tool Call Types
+ */
+export type ToolInput = string | ContentRef;
 
 /**
  * Tool execution result details, available after execution completes.
@@ -1222,7 +1236,7 @@ export interface ToolCallResult {
  */
 export interface ToolCallStreamingState extends ToolCallBase {
   status: ToolCallStatus.Streaming;
-  /** Partial parameters accumulated so far */
+  /** Partial parameters accumulated from tool-call deltas. */
   partialInput?: string;
   /** Progress message shown while parameters are streaming */
   invocationMessage?: StringOrMarkdown;

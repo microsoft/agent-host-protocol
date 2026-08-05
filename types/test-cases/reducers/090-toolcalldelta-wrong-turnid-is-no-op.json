@@ -36,7 +36,7 @@
       "type": "chat/toolCallDelta",
       "turnId": "wrong-turn",
       "toolCallId": "tc-1",
-      "content": "data"
+      "invocationMessage": "Working"
     }
   ],
   "expected": {

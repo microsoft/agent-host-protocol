@@ -1,6 +1,0 @@
-{
-  "type": "added",
-  "message": "`Client.Completions()` and `Client.SessionConfigCompletions()` typed wrappers for the `completions` / `sessionConfigCompletions` commands, matching the existing `resource*` convenience methods.",
-  "targets": ["go"],
-  "issues": [340]
-}

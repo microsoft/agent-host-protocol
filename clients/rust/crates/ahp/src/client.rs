@@ -498,6 +498,7 @@ impl Client {
     ) -> Result<InitializeResult, ClientError> {
         let params = InitializeParams {
             channel: ROOT_RESOURCE_URI.to_string(),
+            meta: None,
             protocol_versions,
             client_id,
             initial_subscriptions: if initial_subscriptions.is_empty() {
@@ -521,6 +522,7 @@ impl Client {
     ) -> Result<ReconnectResult, ClientError> {
         let params = ReconnectParams {
             channel: ROOT_RESOURCE_URI.to_string(),
+            meta: None,
             client_id,
             last_seen_server_seq,
             subscriptions,
@@ -583,6 +585,7 @@ impl Client {
                 "subscribe",
                 SubscribeParams {
                     channel: uri,
+                    meta: None,
                     delivery,
                     view,
                 },

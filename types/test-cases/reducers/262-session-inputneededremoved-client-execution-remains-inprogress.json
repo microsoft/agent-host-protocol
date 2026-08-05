@@ -1,5 +1,5 @@
 {
-  "description": "session/inputNeededSet replaces an existing entry with the same id, and swapping a confirmation for a client execution drops status back to InProgress",
+  "description": "session/inputNeededRemoved clears InputNeeded once only a tool-client-execution entry remains",
   "reducer": "session",
   "initial": {
     "provider": "copilot",
@@ -10,24 +10,12 @@
     "chats": [],
     "inputNeeded": [
       {
-        "kind": "toolConfirmation",
-        "id": "copilot:/test-session/chat-1#call-9",
+        "kind": "chatInput",
+        "id": "copilot:/test-session/chat-1#req-1",
         "chat": "copilot:/test-session/chat-1",
-        "turnId": "turn-1",
-        "toolCall": {
-          "status": "pending-confirmation",
-          "toolCallId": "call-9",
-          "toolName": "run_tool",
-          "displayName": "Run Tool",
-          "invocationMessage": "Run the client tool"
-        }
-      }
-    ]
-  },
-  "actions": [
-    {
-      "type": "session/inputNeededSet",
-      "request": {
+        "request": { "id": "req-1", "message": "Which environment?" }
+      },
+      {
         "kind": "toolClientExecution",
         "id": "copilot:/test-session/chat-1#call-9",
         "chat": "copilot:/test-session/chat-1",
@@ -43,6 +31,12 @@
           "contributor": { "kind": "client", "clientId": "vscode-1" }
         }
       }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/inputNeededRemoved",
+      "id": "copilot:/test-session/chat-1#req-1"
     }
   ],
   "expected": {

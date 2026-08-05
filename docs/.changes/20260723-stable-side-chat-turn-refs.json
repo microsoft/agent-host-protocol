@@ -1,5 +1,0 @@
-{
-  "type": "changed",
-  "message": "Side-chat sources and origins now carry stable `turnId` references instead of nested active/completed turn snapshots.",
-  "targets": ["spec", "rust", "kotlin", "typescript", "swift", "go"]
-}

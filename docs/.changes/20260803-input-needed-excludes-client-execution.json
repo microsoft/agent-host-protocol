@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "`SessionState.inputNeeded` entries of kind `toolClientExecution` no longer raise `SessionStatus.InputNeeded`. Such an entry is work delegated to a client, not a user prompt, so a session stays `InProgress` while a client tool runs."
+}

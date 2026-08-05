@@ -451,8 +451,8 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
     /// contain escape sequences).
     public var meta: [String: AnyCodable]?
     public var type: ActionType
-    /// Partial parameter content to append
-    public var content: String
+    /// Partial parameter content to append, if provided by the host.
+    public var content: String?
     /// Updated progress message
     public var invocationMessage: StringOrMarkdown?
 
@@ -470,7 +470,7 @@ public struct ChatToolCallDeltaAction: Codable, Sendable {
         toolCallId: String,
         meta: [String: AnyCodable]? = nil,
         type: ActionType,
-        content: String,
+        content: String? = nil,
         invocationMessage: StringOrMarkdown? = nil
     ) {
         self.turnId = turnId
@@ -503,8 +503,8 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
     public var intention: String?
     /// Message describing what the tool will do or what confirmation is needed
     public var invocationMessage: StringOrMarkdown
-    /// Raw tool input
-    public var toolInput: String?
+    /// Final tool input
+    public var toolInput: ToolInput?
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
     public var confirmationTitle: StringOrMarkdown?
     /// Risk assessment that informed the confirmation requirement.
@@ -546,7 +546,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         contributor: ToolCallContributor? = nil,
         intention: String? = nil,
         invocationMessage: StringOrMarkdown,
-        toolInput: String? = nil,
+        toolInput: ToolInput? = nil,
         confirmationTitle: StringOrMarkdown? = nil,
         riskAssessment: ToolCallRiskAssessment? = nil,
         edits: AnyCodable? = nil,

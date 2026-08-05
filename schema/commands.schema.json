@@ -12,6 +12,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Channel URI this command targets."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         }
       },
       "required": [
@@ -72,6 +77,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "protocolVersions": {
           "type": "array",
@@ -179,6 +189,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         }
       },
       "required": [
@@ -194,6 +209,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "clientId": {
           "type": "string",
@@ -275,6 +295,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Channel URI this command targets."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "delivery": {
           "$ref": "#/$defs/SubscriptionDeliveryOptions",
@@ -365,6 +390,11 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "uri": {
           "type": "string",
           "description": "Content URI from a `ContentRef`"
@@ -410,6 +440,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "uri": {
           "$ref": "#/$defs/URI",
@@ -465,6 +500,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "uri": {
           "$ref": "#/$defs/URI",
@@ -524,6 +564,11 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "source": {
           "$ref": "#/$defs/URI",
           "description": "Source URI to copy from"
@@ -558,6 +603,11 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "uri": {
           "$ref": "#/$defs/URI",
           "description": "URI of the resource to delete"
@@ -586,6 +636,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "uri": {
           "$ref": "#/$defs/URI",
@@ -620,6 +675,11 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "source": {
           "$ref": "#/$defs/URI",
           "description": "Source URI to move from"
@@ -653,6 +713,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "uri": {
           "$ref": "#/$defs/URI",
@@ -716,6 +781,11 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "uri": {
           "$ref": "#/$defs/URI",
           "description": "Directory URI to create (parents created as needed)."
@@ -733,7 +803,7 @@
     },
     "AuthenticateParams": {
       "type": "object",
-      "description": "Pushes a ****** for a protected resource. The `resource` field MUST\nmatch a protected-resource identifier the client has discovered from the\nserver — whether declared statically in `AgentInfo.protectedResources`,\nor discovered dynamically from a live `McpServerAuthRequiredState.resource`\nor `ToolCallAuthRequiredState.auth.resource` (both surfaced only once the\ncorresponding MCP server or tool call actually challenges for auth).\nServers MUST accept any `resource` value they have themselves advertised\nthrough one of these three mechanisms.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(****** Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command.",
+      "description": "Pushes a Bearer token for a protected resource. The `resource` field MUST\nmatch a protected-resource identifier the client has discovered from the\nserver — whether declared statically in `AgentInfo.protectedResources`,\nor discovered dynamically from a live `McpServerAuthRequiredState.resource`\nor `ToolCallAuthRequiredState.auth.resource` (both surfaced only once the\ncorresponding MCP server or tool call actually challenges for auth).\nServers MUST accept any `resource` value they have themselves advertised\nthrough one of these three mechanisms.\n\nTokens are delivered using [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750)\n(Bearer Token Usage) semantics. The client obtains the token from the\nauthorization server(s) listed in the resource's metadata and pushes it\nto the server via this command.",
       "properties": {
         "channel": {
           "type": "string",
@@ -741,13 +811,18 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "resource": {
           "type": "string",
           "description": "The protected resource identifier. MUST match a `resource` value the\nserver has advertised — via `ProtectedResourceMetadata` in\n`AgentInfo.protectedResources`, or via a live\n`McpServerAuthRequiredState.resource` / `ToolCallAuthRequiredState.auth.resource`."
         },
         "token": {
           "type": "string",
-          "description": "***** obtained from the resource's authorization server"
+          "description": "Bearer token obtained from the resource's authorization server"
         },
         "scopes": {
           "type": "array",
@@ -777,6 +852,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "limit": {
           "type": "number",
@@ -820,6 +900,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "provider": {
           "type": "string",
@@ -890,6 +975,11 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "provider": {
           "type": "string",
           "description": "Agent provider ID"
@@ -958,6 +1048,11 @@
           "$ref": "#/$defs/URI",
           "description": "Session URI (client-chosen, e.g. `ahp-session:/<uuid>`)"
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "provider": {
           "type": "string",
           "description": "Agent provider ID"
@@ -998,6 +1093,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Channel URI this command targets."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         }
       },
       "required": [
@@ -1011,6 +1111,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Chat URI"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "cursor": {
           "type": "string",
@@ -1033,6 +1138,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "The chat URI the completion is being requested for."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "kind": {
           "$ref": "#/$defs/CompletionItemKind",
@@ -1154,6 +1264,11 @@
           "$ref": "#/$defs/URI",
           "description": "Session URI containing the new chat."
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "chat": {
           "$ref": "#/$defs/URI",
           "description": "Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`)."
@@ -1186,6 +1301,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Channel URI this command targets."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         }
       },
       "required": [
@@ -1199,6 +1319,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Terminal URI (client-chosen)."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "claim": {
           "$ref": "#/$defs/TerminalClaim",
@@ -1233,6 +1358,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Channel URI this command targets."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         }
       },
       "required": [
@@ -1262,6 +1392,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "The expanded changeset URI."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "operationId": {
           "type": "string",
@@ -1300,6 +1435,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "uri": {
           "$ref": "#/$defs/URI",
@@ -2140,7 +2280,7 @@
           "items": {
             "$ref": "#/$defs/SessionInputRequest"
           },
-          "description": "Outstanding input the session is blocked on, aggregated across every chat\nso a client can discover and answer it from the session channel alone,\nwithout subscribing to individual chats.\n\nEach entry is self-sufficient: it carries the owning chat's URI plus every\nidentifier the client needs to respond. A client answers by dispatching the\nordinary `chat/*` action to that chat's channel — see\n{@link SessionInputRequest} for the per-variant response path. A present,\nnon-empty list implies {@link SessionStatus.InputNeeded} on\n{@link SessionSummary.status}.\n\nHost-managed: the host upserts entries with `session/inputNeededSet` as\nchats raise requests and removes them with `session/inputNeededRemoved`\nonce the underlying request resolves."
+          "description": "Outstanding input the session is blocked on, aggregated across every chat\nso a client can discover and answer it from the session channel alone,\nwithout subscribing to individual chats.\n\nEach entry is self-sufficient: it carries the owning chat's URI plus every\nidentifier the client needs to respond. A client answers by dispatching the\nordinary `chat/*` action to that chat's channel — see\n{@link SessionInputRequest} for the per-variant response path. A list\nholding any entry other than\n{@link SessionInputRequestKind.ToolClientExecution} implies\n{@link SessionStatus.InputNeeded} on {@link SessionSummary.status};\nclient-execution entries are work delegated to a client rather than a\nprompt, so they leave the session's activity unchanged.\n\nHost-managed: the host upserts entries with `session/inputNeededSet` as\nchats raise requests and removes them with `session/inputNeededRemoved`\nonce the underlying request resolves."
         },
         "_meta": {
           "type": "object",
@@ -2268,7 +2408,7 @@
     },
     "SessionToolClientExecutionRequest": {
       "type": "object",
-      "description": "A running tool whose execution is delegated to an active client. Surfaced so\na client that provides the tool can pick up the work without subscribing to\nthe owning chat.\n\nThe {@link toolCall} is always a {@link ToolCallRunningState} (a\n{@link ToolCallState} in `running` status) whose\n{@link ToolCallRunningState.contributor | `contributor`} is a client\n{@link ToolCallClientContributor} whose `clientId` matches the denormalized\n{@link clientId} here. Execute and report the result by dispatching\n`chat/toolCallComplete` (and optionally streaming with\n`chat/toolCallContentChanged`) to {@link SessionInputRequestBase.chat |\n`chat`}, keyed by `turnId` and `toolCall.toolCallId`.",
+      "description": "A running tool whose execution is delegated to an active client. Surfaced so\na client that provides the tool can pick up the work without subscribing to\nthe owning chat.\n\nThe {@link toolCall} is always a {@link ToolCallRunningState} (a\n{@link ToolCallState} in `running` status) whose\n{@link ToolCallRunningState.contributor | `contributor`} is a client\n{@link ToolCallClientContributor} whose `clientId` matches the denormalized\n{@link clientId} here. Execute and report the result by dispatching\n`chat/toolCallComplete` (and optionally streaming with\n`chat/toolCallContentChanged`) to {@link SessionInputRequestBase.chat |\n`chat`}, keyed by `turnId` and `toolCall.toolCallId`.\n\nUnlike the other variants this does **not** raise\n{@link SessionStatus.InputNeeded}: the call has already cleared its\nconfirmation gate and is merely executing elsewhere, so the session stays\n{@link SessionStatus.InProgress} while it runs.",
       "properties": {
         "id": {
           "type": "string",
@@ -3552,7 +3692,7 @@
     },
     "McpAuthRequirement": {
       "type": "object",
-      "description": "Reusable MCP authentication challenge — the RFC 9728 discovery info a\nclient needs to obtain a token and push it via the `authenticate` command.\nDeliberately carries **no token**: this describes what is being asked for,\nnever the ****** itself.\n\nShared by two independent state machines that describe the same OAuth\nchallenge from different vantage points:\n\n- {@link McpServerAuthRequiredState} — the MCP server itself cannot serve\n  *any* request until the client authenticates.\n- {@link ToolCallAuthRequiredState} — a specific in-flight tool call is\n  paused pending authentication (typically\n  {@link McpAuthRequiredReason.InsufficientScope} step-up auth\n  mid-execution). The server state and the tool-call state remain\n  separate on purpose: the server saying \"I need auth\" and a tool\n  invocation saying \"I am waiting on that auth\" are different facts that\n  can be true independently.",
+      "description": "Reusable MCP authentication challenge — the RFC 9728 discovery info a\nclient needs to obtain a token and push it via the `authenticate` command.\nDeliberately carries **no token**: this describes what is being asked for,\nnever the bearer token itself.\n\nShared by two independent state machines that describe the same OAuth\nchallenge from different vantage points:\n\n- {@link McpServerAuthRequiredState} — the MCP server itself cannot serve\n  *any* request until the client authenticates.\n- {@link ToolCallAuthRequiredState} — a specific in-flight tool call is\n  paused pending authentication (typically\n  {@link McpAuthRequiredReason.InsufficientScope} step-up auth\n  mid-execution). The server state and the tool-call state remain\n  separate on purpose: the server saying \"I need auth\" and a tool\n  invocation saying \"I am waiting on that auth\" are different facts that\n  can be true independently.",
       "properties": {
         "reason": {
           "$ref": "#/$defs/McpAuthRequiredReason",
@@ -3571,7 +3711,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Scopes required for the current challenge, parsed from the\n`WWW-Authenticate: ******\"…\"` header (or `scopes_supported`\nfallback). Authoritative for the next authorization request — clients\nMUST NOT assume any subset/superset relationship to\n`resource.scopes_supported`."
+          "description": "Scopes required for the current challenge, parsed from the\n`WWW-Authenticate: Bearer scope=\"…\"` header (or `scopes_supported`\nfallback). Authoritative for the next authorization request — clients\nMUST NOT assume any subset/superset relationship to\n`resource.scopes_supported`."
         },
         "description": {
           "type": "string",
@@ -3604,7 +3744,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Scopes required for the current challenge, parsed from the\n`WWW-Authenticate: ******\"…\"` header (or `scopes_supported`\nfallback). Authoritative for the next authorization request — clients\nMUST NOT assume any subset/superset relationship to\n`resource.scopes_supported`."
+          "description": "Scopes required for the current challenge, parsed from the\n`WWW-Authenticate: Bearer scope=\"…\"` header (or `scopes_supported`\nfallback). Authoritative for the next authorization request — clients\nMUST NOT assume any subset/superset relationship to\n`resource.scopes_supported`."
         },
         "description": {
           "type": "string",
@@ -4301,7 +4441,6 @@
         "id",
         "message",
         "responseParts",
-        "usage",
         "state"
       ]
     },
@@ -4337,8 +4476,7 @@
         "id",
         "startedAt",
         "message",
-        "responseParts",
-        "usage"
+        "responseParts"
       ]
     },
     "MessageOrigin": {
@@ -4655,7 +4793,7 @@
         "content"
       ]
     },
-    "ResourceReponsePart": {
+    "ResourceResponsePart": {
       "type": "object",
       "description": "A content part that's a reference to large content stored outside the state tree.",
       "properties": {
@@ -4927,8 +5065,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         }
       },
       "required": [
@@ -5014,7 +5152,7 @@
         },
         "partialInput": {
           "type": "string",
-          "description": "Partial parameters accumulated so far"
+          "description": "Partial parameters accumulated from tool-call deltas."
         },
         "invocationMessage": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -5062,8 +5200,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "status": {
           "const": "pending-confirmation"
@@ -5162,8 +5300,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -5227,8 +5365,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
@@ -5298,8 +5436,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "success": {
           "type": "boolean",
@@ -5393,8 +5531,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "success": {
           "type": "boolean",
@@ -5488,8 +5626,8 @@
           "description": "Message describing what the tool will do"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input.\n\nReferenced input is mutable until the tool call leaves\n`pending-confirmation`. When the client confirms with `editedToolInput`,\nthe host MUST replace the resource contents before echoing the accepted\nconfirmation action. Clients MUST NOT cache tool input across confirmation."
         },
         "status": {
           "const": "cancelled"
@@ -6294,8 +6432,7 @@
       "required": [
         "channel",
         "action",
-        "serverSeq",
-        "origin"
+        "serverSeq"
       ]
     },
     "RootAgentsChangedAction": {
@@ -6579,8 +6716,7 @@
         }
       },
       "required": [
-        "type",
-        "activity"
+        "type"
       ]
     },
     "SessionChangesetsChangedAction": {
@@ -6599,8 +6735,7 @@
         }
       },
       "required": [
-        "type",
-        "changesets"
+        "type"
       ]
     },
     "SessionServerToolsChangedAction": {
@@ -6897,8 +7032,7 @@
         }
       },
       "required": [
-        "type",
-        "_meta"
+        "type"
       ]
     },
     "ToolCallActionBase": {
@@ -7103,7 +7237,7 @@
         },
         "content": {
           "type": "string",
-          "description": "Partial parameter content to append"
+          "description": "Partial parameter content to append, if provided by the host."
         },
         "invocationMessage": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -7113,8 +7247,7 @@
       "required": [
         "turnId",
         "toolCallId",
-        "type",
-        "content"
+        "type"
       ]
     },
     "ChatToolCallReadyAction": {
@@ -7150,8 +7283,8 @@
           "description": "Message describing what the tool will do or what confirmation is needed"
         },
         "toolInput": {
-          "type": "string",
-          "description": "Raw tool input"
+          "$ref": "#/$defs/ToolInput",
+          "description": "Final tool input"
         },
         "confirmationTitle": {
           "$ref": "#/$defs/StringOrMarkdown",
@@ -7228,7 +7361,7 @@
         },
         "editedToolInput": {
           "type": "string",
-          "description": "Edited tool input parameters, if the client modified them before confirming"
+          "description": "Edited tool input parameters, if the client modified them before confirming.\n\nFor inline `toolInput`, the reducer replaces the state value directly.\nFor referenced input, the host MUST replace the resource contents before\nechoing the accepted action."
         },
         "selectedOptionId": {
           "type": "string",
@@ -8178,8 +8311,7 @@
         }
       },
       "required": [
-        "type",
-        "operations"
+        "type"
       ]
     },
     "ChangesetOperationStatusChangedAction": {
@@ -9121,7 +9253,7 @@
           "$ref": "#/$defs/MarkdownResponsePart"
         },
         {
-          "$ref": "#/$defs/ResourceReponsePart"
+          "$ref": "#/$defs/ResourceResponsePart"
         },
         {
           "$ref": "#/$defs/ToolCallResponsePart"
@@ -9189,6 +9321,17 @@
           "$ref": "#/$defs/ToolCallMcpContributor"
         }
       ]
+    },
+    "ToolInput": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/ContentRef"
+        }
+      ],
+      "description": "Tool input represented inline or by reference."
     },
     "ToolResultContent": {
       "oneOf": [

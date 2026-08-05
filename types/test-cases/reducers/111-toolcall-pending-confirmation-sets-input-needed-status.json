@@ -33,7 +33,9 @@
       "turnId": "turn-1",
       "toolCallId": "tc-1",
       "invocationMessage": "Run: rm -rf /tmp/test",
-      "toolInput": "rm -rf /tmp/test"
+      "toolInput": {
+        "uri": "file:///tool-inputs/tool-input.json"
+      }
     }
   ],
   "expected": {
@@ -59,7 +61,9 @@
             "contributor": null,
             "_meta": null,
             "invocationMessage": "Run: rm -rf /tmp/test",
-            "toolInput": "rm -rf /tmp/test",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmationTitle": null,
             "riskAssessment": null,
             "edits": null,

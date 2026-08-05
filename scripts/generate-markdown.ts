@@ -1078,6 +1078,7 @@ function generateOtlpChannelPage(project: Project): string {
     lines.push('The `ahp-otlp:` channels are stateless; the only state type is the capability descriptor the host advertises on `InitializeResult.telemetry`.\n');
     lines.push(emitStateTypesSection([stateSf]));
   }
+
   if (notificationsSf) {
     lines.push('## Notifications\n');
     lines.push(schemaLink('notifications.schema.json'));
@@ -1085,6 +1086,7 @@ function generateOtlpChannelPage(project: Project): string {
   }
   return lines.join('\n');
 }
+
 
 // ─── Error Codes Page ────────────────────────────────────────────────────────
 

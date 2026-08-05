@@ -1,4 +1,0 @@
-{
-  "type": "changed",
-  "message": "`MessageChatAttachment.endTurn` is optional; hosts pin the latest completed turn when it is omitted, and chat attachments may reference chats in other sessions."
-}

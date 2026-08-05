@@ -825,9 +825,12 @@ type SessionState struct {
 	// Each entry is self-sufficient: it carries the owning chat's URI plus every
 	// identifier the client needs to respond. A client answers by dispatching the
 	// ordinary `chat/*` action to that chat's channel — see
-	// {@link SessionInputRequest} for the per-variant response path. A present,
-	// non-empty list implies {@link SessionStatus.InputNeeded} on
-	// {@link SessionSummary.status}.
+	// {@link SessionInputRequest} for the per-variant response path. A list
+	// holding any entry other than
+	// {@link SessionInputRequestKind.ToolClientExecution} implies
+	// {@link SessionStatus.InputNeeded} on {@link SessionSummary.status};
+	// client-execution entries are work delegated to a client rather than a
+	// prompt, so they leave the session's activity unchanged.
 	//
 	// Host-managed: the host upserts entries with `session/inputNeededSet` as
 	// chats raise requests and removes them with `session/inputNeededRemoved`
@@ -922,6 +925,11 @@ type SessionToolConfirmationRequest struct {
 // `chat/toolCallComplete` (and optionally streaming with
 // `chat/toolCallContentChanged`) to {@link SessionInputRequestBase.chat |
 // `chat`}, keyed by `turnId` and `toolCall.toolCallId`.
+//
+// Unlike the other variants this does **not** raise
+// {@link SessionStatus.InputNeeded}: the call has already cleared its
+// confirmation gate and is merely executing elsewhere, so the session stays
+// {@link SessionStatus.InProgress} while it runs.
 type SessionToolClientExecutionRequest struct {
 	// Stable key for this entry, unique within the session's
 	// {@link SessionState.inputNeeded} list. The host derives it however it likes
@@ -1922,7 +1930,7 @@ type ToolCallStreamingState struct {
 	// with the {@link contributor} to serve MCP Apps.
 	Meta   map[string]json.RawMessage `json:"_meta,omitempty"`
 	Status ToolCallStatus             `json:"status"`
-	// Partial parameters accumulated so far
+	// Partial parameters accumulated from tool-call deltas.
 	PartialInput *string `json:"partialInput,omitempty"`
 	// Progress message shown while parameters are streaming
 	InvocationMessage *StringOrMarkdown `json:"invocationMessage,omitempty"`
@@ -1949,8 +1957,13 @@ type ToolCallPendingConfirmationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string        `json:"toolInput,omitempty"`
+	// Final tool input.
+	//
+	// Referenced input is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ToolInput     `json:"toolInput,omitempty"`
 	Status    ToolCallStatus `json:"status"`
 	// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
 	ConfirmationTitle *StringOrMarkdown `json:"confirmationTitle,omitempty"`
@@ -1987,8 +2000,13 @@ type ToolCallRunningState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Final tool input.
+	//
+	// Referenced input is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ToolInput `json:"toolInput,omitempty"`
 	// How the tool was confirmed for execution
 	Confirmed ToolCallConfirmationReason `json:"confirmed"`
 	// The confirmation option the user selected, if confirmation options were provided
@@ -2047,8 +2065,13 @@ type ToolCallAuthRequiredState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Final tool input.
+	//
+	// Referenced input is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ToolInput `json:"toolInput,omitempty"`
 	// How the tool was confirmed for execution
 	Confirmed ToolCallConfirmationReason `json:"confirmed"`
 	// The confirmation option the user selected, if confirmation options were provided
@@ -2080,8 +2103,13 @@ type ToolCallPendingResultConfirmationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Final tool input.
+	//
+	// Referenced input is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ToolInput `json:"toolInput,omitempty"`
 	// Whether the tool succeeded
 	Success bool `json:"success"`
 	// Past-tense description of what the tool did
@@ -2123,8 +2151,13 @@ type ToolCallCompletedState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string `json:"toolInput,omitempty"`
+	// Final tool input.
+	//
+	// Referenced input is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ToolInput `json:"toolInput,omitempty"`
 	// Whether the tool succeeded
 	Success bool `json:"success"`
 	// Past-tense description of what the tool did
@@ -2166,8 +2199,13 @@ type ToolCallCancelledState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Message describing what the tool will do
 	InvocationMessage StringOrMarkdown `json:"invocationMessage"`
-	// Raw tool input
-	ToolInput *string        `json:"toolInput,omitempty"`
+	// Final tool input.
+	//
+	// Referenced input is mutable until the tool call leaves
+	// `pending-confirmation`. When the client confirms with `editedToolInput`,
+	// the host MUST replace the resource contents before echoing the accepted
+	// confirmation action. Clients MUST NOT cache tool input across confirmation.
+	ToolInput *ToolInput     `json:"toolInput,omitempty"`
 	Status    ToolCallStatus `json:"status"`
 	// Why the tool was cancelled
 	Reason ToolCallCancellationReason `json:"reason"`
@@ -2949,7 +2987,7 @@ type McpServerAuthRequiredState struct {
 	// authorization spec.
 	Resource ProtectedResourceMetadata `json:"resource"`
 	// Scopes required for the current challenge, parsed from the
-	// `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+	// `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
 	// fallback). Authoritative for the next authorization request — clients
 	// MUST NOT assume any subset/superset relationship to
 	// `resource.scopes_supported`.
@@ -2987,7 +3025,7 @@ type McpOAuthClient struct {
 // Reusable MCP authentication challenge — the RFC 9728 discovery info a
 // client needs to obtain a token and push it via the `authenticate` command.
 // Deliberately carries **no token**: this describes what is being asked for,
-// never the ****** itself.
+// never the bearer token itself.
 //
 // Shared by two independent state machines that describe the same OAuth
 // challenge from different vantage points:
@@ -3013,7 +3051,7 @@ type McpAuthRequirement struct {
 	// authorization spec.
 	Resource ProtectedResourceMetadata `json:"resource"`
 	// Scopes required for the current challenge, parsed from the
-	// `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+	// `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
 	// fallback). Authoritative for the next authorization request — clients
 	// MUST NOT assume any subset/superset relationship to
 	// `resource.scopes_supported`.
@@ -3521,6 +3559,37 @@ type ResourceChange struct {
 	Uri URI `json:"uri"`
 	// The kind of change observed.
 	Type ResourceChangeType `json:"type"`
+}
+
+// ToolInput is raw tool input represented inline or by content reference.
+type ToolInput struct {
+	Inline     *string
+	ContentRef *ContentRef
+}
+
+func (t ToolInput) MarshalJSON() ([]byte, error) {
+	if t.Inline != nil {
+		return json.Marshal(*t.Inline)
+	}
+	if t.ContentRef != nil {
+		return json.Marshal(t.ContentRef)
+	}
+	return []byte("null"), nil
+}
+
+func (t *ToolInput) UnmarshalJSON(data []byte) error {
+	*t = ToolInput{}
+	var inline string
+	if err := json.Unmarshal(data, &inline); err == nil {
+		t.Inline = &inline
+		return nil
+	}
+	var ref ContentRef
+	if err := json.Unmarshal(data, &ref); err != nil {
+		return err
+	}
+	t.ContentRef = &ref
+	return nil
 }
 
 // ─── Discriminated Unions ─────────────────────────────────────────────
@@ -4892,7 +4961,7 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 }
 
 // SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, or annotations state. The active
+// chat, terminal, changeset, resource-watch, annotations, or content state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
 // (session → chat → terminal → changeset → resourceWatch → annotations → root).

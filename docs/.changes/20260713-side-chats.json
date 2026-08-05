@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Capability-gated side chats can start from a chat turn and return bounded chat transcripts as message attachments."
-}

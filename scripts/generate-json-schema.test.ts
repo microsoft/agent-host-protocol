@@ -10,11 +10,13 @@
  * Run: npx tsx --test scripts/generate-json-schema.test.ts
  */
 
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Project } from 'ts-morph';
+import { typeAdmitsUndefined } from './generate-json-schema.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILES = [
@@ -171,6 +173,20 @@ describe('generated JSON schemas', () => {
         );
       });
 
+      it('inherits request metadata from BaseParams', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const name of ['BaseParams', 'CreateSessionParams', 'PingParams']) {
+          const properties = defs[name].properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties._meta.type, 'object');
+          assert.deepEqual(properties._meta.additionalProperties, {});
+        }
+        const baseProperties = defs.BaseParams.properties as Record<string, Record<string, unknown>>;
+        assert.match(baseProperties._meta.description as string, /Receivers MUST ignore keys/);
+      });
+
       it('constrains every ChatOrigin branch to a distinct kind', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const chatOrigin = defs.ChatOrigin;
@@ -265,6 +281,143 @@ describe('generated JSON schemas', () => {
           false,
         );
       });
+    });
+  }
+});
+
+describe('typeAdmitsUndefined', () => {
+  // Guards the depth-aware union splitting these checks depend on: only a
+  // *top-level* `undefined` member means the property may be absent on the
+  // wire. A nested one (inside a generic argument, tuple, parenthesised union
+  // or inline object) does not — the property itself is still always present.
+
+  const admits: string[] = [
+    'string | undefined',
+    'undefined | string',
+    'UsageInfo | undefined',
+    'Changeset[] | undefined',
+    'Record<string, unknown> | undefined',
+    'A | B | undefined',
+    '  string   |   undefined  ',
+  ];
+
+  const doesNotAdmit: string[] = [
+    'string',
+    'UsageInfo',
+    'A | B',
+    'Array<string | undefined>',
+    'Record<string, string | undefined>',
+    '[string | undefined]',
+    '[ string | undefined ]',
+    '{ a: string | undefined }',
+    '(string | undefined)[]',
+    'Map<string, A | undefined>',
+  ];
+
+  for (const typeText of admits) {
+    it(`treats \`${typeText.trim()}\` as admitting undefined`, () => {
+      assert.equal(typeAdmitsUndefined(typeText), true);
+    });
+  }
+
+  for (const typeText of doesNotAdmit) {
+    it(`treats \`${typeText}\` as NOT admitting undefined`, () => {
+      assert.equal(typeAdmitsUndefined(typeText), false);
+    });
+  }
+});
+
+describe('`T | undefined` properties are not schema-required', () => {
+  // The protocol writes a handful of properties as an explicit `T | undefined`
+  // union rather than with a `?` question token, so that a producer building the
+  // object literal in TypeScript is forced to mention the key and consciously
+  // choose between a value and a clear (e.g. `session/activityChanged` clearing
+  // the activity string).
+  //
+  // That is an authoring-time constraint only. `JSON.stringify` drops
+  // `undefined` members, so on the wire such a property is simply **absent**,
+  // exactly like an optional one — and every language generator emits it as
+  // optional (`Option<T>` + `skip_serializing_if`, `*T` + `omitempty`,
+  // `T? = null`). Listing them under `required` made the published schemas
+  // reject the very traffic all five clients produce.
+  //
+  // Derived from the canonical sources rather than hardcoded, so a newly added
+  // `T | undefined` property is covered automatically. Classification reuses the
+  // generator's own `typeAdmitsUndefined` so the test and the generator can
+  // never disagree about what qualifies (in particular, both treat only
+  // *top-level* union members as admitting `undefined`).
+
+  /** `interface name` → property names declared as an explicit `T | undefined` union. */
+  const undefinedProps = new Map<string, Set<string>>();
+
+  // Built lazily in `before` rather than at module load: constructing a ts-morph
+  // Project is expensive, and doing it in the describe body would pay that cost
+  // even when running a filtered subset of tests from this file.
+  before(() => {
+    const project = new Project({
+      tsConfigFilePath: resolve(root, 'types/tsconfig.json'),
+      skipAddingFilesFromTsConfig: false,
+    });
+
+    for (const sourceFile of project.getSourceFiles()) {
+      for (const iface of sourceFile.getInterfaces()) {
+        for (const prop of iface.getProperties()) {
+          if (prop.hasQuestionToken()) {
+            continue;
+          }
+          if (!typeAdmitsUndefined(prop.getTypeNode()?.getText() ?? '')) {
+            continue;
+          }
+          let set = undefinedProps.get(iface.getName());
+          if (!set) {
+            set = new Set();
+            undefinedProps.set(iface.getName(), set);
+          }
+          set.add(prop.getName());
+        }
+      }
+    }
+  });
+
+  it('finds the known `T | undefined` properties in types/', () => {
+    // Sanity-check the derivation itself: if this drops to zero because the
+    // extraction broke, the per-schema assertions below would vacuously pass.
+    assert.ok(
+      undefinedProps.size > 0,
+      'expected to find at least one `T | undefined` property in types/ — the extraction is probably broken',
+    );
+  });
+
+  for (const file of SCHEMA_FILES) {
+    it(`${file} marks none of them required`, () => {
+      const schema = loadSchema(file);
+      const defs = (schema.$defs as Record<string, Record<string, unknown>>) ?? {};
+      const offenders: string[] = [];
+
+      for (const [typeName, properties] of undefinedProps) {
+        const def = defs[typeName];
+        if (!def) {
+          continue;
+        }
+        const required = Array.isArray(def.required) ? (def.required as string[]) : [];
+        const declared = (def.properties as Record<string, unknown> | undefined) ?? {};
+        for (const property of properties) {
+          if (required.includes(property)) {
+            offenders.push(`${typeName}.${property} is listed as required`);
+          }
+          // It must still be *declared* — dropping it from `required` is only
+          // correct if the property itself is still described.
+          if (!(property in declared)) {
+            offenders.push(`${typeName}.${property} is missing from properties`);
+          }
+        }
+      }
+
+      assert.deepEqual(
+        offenders.sort(),
+        [],
+        `${file}: a \`T | undefined\` property must be optional-but-declared, since it is absent on the wire and every client emits it as optional:\n  ${offenders.join('\n  ')}`,
+      );
     });
   }
 });

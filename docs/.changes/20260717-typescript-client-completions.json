@@ -1,6 +1,0 @@
-{
-  "type": "added",
-  "message": "`AhpClient.completions()` and `AhpClient.sessionConfigCompletions()` typed wrappers for the `completions` / `sessionConfigCompletions` commands, matching the existing `resource*` convenience methods.",
-  "targets": ["typescript"],
-  "issues": [340]
-}

@@ -191,6 +191,7 @@ async fn resource_read_send_wrapper_targets_root_channel() {
     let result = client
         .resource_read(ResourceReadParams {
             channel: String::new(),
+            meta: None,
             uri: "ahp-resource:/notes.txt".into(),
             encoding: None,
         })
@@ -239,6 +240,7 @@ async fn completions_send_wrapper_preserves_channel() {
     let result = client
         .completions(CompletionsParams {
             channel: "ahp-chat:/abc".into(),
+            meta: None,
             kind: CompletionItemKind::UserMessage,
             text: "look at @foo".into(),
             offset: 12,
@@ -287,6 +289,7 @@ async fn session_config_completions_send_wrapper_targets_root_channel() {
     let result = client
         .session_config_completions(SessionConfigCompletionsParams {
             channel: String::new(),
+            meta: None,
             provider: None,
             working_directory: None,
             config: None,

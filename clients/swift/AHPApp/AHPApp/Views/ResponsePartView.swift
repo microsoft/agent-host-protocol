@@ -2,6 +2,14 @@ import AgentHostProtocol
 import SwiftUI
 import UIKit
 
+private func toolInputText(_ input: ToolInput?) -> String? {
+    switch input {
+    case .inline(let value): return value
+    case .contentRef(let ref): return ref.uri
+    case nil: return nil
+    }
+}
+
 /// Renders a single response part: markdown text, reasoning, tool call, or content ref.
 struct ResponsePartView: View {
     let part: ResponsePart
@@ -439,11 +447,11 @@ struct ToolCallPartView: View {
 
     private var toolInput: String? {
         switch toolCall {
-        case .streaming(let s): return s.partialInput
-        case .pendingConfirmation(let s): return s.toolInput
-        case .running(let s): return s.toolInput
-        case .pendingResultConfirmation(let s): return s.toolInput
-        case .completed(let s): return s.toolInput
+        case .pendingConfirmation(let s): return toolInputText(s.toolInput)
+        case .running(let s): return toolInputText(s.toolInput)
+        case .pendingResultConfirmation(let s): return toolInputText(s.toolInput)
+        case .completed(let s): return toolInputText(s.toolInput)
+        case .cancelled(let s): return toolInputText(s.toolInput)
         default: return nil
         }
     }
@@ -576,11 +584,11 @@ struct ToolCallDetailSheet: View {
 
     private var toolInput: String? {
         switch toolCall {
-        case .streaming(let s): return s.partialInput
-        case .pendingConfirmation(let s): return s.toolInput
-        case .running(let s): return s.toolInput
-        case .pendingResultConfirmation(let s): return s.toolInput
-        case .completed(let s): return s.toolInput
+        case .pendingConfirmation(let s): return toolInputText(s.toolInput)
+        case .running(let s): return toolInputText(s.toolInput)
+        case .pendingResultConfirmation(let s): return toolInputText(s.toolInput)
+        case .completed(let s): return toolInputText(s.toolInput)
+        case .cancelled(let s): return toolInputText(s.toolInput)
         default: return nil
         }
     }
@@ -725,7 +733,7 @@ struct TerminalToolResultView: View {
 // MARK: - ContentRefView
 
 struct ContentRefView: View {
-    let ref: ResourceReponsePart
+    let ref: ResourceResponsePart
 
     var body: some View {
         HStack {
@@ -796,8 +804,8 @@ struct ContentRefView: View {
                 toolCallId: "tc0",
                 toolName: "editFile",
                 displayName: "Edit file",
+                toolInput: .contentRef(ContentRef(uri: "file:///tool-inputs/tc0.json")),
                 status: .streaming,
-                partialInput: "{\"path\": \"src/main.ts\", \"content\": \"...",
                 invocationMessage: .string("Editing src/main.ts")
             )))
 
@@ -808,7 +816,7 @@ struct ContentRefView: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Run: npm run deploy"),
-                toolInput: "{\"command\": \"npm run deploy\"}",
+                toolInput: .inline("{\"command\": \"npm run deploy\"}"),
                 status: .pendingConfirmation,
                 confirmationTitle: .string("Allow deployment?")
             )))
@@ -820,7 +828,7 @@ struct ContentRefView: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Running: npm test"),
-                toolInput: "{\"command\": \"npm test\"}",
+                toolInput: .inline("{\"command\": \"npm test\"}"),
                 status: .running,
                 confirmed: .notNeeded
             )))
@@ -832,7 +840,7 @@ struct ContentRefView: View {
                 toolName: "readFile",
                 displayName: "Read file",
                 invocationMessage: .string("Reading package.json"),
-                toolInput: "{\"path\": \"package.json\"}",
+                toolInput: .contentRef(ContentRef(uri: "file:///tool-inputs/tc2.json")),
                 success: true,
                 pastTenseMessage: .string("Read package.json"),
                 content: [.text(ToolResultTextContent(type: .text, text: "{\"name\": \"my-app\"}"))],
@@ -847,7 +855,7 @@ struct ContentRefView: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Running: rm -rf /"),
-                toolInput: "{\"command\": \"rm -rf /\"}",
+                toolInput: .inline("{\"command\": \"rm -rf /\"}"),
                 success: false,
                 pastTenseMessage: .string("Command failed"),
                 status: .completed,
@@ -861,7 +869,7 @@ struct ContentRefView: View {
                 toolName: "writeFile",
                 displayName: "Write file",
                 invocationMessage: .string("Writing config.json"),
-                toolInput: "{\"path\": \"config.json\"}",
+                toolInput: .contentRef(ContentRef(uri: "file:///tool-inputs/tc4.json")),
                 success: true,
                 pastTenseMessage: .string("Wrote config.json"),
                 content: [.text(ToolResultTextContent(type: .text, text: "File written successfully"))],
@@ -876,7 +884,7 @@ struct ContentRefView: View {
                 toolName: "bash",
                 displayName: "Run command",
                 invocationMessage: .string("Running: git push --force"),
-                toolInput: "{\"command\": \"git push --force\"}",
+                toolInput: .inline("{\"command\": \"git push --force\"}"),
                 status: .cancelled,
                 reason: .denied,
                 reasonMessage: .string("User denied force push")
@@ -884,7 +892,7 @@ struct ContentRefView: View {
 
             // Content Ref
             Text("Content Ref").font(.caption.bold()).foregroundStyle(.secondary)
-            ContentRefView(ref: ResourceReponsePart(
+            ContentRefView(ref: ResourceResponsePart(
                 uri: "file:///Users/me/project/README.md",
                 contentType: "text/markdown",
                 kind: .contentRef

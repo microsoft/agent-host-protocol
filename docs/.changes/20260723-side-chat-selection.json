@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Side-chat sources and origins can now carry an immutable selected-text snapshot with optional response-part provenance."
-}

@@ -13,6 +13,7 @@ import type {
 import {
   SessionLifecycle,
   SessionStatus,
+  SessionInputRequestKind,
   CustomizationType,
   McpServerStatus,
 } from './state.js';
@@ -30,16 +31,28 @@ function withStatusFlag(status: SessionStatus, flag: SessionStatus, set: boolean
 }
 
 /**
+ * Whether an entry blocks on the *user*.
+ *
+ * {@link SessionInputRequestKind.ToolClientExecution} is work delegated to a
+ * client, not a prompt: the call has already cleared its confirmation gate and
+ * is simply running somewhere else. Counting it would report a session as
+ * awaiting the user for the entire duration of every client tool call.
+ */
+function awaitsUser(request: SessionInputRequest): boolean {
+  return request.kind !== SessionInputRequestKind.ToolClientExecution;
+}
+
+/**
  * Reflects the session-level {@link SessionState.inputNeeded | input queue}
- * into the activity bits of `status`. A non-empty queue promotes the activity
- * to {@link SessionStatus.InputNeeded}; emptying it clears the
- * input-needed-specific bit. Since `InputNeeded` implies
+ * into the activity bits of `status`. A queue holding any user-blocking entry
+ * promotes the activity to {@link SessionStatus.InputNeeded}; draining those
+ * entries clears the input-needed-specific bit. Since `InputNeeded` implies
  * {@link SessionStatus.InProgress}, an unblocked turn falls back to
  * `InProgress` while an already-idle session stays idle. Orthogonal flags
  * (`IsRead` / `IsArchived`) are preserved.
  */
 function withInputNeededStatus(status: SessionStatus, inputNeeded: readonly SessionInputRequest[]): SessionStatus {
-  if (inputNeeded.length > 0) {
+  if (inputNeeded.some(awaitsUser)) {
     return (status & ~STATUS_ACTIVITY_MASK) | SessionStatus.InputNeeded;
   }
   return status & ~(SessionStatus.InputNeeded & ~SessionStatus.InProgress);

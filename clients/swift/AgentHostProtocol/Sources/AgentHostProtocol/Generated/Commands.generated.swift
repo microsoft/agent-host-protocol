@@ -169,6 +169,9 @@ public struct SideChatSource: Codable, Sendable {
 public struct InitializeParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Protocol versions the client is willing to speak, ordered from most
     /// preferred to least preferred. Each entry is a [SemVer](https://semver.org)
     /// `MAJOR.MINOR.PATCH` string (e.g. `"0.1.0"`).
@@ -198,8 +201,20 @@ public struct InitializeParams: Codable, Sendable {
     /// MUST assume the client does not support the feature.
     public var capabilities: ClientCapabilities?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case protocolVersions
+        case clientId
+        case clientInfo
+        case initialSubscriptions
+        case locale
+        case capabilities
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         protocolVersions: [String],
         clientId: String,
         clientInfo: Implementation? = nil,
@@ -208,6 +223,7 @@ public struct InitializeParams: Codable, Sendable {
         capabilities: ClientCapabilities? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.protocolVersions = protocolVersions
         self.clientId = clientId
         self.clientInfo = clientInfo
@@ -316,6 +332,9 @@ public struct Implementation: Codable, Sendable {
 public struct ReconnectParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Client identifier from the original connection
     public var clientId: String
     /// Last `serverSeq` the client received
@@ -323,13 +342,23 @@ public struct ReconnectParams: Codable, Sendable {
     /// URIs the client was subscribed to
     public var subscriptions: [String]
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case clientId
+        case lastSeenServerSeq
+        case subscriptions
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         clientId: String,
         lastSeenServerSeq: Int,
         subscriptions: [String]
     ) {
         self.channel = channel
+        self.meta = meta
         self.clientId = clientId
         self.lastSeenServerSeq = lastSeenServerSeq
         self.subscriptions = subscriptions
@@ -376,6 +405,9 @@ public struct ReconnectSnapshotResult: Codable, Sendable {
 public struct SubscribeParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Optional delivery preferences for this subscription.
     ///
     /// Servers MAY use these preferences to buffer and coalesce high-frequency
@@ -388,12 +420,21 @@ public struct SubscribeParams: Codable, Sendable {
     /// default snapshot. Clients MUST tolerate receiving more state than requested.
     public var view: SubscribeView?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case delivery
+        case view
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         delivery: SubscriptionDeliveryOptions? = nil,
         view: SubscribeView? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.delivery = delivery
         self.view = view
     }
@@ -460,6 +501,9 @@ public struct SessionForkSource: Codable, Sendable {
 public struct CreateSessionParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Agent provider ID
     public var provider: String?
     /// The working directories the session's agent is granted tool access to.
@@ -503,8 +547,20 @@ public struct CreateSessionParams: Codable, Sendable {
     /// `progress` notifications are emitted.
     public var progressToken: String?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case provider
+        case workingDirectories
+        case fork
+        case config
+        case activeClient
+        case progressToken
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectories: [String]? = nil,
         fork: SessionForkSource? = nil,
@@ -513,6 +569,7 @@ public struct CreateSessionParams: Codable, Sendable {
         progressToken: String? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.provider = provider
         self.workingDirectories = workingDirectories
         self.fork = fork
@@ -525,17 +582,30 @@ public struct CreateSessionParams: Codable, Sendable {
 public struct DisposeSessionParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
 
     public init(
-        channel: String
+        channel: String,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
+        self.meta = meta
     }
 }
 
 public struct CreateChatParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Chat URI (client-chosen, e.g. `ahp-chat:/<uuid>`).
     public var chat: String
     /// Optional initial message for the new chat.
@@ -565,14 +635,25 @@ public struct CreateChatParams: Codable, Sendable {
     /// {@link AgentCapabilities.multipleWorkingDirectories}.
     public var workingDirectories: [String]?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case chat
+        case initialMessage
+        case source
+        case workingDirectories
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         chat: String,
         initialMessage: Message? = nil,
         source: ChatSource? = nil,
         workingDirectories: [String]? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.chat = chat
         self.initialMessage = initialMessage
         self.source = source
@@ -583,17 +664,30 @@ public struct CreateChatParams: Codable, Sendable {
 public struct DisposeChatParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
 
     public init(
-        channel: String
+        channel: String,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
+        self.meta = meta
     }
 }
 
 public struct ListSessionsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Maximum number of entries to return in this page. The server SHOULD respect
     /// this bound but MAY return fewer entries and MAY impose its own upper cap.
     /// Omit to let the server choose the page size.
@@ -604,12 +698,21 @@ public struct ListSessionsParams: Codable, Sendable {
     /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
     public var cursor: String?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case limit
+        case cursor
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         limit: Int? = nil,
         cursor: String? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.limit = limit
         self.cursor = cursor
     }
@@ -636,17 +739,29 @@ public struct ListSessionsResult: Codable, Sendable {
 public struct ResourceReadParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Content URI from a `ContentRef`
     public var uri: String
     /// Preferred encoding for the returned data (default: server-chosen)
     public var encoding: ContentEncoding?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case uri
+        case encoding
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         uri: String,
         encoding: ContentEncoding? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.uri = uri
         self.encoding = encoding
     }
@@ -674,6 +789,9 @@ public struct ResourceReadResult: Codable, Sendable {
 public struct ResourceWriteParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Target file URI on the server filesystem
     public var uri: String
     /// Content encoded as a string
@@ -702,8 +820,22 @@ public struct ResourceWriteParams: Codable, Sendable {
     /// updates between a `resourceResolve` and a subsequent `resourceWrite`.
     public var ifMatch: String?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case uri
+        case data
+        case encoding
+        case contentType
+        case createOnly
+        case mode
+        case position
+        case ifMatch
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         uri: String,
         data: String,
         encoding: ContentEncoding,
@@ -714,6 +846,7 @@ public struct ResourceWriteParams: Codable, Sendable {
         ifMatch: String? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.uri = uri
         self.data = data
         self.encoding = encoding
@@ -736,14 +869,25 @@ public struct ResourceWriteResult: Codable, Sendable {
 public struct ResourceListParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Directory URI on the server filesystem
     public var uri: String
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case uri
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         uri: String
     ) {
         self.channel = channel
+        self.meta = meta
         self.uri = uri
     }
 }
@@ -777,6 +921,9 @@ public struct DirectoryEntry: Codable, Sendable {
 public struct ResourceCopyParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Source URI to copy from
     public var source: String
     /// Destination URI to copy to
@@ -785,13 +932,23 @@ public struct ResourceCopyParams: Codable, Sendable {
     /// of overwriting it.
     public var failIfExists: Bool?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case source
+        case destination
+        case failIfExists
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         source: String,
         destination: String,
         failIfExists: Bool? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.source = source
         self.destination = destination
         self.failIfExists = failIfExists
@@ -809,18 +966,30 @@ public struct ResourceCopyResult: Codable, Sendable {
 public struct ResourceDeleteParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// URI of the resource to delete
     public var uri: String
     /// If `true` and the target is a directory, delete it and all its contents
     /// recursively. If `false` (default), deleting a non-empty directory MUST fail.
     public var recursive: Bool?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case uri
+        case recursive
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         uri: String,
         recursive: Bool? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.uri = uri
         self.recursive = recursive
     }
@@ -837,6 +1006,9 @@ public struct ResourceDeleteResult: Codable, Sendable {
 public struct ResourceMoveParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Source URI to move from
     public var source: String
     /// Destination URI to move to
@@ -845,13 +1017,23 @@ public struct ResourceMoveParams: Codable, Sendable {
     /// of overwriting it.
     public var failIfExists: Bool?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case source
+        case destination
+        case failIfExists
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         source: String,
         destination: String,
         failIfExists: Bool? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.source = source
         self.destination = destination
         self.failIfExists = failIfExists
@@ -869,6 +1051,9 @@ public struct ResourceMoveResult: Codable, Sendable {
 public struct ResourceResolveParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// URI to resolve
     public var uri: String
     /// When `true` (default), follow symlinks and report the metadata of the
@@ -877,12 +1062,21 @@ public struct ResourceResolveParams: Codable, Sendable {
     /// `type: 'symlink'`.
     public var followSymlinks: Bool?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case uri
+        case followSymlinks
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         uri: String,
         followSymlinks: Bool? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.uri = uri
         self.followSymlinks = followSymlinks
     }
@@ -930,14 +1124,25 @@ public struct ResourceResolveResult: Codable, Sendable {
 public struct ResourceMkdirParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Directory URI to create (parents created as needed).
     public var uri: String
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case uri
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         uri: String
     ) {
         self.channel = channel
+        self.meta = meta
         self.uri = uri
     }
 }
@@ -953,6 +1158,9 @@ public struct ResourceMkdirResult: Codable, Sendable {
 public struct ResourceRequestParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Resource URI being requested. Typically a `file:` URI on the receiver's
     /// filesystem, but any URI scheme that the receiver mediates access to is
     /// allowed.
@@ -962,13 +1170,23 @@ public struct ResourceRequestParams: Codable, Sendable {
     /// Whether the caller needs write access to the resource.
     public var write: Bool?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case uri
+        case read
+        case write
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         uri: String,
         read: Bool? = nil,
         write: Bool? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.uri = uri
         self.read = read
         self.write = write
@@ -986,6 +1204,9 @@ public struct ResourceRequestResult: Codable, Sendable {
 public struct CreateResourceWatchParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// URI to watch.
     public var uri: String
     /// If `true`, the receiver MUST report changes for descendants of `uri`.
@@ -1000,14 +1221,25 @@ public struct CreateResourceWatchParams: Codable, Sendable {
     /// Wrapped in `{ items }` for forward compatibility.
     public var includes: AnyCodable?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case uri
+        case recursive
+        case excludes
+        case includes
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         uri: String,
         recursive: Bool? = nil,
         excludes: AnyCodable? = nil,
         includes: AnyCodable? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.uri = uri
         self.recursive = recursive
         self.excludes = excludes
@@ -1031,6 +1263,9 @@ public struct CreateResourceWatchResult: Codable, Sendable {
 public struct FetchTurnsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Opaque cursor from `ChatState.turnsNextCursor`.
     ///
     /// The host MUST reject unrecognised cursors with `InvalidParams`. Omit only
@@ -1038,11 +1273,19 @@ public struct FetchTurnsParams: Codable, Sendable {
     /// chat, if any.
     public var cursor: String?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case cursor
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         cursor: String? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.cursor = cursor
     }
 }
@@ -1088,12 +1331,15 @@ public struct DispatchActionParams: Codable, Sendable {
 public struct AuthenticateParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// The protected resource identifier. MUST match a `resource` value the
     /// server has advertised — via `ProtectedResourceMetadata` in
     /// `AgentInfo.protectedResources`, or via a live
     /// `McpServerAuthRequiredState.resource` / `ToolCallAuthRequiredState.auth.resource`.
     public var resource: String
-    /// ***** obtained from the resource's authorization server
+    /// Bearer token obtained from the resource's authorization server
     public var token: String
     /// OAuth scopes the token grants, when known. Lets the server determine
     /// whether a specific challenge — e.g. the `requiredScopes` on a live
@@ -1103,13 +1349,23 @@ public struct AuthenticateParams: Codable, Sendable {
     /// token.
     public var scopes: [String]?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case resource
+        case token
+        case scopes
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         resource: String,
         token: String,
         scopes: [String]? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.resource = resource
         self.token = token
         self.scopes = scopes
@@ -1127,6 +1383,9 @@ public struct AuthenticateResult: Codable, Sendable {
 public struct CreateTerminalParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Initial owner of the terminal
     public var claim: TerminalClaim
     /// Human-readable terminal name
@@ -1138,8 +1397,19 @@ public struct CreateTerminalParams: Codable, Sendable {
     /// Initial terminal height in rows
     public var rows: Int?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case claim
+        case name
+        case cwd
+        case cols
+        case rows
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         claim: TerminalClaim,
         name: String? = nil,
         cwd: String? = nil,
@@ -1147,6 +1417,7 @@ public struct CreateTerminalParams: Codable, Sendable {
         rows: Int? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.claim = claim
         self.name = name
         self.cwd = cwd
@@ -1158,17 +1429,30 @@ public struct CreateTerminalParams: Codable, Sendable {
 public struct DisposeTerminalParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
 
     public init(
-        channel: String
+        channel: String,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
+        self.meta = meta
     }
 }
 
 public struct ResolveSessionConfigParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Agent provider ID
     public var provider: String?
     /// Working directory for the session
@@ -1176,13 +1460,23 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
     /// Current user-filled configuration values
     public var config: [String: AnyCodable]?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case provider
+        case workingDirectory
+        case config
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectory: String? = nil,
         config: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.provider = provider
         self.workingDirectory = workingDirectory
         self.config = config
@@ -1309,6 +1603,9 @@ public struct SessionConfigSchema: Codable, Sendable {
 public struct SessionConfigCompletionsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Agent provider ID
     public var provider: String?
     /// Working directory for the session
@@ -1320,8 +1617,19 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
     /// Search filter text (empty or omitted returns default/recent values)
     public var query: String?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case provider
+        case workingDirectory
+        case config
+        case property
+        case query
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectory: String? = nil,
         config: [String: AnyCodable]? = nil,
@@ -1329,6 +1637,7 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
         query: String? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.provider = provider
         self.workingDirectory = workingDirectory
         self.config = config
@@ -1370,6 +1679,9 @@ public struct SessionConfigValueItem: Codable, Sendable {
 public struct CompletionsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// What kind of completion is being requested.
     public var kind: CompletionItemKind
     /// The complete text of the input being completed (e.g. the full user
@@ -1379,13 +1691,23 @@ public struct CompletionsParams: Codable, Sendable {
     /// measured in UTF-16 code units. MUST satisfy `0 <= offset <= text.length`.
     public var offset: Int
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case kind
+        case text
+        case offset
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         kind: CompletionItemKind,
         text: String,
         offset: Int
     ) {
         self.channel = channel
+        self.meta = meta
         self.kind = kind
         self.text = text
         self.offset = offset
@@ -1440,18 +1762,30 @@ public struct CompletionsResult: Codable, Sendable {
 public struct InvokeChangesetOperationParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Matches {@link ChangesetOperation.id} from the changeset's `operations` list.
     public var operationId: String
     /// Target of the operation. Required iff the chosen scope is
     /// `'resource'` or `'range'`. Omit for changeset-scoped operations.
     public var target: ChangesetOperationTarget?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case operationId
+        case target
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         operationId: String,
         target: ChangesetOperationTarget? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.operationId = operationId
         self.target = target
     }

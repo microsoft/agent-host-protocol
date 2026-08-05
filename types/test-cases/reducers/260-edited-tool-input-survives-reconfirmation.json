@@ -1,5 +1,5 @@
 {
-  "description": "toolCallConfirmed replaces inline tool input with edited input",
+  "description": "tool input ref survives re-confirmation after an edited confirmation",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -32,8 +32,10 @@
       "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
-      "invocationMessage": "Run: ls -la",
-      "toolInput": "ls -la"
+      "invocationMessage": "Run",
+      "toolInput": {
+        "uri": "file:///tool-inputs/tc-1.json"
+      }
     },
     {
       "type": "chat/toolCallConfirmed",
@@ -41,16 +43,20 @@
       "toolCallId": "tc-1",
       "approved": true,
       "confirmed": "user-action",
-      "editedToolInput": "ls -la /tmp"
+      "editedToolInput": "{\"command\":\"echo edited\"}"
     },
     {
-      "type": "chat/toolCallComplete",
+      "type": "chat/toolCallReady",
       "turnId": "turn-1",
       "toolCallId": "tc-1",
-      "result": {
-        "success": true,
-        "pastTenseMessage": "Ran command"
-      }
+      "invocationMessage": "Additional permission needed"
+    },
+    {
+      "type": "chat/toolCallConfirmed",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "approved": true,
+      "confirmed": "user-action"
     }
   ],
   "expected": {
@@ -68,18 +74,18 @@
         {
           "kind": "toolCall",
           "toolCall": {
-            "status": "completed",
+            "status": "running",
             "toolCallId": "tc-1",
             "toolName": "bash",
             "displayName": "Run Command",
             "intention": null,
+            "toolInput": {
+              "uri": "file:///tool-inputs/tc-1.json"
+            },
             "contributor": null,
             "_meta": null,
-            "invocationMessage": "Run: ls -la",
-            "toolInput": "ls -la /tmp",
-            "confirmed": "user-action",
-            "success": true,
-            "pastTenseMessage": "Ran command"
+            "invocationMessage": "Additional permission needed",
+            "confirmed": "user-action"
           }
         }
       ],

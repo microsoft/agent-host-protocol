@@ -1,6 +1,0 @@
-{
-  "type": "added",
-  "message": "`Client::completions()` and `Client::session_config_completions()` typed wrappers for the `completions` / `sessionConfigCompletions` commands, matching the existing `resource_*` convenience methods.",
-  "targets": ["rust"],
-  "issues": [340]
-}

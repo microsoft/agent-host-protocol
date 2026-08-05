@@ -1,6 +1,0 @@
-{
-  "type": "added",
-  "message": "`AHPClient.completions()` and `AHPClient.sessionConfigCompletions()` convenience methods, plus `AHPCommands.completions(id:)` / `AHPCommands.sessionConfigCompletions(id:)` request factories, giving the generated `Completions*` / `SessionConfigCompletions*` types a typed entry point.",
-  "targets": ["swift"],
-  "issues": [340]
-}

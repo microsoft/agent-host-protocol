@@ -317,6 +317,7 @@ impl HostRuntime {
                 "listSessions",
                 ListSessionsParams {
                     channel: ROOT_RESOURCE_URI.to_string(),
+                    meta: None,
                     limit: None,
                     cursor: None,
                 },
@@ -623,6 +624,7 @@ impl HostRuntime {
                 "subscribe",
                 SubscribeParams {
                     channel: uri.clone(),
+                    meta: None,
                     delivery: None,
                     view: None,
                 },

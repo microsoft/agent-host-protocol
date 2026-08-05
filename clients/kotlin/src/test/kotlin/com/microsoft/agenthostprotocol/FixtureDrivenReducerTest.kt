@@ -216,6 +216,7 @@ class FixtureDrivenReducerTest {
                 },
             )
 
+
             else -> fail("${file.name}: unsupported reducer '$reducer'")
         }
     }

@@ -119,6 +119,7 @@ export class MultiHostStateMirror {
     return this.changesetsMap;
   }
 
+
   /** Look up the root state for `hostId`. */
   getRoot(hostId: HostId): RootState | undefined {
     return this.rootStatesMap.get(hostId);
@@ -138,6 +139,7 @@ export class MultiHostStateMirror {
   getChangeset(hostId: HostId, uri: URI): ChangesetState | undefined {
     return this.changesetsMap.get(hostedResourceKey(hostId, uri));
   }
+
 
   /**
    * Convenience: apply a {@link HostSubscriptionEvent} produced by

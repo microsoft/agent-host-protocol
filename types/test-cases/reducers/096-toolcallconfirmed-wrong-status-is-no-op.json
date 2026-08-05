@@ -22,7 +22,9 @@
             "displayName": "Run Command",
             "intention": null,
             "invocationMessage": "Running",
-            "toolInput": "ls",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmed": "user-action"
           }
         }
@@ -64,7 +66,9 @@
             "displayName": "Run Command",
             "intention": null,
             "invocationMessage": "Running",
-            "toolInput": "ls",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
             "confirmed": "user-action"
           }
         }

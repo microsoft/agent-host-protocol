@@ -1237,9 +1237,12 @@ pub struct SessionState {
     /// Each entry is self-sufficient: it carries the owning chat's URI plus every
     /// identifier the client needs to respond. A client answers by dispatching the
     /// ordinary `chat/*` action to that chat's channel — see
-    /// {@link SessionInputRequest} for the per-variant response path. A present,
-    /// non-empty list implies {@link SessionStatus.InputNeeded} on
-    /// {@link SessionSummary.status}.
+    /// {@link SessionInputRequest} for the per-variant response path. A list
+    /// holding any entry other than
+    /// {@link SessionInputRequestKind.ToolClientExecution} implies
+    /// {@link SessionStatus.InputNeeded} on {@link SessionSummary.status};
+    /// client-execution entries are work delegated to a client rather than a
+    /// prompt, so they leave the session's activity unchanged.
     ///
     /// Host-managed: the host upserts entries with `session/inputNeededSet` as
     /// chats raise requests and removes them with `session/inputNeededRemoved`
@@ -1342,6 +1345,11 @@ pub struct SessionToolConfirmationRequest {
 /// `chat/toolCallComplete` (and optionally streaming with
 /// `chat/toolCallContentChanged`) to {@link SessionInputRequestBase.chat |
 /// `chat`}, keyed by `turnId` and `toolCall.toolCallId`.
+///
+/// Unlike the other variants this does **not** raise
+/// {@link SessionStatus.InputNeeded}: the call has already cleared its
+/// confirmation gate and is merely executing elsewhere, so the session stays
+/// {@link SessionStatus.InProgress} while it runs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionToolClientExecutionRequest {
@@ -2364,7 +2372,7 @@ pub struct ToolCallStreamingState {
     /// with the {@link contributor} to serve MCP Apps.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Partial parameters accumulated so far
+    /// Partial parameters accumulated from tool-call deltas.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub partial_input: Option<String>,
     /// Progress message shown while parameters are streaming
@@ -2398,9 +2406,14 @@ pub struct ToolCallPendingConfirmationState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Raw tool input
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_input: Option<String>,
+    pub tool_input: Option<ToolInput>,
     /// Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirmation_title: Option<StringOrMarkdown>,
@@ -2446,9 +2459,14 @@ pub struct ToolCallRunningState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Raw tool input
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_input: Option<String>,
+    pub tool_input: Option<ToolInput>,
     /// How the tool was confirmed for execution
     pub confirmed: ToolCallConfirmationReason,
     /// The confirmation option the user selected, if confirmation options were provided
@@ -2513,9 +2531,14 @@ pub struct ToolCallAuthRequiredState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Raw tool input
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_input: Option<String>,
+    pub tool_input: Option<ToolInput>,
     /// How the tool was confirmed for execution
     pub confirmed: ToolCallConfirmationReason,
     /// The confirmation option the user selected, if confirmation options were provided
@@ -2554,9 +2577,14 @@ pub struct ToolCallPendingResultConfirmationState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Raw tool input
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_input: Option<String>,
+    pub tool_input: Option<ToolInput>,
     /// Whether the tool succeeded
     pub success: bool,
     /// Past-tense description of what the tool did
@@ -2606,9 +2634,14 @@ pub struct ToolCallCompletedState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Raw tool input
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_input: Option<String>,
+    pub tool_input: Option<ToolInput>,
     /// Whether the tool succeeded
     pub success: bool,
     /// Past-tense description of what the tool did
@@ -2658,9 +2691,14 @@ pub struct ToolCallCancelledState {
     pub meta: Option<JsonObject>,
     /// Message describing what the tool will do
     pub invocation_message: StringOrMarkdown,
-    /// Raw tool input
+    /// Final tool input.
+    ///
+    /// Referenced input is mutable until the tool call leaves
+    /// `pending-confirmation`. When the client confirms with `editedToolInput`,
+    /// the host MUST replace the resource contents before echoing the accepted
+    /// confirmation action. Clients MUST NOT cache tool input across confirmation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_input: Option<String>,
+    pub tool_input: Option<ToolInput>,
     /// Why the tool was cancelled
     pub reason: ToolCallCancellationReason,
     /// Optional message explaining the cancellation
@@ -3555,7 +3593,7 @@ pub struct McpServerAuthRequiredState {
     /// authorization spec.
     pub resource: ProtectedResourceMetadata,
     /// Scopes required for the current challenge, parsed from the
-    /// `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+    /// `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
     /// fallback). Authoritative for the next authorization request — clients
     /// MUST NOT assume any subset/superset relationship to
     /// `resource.scopes_supported`.
@@ -3598,7 +3636,7 @@ pub struct McpOAuthClient {
 /// Reusable MCP authentication challenge — the RFC 9728 discovery info a
 /// client needs to obtain a token and push it via the `authenticate` command.
 /// Deliberately carries **no token**: this describes what is being asked for,
-/// never the ****** itself.
+/// never the bearer token itself.
 ///
 /// Shared by two independent state machines that describe the same OAuth
 /// challenge from different vantage points:
@@ -3627,7 +3665,7 @@ pub struct McpAuthRequirement {
     /// authorization spec.
     pub resource: ProtectedResourceMetadata,
     /// Scopes required for the current challenge, parsed from the
-    /// `WWW-Authenticate: ******"…"` header (or `scopes_supported`
+    /// `WWW-Authenticate: Bearer scope="…"` header (or `scopes_supported`
     /// fallback). Authoritative for the next authorization request — clients
     /// MUST NOT assume any subset/superset relationship to
     /// `resource.scopes_supported`.
@@ -4226,6 +4264,14 @@ pub struct ResourceChange {
     pub r#type: ResourceChangeType,
 }
 
+/// Raw tool input represented inline or by content reference.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ToolInput {
+    Inline(String),
+    ContentRef(ContentRef),
+}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 /// How a chat came into existence.
@@ -4582,7 +4628,7 @@ pub enum SessionInputRequest {
 }
 
 /// The state payload of a snapshot — root, session, chat, terminal,
-/// changeset, resource-watch, or annotations state.
+/// changeset, resource-watch, annotations, or content state.
 ///
 /// Deserialized by trying session first (has required `lifecycle`), then
 /// chat (has required `turns`), then terminal (has required `content`),

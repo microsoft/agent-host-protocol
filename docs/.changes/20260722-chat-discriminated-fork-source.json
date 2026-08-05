@@ -1,4 +1,0 @@
-{
-  "type": "fixed",
-  "message": "`createChat.source` is once again a fully discriminated union: fork and side-chat sources both require a `kind`, and missing or unknown kinds are rejected."
-}

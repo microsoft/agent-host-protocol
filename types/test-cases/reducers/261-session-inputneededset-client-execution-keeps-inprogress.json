@@ -1,28 +1,13 @@
 {
-  "description": "session/inputNeededSet replaces an existing entry with the same id, and swapping a confirmation for a client execution drops status back to InProgress",
+  "description": "session/inputNeededSet with a tool-client-execution request leaves an in-progress session InProgress",
   "reducer": "session",
   "initial": {
     "provider": "copilot",
     "title": "Test Session",
-    "status": 24,
+    "status": 8,
     "lifecycle": "ready",
     "activeClients": [],
-    "chats": [],
-    "inputNeeded": [
-      {
-        "kind": "toolConfirmation",
-        "id": "copilot:/test-session/chat-1#call-9",
-        "chat": "copilot:/test-session/chat-1",
-        "turnId": "turn-1",
-        "toolCall": {
-          "status": "pending-confirmation",
-          "toolCallId": "call-9",
-          "toolName": "run_tool",
-          "displayName": "Run Tool",
-          "invocationMessage": "Run the client tool"
-        }
-      }
-    ]
+    "chats": []
   },
   "actions": [
     {

@@ -70,16 +70,30 @@ func withStatusFlag(status, flag ahptypes.SessionStatus, set bool) ahptypes.Sess
 	return status &^ flag
 }
 
+// awaitsUser reports whether an entry blocks on the *user*.
+//
+// SessionInputRequestKindToolClientExecution is work delegated to a client, not
+// a prompt: the call has already cleared its confirmation gate and is simply
+// running somewhere else. Counting it would report a session as awaiting the
+// user for the entire duration of every client tool call.
+func awaitsUser(request ahptypes.SessionInputRequest) bool {
+	_, isClientExecution := request.Value.(*ahptypes.SessionToolClientExecutionRequest)
+	return !isClientExecution
+}
+
 // withInputNeededStatus reflects the session-level input queue into the activity
-// bits of status. A non-empty queue promotes the activity to InputNeeded;
-// emptying it clears the input-needed-specific bit. Because InputNeeded implies
-// InProgress, an unblocked turn falls back to InProgress while an already-idle
-// session stays idle. Orthogonal flags (IsRead / IsArchived) are preserved.
+// bits of status. A queue holding any user-blocking entry promotes the activity
+// to InputNeeded; draining those entries clears the input-needed-specific bit.
+// Because InputNeeded implies InProgress, an unblocked turn falls back to
+// InProgress while an already-idle session stays idle. Orthogonal flags
+// (IsRead / IsArchived) are preserved.
 func withInputNeededStatus(status ahptypes.SessionStatus, inputNeeded []ahptypes.SessionInputRequest) ahptypes.SessionStatus {
-	if len(inputNeeded) == 0 {
-		return status &^ (ahptypes.SessionStatusInputNeeded &^ ahptypes.SessionStatusInProgress)
+	for _, request := range inputNeeded {
+		if awaitsUser(request) {
+			return (status &^ statusActivityMask) | ahptypes.SessionStatusInputNeeded
+		}
 	}
-	return (status &^ statusActivityMask) | ahptypes.SessionStatusInputNeeded
+	return status &^ (ahptypes.SessionStatusInputNeeded &^ ahptypes.SessionStatusInProgress)
 }
 
 // ─── Tool-call helpers ─────────────────────────────────────────────────
@@ -91,6 +105,7 @@ type toolCallCommon struct {
 	name        string
 	displayName string
 	intention   *string
+	toolInput   *ahptypes.ToolInput
 	contributor *ahptypes.ToolCallContributor
 	meta        ahptypes.JSONObject
 }
@@ -98,44 +113,43 @@ type toolCallCommon struct {
 func toolCallMeta(tc ahptypes.ToolCallState) toolCallCommon {
 	switch v := tc.Value.(type) {
 	case *ahptypes.ToolCallStreamingState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, nil, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallPendingConfirmationState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallRunningState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallAuthRequiredState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallPendingResultConfirmationState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallCompletedState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallCancelledState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.Contributor, v.Meta}
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
 	}
 	return toolCallCommon{}
 }
 
-// toolCallInvocationAndInput pulls the optional invocationMessage and
-// toolInput fields out of whichever non-terminal variant tc points to.
-// Returns (StringOrMarkdown{}, nil) for variants that don't carry them.
-func toolCallInvocationAndInput(tc ahptypes.ToolCallState) (ahptypes.StringOrMarkdown, *string) {
+// toolCallInvocationMessage pulls the invocation message from a non-terminal
+// tool-call variant.
+func toolCallInvocationMessage(tc ahptypes.ToolCallState) ahptypes.StringOrMarkdown {
 	switch v := tc.Value.(type) {
 	case *ahptypes.ToolCallStreamingState:
 		var im ahptypes.StringOrMarkdown
 		if v.InvocationMessage != nil {
 			im = *v.InvocationMessage
 		}
-		return im, nil
+		return im
 	case *ahptypes.ToolCallPendingConfirmationState:
-		return v.InvocationMessage, v.ToolInput
+		return v.InvocationMessage
 	case *ahptypes.ToolCallRunningState:
-		return v.InvocationMessage, v.ToolInput
+		return v.InvocationMessage
 	case *ahptypes.ToolCallAuthRequiredState:
-		return v.InvocationMessage, v.ToolInput
+		return v.InvocationMessage
 	case *ahptypes.ToolCallPendingResultConfirmationState:
-		return v.InvocationMessage, v.ToolInput
+		return v.InvocationMessage
 	}
-	return ahptypes.StringOrMarkdown{}, nil
+	return ahptypes.StringOrMarkdown{}
 }
 
 func toolCallID(tc ahptypes.ToolCallState) string {
@@ -221,17 +235,17 @@ func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState
 			continue
 		}
 		common := toolCallMeta(tc.ToolCall)
-		invocation, toolInput := toolCallInvocationAndInput(tc.ToolCall)
+		invocation := toolCallInvocationMessage(tc.ToolCall)
 		cancelled := &ahptypes.ToolCallCancelledState{
 			Status:            ahptypes.ToolCallStatusCancelled,
 			ToolCallId:        common.id,
 			ToolName:          common.name,
 			DisplayName:       common.displayName,
 			Intention:         common.intention,
+			ToolInput:         common.toolInput,
 			Contributor:       common.contributor,
 			Meta:              common.meta,
 			InvocationMessage: invocation,
-			ToolInput:         toolInput,
 			Reason:            ahptypes.ToolCallCancellationReasonSkipped,
 		}
 		parts = append(parts, ahptypes.ResponsePart{Value: &ahptypes.ToolCallResponsePart{
@@ -1057,18 +1071,20 @@ func applyToolCallDelta(state *ahptypes.ChatState, a *ahptypes.ChatToolCallDelta
 		if !ok {
 			return tc
 		}
-		current := ""
-		if s.PartialInput != nil {
-			current = *s.PartialInput
-		}
-		joined := current + a.Content
-		s.PartialInput = &joined
 		if a.Meta != nil {
 			s.Meta = a.Meta
 		}
+		if a.Content != nil {
+			partial := ""
+			if s.PartialInput != nil {
+				partial = *s.PartialInput
+			}
+			partial += *a.Content
+			s.PartialInput = &partial
+		}
 		if a.InvocationMessage != nil {
-			im := *a.InvocationMessage
-			s.InvocationMessage = &im
+			invocationMessage := *a.InvocationMessage
+			s.InvocationMessage = &invocationMessage
 		}
 		return tc
 	})
@@ -1098,6 +1114,9 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 		if a.Intention != nil {
 			common.intention = a.Intention
 		}
+		if a.ToolInput != nil {
+			common.toolInput = a.ToolInput
+		}
 		common.contributor = refineToolCallContributor(common.contributor, a.Contributor)
 		if a.Meta != nil {
 			common.meta = a.Meta
@@ -1117,10 +1136,10 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 					ToolName:          common.name,
 					DisplayName:       common.displayName,
 					Intention:         common.intention,
+					ToolInput:         common.toolInput,
 					Contributor:       common.contributor,
 					Meta:              common.meta,
 					InvocationMessage: a.InvocationMessage,
-					ToolInput:         a.ToolInput,
 					Confirmed:         *a.Confirmed,
 				}}
 			}
@@ -1130,10 +1149,10 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 				ToolName:          common.name,
 				DisplayName:       common.displayName,
 				Intention:         common.intention,
+				ToolInput:         common.toolInput,
 				Contributor:       common.contributor,
 				Meta:              common.meta,
 				InvocationMessage: a.InvocationMessage,
-				ToolInput:         a.ToolInput,
 				ConfirmationTitle: a.ConfirmationTitle,
 				RiskAssessment:    a.RiskAssessment,
 				Edits:             a.Edits,
@@ -1141,9 +1160,6 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 				Options:           a.Options,
 			}
 			if pending != nil {
-				if next.ToolInput == nil {
-					next.ToolInput = pending.ToolInput
-				}
 				if next.ConfirmationTitle == nil {
 					next.ConfirmationTitle = pending.ConfirmationTitle
 				}
@@ -1188,8 +1204,9 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 		selected := resolveSelectedOption(s.Options, a.SelectedOptionId)
 		if a.Approved {
 			toolInput := s.ToolInput
-			if a.EditedToolInput != nil {
-				toolInput = a.EditedToolInput
+			if a.EditedToolInput != nil && toolInput != nil && toolInput.Inline != nil {
+				inline := *a.EditedToolInput
+				toolInput = &ahptypes.ToolInput{Inline: &inline}
 			}
 			meta := s.Meta
 			if a.Meta != nil {
@@ -1205,10 +1222,10 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
 				Intention:         s.Intention,
+				ToolInput:         toolInput,
 				Contributor:       s.Contributor,
 				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
-				ToolInput:         toolInput,
 				Confirmed:         confirmed,
 				SelectedOption:    selected,
 			}}
@@ -1227,10 +1244,10 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
 			Intention:         s.Intention,
+			ToolInput:         s.ToolInput,
 			Contributor:       s.Contributor,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
-			ToolInput:         s.ToolInput,
 			Reason:            reason,
 			ReasonMessage:     a.ReasonMessage,
 			UserSuggestion:    a.UserSuggestion,
@@ -1247,7 +1264,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 		}
 		var (
 			invocation       ahptypes.StringOrMarkdown
-			toolInput        *string
+			toolInput        *ahptypes.ToolInput
 			confirmed        = ahptypes.ToolCallConfirmationReasonNotNeeded
 			selectedOption   *ahptypes.ConfirmationOption
 			preAuthContent   []ahptypes.ToolResultContent
@@ -1297,10 +1314,10 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 				ToolName:          common.name,
 				DisplayName:       common.displayName,
 				Intention:         common.intention,
+				ToolInput:         toolInput,
 				Contributor:       common.contributor,
 				Meta:              common.meta,
 				InvocationMessage: invocation,
-				ToolInput:         toolInput,
 				Success:           a.Result.Success,
 				PastTenseMessage:  a.Result.PastTenseMessage,
 				Content:           append([]ahptypes.ToolResultContent(nil), content...),
@@ -1316,10 +1333,10 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			ToolName:          common.name,
 			DisplayName:       common.displayName,
 			Intention:         common.intention,
+			ToolInput:         toolInput,
 			Contributor:       common.contributor,
 			Meta:              common.meta,
 			InvocationMessage: invocation,
-			ToolInput:         toolInput,
 			Success:           a.Result.Success,
 			PastTenseMessage:  a.Result.PastTenseMessage,
 			Content:           append([]ahptypes.ToolResultContent(nil), content...),
@@ -1348,10 +1365,10 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 				ToolName:          s.ToolName,
 				DisplayName:       s.DisplayName,
 				Intention:         s.Intention,
+				ToolInput:         s.ToolInput,
 				Contributor:       s.Contributor,
 				Meta:              meta,
 				InvocationMessage: s.InvocationMessage,
-				ToolInput:         s.ToolInput,
 				Success:           s.Success,
 				PastTenseMessage:  s.PastTenseMessage,
 				Content:           s.Content,
@@ -1371,10 +1388,10 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
 			Intention:         s.Intention,
+			ToolInput:         s.ToolInput,
 			Contributor:       s.Contributor,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
-			ToolInput:         s.ToolInput,
 			Reason:            ahptypes.ToolCallCancellationReasonResultDenied,
 			SelectedOption:    s.SelectedOption,
 		}}
@@ -1403,10 +1420,10 @@ func applyToolCallAuthRequired(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
 			Intention:         s.Intention,
+			ToolInput:         s.ToolInput,
 			Contributor:       s.Contributor,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
-			ToolInput:         s.ToolInput,
 			Confirmed:         s.Confirmed,
 			SelectedOption:    s.SelectedOption,
 			Auth:              a.Auth,
@@ -1431,10 +1448,10 @@ func applyToolCallAuthResolved(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 			ToolName:          s.ToolName,
 			DisplayName:       s.DisplayName,
 			Intention:         s.Intention,
+			ToolInput:         s.ToolInput,
 			Contributor:       s.Contributor,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
-			ToolInput:         s.ToolInput,
 			Confirmed:         s.Confirmed,
 			SelectedOption:    s.SelectedOption,
 			Content:           append([]ahptypes.ToolResultContent(nil), s.Content...),
