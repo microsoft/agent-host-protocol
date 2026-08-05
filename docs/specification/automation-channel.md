@@ -22,6 +22,10 @@ An empty trigger list means manual-only. Schedule triggers are typed; event
 triggers use a host-defined type plus schema-defined configuration returned by
 `listAutomationTriggerDefinitions`.
 
+The session template can select a provider, model, and custom agent, and carries
+the same schema-defined configuration values used for ordinary session
+creation. Hosts revalidate all selections when a run starts.
+
 ## Catalogue
 
 Clients fetch summaries through `listAutomations` on `ahp-root://`. Root
@@ -65,4 +69,3 @@ occurrence with at most one run.
 Definitions contain no credentials or durable permission grants. The host
 authorizes every operation and revalidates session configuration at execution
 time.
-

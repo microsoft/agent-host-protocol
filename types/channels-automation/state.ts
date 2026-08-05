@@ -7,6 +7,8 @@
 import type { Message } from '../channels-chat/state.js';
 import type { ConfigSchema, URI } from '../common/state.js';
 import type { AutomationRunSummary } from '../channels-automation-run/state.js';
+import type { ModelSelection } from '../channels-root/state.js';
+import type { AgentSelection } from '../channels-session/state.js';
 
 /** @category Automation State */
 export const enum AutomationOperation {
@@ -142,6 +144,8 @@ export interface AutomationTriggerDefinition {
 /** @category Automation State */
 export interface AutomationSessionTemplate {
   provider?: string;
+  model?: ModelSelection;
+  agent?: AgentSelection;
   /** Absence means a workspace-less session. */
   workingDirectories?: URI[];
   /** Values resolved through `resolveSessionConfig`. */

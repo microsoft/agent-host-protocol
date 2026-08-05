@@ -7495,6 +7495,12 @@
         "provider": {
           "type": "string"
         },
+        "model": {
+          "$ref": "#/$defs/ModelSelection"
+        },
+        "agent": {
+          "$ref": "#/$defs/AgentSelection"
+        },
         "workingDirectories": {
           "type": "array",
           "items": {

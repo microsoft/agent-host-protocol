@@ -4886,6 +4886,8 @@ data class AutomationTriggerDefinition(
 @Serializable
 data class AutomationSessionTemplate(
     val provider: String? = null,
+    val model: ModelSelection? = null,
+    val agent: AgentSelection? = null,
     /**
      * Absence means a workspace-less session.
      */

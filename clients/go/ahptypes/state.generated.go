@@ -3723,7 +3723,9 @@ type AutomationTriggerDefinition struct {
 }
 
 type AutomationSessionTemplate struct {
-	Provider *string `json:"provider,omitempty"`
+	Provider *string         `json:"provider,omitempty"`
+	Model    *ModelSelection `json:"model,omitempty"`
+	Agent    *AgentSelection `json:"agent,omitempty"`
 	// Absence means a workspace-less session.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Values resolved through `resolveSessionConfig`.

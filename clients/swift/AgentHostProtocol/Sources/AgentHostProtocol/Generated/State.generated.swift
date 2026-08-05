@@ -5484,6 +5484,8 @@ public struct AutomationTriggerDefinition: Codable, Sendable {
 
 public struct AutomationSessionTemplate: Codable, Sendable {
     public var provider: String?
+    public var model: ModelSelection?
+    public var agent: AgentSelection?
     /// Absence means a workspace-less session.
     public var workingDirectories: [String]?
     /// Values resolved through `resolveSessionConfig`.
@@ -5491,10 +5493,14 @@ public struct AutomationSessionTemplate: Codable, Sendable {
 
     public init(
         provider: String? = nil,
+        model: ModelSelection? = nil,
+        agent: AgentSelection? = nil,
         workingDirectories: [String]? = nil,
         config: [String: AnyCodable]? = nil
     ) {
         self.provider = provider
+        self.model = model
+        self.agent = agent
         self.workingDirectories = workingDirectories
         self.config = config
     }
