@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.contentOrNull
 
 // ─── Command Enums ──────────────────────────────────────────────────────────
@@ -339,7 +340,11 @@ data class InitializeResult(
      * defines a template variable, `{level}`, for subscriber-side severity
      * filtering). Clients MAY ignore signals they cannot process.
      */
-    val telemetry: TelemetryCapabilities? = null
+    val telemetry: TelemetryCapabilities? = null,
+    /**
+     * Host automation support. Absence means unsupported.
+     */
+    val automations: AutomationCapabilities? = null
 )
 
 @Serializable
@@ -359,6 +364,42 @@ data class ClientCapabilities(
      */
     val mcpApps: Map<String, JsonElement>? = null
 )
+
+@Serializable
+data class AutomationCapabilities(
+    val execution: AutomationExecutionCapabilities,
+    val create: AutomationCreateCapability? = null,
+    val schedules: AutomationScheduleCapabilities? = null,
+    val runCancellation: AutomationRunCancellationCapability? = null,
+    val schedulePreview: AutomationSchedulePreviewCapability? = null,
+    val runHistoryLimit: Long? = null
+)
+
+@Serializable
+data class AutomationExecutionCapabilities(
+    val lifetime: AutomationExecutionLifetime
+)
+
+@Serializable
+class AutomationCreateCapability
+
+@Serializable
+data class AutomationScheduleCapabilities(
+    val kinds: List<AutomationScheduleKind>,
+    val cron: AutomationCronScheduleCapability? = null
+)
+
+@Serializable
+data class AutomationCronScheduleCapability(
+    val dialect: String,
+    val minIntervalMinutes: Long? = null
+)
+
+@Serializable
+class AutomationRunCancellationCapability
+
+@Serializable
+class AutomationSchedulePreviewCapability
 
 @Serializable
 data class Implementation(
@@ -1495,6 +1536,136 @@ data class ChangesetOperationFollowUp(
      * When `true`, open in an external handler rather than inline.
      */
     val external: Boolean? = null
+)
+
+@Serializable
+data class ListAutomationsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Maximum number of entries to return in this page. The server SHOULD respect
+     * this bound but MAY return fewer entries and MAY impose its own upper cap.
+     * Omit to let the server choose the page size.
+     */
+    val limit: Long? = null,
+    /**
+     * Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+     * Omit to fetch the first page. Cursors are server-defined and MUST be treated
+     * as opaque — do not parse, modify, or persist them across connections. An
+     * unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+     */
+    val cursor: String? = null,
+    val enabled: Boolean? = null
+)
+
+@Serializable
+data class ListAutomationsResult(
+    /**
+     * Opaque cursor for the next page. Present when more entries exist beyond the
+     * returned page; absent signals the end of the collection. Pass it back as
+     * {@link PaginatedParams.cursor} to fetch the following page.
+     */
+    val nextCursor: String? = null,
+    val items: List<AutomationSummary>
+)
+
+@Serializable
+data class ListAutomationTriggerDefinitionsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    val provider: String? = null,
+    val workingDirectories: List<String>? = null,
+    val sessionConfig: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class ListAutomationTriggerDefinitionsResult(
+    val items: List<AutomationTriggerDefinition>
+)
+
+@Serializable
+data class CreateAutomationParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    val definition: AutomationDefinition,
+    @SerialName("import")
+    val `import`: JsonElement? = null
+)
+
+@Serializable
+data class AutomationDefinitionPatch(
+    val title: String? = null,
+    val message: Message? = null,
+    val session: AutomationSessionTemplate? = null,
+    val enabled: Boolean? = null,
+    val triggers: List<AutomationTrigger>? = null,
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class UpdateAutomationParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    val expectedRevision: Long,
+    val changes: AutomationDefinitionPatch
+)
+
+@Serializable
+data class DisposeAutomationParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String
+)
+
+@Serializable
+data class RunAutomationParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    val requestId: String
+)
+
+@Serializable
+data class RunAutomationResult(
+    val run: String
+)
+
+@Serializable
+data class FetchAutomationRunsParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    val cursor: String? = null
+)
+
+@Serializable
+class FetchAutomationRunsResult
+
+@Serializable
+data class PreviewAutomationScheduleParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    val schedule: AutomationSchedule,
+    val count: Long? = null
+)
+
+@Serializable
+data class PreviewAutomationScheduleResult(
+    val items: List<String>
 )
 
 // ─── ChatSource Union ───────────────────────────────────────────────────────

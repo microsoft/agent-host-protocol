@@ -159,6 +159,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -660,6 +661,11 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'SessionOriginKind',
+  'AutomationOperation', 'AutomationExecutionLifetime', 'AutomationScheduleKind',
+  'AutomationWeekday', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
+  'AutomationRunOperation',
 ];
 
 /**
@@ -812,6 +818,33 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'TelemetryCapabilities' },
   { name: 'ResourceWatchState' },
   { name: 'ResourceChange' },
+  { name: 'AutomationSessionOrigin', omitDiscriminants: true },
+  { name: 'AutomationLocalTime' },
+  { name: 'AutomationHourlySchedule', omitDiscriminants: true },
+  { name: 'AutomationDailySchedule', omitDiscriminants: true },
+  { name: 'AutomationWeeklySchedule', omitDiscriminants: true },
+  { name: 'AutomationCronSchedule', omitDiscriminants: true },
+  { name: 'AutomationScheduleTrigger', omitDiscriminants: true },
+  { name: 'AutomationEventTrigger', omitDiscriminants: true },
+  { name: 'AutomationTriggerEventDefinition' },
+  { name: 'AutomationTriggerDefinition' },
+  { name: 'AutomationSessionTemplate' },
+  { name: 'AutomationDefinition' },
+  { name: 'AutomationRuntimeState' },
+  { name: 'AutomationSummary' },
+  { name: 'AutomationState' },
+  { name: 'AutomationRunBlocker' },
+  { name: 'AutomationManualRunCause', omitDiscriminants: true },
+  { name: 'AutomationTriggeredRunCause', omitDiscriminants: true },
+  { name: 'AutomationPendingRunLifecycle', omitDiscriminants: true },
+  { name: 'AutomationRunningRunLifecycle', omitDiscriminants: true },
+  { name: 'AutomationBlockedRunLifecycle', omitDiscriminants: true },
+  { name: 'AutomationCompletedRunLifecycle', omitDiscriminants: true },
+  { name: 'AutomationFailedRunLifecycle', omitDiscriminants: true },
+  { name: 'AutomationCancelledRunLifecycle', omitDiscriminants: true },
+  { name: 'AutomationRunArtifact' },
+  { name: 'AutomationRunSummary' },
+  { name: 'AutomationRunState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1042,6 +1075,61 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const SESSION_ORIGIN_UNION: UnionConfig = {
+  name: 'SessionOrigin',
+  discriminantField: 'kind',
+  doc: 'Durable origin of a session.',
+  variants: [
+    { variantName: 'Automation', innerType: 'AutomationSessionOrigin', wireValue: 'automation' },
+  ],
+};
+
+const AUTOMATION_SCHEDULE_UNION: UnionConfig = {
+  name: 'AutomationSchedule',
+  discriminantField: 'kind',
+  doc: 'Calendar schedule for an automation trigger.',
+  variants: [
+    { variantName: 'Hourly', innerType: 'AutomationHourlySchedule', wireValue: 'hourly' },
+    { variantName: 'Daily', innerType: 'AutomationDailySchedule', wireValue: 'daily' },
+    { variantName: 'Weekly', innerType: 'AutomationWeeklySchedule', wireValue: 'weekly' },
+    { variantName: 'Cron', innerType: 'AutomationCronSchedule', wireValue: 'cron' },
+  ],
+};
+
+const AUTOMATION_TRIGGER_UNION: UnionConfig = {
+  name: 'AutomationTrigger',
+  discriminantField: 'kind',
+  doc: 'Automatic trigger for an automation.',
+  variants: [
+    { variantName: 'Schedule', innerType: 'AutomationScheduleTrigger', wireValue: 'schedule' },
+    { variantName: 'Event', innerType: 'AutomationEventTrigger', wireValue: 'event' },
+  ],
+};
+
+const AUTOMATION_RUN_CAUSE_UNION: UnionConfig = {
+  name: 'AutomationRunCause',
+  discriminantField: 'kind',
+  doc: 'Cause of an automation run.',
+  variants: [
+    { variantName: 'Manual', innerType: 'AutomationManualRunCause', wireValue: 'manual' },
+    { variantName: 'Trigger', innerType: 'AutomationTriggeredRunCause', wireValue: 'trigger' },
+  ],
+};
+
+const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
+  name: 'AutomationRunLifecycle',
+  discriminantField: 'status',
+  doc: 'Lifecycle of an automation run.',
+  variants: [
+    { variantName: 'Pending', innerType: 'AutomationPendingRunLifecycle', wireValue: 'pending' },
+    { variantName: 'Running', innerType: 'AutomationRunningRunLifecycle', wireValue: 'running' },
+    { variantName: 'Blocked', innerType: 'AutomationBlockedRunLifecycle', wireValue: 'blocked' },
+    { variantName: 'Completed', innerType: 'AutomationCompletedRunLifecycle', wireValue: 'completed' },
+    { variantName: 'Failed', innerType: 'AutomationFailedRunLifecycle', wireValue: 'failed' },
+    { variantName: 'Cancelled', innerType: 'AutomationCancelledRunLifecycle', wireValue: 'cancelled' },
+  ],
+};
+
 function generateChatOrigin(): string {
   return `/// How a chat came into existence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1088,8 +1176,7 @@ pub enum ChatOrigin {
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot — root, session, chat, terminal,
-/// changeset, resource-watch, annotations, or content state.
+  return `/// The state payload of a snapshot.
 ///
 /// Deserialized by trying session first (has required \`lifecycle\`), then
 /// chat (has required \`turns\`), then terminal (has required \`content\`),
@@ -1105,6 +1192,8 @@ pub enum SnapshotState {
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
     Annotations(Box<AnnotationsState>),
+    Automation(Box<AutomationState>),
+    AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
 }`;
 }
@@ -1190,6 +1279,16 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(TOOL_CALL_RISK_ASSESSMENT_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(SESSION_ORIGIN_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_SCHEDULE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_TRIGGER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_CAUSE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
@@ -1292,6 +1391,17 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'automation/definitionChanged', variantName: 'AutomationDefinitionChanged', tsInterface: 'AutomationDefinitionChangedAction', boxed: true },
+  { type: 'automation/runSummarySet', variantName: 'AutomationRunSummarySet', tsInterface: 'AutomationRunSummarySetAction', boxed: true },
+  { type: 'automation/runSummaryRemoved', variantName: 'AutomationRunSummaryRemoved', tsInterface: 'AutomationRunSummaryRemovedAction' },
+  { type: 'automation/runsLoaded', variantName: 'AutomationRunsLoaded', tsInterface: 'AutomationRunsLoadedAction', boxed: true },
+  { type: 'automationRun/lifecycleChanged', variantName: 'AutomationRunLifecycleChanged', tsInterface: 'AutomationRunLifecycleChangedAction', boxed: true },
+  { type: 'automationRun/sessionSet', variantName: 'AutomationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
+  { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
+  { type: 'automationRun/primarySessionChanged', variantName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
+  { type: 'automationRun/artifactSet', variantName: 'AutomationRunArtifactSet', tsInterface: 'AutomationRunArtifactSetAction', boxed: true },
+  { type: 'automationRun/artifactRemoved', variantName: 'AutomationRunArtifactRemoved', tsInterface: 'AutomationRunArtifactRemovedAction' },
+  { type: 'automationRun/cancelRequested', variantName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
 ];
 
 function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Session'): string {
@@ -1330,7 +1440,7 @@ pub struct ${scope}ToolCallConfirmedAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AutomationDefinition, AutomationRunArtifact, AutomationRunLifecycle, AutomationRunOperation, AutomationRunSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1433,7 +1543,11 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
-  { name: 'ClientCapabilities' }, { name: 'Implementation' },
+  { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
+  { name: 'AutomationExecutionCapabilities' }, { name: 'AutomationCreateCapability' },
+  { name: 'AutomationScheduleCapabilities' }, { name: 'AutomationCronScheduleCapability' },
+  { name: 'AutomationRunCancellationCapability' }, { name: 'AutomationSchedulePreviewCapability' },
+  { name: 'Implementation' },
   { name: 'ReconnectParams' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
   { name: 'ReconnectSnapshotResult', omitDiscriminants: true },
@@ -1464,6 +1578,13 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'CompletionsParams' }, { name: 'CompletionItem' }, { name: 'CompletionsResult' },
   { name: 'InvokeChangesetOperationParams' }, { name: 'InvokeChangesetOperationResult' },
   { name: 'ChangesetOperationFollowUp' },
+  { name: 'ListAutomationsParams' }, { name: 'ListAutomationsResult' },
+  { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
+  { name: 'CreateAutomationParams' }, { name: 'AutomationDefinitionPatch' },
+  { name: 'UpdateAutomationParams' }, { name: 'DisposeAutomationParams' },
+  { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
+  { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
+  { name: 'PreviewAutomationScheduleParams' }, { name: 'PreviewAutomationScheduleResult' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1491,7 +1612,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationExecutionLifetime, AutomationSchedule, AutomationScheduleKind, AutomationSessionTemplate, AutomationSummary, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1601,6 +1722,9 @@ const NOTIFICATION_STRUCTS = [
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
+  'AutomationAddedParams',
+  'AutomationRemovedParams',
+  'AutomationSummaryChangedParams',
   'ProgressParams',
   'AuthRequiredParams',
   'OtlpExportLogsParams',
@@ -1611,7 +1735,7 @@ const NOTIFICATION_STRUCTS = [
 function generateNotificationsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, SessionStatus, SessionSummary};');
+  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, AutomationOperation, AutomationRunSummary, AutomationSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, SessionOrigin, SessionStatus, SessionSummary};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1918,6 +2042,11 @@ function checkExhaustiveness(project: Project): void {
     'SessionInputRequest',          // SESSION_INPUT_REQUEST_UNION discriminated union
     'ToolCallConfirmationState',    // TOOL_CALL_CONFIRMATION_STATE_UNION discriminated union
     'ReconnectResult',
+    'SessionOrigin',
+    'AutomationSchedule',
+    'AutomationTrigger',
+    'AutomationRunCause',
+    'AutomationRunLifecycle',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',

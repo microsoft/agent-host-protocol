@@ -93,6 +93,7 @@ pub(super) fn spawn(
         protocol_version: None,
         server_seq: 0,
         default_directory: None,
+        automations: None,
         root_state: RootState {
             agents: vec![],
             active_sessions: None,
@@ -346,6 +347,7 @@ impl HostRuntime {
                 }
                 state.protocol_version = Some(init.protocol_version.clone());
                 state.default_directory = init.default_directory.clone();
+                state.automations = init.automations.clone();
                 state.completion_trigger_characters = init
                     .completion_trigger_characters
                     .clone()
@@ -578,6 +580,11 @@ impl HostRuntime {
                     apply_summary_changes(existing, &n.changes);
                 }
             }
+            SubscriptionEvent::AutomationAdded(_)
+            | SubscriptionEvent::AutomationRemoved(_)
+            | SubscriptionEvent::AutomationSummaryChanged(_) => {
+                // No cache update; consumers observe via the event stream.
+            }
             SubscriptionEvent::AuthRequired(_) => {
                 // No cache update; consumers observe via the event stream.
             }
@@ -716,6 +723,9 @@ fn apply_summary_changes(
     }
     if let Some(v) = &changes.activity {
         existing.activity = Some(v.clone());
+    }
+    if let Some(v) = &changes.origin {
+        existing.origin = Some(v.clone());
     }
     if let Some(v) = &changes.modified_at {
         existing.modified_at = v.clone();

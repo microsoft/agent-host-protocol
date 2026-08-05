@@ -143,6 +143,27 @@ func TestSnapshotStateVariants(t *testing.T) {
 	}
 }
 
+func TestAutomationScheduleUsesUnionDiscriminator(t *testing.T) {
+	schedule := AutomationSchedule{
+		Value: &AutomationDailySchedule{
+			Kind:     AutomationScheduleKindHourly,
+			Time:     AutomationLocalTime{Hour: 9, Minute: 0},
+			TimeZone: "UTC",
+		},
+	}
+	data, err := json.Marshal(schedule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wire map[string]any
+	if err := json.Unmarshal(data, &wire); err != nil {
+		t.Fatal(err)
+	}
+	if wire["kind"] != "daily" {
+		t.Fatalf("expected daily union discriminator, got %v", wire["kind"])
+	}
+}
+
 // TestSessionStatusBitset confirms the typed-uint32 Has/Or helpers
 // match the canonical bitset semantics.
 func TestSessionStatusBitset(t *testing.T) {

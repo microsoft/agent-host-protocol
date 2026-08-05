@@ -266,6 +266,8 @@ public struct InitializeResult: Codable, Sendable {
     /// defines a template variable, `{level}`, for subscriber-side severity
     /// filtering). Clients MAY ignore signals they cannot process.
     public var telemetry: TelemetryCapabilities?
+    /// Host automation support. Absence means unsupported.
+    public var automations: AutomationCapabilities?
 
     public init(
         protocolVersion: String,
@@ -275,7 +277,8 @@ public struct InitializeResult: Codable, Sendable {
         defaultDirectory: String? = nil,
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
-        telemetry: TelemetryCapabilities? = nil
+        telemetry: TelemetryCapabilities? = nil,
+        automations: AutomationCapabilities? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -285,6 +288,7 @@ public struct InitializeResult: Codable, Sendable {
         self.completionTriggerCharacters = completionTriggerCharacters
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
+        self.automations = automations
     }
 }
 
@@ -306,6 +310,91 @@ public struct ClientCapabilities: Codable, Sendable {
         mcpApps: [String: AnyCodable]? = nil
     ) {
         self.mcpApps = mcpApps
+    }
+}
+
+public struct AutomationCapabilities: Codable, Sendable {
+    public var execution: AutomationExecutionCapabilities
+    public var create: AutomationCreateCapability?
+    public var schedules: AutomationScheduleCapabilities?
+    public var runCancellation: AutomationRunCancellationCapability?
+    public var schedulePreview: AutomationSchedulePreviewCapability?
+    public var runHistoryLimit: Int?
+
+    public init(
+        execution: AutomationExecutionCapabilities,
+        create: AutomationCreateCapability? = nil,
+        schedules: AutomationScheduleCapabilities? = nil,
+        runCancellation: AutomationRunCancellationCapability? = nil,
+        schedulePreview: AutomationSchedulePreviewCapability? = nil,
+        runHistoryLimit: Int? = nil
+    ) {
+        self.execution = execution
+        self.create = create
+        self.schedules = schedules
+        self.runCancellation = runCancellation
+        self.schedulePreview = schedulePreview
+        self.runHistoryLimit = runHistoryLimit
+    }
+}
+
+public struct AutomationExecutionCapabilities: Codable, Sendable {
+    public var lifetime: AutomationExecutionLifetime
+
+    public init(
+        lifetime: AutomationExecutionLifetime
+    ) {
+        self.lifetime = lifetime
+    }
+}
+
+public struct AutomationCreateCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationScheduleCapabilities: Codable, Sendable {
+    public var kinds: [AutomationScheduleKind]
+    public var cron: AutomationCronScheduleCapability?
+
+    public init(
+        kinds: [AutomationScheduleKind],
+        cron: AutomationCronScheduleCapability? = nil
+    ) {
+        self.kinds = kinds
+        self.cron = cron
+    }
+}
+
+public struct AutomationCronScheduleCapability: Codable, Sendable {
+    public var dialect: String
+    public var minIntervalMinutes: Int?
+
+    public init(
+        dialect: String,
+        minIntervalMinutes: Int? = nil
+    ) {
+        self.dialect = dialect
+        self.minIntervalMinutes = minIntervalMinutes
+    }
+}
+
+public struct AutomationRunCancellationCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationSchedulePreviewCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
     }
 }
 
@@ -1817,6 +1906,237 @@ public struct ChangesetOperationFollowUp: Codable, Sendable {
     ) {
         self.content = content
         self.external = external
+    }
+}
+
+public struct ListAutomationsParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Maximum number of entries to return in this page. The server SHOULD respect
+    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
+    /// Omit to let the server choose the page size.
+    public var limit: Int?
+    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+    /// as opaque — do not parse, modify, or persist them across connections. An
+    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+    public var cursor: String?
+    public var enabled: Bool?
+
+    public init(
+        channel: String,
+        limit: Int? = nil,
+        cursor: String? = nil,
+        enabled: Bool? = nil
+    ) {
+        self.channel = channel
+        self.limit = limit
+        self.cursor = cursor
+        self.enabled = enabled
+    }
+}
+
+public struct ListAutomationsResult: Codable, Sendable {
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    public var nextCursor: String?
+    public var items: [AutomationSummary]
+
+    public init(
+        nextCursor: String? = nil,
+        items: [AutomationSummary]
+    ) {
+        self.nextCursor = nextCursor
+        self.items = items
+    }
+}
+
+public struct ListAutomationTriggerDefinitionsParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    public var provider: String?
+    public var workingDirectories: [String]?
+    public var sessionConfig: [String: AnyCodable]?
+
+    public init(
+        channel: String,
+        provider: String? = nil,
+        workingDirectories: [String]? = nil,
+        sessionConfig: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.provider = provider
+        self.workingDirectories = workingDirectories
+        self.sessionConfig = sessionConfig
+    }
+}
+
+public struct ListAutomationTriggerDefinitionsResult: Codable, Sendable {
+    public var items: [AutomationTriggerDefinition]
+
+    public init(
+        items: [AutomationTriggerDefinition]
+    ) {
+        self.items = items
+    }
+}
+
+public struct CreateAutomationParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    public var definition: AutomationDefinition
+    public var `import`: AnyCodable?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case definition
+        case `import` = "import"
+    }
+
+    public init(
+        channel: String,
+        definition: AutomationDefinition,
+        `import`: AnyCodable? = nil
+    ) {
+        self.channel = channel
+        self.definition = definition
+        self.`import` = `import`
+    }
+}
+
+public struct AutomationDefinitionPatch: Codable, Sendable {
+    public var title: String?
+    public var message: Message?
+    public var session: AutomationSessionTemplate?
+    public var enabled: Bool?
+    public var triggers: [AutomationTrigger]?
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case message
+        case session
+        case enabled
+        case triggers
+        case meta = "_meta"
+    }
+
+    public init(
+        title: String? = nil,
+        message: Message? = nil,
+        session: AutomationSessionTemplate? = nil,
+        enabled: Bool? = nil,
+        triggers: [AutomationTrigger]? = nil,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.title = title
+        self.message = message
+        self.session = session
+        self.enabled = enabled
+        self.triggers = triggers
+        self.meta = meta
+    }
+}
+
+public struct UpdateAutomationParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    public var expectedRevision: Int
+    public var changes: AutomationDefinitionPatch
+
+    public init(
+        channel: String,
+        expectedRevision: Int,
+        changes: AutomationDefinitionPatch
+    ) {
+        self.channel = channel
+        self.expectedRevision = expectedRevision
+        self.changes = changes
+    }
+}
+
+public struct DisposeAutomationParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+
+    public init(
+        channel: String
+    ) {
+        self.channel = channel
+    }
+}
+
+public struct RunAutomationParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    public var requestId: String
+
+    public init(
+        channel: String,
+        requestId: String
+    ) {
+        self.channel = channel
+        self.requestId = requestId
+    }
+}
+
+public struct RunAutomationResult: Codable, Sendable {
+    public var run: String
+
+    public init(
+        run: String
+    ) {
+        self.run = run
+    }
+}
+
+public struct FetchAutomationRunsParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    public var cursor: String?
+
+    public init(
+        channel: String,
+        cursor: String? = nil
+    ) {
+        self.channel = channel
+        self.cursor = cursor
+    }
+}
+
+public struct FetchAutomationRunsResult: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct PreviewAutomationScheduleParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    public var schedule: AutomationSchedule
+    public var count: Int?
+
+    public init(
+        channel: String,
+        schedule: AutomationSchedule,
+        count: Int? = nil
+    ) {
+        self.channel = channel
+        self.schedule = schedule
+        self.count = count
+    }
+}
+
+public struct PreviewAutomationScheduleResult: Codable, Sendable {
+    public var items: [String]
+
+    public init(
+        items: [String]
+    ) {
+        self.items = items
     }
 }
 

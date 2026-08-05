@@ -69,6 +69,9 @@ target channel instead.
 | `authenticate` | request | Bearer-token push for protected resources is connection-level. |
 | `resolveSessionConfig` | request | Pre-creation config resolution happens before any session channel exists. |
 | `sessionConfigCompletions` | request | Completes dynamic fields in pre-creation session config. |
+| `listAutomations` | request | Fetches the paginated automation catalogue. |
+| `listAutomationTriggerDefinitions` | request | Describes host-defined event triggers. |
+| `previewAutomationSchedule` | request | Computes host-canonical future schedule occurrences. |
 
 ### Notifications (`params.channel = "ahp-root://"`)
 
@@ -79,6 +82,9 @@ target channel instead.
 | `root/sessionRemoved` | server → client notification | Session catalogue entry removed. |
 | `root/sessionSummaryChanged` | server → client notification | Session catalogue entry mutated. |
 | `root/progress` | server → client notification | Generic progress for a long-running operation a client opted into (e.g. an SDK download). |
+| `root/automationAdded` | server → client notification | Automation catalogue entry created. |
+| `root/automationRemoved` | server → client notification | Automation catalogue entry removed. |
+| `root/automationSummaryChanged` | server → client notification | Automation catalogue entry mutated. |
 | `unsubscribe` | client → server notification | Stop receiving root-channel messages. |
 | `dispatchAction` | client → server notification | Dispatch a root-scoped client action (currently `root/configChanged`). |
 

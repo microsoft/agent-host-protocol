@@ -1,0 +1,54 @@
+{
+  "name": "automation-run-snapshot",
+  "group": "A",
+  "description": "An automation-run snapshot preserves multiple session attempts and artifacts.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-automation-run:/r1",
+    "state": {
+      "resource": "ahp-automation-run:/r1",
+      "automation": "ahp-automation:/a1",
+      "cause": { "kind": "manual" },
+      "lifecycle": {
+        "status": "completed",
+        "createdAt": "2026-08-05T12:00:00Z",
+        "startedAt": "2026-08-05T12:00:01Z",
+        "completedAt": "2026-08-05T12:03:00Z"
+      },
+      "sessions": ["ahp-session:/old", "ahp-session:/retry"],
+      "primarySession": "ahp-session:/retry",
+      "artifacts": [{
+        "id": "report",
+        "label": "Report",
+        "uri": "https://example.test/report",
+        "contentType": "text/markdown"
+      }],
+      "operations": []
+    },
+    "fromSeq": 9
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-automation-run:/r1",
+    "state": {
+      "resource": "ahp-automation-run:/r1",
+      "automation": "ahp-automation:/a1",
+      "cause": { "kind": "manual" },
+      "lifecycle": {
+        "status": "completed",
+        "createdAt": "2026-08-05T12:00:00Z",
+        "startedAt": "2026-08-05T12:00:01Z",
+        "completedAt": "2026-08-05T12:03:00Z"
+      },
+      "sessions": ["ahp-session:/old", "ahp-session:/retry"],
+      "primarySession": "ahp-session:/retry",
+      "artifacts": [{
+        "id": "report",
+        "label": "Report",
+        "uri": "https://example.test/report",
+        "contentType": "text/markdown"
+      }],
+      "operations": []
+    },
+    "fromSeq": 9
+  }]
+}

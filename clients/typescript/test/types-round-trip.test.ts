@@ -51,7 +51,7 @@ import type {
   ActionEnvelope,
   StateAction,
 } from '../src/types/common/actions.js';
-import type { StringOrMarkdown } from '../src/types/common/state.js';
+import type { Snapshot, StringOrMarkdown } from '../src/types/common/state.js';
 import type { ChangesetOperationTarget } from '../src/types/channels-changeset/commands.js';
 import type {
   ChatInputQuestion,
@@ -244,6 +244,7 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'Implementation':     void (parsed as Implementation); break;
     case 'InitializeResult':    void (parsed as InitializeResult); break;
     case 'ChatSource':          void (parsed as ChatSource); break;
+    case 'Snapshot':            void (parsed as Snapshot); break;
     default:
       throw new Error(
         `${file}: unknown wire type "${type}". Add a decode entry to bindToType.`,

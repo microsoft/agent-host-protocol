@@ -25,22 +25,26 @@ type HostedResourceKey struct {
 // [ApplyActionToRoot] / [ApplyActionToSession] / [ApplyActionToChat] /
 // [ApplyActionToTerminal] reducer and re-storing the result.
 type MultiHostStateMirror struct {
-	mu      sync.RWMutex
-	roots   map[string]ahptypes.RootState
-	session map[HostedResourceKey]ahptypes.SessionState
-	chat    map[HostedResourceKey]ahptypes.ChatState
-	term    map[HostedResourceKey]ahptypes.TerminalState
-	changes map[HostedResourceKey]ahptypes.ChangesetState
+	mu            sync.RWMutex
+	roots         map[string]ahptypes.RootState
+	session       map[HostedResourceKey]ahptypes.SessionState
+	chat          map[HostedResourceKey]ahptypes.ChatState
+	term          map[HostedResourceKey]ahptypes.TerminalState
+	changes       map[HostedResourceKey]ahptypes.ChangesetState
+	automation    map[HostedResourceKey]ahptypes.AutomationState
+	automationRun map[HostedResourceKey]ahptypes.AutomationRunState
 }
 
 // NewMultiHostStateMirror returns an empty mirror.
 func NewMultiHostStateMirror() *MultiHostStateMirror {
 	return &MultiHostStateMirror{
-		roots:   make(map[string]ahptypes.RootState),
-		session: make(map[HostedResourceKey]ahptypes.SessionState),
-		chat:    make(map[HostedResourceKey]ahptypes.ChatState),
-		term:    make(map[HostedResourceKey]ahptypes.TerminalState),
-		changes: make(map[HostedResourceKey]ahptypes.ChangesetState),
+		roots:         make(map[string]ahptypes.RootState),
+		session:       make(map[HostedResourceKey]ahptypes.SessionState),
+		chat:          make(map[HostedResourceKey]ahptypes.ChatState),
+		term:          make(map[HostedResourceKey]ahptypes.TerminalState),
+		changes:       make(map[HostedResourceKey]ahptypes.ChangesetState),
+		automation:    make(map[HostedResourceKey]ahptypes.AutomationState),
+		automationRun: make(map[HostedResourceKey]ahptypes.AutomationRunState),
 	}
 }
 
@@ -124,6 +128,36 @@ func (m *MultiHostStateMirror) Changeset(hostID string, uri ahptypes.URI) (ahpty
 	return v, ok
 }
 
+// PutAutomation stores an automation snapshot under (hostID, uri).
+func (m *MultiHostStateMirror) PutAutomation(hostID string, uri ahptypes.URI, automation ahptypes.AutomationState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.automation[HostedResourceKey{hostID, uri}] = automation
+}
+
+// Automation returns the automation snapshot at (hostID, uri).
+func (m *MultiHostStateMirror) Automation(hostID string, uri ahptypes.URI) (ahptypes.AutomationState, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.automation[HostedResourceKey{hostID, uri}]
+	return v, ok
+}
+
+// PutAutomationRun stores an automation-run snapshot under (hostID, uri).
+func (m *MultiHostStateMirror) PutAutomationRun(hostID string, uri ahptypes.URI, run ahptypes.AutomationRunState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.automationRun[HostedResourceKey{hostID, uri}] = run
+}
+
+// AutomationRun returns the automation-run snapshot at (hostID, uri).
+func (m *MultiHostStateMirror) AutomationRun(hostID string, uri ahptypes.URI) (ahptypes.AutomationRunState, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.automationRun[HostedResourceKey{hostID, uri}]
+	return v, ok
+}
+
 // DropHost removes every snapshot belonging to hostID. Use when a
 // host is removed from the multi-host registry.
 func (m *MultiHostStateMirror) DropHost(hostID string) {
@@ -150,6 +184,16 @@ func (m *MultiHostStateMirror) DropHost(hostID string) {
 			delete(m.changes, k)
 		}
 	}
+	for k := range m.automation {
+		if k.HostID == hostID {
+			delete(m.automation, k)
+		}
+	}
+	for k := range m.automationRun {
+		if k.HostID == hostID {
+			delete(m.automationRun, k)
+		}
+	}
 }
 
 // DropResource removes the snapshot at (hostID, uri) across every
@@ -162,4 +206,6 @@ func (m *MultiHostStateMirror) DropResource(hostID string, uri ahptypes.URI) {
 	delete(m.chat, k)
 	delete(m.term, k)
 	delete(m.changes, k)
+	delete(m.automation, k)
+	delete(m.automationRun, k)
 }

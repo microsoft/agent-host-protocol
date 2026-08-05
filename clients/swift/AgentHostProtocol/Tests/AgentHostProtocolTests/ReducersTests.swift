@@ -95,6 +95,13 @@ final class ReducersTests: XCTestCase {
         XCTAssertTrue(isClientDispatchable(action))
     }
 
+    func testAutomationCancellationIsClientDispatchable() {
+        let action: StateAction = .automationRunCancelRequested(
+            AutomationRunCancelRequestedAction(type: .automationRunCancelRequested)
+        )
+        XCTAssertTrue(isClientDispatchable(action))
+    }
+
     func testClientDispatchableReturnsFalse() {
         let action: StateAction = .sessionReady(SessionReadyAction(type: .sessionReady))
         XCTAssertFalse(isClientDispatchable(action))

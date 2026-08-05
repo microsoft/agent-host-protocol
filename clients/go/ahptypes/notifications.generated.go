@@ -85,6 +85,21 @@ type SessionSummaryChangedParams struct {
 	Changes PartialSessionSummary `json:"changes"`
 }
 
+type AutomationAddedParams struct {
+	Channel URI               `json:"channel"`
+	Summary AutomationSummary `json:"summary"`
+}
+
+type AutomationRemovedParams struct {
+	Channel    URI `json:"channel"`
+	Automation URI `json:"automation"`
+}
+
+type AutomationSummaryChangedParams struct {
+	Channel URI               `json:"channel"`
+	Summary AutomationSummary `json:"summary"`
+}
+
 // Generic progress notification for a long-running operation.
 //
 // A client opts in to progress for a request by including a `progressToken` in
@@ -215,6 +230,8 @@ type PartialSessionSummary struct {
 	Status *SessionStatus `json:"status,omitempty"`
 	// Human-readable description of what the session is currently doing
 	Activity *string `json:"activity,omitempty"`
+	// Durable origin of this session, when another AHP resource created it.
+	Origin *SessionOrigin `json:"origin,omitempty"`
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
 	// The working directories the session's agent has tool access to, as

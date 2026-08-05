@@ -13,11 +13,12 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[allow(unused_imports)]
 use crate::state::{
-    AgentInfo, AgentSelection, Annotation, AnnotationEntry, Changeset, ChangesetFile,
-    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
-    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
-    ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement, McpServerState,
-    Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
+    AgentInfo, AgentSelection, Annotation, AnnotationEntry, AutomationDefinition,
+    AutomationRunArtifact, AutomationRunLifecycle, AutomationRunOperation, AutomationRunSummary,
+    Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
+    ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
+    ChatSummary, ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement,
+    McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
     SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
     ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
     ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
@@ -198,6 +199,28 @@ pub enum ActionType {
     TerminalCommandFinished,
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged,
+    #[serde(rename = "automation/definitionChanged")]
+    AutomationDefinitionChanged,
+    #[serde(rename = "automation/runSummarySet")]
+    AutomationRunSummarySet,
+    #[serde(rename = "automation/runSummaryRemoved")]
+    AutomationRunSummaryRemoved,
+    #[serde(rename = "automation/runsLoaded")]
+    AutomationRunsLoaded,
+    #[serde(rename = "automationRun/lifecycleChanged")]
+    AutomationRunLifecycleChanged,
+    #[serde(rename = "automationRun/sessionSet")]
+    AutomationRunSessionSet,
+    #[serde(rename = "automationRun/sessionRemoved")]
+    AutomationRunSessionRemoved,
+    #[serde(rename = "automationRun/primarySessionChanged")]
+    AutomationRunPrimarySessionChanged,
+    #[serde(rename = "automationRun/artifactSet")]
+    AutomationRunArtifactSet,
+    #[serde(rename = "automationRun/artifactRemoved")]
+    AutomationRunArtifactRemoved,
+    #[serde(rename = "automationRun/cancelRequested")]
+    AutomationRunCancelRequested,
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -1736,6 +1759,78 @@ pub struct ResourceWatchChangedAction {
     pub changes: AnyValue,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationDefinitionChangedAction {
+    pub definition: AutomationDefinition,
+    pub revision: i64,
+    pub modified_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_run_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunSummarySetAction {
+    pub run: AutomationRunSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunSummaryRemovedAction {
+    pub run: Uri,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunsLoadedAction {
+    pub runs: Vec<AutomationRunSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunLifecycleChangedAction {
+    pub lifecycle: AutomationRunLifecycle,
+    pub operations: Vec<AutomationRunOperation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunSessionSetAction {
+    pub session: Uri,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunSessionRemovedAction {
+    pub session: Uri,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunPrimarySessionChangedAction {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_session: Option<Uri>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunArtifactSetAction {
+    pub artifact: AutomationRunArtifact,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunArtifactRemovedAction {
+    pub artifact_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunCancelRequestedAction {}
+
 // ─── Partial Summaries ────────────────────────────────────────────────
 
 /// Partial equivalent of ChatSummary — every field is optional for delta updates.
@@ -1949,6 +2044,28 @@ pub enum StateAction {
     TerminalCommandFinished(TerminalCommandFinishedAction),
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged(ResourceWatchChangedAction),
+    #[serde(rename = "automation/definitionChanged")]
+    AutomationDefinitionChanged(Box<AutomationDefinitionChangedAction>),
+    #[serde(rename = "automation/runSummarySet")]
+    AutomationRunSummarySet(Box<AutomationRunSummarySetAction>),
+    #[serde(rename = "automation/runSummaryRemoved")]
+    AutomationRunSummaryRemoved(AutomationRunSummaryRemovedAction),
+    #[serde(rename = "automation/runsLoaded")]
+    AutomationRunsLoaded(Box<AutomationRunsLoadedAction>),
+    #[serde(rename = "automationRun/lifecycleChanged")]
+    AutomationRunLifecycleChanged(Box<AutomationRunLifecycleChangedAction>),
+    #[serde(rename = "automationRun/sessionSet")]
+    AutomationRunSessionSet(AutomationRunSessionSetAction),
+    #[serde(rename = "automationRun/sessionRemoved")]
+    AutomationRunSessionRemoved(AutomationRunSessionRemovedAction),
+    #[serde(rename = "automationRun/primarySessionChanged")]
+    AutomationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction),
+    #[serde(rename = "automationRun/artifactSet")]
+    AutomationRunArtifactSet(Box<AutomationRunArtifactSetAction>),
+    #[serde(rename = "automationRun/artifactRemoved")]
+    AutomationRunArtifactRemoved(AutomationRunArtifactRemovedAction),
+    #[serde(rename = "automationRun/cancelRequested")]
+    AutomationRunCancelRequested(AutomationRunCancelRequestedAction),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

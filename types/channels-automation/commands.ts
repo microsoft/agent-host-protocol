@@ -1,0 +1,142 @@
+/**
+ * Automation Channel Commands.
+ *
+ * @module channels-automation/commands
+ */
+
+import type { BaseParams, PaginatedParams, PaginatedResult } from '../common/commands.js';
+import type { URI } from '../common/state.js';
+import type {
+  AutomationDefinition,
+  AutomationSchedule,
+  AutomationSessionTemplate,
+  AutomationSummary,
+  AutomationTrigger,
+  AutomationTriggerDefinition,
+} from './state.js';
+import type { Message } from '../channels-chat/state.js';
+
+/**
+ * @category Commands
+ * @method listAutomations
+ * @direction Client → Server
+ * @messageType Request
+ */
+export interface ListAutomationsParams extends BaseParams, PaginatedParams {
+  channel: 'ahp-root://';
+  enabled?: boolean;
+}
+
+/** @category Commands */
+export interface ListAutomationsResult extends PaginatedResult {
+  items: AutomationSummary[];
+}
+
+/**
+ * @category Commands
+ * @method listAutomationTriggerDefinitions
+ * @direction Client → Server
+ * @messageType Request
+ */
+export interface ListAutomationTriggerDefinitionsParams extends BaseParams {
+  channel: 'ahp-root://';
+  provider?: string;
+  workingDirectories?: URI[];
+  sessionConfig?: Record<string, unknown>;
+}
+
+/** @category Commands */
+export interface ListAutomationTriggerDefinitionsResult {
+  items: AutomationTriggerDefinition[];
+}
+
+/**
+ * @category Commands
+ * @method createAutomation
+ * @direction Client → Server
+ * @messageType Request
+ */
+export interface CreateAutomationParams extends BaseParams {
+  channel: URI;
+  definition: AutomationDefinition;
+  import?: {
+    source: string;
+    batchId: string;
+    itemId: string;
+  };
+}
+
+/** @category Commands */
+export interface AutomationDefinitionPatch {
+  title?: string;
+  message?: Message;
+  session?: AutomationSessionTemplate;
+  enabled?: boolean;
+  triggers?: AutomationTrigger[];
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * @category Commands
+ * @method updateAutomation
+ * @direction Client → Server
+ * @messageType Request
+ */
+export interface UpdateAutomationParams extends BaseParams {
+  channel: URI;
+  expectedRevision: number;
+  changes: AutomationDefinitionPatch;
+}
+
+/**
+ * @category Commands
+ * @method disposeAutomation
+ * @direction Client → Server
+ * @messageType Request
+ */
+export interface DisposeAutomationParams extends BaseParams {}
+
+/**
+ * @category Commands
+ * @method runAutomation
+ * @direction Client → Server
+ * @messageType Request
+ */
+export interface RunAutomationParams extends BaseParams {
+  requestId: string;
+}
+
+/** @category Commands */
+export interface RunAutomationResult {
+  run: URI;
+}
+
+/**
+ * @category Commands
+ * @method fetchAutomationRuns
+ * @direction Client → Server
+ * @messageType Request
+ */
+export interface FetchAutomationRunsParams extends BaseParams {
+  cursor?: string;
+}
+
+/** @category Commands */
+export interface FetchAutomationRunsResult {}
+
+/**
+ * @category Commands
+ * @method previewAutomationSchedule
+ * @direction Client → Server
+ * @messageType Request
+ */
+export interface PreviewAutomationScheduleParams extends BaseParams {
+  channel: 'ahp-root://';
+  schedule: AutomationSchedule;
+  count?: number;
+}
+
+/** @category Commands */
+export interface PreviewAutomationScheduleResult {
+  items: string[];
+}

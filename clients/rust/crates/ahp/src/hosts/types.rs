@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use ahp_types::actions::ActionEnvelope;
+use ahp_types::commands::AutomationCapabilities;
 use ahp_types::state::{AgentInfo, RootState, SessionSummary, TerminalInfo};
 use thiserror::Error;
 use tokio::sync::{broadcast, Mutex};
@@ -202,9 +203,10 @@ impl std::fmt::Debug for HostConfig {
 /// Snapshot of everything the multi-host SDK knows about a single host.
 ///
 /// This is the value type UIs render: connection state, last error,
-/// protocol version, agents pulled from root state, subscribed URIs,
-/// cached session summaries, and so on. Cheap to clone (most fields
-/// are small or already `Arc`-shared internally).
+/// protocol version, host automation capabilities, agents pulled from
+/// root state, subscribed URIs, cached session summaries, and so on.
+/// Cheap to clone (most fields are small or already `Arc`-shared
+/// internally).
 ///
 /// Snapshots are immutable; refresh by calling [`super::MultiHostClient::host`]
 /// or [`super::MultiHostClient::hosts`] again, or subscribe to the
@@ -235,6 +237,8 @@ pub struct HostHandle {
     pub server_seq: i64,
     /// Optional `defaultDirectory` from the host's `InitializeResult`.
     pub default_directory: Option<String>,
+    /// Automation support advertised by the host.
+    pub automations: Option<AutomationCapabilities>,
     /// Agents currently advertised by the host (mirrored from root state).
     pub agents: Vec<AgentInfo>,
     /// Active session count from root state, when present.
@@ -543,6 +547,7 @@ pub(super) struct HostInternal {
     pub(super) protocol_version: Option<String>,
     pub(super) server_seq: i64,
     pub(super) default_directory: Option<String>,
+    pub(super) automations: Option<AutomationCapabilities>,
     pub(super) root_state: RootState,
     pub(super) subscriptions: Vec<String>,
     pub(super) completion_trigger_characters: Vec<String>,
@@ -563,6 +568,7 @@ impl HostInternal {
             protocol_version: self.protocol_version.clone(),
             server_seq: self.server_seq,
             default_directory: self.default_directory.clone(),
+            automations: self.automations.clone(),
             agents: self.root_state.agents.clone(),
             active_sessions: self.root_state.active_sessions,
             terminals: self.root_state.terminals.clone(),

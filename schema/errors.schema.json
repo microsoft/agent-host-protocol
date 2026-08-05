@@ -507,6 +507,12 @@
             },
             {
               "$ref": "#/$defs/ChatState"
+            },
+            {
+              "$ref": "#/$defs/AutomationState"
+            },
+            {
+              "$ref": "#/$defs/AutomationRunState"
             }
           ],
           "description": "The current state of the resource"
@@ -734,6 +740,25 @@
         "values"
       ]
     },
+    "AutomationSessionOrigin": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "automation"
+        },
+        "automation": {
+          "$ref": "#/$defs/URI"
+        },
+        "run": {
+          "$ref": "#/$defs/URI"
+        }
+      },
+      "required": [
+        "kind",
+        "automation",
+        "run"
+      ]
+    },
     "SessionMetadata": {
       "type": "object",
       "description": "Metadata shared between the full {@link SessionState} (delivered when a\nclient subscribes to a session's URI) and the lightweight\n{@link SessionSummary} (carried in the root-channel session catalog).\n\nThese fields describe the session at a glance and appear in both places.\n`SessionState` owns the authoritative values for a subscribed session;\n`SessionSummary` mirrors them into the catalog so clients that only render a\nsession list don't have to subscribe to every session URI. The host keeps\nthe catalog in sync via `root/sessionSummaryChanged`.",
@@ -753,6 +778,10 @@
         "activity": {
           "type": "string",
           "description": "Human-readable description of what the session is currently doing"
+        },
+        "origin": {
+          "$ref": "#/$defs/SessionOrigin",
+          "description": "Durable origin of this session, when another AHP resource created it."
         },
         "project": {
           "$ref": "#/$defs/ProjectInfo",
@@ -795,6 +824,10 @@
         "activity": {
           "type": "string",
           "description": "Human-readable description of what the session is currently doing"
+        },
+        "origin": {
+          "$ref": "#/$defs/SessionOrigin",
+          "description": "Durable origin of this session, when another AHP resource created it."
         },
         "project": {
           "$ref": "#/$defs/ProjectInfo",
@@ -1099,6 +1132,10 @@
         "activity": {
           "type": "string",
           "description": "Human-readable description of what the session is currently doing"
+        },
+        "origin": {
+          "$ref": "#/$defs/SessionOrigin",
+          "description": "Durable origin of this session, when another AHP resource created it."
         },
         "project": {
           "$ref": "#/$defs/ProjectInfo",
@@ -4979,6 +5016,689 @@
         "type"
       ]
     },
+    "AutomationLocalTime": {
+      "type": "object",
+      "properties": {
+        "hour": {
+          "type": "number"
+        },
+        "minute": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "hour",
+        "minute"
+      ]
+    },
+    "AutomationHourlySchedule": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "hourly"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AutomationDailySchedule": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "daily"
+        },
+        "time": {
+          "$ref": "#/$defs/AutomationLocalTime"
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "IANA time-zone identifier."
+        }
+      },
+      "required": [
+        "kind",
+        "time",
+        "timeZone"
+      ]
+    },
+    "AutomationWeeklySchedule": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "weekly"
+        },
+        "weekday": {
+          "$ref": "#/$defs/AutomationWeekday"
+        },
+        "time": {
+          "$ref": "#/$defs/AutomationLocalTime"
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "IANA time-zone identifier."
+        }
+      },
+      "required": [
+        "kind",
+        "weekday",
+        "time",
+        "timeZone"
+      ]
+    },
+    "AutomationCronSchedule": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "cron"
+        },
+        "expression": {
+          "type": "string",
+          "description": "Standard five-field Unix cron expression."
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "IANA time-zone identifier."
+        }
+      },
+      "required": [
+        "kind",
+        "expression",
+        "timeZone"
+      ]
+    },
+    "AutomationScheduleTrigger": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable within the automation definition."
+        },
+        "kind": {
+          "const": "schedule"
+        },
+        "schedule": {
+          "$ref": "#/$defs/AutomationSchedule"
+        },
+        "misfirePolicy": {
+          "$ref": "#/$defs/AutomationMisfirePolicy"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "schedule"
+      ]
+    },
+    "AutomationEventTrigger": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable within the automation definition."
+        },
+        "kind": {
+          "const": "event"
+        },
+        "type": {
+          "type": "string",
+          "description": "Stable host-defined trigger type."
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Selected event actions."
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Schema-defined values. Unknown entries must survive round-trips."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "type",
+        "events"
+      ]
+    },
+    "AutomationTriggerEventDefinition": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ]
+    },
+    "AutomationTriggerDefinition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationTriggerEventDefinition"
+          }
+        },
+        "configSchema": {
+          "$ref": "#/$defs/ConfigSchema"
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "events"
+      ]
+    },
+    "AutomationSessionTemplate": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "workingDirectories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          },
+          "description": "Absence means a workspace-less session."
+        },
+        "config": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Values resolved through `resolveSessionConfig`."
+        }
+      }
+    },
+    "AutomationDefinition": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "Initial user message sent to each new session."
+        },
+        "session": {
+          "$ref": "#/$defs/AutomationSessionTemplate"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Controls automatic triggers; manual runs remain permitted."
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationTrigger"
+          },
+          "description": "Empty means manual-only."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "title",
+        "message",
+        "session",
+        "enabled",
+        "triggers"
+      ]
+    },
+    "AutomationRuntimeState": {
+      "type": "object",
+      "properties": {
+        "workingDirectories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          }
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      }
+    },
+    "AutomationSummary": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI"
+        },
+        "title": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "triggerCount": {
+          "type": "number"
+        },
+        "nextRunAt": {
+          "type": "string"
+        },
+        "lastRun": {
+          "$ref": "#/$defs/AutomationRunSummary"
+        },
+        "revision": {
+          "type": "number"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationOperation"
+          }
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "modifiedAt": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "resource",
+        "title",
+        "enabled",
+        "triggerCount",
+        "revision",
+        "operations",
+        "createdAt",
+        "modifiedAt"
+      ]
+    },
+    "AutomationState": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI"
+        },
+        "definition": {
+          "$ref": "#/$defs/AutomationDefinition"
+        },
+        "revision": {
+          "type": "number"
+        },
+        "nextRunAt": {
+          "type": "string"
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationRunSummary"
+          },
+          "description": "Newest-first retained run summaries."
+        },
+        "runsNextCursor": {
+          "type": "string"
+        },
+        "runtime": {
+          "$ref": "#/$defs/AutomationRuntimeState"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationOperation"
+          }
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "modifiedAt": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "resource",
+        "definition",
+        "revision",
+        "runs",
+        "operations",
+        "createdAt",
+        "modifiedAt"
+      ]
+    },
+    "AutomationRunBlocker": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/AutomationRunBlockerKind"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AutomationManualRunCause": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "manual"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "AutomationTriggeredRunCause": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "trigger"
+        },
+        "triggerId": {
+          "type": "string"
+        },
+        "scheduledFor": {
+          "type": "string"
+        },
+        "catchUp": {
+          "type": "boolean"
+        },
+        "event": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Host-defined event provenance containing no secrets."
+        }
+      },
+      "required": [
+        "kind",
+        "triggerId"
+      ]
+    },
+    "AutomationPendingRunLifecycle": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "pending"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "createdAt"
+      ]
+    },
+    "AutomationRunningRunLifecycle": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "running"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "createdAt",
+        "startedAt"
+      ]
+    },
+    "AutomationBlockedRunLifecycle": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "blocked"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "blocker": {
+          "$ref": "#/$defs/AutomationRunBlocker"
+        }
+      },
+      "required": [
+        "status",
+        "createdAt",
+        "startedAt",
+        "blocker"
+      ]
+    },
+    "AutomationCompletedRunLifecycle": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "completed"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/UsageInfo"
+        }
+      },
+      "required": [
+        "status",
+        "createdAt",
+        "startedAt",
+        "completedAt"
+      ]
+    },
+    "AutomationFailedRunLifecycle": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "failed"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo"
+        }
+      },
+      "required": [
+        "status",
+        "createdAt",
+        "completedAt",
+        "error"
+      ]
+    },
+    "AutomationCancelledRunLifecycle": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "cancelled"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "createdAt",
+        "completedAt"
+      ]
+    },
+    "AutomationRunArtifact": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Content URI"
+        },
+        "sizeHint": {
+          "type": "number",
+          "description": "Approximate size in bytes"
+        },
+        "contentType": {
+          "type": "string",
+          "description": "Content MIME type"
+        },
+        "nonce": {
+          "type": "string",
+          "description": "Content nonce"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "uri",
+        "id",
+        "label"
+      ]
+    },
+    "AutomationRunSummary": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI"
+        },
+        "automation": {
+          "$ref": "#/$defs/URI"
+        },
+        "cause": {
+          "$ref": "#/$defs/AutomationRunCause"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/AutomationRunLifecycle"
+        },
+        "primarySession": {
+          "$ref": "#/$defs/URI"
+        },
+        "sessionCount": {
+          "type": "number"
+        },
+        "artifactCount": {
+          "type": "number"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationRunOperation"
+          }
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "resource",
+        "automation",
+        "cause",
+        "lifecycle",
+        "sessionCount",
+        "operations"
+      ]
+    },
+    "AutomationRunState": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI"
+        },
+        "automation": {
+          "$ref": "#/$defs/URI"
+        },
+        "cause": {
+          "$ref": "#/$defs/AutomationRunCause"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/AutomationRunLifecycle"
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          }
+        },
+        "primarySession": {
+          "$ref": "#/$defs/URI"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationRunArtifact"
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationRunOperation"
+          }
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "resource",
+        "automation",
+        "cause",
+        "lifecycle",
+        "sessions",
+        "artifacts",
+        "operations"
+      ]
+    },
     "BaseParams": {
       "type": "object",
       "description": "Base shape every command's params extends.\n\n`channel` identifies the channel the command targets, mirroring the\n`channel` field on every protocol notification. For commands that operate\non a specific channel (a session, terminal, or changeset), `channel` is\nthat channel's URI. For commands that are connection-level rather than\nchannel-scoped (e.g. {@link InitializeParams | `initialize`},\n{@link PingParams | `ping`}, {@link ListSessionsParams | `listSessions`},\nthe `resource*` filesystem commands, and {@link AuthenticateParams |\n`authenticate`}), the params type narrows `channel` to the literal\nroot URI `'ahp-root://'`.\n\nThis invariant lets implementations route every incoming message —\nrequest, response, or notification — by inspecting `params.channel`\nwithout needing to know the per-method param shape.",
@@ -5146,6 +5866,10 @@
         "telemetry": {
           "$ref": "#/$defs/TelemetryCapabilities",
           "description": "OTLP telemetry channels the host emits, if any. Each populated field is\neither a literal `ahp-otlp:` channel URI or an RFC 6570 URI template a\nclient expands before subscribing (currently only the `logs` channel\ndefines a template variable, `{level}`, for subscriber-side severity\nfiltering). Clients MAY ignore signals they cannot process."
+        },
+        "automations": {
+          "$ref": "#/$defs/AutomationCapabilities",
+          "description": "Host automation support. Absence means unsupported."
         }
       },
       "required": [
@@ -5153,6 +5877,89 @@
         "serverSeq",
         "snapshots"
       ]
+    },
+    "AutomationCapabilities": {
+      "type": "object",
+      "properties": {
+        "execution": {
+          "$ref": "#/$defs/AutomationExecutionCapabilities"
+        },
+        "create": {
+          "$ref": "#/$defs/AutomationCreateCapability"
+        },
+        "schedules": {
+          "$ref": "#/$defs/AutomationScheduleCapabilities"
+        },
+        "runCancellation": {
+          "$ref": "#/$defs/AutomationRunCancellationCapability"
+        },
+        "schedulePreview": {
+          "$ref": "#/$defs/AutomationSchedulePreviewCapability"
+        },
+        "runHistoryLimit": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "execution"
+      ]
+    },
+    "AutomationExecutionCapabilities": {
+      "type": "object",
+      "properties": {
+        "lifetime": {
+          "$ref": "#/$defs/AutomationExecutionLifetime"
+        }
+      },
+      "required": [
+        "lifetime"
+      ]
+    },
+    "AutomationCreateCapability": {
+      "type": "object",
+      "properties": {}
+    },
+    "AutomationScheduleCapabilities": {
+      "type": "object",
+      "properties": {
+        "kinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationScheduleKind"
+          }
+        },
+        "cron": {
+          "$ref": "#/$defs/AutomationCronScheduleCapability"
+        }
+      },
+      "required": [
+        "kinds"
+      ]
+    },
+    "AutomationCronScheduleCapability": {
+      "type": "object",
+      "properties": {
+        "dialect": {
+          "type": "string",
+          "enum": [
+            "unix5"
+          ]
+        },
+        "minIntervalMinutes": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "dialect"
+      ]
+    },
+    "AutomationRunCancellationCapability": {
+      "type": "object",
+      "properties": {}
+    },
+    "AutomationSchedulePreviewCapability": {
+      "type": "object",
+      "properties": {}
     },
     "PingParams": {
       "type": "object",
@@ -6472,6 +7279,263 @@
         "channel"
       ]
     },
+    "ListAutomationsParams": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "type": "string",
+          "enum": [
+            "ahp-root://"
+          ]
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum number of entries to return in this page. The server SHOULD respect\nthis bound but MAY return fewer entries and MAY impose its own upper cap.\nOmit to let the server choose the page size."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.\nOmit to fetch the first page. Cursors are server-defined and MUST be treated\nas opaque — do not parse, modify, or persist them across connections. An\nunrecognised cursor SHOULD be rejected with an `InvalidParams` error."
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
+    "ListAutomationsResult": {
+      "type": "object",
+      "properties": {
+        "nextCursor": {
+          "type": "string",
+          "description": "Opaque cursor for the next page. Present when more entries exist beyond the\nreturned page; absent signals the end of the collection. Pass it back as\n{@link PaginatedParams.cursor} to fetch the following page."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationSummary"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "ListAutomationTriggerDefinitionsParams": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "type": "string",
+          "enum": [
+            "ahp-root://"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        },
+        "workingDirectories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/URI"
+          }
+        },
+        "sessionConfig": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
+    "ListAutomationTriggerDefinitionsResult": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationTriggerDefinition"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "CreateAutomationParams": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI"
+        },
+        "definition": {
+          "$ref": "#/$defs/AutomationDefinition"
+        },
+        "import": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "batchId": {
+              "type": "string"
+            },
+            "itemId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "batchId",
+            "itemId"
+          ]
+        }
+      },
+      "required": [
+        "channel",
+        "definition"
+      ]
+    },
+    "AutomationDefinitionPatch": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "message": {
+          "$ref": "#/$defs/Message"
+        },
+        "session": {
+          "$ref": "#/$defs/AutomationSessionTemplate"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationTrigger"
+          }
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      }
+    },
+    "UpdateAutomationParams": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI"
+        },
+        "expectedRevision": {
+          "type": "number"
+        },
+        "changes": {
+          "$ref": "#/$defs/AutomationDefinitionPatch"
+        }
+      },
+      "required": [
+        "channel",
+        "expectedRevision",
+        "changes"
+      ]
+    },
+    "DisposeAutomationParams": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this command targets."
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
+    "RunAutomationParams": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this command targets."
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel",
+        "requestId"
+      ]
+    },
+    "RunAutomationResult": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "$ref": "#/$defs/URI"
+        }
+      },
+      "required": [
+        "run"
+      ]
+    },
+    "FetchAutomationRunsParams": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Channel URI this command targets."
+        },
+        "cursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
+    "FetchAutomationRunsResult": {
+      "type": "object",
+      "properties": {}
+    },
+    "PreviewAutomationScheduleParams": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "type": "string",
+          "enum": [
+            "ahp-root://"
+          ]
+        },
+        "schedule": {
+          "$ref": "#/$defs/AutomationSchedule"
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "channel",
+        "schedule"
+      ]
+    },
+    "PreviewAutomationScheduleResult": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
     "URI": {
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
@@ -6527,6 +7591,9 @@
       ],
       "type": "number",
       "description": "Bitset of summary-level session status flags.\n\nUse bitwise checks instead of equality for non-terminal activity. For example,\n`status & SessionStatus.InProgress` matches both ordinary in-progress turns\nand turns that are paused waiting for input."
+    },
+    "SessionOrigin": {
+      "$ref": "#/$defs/AutomationSessionOrigin"
     },
     "SessionLifecycle": {
       "enum": [
@@ -7053,6 +8120,122 @@
       "type": "string",
       "description": "Discriminant for {@link ResourceChange.type}."
     },
+    "AutomationWeekday": {
+      "enum": [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday"
+      ],
+      "type": "string"
+    },
+    "AutomationSchedule": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationHourlySchedule"
+        },
+        {
+          "$ref": "#/$defs/AutomationDailySchedule"
+        },
+        {
+          "$ref": "#/$defs/AutomationWeeklySchedule"
+        },
+        {
+          "$ref": "#/$defs/AutomationCronSchedule"
+        }
+      ]
+    },
+    "AutomationMisfirePolicy": {
+      "enum": [
+        "skip",
+        "runOnce"
+      ],
+      "type": "string"
+    },
+    "AutomationTrigger": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationScheduleTrigger"
+        },
+        {
+          "$ref": "#/$defs/AutomationEventTrigger"
+        }
+      ]
+    },
+    "AutomationOperation": {
+      "enum": [
+        "update",
+        "dispose",
+        "run"
+      ],
+      "type": "string"
+    },
+    "AutomationRunBlockerKind": {
+      "enum": [
+        "userInput",
+        "toolConfirmation",
+        "authentication",
+        "clientExecution"
+      ],
+      "type": "string"
+    },
+    "AutomationRunCause": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationManualRunCause"
+        },
+        {
+          "$ref": "#/$defs/AutomationTriggeredRunCause"
+        }
+      ]
+    },
+    "AutomationRunLifecycle": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AutomationPendingRunLifecycle"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunningRunLifecycle"
+        },
+        {
+          "$ref": "#/$defs/AutomationBlockedRunLifecycle"
+        },
+        {
+          "$ref": "#/$defs/AutomationCompletedRunLifecycle"
+        },
+        {
+          "$ref": "#/$defs/AutomationFailedRunLifecycle"
+        },
+        {
+          "$ref": "#/$defs/AutomationCancelledRunLifecycle"
+        }
+      ]
+    },
+    "AutomationRunOperation": {
+      "enum": [
+        "cancel"
+      ],
+      "type": "string"
+    },
+    "AutomationExecutionLifetime": {
+      "enum": [
+        "hostLifetime",
+        "managed"
+      ],
+      "type": "string"
+    },
+    "AutomationScheduleKind": {
+      "enum": [
+        "hourly",
+        "daily",
+        "weekly",
+        "cron"
+      ],
+      "type": "string"
+    },
     "ActionEnvelope": {
       "type": "object",
       "description": "Every action is wrapped in an `ActionEnvelope`.\n\nThe envelope identifies the channel the action belongs to (e.g.\n`ahp-root://` for root actions, the session URI for session actions, the\nterminal URI for terminal actions). Individual action payloads carry only\nfields that are intrinsic to the action; the channel comes from the\nenvelope so that any subscribable resource can route its actions uniformly.",
@@ -7336,6 +8519,39 @@
         },
         {
           "$ref": "#/$defs/ResourceWatchChangedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationDefinitionChangedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunSummarySetAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunSummaryRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunsLoadedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunLifecycleChangedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunSessionSetAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunSessionRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunPrimarySessionChangedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunArtifactSetAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunArtifactRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationRunCancelRequestedAction"
         }
       ],
       "description": "Discriminated union of all state actions."
@@ -9379,6 +10595,190 @@
       "required": [
         "type",
         "changes"
+      ]
+    },
+    "AutomationDefinitionChangedAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automation/definitionChanged"
+        },
+        "definition": {
+          "$ref": "#/$defs/AutomationDefinition"
+        },
+        "revision": {
+          "type": "number"
+        },
+        "modifiedAt": {
+          "type": "string"
+        },
+        "nextRunAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "definition",
+        "revision",
+        "modifiedAt"
+      ]
+    },
+    "AutomationRunSummarySetAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automation/runSummarySet"
+        },
+        "run": {
+          "$ref": "#/$defs/AutomationRunSummary"
+        }
+      },
+      "required": [
+        "type",
+        "run"
+      ]
+    },
+    "AutomationRunSummaryRemovedAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automation/runSummaryRemoved"
+        },
+        "run": {
+          "$ref": "#/$defs/URI"
+        }
+      },
+      "required": [
+        "type",
+        "run"
+      ]
+    },
+    "AutomationRunsLoadedAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automation/runsLoaded"
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationRunSummary"
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "runs"
+      ]
+    },
+    "AutomationRunLifecycleChangedAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automationRun/lifecycleChanged"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/AutomationRunLifecycle"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationRunOperation"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "lifecycle",
+        "operations"
+      ]
+    },
+    "AutomationRunSessionSetAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automationRun/sessionSet"
+        },
+        "session": {
+          "$ref": "#/$defs/URI"
+        }
+      },
+      "required": [
+        "type",
+        "session"
+      ]
+    },
+    "AutomationRunSessionRemovedAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automationRun/sessionRemoved"
+        },
+        "session": {
+          "$ref": "#/$defs/URI"
+        }
+      },
+      "required": [
+        "type",
+        "session"
+      ]
+    },
+    "AutomationRunPrimarySessionChangedAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automationRun/primarySessionChanged"
+        },
+        "primarySession": {
+          "$ref": "#/$defs/URI"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "AutomationRunArtifactSetAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automationRun/artifactSet"
+        },
+        "artifact": {
+          "$ref": "#/$defs/AutomationRunArtifact"
+        }
+      },
+      "required": [
+        "type",
+        "artifact"
+      ]
+    },
+    "AutomationRunArtifactRemovedAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automationRun/artifactRemoved"
+        },
+        "artifactId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "artifactId"
+      ]
+    },
+    "AutomationRunCancelRequestedAction": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "automationRun/cancelRequested"
+        }
+      },
+      "required": [
+        "type"
       ]
     },
     "ChatToolCallApprovedAction": {

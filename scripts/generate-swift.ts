@@ -115,6 +115,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -446,6 +447,8 @@ interface UnionConfig {
    * ChangesetOperationTarget, ReconnectResult).
    */
   allowUnknown?: boolean;
+  /** Force the enum case's discriminator when encoding its payload. */
+  injectDiscriminantOnEncode?: boolean;
 }
 
 function generateDiscriminatedUnion(config: UnionConfig): string {
@@ -490,7 +493,13 @@ function generateDiscriminatedUnion(config: UnionConfig): string {
   lines.push('    public func encode(to encoder: Encoder) throws {');
   lines.push('        switch self {');
   for (const v of config.variants) {
-    lines.push(`        case .${v.caseName}(let value): try value.encode(to: encoder)`);
+    if (config.injectDiscriminantOnEncode) {
+      lines.push(`        case .${v.caseName}(var value):`);
+      lines.push(`            value.${config.discriminantField} = .${v.caseName}`);
+      lines.push('            try value.encode(to: encoder)');
+    } else {
+      lines.push(`        case .${v.caseName}(let value): try value.encode(to: encoder)`);
+    }
   }
   if (config.allowUnknown) {
     lines.push('        case .unknown(let value): try value.encode(to: encoder)');
@@ -612,6 +621,11 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'SessionOriginKind',
+  'AutomationOperation', 'AutomationExecutionLifetime', 'AutomationScheduleKind',
+  'AutomationWeekday', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
+  'AutomationRunOperation',
 ];
 
 const STATE_STRUCTS = [
@@ -667,6 +681,18 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
+  'AutomationSessionOrigin',
+  'AutomationLocalTime', 'AutomationHourlySchedule', 'AutomationDailySchedule',
+  'AutomationWeeklySchedule', 'AutomationCronSchedule',
+  'AutomationScheduleTrigger', 'AutomationEventTrigger',
+  'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
+  'AutomationSessionTemplate', 'AutomationDefinition', 'AutomationRuntimeState',
+  'AutomationSummary', 'AutomationState',
+  'AutomationRunBlocker', 'AutomationManualRunCause', 'AutomationTriggeredRunCause',
+  'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
+  'AutomationBlockedRunLifecycle', 'AutomationCompletedRunLifecycle',
+  'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
+  'AutomationRunArtifact', 'AutomationRunSummary', 'AutomationRunState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -995,7 +1021,7 @@ public enum ToolInput: Codable, Sendable {
 }
 
 function generateSnapshotState(): string {
-  return `/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, annotations, or content state.
+  return `/// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
@@ -1004,6 +1030,8 @@ public enum SnapshotState: Codable, Sendable {
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
     case annotations(AnnotationsState)
+    case automation(AutomationState)
+    case automationRun(AutomationRunState)
 
     public init(from decoder: Decoder) throws {
         // Try the most distinctive shapes first. SessionState has required
@@ -1022,6 +1050,10 @@ public enum SnapshotState: Codable, Sendable {
             self = .resourceWatch(resourceWatch)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
+        } else if let automation = try? AutomationState(from: decoder) {
+            self = .automation(automation)
+        } else if let automationRun = try? AutomationRunState(from: decoder) {
+            self = .automationRun(automationRun)
         } else {
             self = .root(try RootState(from: decoder))
         }
@@ -1036,6 +1068,8 @@ public enum SnapshotState: Codable, Sendable {
         case .changeset(let state): try state.encode(to: encoder)
         case .resourceWatch(let state): try state.encode(to: encoder)
         case .annotations(let state): try state.encode(to: encoder)
+        case .automation(let state): try state.encode(to: encoder)
+        case .automationRun(let state): try state.encode(to: encoder)
         }
     }
 }`;
@@ -1121,6 +1155,61 @@ public enum ChatOrigin: Codable, Sendable {
 }`;
 }
 
+const SESSION_ORIGIN_UNION: UnionConfig = {
+  name: 'SessionOrigin',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'automation', structName: 'AutomationSessionOrigin', discriminantValue: 'automation' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
+const AUTOMATION_SCHEDULE_UNION: UnionConfig = {
+  name: 'AutomationSchedule',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'hourly', structName: 'AutomationHourlySchedule', discriminantValue: 'hourly' },
+    { caseName: 'daily', structName: 'AutomationDailySchedule', discriminantValue: 'daily' },
+    { caseName: 'weekly', structName: 'AutomationWeeklySchedule', discriminantValue: 'weekly' },
+    { caseName: 'cron', structName: 'AutomationCronSchedule', discriminantValue: 'cron' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
+const AUTOMATION_TRIGGER_UNION: UnionConfig = {
+  name: 'AutomationTrigger',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'schedule', structName: 'AutomationScheduleTrigger', discriminantValue: 'schedule' },
+    { caseName: 'event', structName: 'AutomationEventTrigger', discriminantValue: 'event' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
+const AUTOMATION_RUN_CAUSE_UNION: UnionConfig = {
+  name: 'AutomationRunCause',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'manual', structName: 'AutomationManualRunCause', discriminantValue: 'manual' },
+    { caseName: 'trigger', structName: 'AutomationTriggeredRunCause', discriminantValue: 'trigger' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
+const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
+  name: 'AutomationRunLifecycle',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'pending', structName: 'AutomationPendingRunLifecycle', discriminantValue: 'pending' },
+    { caseName: 'running', structName: 'AutomationRunningRunLifecycle', discriminantValue: 'running' },
+    { caseName: 'blocked', structName: 'AutomationBlockedRunLifecycle', discriminantValue: 'blocked' },
+    { caseName: 'completed', structName: 'AutomationCompletedRunLifecycle', discriminantValue: 'completed' },
+    { caseName: 'failed', structName: 'AutomationFailedRunLifecycle', discriminantValue: 'failed' },
+    { caseName: 'cancelled', structName: 'AutomationCancelledRunLifecycle', discriminantValue: 'cancelled' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1189,6 +1278,16 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(TOOL_CALL_RISK_ASSESSMENT_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(SESSION_ORIGIN_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_SCHEDULE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_TRIGGER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_CAUSE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -1287,6 +1386,17 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'terminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'terminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'resourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'automation/definitionChanged', caseName: 'automationDefinitionChanged', tsInterface: 'AutomationDefinitionChangedAction' },
+  { type: 'automation/runSummarySet', caseName: 'automationRunSummarySet', tsInterface: 'AutomationRunSummarySetAction' },
+  { type: 'automation/runSummaryRemoved', caseName: 'automationRunSummaryRemoved', tsInterface: 'AutomationRunSummaryRemovedAction' },
+  { type: 'automation/runsLoaded', caseName: 'automationRunsLoaded', tsInterface: 'AutomationRunsLoadedAction' },
+  { type: 'automationRun/lifecycleChanged', caseName: 'automationRunLifecycleChanged', tsInterface: 'AutomationRunLifecycleChangedAction' },
+  { type: 'automationRun/sessionSet', caseName: 'automationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
+  { type: 'automationRun/sessionRemoved', caseName: 'automationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
+  { type: 'automationRun/primarySessionChanged', caseName: 'automationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
+  { type: 'automationRun/artifactSet', caseName: 'automationRunArtifactSet', tsInterface: 'AutomationRunArtifactSetAction' },
+  { type: 'automationRun/artifactRemoved', caseName: 'automationRunArtifactRemoved', tsInterface: 'AutomationRunArtifactRemovedAction' },
+  { type: 'automationRun/cancelRequested', caseName: 'automationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
 ];
 
 /** Merged struct for the approved/denied tool call confirmed action */
@@ -1456,7 +1566,11 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
-  'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'Implementation',
+  'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
+  'AutomationExecutionCapabilities', 'AutomationCreateCapability',
+  'AutomationScheduleCapabilities', 'AutomationCronScheduleCapability',
+  'AutomationRunCancellationCapability', 'AutomationSchedulePreviewCapability',
+  'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'SessionForkSource', 'CreateSessionParams', 'DisposeSessionParams',
@@ -1483,6 +1597,12 @@ const COMMAND_STRUCTS = [
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
+  'ListAutomationsParams', 'ListAutomationsResult',
+  'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',
+  'CreateAutomationParams', 'AutomationDefinitionPatch', 'UpdateAutomationParams',
+  'DisposeAutomationParams', 'RunAutomationParams', 'RunAutomationResult',
+  'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
+  'PreviewAutomationScheduleParams', 'PreviewAutomationScheduleResult',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1648,7 +1768,9 @@ public struct ChangesetOperationRangeTarget: Codable, Sendable {
 const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
-  'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams', 'ProgressParams', 'AuthRequiredParams',
+  'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams',
+  'AutomationAddedParams', 'AutomationRemovedParams', 'AutomationSummaryChangedParams',
+  'ProgressParams', 'AuthRequiredParams',
   'OtlpExportLogsParams', 'OtlpExportTracesParams', 'OtlpExportMetricsParams',
 ];
 
@@ -2136,6 +2258,11 @@ function checkExhaustiveness(project: Project): void {
     'AhpErrorCodeWithData',         // type-level alias; not a Swift type
     'JsonRpcErrorCode',             // type-level alias over JsonRpcErrorCodes const enum
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
+    'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
+    'AutomationSchedule',           // AUTOMATION_SCHEDULE_UNION discriminated union
+    'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
+    'AutomationRunCause',           // AUTOMATION_RUN_CAUSE_UNION discriminated union
+    'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union
     'ForkChatSource',               // generateFixedChatSourceBranchSwift()
     'SideChatSource',               // generateFixedChatSourceBranchSwift()
     'ChangesetOperationTarget',     // TS discriminated union; consumers should add a Swift case-iterable enum

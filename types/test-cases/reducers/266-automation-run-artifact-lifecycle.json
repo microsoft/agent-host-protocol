@@ -1,0 +1,44 @@
+{
+  "description": "automation run artifacts insert, replace, and remove",
+  "reducer": "automationRun",
+  "initial": {
+    "resource": "ahp-automation-run:/r1",
+    "automation": "ahp-automation:/a1",
+    "cause": { "kind": "manual" },
+    "lifecycle": { "status": "pending", "createdAt": "2025-01-01T00:00:00Z" },
+    "sessions": [],
+    "artifacts": [],
+    "operations": ["cancel"]
+  },
+  "actions": [
+    {
+      "type": "automationRun/artifactSet",
+      "artifact": {
+        "id": "report",
+        "label": "Report",
+        "uri": "https://example.test/report",
+        "contentType": "text/markdown"
+      }
+    },
+    {
+      "type": "automationRun/artifactSet",
+      "artifact": {
+        "id": "report",
+        "label": "Final report",
+        "uri": "https://example.test/report",
+        "contentType": "text/markdown"
+      }
+    },
+    { "type": "automationRun/cancelRequested" },
+    { "type": "automationRun/artifactRemoved", "artifactId": "report" }
+  ],
+  "expected": {
+    "resource": "ahp-automation-run:/r1",
+    "automation": "ahp-automation:/a1",
+    "cause": { "kind": "manual" },
+    "lifecycle": { "status": "pending", "createdAt": "2025-01-01T00:00:00Z" },
+    "sessions": [],
+    "artifacts": [],
+    "operations": ["cancel"]
+  }
+}

@@ -7,6 +7,7 @@
 
 import type { URI } from '../common/state.js';
 import type { SessionSummary } from '../channels-session/state.js';
+import type { AutomationSummary } from '../channels-automation/state.js';
 
 // ─── root/sessionAdded ───────────────────────────────────────────────────────
 
@@ -141,6 +142,45 @@ export interface SessionSummaryChangedParams {
    * MUST be omitted by senders; receivers SHOULD ignore them if present.
    */
   changes: Partial<SessionSummary>;
+}
+
+// ─── root/automationAdded ────────────────────────────────────────────────────
+
+/**
+ * @category Protocol Notifications
+ * @method root/automationAdded
+ * @direction Server → Client
+ * @messageType Notification
+ */
+export interface AutomationAddedParams {
+  channel: URI;
+  summary: AutomationSummary;
+}
+
+// ─── root/automationRemoved ──────────────────────────────────────────────────
+
+/**
+ * @category Protocol Notifications
+ * @method root/automationRemoved
+ * @direction Server → Client
+ * @messageType Notification
+ */
+export interface AutomationRemovedParams {
+  channel: URI;
+  automation: URI;
+}
+
+// ─── root/automationSummaryChanged ───────────────────────────────────────────
+
+/**
+ * @category Protocol Notifications
+ * @method root/automationSummaryChanged
+ * @direction Server → Client
+ * @messageType Notification
+ */
+export interface AutomationSummaryChangedParams {
+  channel: URI;
+  summary: AutomationSummary;
 }
 
 // ─── progress ────────────────────────────────────────────────────────────────

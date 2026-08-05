@@ -25,11 +25,13 @@ import {
   changesetReducer,
   annotationsReducer,
   resourceWatchReducer,
+  automationReducer,
+  automationRunReducer,
   isClientDispatchable,
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState } from './state.js';
+import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
 import {
   SessionStatus,
   TurnState,
@@ -54,6 +56,8 @@ function readChannelSources(baseName: string): string {
     'channels-changeset',
     'channels-annotations',
     'channels-resource-watch',
+    'channels-automation',
+    'channels-automation-run',
   ];
   return dirs
     .map(dir => {
@@ -69,11 +73,11 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState;
+type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch';
+  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
   initial: FixtureState;
   actions: unknown[];
   expected: FixtureState;
@@ -140,6 +144,10 @@ describe('reducer fixtures', () => {
           state = annotationsReducer(state as AnnotationsState, action as any);
         } else if (fixture.reducer === 'resourceWatch') {
           state = resourceWatchReducer(state as ResourceWatchState, action as any);
+        } else if (fixture.reducer === 'automation') {
+          state = automationReducer(state as AutomationState, action as any);
+        } else if (fixture.reducer === 'automationRun') {
+          state = automationRunReducer(state as AutomationRunState, action as any);
         } else {
           state = sessionReducer(state as SessionState, action as any);
         }

@@ -213,6 +213,7 @@ type HostHandle struct {
 	ClientID        string
 	State           HostState
 	ProtocolVersion string
+	Automations     *ahptypes.AutomationCapabilities
 	Agents          []ahptypes.AgentInfo
 	Sessions        []ahptypes.SessionSummary
 	Terminals       []ahptypes.TerminalInfo
@@ -400,21 +401,22 @@ var ErrDuplicateHost = errors.New("hosts: host id already registered")
 
 // hostState is the per-host bookkeeping the multi-host runtime owns.
 type hostState struct {
-	id         HostID
-	label      string
-	cfg        HostConfig
-	mu         sync.RWMutex
-	client     *ahp.Client
-	state      HostState
-	clientID   string
-	protoVer   string
-	agents     []ahptypes.AgentInfo
-	sessions   []ahptypes.SessionSummary
-	terminals  []ahptypes.TerminalInfo
-	updatedAt  time.Time
-	generation uint64
-	cancel     context.CancelFunc
-	supervised sync.WaitGroup
+	id          HostID
+	label       string
+	cfg         HostConfig
+	mu          sync.RWMutex
+	client      *ahp.Client
+	state       HostState
+	clientID    string
+	protoVer    string
+	automations *ahptypes.AutomationCapabilities
+	agents      []ahptypes.AgentInfo
+	sessions    []ahptypes.SessionSummary
+	terminals   []ahptypes.TerminalInfo
+	updatedAt   time.Time
+	generation  uint64
+	cancel      context.CancelFunc
+	supervised  sync.WaitGroup
 }
 
 // MultiHostClient is the public multi-host registry + reconnect
@@ -573,6 +575,7 @@ func (m *MultiHostClient) openHost(ctx context.Context, hs *hostState) error {
 	hs.mu.Lock()
 	hs.client = client
 	hs.protoVer = result.ProtocolVersion
+	hs.automations = cloneAutomationCapabilities(result.Automations)
 	hs.generation++
 	hs.mu.Unlock()
 
@@ -716,11 +719,50 @@ func (m *MultiHostClient) snapshotHandle(hs *hostState) *HostHandle {
 		ClientID:        hs.clientID,
 		State:           hs.state,
 		ProtocolVersion: hs.protoVer,
+		Automations:     cloneAutomationCapabilities(hs.automations),
 		Agents:          append([]ahptypes.AgentInfo(nil), hs.agents...),
 		Sessions:        append([]ahptypes.SessionSummary(nil), hs.sessions...),
 		Terminals:       append([]ahptypes.TerminalInfo(nil), hs.terminals...),
 		UpdatedAt:       hs.updatedAt,
 	}
+}
+
+func cloneAutomationCapabilities(capabilities *ahptypes.AutomationCapabilities) *ahptypes.AutomationCapabilities {
+	if capabilities == nil {
+		return nil
+	}
+
+	clone := *capabilities
+	if capabilities.Create != nil {
+		value := *capabilities.Create
+		clone.Create = &value
+	}
+	if capabilities.Schedules != nil {
+		value := *capabilities.Schedules
+		value.Kinds = append([]ahptypes.AutomationScheduleKind(nil), capabilities.Schedules.Kinds...)
+		if capabilities.Schedules.Cron != nil {
+			cron := *capabilities.Schedules.Cron
+			if capabilities.Schedules.Cron.MinIntervalMinutes != nil {
+				minIntervalMinutes := *capabilities.Schedules.Cron.MinIntervalMinutes
+				cron.MinIntervalMinutes = &minIntervalMinutes
+			}
+			value.Cron = &cron
+		}
+		clone.Schedules = &value
+	}
+	if capabilities.RunCancellation != nil {
+		value := *capabilities.RunCancellation
+		clone.RunCancellation = &value
+	}
+	if capabilities.SchedulePreview != nil {
+		value := *capabilities.SchedulePreview
+		clone.SchedulePreview = &value
+	}
+	if capabilities.RunHistoryLimit != nil {
+		value := *capabilities.RunHistoryLimit
+		clone.RunHistoryLimit = &value
+	}
+	return &clone
 }
 
 // ClientHandle returns a generation-checked [HostClientHandle] for

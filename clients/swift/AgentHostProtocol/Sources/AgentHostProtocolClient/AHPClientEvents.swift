@@ -14,6 +14,9 @@ public enum SubscriptionEvent: Sendable {
     case sessionAdded(SessionAddedParams)
     case sessionRemoved(SessionRemovedParams)
     case sessionSummaryChanged(SessionSummaryChangedParams)
+    case automationAdded(AutomationAddedParams)
+    case automationRemoved(AutomationRemovedParams)
+    case automationSummaryChanged(AutomationSummaryChangedParams)
     case authRequired(AuthRequiredParams)
 }
 

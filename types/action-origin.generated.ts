@@ -88,6 +88,17 @@ import type {
   TerminalCommandExecutedAction,
   TerminalCommandFinishedAction,
   ResourceWatchChangedAction,
+  AutomationDefinitionChangedAction,
+  AutomationRunSummarySetAction,
+  AutomationRunSummaryRemovedAction,
+  AutomationRunsLoadedAction,
+  AutomationRunLifecycleChangedAction,
+  AutomationRunSessionSetAction,
+  AutomationRunSessionRemovedAction,
+  AutomationRunPrimarySessionChangedAction,
+  AutomationRunArtifactSetAction,
+  AutomationRunArtifactRemovedAction,
+  AutomationRunCancelRequestedAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -350,6 +361,53 @@ export type ServerResourceWatchAction =
   | ResourceWatchChangedAction
 ;
 
+/** Union of all automation-scoped actions. */
+export type AutomationAction =
+  | AutomationDefinitionChangedAction
+  | AutomationRunSummarySetAction
+  | AutomationRunSummaryRemovedAction
+  | AutomationRunsLoadedAction
+;
+
+/** Union of automation actions that clients may dispatch. */
+export type ClientAutomationAction =
+  never
+;
+
+/** Union of automation actions that only the server may produce. */
+export type ServerAutomationAction =
+  | AutomationDefinitionChangedAction
+  | AutomationRunSummarySetAction
+  | AutomationRunSummaryRemovedAction
+  | AutomationRunsLoadedAction
+;
+
+/** Union of all automation-run-scoped actions. */
+export type AutomationRunAction =
+  | AutomationRunLifecycleChangedAction
+  | AutomationRunSessionSetAction
+  | AutomationRunSessionRemovedAction
+  | AutomationRunPrimarySessionChangedAction
+  | AutomationRunArtifactSetAction
+  | AutomationRunArtifactRemovedAction
+  | AutomationRunCancelRequestedAction
+;
+
+/** Union of automation-run actions that clients may dispatch. */
+export type ClientAutomationRunAction =
+  | AutomationRunCancelRequestedAction
+;
+
+/** Union of automation-run actions that only the server may produce. */
+export type ServerAutomationRunAction =
+  | AutomationRunLifecycleChangedAction
+  | AutomationRunSessionSetAction
+  | AutomationRunSessionRemovedAction
+  | AutomationRunPrimarySessionChangedAction
+  | AutomationRunArtifactSetAction
+  | AutomationRunArtifactRemovedAction
+;
+
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
 
 /**
@@ -442,4 +500,15 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.TerminalCommandExecuted]: false,
   [ActionType.TerminalCommandFinished]: false,
   [ActionType.ResourceWatchChanged]: false,
+  [ActionType.AutomationDefinitionChanged]: false,
+  [ActionType.AutomationRunSummarySet]: false,
+  [ActionType.AutomationRunSummaryRemoved]: false,
+  [ActionType.AutomationRunsLoaded]: false,
+  [ActionType.AutomationRunLifecycleChanged]: false,
+  [ActionType.AutomationRunSessionSet]: false,
+  [ActionType.AutomationRunSessionRemoved]: false,
+  [ActionType.AutomationRunPrimarySessionChanged]: false,
+  [ActionType.AutomationRunArtifactSet]: false,
+  [ActionType.AutomationRunArtifactRemoved]: false,
+  [ActionType.AutomationRunCancelRequested]: true,
 };

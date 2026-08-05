@@ -32,6 +32,8 @@ import type { ActionEnvelope } from '../../types/common/actions.js';
 import type { Snapshot, URI } from '../../types/common/state.js';
 import type {
   ChangesetAction,
+  AutomationAction,
+  AutomationRunAction,
   RootAction,
   SessionAction,
   TerminalAction,
@@ -40,10 +42,14 @@ import type { ChangesetState } from '../../types/channels-changeset/state.js';
 import type { RootState } from '../../types/channels-root/state.js';
 import type { SessionState } from '../../types/channels-session/state.js';
 import type { TerminalState } from '../../types/channels-terminal/state.js';
+import type { AutomationState } from '../../types/channels-automation/state.js';
+import type { AutomationRunState } from '../../types/channels-automation-run/state.js';
 import { changesetReducer } from '../../types/channels-changeset/reducer.js';
 import { rootReducer } from '../../types/channels-root/reducer.js';
 import { sessionReducer } from '../../types/channels-session/reducer.js';
 import { terminalReducer } from '../../types/channels-terminal/reducer.js';
+import { automationReducer } from '../../types/channels-automation/reducer.js';
+import { automationRunReducer } from '../../types/channels-automation-run/reducer.js';
 import { ROOT_RESOURCE_URI, type HostId, type HostSubscriptionEvent } from './types.js';
 
 const INITIAL_ROOT: RootState = { agents: [] };
@@ -98,6 +104,8 @@ export class MultiHostStateMirror {
   private readonly sessionsMap = new Map<string, SessionState>();
   private readonly terminalsMap = new Map<string, TerminalState>();
   private readonly changesetsMap = new Map<string, ChangesetState>();
+  private readonly automationsMap = new Map<string, AutomationState>();
+  private readonly automationRunsMap = new Map<string, AutomationRunState>();
 
   /** All known root states keyed by host. */
   get rootStates(): ReadonlyMap<HostId, RootState> {
@@ -117,6 +125,14 @@ export class MultiHostStateMirror {
   /** All known changeset states keyed by `hostedResourceKey(hostId, uri)`. */
   get changesets(): ReadonlyMap<string, ChangesetState> {
     return this.changesetsMap;
+  }
+
+  get automations(): ReadonlyMap<string, AutomationState> {
+    return this.automationsMap;
+  }
+
+  get automationRuns(): ReadonlyMap<string, AutomationRunState> {
+    return this.automationRunsMap;
   }
 
 
@@ -187,6 +203,20 @@ export class MultiHostStateMirror {
       this.changesetsMap.set(key, changesetReducer(current, action as ChangesetAction));
       return;
     }
+    if (channel.startsWith('ahp-automation-run:')) {
+      const key = hostedResourceKey(hostId, channel);
+      const current = this.automationRunsMap.get(key);
+      if (!current) return;
+      this.automationRunsMap.set(key, automationRunReducer(current, action as AutomationRunAction));
+      return;
+    }
+    if (channel.startsWith('ahp-automation:')) {
+      const key = hostedResourceKey(hostId, channel);
+      const current = this.automationsMap.get(key);
+      if (!current) return;
+      this.automationsMap.set(key, automationReducer(current, action as AutomationAction));
+      return;
+    }
   }
 
   /**
@@ -213,6 +243,14 @@ export class MultiHostStateMirror {
       this.changesetsMap.set(key, snapshot.state as ChangesetState);
       return;
     }
+    if (resource.startsWith('ahp-automation-run:')) {
+      this.automationRunsMap.set(key, snapshot.state as AutomationRunState);
+      return;
+    }
+    if (resource.startsWith('ahp-automation:')) {
+      this.automationsMap.set(key, snapshot.state as AutomationState);
+      return;
+    }
   }
 
   /** Drop every slot keyed under `hostId` — root, sessions, terminals, changesets. */
@@ -228,6 +266,12 @@ export class MultiHostStateMirror {
     for (const key of this.changesetsMap.keys()) {
       if (key.startsWith(prefix)) this.changesetsMap.delete(key);
     }
+    for (const key of this.automationsMap.keys()) {
+      if (key.startsWith(prefix)) this.automationsMap.delete(key);
+    }
+    for (const key of this.automationRunsMap.keys()) {
+      if (key.startsWith(prefix)) this.automationRunsMap.delete(key);
+    }
   }
 
   /** Drop every host's state. */
@@ -236,5 +280,7 @@ export class MultiHostStateMirror {
     this.sessionsMap.clear();
     this.terminalsMap.clear();
     this.changesetsMap.clear();
+    this.automationsMap.clear();
+    this.automationRunsMap.clear();
   }
 }

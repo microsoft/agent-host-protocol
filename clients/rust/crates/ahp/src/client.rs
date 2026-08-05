@@ -49,7 +49,9 @@ use ahp_types::messages::{
     JsonRpcNotification, JsonRpcRequest, JsonRpcSuccessResponse, JsonRpcVersion,
 };
 use ahp_types::notifications::{
-    AuthRequiredParams, SessionAddedParams, SessionRemovedParams, SessionSummaryChangedParams,
+    AuthRequiredParams, AutomationAddedParams, AutomationRemovedParams,
+    AutomationSummaryChangedParams, SessionAddedParams, SessionRemovedParams,
+    SessionSummaryChangedParams,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
@@ -86,8 +88,9 @@ impl Default for ClientConfig {
 ///
 /// `Action` envelopes carry the write-ahead mutation stream; the
 /// remaining variants carry per-channel protocol notifications the
-/// server emits as top-level JSON-RPC methods (session catalogue events
-/// on the root channel, auth-required signals scoped to a channel).
+/// server emits as top-level JSON-RPC methods (session and automation
+/// catalogue events on the root channel, auth-required signals scoped to
+/// a channel).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum SubscriptionEvent {
@@ -99,6 +102,12 @@ pub enum SubscriptionEvent {
     SessionRemoved(SessionRemovedParams),
     /// `root/sessionSummaryChanged`: a session summary mutated.
     SessionSummaryChanged(SessionSummaryChangedParams),
+    /// `root/automationAdded`: a new automation was added to the catalogue.
+    AutomationAdded(AutomationAddedParams),
+    /// `root/automationRemoved`: an automation was removed from the catalogue.
+    AutomationRemoved(AutomationRemovedParams),
+    /// `root/automationSummaryChanged`: an automation summary mutated.
+    AutomationSummaryChanged(AutomationSummaryChangedParams),
     /// `auth/required`: the server needs (re-)authentication for a channel.
     AuthRequired(AuthRequiredParams),
 }
@@ -986,6 +995,35 @@ async fn handle_notification(shared: &Shared, n: JsonRpcNotification) {
                     shared,
                     &channel,
                     SubscriptionEvent::SessionSummaryChanged(params),
+                )
+                .await;
+            }
+        }
+        "root/automationAdded" => {
+            if let Ok(params) = serde_json::from_value::<AutomationAddedParams>(params_val) {
+                let channel = params.channel.clone();
+                fan_out(shared, &channel, SubscriptionEvent::AutomationAdded(params)).await;
+            }
+        }
+        "root/automationRemoved" => {
+            if let Ok(params) = serde_json::from_value::<AutomationRemovedParams>(params_val) {
+                let channel = params.channel.clone();
+                fan_out(
+                    shared,
+                    &channel,
+                    SubscriptionEvent::AutomationRemoved(params),
+                )
+                .await;
+            }
+        }
+        "root/automationSummaryChanged" => {
+            if let Ok(params) = serde_json::from_value::<AutomationSummaryChangedParams>(params_val)
+            {
+                let channel = params.channel.clone();
+                fan_out(
+                    shared,
+                    &channel,
+                    SubscriptionEvent::AutomationSummaryChanged(params),
                 )
                 .await;
             }

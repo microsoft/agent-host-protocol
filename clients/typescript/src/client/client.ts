@@ -70,6 +70,9 @@ import type {
   SessionAddedParams,
   SessionRemovedParams,
   SessionSummaryChangedParams,
+  AutomationAddedParams,
+  AutomationRemovedParams,
+  AutomationSummaryChangedParams,
 } from '../types/channels-root/notifications.js';
 import type { AuthRequiredParams } from '../types/common/notifications.js';
 import type { URI } from '../types/common/state.js';
@@ -845,6 +848,21 @@ export class AhpClient {
       case 'root/sessionSummaryChanged': {
         const p = n.params as SessionSummaryChangedParams;
         this.fanOut(p.channel, { type: 'sessionSummaryChanged', params: p });
+        break;
+      }
+      case 'root/automationAdded': {
+        const p = n.params as AutomationAddedParams;
+        this.fanOut(p.channel, { type: 'automationAdded', params: p });
+        break;
+      }
+      case 'root/automationRemoved': {
+        const p = n.params as AutomationRemovedParams;
+        this.fanOut(p.channel, { type: 'automationRemoved', params: p });
+        break;
+      }
+      case 'root/automationSummaryChanged': {
+        const p = n.params as AutomationSummaryChangedParams;
+        this.fanOut(p.channel, { type: 'automationSummaryChanged', params: p });
         break;
       }
       case 'auth/required': {

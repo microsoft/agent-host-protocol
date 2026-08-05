@@ -27,9 +27,8 @@ public struct HostedResourceKey: Hashable, Sendable {
     }
 }
 
-/// In-memory mirror of root/session/terminal/changeset state, fed by
-/// `ActionEnvelope` and `Snapshot` values tagged with their host of
-/// origin.
+/// In-memory mirror of stateful AHP channels, fed by `ActionEnvelope` and
+/// `Snapshot` values tagged with their host of origin.
 ///
 /// Single-host consumers should keep using `AHPStateMirror`; this type
 /// adds the host dimension necessary for multi-host UIs. Apply
@@ -50,6 +49,8 @@ public actor MultiHostStateMirror {
     public private(set) var changesets: [HostedResourceKey: ChangesetState] = [:]
     public private(set) var annotations: [HostedResourceKey: AnnotationsState] = [:]
     public private(set) var resourceWatches: [HostedResourceKey: ResourceWatchState] = [:]
+    public private(set) var automations: [HostedResourceKey: AutomationState] = [:]
+    public private(set) var automationRuns: [HostedResourceKey: AutomationRunState] = [:]
 
     public init() {}
 
@@ -106,13 +107,22 @@ public actor MultiHostStateMirror {
             // a reducer input. The slot is seeded by `applySnapshot`.
             return
         }
+        if var automation = automations[key] {
+            automation = automationReducer(state: automation, action: action)
+            automations[key] = automation
+            return
+        }
+        if var run = automationRuns[key] {
+            run = automationRunReducer(state: run, action: action)
+            automationRuns[key] = run
+            return
+        }
         // No state for this `(host, channel)` yet — the reducer can't
         // initialise one; only `applySnapshot(host:snapshot:)` can.
     }
 
-    /// Seed the mirror from a `Snapshot` scoped to `host` — root,
-    /// session, terminal, changeset, resource-watch, or annotations as
-    /// the snapshot's `state` discriminator dictates.
+    /// Seed the mirror from a `Snapshot` scoped to `host`, routing by its
+    /// `state` discriminator.
     public func applySnapshot(host: HostId, snapshot: Snapshot) {
         let key = HostedResourceKey(hostId: host, uri: snapshot.resource)
         switch snapshot.state {
@@ -130,13 +140,14 @@ public actor MultiHostStateMirror {
             resourceWatches[key] = state
         case .annotations(let state):
             annotations[key] = state
+        case .automation(let state):
+            automations[key] = state
+        case .automationRun(let state):
+            automationRuns[key] = state
         }
     }
 
-    /// Reset every slot for `host` — drops the root state, all sessions
-    /// keyed under that host, all terminals keyed under that host, all
-    /// changesets keyed under that host, all annotations keyed under
-    /// that host, and all resource watches keyed under that host.
+    /// Reset every state slot keyed under `host`.
     public func reset(host: HostId) {
         rootStates.removeValue(forKey: host)
         sessions = sessions.filter { $0.key.hostId != host }
@@ -145,6 +156,8 @@ public actor MultiHostStateMirror {
         changesets = changesets.filter { $0.key.hostId != host }
         annotations = annotations.filter { $0.key.hostId != host }
         resourceWatches = resourceWatches.filter { $0.key.hostId != host }
+        automations = automations.filter { $0.key.hostId != host }
+        automationRuns = automationRuns.filter { $0.key.hostId != host }
     }
 
     /// Reset every host's state.
@@ -156,5 +169,7 @@ public actor MultiHostStateMirror {
         changesets.removeAll()
         annotations.removeAll()
         resourceWatches.removeAll()
+        automations.removeAll()
+        automationRuns.removeAll()
     }
 }

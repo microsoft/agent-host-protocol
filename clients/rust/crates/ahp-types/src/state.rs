@@ -587,6 +587,118 @@ pub enum ResourceChangeType {
     Deleted,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SessionOriginKind {
+    #[serde(rename = "automation")]
+    Automation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationOperation {
+    #[serde(rename = "update")]
+    Update,
+    #[serde(rename = "dispose")]
+    Dispose,
+    #[serde(rename = "run")]
+    Run,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationExecutionLifetime {
+    #[serde(rename = "hostLifetime")]
+    HostLifetime,
+    #[serde(rename = "managed")]
+    Managed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationScheduleKind {
+    #[serde(rename = "hourly")]
+    Hourly,
+    #[serde(rename = "daily")]
+    Daily,
+    #[serde(rename = "weekly")]
+    Weekly,
+    #[serde(rename = "cron")]
+    Cron,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationWeekday {
+    #[serde(rename = "monday")]
+    Monday,
+    #[serde(rename = "tuesday")]
+    Tuesday,
+    #[serde(rename = "wednesday")]
+    Wednesday,
+    #[serde(rename = "thursday")]
+    Thursday,
+    #[serde(rename = "friday")]
+    Friday,
+    #[serde(rename = "saturday")]
+    Saturday,
+    #[serde(rename = "sunday")]
+    Sunday,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationMisfirePolicy {
+    #[serde(rename = "skip")]
+    Skip,
+    #[serde(rename = "runOnce")]
+    RunOnce,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationTriggerKind {
+    #[serde(rename = "schedule")]
+    Schedule,
+    #[serde(rename = "event")]
+    Event,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationRunStatus {
+    #[serde(rename = "pending")]
+    Pending,
+    #[serde(rename = "running")]
+    Running,
+    #[serde(rename = "blocked")]
+    Blocked,
+    #[serde(rename = "completed")]
+    Completed,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "cancelled")]
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationRunBlockerKind {
+    #[serde(rename = "userInput")]
+    UserInput,
+    #[serde(rename = "toolConfirmation")]
+    ToolConfirmation,
+    #[serde(rename = "authentication")]
+    Authentication,
+    #[serde(rename = "clientExecution")]
+    ClientExecution,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationRunCauseKind {
+    #[serde(rename = "manual")]
+    Manual,
+    #[serde(rename = "trigger")]
+    Trigger,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AutomationRunOperation {
+    #[serde(rename = "cancel")]
+    Cancel,
+}
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 /// An optionally-sized icon that can be displayed in a user interface.
@@ -1150,6 +1262,9 @@ pub struct SessionState {
     /// Human-readable description of what the session is currently doing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
+    /// Durable origin of this session, when another AHP resource created it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<SessionOrigin>,
     /// Server-owned project for this session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<ProjectInfo>,
@@ -1446,6 +1561,9 @@ pub struct SessionSummary {
     /// Human-readable description of what the session is currently doing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
+    /// Durable origin of this session, when another AHP resource created it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<SessionOrigin>,
     /// Server-owned project for this session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<ProjectInfo>,
@@ -4258,6 +4376,298 @@ pub struct ResourceChange {
     pub r#type: ResourceChangeType,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationSessionOrigin {
+    pub automation: Uri,
+    pub run: Uri,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationLocalTime {
+    pub hour: i64,
+    pub minute: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationHourlySchedule {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationDailySchedule {
+    pub time: AutomationLocalTime,
+    /// IANA time-zone identifier.
+    pub time_zone: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationWeeklySchedule {
+    pub weekday: AutomationWeekday,
+    pub time: AutomationLocalTime,
+    /// IANA time-zone identifier.
+    pub time_zone: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationCronSchedule {
+    /// Standard five-field Unix cron expression.
+    pub expression: String,
+    /// IANA time-zone identifier.
+    pub time_zone: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationScheduleTrigger {
+    /// Stable within the automation definition.
+    pub id: String,
+    pub schedule: AutomationSchedule,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub misfire_policy: Option<AutomationMisfirePolicy>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationEventTrigger {
+    /// Stable within the automation definition.
+    pub id: String,
+    /// Stable host-defined trigger type.
+    pub r#type: String,
+    /// Selected event actions.
+    pub events: Vec<String>,
+    /// Schema-defined values. Unknown entries must survive round-trips.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationTriggerEventDefinition {
+    pub id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationTriggerDefinition {
+    pub r#type: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub events: Vec<AutomationTriggerEventDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_schema: Option<ConfigSchema>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationSessionTemplate {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Absence means a workspace-less session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_directories: Option<Vec<Uri>>,
+    /// Values resolved through `resolveSessionConfig`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationDefinition {
+    pub title: String,
+    /// Initial user message sent to each new session.
+    pub message: Message,
+    pub session: AutomationSessionTemplate,
+    /// Controls automatic triggers; manual runs remain permitted.
+    pub enabled: bool,
+    /// Empty means manual-only.
+    pub triggers: Vec<AutomationTrigger>,
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRuntimeState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_directories: Option<Vec<Uri>>,
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationSummary {
+    pub resource: Uri,
+    pub title: String,
+    pub enabled: bool,
+    pub trigger_count: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_run_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_run: Option<AutomationRunSummary>,
+    pub revision: i64,
+    pub operations: Vec<AutomationOperation>,
+    pub created_at: String,
+    pub modified_at: String,
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationState {
+    pub resource: Uri,
+    pub definition: AutomationDefinition,
+    pub revision: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_run_at: Option<String>,
+    /// Newest-first retained run summaries.
+    pub runs: Vec<AutomationRunSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runs_next_cursor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<AutomationRuntimeState>,
+    pub operations: Vec<AutomationOperation>,
+    pub created_at: String,
+    pub modified_at: String,
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunBlocker {
+    pub kind: AutomationRunBlockerKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationManualRunCause {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationTriggeredRunCause {
+    pub trigger_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_for: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub catch_up: Option<bool>,
+    /// Host-defined event provenance containing no secrets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationPendingRunLifecycle {
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunningRunLifecycle {
+    pub created_at: String,
+    pub started_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationBlockedRunLifecycle {
+    pub created_at: String,
+    pub started_at: String,
+    pub blocker: AutomationRunBlocker,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationCompletedRunLifecycle {
+    pub created_at: String,
+    pub started_at: String,
+    pub completed_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<UsageInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationFailedRunLifecycle {
+    pub created_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    pub completed_at: String,
+    pub error: ErrorInfo,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationCancelledRunLifecycle {
+    pub created_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    pub completed_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunArtifact {
+    /// Content URI
+    pub uri: Uri,
+    /// Approximate size in bytes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_hint: Option<i64>,
+    /// Content MIME type
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+    /// Content nonce
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    pub id: String,
+    pub label: String,
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunSummary {
+    pub resource: Uri,
+    pub automation: Uri,
+    pub cause: AutomationRunCause,
+    pub lifecycle: AutomationRunLifecycle,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_session: Option<Uri>,
+    pub session_count: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_count: Option<i64>,
+    pub operations: Vec<AutomationRunOperation>,
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunState {
+    pub resource: Uri,
+    pub automation: Uri,
+    pub cause: AutomationRunCause,
+    pub lifecycle: AutomationRunLifecycle,
+    pub sessions: Vec<Uri>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_session: Option<Uri>,
+    pub artifacts: Vec<AutomationRunArtifact>,
+    pub operations: Vec<AutomationRunOperation>,
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
 /// Raw tool input represented inline or by content reference.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -4621,8 +5031,67 @@ pub enum SessionInputRequest {
     Unknown(serde_json::Value),
 }
 
-/// The state payload of a snapshot — root, session, chat, terminal,
-/// changeset, resource-watch, annotations, or content state.
+/// Durable origin of a session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum SessionOrigin {
+    #[serde(rename = "automation")]
+    Automation(AutomationSessionOrigin),
+}
+
+/// Calendar schedule for an automation trigger.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum AutomationSchedule {
+    #[serde(rename = "hourly")]
+    Hourly(AutomationHourlySchedule),
+    #[serde(rename = "daily")]
+    Daily(AutomationDailySchedule),
+    #[serde(rename = "weekly")]
+    Weekly(AutomationWeeklySchedule),
+    #[serde(rename = "cron")]
+    Cron(AutomationCronSchedule),
+}
+
+/// Automatic trigger for an automation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum AutomationTrigger {
+    #[serde(rename = "schedule")]
+    Schedule(AutomationScheduleTrigger),
+    #[serde(rename = "event")]
+    Event(AutomationEventTrigger),
+}
+
+/// Cause of an automation run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum AutomationRunCause {
+    #[serde(rename = "manual")]
+    Manual(AutomationManualRunCause),
+    #[serde(rename = "trigger")]
+    Trigger(AutomationTriggeredRunCause),
+}
+
+/// Lifecycle of an automation run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum AutomationRunLifecycle {
+    #[serde(rename = "pending")]
+    Pending(AutomationPendingRunLifecycle),
+    #[serde(rename = "running")]
+    Running(AutomationRunningRunLifecycle),
+    #[serde(rename = "blocked")]
+    Blocked(AutomationBlockedRunLifecycle),
+    #[serde(rename = "completed")]
+    Completed(AutomationCompletedRunLifecycle),
+    #[serde(rename = "failed")]
+    Failed(AutomationFailedRunLifecycle),
+    #[serde(rename = "cancelled")]
+    Cancelled(AutomationCancelledRunLifecycle),
+}
+
+/// The state payload of a snapshot.
 ///
 /// Deserialized by trying session first (has required `lifecycle`), then
 /// chat (has required `turns`), then terminal (has required `content`),
@@ -4638,5 +5107,7 @@ pub enum SnapshotState {
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
     Annotations(Box<AnnotationsState>),
+    Automation(Box<AutomationState>),
+    AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
 }

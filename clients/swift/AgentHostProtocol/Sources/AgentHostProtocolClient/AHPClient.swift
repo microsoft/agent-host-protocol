@@ -951,6 +951,27 @@ public actor AHPClient {
                 wrap: SubscriptionEvent.sessionSummaryChanged,
                 channel: { $0.channel }
             )
+        case "root/automationAdded":
+            await handleSubscriptionParams(
+                paramsData: paramsData,
+                type: AutomationAddedParams.self,
+                wrap: SubscriptionEvent.automationAdded,
+                channel: { $0.channel }
+            )
+        case "root/automationRemoved":
+            await handleSubscriptionParams(
+                paramsData: paramsData,
+                type: AutomationRemovedParams.self,
+                wrap: SubscriptionEvent.automationRemoved,
+                channel: { $0.channel }
+            )
+        case "root/automationSummaryChanged":
+            await handleSubscriptionParams(
+                paramsData: paramsData,
+                type: AutomationSummaryChangedParams.self,
+                wrap: SubscriptionEvent.automationSummaryChanged,
+                channel: { $0.channel }
+            )
         case "auth/required":
             await handleSubscriptionParams(
                 paramsData: paramsData,

@@ -17,6 +17,8 @@ import type { ActionEnvelope } from '../types/common/actions.js';
 import type { Snapshot, URI } from '../types/common/state.js';
 import type {
   ChangesetAction,
+  AutomationAction,
+  AutomationRunAction,
   RootAction,
   SessionAction,
   TerminalAction,
@@ -25,10 +27,14 @@ import type { ChangesetState } from '../types/channels-changeset/state.js';
 import type { RootState } from '../types/channels-root/state.js';
 import type { SessionState } from '../types/channels-session/state.js';
 import type { TerminalState } from '../types/channels-terminal/state.js';
+import type { AutomationState } from '../types/channels-automation/state.js';
+import type { AutomationRunState } from '../types/channels-automation-run/state.js';
 import { changesetReducer } from '../types/channels-changeset/reducer.js';
 import { rootReducer } from '../types/channels-root/reducer.js';
 import { sessionReducer } from '../types/channels-session/reducer.js';
 import { terminalReducer } from '../types/channels-terminal/reducer.js';
+import { automationReducer } from '../types/channels-automation/reducer.js';
+import { automationRunReducer } from '../types/channels-automation-run/reducer.js';
 
 const ROOT_URI = 'ahp-root://' as const;
 
@@ -40,6 +46,8 @@ export class AhpStateMirror {
   private readonly sessionsMap = new Map<URI, SessionState>();
   private readonly terminalsMap = new Map<URI, TerminalState>();
   private readonly changesetsMap = new Map<URI, ChangesetState>();
+  private readonly automationsMap = new Map<URI, AutomationState>();
+  private readonly automationRunsMap = new Map<URI, AutomationRunState>();
 
   /** Current root state. */
   get root(): RootState {
@@ -59,6 +67,14 @@ export class AhpStateMirror {
   /** All known changesets keyed by URI. */
   get changesets(): ReadonlyMap<URI, ChangesetState> {
     return this.changesetsMap;
+  }
+
+  get automations(): ReadonlyMap<URI, AutomationState> {
+    return this.automationsMap;
+  }
+
+  get automationRuns(): ReadonlyMap<URI, AutomationRunState> {
+    return this.automationRunsMap;
   }
 
 
@@ -95,6 +111,14 @@ export class AhpStateMirror {
       this.changesetsMap.set(resource, snapshot.state as ChangesetState);
       return;
     }
+    if (resource.startsWith('ahp-automation-run:')) {
+      this.automationRunsMap.set(resource, snapshot.state as AutomationRunState);
+      return;
+    }
+    if (resource.startsWith('ahp-automation:')) {
+      this.automationsMap.set(resource, snapshot.state as AutomationState);
+      return;
+    }
   }
 
   /**
@@ -129,6 +153,18 @@ export class AhpStateMirror {
       const current = this.changesetsMap.get(channel);
       if (!current) return;
       this.changesetsMap.set(channel, changesetReducer(current, action as ChangesetAction));
+      return;
+    }
+    if (channel.startsWith('ahp-automation-run:')) {
+      const current = this.automationRunsMap.get(channel);
+      if (!current) return;
+      this.automationRunsMap.set(channel, automationRunReducer(current, action as AutomationRunAction));
+      return;
+    }
+    if (channel.startsWith('ahp-automation:')) {
+      const current = this.automationsMap.get(channel);
+      if (!current) return;
+      this.automationsMap.set(channel, automationReducer(current, action as AutomationAction));
       return;
     }
   }

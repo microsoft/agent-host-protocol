@@ -17,10 +17,11 @@ use ahp::hosts::{
 };
 use ahp::transport::BoxedTransport;
 use ahp::{Transport, TransportError, TransportMessage};
+use ahp_types::commands::{AutomationCapabilities, AutomationExecutionCapabilities};
 use ahp_types::messages::{
     JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcSuccessResponse, JsonRpcVersion,
 };
-use ahp_types::state::AgentInfo;
+use ahp_types::state::{AgentInfo, AutomationExecutionLifetime};
 use tokio::sync::{mpsc, Mutex};
 
 // ─── In-memory transport ────────────────────────────────────────────────────
@@ -59,6 +60,8 @@ struct FakeHostState {
     agents: Vec<AgentInfo>,
     /// Optional list of session summaries to return from `listSessions`.
     sessions: Vec<ahp_types::state::SessionSummary>,
+    /// Automation support to advertise in `InitializeResult`.
+    automations: Option<AutomationCapabilities>,
 }
 
 impl FakeHostState {
@@ -67,6 +70,7 @@ impl FakeHostState {
             server_seq: Arc::new(AtomicU32::new(0)),
             agents: vec![],
             sessions: vec![],
+            automations: None,
         }
     }
 
@@ -77,6 +81,11 @@ impl FakeHostState {
 
     fn with_sessions(mut self, sessions: Vec<ahp_types::state::SessionSummary>) -> Self {
         self.sessions = sessions;
+        self
+    }
+
+    fn with_automations(mut self, automations: AutomationCapabilities) -> Self {
+        self.automations = Some(automations);
         self
     }
 }
@@ -187,6 +196,7 @@ fn handle_request(req: &JsonRpcRequest, state: &FakeHostState) -> serde_json::Va
                 "protocolVersion": ahp_types::PROTOCOL_VERSION,
                 "serverSeq": seq,
                 "snapshots": [snapshot],
+                "automations": state.automations,
             })
         }
         "reconnect" => serde_json::json!({
@@ -370,6 +380,53 @@ async fn host_client_handle_invalidates_after_reconnect() {
         .expect("fresh client handle");
     assert!(fresh.generation() > initial_generation);
     fresh.check_alive().await.expect("fresh handle alive");
+}
+
+#[tokio::test]
+async fn automation_capabilities_are_exposed_and_survive_reconnect() {
+    let automations = AutomationCapabilities {
+        execution: AutomationExecutionCapabilities {
+            lifetime: AutomationExecutionLifetime::Managed,
+        },
+        create: None,
+        schedules: None,
+        run_cancellation: None,
+        schedule_preview: None,
+        run_history_limit: Some(25),
+    };
+    let drop_after_init = Arc::new(AtomicBool::new(false));
+    let return_replay = Arc::new(Mutex::new(true));
+    let state = FakeHostState::new().with_automations(automations.clone());
+    let multi = MultiHostClient::new();
+    multi
+        .add_host(
+            HostConfig::new(
+                "local",
+                "Local",
+                make_replay_factory(state, drop_after_init, return_replay),
+            )
+            .with_reconnect_policy(ReconnectPolicy::immediate_forever()),
+        )
+        .await
+        .unwrap();
+
+    let host_id = HostId::new("local");
+    wait_for_state(&multi, &host_id, |s| s.is_connected(), 2000).await;
+    let before = multi.host(&host_id).await.expect("host");
+    assert_eq!(before.automations, Some(automations.clone()));
+
+    multi.reconnect_host(&host_id).await.expect("reconnect");
+    wait_until(2000, || async {
+        multi
+            .host(&host_id)
+            .await
+            .map(|host| host.generation > before.generation && host.state.is_connected())
+            .unwrap_or(false)
+    })
+    .await;
+
+    let after = multi.host(&host_id).await.expect("host");
+    assert_eq!(after.automations, Some(automations));
 }
 
 #[tokio::test]
@@ -1036,6 +1093,7 @@ fn make_summary(uri: &str, title: &str, modified_at: i64) -> ahp_types::state::S
         title: title.into(),
         status: 0,
         activity: None,
+        origin: None,
         created_at: "1970-01-01T00:00:00.000Z".into(),
         modified_at: modified,
         project: None,

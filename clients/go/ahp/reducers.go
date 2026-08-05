@@ -1795,3 +1795,100 @@ func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahpty
 	}
 	return ReduceOutcomeOutOfScope
 }
+
+// ApplyActionToAutomation applies an action to automation state.
+func ApplyActionToAutomation(state *ahptypes.AutomationState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.AutomationDefinitionChangedAction:
+		state.Definition = a.Definition
+		state.Revision = a.Revision
+		state.ModifiedAt = a.ModifiedAt
+		state.NextRunAt = a.NextRunAt
+		return ReduceOutcomeApplied
+	case *ahptypes.AutomationRunSummarySetAction:
+		for i := range state.Runs {
+			if state.Runs[i].Resource == a.Run.Resource {
+				state.Runs[i] = a.Run
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Runs = append([]ahptypes.AutomationRunSummary{a.Run}, state.Runs...)
+		return ReduceOutcomeApplied
+	case *ahptypes.AutomationRunSummaryRemovedAction:
+		for i := range state.Runs {
+			if state.Runs[i].Resource == a.Run {
+				state.Runs = append(state.Runs[:i], state.Runs[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.AutomationRunsLoadedAction:
+		known := make(map[ahptypes.URI]struct{}, len(state.Runs))
+		for _, run := range state.Runs {
+			known[run.Resource] = struct{}{}
+		}
+		for _, run := range a.Runs {
+			if _, ok := known[run.Resource]; ok {
+				continue
+			}
+			state.Runs = append(state.Runs, run)
+			known[run.Resource] = struct{}{}
+		}
+		state.RunsNextCursor = a.NextCursor
+		return ReduceOutcomeApplied
+	}
+	return ReduceOutcomeOutOfScope
+}
+
+// ApplyActionToAutomationRun applies an action to automation-run state.
+func ApplyActionToAutomationRun(state *ahptypes.AutomationRunState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.AutomationRunLifecycleChangedAction:
+		state.Lifecycle = a.Lifecycle
+		state.Operations = a.Operations
+		return ReduceOutcomeApplied
+	case *ahptypes.AutomationRunSessionSetAction:
+		for _, session := range state.Sessions {
+			if session == a.Session {
+				return ReduceOutcomeNoOp
+			}
+		}
+		state.Sessions = append(state.Sessions, a.Session)
+		return ReduceOutcomeApplied
+	case *ahptypes.AutomationRunSessionRemovedAction:
+		for i, session := range state.Sessions {
+			if session != a.Session {
+				continue
+			}
+			state.Sessions = append(state.Sessions[:i], state.Sessions[i+1:]...)
+			if state.PrimarySession != nil && *state.PrimarySession == a.Session {
+				state.PrimarySession = nil
+			}
+			return ReduceOutcomeApplied
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.AutomationRunPrimarySessionChangedAction:
+		state.PrimarySession = a.PrimarySession
+		return ReduceOutcomeApplied
+	case *ahptypes.AutomationRunArtifactSetAction:
+		for i := range state.Artifacts {
+			if state.Artifacts[i].Id == a.Artifact.Id {
+				state.Artifacts[i] = a.Artifact
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Artifacts = append(state.Artifacts, a.Artifact)
+		return ReduceOutcomeApplied
+	case *ahptypes.AutomationRunArtifactRemovedAction:
+		for i := range state.Artifacts {
+			if state.Artifacts[i].Id == a.ArtifactId {
+				state.Artifacts = append(state.Artifacts[:i], state.Artifacts[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.AutomationRunCancelRequestedAction:
+		return ReduceOutcomeNoOp
+	}
+	return ReduceOutcomeOutOfScope
+}

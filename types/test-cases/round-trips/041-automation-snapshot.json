@@ -1,0 +1,96 @@
+{
+  "name": "automation-snapshot",
+  "group": "A",
+  "description": "An automation snapshot preserves schedule and event triggers plus run summaries.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-automation:/a1",
+    "state": {
+      "resource": "ahp-automation:/a1",
+      "definition": {
+        "title": "Triage",
+        "message": { "text": "Triage the issue", "origin": { "kind": "user" } },
+        "session": { "provider": "copilot" },
+        "enabled": true,
+        "triggers": [
+          {
+            "id": "daily",
+            "kind": "schedule",
+            "schedule": {
+              "kind": "daily",
+              "time": { "hour": 9, "minute": 30 },
+              "timeZone": "Europe/Berlin"
+            },
+            "misfirePolicy": "runOnce"
+          },
+          {
+            "id": "issue",
+            "kind": "event",
+            "type": "issues",
+            "events": ["opened"],
+            "config": { "query": "label:bug" }
+          }
+        ]
+      },
+      "revision": 3,
+      "nextRunAt": "2026-08-06T07:30:00Z",
+      "runs": [{
+        "resource": "ahp-automation-run:/r1",
+        "automation": "ahp-automation:/a1",
+        "cause": { "kind": "trigger", "triggerId": "issue", "event": { "issue": 42 } },
+        "lifecycle": { "status": "pending", "createdAt": "2026-08-05T12:00:00Z" },
+        "sessionCount": 0,
+        "operations": ["cancel"]
+      }],
+      "operations": ["update", "dispose", "run"],
+      "createdAt": "2026-08-01T00:00:00Z",
+      "modifiedAt": "2026-08-05T12:00:00Z"
+    },
+    "fromSeq": 4
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-automation:/a1",
+    "state": {
+      "resource": "ahp-automation:/a1",
+      "definition": {
+        "title": "Triage",
+        "message": { "text": "Triage the issue", "origin": { "kind": "user" } },
+        "session": { "provider": "copilot" },
+        "enabled": true,
+        "triggers": [
+          {
+            "id": "daily",
+            "kind": "schedule",
+            "schedule": {
+              "kind": "daily",
+              "time": { "hour": 9, "minute": 30 },
+              "timeZone": "Europe/Berlin"
+            },
+            "misfirePolicy": "runOnce"
+          },
+          {
+            "id": "issue",
+            "kind": "event",
+            "type": "issues",
+            "events": ["opened"],
+            "config": { "query": "label:bug" }
+          }
+        ]
+      },
+      "revision": 3,
+      "nextRunAt": "2026-08-06T07:30:00Z",
+      "runs": [{
+        "resource": "ahp-automation-run:/r1",
+        "automation": "ahp-automation:/a1",
+        "cause": { "kind": "trigger", "triggerId": "issue", "event": { "issue": 42 } },
+        "lifecycle": { "status": "pending", "createdAt": "2026-08-05T12:00:00Z" },
+        "sessionCount": 0,
+        "operations": ["cancel"]
+      }],
+      "operations": ["update", "dispose", "run"],
+      "createdAt": "2026-08-01T00:00:00Z",
+      "modifiedAt": "2026-08-05T12:00:00Z"
+    },
+    "fromSeq": 4
+  }]
+}

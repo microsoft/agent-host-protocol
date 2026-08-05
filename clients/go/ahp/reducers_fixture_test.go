@@ -160,6 +160,10 @@ func TestFixtureDrivenReducerParity(t *testing.T) {
 				runFixture[ahptypes.AnnotationsState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAnnotations)
 			case "resourceWatch":
 				runFixture[ahptypes.ResourceWatchState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToResourceWatch)
+			case "automation":
+				runFixture[ahptypes.AutomationState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAutomation)
+			case "automationRun":
+				runFixture[ahptypes.AutomationRunState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAutomationRun)
 			default:
 				tt.Fatalf("unknown reducer kind %q", fixture.Reducer)
 			}

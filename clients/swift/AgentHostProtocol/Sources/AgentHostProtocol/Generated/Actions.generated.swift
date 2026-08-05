@@ -91,6 +91,17 @@ public enum ActionType: String, Codable, Sendable {
     case terminalCommandExecuted = "terminal/commandExecuted"
     case terminalCommandFinished = "terminal/commandFinished"
     case resourceWatchChanged = "resourceWatch/changed"
+    case automationDefinitionChanged = "automation/definitionChanged"
+    case automationRunSummarySet = "automation/runSummarySet"
+    case automationRunSummaryRemoved = "automation/runSummaryRemoved"
+    case automationRunsLoaded = "automation/runsLoaded"
+    case automationRunLifecycleChanged = "automationRun/lifecycleChanged"
+    case automationRunSessionSet = "automationRun/sessionSet"
+    case automationRunSessionRemoved = "automationRun/sessionRemoved"
+    case automationRunPrimarySessionChanged = "automationRun/primarySessionChanged"
+    case automationRunArtifactSet = "automationRun/artifactSet"
+    case automationRunArtifactRemoved = "automationRun/artifactRemoved"
+    case automationRunCancelRequested = "automationRun/cancelRequested"
 }
 
 // MARK: - Action Infrastructure
@@ -1967,6 +1978,161 @@ public struct ResourceWatchChangedAction: Codable, Sendable {
     }
 }
 
+public struct AutomationDefinitionChangedAction: Codable, Sendable {
+    public var type: ActionType
+    public var definition: AutomationDefinition
+    public var revision: Int
+    public var modifiedAt: String
+    public var nextRunAt: String?
+
+    public init(
+        type: ActionType,
+        definition: AutomationDefinition,
+        revision: Int,
+        modifiedAt: String,
+        nextRunAt: String? = nil
+    ) {
+        self.type = type
+        self.definition = definition
+        self.revision = revision
+        self.modifiedAt = modifiedAt
+        self.nextRunAt = nextRunAt
+    }
+}
+
+public struct AutomationRunSummarySetAction: Codable, Sendable {
+    public var type: ActionType
+    public var run: AutomationRunSummary
+
+    public init(
+        type: ActionType,
+        run: AutomationRunSummary
+    ) {
+        self.type = type
+        self.run = run
+    }
+}
+
+public struct AutomationRunSummaryRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    public var run: String
+
+    public init(
+        type: ActionType,
+        run: String
+    ) {
+        self.type = type
+        self.run = run
+    }
+}
+
+public struct AutomationRunsLoadedAction: Codable, Sendable {
+    public var type: ActionType
+    public var runs: [AutomationRunSummary]
+    public var nextCursor: String?
+
+    public init(
+        type: ActionType,
+        runs: [AutomationRunSummary],
+        nextCursor: String? = nil
+    ) {
+        self.type = type
+        self.runs = runs
+        self.nextCursor = nextCursor
+    }
+}
+
+public struct AutomationRunLifecycleChangedAction: Codable, Sendable {
+    public var type: ActionType
+    public var lifecycle: AutomationRunLifecycle
+    public var operations: [AutomationRunOperation]
+
+    public init(
+        type: ActionType,
+        lifecycle: AutomationRunLifecycle,
+        operations: [AutomationRunOperation]
+    ) {
+        self.type = type
+        self.lifecycle = lifecycle
+        self.operations = operations
+    }
+}
+
+public struct AutomationRunSessionSetAction: Codable, Sendable {
+    public var type: ActionType
+    public var session: String
+
+    public init(
+        type: ActionType,
+        session: String
+    ) {
+        self.type = type
+        self.session = session
+    }
+}
+
+public struct AutomationRunSessionRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    public var session: String
+
+    public init(
+        type: ActionType,
+        session: String
+    ) {
+        self.type = type
+        self.session = session
+    }
+}
+
+public struct AutomationRunPrimarySessionChangedAction: Codable, Sendable {
+    public var type: ActionType
+    public var primarySession: String?
+
+    public init(
+        type: ActionType,
+        primarySession: String? = nil
+    ) {
+        self.type = type
+        self.primarySession = primarySession
+    }
+}
+
+public struct AutomationRunArtifactSetAction: Codable, Sendable {
+    public var type: ActionType
+    public var artifact: AutomationRunArtifact
+
+    public init(
+        type: ActionType,
+        artifact: AutomationRunArtifact
+    ) {
+        self.type = type
+        self.artifact = artifact
+    }
+}
+
+public struct AutomationRunArtifactRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    public var artifactId: String
+
+    public init(
+        type: ActionType,
+        artifactId: String
+    ) {
+        self.type = type
+        self.artifactId = artifactId
+    }
+}
+
+public struct AutomationRunCancelRequestedAction: Codable, Sendable {
+    public var type: ActionType
+
+    public init(
+        type: ActionType
+    ) {
+        self.type = type
+    }
+}
+
 // MARK: - Partial Summary Types
 
 public struct PartialChatSummary: Codable, Sendable {
@@ -2102,6 +2268,17 @@ public enum StateAction: Codable, Sendable {
     case terminalCommandExecuted(TerminalCommandExecutedAction)
     case terminalCommandFinished(TerminalCommandFinishedAction)
     case resourceWatchChanged(ResourceWatchChangedAction)
+    case automationDefinitionChanged(AutomationDefinitionChangedAction)
+    case automationRunSummarySet(AutomationRunSummarySetAction)
+    case automationRunSummaryRemoved(AutomationRunSummaryRemovedAction)
+    case automationRunsLoaded(AutomationRunsLoadedAction)
+    case automationRunLifecycleChanged(AutomationRunLifecycleChangedAction)
+    case automationRunSessionSet(AutomationRunSessionSetAction)
+    case automationRunSessionRemoved(AutomationRunSessionRemovedAction)
+    case automationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction)
+    case automationRunArtifactSet(AutomationRunArtifactSetAction)
+    case automationRunArtifactRemoved(AutomationRunArtifactRemovedAction)
+    case automationRunCancelRequested(AutomationRunCancelRequestedAction)
     /// Unknown or future action type; reducers treat this as a no-op.
     /// The raw payload (including its `type` discriminant) is preserved
     /// as an `AnyCodable` so a decode→encode round-trip re-emits it
@@ -2284,6 +2461,28 @@ public enum StateAction: Codable, Sendable {
             self = .terminalCommandFinished(try TerminalCommandFinishedAction(from: decoder))
         case "resourceWatch/changed":
             self = .resourceWatchChanged(try ResourceWatchChangedAction(from: decoder))
+        case "automation/definitionChanged":
+            self = .automationDefinitionChanged(try AutomationDefinitionChangedAction(from: decoder))
+        case "automation/runSummarySet":
+            self = .automationRunSummarySet(try AutomationRunSummarySetAction(from: decoder))
+        case "automation/runSummaryRemoved":
+            self = .automationRunSummaryRemoved(try AutomationRunSummaryRemovedAction(from: decoder))
+        case "automation/runsLoaded":
+            self = .automationRunsLoaded(try AutomationRunsLoadedAction(from: decoder))
+        case "automationRun/lifecycleChanged":
+            self = .automationRunLifecycleChanged(try AutomationRunLifecycleChangedAction(from: decoder))
+        case "automationRun/sessionSet":
+            self = .automationRunSessionSet(try AutomationRunSessionSetAction(from: decoder))
+        case "automationRun/sessionRemoved":
+            self = .automationRunSessionRemoved(try AutomationRunSessionRemovedAction(from: decoder))
+        case "automationRun/primarySessionChanged":
+            self = .automationRunPrimarySessionChanged(try AutomationRunPrimarySessionChangedAction(from: decoder))
+        case "automationRun/artifactSet":
+            self = .automationRunArtifactSet(try AutomationRunArtifactSetAction(from: decoder))
+        case "automationRun/artifactRemoved":
+            self = .automationRunArtifactRemoved(try AutomationRunArtifactRemovedAction(from: decoder))
+        case "automationRun/cancelRequested":
+            self = .automationRunCancelRequested(try AutomationRunCancelRequestedAction(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -2376,6 +2575,17 @@ public enum StateAction: Codable, Sendable {
         case .terminalCommandExecuted(let v): try v.encode(to: encoder)
         case .terminalCommandFinished(let v): try v.encode(to: encoder)
         case .resourceWatchChanged(let v): try v.encode(to: encoder)
+        case .automationDefinitionChanged(let v): try v.encode(to: encoder)
+        case .automationRunSummarySet(let v): try v.encode(to: encoder)
+        case .automationRunSummaryRemoved(let v): try v.encode(to: encoder)
+        case .automationRunsLoaded(let v): try v.encode(to: encoder)
+        case .automationRunLifecycleChanged(let v): try v.encode(to: encoder)
+        case .automationRunSessionSet(let v): try v.encode(to: encoder)
+        case .automationRunSessionRemoved(let v): try v.encode(to: encoder)
+        case .automationRunPrimarySessionChanged(let v): try v.encode(to: encoder)
+        case .automationRunArtifactSet(let v): try v.encode(to: encoder)
+        case .automationRunArtifactRemoved(let v): try v.encode(to: encoder)
+        case .automationRunCancelRequested(let v): try v.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

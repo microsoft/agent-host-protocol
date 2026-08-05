@@ -15,9 +15,11 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
-    AgentSelection, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient,
-    SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState,
-    TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AgentSelection, AutomationDefinition, AutomationExecutionLifetime, AutomationSchedule,
+    AutomationScheduleKind, AutomationSessionTemplate, AutomationSummary, AutomationTrigger,
+    AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection,
+    SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot,
+    SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -195,6 +197,9 @@ pub struct InitializeResult {
     /// filtering). Clients MAY ignore signals they cannot process.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub telemetry: Option<TelemetryCapabilities>,
+    /// Host automation support. Absence means unsupported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub automations: Option<AutomationCapabilities>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -219,6 +224,56 @@ pub struct ClientCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationCapabilities {
+    pub execution: AutomationExecutionCapabilities,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create: Option<AutomationCreateCapability>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedules: Option<AutomationScheduleCapabilities>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_cancellation: Option<AutomationRunCancellationCapability>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule_preview: Option<AutomationSchedulePreviewCapability>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_history_limit: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationExecutionCapabilities {
+    pub lifetime: AutomationExecutionLifetime,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationCreateCapability {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationScheduleCapabilities {
+    pub kinds: Vec<AutomationScheduleKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cron: Option<AutomationCronScheduleCapability>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationCronScheduleCapability {
+    pub dialect: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_interval_minutes: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRunCancellationCapability {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationSchedulePreviewCapability {}
 
 /// Identifies a protocol implementation — the software (and build) on one end
 /// of the connection, as distinct from the {@link AgentInfo | agent persona} it
@@ -1426,6 +1481,142 @@ pub struct ChangesetOperationFollowUp {
     /// When `true`, open in an external handler rather than inline.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAutomationsParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Maximum number of entries to return in this page. The server SHOULD respect
+    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
+    /// Omit to let the server choose the page size.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+    /// as opaque — do not parse, modify, or persist them across connections. An
+    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAutomationsResult {
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+    pub items: Vec<AutomationSummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAutomationTriggerDefinitionsParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_directories: Option<Vec<Uri>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_config: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListAutomationTriggerDefinitionsResult {
+    pub items: Vec<AutomationTriggerDefinition>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAutomationParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    pub definition: AutomationDefinition,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub import: Option<AnyValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationDefinitionPatch {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<Message>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session: Option<AutomationSessionTemplate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub triggers: Option<Vec<AutomationTrigger>>,
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAutomationParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    pub expected_revision: i64,
+    pub changes: AutomationDefinitionPatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisposeAutomationParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunAutomationParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    pub request_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunAutomationResult {
+    pub run: Uri,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchAutomationRunsParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchAutomationRunsResult {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewAutomationScheduleParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    pub schedule: AutomationSchedule,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub count: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewAutomationScheduleResult {
+    pub items: Vec<String>,
 }
 
 // ─── ChatSource Union ─────────────────────────────────────────────────

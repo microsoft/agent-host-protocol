@@ -76,7 +76,15 @@ type _ExpectedCommands =
   | 'resolveSessionConfig'
   | 'sessionConfigCompletions'
   | 'completions'
-  | 'invokeChangesetOperation';
+  | 'invokeChangesetOperation'
+  | 'listAutomations'
+  | 'listAutomationTriggerDefinitions'
+  | 'createAutomation'
+  | 'updateAutomation'
+  | 'disposeAutomation'
+  | 'runAutomation'
+  | 'fetchAutomationRuns'
+  | 'previewAutomationSchedule';
 
 /** All methods annotated `@messageType Notification` (client → server). */
 type _ExpectedClientNotifications =
@@ -89,6 +97,9 @@ type _ExpectedServerNotifications =
   | 'root/sessionAdded'
   | 'root/sessionRemoved'
   | 'root/sessionSummaryChanged'
+  | 'root/automationAdded'
+  | 'root/automationRemoved'
+  | 'root/automationSummaryChanged'
   | 'root/progress'
   | 'auth/required'
   | 'otlp/exportLogs'

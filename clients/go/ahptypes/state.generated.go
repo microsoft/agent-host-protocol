@@ -442,6 +442,95 @@ const (
 	ResourceChangeTypeDeleted ResourceChangeType = "deleted"
 )
 
+type SessionOriginKind string
+
+const (
+	SessionOriginKindAutomation SessionOriginKind = "automation"
+)
+
+type AutomationOperation string
+
+const (
+	AutomationOperationUpdate  AutomationOperation = "update"
+	AutomationOperationDispose AutomationOperation = "dispose"
+	AutomationOperationRun     AutomationOperation = "run"
+)
+
+type AutomationExecutionLifetime string
+
+const (
+	AutomationExecutionLifetimeHostLifetime AutomationExecutionLifetime = "hostLifetime"
+	AutomationExecutionLifetimeManaged      AutomationExecutionLifetime = "managed"
+)
+
+type AutomationScheduleKind string
+
+const (
+	AutomationScheduleKindHourly AutomationScheduleKind = "hourly"
+	AutomationScheduleKindDaily  AutomationScheduleKind = "daily"
+	AutomationScheduleKindWeekly AutomationScheduleKind = "weekly"
+	AutomationScheduleKindCron   AutomationScheduleKind = "cron"
+)
+
+type AutomationWeekday string
+
+const (
+	AutomationWeekdayMonday    AutomationWeekday = "monday"
+	AutomationWeekdayTuesday   AutomationWeekday = "tuesday"
+	AutomationWeekdayWednesday AutomationWeekday = "wednesday"
+	AutomationWeekdayThursday  AutomationWeekday = "thursday"
+	AutomationWeekdayFriday    AutomationWeekday = "friday"
+	AutomationWeekdaySaturday  AutomationWeekday = "saturday"
+	AutomationWeekdaySunday    AutomationWeekday = "sunday"
+)
+
+type AutomationMisfirePolicy string
+
+const (
+	AutomationMisfirePolicySkip    AutomationMisfirePolicy = "skip"
+	AutomationMisfirePolicyRunOnce AutomationMisfirePolicy = "runOnce"
+)
+
+type AutomationTriggerKind string
+
+const (
+	AutomationTriggerKindSchedule AutomationTriggerKind = "schedule"
+	AutomationTriggerKindEvent    AutomationTriggerKind = "event"
+)
+
+type AutomationRunStatus string
+
+const (
+	AutomationRunStatusPending   AutomationRunStatus = "pending"
+	AutomationRunStatusRunning   AutomationRunStatus = "running"
+	AutomationRunStatusBlocked   AutomationRunStatus = "blocked"
+	AutomationRunStatusCompleted AutomationRunStatus = "completed"
+	AutomationRunStatusFailed    AutomationRunStatus = "failed"
+	AutomationRunStatusCancelled AutomationRunStatus = "cancelled"
+)
+
+type AutomationRunBlockerKind string
+
+const (
+	AutomationRunBlockerKindUserInput        AutomationRunBlockerKind = "userInput"
+	AutomationRunBlockerKindToolConfirmation AutomationRunBlockerKind = "toolConfirmation"
+	AutomationRunBlockerKindAuthentication   AutomationRunBlockerKind = "authentication"
+	AutomationRunBlockerKindClientExecution  AutomationRunBlockerKind = "clientExecution"
+)
+
+type AutomationRunCauseKind string
+
+const (
+	AutomationRunCauseKindManual  AutomationRunCauseKind = "manual"
+	AutomationRunCauseKindTrigger AutomationRunCauseKind = "trigger"
+)
+
+type AutomationRunOperation string
+
+const (
+	AutomationRunOperationCancel AutomationRunOperation = "cancel"
+)
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 // An optionally-sized icon that can be displayed in a user interface.
@@ -748,6 +837,8 @@ type SessionState struct {
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the session is currently doing
 	Activity *string `json:"activity,omitempty"`
+	// Durable origin of this session, when another AHP resource created it.
+	Origin *SessionOrigin `json:"origin,omitempty"`
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
 	// The working directories the session's agent has tool access to, as
@@ -1022,6 +1113,8 @@ type SessionSummary struct {
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the session is currently doing
 	Activity *string `json:"activity,omitempty"`
+	// Durable origin of this session, when another AHP resource created it.
+	Origin *SessionOrigin `json:"origin,omitempty"`
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
 	// The working directories the session's agent has tool access to, as
@@ -3557,6 +3650,228 @@ type ResourceChange struct {
 	Type ResourceChangeType `json:"type"`
 }
 
+type AutomationSessionOrigin struct {
+	Kind       SessionOriginKind `json:"kind"`
+	Automation URI               `json:"automation"`
+	Run        URI               `json:"run"`
+}
+
+type AutomationLocalTime struct {
+	Hour   int64 `json:"hour"`
+	Minute int64 `json:"minute"`
+}
+
+type AutomationHourlySchedule struct {
+	Kind AutomationScheduleKind `json:"kind"`
+}
+
+type AutomationDailySchedule struct {
+	Kind AutomationScheduleKind `json:"kind"`
+	Time AutomationLocalTime    `json:"time"`
+	// IANA time-zone identifier.
+	TimeZone string `json:"timeZone"`
+}
+
+type AutomationWeeklySchedule struct {
+	Kind    AutomationScheduleKind `json:"kind"`
+	Weekday AutomationWeekday      `json:"weekday"`
+	Time    AutomationLocalTime    `json:"time"`
+	// IANA time-zone identifier.
+	TimeZone string `json:"timeZone"`
+}
+
+type AutomationCronSchedule struct {
+	Kind AutomationScheduleKind `json:"kind"`
+	// Standard five-field Unix cron expression.
+	Expression string `json:"expression"`
+	// IANA time-zone identifier.
+	TimeZone string `json:"timeZone"`
+}
+
+type AutomationScheduleTrigger struct {
+	// Stable within the automation definition.
+	Id            string                   `json:"id"`
+	Kind          AutomationTriggerKind    `json:"kind"`
+	Schedule      AutomationSchedule       `json:"schedule"`
+	MisfirePolicy *AutomationMisfirePolicy `json:"misfirePolicy,omitempty"`
+}
+
+type AutomationEventTrigger struct {
+	// Stable within the automation definition.
+	Id   string                `json:"id"`
+	Kind AutomationTriggerKind `json:"kind"`
+	// Stable host-defined trigger type.
+	Type string `json:"type"`
+	// Selected event actions.
+	Events []string `json:"events"`
+	// Schema-defined values. Unknown entries must survive round-trips.
+	Config map[string]json.RawMessage `json:"config,omitempty"`
+}
+
+type AutomationTriggerEventDefinition struct {
+	Id          string  `json:"id"`
+	Title       string  `json:"title"`
+	Description *string `json:"description,omitempty"`
+}
+
+type AutomationTriggerDefinition struct {
+	Type         string                             `json:"type"`
+	Title        string                             `json:"title"`
+	Description  *string                            `json:"description,omitempty"`
+	Events       []AutomationTriggerEventDefinition `json:"events"`
+	ConfigSchema *ConfigSchema                      `json:"configSchema,omitempty"`
+}
+
+type AutomationSessionTemplate struct {
+	Provider *string `json:"provider,omitempty"`
+	// Absence means a workspace-less session.
+	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Values resolved through `resolveSessionConfig`.
+	Config map[string]json.RawMessage `json:"config,omitempty"`
+}
+
+type AutomationDefinition struct {
+	Title string `json:"title"`
+	// Initial user message sent to each new session.
+	Message Message                   `json:"message"`
+	Session AutomationSessionTemplate `json:"session"`
+	// Controls automatic triggers; manual runs remain permitted.
+	Enabled bool `json:"enabled"`
+	// Empty means manual-only.
+	Triggers []AutomationTrigger        `json:"triggers"`
+	Meta     map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+type AutomationRuntimeState struct {
+	WorkingDirectories []URI                      `json:"workingDirectories,omitempty"`
+	Meta               map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+type AutomationSummary struct {
+	Resource     URI                        `json:"resource"`
+	Title        string                     `json:"title"`
+	Enabled      bool                       `json:"enabled"`
+	TriggerCount int64                      `json:"triggerCount"`
+	NextRunAt    *string                    `json:"nextRunAt,omitempty"`
+	LastRun      *AutomationRunSummary      `json:"lastRun,omitempty"`
+	Revision     int64                      `json:"revision"`
+	Operations   []AutomationOperation      `json:"operations"`
+	CreatedAt    string                     `json:"createdAt"`
+	ModifiedAt   string                     `json:"modifiedAt"`
+	Meta         map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+type AutomationState struct {
+	Resource   URI                  `json:"resource"`
+	Definition AutomationDefinition `json:"definition"`
+	Revision   int64                `json:"revision"`
+	NextRunAt  *string              `json:"nextRunAt,omitempty"`
+	// Newest-first retained run summaries.
+	Runs           []AutomationRunSummary     `json:"runs"`
+	RunsNextCursor *string                    `json:"runsNextCursor,omitempty"`
+	Runtime        *AutomationRuntimeState    `json:"runtime,omitempty"`
+	Operations     []AutomationOperation      `json:"operations"`
+	CreatedAt      string                     `json:"createdAt"`
+	ModifiedAt     string                     `json:"modifiedAt"`
+	Meta           map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+type AutomationRunBlocker struct {
+	Kind AutomationRunBlockerKind `json:"kind"`
+}
+
+type AutomationManualRunCause struct {
+	Kind AutomationRunCauseKind `json:"kind"`
+}
+
+type AutomationTriggeredRunCause struct {
+	Kind         AutomationRunCauseKind `json:"kind"`
+	TriggerId    string                 `json:"triggerId"`
+	ScheduledFor *string                `json:"scheduledFor,omitempty"`
+	CatchUp      *bool                  `json:"catchUp,omitempty"`
+	// Host-defined event provenance containing no secrets.
+	Event map[string]json.RawMessage `json:"event,omitempty"`
+}
+
+type AutomationPendingRunLifecycle struct {
+	Status    AutomationRunStatus `json:"status"`
+	CreatedAt string              `json:"createdAt"`
+}
+
+type AutomationRunningRunLifecycle struct {
+	Status    AutomationRunStatus `json:"status"`
+	CreatedAt string              `json:"createdAt"`
+	StartedAt string              `json:"startedAt"`
+}
+
+type AutomationBlockedRunLifecycle struct {
+	Status    AutomationRunStatus  `json:"status"`
+	CreatedAt string               `json:"createdAt"`
+	StartedAt string               `json:"startedAt"`
+	Blocker   AutomationRunBlocker `json:"blocker"`
+}
+
+type AutomationCompletedRunLifecycle struct {
+	Status      AutomationRunStatus `json:"status"`
+	CreatedAt   string              `json:"createdAt"`
+	StartedAt   string              `json:"startedAt"`
+	CompletedAt string              `json:"completedAt"`
+	Usage       *UsageInfo          `json:"usage,omitempty"`
+}
+
+type AutomationFailedRunLifecycle struct {
+	Status      AutomationRunStatus `json:"status"`
+	CreatedAt   string              `json:"createdAt"`
+	StartedAt   *string             `json:"startedAt,omitempty"`
+	CompletedAt string              `json:"completedAt"`
+	Error       ErrorInfo           `json:"error"`
+}
+
+type AutomationCancelledRunLifecycle struct {
+	Status      AutomationRunStatus `json:"status"`
+	CreatedAt   string              `json:"createdAt"`
+	StartedAt   *string             `json:"startedAt,omitempty"`
+	CompletedAt string              `json:"completedAt"`
+}
+
+type AutomationRunArtifact struct {
+	// Content URI
+	Uri URI `json:"uri"`
+	// Approximate size in bytes
+	SizeHint *int64 `json:"sizeHint,omitempty"`
+	// Content MIME type
+	ContentType *string `json:"contentType,omitempty"`
+	// Content nonce
+	Nonce *string                    `json:"nonce,omitempty"`
+	Id    string                     `json:"id"`
+	Label string                     `json:"label"`
+	Meta  map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+type AutomationRunSummary struct {
+	Resource       URI                        `json:"resource"`
+	Automation     URI                        `json:"automation"`
+	Cause          AutomationRunCause         `json:"cause"`
+	Lifecycle      AutomationRunLifecycle     `json:"lifecycle"`
+	PrimarySession *URI                       `json:"primarySession,omitempty"`
+	SessionCount   int64                      `json:"sessionCount"`
+	ArtifactCount  *int64                     `json:"artifactCount,omitempty"`
+	Operations     []AutomationRunOperation   `json:"operations"`
+	Meta           map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+type AutomationRunState struct {
+	Resource       URI                        `json:"resource"`
+	Automation     URI                        `json:"automation"`
+	Cause          AutomationRunCause         `json:"cause"`
+	Lifecycle      AutomationRunLifecycle     `json:"lifecycle"`
+	Sessions       []URI                      `json:"sessions"`
+	PrimarySession *URI                       `json:"primarySession,omitempty"`
+	Artifacts      []AutomationRunArtifact    `json:"artifacts"`
+	Operations     []AutomationRunOperation   `json:"operations"`
+	Meta           map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
 // ToolInput is raw tool input represented inline or by content reference.
 type ToolInput struct {
 	Inline     *string
@@ -4860,6 +5175,361 @@ func (u SessionInputRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Value)
 }
 
+// SessionOrigin is the durable origin of a session.
+type SessionOrigin struct {
+	Value isSessionOrigin
+}
+
+// isSessionOrigin is the marker interface implemented by every
+// concrete variant of SessionOrigin.
+type isSessionOrigin interface{ isSessionOrigin() }
+
+func (*AutomationSessionOrigin) isSessionOrigin() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *SessionOrigin) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("SessionOrigin", "kind")
+	}
+	switch disc {
+	case "automation":
+		var value AutomationSessionOrigin
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("SessionOrigin", "kind", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u SessionOrigin) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *AutomationSessionOrigin:
+		object["kind"] = json.RawMessage("\"automation\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationSchedule is the calendar schedule for an automation trigger.
+type AutomationSchedule struct {
+	Value isAutomationSchedule
+}
+
+// isAutomationSchedule is the marker interface implemented by every
+// concrete variant of AutomationSchedule.
+type isAutomationSchedule interface{ isAutomationSchedule() }
+
+func (*AutomationHourlySchedule) isAutomationSchedule() {}
+func (*AutomationDailySchedule) isAutomationSchedule()  {}
+func (*AutomationWeeklySchedule) isAutomationSchedule() {}
+func (*AutomationCronSchedule) isAutomationSchedule()   {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AutomationSchedule) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("AutomationSchedule", "kind")
+	}
+	switch disc {
+	case "hourly":
+		var value AutomationHourlySchedule
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "daily":
+		var value AutomationDailySchedule
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "weekly":
+		var value AutomationWeeklySchedule
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "cron":
+		var value AutomationCronSchedule
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("AutomationSchedule", "kind", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationSchedule) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *AutomationHourlySchedule:
+		object["kind"] = json.RawMessage("\"hourly\"")
+	case *AutomationDailySchedule:
+		object["kind"] = json.RawMessage("\"daily\"")
+	case *AutomationWeeklySchedule:
+		object["kind"] = json.RawMessage("\"weekly\"")
+	case *AutomationCronSchedule:
+		object["kind"] = json.RawMessage("\"cron\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationTrigger is an automatic trigger for an automation.
+type AutomationTrigger struct {
+	Value isAutomationTrigger
+}
+
+// isAutomationTrigger is the marker interface implemented by every
+// concrete variant of AutomationTrigger.
+type isAutomationTrigger interface{ isAutomationTrigger() }
+
+func (*AutomationScheduleTrigger) isAutomationTrigger() {}
+func (*AutomationEventTrigger) isAutomationTrigger()    {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AutomationTrigger) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("AutomationTrigger", "kind")
+	}
+	switch disc {
+	case "schedule":
+		var value AutomationScheduleTrigger
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "event":
+		var value AutomationEventTrigger
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("AutomationTrigger", "kind", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *AutomationScheduleTrigger:
+		object["kind"] = json.RawMessage("\"schedule\"")
+	case *AutomationEventTrigger:
+		object["kind"] = json.RawMessage("\"event\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationRunCause is the cause of an automation run.
+type AutomationRunCause struct {
+	Value isAutomationRunCause
+}
+
+// isAutomationRunCause is the marker interface implemented by every
+// concrete variant of AutomationRunCause.
+type isAutomationRunCause interface{ isAutomationRunCause() }
+
+func (*AutomationManualRunCause) isAutomationRunCause()    {}
+func (*AutomationTriggeredRunCause) isAutomationRunCause() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AutomationRunCause) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("AutomationRunCause", "kind")
+	}
+	switch disc {
+	case "manual":
+		var value AutomationManualRunCause
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "trigger":
+		var value AutomationTriggeredRunCause
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("AutomationRunCause", "kind", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationRunCause) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *AutomationManualRunCause:
+		object["kind"] = json.RawMessage("\"manual\"")
+	case *AutomationTriggeredRunCause:
+		object["kind"] = json.RawMessage("\"trigger\"")
+	}
+	return json.Marshal(object)
+}
+
+// AutomationRunLifecycle is the lifecycle of an automation run.
+type AutomationRunLifecycle struct {
+	Value isAutomationRunLifecycle
+}
+
+// isAutomationRunLifecycle is the marker interface implemented by every
+// concrete variant of AutomationRunLifecycle.
+type isAutomationRunLifecycle interface{ isAutomationRunLifecycle() }
+
+func (*AutomationPendingRunLifecycle) isAutomationRunLifecycle()   {}
+func (*AutomationRunningRunLifecycle) isAutomationRunLifecycle()   {}
+func (*AutomationBlockedRunLifecycle) isAutomationRunLifecycle()   {}
+func (*AutomationCompletedRunLifecycle) isAutomationRunLifecycle() {}
+func (*AutomationFailedRunLifecycle) isAutomationRunLifecycle()    {}
+func (*AutomationCancelledRunLifecycle) isAutomationRunLifecycle() {}
+
+// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
+func (u *AutomationRunLifecycle) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "status")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("AutomationRunLifecycle", "status")
+	}
+	switch disc {
+	case "pending":
+		var value AutomationPendingRunLifecycle
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "running":
+		var value AutomationRunningRunLifecycle
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "blocked":
+		var value AutomationBlockedRunLifecycle
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "completed":
+		var value AutomationCompletedRunLifecycle
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "failed":
+		var value AutomationFailedRunLifecycle
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "cancelled":
+		var value AutomationCancelledRunLifecycle
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("AutomationRunLifecycle", "status", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *AutomationPendingRunLifecycle:
+		object["status"] = json.RawMessage("\"pending\"")
+	case *AutomationRunningRunLifecycle:
+		object["status"] = json.RawMessage("\"running\"")
+	case *AutomationBlockedRunLifecycle:
+		object["status"] = json.RawMessage("\"blocked\"")
+	case *AutomationCompletedRunLifecycle:
+		object["status"] = json.RawMessage("\"completed\"")
+	case *AutomationFailedRunLifecycle:
+		object["status"] = json.RawMessage("\"failed\"")
+	case *AutomationCancelledRunLifecycle:
+		object["status"] = json.RawMessage("\"cancelled\"")
+	}
+	return json.Marshal(object)
+}
+
 // ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
 	Value isChatOrigin
@@ -4957,10 +5627,12 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 }
 
 // SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, annotations, or content state. The active
+// chat, terminal, changeset, resource-watch, annotations, automation, or
+// automation-run state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (session → chat → terminal → changeset → resourceWatch → annotations → root).
+// (automationRun → automation → session → chat → terminal → changeset →
+// resourceWatch → annotations → root).
 type SnapshotState struct {
 	Root          *RootState          `json:"-"`
 	Session       *SessionState       `json:"-"`
@@ -4969,11 +5641,17 @@ type SnapshotState struct {
 	Changeset     *ChangesetState     `json:"-"`
 	ResourceWatch *ResourceWatchState `json:"-"`
 	Annotations   *AnnotationsState   `json:"-"`
+	Automation    *AutomationState    `json:"-"`
+	AutomationRun *AutomationRunState `json:"-"`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	switch {
+	case s.AutomationRun != nil:
+		return json.Marshal(s.AutomationRun)
+	case s.Automation != nil:
+		return json.Marshal(s.Automation)
 	case s.Session != nil:
 		return json.Marshal(s.Session)
 	case s.Chat != nil:
@@ -5002,6 +5680,18 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch {
+	case containsAll(probe, "automation", "cause", "sessions"):
+		var v AutomationRunState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.AutomationRun = &v
+	case containsAll(probe, "definition"):
+		var v AutomationState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Automation = &v
 	case containsAll(probe, "lifecycle"):
 		var v SessionState
 		if err := json.Unmarshal(data, &v); err != nil {

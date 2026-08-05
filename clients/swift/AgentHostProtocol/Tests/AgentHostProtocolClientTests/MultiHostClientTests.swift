@@ -132,6 +132,46 @@ final class MultiHostClientTests: XCTestCase {
         await multi.shutdown()
     }
 
+    func testAutomationCapabilitiesPersistAcrossReconnect() async throws {
+        let mode = ReconnectResponseModeSwitch()
+        let capabilities = AutomationCapabilities(
+            execution: AutomationExecutionCapabilities(lifetime: .managed),
+            create: AutomationCreateCapability(),
+            runHistoryLimit: 25
+        )
+        let multi = MultiHostClient()
+        let config = HostConfig(
+            id: "local",
+            label: "Local",
+            transportFactory: makeReconnectResultFactory(
+                mode: mode,
+                automationCapabilities: capabilities
+            )
+        ).withInitialSubscriptions([RootResourceURI])
+        _ = try await multi.add(config)
+        await waitForHostState(multi, id: "local") { $0.isConnected }
+
+        let initialValue = await multi.host("local")
+        let initial = try XCTUnwrap(initialValue)
+        XCTAssertEqual(initial.automations?.execution.lifetime, .managed)
+        XCTAssertNotNil(initial.automations?.create)
+        XCTAssertEqual(initial.automations?.runHistoryLimit, 25)
+
+        try await multi.reconnect("local")
+        await waitUntil {
+            guard let snapshot = await multi.host("local") else { return false }
+            return snapshot.generation > initial.generation && snapshot.state.isConnected
+        }
+
+        let reconnectedValue = await multi.host("local")
+        let reconnected = try XCTUnwrap(reconnectedValue)
+        XCTAssertEqual(reconnected.automations?.execution.lifetime, .managed)
+        XCTAssertNotNil(reconnected.automations?.create)
+        XCTAssertEqual(reconnected.automations?.runHistoryLimit, 25)
+
+        await multi.shutdown()
+    }
+
     // MARK: - dispatch_can_use_explicit_client_seq
 
     func testDispatchCanUseExplicitClientSeqThroughMultiHostSurfaces() async throws {
@@ -1116,17 +1156,27 @@ private func actionEnvelope(from event: HostSubscriptionEvent?) -> ActionEnvelop
 
 // MARK: - Reconnect-result fake host
 
-private func makeReconnectResultFactory(mode: ReconnectResponseModeSwitch) -> HostTransportFactory {
+private func makeReconnectResultFactory(
+    mode: ReconnectResponseModeSwitch,
+    automationCapabilities: AutomationCapabilities? = nil
+) -> HostTransportFactory {
     { _ in
         let (clientSide, serverSide) = InMemoryTransport.pair()
-        Task { await driveReconnectResultHost(transport: serverSide, mode: mode) }
+        Task {
+            await driveReconnectResultHost(
+                transport: serverSide,
+                mode: mode,
+                automationCapabilities: automationCapabilities
+            )
+        }
         return clientSide
     }
 }
 
 private func driveReconnectResultHost(
     transport: InMemoryTransport,
-    mode: ReconnectResponseModeSwitch
+    mode: ReconnectResponseModeSwitch,
+    automationCapabilities: AutomationCapabilities?
 ) async {
     while !Task.isCancelled {
         let frame: TransportMessage?
@@ -1147,7 +1197,11 @@ private func driveReconnectResultHost(
         let result: Any
         switch method {
         case "initialize":
-            result = initializeResult(serverSeq: 40, activeSessions: 1)
+            result = initializeResult(
+                serverSeq: 40,
+                activeSessions: 1,
+                automationCapabilities: automationCapabilities
+            )
         case "reconnect":
             result = reconnectResult(for: currentMode)
         case "listSessions":
@@ -1168,12 +1222,22 @@ private func driveReconnectResultHost(
     }
 }
 
-private func initializeResult(serverSeq: Int, activeSessions: Int) -> [String: Any] {
-    [
+private func initializeResult(
+    serverSeq: Int,
+    activeSessions: Int,
+    automationCapabilities: AutomationCapabilities? = nil
+) -> [String: Any] {
+    var result: [String: Any] = [
         "protocolVersion": "0.1.0",
         "serverSeq": serverSeq,
         "snapshots": [rootSnapshot(fromSeq: serverSeq, activeSessions: activeSessions)],
-    ] as [String: Any]
+    ]
+    if let automationCapabilities,
+       let data = try? JSONEncoder().encode(automationCapabilities),
+       let object = try? JSONSerialization.jsonObject(with: data) {
+        result["automations"] = object
+    }
+    return result
 }
 
 private func reconnectResult(for mode: ReconnectResponseMode) -> [String: Any] {

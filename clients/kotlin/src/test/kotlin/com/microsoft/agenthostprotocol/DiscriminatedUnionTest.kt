@@ -1,5 +1,10 @@
 package com.microsoft.agenthostprotocol
 
+import com.microsoft.agenthostprotocol.generated.AutomationDailySchedule
+import com.microsoft.agenthostprotocol.generated.AutomationLocalTime
+import com.microsoft.agenthostprotocol.generated.AutomationSchedule
+import com.microsoft.agenthostprotocol.generated.AutomationScheduleDaily
+import com.microsoft.agenthostprotocol.generated.AutomationScheduleKind
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationRangeTarget
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationResourceTarget
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
@@ -80,6 +85,20 @@ class DiscriminatedUnionTest {
 
         val decoded = json.decodeFromString(ResponsePart.serializer(), encoded)
         assertIs<ResponsePartReasoning>(decoded)
+    }
+
+    @Test
+    fun `AutomationSchedule serializer uses wrapper discriminant`() {
+        val schedule: AutomationSchedule = AutomationScheduleDaily(
+            AutomationDailySchedule(
+                kind = AutomationScheduleKind.HOURLY,
+                time = AutomationLocalTime(hour = 9, minute = 30),
+                timeZone = "Europe/Berlin",
+            ),
+        )
+
+        val encoded = json.encodeToString(AutomationSchedule.serializer(), schedule)
+        assertEquals(JsonPrimitive("daily"), json.parseToJsonElement(encoded).jsonObject["kind"])
     }
 
     @Test

@@ -1,0 +1,105 @@
+{
+  "description": "automation run summaries insert, replace, load, and remove",
+  "reducer": "automation",
+  "initial": {
+    "resource": "ahp-automation:/a1",
+    "definition": {
+      "title": "A",
+      "message": { "text": "go", "origin": { "kind": "user" } },
+      "session": {},
+      "enabled": true,
+      "triggers": []
+    },
+    "revision": 1,
+    "runs": [],
+    "operations": ["run"],
+    "createdAt": "2025-01-01T00:00:00Z",
+    "modifiedAt": "2025-01-01T00:00:00Z"
+  },
+  "actions": [
+    {
+      "type": "automation/runSummarySet",
+      "run": {
+        "resource": "ahp-automation-run:/r1",
+        "automation": "ahp-automation:/a1",
+        "cause": { "kind": "manual" },
+        "lifecycle": { "status": "pending", "createdAt": "2025-01-02T00:00:00Z" },
+        "sessionCount": 0,
+        "operations": ["cancel"]
+      }
+    },
+    {
+      "type": "automation/runSummarySet",
+      "run": {
+        "resource": "ahp-automation-run:/r1",
+        "automation": "ahp-automation:/a1",
+        "cause": { "kind": "manual" },
+        "lifecycle": {
+          "status": "running",
+          "createdAt": "2025-01-02T00:00:00Z",
+          "startedAt": "2025-01-02T00:00:01Z"
+        },
+        "sessionCount": 1,
+        "operations": ["cancel"]
+      }
+    },
+    {
+      "type": "automation/runsLoaded",
+      "runs": [
+        {
+          "resource": "ahp-automation-run:/r1",
+          "automation": "ahp-automation:/a1",
+          "cause": { "kind": "manual" },
+          "lifecycle": { "status": "pending", "createdAt": "ignored" },
+          "sessionCount": 0,
+          "operations": []
+        },
+        {
+          "resource": "ahp-automation-run:/r0",
+          "automation": "ahp-automation:/a1",
+          "cause": { "kind": "manual" },
+          "lifecycle": {
+            "status": "completed",
+            "createdAt": "2025-01-01T00:00:00Z",
+            "startedAt": "2025-01-01T00:00:01Z",
+            "completedAt": "2025-01-01T00:01:00Z"
+          },
+          "sessionCount": 1,
+          "operations": []
+        }
+      ],
+      "nextCursor": "older"
+    },
+    { "type": "automation/runSummaryRemoved", "run": "ahp-automation-run:/r1" }
+  ],
+  "expected": {
+    "resource": "ahp-automation:/a1",
+    "definition": {
+      "title": "A",
+      "message": { "text": "go", "origin": { "kind": "user" } },
+      "session": {},
+      "enabled": true,
+      "triggers": []
+    },
+    "revision": 1,
+    "runs": [
+      {
+        "resource": "ahp-automation-run:/r0",
+        "automation": "ahp-automation:/a1",
+        "cause": { "kind": "manual" },
+        "lifecycle": {
+          "status": "completed",
+          "createdAt": "2025-01-01T00:00:00Z",
+          "startedAt": "2025-01-01T00:00:01Z",
+          "completedAt": "2025-01-01T00:01:00Z"
+        },
+        "sessionCount": 1,
+        "operations": []
+      }
+    ],
+    "runsNextCursor": "older",
+    "operations": ["run"],
+    "createdAt": "2025-01-01T00:00:00Z",
+    "modifiedAt": "2025-01-01T00:00:00Z"
+  }
+}

@@ -36,6 +36,7 @@ import type { AsyncBroadcastQueue } from '../async-queue.js';
 import { rootReducer } from '../../types/channels-root/reducer.js';
 import type { RootAction } from '../../types/action-origin.generated.js';
 import type { StateAction } from '../../types/common/actions.js';
+import type { AutomationCapabilities } from '../../types/common/commands.js';
 import {
   HostNotConnectedError,
   HostShutDownError,
@@ -71,6 +72,7 @@ export interface HostShared {
   protocolVersion: string | null;
   serverSeq: number;
   defaultDirectory: string | null;
+  automations: AutomationCapabilities | null;
   rootState: RootState;
   subscriptions: URI[];
   completionTriggerCharacters: string[];
@@ -101,6 +103,7 @@ export function makeInitialShared(
     protocolVersion: null,
     serverSeq: 0,
     defaultDirectory: null,
+    automations: null,
     rootState: { agents: [] },
     subscriptions: [...config.initialSubscriptions],
     completionTriggerCharacters: [],
@@ -123,6 +126,7 @@ export function snapshotHandle(shared: HostShared): HostHandle {
     protocolVersion: shared.protocolVersion,
     serverSeq: shared.serverSeq,
     defaultDirectory: shared.defaultDirectory,
+    automations: shared.automations,
     agents: [...shared.rootState.agents],
     activeSessions: shared.rootState.activeSessions ?? null,
     terminals: shared.rootState.terminals ? [...shared.rootState.terminals] : null,
@@ -569,6 +573,7 @@ export class HostRuntime {
         let initServerSeq = prior.serverSeq;
         let initProtocolVersion: string | null = null;
         let initDefaultDirectory: string | null = null;
+        let initAutomations = this.shared.automations;
         let initCompletionTriggers: string[] = [];
 
         if (canReconnect) {
@@ -603,6 +608,7 @@ export class HostRuntime {
             initServerSeq = initResult.serverSeq;
             initProtocolVersion = initResult.protocolVersion;
             initDefaultDirectory = initResult.defaultDirectory ?? null;
+            initAutomations = initResult.automations ?? null;
             initCompletionTriggers = initResult.completionTriggerCharacters ?? [];
           }
         } else {
@@ -619,6 +625,7 @@ export class HostRuntime {
           initServerSeq = initResult.serverSeq;
           initProtocolVersion = initResult.protocolVersion;
           initDefaultDirectory = initResult.defaultDirectory ?? null;
+          initAutomations = initResult.automations ?? null;
           initCompletionTriggers = initResult.completionTriggerCharacters ?? [];
         }
 
@@ -684,6 +691,7 @@ export class HostRuntime {
           if (rootSnap) this.shared.rootState = (rootSnap.state as RootState) ?? EMPTY_ROOT_STATE;
           if (initProtocolVersion) this.shared.protocolVersion = initProtocolVersion;
           this.shared.defaultDirectory = initDefaultDirectory;
+          this.shared.automations = initAutomations;
           this.shared.completionTriggerCharacters = [...initCompletionTriggers];
         }
         if (summaries !== null) {
@@ -807,6 +815,9 @@ export class HostRuntime {
       case 'sessionSummaryChanged':
         applySummaryChange(this.shared.sessionSummaries, event.event.params);
         break;
+      case 'automationAdded':
+      case 'automationRemoved':
+      case 'automationSummaryChanged':
       case 'authRequired':
         // No cache update; consumers observe via the event stream.
         break;
@@ -877,6 +888,7 @@ function applySummaryChange(
   if (changes.title !== undefined) merged.title = changes.title;
   if (changes.status !== undefined) merged.status = changes.status;
   if (changes.activity !== undefined) merged.activity = changes.activity;
+  if (changes.origin !== undefined) merged.origin = changes.origin;
   if (changes.modifiedAt !== undefined) merged.modifiedAt = changes.modifiedAt;
   if (changes.project !== undefined) merged.project = changes.project;
   if (changes.workingDirectories !== undefined) merged.workingDirectories = changes.workingDirectories;

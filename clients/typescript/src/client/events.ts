@@ -16,6 +16,9 @@ import type {
   SessionAddedParams,
   SessionRemovedParams,
   SessionSummaryChangedParams,
+  AutomationAddedParams,
+  AutomationRemovedParams,
+  AutomationSummaryChangedParams,
 } from '../types/channels-root/notifications.js';
 import type { AuthRequiredParams } from '../types/common/notifications.js';
 import type { URI } from '../types/common/state.js';
@@ -27,6 +30,9 @@ export type SubscriptionEvent =
   | { readonly type: 'sessionAdded'; readonly params: SessionAddedParams }
   | { readonly type: 'sessionRemoved'; readonly params: SessionRemovedParams }
   | { readonly type: 'sessionSummaryChanged'; readonly params: SessionSummaryChangedParams }
+  | { readonly type: 'automationAdded'; readonly params: AutomationAddedParams }
+  | { readonly type: 'automationRemoved'; readonly params: AutomationRemovedParams }
+  | { readonly type: 'automationSummaryChanged'; readonly params: AutomationSummaryChangedParams }
   | { readonly type: 'authRequired'; readonly params: AuthRequiredParams };
 
 /**

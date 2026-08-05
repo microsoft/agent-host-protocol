@@ -3,6 +3,8 @@ package com.microsoft.agenthostprotocol
 import com.microsoft.agenthostprotocol.generated.ChatState
 import com.microsoft.agenthostprotocol.generated.ChangesetState
 import com.microsoft.agenthostprotocol.generated.AnnotationsState
+import com.microsoft.agenthostprotocol.generated.AutomationRunState
+import com.microsoft.agenthostprotocol.generated.AutomationState
 import com.microsoft.agenthostprotocol.generated.ResourceWatchState
 import com.microsoft.agenthostprotocol.generated.RootState
 import com.microsoft.agenthostprotocol.generated.SessionState
@@ -216,6 +218,29 @@ class FixtureDrivenReducerTest {
                 },
             )
 
+            "automation" -> compareFixture(
+                file = file,
+                initial = initial,
+                expected = expected,
+                serializer = AutomationState.serializer(),
+                run = { state ->
+                    var s = state
+                    for (action in actions) s = automationReducer(s, action)
+                    s
+                },
+            )
+
+            "automationRun" -> compareFixture(
+                file = file,
+                initial = initial,
+                expected = expected,
+                serializer = AutomationRunState.serializer(),
+                run = { state ->
+                    var s = state
+                    for (action in actions) s = automationRunReducer(s, action)
+                    s
+                },
+            )
 
             else -> fail("${file.name}: unsupported reducer '$reducer'")
         }

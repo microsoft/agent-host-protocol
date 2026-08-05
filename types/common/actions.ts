@@ -113,6 +113,21 @@ import type {
 import type {
   ResourceWatchChangedAction,
 } from '../channels-resource-watch/actions.js';
+import type {
+  AutomationDefinitionChangedAction,
+  AutomationRunSummarySetAction,
+  AutomationRunSummaryRemovedAction,
+  AutomationRunsLoadedAction,
+} from '../channels-automation/actions.js';
+import type {
+  AutomationRunLifecycleChangedAction,
+  AutomationRunSessionSetAction,
+  AutomationRunSessionRemovedAction,
+  AutomationRunPrimarySessionChangedAction,
+  AutomationRunArtifactSetAction,
+  AutomationRunArtifactRemovedAction,
+  AutomationRunCancelRequestedAction,
+} from '../channels-automation-run/actions.js';
 
 // ─── Action Type Enum ────────────────────────────────────────────────────────
 
@@ -207,6 +222,17 @@ export const enum ActionType {
   TerminalCommandExecuted = 'terminal/commandExecuted',
   TerminalCommandFinished = 'terminal/commandFinished',
   ResourceWatchChanged = 'resourceWatch/changed',
+  AutomationDefinitionChanged = 'automation/definitionChanged',
+  AutomationRunSummarySet = 'automation/runSummarySet',
+  AutomationRunSummaryRemoved = 'automation/runSummaryRemoved',
+  AutomationRunsLoaded = 'automation/runsLoaded',
+  AutomationRunLifecycleChanged = 'automationRun/lifecycleChanged',
+  AutomationRunSessionSet = 'automationRun/sessionSet',
+  AutomationRunSessionRemoved = 'automationRun/sessionRemoved',
+  AutomationRunPrimarySessionChanged = 'automationRun/primarySessionChanged',
+  AutomationRunArtifactSet = 'automationRun/artifactSet',
+  AutomationRunArtifactRemoved = 'automationRun/artifactRemoved',
+  AutomationRunCancelRequested = 'automationRun/cancelRequested',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -327,4 +353,15 @@ export type StateAction =
   | TerminalCommandDetectionAvailableAction
   | TerminalCommandExecutedAction
   | TerminalCommandFinishedAction
-  | ResourceWatchChangedAction;
+  | ResourceWatchChangedAction
+  | AutomationDefinitionChangedAction
+  | AutomationRunSummarySetAction
+  | AutomationRunSummaryRemovedAction
+  | AutomationRunsLoadedAction
+  | AutomationRunLifecycleChangedAction
+  | AutomationRunSessionSetAction
+  | AutomationRunSessionRemovedAction
+  | AutomationRunPrimarySessionChangedAction
+  | AutomationRunArtifactSetAction
+  | AutomationRunArtifactRemovedAction
+  | AutomationRunCancelRequestedAction;

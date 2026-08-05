@@ -70,6 +70,21 @@ import type {
   InvokeChangesetOperationParams,
   InvokeChangesetOperationResult,
 } from '../channels-changeset/commands.js';
+import type {
+  ListAutomationsParams,
+  ListAutomationsResult,
+  ListAutomationTriggerDefinitionsParams,
+  ListAutomationTriggerDefinitionsResult,
+  CreateAutomationParams,
+  UpdateAutomationParams,
+  DisposeAutomationParams,
+  RunAutomationParams,
+  RunAutomationResult,
+  FetchAutomationRunsParams,
+  FetchAutomationRunsResult,
+  PreviewAutomationScheduleParams,
+  PreviewAutomationScheduleResult,
+} from '../channels-automation/commands.js';
 
 import type { ActionEnvelope } from './actions.js';
 import type {
@@ -77,6 +92,9 @@ import type {
   SessionRemovedParams,
   SessionSummaryChangedParams,
   ProgressParams,
+  AutomationAddedParams,
+  AutomationRemovedParams,
+  AutomationSummaryChangedParams,
 } from '../channels-root/notifications.js';
 import type { AuthRequiredParams } from './notifications.js';
 import type {
@@ -174,6 +192,14 @@ export interface CommandMap {
   'sessionConfigCompletions': { params: SessionConfigCompletionsParams; result: SessionConfigCompletionsResult };
   'completions': { params: CompletionsParams; result: CompletionsResult };
   'invokeChangesetOperation': { params: InvokeChangesetOperationParams; result: InvokeChangesetOperationResult };
+  'listAutomations': { params: ListAutomationsParams; result: ListAutomationsResult };
+  'listAutomationTriggerDefinitions': { params: ListAutomationTriggerDefinitionsParams; result: ListAutomationTriggerDefinitionsResult };
+  'createAutomation': { params: CreateAutomationParams; result: null };
+  'updateAutomation': { params: UpdateAutomationParams; result: null };
+  'disposeAutomation': { params: DisposeAutomationParams; result: null };
+  'runAutomation': { params: RunAutomationParams; result: RunAutomationResult };
+  'fetchAutomationRuns': { params: FetchAutomationRunsParams; result: FetchAutomationRunsResult };
+  'previewAutomationSchedule': { params: PreviewAutomationScheduleParams; result: PreviewAutomationScheduleResult };
 }
 
 /**
@@ -232,6 +258,9 @@ export interface ServerNotificationMap {
   'root/sessionAdded': { params: SessionAddedParams };
   'root/sessionRemoved': { params: SessionRemovedParams };
   'root/sessionSummaryChanged': { params: SessionSummaryChangedParams };
+  'root/automationAdded': { params: AutomationAddedParams };
+  'root/automationRemoved': { params: AutomationRemovedParams };
+  'root/automationSummaryChanged': { params: AutomationSummaryChangedParams };
   'root/progress': { params: ProgressParams };
   'auth/required': { params: AuthRequiredParams };
   'otlp/exportLogs': { params: OtlpExportLogsParams };

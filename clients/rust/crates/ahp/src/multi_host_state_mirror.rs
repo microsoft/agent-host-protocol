@@ -1,10 +1,12 @@
 //! Host-aware reducer façade for multi-host consumers.
 //!
-//! Wraps the existing pure reducers
-//! ([`apply_action_to_root`](crate::reducers::apply_action_to_root),
+//! Wraps the existing pure reducers:
+//! [`apply_action_to_automation`](crate::reducers::apply_action_to_automation),
+//! [`apply_action_to_automation_run`](crate::reducers::apply_action_to_automation_run),
+//! [`apply_action_to_root`](crate::reducers::apply_action_to_root),
 //! [`apply_action_to_session`](crate::reducers::apply_action_to_session),
-//! [`apply_action_to_terminal`](crate::reducers::apply_action_to_terminal))
-//! the way a single-host consumer would, but keys state by
+//! and [`apply_action_to_terminal`](crate::reducers::apply_action_to_terminal).
+//! It applies them the way a single-host consumer would, but keys state by
 //! `(host_id, uri)` so resource URIs that legitimately collide across
 //! hosts (the normal case for session URIs) don't clobber each other.
 //!
@@ -37,13 +39,14 @@ use std::collections::HashMap;
 use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AnnotationsState, ChangesetState, ChatState, ResourceWatchState, RootState, SessionState,
-    SnapshotState, TerminalState,
+    AnnotationsState, AutomationRunState, AutomationState, ChangesetState, ChatState,
+    ResourceWatchState, RootState, SessionState, SnapshotState, TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
 use crate::reducers::{
-    apply_action_to_chat, apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
+    apply_action_to_automation, apply_action_to_automation_run, apply_action_to_chat,
+    apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
 };
 use crate::SubscriptionEvent;
 
@@ -71,7 +74,7 @@ impl HostedResourceKey {
     }
 }
 
-/// In-memory mirror of per-host root/session/terminal/changeset state,
+/// In-memory mirror of per-host root/session/terminal/changeset/automation state,
 /// fed by [`ActionEnvelope`]s and snapshot states tagged with their
 /// host of origin.
 ///
@@ -92,6 +95,8 @@ pub struct MultiHostStateMirror {
     changesets: HashMap<HostedResourceKey, ChangesetState>,
     annotations: HashMap<HostedResourceKey, AnnotationsState>,
     resource_watches: HashMap<HostedResourceKey, ResourceWatchState>,
+    automations: HashMap<HostedResourceKey, AutomationState>,
+    automation_runs: HashMap<HostedResourceKey, AutomationRunState>,
 }
 
 impl MultiHostStateMirror {
@@ -135,11 +140,21 @@ impl MultiHostStateMirror {
         &self.resource_watches
     }
 
+    /// Borrow automation states keyed by `(host_id, uri)`.
+    pub fn automations(&self) -> &HashMap<HostedResourceKey, AutomationState> {
+        &self.automations
+    }
+
+    /// Borrow automation-run states keyed by `(host_id, uri)`.
+    pub fn automation_runs(&self) -> &HashMap<HostedResourceKey, AutomationRunState> {
+        &self.automation_runs
+    }
+
     /// Convenience: apply a [`HostSubscriptionEvent`] produced by
     /// [`crate::hosts::MultiHostClient::events`]. Action envelopes are
     /// routed through the reducer; non-action events (session-summary
-    /// notifications, auth challenges) are ignored — they don't move
-    /// any of the reducer-tracked state shapes.
+    /// notifications, automation-catalogue notifications, auth challenges)
+    /// are ignored — they don't move any of the reducer-tracked state shapes.
     pub fn apply_event(&mut self, event: &HostSubscriptionEvent) {
         if let SubscriptionEvent::Action(envelope) = &event.event {
             self.apply_envelope(&event.host_id, envelope);
@@ -176,6 +191,14 @@ impl MultiHostStateMirror {
         }
         if let Some(terminal) = self.terminals.get_mut(&key) {
             apply_action_to_terminal(terminal, &envelope.action);
+            return;
+        }
+        if let Some(automation) = self.automations.get_mut(&key) {
+            apply_action_to_automation(automation, &envelope.action);
+            return;
+        }
+        if let Some(run) = self.automation_runs.get_mut(&key) {
+            apply_action_to_automation_run(run, &envelope.action);
         }
         // Changesets are seeded by `apply_snapshot` only — there's no
         // changeset reducer in the SDK today (matching the Swift
@@ -184,8 +207,8 @@ impl MultiHostStateMirror {
 
     /// Seed the mirror from a [`Snapshot`](ahp_types::state::Snapshot)
     /// scoped to `host` — root, session, terminal, changeset,
-    /// resource-watch, or annotations as the snapshot's `state`
-    /// discriminator dictates.
+    /// resource-watch, annotations, automation, or automation-run as the
+    /// snapshot's `state` discriminator dictates.
     pub fn apply_snapshot(&mut self, host: &HostId, snapshot: &ahp_types::state::Snapshot) {
         let key = HostedResourceKey::new(host.clone(), snapshot.resource.clone());
         match &snapshot.state {
@@ -211,11 +234,18 @@ impl MultiHostStateMirror {
             SnapshotState::Annotations(state) => {
                 self.annotations.insert(key, state.as_ref().clone());
             }
+            SnapshotState::Automation(state) => {
+                self.automations.insert(key, state.as_ref().clone());
+            }
+            SnapshotState::AutomationRun(state) => {
+                self.automation_runs.insert(key, state.as_ref().clone());
+            }
         }
     }
 
     /// Drop every slot keyed under `host` — root state, sessions,
-    /// terminals, changesets, resource watches, and annotations.
+    /// terminals, changesets, resource watches, annotations, automations,
+    /// and automation runs.
     pub fn reset_host(&mut self, host: &HostId) {
         self.root_states.remove(host);
         self.sessions.retain(|key, _| &key.host_id != host);
@@ -224,6 +254,8 @@ impl MultiHostStateMirror {
         self.changesets.retain(|key, _| &key.host_id != host);
         self.annotations.retain(|key, _| &key.host_id != host);
         self.resource_watches.retain(|key, _| &key.host_id != host);
+        self.automations.retain(|key, _| &key.host_id != host);
+        self.automation_runs.retain(|key, _| &key.host_id != host);
     }
 
     /// Drop every host's state.
@@ -235,5 +267,7 @@ impl MultiHostStateMirror {
         self.changesets.clear();
         self.annotations.clear();
         self.resource_watches.clear();
+        self.automations.clear();
+        self.automation_runs.clear();
     }
 }

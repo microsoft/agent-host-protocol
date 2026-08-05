@@ -13,8 +13,9 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[allow(unused_imports)]
 use crate::state::{
-    AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
-    ProjectInfo, SessionStatus, SessionSummary,
+    AgentSelection, AnnotationsSummary, AutomationOperation, AutomationRunSummary,
+    AutomationSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo,
+    SessionOrigin, SessionStatus, SessionSummary,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -94,6 +95,27 @@ pub struct SessionSummaryChangedParams {
     /// Identity fields (`resource`, `provider`, `createdAt`) never change and
     /// MUST be omitted by senders; receivers SHOULD ignore them if present.
     pub changes: PartialSessionSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationAddedParams {
+    pub channel: Uri,
+    pub summary: AutomationSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationRemovedParams {
+    pub channel: Uri,
+    pub automation: Uri,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationSummaryChangedParams {
+    pub channel: Uri,
+    pub summary: AutomationSummary,
 }
 
 /// Generic progress notification for a long-running operation.
@@ -245,6 +267,9 @@ pub struct PartialSessionSummary {
     /// Human-readable description of what the session is currently doing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
+    /// Durable origin of this session, when another AHP resource created it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<SessionOrigin>,
     /// Server-owned project for this session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<ProjectInfo>,

@@ -66,6 +66,45 @@ public struct SessionSummaryChangedParams: Codable, Sendable {
     }
 }
 
+public struct AutomationAddedParams: Codable, Sendable {
+    public var channel: String
+    public var summary: AutomationSummary
+
+    public init(
+        channel: String,
+        summary: AutomationSummary
+    ) {
+        self.channel = channel
+        self.summary = summary
+    }
+}
+
+public struct AutomationRemovedParams: Codable, Sendable {
+    public var channel: String
+    public var automation: String
+
+    public init(
+        channel: String,
+        automation: String
+    ) {
+        self.channel = channel
+        self.automation = automation
+    }
+}
+
+public struct AutomationSummaryChangedParams: Codable, Sendable {
+    public var channel: String
+    public var summary: AutomationSummary
+
+    public init(
+        channel: String,
+        summary: AutomationSummary
+    ) {
+        self.channel = channel
+        self.summary = summary
+    }
+}
+
 public struct ProgressParams: Codable, Sendable {
     /// Channel URI this notification belongs to (the root channel).
     public var channel: String
@@ -180,6 +219,8 @@ public struct PartialSessionSummary: Codable, Sendable {
     public var status: SessionStatus?
     /// Human-readable description of what the session is currently doing
     public var activity: String?
+    /// Durable origin of this session, when another AHP resource created it.
+    public var origin: SessionOrigin?
     /// Server-owned project for this session
     public var project: ProjectInfo?
     /// The working directories the session's agent has tool access to, as
@@ -219,6 +260,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         case title
         case status
         case activity
+        case origin
         case project
         case workingDirectories
         case annotations
@@ -234,6 +276,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         title: String? = nil,
         status: SessionStatus? = nil,
         activity: String? = nil,
+        origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
         workingDirectories: [String]? = nil,
         annotations: AnnotationsSummary? = nil,
@@ -247,6 +290,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         self.title = title
         self.status = status
         self.activity = activity
+        self.origin = origin
         self.project = project
         self.workingDirectories = workingDirectories
         self.annotations = annotations

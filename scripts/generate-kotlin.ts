@@ -54,6 +54,7 @@ const GENERATED_HEADER =
   'import kotlinx.serialization.json.JsonObject\n' +
   'import kotlinx.serialization.json.JsonPrimitive\n' +
   'import kotlinx.serialization.json.buildJsonObject\n' +
+  'import kotlinx.serialization.json.jsonObject\n' +
   'import kotlinx.serialization.json.contentOrNull\n';
 
 const PACKAGE = 'com.microsoft.agenthostprotocol.generated';
@@ -86,7 +87,7 @@ function snakeToCamel(s: string): string {
 const KOTLIN_RESERVED_KEYWORDS = new Set([
   // Hard keywords
   'as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for', 'fun',
-  'if', 'in', 'interface', 'is', 'null', 'object', 'package', 'return',
+  'if', 'import', 'in', 'interface', 'is', 'null', 'object', 'package', 'return',
   'super', 'this', 'throw', 'true', 'try', 'typealias', 'typeof', 'val',
   'var', 'when', 'while',
 ]);
@@ -148,6 +149,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -483,6 +485,8 @@ interface UnionConfig {
    * on the same set of state-channel unions.
    */
   unknown?: boolean;
+  /** Force the sealed case's discriminator when serializing its payload. */
+  injectDiscriminantOnSerialize?: boolean;
 }
 
 /**
@@ -570,7 +574,21 @@ function generateDiscriminatedUnion(config: UnionConfig): string {
     lines.push(`            is ${config.name}Unknown -> value.raw`);
   }
   lines.push('        }');
-  lines.push('        output.encodeJsonElement(element)');
+  if (config.injectDiscriminantOnSerialize) {
+    lines.push('        val encodedObject = element.jsonObject.toMutableMap()');
+    lines.push('        val discriminant = when (value) {');
+    for (const v of byStruct.values()) {
+      lines.push(`            is ${config.name}${v.caseName} -> ${JSON.stringify(v.discriminantValue)}`);
+    }
+    if (config.unknown) {
+      lines.push(`            is ${config.name}Unknown -> null`);
+    }
+    lines.push('        }');
+    lines.push(`        if (discriminant != null) encodedObject[${JSON.stringify(config.discriminantField)}] = JsonPrimitive(discriminant)`);
+    lines.push('        output.encodeJsonElement(JsonObject(encodedObject))');
+  } else {
+    lines.push('        output.encodeJsonElement(element)');
+  }
   lines.push('    }');
   lines.push('}');
 
@@ -767,8 +785,7 @@ internal object ToolInputSerializer : KSerializer<ToolInput> {
 
 function generateSnapshotState(): string {
   return `/**
- * The state payload of a snapshot — root, session, chat, terminal, changeset,
- * resource-watch, annotations, or content state.
+ * The state payload of a snapshot.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
@@ -779,6 +796,8 @@ sealed interface SnapshotState {
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
+    @JvmInline value class Automation(val value: AutomationState) : SnapshotState
+    @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
 }
 
 internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
@@ -791,7 +810,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
-        // Try the most distinctive shape first. SessionState has required
+        // Try the most distinctive shape first. AutomationRunState has required
+        // \`automation\`, \`cause\`, and \`sessions\`; AutomationState has required
+        // \`definition\`; SessionState has required
         // \`lifecycle\`; ChatState has required \`turns\`; ChangesetState has
         // required \`status\` + \`files\`; ResourceWatchState has required
         // \`root\` + \`recursive\`; AnnotationsState has required \`annotations\`
@@ -799,6 +820,10 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // key); TerminalState has required \`content\`; RootState is the
         // catch-all.
         return when {
+            obj.containsKey("automation") && obj.containsKey("cause") && obj.containsKey("sessions") ->
+                SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
+            obj.containsKey("definition") ->
+                SnapshotState.Automation(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
             obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
@@ -824,6 +849,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
+            is SnapshotState.Automation -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
+            is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
         }
         output.encodeJsonElement(element)
     }
@@ -903,6 +930,11 @@ const STATE_ENUMS = [
   'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
+  'SessionOriginKind',
+  'AutomationOperation', 'AutomationExecutionLifetime', 'AutomationScheduleKind',
+  'AutomationWeekday', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
+  'AutomationRunOperation',
 ];
 
 const STATE_STRUCTS = [
@@ -958,6 +990,18 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
+  'AutomationSessionOrigin',
+  'AutomationLocalTime', 'AutomationHourlySchedule', 'AutomationDailySchedule',
+  'AutomationWeeklySchedule', 'AutomationCronSchedule',
+  'AutomationScheduleTrigger', 'AutomationEventTrigger',
+  'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
+  'AutomationSessionTemplate', 'AutomationDefinition', 'AutomationRuntimeState',
+  'AutomationSummary', 'AutomationState',
+  'AutomationRunBlocker', 'AutomationManualRunCause', 'AutomationTriggeredRunCause',
+  'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
+  'AutomationBlockedRunLifecycle', 'AutomationCompletedRunLifecycle',
+  'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
+  'AutomationRunArtifact', 'AutomationRunSummary', 'AutomationRunState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1221,6 +1265,61 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const SESSION_ORIGIN_UNION: UnionConfig = {
+  name: 'SessionOrigin',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Automation', structName: 'AutomationSessionOrigin', discriminantValue: 'automation' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
+const AUTOMATION_SCHEDULE_UNION: UnionConfig = {
+  name: 'AutomationSchedule',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Hourly', structName: 'AutomationHourlySchedule', discriminantValue: 'hourly' },
+    { caseName: 'Daily', structName: 'AutomationDailySchedule', discriminantValue: 'daily' },
+    { caseName: 'Weekly', structName: 'AutomationWeeklySchedule', discriminantValue: 'weekly' },
+    { caseName: 'Cron', structName: 'AutomationCronSchedule', discriminantValue: 'cron' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
+const AUTOMATION_TRIGGER_UNION: UnionConfig = {
+  name: 'AutomationTrigger',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Schedule', structName: 'AutomationScheduleTrigger', discriminantValue: 'schedule' },
+    { caseName: 'Event', structName: 'AutomationEventTrigger', discriminantValue: 'event' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
+const AUTOMATION_RUN_CAUSE_UNION: UnionConfig = {
+  name: 'AutomationRunCause',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Manual', structName: 'AutomationManualRunCause', discriminantValue: 'manual' },
+    { caseName: 'Trigger', structName: 'AutomationTriggeredRunCause', discriminantValue: 'trigger' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
+const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
+  name: 'AutomationRunLifecycle',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'Pending', structName: 'AutomationPendingRunLifecycle', discriminantValue: 'pending' },
+    { caseName: 'Running', structName: 'AutomationRunningRunLifecycle', discriminantValue: 'running' },
+    { caseName: 'Blocked', structName: 'AutomationBlockedRunLifecycle', discriminantValue: 'blocked' },
+    { caseName: 'Completed', structName: 'AutomationCompletedRunLifecycle', discriminantValue: 'completed' },
+    { caseName: 'Failed', structName: 'AutomationFailedRunLifecycle', discriminantValue: 'failed' },
+    { caseName: 'Cancelled', structName: 'AutomationCancelledRunLifecycle', discriminantValue: 'cancelled' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1296,6 +1395,16 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(TOOL_CALL_RISK_ASSESSMENT_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(SESSION_ORIGIN_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_SCHEDULE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_TRIGGER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_CAUSE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -1393,6 +1502,17 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
+  { type: 'automation/definitionChanged', caseName: 'AutomationDefinitionChanged', tsInterface: 'AutomationDefinitionChangedAction' },
+  { type: 'automation/runSummarySet', caseName: 'AutomationRunSummarySet', tsInterface: 'AutomationRunSummarySetAction' },
+  { type: 'automation/runSummaryRemoved', caseName: 'AutomationRunSummaryRemoved', tsInterface: 'AutomationRunSummaryRemovedAction' },
+  { type: 'automation/runsLoaded', caseName: 'AutomationRunsLoaded', tsInterface: 'AutomationRunsLoadedAction' },
+  { type: 'automationRun/lifecycleChanged', caseName: 'AutomationRunLifecycleChanged', tsInterface: 'AutomationRunLifecycleChangedAction' },
+  { type: 'automationRun/sessionSet', caseName: 'AutomationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
+  { type: 'automationRun/sessionRemoved', caseName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
+  { type: 'automationRun/primarySessionChanged', caseName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
+  { type: 'automationRun/artifactSet', caseName: 'AutomationRunArtifactSet', tsInterface: 'AutomationRunArtifactSetAction' },
+  { type: 'automationRun/artifactRemoved', caseName: 'AutomationRunArtifactRemoved', tsInterface: 'AutomationRunArtifactRemovedAction' },
+  { type: 'automationRun/cancelRequested', caseName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
 ];
 
 /** Merged data class for the approved/denied tool call confirmed action. */
@@ -1553,7 +1673,11 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
-  'ClientCapabilities', 'Implementation',
+  'ClientCapabilities', 'AutomationCapabilities',
+  'AutomationExecutionCapabilities', 'AutomationCreateCapability',
+  'AutomationScheduleCapabilities', 'AutomationCronScheduleCapability',
+  'AutomationRunCancellationCapability', 'AutomationSchedulePreviewCapability',
+  'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'SessionForkSource', 'CreateSessionParams', 'DisposeSessionParams',
@@ -1580,6 +1704,12 @@ const COMMAND_STRUCTS = [
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
+  'ListAutomationsParams', 'ListAutomationsResult',
+  'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',
+  'CreateAutomationParams', 'AutomationDefinitionPatch', 'UpdateAutomationParams',
+  'DisposeAutomationParams', 'RunAutomationParams', 'RunAutomationResult',
+  'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
+  'PreviewAutomationScheduleParams', 'PreviewAutomationScheduleResult',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1742,6 +1872,9 @@ const NOTIFICATION_STRUCTS = [
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
+  'AutomationAddedParams',
+  'AutomationRemovedParams',
+  'AutomationSummaryChangedParams',
   'ProgressParams',
   'AuthRequiredParams',
   'OtlpExportLogsParams',
@@ -2117,6 +2250,11 @@ function checkExhaustiveness(project: Project): void {
     'AhpErrorCodeWithData',         // type-level alias; not a Kotlin type
     'JsonRpcErrorCode',             // type-level alias over JsonRpcErrorCodes const enum
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
+    'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
+    'AutomationSchedule',           // AUTOMATION_SCHEDULE_UNION discriminated union
+    'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
+    'AutomationRunCause',           // AUTOMATION_RUN_CAUSE_UNION discriminated union
+    'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union
     'ForkChatSource',               // generateFixedChatSourceBranchKotlin()
     'SideChatSource',               // generateFixedChatSourceBranchKotlin()
     'ChangesetOperationTarget',     // generateChangesetOperationTargetKotlin()

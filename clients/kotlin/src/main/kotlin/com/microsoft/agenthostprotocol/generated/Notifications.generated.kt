@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.contentOrNull
 
 // ─── Notification Enums ─────────────────────────────────────────────────────
@@ -81,6 +82,24 @@ data class SessionSummaryChangedParams(
      * MUST be omitted by senders; receivers SHOULD ignore them if present.
      */
     val changes: PartialSessionSummary
+)
+
+@Serializable
+data class AutomationAddedParams(
+    val channel: String,
+    val summary: AutomationSummary
+)
+
+@Serializable
+data class AutomationRemovedParams(
+    val channel: String,
+    val automation: String
+)
+
+@Serializable
+data class AutomationSummaryChangedParams(
+    val channel: String,
+    val summary: AutomationSummary
 )
 
 @Serializable
@@ -191,6 +210,10 @@ data class PartialSessionSummary(
      * Human-readable description of what the session is currently doing
      */
     val activity: String? = null,
+    /**
+     * Durable origin of this session, when another AHP resource created it.
+     */
+    val origin: SessionOrigin? = null,
     /**
      * Server-owned project for this session
      */

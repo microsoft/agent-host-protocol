@@ -30,7 +30,7 @@ use ahp_types::{
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
     notifications::{PartialSessionSummary, SessionAddedParams},
-    state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary},
+    state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary, Snapshot},
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
 };
 use serde_json::{Number, Value};
@@ -222,6 +222,7 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "Implementation" => round_trip!(Implementation),
         "InitializeResult" => round_trip!(InitializeResult),
         "ChatSource" => round_trip!(ChatSource),
+        "Snapshot" => round_trip!(Snapshot),
         other => Err(format!(
             "{}: unknown wire type {:?}. Add a decode entry to decode_and_reencode.",
             file, other

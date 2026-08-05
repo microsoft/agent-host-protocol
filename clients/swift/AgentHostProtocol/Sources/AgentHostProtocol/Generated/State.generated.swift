@@ -400,6 +400,73 @@ public enum ResourceChangeType: String, Codable, Sendable {
     case deleted = "deleted"
 }
 
+public enum SessionOriginKind: String, Codable, Sendable {
+    case automation = "automation"
+}
+
+public enum AutomationOperation: String, Codable, Sendable {
+    case update = "update"
+    case dispose = "dispose"
+    case run = "run"
+}
+
+public enum AutomationExecutionLifetime: String, Codable, Sendable {
+    case hostLifetime = "hostLifetime"
+    case managed = "managed"
+}
+
+public enum AutomationScheduleKind: String, Codable, Sendable {
+    case hourly = "hourly"
+    case daily = "daily"
+    case weekly = "weekly"
+    case cron = "cron"
+}
+
+public enum AutomationWeekday: String, Codable, Sendable {
+    case monday = "monday"
+    case tuesday = "tuesday"
+    case wednesday = "wednesday"
+    case thursday = "thursday"
+    case friday = "friday"
+    case saturday = "saturday"
+    case sunday = "sunday"
+}
+
+public enum AutomationMisfirePolicy: String, Codable, Sendable {
+    case skip = "skip"
+    case runOnce = "runOnce"
+}
+
+public enum AutomationTriggerKind: String, Codable, Sendable {
+    case schedule = "schedule"
+    case event = "event"
+}
+
+public enum AutomationRunStatus: String, Codable, Sendable {
+    case pending = "pending"
+    case running = "running"
+    case blocked = "blocked"
+    case completed = "completed"
+    case failed = "failed"
+    case cancelled = "cancelled"
+}
+
+public enum AutomationRunBlockerKind: String, Codable, Sendable {
+    case userInput = "userInput"
+    case toolConfirmation = "toolConfirmation"
+    case authentication = "authentication"
+    case clientExecution = "clientExecution"
+}
+
+public enum AutomationRunCauseKind: String, Codable, Sendable {
+    case manual = "manual"
+    case trigger = "trigger"
+}
+
+public enum AutomationRunOperation: String, Codable, Sendable {
+    case cancel = "cancel"
+}
+
 // MARK: - State Types
 
 public struct Icon: Codable, Sendable {
@@ -1077,6 +1144,8 @@ public struct SessionState: Codable, Sendable {
     public var status: SessionStatus
     /// Human-readable description of what the session is currently doing
     public var activity: String?
+    /// Durable origin of this session, when another AHP resource created it.
+    public var origin: SessionOrigin?
     /// Server-owned project for this session
     public var project: ProjectInfo?
     /// The working directories the session's agent has tool access to, as
@@ -1175,6 +1244,7 @@ public struct SessionState: Codable, Sendable {
         case title
         case status
         case activity
+        case origin
         case project
         case workingDirectories
         case annotations
@@ -1196,6 +1266,7 @@ public struct SessionState: Codable, Sendable {
         title: String,
         status: SessionStatus,
         activity: String? = nil,
+        origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
         workingDirectories: [String]? = nil,
         annotations: AnnotationsSummary? = nil,
@@ -1215,6 +1286,7 @@ public struct SessionState: Codable, Sendable {
         self.title = title
         self.status = status
         self.activity = activity
+        self.origin = origin
         self.project = project
         self.workingDirectories = workingDirectories
         self.annotations = annotations
@@ -1400,6 +1472,8 @@ public struct SessionSummary: Codable, Sendable {
     public var status: SessionStatus
     /// Human-readable description of what the session is currently doing
     public var activity: String?
+    /// Durable origin of this session, when another AHP resource created it.
+    public var origin: SessionOrigin?
     /// Server-owned project for this session
     public var project: ProjectInfo?
     /// The working directories the session's agent has tool access to, as
@@ -1439,6 +1513,7 @@ public struct SessionSummary: Codable, Sendable {
         case title
         case status
         case activity
+        case origin
         case project
         case workingDirectories
         case annotations
@@ -1454,6 +1529,7 @@ public struct SessionSummary: Codable, Sendable {
         title: String,
         status: SessionStatus,
         activity: String? = nil,
+        origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
         workingDirectories: [String]? = nil,
         annotations: AnnotationsSummary? = nil,
@@ -1467,6 +1543,7 @@ public struct SessionSummary: Codable, Sendable {
         self.title = title
         self.status = status
         self.activity = activity
+        self.origin = origin
         self.project = project
         self.workingDirectories = workingDirectories
         self.annotations = annotations
@@ -5227,6 +5304,654 @@ public struct ResourceChange: Codable, Sendable {
     }
 }
 
+public struct AutomationSessionOrigin: Codable, Sendable {
+    public var kind: SessionOriginKind
+    public var automation: String
+    public var run: String
+
+    public init(
+        kind: SessionOriginKind,
+        automation: String,
+        run: String
+    ) {
+        self.kind = kind
+        self.automation = automation
+        self.run = run
+    }
+}
+
+public struct AutomationLocalTime: Codable, Sendable {
+    public var hour: Int
+    public var minute: Int
+
+    public init(
+        hour: Int,
+        minute: Int
+    ) {
+        self.hour = hour
+        self.minute = minute
+    }
+}
+
+public struct AutomationHourlySchedule: Codable, Sendable {
+    public var kind: AutomationScheduleKind
+
+    public init(
+        kind: AutomationScheduleKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct AutomationDailySchedule: Codable, Sendable {
+    public var kind: AutomationScheduleKind
+    public var time: AutomationLocalTime
+    /// IANA time-zone identifier.
+    public var timeZone: String
+
+    public init(
+        kind: AutomationScheduleKind,
+        time: AutomationLocalTime,
+        timeZone: String
+    ) {
+        self.kind = kind
+        self.time = time
+        self.timeZone = timeZone
+    }
+}
+
+public struct AutomationWeeklySchedule: Codable, Sendable {
+    public var kind: AutomationScheduleKind
+    public var weekday: AutomationWeekday
+    public var time: AutomationLocalTime
+    /// IANA time-zone identifier.
+    public var timeZone: String
+
+    public init(
+        kind: AutomationScheduleKind,
+        weekday: AutomationWeekday,
+        time: AutomationLocalTime,
+        timeZone: String
+    ) {
+        self.kind = kind
+        self.weekday = weekday
+        self.time = time
+        self.timeZone = timeZone
+    }
+}
+
+public struct AutomationCronSchedule: Codable, Sendable {
+    public var kind: AutomationScheduleKind
+    /// Standard five-field Unix cron expression.
+    public var expression: String
+    /// IANA time-zone identifier.
+    public var timeZone: String
+
+    public init(
+        kind: AutomationScheduleKind,
+        expression: String,
+        timeZone: String
+    ) {
+        self.kind = kind
+        self.expression = expression
+        self.timeZone = timeZone
+    }
+}
+
+public struct AutomationScheduleTrigger: Codable, Sendable {
+    /// Stable within the automation definition.
+    public var id: String
+    public var kind: AutomationTriggerKind
+    public var schedule: AutomationSchedule
+    public var misfirePolicy: AutomationMisfirePolicy?
+
+    public init(
+        id: String,
+        kind: AutomationTriggerKind,
+        schedule: AutomationSchedule,
+        misfirePolicy: AutomationMisfirePolicy? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.schedule = schedule
+        self.misfirePolicy = misfirePolicy
+    }
+}
+
+public struct AutomationEventTrigger: Codable, Sendable {
+    /// Stable within the automation definition.
+    public var id: String
+    public var kind: AutomationTriggerKind
+    /// Stable host-defined trigger type.
+    public var type: String
+    /// Selected event actions.
+    public var events: [String]
+    /// Schema-defined values. Unknown entries must survive round-trips.
+    public var config: [String: AnyCodable]?
+
+    public init(
+        id: String,
+        kind: AutomationTriggerKind,
+        type: String,
+        events: [String],
+        config: [String: AnyCodable]? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.type = type
+        self.events = events
+        self.config = config
+    }
+}
+
+public struct AutomationTriggerEventDefinition: Codable, Sendable {
+    public var id: String
+    public var title: String
+    public var description: String?
+
+    public init(
+        id: String,
+        title: String,
+        description: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.description = description
+    }
+}
+
+public struct AutomationTriggerDefinition: Codable, Sendable {
+    public var type: String
+    public var title: String
+    public var description: String?
+    public var events: [AutomationTriggerEventDefinition]
+    public var configSchema: ConfigSchema?
+
+    public init(
+        type: String,
+        title: String,
+        description: String? = nil,
+        events: [AutomationTriggerEventDefinition],
+        configSchema: ConfigSchema? = nil
+    ) {
+        self.type = type
+        self.title = title
+        self.description = description
+        self.events = events
+        self.configSchema = configSchema
+    }
+}
+
+public struct AutomationSessionTemplate: Codable, Sendable {
+    public var provider: String?
+    /// Absence means a workspace-less session.
+    public var workingDirectories: [String]?
+    /// Values resolved through `resolveSessionConfig`.
+    public var config: [String: AnyCodable]?
+
+    public init(
+        provider: String? = nil,
+        workingDirectories: [String]? = nil,
+        config: [String: AnyCodable]? = nil
+    ) {
+        self.provider = provider
+        self.workingDirectories = workingDirectories
+        self.config = config
+    }
+}
+
+public struct AutomationDefinition: Codable, Sendable {
+    public var title: String
+    /// Initial user message sent to each new session.
+    public var message: Message
+    public var session: AutomationSessionTemplate
+    /// Controls automatic triggers; manual runs remain permitted.
+    public var enabled: Bool
+    /// Empty means manual-only.
+    public var triggers: [AutomationTrigger]
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case message
+        case session
+        case enabled
+        case triggers
+        case meta = "_meta"
+    }
+
+    public init(
+        title: String,
+        message: Message,
+        session: AutomationSessionTemplate,
+        enabled: Bool,
+        triggers: [AutomationTrigger],
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.title = title
+        self.message = message
+        self.session = session
+        self.enabled = enabled
+        self.triggers = triggers
+        self.meta = meta
+    }
+}
+
+public struct AutomationRuntimeState: Codable, Sendable {
+    public var workingDirectories: [String]?
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case workingDirectories
+        case meta = "_meta"
+    }
+
+    public init(
+        workingDirectories: [String]? = nil,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.workingDirectories = workingDirectories
+        self.meta = meta
+    }
+}
+
+public struct AutomationSummary: Codable, Sendable {
+    public var resource: String
+    public var title: String
+    public var enabled: Bool
+    public var triggerCount: Int
+    public var nextRunAt: String?
+    public var lastRun: AutomationRunSummary?
+    public var revision: Int
+    public var operations: [AutomationOperation]
+    public var createdAt: String
+    public var modifiedAt: String
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case title
+        case enabled
+        case triggerCount
+        case nextRunAt
+        case lastRun
+        case revision
+        case operations
+        case createdAt
+        case modifiedAt
+        case meta = "_meta"
+    }
+
+    public init(
+        resource: String,
+        title: String,
+        enabled: Bool,
+        triggerCount: Int,
+        nextRunAt: String? = nil,
+        lastRun: AutomationRunSummary? = nil,
+        revision: Int,
+        operations: [AutomationOperation],
+        createdAt: String,
+        modifiedAt: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.resource = resource
+        self.title = title
+        self.enabled = enabled
+        self.triggerCount = triggerCount
+        self.nextRunAt = nextRunAt
+        self.lastRun = lastRun
+        self.revision = revision
+        self.operations = operations
+        self.createdAt = createdAt
+        self.modifiedAt = modifiedAt
+        self.meta = meta
+    }
+}
+
+public struct AutomationState: Codable, Sendable {
+    public var resource: String
+    public var definition: AutomationDefinition
+    public var revision: Int
+    public var nextRunAt: String?
+    /// Newest-first retained run summaries.
+    public var runs: [AutomationRunSummary]
+    public var runsNextCursor: String?
+    public var runtime: AutomationRuntimeState?
+    public var operations: [AutomationOperation]
+    public var createdAt: String
+    public var modifiedAt: String
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case definition
+        case revision
+        case nextRunAt
+        case runs
+        case runsNextCursor
+        case runtime
+        case operations
+        case createdAt
+        case modifiedAt
+        case meta = "_meta"
+    }
+
+    public init(
+        resource: String,
+        definition: AutomationDefinition,
+        revision: Int,
+        nextRunAt: String? = nil,
+        runs: [AutomationRunSummary],
+        runsNextCursor: String? = nil,
+        runtime: AutomationRuntimeState? = nil,
+        operations: [AutomationOperation],
+        createdAt: String,
+        modifiedAt: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.resource = resource
+        self.definition = definition
+        self.revision = revision
+        self.nextRunAt = nextRunAt
+        self.runs = runs
+        self.runsNextCursor = runsNextCursor
+        self.runtime = runtime
+        self.operations = operations
+        self.createdAt = createdAt
+        self.modifiedAt = modifiedAt
+        self.meta = meta
+    }
+}
+
+public struct AutomationRunBlocker: Codable, Sendable {
+    public var kind: AutomationRunBlockerKind
+
+    public init(
+        kind: AutomationRunBlockerKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct AutomationManualRunCause: Codable, Sendable {
+    public var kind: AutomationRunCauseKind
+
+    public init(
+        kind: AutomationRunCauseKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct AutomationTriggeredRunCause: Codable, Sendable {
+    public var kind: AutomationRunCauseKind
+    public var triggerId: String
+    public var scheduledFor: String?
+    public var catchUp: Bool?
+    /// Host-defined event provenance containing no secrets.
+    public var event: [String: AnyCodable]?
+
+    public init(
+        kind: AutomationRunCauseKind,
+        triggerId: String,
+        scheduledFor: String? = nil,
+        catchUp: Bool? = nil,
+        event: [String: AnyCodable]? = nil
+    ) {
+        self.kind = kind
+        self.triggerId = triggerId
+        self.scheduledFor = scheduledFor
+        self.catchUp = catchUp
+        self.event = event
+    }
+}
+
+public struct AutomationPendingRunLifecycle: Codable, Sendable {
+    public var status: AutomationRunStatus
+    public var createdAt: String
+
+    public init(
+        status: AutomationRunStatus,
+        createdAt: String
+    ) {
+        self.status = status
+        self.createdAt = createdAt
+    }
+}
+
+public struct AutomationRunningRunLifecycle: Codable, Sendable {
+    public var status: AutomationRunStatus
+    public var createdAt: String
+    public var startedAt: String
+
+    public init(
+        status: AutomationRunStatus,
+        createdAt: String,
+        startedAt: String
+    ) {
+        self.status = status
+        self.createdAt = createdAt
+        self.startedAt = startedAt
+    }
+}
+
+public struct AutomationBlockedRunLifecycle: Codable, Sendable {
+    public var status: AutomationRunStatus
+    public var createdAt: String
+    public var startedAt: String
+    public var blocker: AutomationRunBlocker
+
+    public init(
+        status: AutomationRunStatus,
+        createdAt: String,
+        startedAt: String,
+        blocker: AutomationRunBlocker
+    ) {
+        self.status = status
+        self.createdAt = createdAt
+        self.startedAt = startedAt
+        self.blocker = blocker
+    }
+}
+
+public struct AutomationCompletedRunLifecycle: Codable, Sendable {
+    public var status: AutomationRunStatus
+    public var createdAt: String
+    public var startedAt: String
+    public var completedAt: String
+    public var usage: UsageInfo?
+
+    public init(
+        status: AutomationRunStatus,
+        createdAt: String,
+        startedAt: String,
+        completedAt: String,
+        usage: UsageInfo? = nil
+    ) {
+        self.status = status
+        self.createdAt = createdAt
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+        self.usage = usage
+    }
+}
+
+public struct AutomationFailedRunLifecycle: Codable, Sendable {
+    public var status: AutomationRunStatus
+    public var createdAt: String
+    public var startedAt: String?
+    public var completedAt: String
+    public var error: ErrorInfo
+
+    public init(
+        status: AutomationRunStatus,
+        createdAt: String,
+        startedAt: String? = nil,
+        completedAt: String,
+        error: ErrorInfo
+    ) {
+        self.status = status
+        self.createdAt = createdAt
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+        self.error = error
+    }
+}
+
+public struct AutomationCancelledRunLifecycle: Codable, Sendable {
+    public var status: AutomationRunStatus
+    public var createdAt: String
+    public var startedAt: String?
+    public var completedAt: String
+
+    public init(
+        status: AutomationRunStatus,
+        createdAt: String,
+        startedAt: String? = nil,
+        completedAt: String
+    ) {
+        self.status = status
+        self.createdAt = createdAt
+        self.startedAt = startedAt
+        self.completedAt = completedAt
+    }
+}
+
+public struct AutomationRunArtifact: Codable, Sendable {
+    /// Content URI
+    public var uri: String
+    /// Approximate size in bytes
+    public var sizeHint: Int?
+    /// Content MIME type
+    public var contentType: String?
+    /// Content nonce
+    public var nonce: String?
+    public var id: String
+    public var label: String
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case uri
+        case sizeHint
+        case contentType
+        case nonce
+        case id
+        case label
+        case meta = "_meta"
+    }
+
+    public init(
+        uri: String,
+        sizeHint: Int? = nil,
+        contentType: String? = nil,
+        nonce: String? = nil,
+        id: String,
+        label: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.uri = uri
+        self.sizeHint = sizeHint
+        self.contentType = contentType
+        self.nonce = nonce
+        self.id = id
+        self.label = label
+        self.meta = meta
+    }
+}
+
+public struct AutomationRunSummary: Codable, Sendable {
+    public var resource: String
+    public var automation: String
+    public var cause: AutomationRunCause
+    public var lifecycle: AutomationRunLifecycle
+    public var primarySession: String?
+    public var sessionCount: Int
+    public var artifactCount: Int?
+    public var operations: [AutomationRunOperation]
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case automation
+        case cause
+        case lifecycle
+        case primarySession
+        case sessionCount
+        case artifactCount
+        case operations
+        case meta = "_meta"
+    }
+
+    public init(
+        resource: String,
+        automation: String,
+        cause: AutomationRunCause,
+        lifecycle: AutomationRunLifecycle,
+        primarySession: String? = nil,
+        sessionCount: Int,
+        artifactCount: Int? = nil,
+        operations: [AutomationRunOperation],
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.resource = resource
+        self.automation = automation
+        self.cause = cause
+        self.lifecycle = lifecycle
+        self.primarySession = primarySession
+        self.sessionCount = sessionCount
+        self.artifactCount = artifactCount
+        self.operations = operations
+        self.meta = meta
+    }
+}
+
+public struct AutomationRunState: Codable, Sendable {
+    public var resource: String
+    public var automation: String
+    public var cause: AutomationRunCause
+    public var lifecycle: AutomationRunLifecycle
+    public var sessions: [String]
+    public var primarySession: String?
+    public var artifacts: [AutomationRunArtifact]
+    public var operations: [AutomationRunOperation]
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case automation
+        case cause
+        case lifecycle
+        case sessions
+        case primarySession
+        case artifacts
+        case operations
+        case meta = "_meta"
+    }
+
+    public init(
+        resource: String,
+        automation: String,
+        cause: AutomationRunCause,
+        lifecycle: AutomationRunLifecycle,
+        sessions: [String],
+        primarySession: String? = nil,
+        artifacts: [AutomationRunArtifact],
+        operations: [AutomationRunOperation],
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.resource = resource
+        self.automation = automation
+        self.cause = cause
+        self.lifecycle = lifecycle
+        self.sessions = sessions
+        self.primarySession = primarySession
+        self.artifacts = artifacts
+        self.operations = operations
+        self.meta = meta
+    }
+}
+
 // MARK: - Tool Input
 
 /// Raw tool input represented inline or by content reference.
@@ -5979,6 +6704,201 @@ public enum SessionInputRequest: Codable, Sendable {
     }
 }
 
+public enum SessionOrigin: Codable, Sendable {
+    case automation(AutomationSessionOrigin)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "automation":
+            self = .automation(try AutomationSessionOrigin(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown SessionOrigin discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .automation(var value):
+            value.kind = .automation
+            try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum AutomationSchedule: Codable, Sendable {
+    case hourly(AutomationHourlySchedule)
+    case daily(AutomationDailySchedule)
+    case weekly(AutomationWeeklySchedule)
+    case cron(AutomationCronSchedule)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "hourly":
+            self = .hourly(try AutomationHourlySchedule(from: decoder))
+        case "daily":
+            self = .daily(try AutomationDailySchedule(from: decoder))
+        case "weekly":
+            self = .weekly(try AutomationWeeklySchedule(from: decoder))
+        case "cron":
+            self = .cron(try AutomationCronSchedule(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationSchedule discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .hourly(var value):
+            value.kind = .hourly
+            try value.encode(to: encoder)
+        case .daily(var value):
+            value.kind = .daily
+            try value.encode(to: encoder)
+        case .weekly(var value):
+            value.kind = .weekly
+            try value.encode(to: encoder)
+        case .cron(var value):
+            value.kind = .cron
+            try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum AutomationTrigger: Codable, Sendable {
+    case schedule(AutomationScheduleTrigger)
+    case event(AutomationEventTrigger)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "schedule":
+            self = .schedule(try AutomationScheduleTrigger(from: decoder))
+        case "event":
+            self = .event(try AutomationEventTrigger(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationTrigger discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .schedule(var value):
+            value.kind = .schedule
+            try value.encode(to: encoder)
+        case .event(var value):
+            value.kind = .event
+            try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum AutomationRunCause: Codable, Sendable {
+    case manual(AutomationManualRunCause)
+    case trigger(AutomationTriggeredRunCause)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "manual":
+            self = .manual(try AutomationManualRunCause(from: decoder))
+        case "trigger":
+            self = .trigger(try AutomationTriggeredRunCause(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationRunCause discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .manual(var value):
+            value.kind = .manual
+            try value.encode(to: encoder)
+        case .trigger(var value):
+            value.kind = .trigger
+            try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum AutomationRunLifecycle: Codable, Sendable {
+    case pending(AutomationPendingRunLifecycle)
+    case running(AutomationRunningRunLifecycle)
+    case blocked(AutomationBlockedRunLifecycle)
+    case completed(AutomationCompletedRunLifecycle)
+    case failed(AutomationFailedRunLifecycle)
+    case cancelled(AutomationCancelledRunLifecycle)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "status"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "pending":
+            self = .pending(try AutomationPendingRunLifecycle(from: decoder))
+        case "running":
+            self = .running(try AutomationRunningRunLifecycle(from: decoder))
+        case "blocked":
+            self = .blocked(try AutomationBlockedRunLifecycle(from: decoder))
+        case "completed":
+            self = .completed(try AutomationCompletedRunLifecycle(from: decoder))
+        case "failed":
+            self = .failed(try AutomationFailedRunLifecycle(from: decoder))
+        case "cancelled":
+            self = .cancelled(try AutomationCancelledRunLifecycle(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown AutomationRunLifecycle discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .pending(var value):
+            value.status = .pending
+            try value.encode(to: encoder)
+        case .running(var value):
+            value.status = .running
+            try value.encode(to: encoder)
+        case .blocked(var value):
+            value.status = .blocked
+            try value.encode(to: encoder)
+        case .completed(var value):
+            value.status = .completed
+            try value.encode(to: encoder)
+        case .failed(var value):
+            value.status = .failed
+            try value.encode(to: encoder)
+        case .cancelled(var value):
+            value.status = .cancelled
+            try value.encode(to: encoder)
+        }
+    }
+}
+
 public enum ToolResultContent: Codable, Sendable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
@@ -6034,7 +6954,7 @@ public enum ToolResultContent: Codable, Sendable {
     }
 }
 
-/// The state payload of a snapshot — root, session, chat, terminal, changeset, resource-watch, annotations, or content state.
+/// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
     case session(SessionState)
@@ -6043,6 +6963,8 @@ public enum SnapshotState: Codable, Sendable {
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
     case annotations(AnnotationsState)
+    case automation(AutomationState)
+    case automationRun(AutomationRunState)
 
     public init(from decoder: Decoder) throws {
         // Try the most distinctive shapes first. SessionState has required
@@ -6061,6 +6983,10 @@ public enum SnapshotState: Codable, Sendable {
             self = .resourceWatch(resourceWatch)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
+        } else if let automation = try? AutomationState(from: decoder) {
+            self = .automation(automation)
+        } else if let automationRun = try? AutomationRunState(from: decoder) {
+            self = .automationRun(automationRun)
         } else {
             self = .root(try RootState(from: decoder))
         }
@@ -6075,6 +7001,8 @@ public enum SnapshotState: Codable, Sendable {
         case .changeset(let state): try state.encode(to: encoder)
         case .resourceWatch(let state): try state.encode(to: encoder)
         case .annotations(let state): try state.encode(to: encoder)
+        case .automation(let state): try state.encode(to: encoder)
+        case .automationRun(let state): try state.encode(to: encoder)
         }
     }
 }

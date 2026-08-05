@@ -167,6 +167,8 @@ type InitializeResult struct {
 	// defines a template variable, `{level}`, for subscriber-side severity
 	// filtering). Clients MAY ignore signals they cannot process.
 	Telemetry *TelemetryCapabilities `json:"telemetry,omitempty"`
+	// Host automation support. Absence means unsupported.
+	Automations *AutomationCapabilities `json:"automations,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -187,6 +189,38 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+}
+
+type AutomationCapabilities struct {
+	Execution       AutomationExecutionCapabilities      `json:"execution"`
+	Create          *AutomationCreateCapability          `json:"create,omitempty"`
+	Schedules       *AutomationScheduleCapabilities      `json:"schedules,omitempty"`
+	RunCancellation *AutomationRunCancellationCapability `json:"runCancellation,omitempty"`
+	SchedulePreview *AutomationSchedulePreviewCapability `json:"schedulePreview,omitempty"`
+	RunHistoryLimit *int64                               `json:"runHistoryLimit,omitempty"`
+}
+
+type AutomationExecutionCapabilities struct {
+	Lifetime AutomationExecutionLifetime `json:"lifetime"`
+}
+
+type AutomationCreateCapability struct {
+}
+
+type AutomationScheduleCapabilities struct {
+	Kinds []AutomationScheduleKind          `json:"kinds"`
+	Cron  *AutomationCronScheduleCapability `json:"cron,omitempty"`
+}
+
+type AutomationCronScheduleCapability struct {
+	Dialect            string `json:"dialect"`
+	MinIntervalMinutes *int64 `json:"minIntervalMinutes,omitempty"`
+}
+
+type AutomationRunCancellationCapability struct {
+}
+
+type AutomationSchedulePreviewCapability struct {
 }
 
 // Identifies a protocol implementation — the software (and build) on one end
@@ -1175,6 +1209,99 @@ type ChangesetOperationFollowUp struct {
 	Content ContentRef `json:"content"`
 	// When `true`, open in an external handler rather than inline.
 	External *bool `json:"external,omitempty"`
+}
+
+type ListAutomationsParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Maximum number of entries to return in this page. The server SHOULD respect
+	// this bound but MAY return fewer entries and MAY impose its own upper cap.
+	// Omit to let the server choose the page size.
+	Limit *int64 `json:"limit,omitempty"`
+	// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+	// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+	// as opaque — do not parse, modify, or persist them across connections. An
+	// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+	Cursor  *string `json:"cursor,omitempty"`
+	Enabled *bool   `json:"enabled,omitempty"`
+}
+
+type ListAutomationsResult struct {
+	// Opaque cursor for the next page. Present when more entries exist beyond the
+	// returned page; absent signals the end of the collection. Pass it back as
+	// {@link PaginatedParams.cursor} to fetch the following page.
+	NextCursor *string             `json:"nextCursor,omitempty"`
+	Items      []AutomationSummary `json:"items"`
+}
+
+type ListAutomationTriggerDefinitionsParams struct {
+	// Channel URI this command targets.
+	Channel            URI                        `json:"channel"`
+	Provider           *string                    `json:"provider,omitempty"`
+	WorkingDirectories []URI                      `json:"workingDirectories,omitempty"`
+	SessionConfig      map[string]json.RawMessage `json:"sessionConfig,omitempty"`
+}
+
+type ListAutomationTriggerDefinitionsResult struct {
+	Items []AutomationTriggerDefinition `json:"items"`
+}
+
+type CreateAutomationParams struct {
+	// Channel URI this command targets.
+	Channel    URI                  `json:"channel"`
+	Definition AutomationDefinition `json:"definition"`
+	Import     *json.RawMessage     `json:"import,omitempty"`
+}
+
+type AutomationDefinitionPatch struct {
+	Title    *string                     `json:"title,omitempty"`
+	Message  *Message                    `json:"message,omitempty"`
+	Session  *AutomationSessionTemplate  `json:"session,omitempty"`
+	Enabled  *bool                       `json:"enabled,omitempty"`
+	Triggers *[]AutomationTrigger        `json:"triggers,omitempty"`
+	Meta     *map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+type UpdateAutomationParams struct {
+	// Channel URI this command targets.
+	Channel          URI                       `json:"channel"`
+	ExpectedRevision int64                     `json:"expectedRevision"`
+	Changes          AutomationDefinitionPatch `json:"changes"`
+}
+
+type DisposeAutomationParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+}
+
+type RunAutomationParams struct {
+	// Channel URI this command targets.
+	Channel   URI    `json:"channel"`
+	RequestId string `json:"requestId"`
+}
+
+type RunAutomationResult struct {
+	Run URI `json:"run"`
+}
+
+type FetchAutomationRunsParams struct {
+	// Channel URI this command targets.
+	Channel URI     `json:"channel"`
+	Cursor  *string `json:"cursor,omitempty"`
+}
+
+type FetchAutomationRunsResult struct {
+}
+
+type PreviewAutomationScheduleParams struct {
+	// Channel URI this command targets.
+	Channel  URI                `json:"channel"`
+	Schedule AutomationSchedule `json:"schedule"`
+	Count    *int64             `json:"count,omitempty"`
+}
+
+type PreviewAutomationScheduleResult struct {
+	Items []string `json:"items"`
 }
 
 func (v *ForkChatSource) UnmarshalJSON(data []byte) error {

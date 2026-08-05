@@ -7,8 +7,8 @@ import AgentHostProtocol
 /// Snapshot of everything the multi-host SDK knows about a single host.
 ///
 /// This is the value type UIs render: connection state, last error, protocol
-/// version, agents pulled from root state, subscribed URIs, cached session
-/// summaries, and so on.
+/// version, host capabilities, agents pulled from root state, subscribed URIs,
+/// cached session summaries, and so on.
 ///
 /// Snapshots are immutable; refresh by calling
 /// `MultiHostClient.host(_:)`/`MultiHostClient.hosts()` again or by listening
@@ -35,6 +35,8 @@ public struct HostHandle: Sendable {
     public let serverSeq: Int
     /// Optional `defaultDirectory` from the host's `InitializeResult`.
     public let defaultDirectory: String?
+    /// Automation support advertised by the host.
+    public let automations: AutomationCapabilities?
     /// Agents currently advertised by the host (mirrored from root state).
     public let agents: [AgentInfo]
     /// Active session count from root state, when present.
@@ -64,6 +66,7 @@ public struct HostHandle: Sendable {
         protocolVersion: String?,
         serverSeq: Int,
         defaultDirectory: String?,
+        automations: AutomationCapabilities? = nil,
         agents: [AgentInfo],
         activeSessions: Int?,
         terminals: [TerminalInfo]?,
@@ -81,6 +84,7 @@ public struct HostHandle: Sendable {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
         self.defaultDirectory = defaultDirectory
+        self.automations = automations
         self.agents = agents
         self.activeSessions = activeSessions
         self.terminals = terminals

@@ -214,6 +214,14 @@ final class FixtureDrivenReducerTests: XCTestCase {
             try compareFixture(file: file, fixture: fixture, stateType: AnnotationsState.self) { state in
                 actions.reduce(state) { annotationsReducer(state: $0, action: $1) }
             }
+        case "automation":
+            try compareFixture(file: file, fixture: fixture, stateType: AutomationState.self) { state in
+                actions.reduce(state) { automationReducer(state: $0, action: $1) }
+            }
+        case "automationRun":
+            try compareFixture(file: file, fixture: fixture, stateType: AutomationRunState.self) { state in
+                actions.reduce(state) { automationRunReducer(state: $0, action: $1) }
+            }
         default:
             throw FixtureError.unsupportedReducer(fixture.reducer)
         }

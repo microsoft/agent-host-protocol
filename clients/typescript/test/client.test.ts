@@ -113,6 +113,35 @@ test('subscribe attaches before sending the request and fans out an action', asy
     delivery: { maxLatencyMs: 100 },
     view: { turns: 30 },
   });
+
+  test('root automation catalogue notifications reach subscriptions', async () => {
+    const [c, s] = InMemoryTransport.pair();
+    const client = new AhpClient(c);
+    client.connect();
+    const subscription = client.attachSubscription(ROOT);
+
+    pushNotification(s, 'root/automationAdded', {
+      channel: ROOT,
+      summary: {
+        resource: 'ahp-automation:/a1',
+        title: 'Daily triage',
+        enabled: true,
+        triggerCount: 1,
+        revision: 1,
+        operations: ['run'],
+        createdAt: '2026-08-01T00:00:00Z',
+        modifiedAt: '2026-08-01T00:00:00Z',
+      },
+    });
+
+    const next = await subscription.next();
+    assert.equal(next.done, false);
+    assert.equal(next.value?.type, 'automationAdded');
+    if (next.value?.type !== 'automationAdded') throw new Error('unreachable');
+    assert.equal(next.value.params.summary.resource, 'ahp-automation:/a1');
+
+    await client.shutdown();
+  });
   const req = await readRequest(s);
   assert.equal(req.method, 'subscribe');
   assert.equal((req.params as SubscribeParams).channel, 'ahp-session:/s1');

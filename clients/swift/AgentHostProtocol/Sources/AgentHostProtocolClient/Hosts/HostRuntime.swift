@@ -71,6 +71,7 @@ internal final class HostRuntime: Sendable {
             protocolVersion: nil,
             serverSeq: 0,
             defaultDirectory: nil,
+            automations: nil,
             rootState: RootState(agents: []),
             subscriptions: config.initialSubscriptions,
             completionTriggerCharacters: [],
@@ -371,6 +372,7 @@ internal final class HostRuntime: Sendable {
                 if let init1 = initResult {
                     state.protocolVersion = init1.protocolVersion
                     state.defaultDirectory = init1.defaultDirectory
+                    state.automations = init1.automations
                     state.completionTriggerCharacters = init1.completionTriggerCharacters ?? []
                     if let snap = init1.snapshots.first(where: { $0.resource == RootResourceURI }) {
                         if case .root(let root) = snap.state {
@@ -606,6 +608,8 @@ internal final class HostRuntime: Sendable {
                     state.sessionSummaries[n.session] = existing
                 }
             }
+        case .automationAdded, .automationRemoved, .automationSummaryChanged:
+            break
         case .authRequired:
             break
         }
@@ -826,9 +830,9 @@ private func applySummaryChanges(
     if let v = changes.title { existing.title = v }
     if let v = changes.status { existing.status = v }
     if let v = changes.activity { existing.activity = v }
+    if let v = changes.origin { existing.origin = v }
     if let v = changes.modifiedAt { existing.modifiedAt = v }
     if let v = changes.project { existing.project = v }
     if let v = changes.annotations { existing.annotations = v }
     if let v = changes.workingDirectories { existing.workingDirectories = v }
 }
-

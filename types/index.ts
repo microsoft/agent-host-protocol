@@ -29,5 +29,7 @@ export {
   changesetReducer,
   annotationsReducer,
   resourceWatchReducer,
+  automationReducer,
+  automationRunReducer,
   isClientDispatchable,
 } from './reducers.js';

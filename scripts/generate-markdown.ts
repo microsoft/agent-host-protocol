@@ -56,6 +56,8 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-changeset': 'changeset',
   'channels-annotations': 'annotations',
   'channels-otlp': 'otlp',
+  'channels-automation': 'automation',
+  'channels-automation-run': 'automation-run',
 };
 
 /**
@@ -1291,6 +1293,38 @@ function generateMessagesPage(project: Project): string {
   return lines.join('\n');
 }
 
+function generateAutomationChannelPage(project: Project): string {
+  currentPage = 'automation';
+  const stateSf = findChannelSourceFile(project, 'channels-automation', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-automation', 'actions.ts');
+  const commandsSf = findChannelSourceFile(project, 'channels-automation', 'commands.ts');
+  const lines: string[] = [GENERATED_HEADER, '# Automation Channel\n', schemaLink('state.schema.json')];
+  if (stateSf) {
+    lines.push('## State Types\n', emitStateTypesSection([stateSf]));
+  }
+  if (actionsSf) {
+    lines.push('## Actions\n', schemaLink('actions.schema.json'), emitActionsSection([actionsSf]));
+  }
+  if (commandsSf) {
+    lines.push('## Commands\n', schemaLink('commands.schema.json'), emitCommandsSection(project, [commandsSf]));
+  }
+  return lines.join('\n');
+}
+
+function generateAutomationRunChannelPage(project: Project): string {
+  currentPage = 'automation-run';
+  const stateSf = findChannelSourceFile(project, 'channels-automation-run', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-automation-run', 'actions.ts');
+  const lines: string[] = [GENERATED_HEADER, '# Automation Run Channel\n', schemaLink('state.schema.json')];
+  if (stateSf) {
+    lines.push('## State Types\n', emitStateTypesSection([stateSf]));
+  }
+  if (actionsSf) {
+    lines.push('## Actions\n', schemaLink('actions.schema.json'), emitActionsSection([actionsSf]));
+  }
+  return lines.join('\n');
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export function generateMarkdownDocs(project: Project, outDir: string): void {
@@ -1308,6 +1342,8 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'changeset.md', generator: generateChangesetChannelPage },
     { filename: 'annotations.md', generator: generateAnnotationsChannelPage },
     { filename: 'otlp.md', generator: generateOtlpChannelPage },
+    { filename: 'automation.md', generator: generateAutomationChannelPage },
+    { filename: 'automation-run.md', generator: generateAutomationRunChannelPage },
     { filename: 'messages.md', generator: generateMessagesPage },
     { filename: 'error-codes.md', generator: generateErrorCodesPage },
   ];

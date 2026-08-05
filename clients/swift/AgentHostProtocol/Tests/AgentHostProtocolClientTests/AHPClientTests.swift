@@ -188,6 +188,103 @@ final class AHPClientTests: XCTestCase {
         await client.shutdown()
     }
 
+    func testAutomationCatalogueNotificationsDispatchToSubscriptionsAndEvents() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        let events = await client.events
+        let subscription = await client.attachSubscription(RootResourceURI)
+        try await client.connect()
+
+        let initial = AutomationSummary(
+            resource: "ahp-automation:/a1",
+            title: "Initial",
+            enabled: true,
+            triggerCount: 0,
+            revision: 1,
+            operations: [.run],
+            createdAt: "2026-08-05T12:00:00Z",
+            modifiedAt: "2026-08-05T12:00:00Z"
+        )
+        let changed = AutomationSummary(
+            resource: initial.resource,
+            title: "Changed",
+            enabled: false,
+            triggerCount: 1,
+            revision: 2,
+            operations: [.update, .run],
+            createdAt: initial.createdAt,
+            modifiedAt: "2026-08-05T13:00:00Z"
+        )
+
+        let serverTask = Task {
+            try await pushNotification(
+                method: "root/automationAdded",
+                params: AutomationAddedParams(channel: RootResourceURI, summary: initial),
+                on: serverSide
+            )
+            try await pushNotification(
+                method: "root/automationRemoved",
+                params: AutomationRemovedParams(
+                    channel: RootResourceURI,
+                    automation: initial.resource
+                ),
+                on: serverSide
+            )
+            try await pushNotification(
+                method: "root/automationSummaryChanged",
+                params: AutomationSummaryChangedParams(
+                    channel: RootResourceURI,
+                    summary: changed
+                ),
+                on: serverSide
+            )
+        }
+
+        var subscriptionIter = subscription.makeAsyncIterator()
+        let added = try await nextWithTimeout(&subscriptionIter)
+        guard case .automationAdded(let addedParams) = added else {
+            XCTFail("expected automationAdded, got \(String(describing: added))")
+            return
+        }
+        XCTAssertEqual(addedParams.summary.resource, initial.resource)
+
+        let removed = try await nextWithTimeout(&subscriptionIter)
+        guard case .automationRemoved(let removedParams) = removed else {
+            XCTFail("expected automationRemoved, got \(String(describing: removed))")
+            return
+        }
+        XCTAssertEqual(removedParams.automation, initial.resource)
+
+        let summaryChanged = try await nextWithTimeout(&subscriptionIter)
+        guard case .automationSummaryChanged(let changedParams) = summaryChanged else {
+            XCTFail("expected automationSummaryChanged, got \(String(describing: summaryChanged))")
+            return
+        }
+        XCTAssertEqual(changedParams.summary.title, "Changed")
+
+        var eventIter = events.makeAsyncIterator()
+        var receivedKinds: Set<String> = []
+        for _ in 0..<3 {
+            let nextEvent = try await nextWithTimeout(&eventIter)
+            let event = try XCTUnwrap(nextEvent)
+            XCTAssertEqual(event.resource, RootResourceURI)
+            switch event.event {
+            case .automationAdded:
+                receivedKinds.insert("added")
+            case .automationRemoved:
+                receivedKinds.insert("removed")
+            case .automationSummaryChanged:
+                receivedKinds.insert("changed")
+            default:
+                XCTFail("unexpected event: \(event.event)")
+            }
+        }
+        XCTAssertEqual(receivedKinds, ["added", "removed", "changed"])
+
+        try await serverTask.value
+        await client.shutdown()
+    }
+
     // MARK: - unexpected_close_fails_pending_requests
 
     func testUnexpectedCloseFailsPendingRequests() async throws {

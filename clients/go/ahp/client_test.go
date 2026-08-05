@@ -607,6 +607,120 @@ func TestClientSubscriptionFanOut(t *testing.T) {
 	}
 }
 
+func TestClientAutomationCatalogueNotifications(t *testing.T) {
+	clientSide, serverSide := newMemTransportPair()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, err := Connect(ctx, clientSide, DefaultConfig())
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer client.Shutdown(context.Background())
+
+	sub := client.AttachSubscription(ahptypes.RootResourceURI)
+	stream := client.Events()
+	automationURI := ahptypes.URI("ahp-automation:/nightly")
+
+	tests := []struct {
+		name   string
+		method string
+		params any
+		check  func(t *testing.T, event SubscriptionEvent)
+	}{
+		{
+			name:   "added",
+			method: "root/automationAdded",
+			params: ahptypes.AutomationAddedParams{
+				Channel: ahptypes.RootResourceURI,
+				Summary: ahptypes.AutomationSummary{Resource: automationURI},
+			},
+			check: func(t *testing.T, event SubscriptionEvent) {
+				t.Helper()
+				added, ok := event.(SubscriptionEventAutomationAdded)
+				if !ok {
+					t.Fatalf("got %T, want SubscriptionEventAutomationAdded", event)
+				}
+				if added.Params.Summary.Resource != automationURI {
+					t.Errorf("resource = %q, want %q", added.Params.Summary.Resource, automationURI)
+				}
+			},
+		},
+		{
+			name:   "removed",
+			method: "root/automationRemoved",
+			params: ahptypes.AutomationRemovedParams{
+				Channel:    ahptypes.RootResourceURI,
+				Automation: automationURI,
+			},
+			check: func(t *testing.T, event SubscriptionEvent) {
+				t.Helper()
+				removed, ok := event.(SubscriptionEventAutomationRemoved)
+				if !ok {
+					t.Fatalf("got %T, want SubscriptionEventAutomationRemoved", event)
+				}
+				if removed.Params.Automation != automationURI {
+					t.Errorf("automation = %q, want %q", removed.Params.Automation, automationURI)
+				}
+			},
+		},
+		{
+			name:   "summary changed",
+			method: "root/automationSummaryChanged",
+			params: ahptypes.AutomationSummaryChangedParams{
+				Channel: ahptypes.RootResourceURI,
+				Summary: ahptypes.AutomationSummary{Resource: automationURI},
+			},
+			check: func(t *testing.T, event SubscriptionEvent) {
+				t.Helper()
+				changed, ok := event.(SubscriptionEventAutomationSummaryChanged)
+				if !ok {
+					t.Fatalf("got %T, want SubscriptionEventAutomationSummaryChanged", event)
+				}
+				if changed.Params.Summary.Resource != automationURI {
+					t.Errorf("resource = %q, want %q", changed.Params.Summary.Resource, automationURI)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params, err := json.Marshal(tt.params)
+			if err != nil {
+				t.Fatalf("marshal params: %v", err)
+			}
+			wire, err := EncodeMessage(ahptypes.JsonRpcMessage{Notification: &ahptypes.JsonRpcNotification{
+				JsonRpc: ahptypes.JsonRpcV2,
+				Method:  tt.method,
+				Params:  params,
+			}})
+			if err != nil {
+				t.Fatalf("encode notification: %v", err)
+			}
+			if err := serverSide.Send(ctx, wire); err != nil {
+				t.Fatalf("send notification: %v", err)
+			}
+
+			select {
+			case event := <-sub.Events():
+				tt.check(t, event)
+			case <-ctx.Done():
+				t.Fatal("subscription did not receive event")
+			}
+
+			select {
+			case event := <-stream.Events():
+				if event.Channel != ahptypes.RootResourceURI {
+					t.Errorf("channel = %q, want %q", event.Channel, ahptypes.RootResourceURI)
+				}
+				tt.check(t, event.Event)
+			case <-ctx.Done():
+				t.Fatal("top-level stream did not receive event")
+			}
+		})
+	}
+}
+
 // TestClientShutdownFailsInFlightRequest confirms a Shutdown unblocks
 // any pending request with ErrShutdown.
 func TestClientShutdownFailsInFlightRequest(t *testing.T) {

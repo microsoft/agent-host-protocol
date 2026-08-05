@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.contentOrNull
 
 // ─── Type Aliases ───────────────────────────────────────────────────────────
@@ -750,6 +751,118 @@ enum class ResourceChangeType {
     DELETED
 }
 
+@Serializable
+enum class SessionOriginKind {
+    @SerialName("automation")
+    AUTOMATION
+}
+
+@Serializable
+enum class AutomationOperation {
+    @SerialName("update")
+    UPDATE,
+    @SerialName("dispose")
+    DISPOSE,
+    @SerialName("run")
+    RUN
+}
+
+@Serializable
+enum class AutomationExecutionLifetime {
+    @SerialName("hostLifetime")
+    HOST_LIFETIME,
+    @SerialName("managed")
+    MANAGED
+}
+
+@Serializable
+enum class AutomationScheduleKind {
+    @SerialName("hourly")
+    HOURLY,
+    @SerialName("daily")
+    DAILY,
+    @SerialName("weekly")
+    WEEKLY,
+    @SerialName("cron")
+    CRON
+}
+
+@Serializable
+enum class AutomationWeekday {
+    @SerialName("monday")
+    MONDAY,
+    @SerialName("tuesday")
+    TUESDAY,
+    @SerialName("wednesday")
+    WEDNESDAY,
+    @SerialName("thursday")
+    THURSDAY,
+    @SerialName("friday")
+    FRIDAY,
+    @SerialName("saturday")
+    SATURDAY,
+    @SerialName("sunday")
+    SUNDAY
+}
+
+@Serializable
+enum class AutomationMisfirePolicy {
+    @SerialName("skip")
+    SKIP,
+    @SerialName("runOnce")
+    RUN_ONCE
+}
+
+@Serializable
+enum class AutomationTriggerKind {
+    @SerialName("schedule")
+    SCHEDULE,
+    @SerialName("event")
+    EVENT
+}
+
+@Serializable
+enum class AutomationRunStatus {
+    @SerialName("pending")
+    PENDING,
+    @SerialName("running")
+    RUNNING,
+    @SerialName("blocked")
+    BLOCKED,
+    @SerialName("completed")
+    COMPLETED,
+    @SerialName("failed")
+    FAILED,
+    @SerialName("cancelled")
+    CANCELLED
+}
+
+@Serializable
+enum class AutomationRunBlockerKind {
+    @SerialName("userInput")
+    USER_INPUT,
+    @SerialName("toolConfirmation")
+    TOOL_CONFIRMATION,
+    @SerialName("authentication")
+    AUTHENTICATION,
+    @SerialName("clientExecution")
+    CLIENT_EXECUTION
+}
+
+@Serializable
+enum class AutomationRunCauseKind {
+    @SerialName("manual")
+    MANUAL,
+    @SerialName("trigger")
+    TRIGGER
+}
+
+@Serializable
+enum class AutomationRunOperation {
+    @SerialName("cancel")
+    CANCEL
+}
+
 // ─── State Types ────────────────────────────────────────────────────────────
 
 @Serializable
@@ -1330,6 +1443,10 @@ data class SessionState(
      */
     val activity: String? = null,
     /**
+     * Durable origin of this session, when another AHP resource created it.
+     */
+    val origin: SessionOrigin? = null,
+    /**
      * Server-owned project for this session
      */
     val project: ProjectInfo? = null,
@@ -1606,6 +1723,10 @@ data class SessionSummary(
      * Human-readable description of what the session is currently doing
      */
     val activity: String? = null,
+    /**
+     * Durable origin of this session, when another AHP resource created it.
+     */
+    val origin: SessionOrigin? = null,
     /**
      * Server-owned project for this session
      */
@@ -4662,6 +4783,302 @@ data class ResourceChange(
     val type: ResourceChangeType
 )
 
+@Serializable
+data class AutomationSessionOrigin(
+    val kind: SessionOriginKind,
+    val automation: String,
+    val run: String
+)
+
+@Serializable
+data class AutomationLocalTime(
+    val hour: Long,
+    val minute: Long
+)
+
+@Serializable
+data class AutomationHourlySchedule(
+    val kind: AutomationScheduleKind
+)
+
+@Serializable
+data class AutomationDailySchedule(
+    val kind: AutomationScheduleKind,
+    val time: AutomationLocalTime,
+    /**
+     * IANA time-zone identifier.
+     */
+    val timeZone: String
+)
+
+@Serializable
+data class AutomationWeeklySchedule(
+    val kind: AutomationScheduleKind,
+    val weekday: AutomationWeekday,
+    val time: AutomationLocalTime,
+    /**
+     * IANA time-zone identifier.
+     */
+    val timeZone: String
+)
+
+@Serializable
+data class AutomationCronSchedule(
+    val kind: AutomationScheduleKind,
+    /**
+     * Standard five-field Unix cron expression.
+     */
+    val expression: String,
+    /**
+     * IANA time-zone identifier.
+     */
+    val timeZone: String
+)
+
+@Serializable
+data class AutomationScheduleTrigger(
+    /**
+     * Stable within the automation definition.
+     */
+    val id: String,
+    val kind: AutomationTriggerKind,
+    val schedule: AutomationSchedule,
+    val misfirePolicy: AutomationMisfirePolicy? = null
+)
+
+@Serializable
+data class AutomationEventTrigger(
+    /**
+     * Stable within the automation definition.
+     */
+    val id: String,
+    val kind: AutomationTriggerKind,
+    /**
+     * Stable host-defined trigger type.
+     */
+    val type: String,
+    /**
+     * Selected event actions.
+     */
+    val events: List<String>,
+    /**
+     * Schema-defined values. Unknown entries must survive round-trips.
+     */
+    val config: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationTriggerEventDefinition(
+    val id: String,
+    val title: String,
+    val description: String? = null
+)
+
+@Serializable
+data class AutomationTriggerDefinition(
+    val type: String,
+    val title: String,
+    val description: String? = null,
+    val events: List<AutomationTriggerEventDefinition>,
+    val configSchema: ConfigSchema? = null
+)
+
+@Serializable
+data class AutomationSessionTemplate(
+    val provider: String? = null,
+    /**
+     * Absence means a workspace-less session.
+     */
+    val workingDirectories: List<String>? = null,
+    /**
+     * Values resolved through `resolveSessionConfig`.
+     */
+    val config: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationDefinition(
+    val title: String,
+    /**
+     * Initial user message sent to each new session.
+     */
+    val message: Message,
+    val session: AutomationSessionTemplate,
+    /**
+     * Controls automatic triggers; manual runs remain permitted.
+     */
+    val enabled: Boolean,
+    /**
+     * Empty means manual-only.
+     */
+    val triggers: List<AutomationTrigger>,
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationRuntimeState(
+    val workingDirectories: List<String>? = null,
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationSummary(
+    val resource: String,
+    val title: String,
+    val enabled: Boolean,
+    val triggerCount: Long,
+    val nextRunAt: String? = null,
+    val lastRun: AutomationRunSummary? = null,
+    val revision: Long,
+    val operations: List<AutomationOperation>,
+    val createdAt: String,
+    val modifiedAt: String,
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationState(
+    val resource: String,
+    val definition: AutomationDefinition,
+    val revision: Long,
+    val nextRunAt: String? = null,
+    /**
+     * Newest-first retained run summaries.
+     */
+    val runs: List<AutomationRunSummary>,
+    val runsNextCursor: String? = null,
+    val runtime: AutomationRuntimeState? = null,
+    val operations: List<AutomationOperation>,
+    val createdAt: String,
+    val modifiedAt: String,
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationRunBlocker(
+    val kind: AutomationRunBlockerKind
+)
+
+@Serializable
+data class AutomationManualRunCause(
+    val kind: AutomationRunCauseKind
+)
+
+@Serializable
+data class AutomationTriggeredRunCause(
+    val kind: AutomationRunCauseKind,
+    val triggerId: String,
+    val scheduledFor: String? = null,
+    val catchUp: Boolean? = null,
+    /**
+     * Host-defined event provenance containing no secrets.
+     */
+    val event: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationPendingRunLifecycle(
+    val status: AutomationRunStatus,
+    val createdAt: String
+)
+
+@Serializable
+data class AutomationRunningRunLifecycle(
+    val status: AutomationRunStatus,
+    val createdAt: String,
+    val startedAt: String
+)
+
+@Serializable
+data class AutomationBlockedRunLifecycle(
+    val status: AutomationRunStatus,
+    val createdAt: String,
+    val startedAt: String,
+    val blocker: AutomationRunBlocker
+)
+
+@Serializable
+data class AutomationCompletedRunLifecycle(
+    val status: AutomationRunStatus,
+    val createdAt: String,
+    val startedAt: String,
+    val completedAt: String,
+    val usage: UsageInfo? = null
+)
+
+@Serializable
+data class AutomationFailedRunLifecycle(
+    val status: AutomationRunStatus,
+    val createdAt: String,
+    val startedAt: String? = null,
+    val completedAt: String,
+    val error: ErrorInfo
+)
+
+@Serializable
+data class AutomationCancelledRunLifecycle(
+    val status: AutomationRunStatus,
+    val createdAt: String,
+    val startedAt: String? = null,
+    val completedAt: String
+)
+
+@Serializable
+data class AutomationRunArtifact(
+    /**
+     * Content URI
+     */
+    val uri: String,
+    /**
+     * Approximate size in bytes
+     */
+    val sizeHint: Long? = null,
+    /**
+     * Content MIME type
+     */
+    val contentType: String? = null,
+    /**
+     * Content nonce
+     */
+    val nonce: String? = null,
+    val id: String,
+    val label: String,
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationRunSummary(
+    val resource: String,
+    val automation: String,
+    val cause: AutomationRunCause,
+    val lifecycle: AutomationRunLifecycle,
+    val primarySession: String? = null,
+    val sessionCount: Long,
+    val artifactCount: Long? = null,
+    val operations: List<AutomationRunOperation>,
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AutomationRunState(
+    val resource: String,
+    val automation: String,
+    val cause: AutomationRunCause,
+    val lifecycle: AutomationRunLifecycle,
+    val sessions: List<String>,
+    val primarySession: String? = null,
+    val artifacts: List<AutomationRunArtifact>,
+    val operations: List<AutomationRunOperation>,
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
 // ─── Tool Input ──────────────────────────────────────────────────────────────
 
 /**
@@ -5676,6 +6093,251 @@ internal object SessionInputRequestSerializer : KSerializer<SessionInputRequest>
     }
 }
 
+@Serializable(with = SessionOriginSerializer::class)
+sealed interface SessionOrigin
+
+@JvmInline
+value class SessionOriginAutomation(val value: AutomationSessionOrigin) : SessionOrigin
+
+internal object SessionOriginSerializer : KSerializer<SessionOrigin> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("SessionOrigin")
+
+    override fun deserialize(decoder: Decoder): SessionOrigin {
+        val input = decoder as? JsonDecoder
+            ?: error("SessionOrigin can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for SessionOrigin")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on SessionOrigin")
+        return when (discriminant) {
+            "automation" -> SessionOriginAutomation(input.json.decodeFromJsonElement(AutomationSessionOrigin.serializer(), element))
+            else -> error("Unknown SessionOrigin discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: SessionOrigin) {
+        val output = encoder as? JsonEncoder
+            ?: error("SessionOrigin can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is SessionOriginAutomation -> output.json.encodeToJsonElement(AutomationSessionOrigin.serializer(), value.value)
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is SessionOriginAutomation -> "automation"
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = AutomationScheduleSerializer::class)
+sealed interface AutomationSchedule
+
+@JvmInline
+value class AutomationScheduleHourly(val value: AutomationHourlySchedule) : AutomationSchedule
+@JvmInline
+value class AutomationScheduleDaily(val value: AutomationDailySchedule) : AutomationSchedule
+@JvmInline
+value class AutomationScheduleWeekly(val value: AutomationWeeklySchedule) : AutomationSchedule
+@JvmInline
+value class AutomationScheduleCron(val value: AutomationCronSchedule) : AutomationSchedule
+
+internal object AutomationScheduleSerializer : KSerializer<AutomationSchedule> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AutomationSchedule")
+
+    override fun deserialize(decoder: Decoder): AutomationSchedule {
+        val input = decoder as? JsonDecoder
+            ?: error("AutomationSchedule can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AutomationSchedule")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on AutomationSchedule")
+        return when (discriminant) {
+            "hourly" -> AutomationScheduleHourly(input.json.decodeFromJsonElement(AutomationHourlySchedule.serializer(), element))
+            "daily" -> AutomationScheduleDaily(input.json.decodeFromJsonElement(AutomationDailySchedule.serializer(), element))
+            "weekly" -> AutomationScheduleWeekly(input.json.decodeFromJsonElement(AutomationWeeklySchedule.serializer(), element))
+            "cron" -> AutomationScheduleCron(input.json.decodeFromJsonElement(AutomationCronSchedule.serializer(), element))
+            else -> error("Unknown AutomationSchedule discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AutomationSchedule) {
+        val output = encoder as? JsonEncoder
+            ?: error("AutomationSchedule can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AutomationScheduleHourly -> output.json.encodeToJsonElement(AutomationHourlySchedule.serializer(), value.value)
+            is AutomationScheduleDaily -> output.json.encodeToJsonElement(AutomationDailySchedule.serializer(), value.value)
+            is AutomationScheduleWeekly -> output.json.encodeToJsonElement(AutomationWeeklySchedule.serializer(), value.value)
+            is AutomationScheduleCron -> output.json.encodeToJsonElement(AutomationCronSchedule.serializer(), value.value)
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AutomationScheduleHourly -> "hourly"
+            is AutomationScheduleDaily -> "daily"
+            is AutomationScheduleWeekly -> "weekly"
+            is AutomationScheduleCron -> "cron"
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = AutomationTriggerSerializer::class)
+sealed interface AutomationTrigger
+
+@JvmInline
+value class AutomationTriggerSchedule(val value: AutomationScheduleTrigger) : AutomationTrigger
+@JvmInline
+value class AutomationTriggerEvent(val value: AutomationEventTrigger) : AutomationTrigger
+
+internal object AutomationTriggerSerializer : KSerializer<AutomationTrigger> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AutomationTrigger")
+
+    override fun deserialize(decoder: Decoder): AutomationTrigger {
+        val input = decoder as? JsonDecoder
+            ?: error("AutomationTrigger can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AutomationTrigger")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on AutomationTrigger")
+        return when (discriminant) {
+            "schedule" -> AutomationTriggerSchedule(input.json.decodeFromJsonElement(AutomationScheduleTrigger.serializer(), element))
+            "event" -> AutomationTriggerEvent(input.json.decodeFromJsonElement(AutomationEventTrigger.serializer(), element))
+            else -> error("Unknown AutomationTrigger discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AutomationTrigger) {
+        val output = encoder as? JsonEncoder
+            ?: error("AutomationTrigger can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AutomationTriggerSchedule -> output.json.encodeToJsonElement(AutomationScheduleTrigger.serializer(), value.value)
+            is AutomationTriggerEvent -> output.json.encodeToJsonElement(AutomationEventTrigger.serializer(), value.value)
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AutomationTriggerSchedule -> "schedule"
+            is AutomationTriggerEvent -> "event"
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = AutomationRunCauseSerializer::class)
+sealed interface AutomationRunCause
+
+@JvmInline
+value class AutomationRunCauseManual(val value: AutomationManualRunCause) : AutomationRunCause
+@JvmInline
+value class AutomationRunCauseTrigger(val value: AutomationTriggeredRunCause) : AutomationRunCause
+
+internal object AutomationRunCauseSerializer : KSerializer<AutomationRunCause> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AutomationRunCause")
+
+    override fun deserialize(decoder: Decoder): AutomationRunCause {
+        val input = decoder as? JsonDecoder
+            ?: error("AutomationRunCause can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AutomationRunCause")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on AutomationRunCause")
+        return when (discriminant) {
+            "manual" -> AutomationRunCauseManual(input.json.decodeFromJsonElement(AutomationManualRunCause.serializer(), element))
+            "trigger" -> AutomationRunCauseTrigger(input.json.decodeFromJsonElement(AutomationTriggeredRunCause.serializer(), element))
+            else -> error("Unknown AutomationRunCause discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AutomationRunCause) {
+        val output = encoder as? JsonEncoder
+            ?: error("AutomationRunCause can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AutomationRunCauseManual -> output.json.encodeToJsonElement(AutomationManualRunCause.serializer(), value.value)
+            is AutomationRunCauseTrigger -> output.json.encodeToJsonElement(AutomationTriggeredRunCause.serializer(), value.value)
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AutomationRunCauseManual -> "manual"
+            is AutomationRunCauseTrigger -> "trigger"
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = AutomationRunLifecycleSerializer::class)
+sealed interface AutomationRunLifecycle
+
+@JvmInline
+value class AutomationRunLifecyclePending(val value: AutomationPendingRunLifecycle) : AutomationRunLifecycle
+@JvmInline
+value class AutomationRunLifecycleRunning(val value: AutomationRunningRunLifecycle) : AutomationRunLifecycle
+@JvmInline
+value class AutomationRunLifecycleBlocked(val value: AutomationBlockedRunLifecycle) : AutomationRunLifecycle
+@JvmInline
+value class AutomationRunLifecycleCompleted(val value: AutomationCompletedRunLifecycle) : AutomationRunLifecycle
+@JvmInline
+value class AutomationRunLifecycleFailed(val value: AutomationFailedRunLifecycle) : AutomationRunLifecycle
+@JvmInline
+value class AutomationRunLifecycleCancelled(val value: AutomationCancelledRunLifecycle) : AutomationRunLifecycle
+
+internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLifecycle> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AutomationRunLifecycle")
+
+    override fun deserialize(decoder: Decoder): AutomationRunLifecycle {
+        val input = decoder as? JsonDecoder
+            ?: error("AutomationRunLifecycle can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AutomationRunLifecycle")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: error("Missing status discriminator on AutomationRunLifecycle")
+        return when (discriminant) {
+            "pending" -> AutomationRunLifecyclePending(input.json.decodeFromJsonElement(AutomationPendingRunLifecycle.serializer(), element))
+            "running" -> AutomationRunLifecycleRunning(input.json.decodeFromJsonElement(AutomationRunningRunLifecycle.serializer(), element))
+            "blocked" -> AutomationRunLifecycleBlocked(input.json.decodeFromJsonElement(AutomationBlockedRunLifecycle.serializer(), element))
+            "completed" -> AutomationRunLifecycleCompleted(input.json.decodeFromJsonElement(AutomationCompletedRunLifecycle.serializer(), element))
+            "failed" -> AutomationRunLifecycleFailed(input.json.decodeFromJsonElement(AutomationFailedRunLifecycle.serializer(), element))
+            "cancelled" -> AutomationRunLifecycleCancelled(input.json.decodeFromJsonElement(AutomationCancelledRunLifecycle.serializer(), element))
+            else -> error("Unknown AutomationRunLifecycle discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AutomationRunLifecycle) {
+        val output = encoder as? JsonEncoder
+            ?: error("AutomationRunLifecycle can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AutomationRunLifecyclePending -> output.json.encodeToJsonElement(AutomationPendingRunLifecycle.serializer(), value.value)
+            is AutomationRunLifecycleRunning -> output.json.encodeToJsonElement(AutomationRunningRunLifecycle.serializer(), value.value)
+            is AutomationRunLifecycleBlocked -> output.json.encodeToJsonElement(AutomationBlockedRunLifecycle.serializer(), value.value)
+            is AutomationRunLifecycleCompleted -> output.json.encodeToJsonElement(AutomationCompletedRunLifecycle.serializer(), value.value)
+            is AutomationRunLifecycleFailed -> output.json.encodeToJsonElement(AutomationFailedRunLifecycle.serializer(), value.value)
+            is AutomationRunLifecycleCancelled -> output.json.encodeToJsonElement(AutomationCancelledRunLifecycle.serializer(), value.value)
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is AutomationRunLifecyclePending -> "pending"
+            is AutomationRunLifecycleRunning -> "running"
+            is AutomationRunLifecycleBlocked -> "blocked"
+            is AutomationRunLifecycleCompleted -> "completed"
+            is AutomationRunLifecycleFailed -> "failed"
+            is AutomationRunLifecycleCancelled -> "cancelled"
+        }
+        if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
 @Serializable(with = ToolResultContentSerializer::class)
 sealed interface ToolResultContent {
     @JvmInline value class Text(val value: ToolResultTextContent) : ToolResultContent
@@ -5734,8 +6396,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 }
 
 /**
- * The state payload of a snapshot — root, session, chat, terminal, changeset,
- * resource-watch, annotations, or content state.
+ * The state payload of a snapshot.
  */
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
@@ -5746,6 +6407,8 @@ sealed interface SnapshotState {
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
+    @JvmInline value class Automation(val value: AutomationState) : SnapshotState
+    @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
 }
 
 internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
@@ -5758,7 +6421,9 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val element = input.decodeJsonElement()
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
-        // Try the most distinctive shape first. SessionState has required
+        // Try the most distinctive shape first. AutomationRunState has required
+        // `automation`, `cause`, and `sessions`; AutomationState has required
+        // `definition`; SessionState has required
         // `lifecycle`; ChatState has required `turns`; ChangesetState has
         // required `status` + `files`; ResourceWatchState has required
         // `root` + `recursive`; AnnotationsState has required `annotations`
@@ -5766,6 +6431,10 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // key); TerminalState has required `content`; RootState is the
         // catch-all.
         return when {
+            obj.containsKey("automation") && obj.containsKey("cause") && obj.containsKey("sessions") ->
+                SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
+            obj.containsKey("definition") ->
+                SnapshotState.Automation(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
             obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
@@ -5791,6 +6460,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
+            is SnapshotState.Automation -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
+            is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
         }
         output.encodeJsonElement(element)
     }

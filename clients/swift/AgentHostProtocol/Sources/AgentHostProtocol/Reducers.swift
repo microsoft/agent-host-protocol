@@ -900,6 +900,7 @@ public let clientDispatchableActions: Set<String> = [
     "session/mcpServerStopRequested",
     "session/isReadChanged",
     "session/isArchivedChanged",
+    "automationRun/cancelRequested",
 ]
 
 /// Checks whether an action may be dispatched by a client.
@@ -915,7 +916,8 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .sessionCustomizationToggled,
          .sessionMcpServerStartRequested, .sessionMcpServerStopRequested,
          .sessionIsReadChanged,
-         .sessionIsArchivedChanged:
+         .sessionIsArchivedChanged,
+         .automationRunCancelRequested:
         return true
     default:
         return false
@@ -1443,4 +1445,71 @@ public func resourceWatchReducer(state: ResourceWatchState, action: StateAction)
     default:
         return state
     }
+}
+
+/// Pure reducer for automation state.
+public func automationReducer(state: AutomationState, action: StateAction) -> AutomationState {
+    var next = state
+    switch action {
+    case .automationDefinitionChanged(let value):
+        next.definition = value.definition
+        next.revision = value.revision
+        next.modifiedAt = value.modifiedAt
+        next.nextRunAt = value.nextRunAt
+    case .automationRunSummarySet(let value):
+        if let index = next.runs.firstIndex(where: { $0.resource == value.run.resource }) {
+            next.runs[index] = value.run
+        } else {
+            next.runs.insert(value.run, at: 0)
+        }
+    case .automationRunSummaryRemoved(let value):
+        guard let index = next.runs.firstIndex(where: { $0.resource == value.run }) else {
+            return state
+        }
+        next.runs.remove(at: index)
+    case .automationRunsLoaded(let value):
+        var known = Set(next.runs.map(\.resource))
+        next.runs.append(contentsOf: value.runs.filter { known.insert($0.resource).inserted })
+        next.runsNextCursor = value.nextCursor
+    default:
+        return state
+    }
+    return next
+}
+
+/// Pure reducer for automation-run state.
+public func automationRunReducer(state: AutomationRunState, action: StateAction) -> AutomationRunState {
+    var next = state
+    switch action {
+    case .automationRunLifecycleChanged(let value):
+        next.lifecycle = value.lifecycle
+        next.operations = value.operations
+    case .automationRunSessionSet(let value):
+        guard !next.sessions.contains(value.session) else { return state }
+        next.sessions.append(value.session)
+    case .automationRunSessionRemoved(let value):
+        guard let index = next.sessions.firstIndex(of: value.session) else { return state }
+        next.sessions.remove(at: index)
+        if next.primarySession == value.session {
+            next.primarySession = nil
+        }
+    case .automationRunPrimarySessionChanged(let value):
+        next.primarySession = value.primarySession
+    case .automationRunArtifactSet(let value):
+        if let index = next.artifacts.firstIndex(where: { $0.id == value.artifact.id }) {
+            next.artifacts[index] = value.artifact
+        } else {
+            next.artifacts.append(value.artifact)
+        }
+    case .automationRunArtifactRemoved(let value):
+        guard let index = next.artifacts.firstIndex(where: { $0.id == value.artifactId }) else {
+            return state
+        }
+        next.artifacts.remove(at: index)
+    case .automationRunCancelRequested:
+        return state
+    default:
+        return state
+    }
+    return next
 }

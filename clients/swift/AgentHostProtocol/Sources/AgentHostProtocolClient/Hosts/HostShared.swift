@@ -21,6 +21,7 @@ internal struct HostInternal {
     var protocolVersion: String?
     var serverSeq: Int
     var defaultDirectory: String?
+    var automations: AutomationCapabilities?
     var rootState: RootState
     var subscriptions: [String]
     var completionTriggerCharacters: [String]
@@ -44,6 +45,7 @@ internal struct HostInternal {
             protocolVersion: protocolVersion,
             serverSeq: serverSeq,
             defaultDirectory: defaultDirectory,
+            automations: automations,
             agents: rootState.agents,
             activeSessions: rootState.activeSessions,
             terminals: rootState.terminals,

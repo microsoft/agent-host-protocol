@@ -66,6 +66,12 @@ func (t *fakeTransport) Close(_ context.Context) error {
 // runFakeServer responds to one Initialize request with a stub
 // InitializeResult. It exits when the transport closes.
 func runFakeServer(t *testing.T, serverSide *fakeTransport) {
+	runFakeServerWithInitializeResult(t, serverSide, ahptypes.InitializeResult{
+		ProtocolVersion: ahptypes.ProtocolVersion,
+	})
+}
+
+func runFakeServerWithInitializeResult(t *testing.T, serverSide *fakeTransport, initializeResult ahptypes.InitializeResult) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -82,7 +88,7 @@ func runFakeServer(t *testing.T, serverSide *fakeTransport) {
 			continue
 		}
 		if parsed.Request.Method == "initialize" {
-			result, _ := json.Marshal(ahptypes.InitializeResult{ProtocolVersion: ahptypes.ProtocolVersion})
+			result, _ := json.Marshal(initializeResult)
 			resp := ahptypes.JsonRpcMessage{SuccessResponse: &ahptypes.JsonRpcSuccessResponse{
 				JsonRpc: ahptypes.JsonRpcV2,
 				ID:      parsed.Request.ID,
@@ -90,6 +96,71 @@ func runFakeServer(t *testing.T, serverSide *fakeTransport) {
 			}}
 			out, _ := ahp.EncodeMessage(resp)
 			_ = serverSide.Send(ctx, out)
+		}
+	}
+}
+
+func TestAutomationCapabilitiesUpdatedAcrossReconnect(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	multi := NewMultiHostClient()
+	defer multi.Shutdown(context.Background())
+
+	servers := make(chan *fakeTransport, 2)
+	attempt := 0
+	cfg := NewHostConfig("automation-host", "Automation Host", func(_ context.Context, _ HostID) (ahp.Transport, error) {
+		attempt++
+		clientSide, serverSide := newFakePair()
+		lifetime := ahptypes.AutomationExecutionLifetimeHostLifetime
+		if attempt > 1 {
+			lifetime = ahptypes.AutomationExecutionLifetimeManaged
+		}
+		go runFakeServerWithInitializeResult(t, serverSide, ahptypes.InitializeResult{
+			ProtocolVersion: ahptypes.ProtocolVersion,
+			Automations: &ahptypes.AutomationCapabilities{
+				Execution: ahptypes.AutomationExecutionCapabilities{Lifetime: lifetime},
+			},
+		})
+		servers <- serverSide
+		return clientSide, nil
+	})
+	cfg.ReconnectPolicy = ReconnectPolicy{
+		MaxAttempts:       2,
+		InitialBackoff:    time.Millisecond,
+		MaxBackoff:        time.Millisecond,
+		BackoffMultiplier: 1,
+		ResetOnSuccess:    true,
+	}
+
+	handle, err := multi.AddHost(ctx, cfg)
+	if err != nil {
+		t.Fatalf("AddHost: %v", err)
+	}
+	if handle.Automations == nil {
+		t.Fatal("initial Automations is nil")
+	}
+	if got := handle.Automations.Execution.Lifetime; got != ahptypes.AutomationExecutionLifetimeHostLifetime {
+		t.Fatalf("initial lifetime = %q, want %q", got, ahptypes.AutomationExecutionLifetimeHostLifetime)
+	}
+
+	firstServer := <-servers
+	if err := firstServer.Close(ctx); err != nil {
+		t.Fatalf("close first server: %v", err)
+	}
+
+	for {
+		handle = multi.Host(cfg.ID)
+		if handle != nil &&
+			handle.State.Kind == HostStateConnected &&
+			handle.Automations != nil &&
+			handle.Automations.Execution.Lifetime == ahptypes.AutomationExecutionLifetimeManaged {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("automation capabilities were not updated after reconnect")
+		case <-time.After(time.Millisecond):
 		}
 	}
 }

@@ -1,0 +1,62 @@
+{
+  "description": "automation runsLoaded deduplicates repeated resources within one page",
+  "reducer": "automation",
+  "initial": {
+    "resource": "ahp-automation:/a1",
+    "definition": {
+      "title": "A",
+      "message": { "text": "go", "origin": { "kind": "user" } },
+      "session": {},
+      "enabled": true,
+      "triggers": []
+    },
+    "revision": 1,
+    "runs": [],
+    "operations": ["run"],
+    "createdAt": "2025-01-01T00:00:00Z",
+    "modifiedAt": "2025-01-01T00:00:00Z"
+  },
+  "actions": [{
+    "type": "automation/runsLoaded",
+    "runs": [
+      {
+        "resource": "ahp-automation-run:/r1",
+        "automation": "ahp-automation:/a1",
+        "cause": { "kind": "manual" },
+        "lifecycle": { "status": "pending", "createdAt": "2025-01-01T00:00:00Z" },
+        "sessionCount": 0,
+        "operations": []
+      },
+      {
+        "resource": "ahp-automation-run:/r1",
+        "automation": "ahp-automation:/a1",
+        "cause": { "kind": "manual" },
+        "lifecycle": { "status": "pending", "createdAt": "2025-01-01T00:00:00Z" },
+        "sessionCount": 0,
+        "operations": []
+      }
+    ]
+  }],
+  "expected": {
+    "resource": "ahp-automation:/a1",
+    "definition": {
+      "title": "A",
+      "message": { "text": "go", "origin": { "kind": "user" } },
+      "session": {},
+      "enabled": true,
+      "triggers": []
+    },
+    "revision": 1,
+    "runs": [{
+      "resource": "ahp-automation-run:/r1",
+      "automation": "ahp-automation:/a1",
+      "cause": { "kind": "manual" },
+      "lifecycle": { "status": "pending", "createdAt": "2025-01-01T00:00:00Z" },
+      "sessionCount": 0,
+      "operations": []
+    }],
+    "operations": ["run"],
+    "createdAt": "2025-01-01T00:00:00Z",
+    "modifiedAt": "2025-01-01T00:00:00Z"
+  }
+}
