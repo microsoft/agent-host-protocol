@@ -773,6 +773,9 @@ pub struct ChatErrorAction {
     pub duration: i64,
     /// Error details
     pub error: ErrorInfo,
+    /// Whether the failed turn can be resumed without adding another message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resumable: Option<bool>,
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and

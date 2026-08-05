@@ -22,9 +22,9 @@
         "state": "error",
         "error": {
           "errorType": "runtime",
-          "message": "Request failed",
-          "resumable": true
-        }
+          "message": "Request failed"
+        },
+        "resumable": true
       },
       {
         "id": "turn-2",
@@ -66,9 +66,9 @@
         "state": "error",
         "error": {
           "errorType": "runtime",
-          "message": "Request failed",
-          "resumable": true
-        }
+          "message": "Request failed"
+        },
+        "resumable": true
       },
       {
         "id": "turn-2",

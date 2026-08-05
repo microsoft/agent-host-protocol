@@ -804,9 +804,6 @@ pub struct AgentCapabilities {
     /// {@link CreateSessionParams.workingDirectories}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_working_directories: Option<MultipleWorkingDirectoriesCapability>,
-    /// The agent can resume a failed turn without adding another message.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resume_turn: Option<AnyValue>,
 }
 
 /// Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -1622,6 +1619,9 @@ pub struct Turn {
     /// Error details if state is `'error'`
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorInfo>,
+    /// Whether this failed turn can be resumed without adding another message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resumable: Option<bool>,
 }
 
 /// An in-progress turn — the assistant is actively streaming.
@@ -3878,9 +3878,6 @@ pub struct ErrorInfo {
     /// Stack trace
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stack: Option<String>,
-    /// Whether the failed operation can be resumed without adding new user input.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resumable: Option<bool>,
     /// Additional provider-specific metadata for this error.
     /// Clients MAY look for well-known optional keys here to provide enhanced UI
     /// (e.g. a structured chat fetch error for richer, localized messaging).

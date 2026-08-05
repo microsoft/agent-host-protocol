@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "`chat/turnResumed`, the `resumeTurn` agent capability, and resumable turn errors let clients continue failed turns without adding another user message."
+  "message": "`chat/turnResumed` and per-turn `resumable` eligibility let clients continue failed turns without adding another user message."
 }

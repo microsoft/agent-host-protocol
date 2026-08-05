@@ -379,6 +379,7 @@ private fun endTurn(
     turnState: TurnState,
     terminalStatus: SessionStatus? = null,
     error: ErrorInfo? = null,
+    resumable: Boolean? = null,
 ): ChatState {
     val active = state.activeTurn ?: return state
     if (active.id != turnId) return state
@@ -434,6 +435,7 @@ private fun endTurn(
         usage = active.usage,
         state = turnState,
         error = error,
+        resumable = resumable,
     )
 
     val withoutTurn = state.copy(
@@ -857,7 +859,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
             turn == null ||
             turn.id != a.turnId ||
             turn.state != TurnState.ERROR ||
-            turn.error?.resumable != true
+            turn.resumable != true
         ) {
             state
         } else {
@@ -908,7 +910,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         endTurn(state, action.value.turnId, action.value.duration, TurnState.CANCELLED)
 
     is StateActionChatError ->
-        endTurn(state, action.value.turnId, action.value.duration, TurnState.ERROR, SessionStatus.ERROR, action.value.error)
+        endTurn(state, action.value.turnId, action.value.duration, TurnState.ERROR, SessionStatus.ERROR, action.value.error, action.value.resumable)
 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)

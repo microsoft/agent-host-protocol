@@ -962,11 +962,7 @@ data class AgentCapabilities(
      * set and MUST NOT set more than one entry in
      * {@link CreateSessionParams.workingDirectories}.
      */
-    val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null,
-    /**
-     * The agent can resume a failed turn without adding another message.
-     */
-    val resumeTurn: JsonElement? = null
+    val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null
 )
 
 @Serializable
@@ -1738,7 +1734,11 @@ data class Turn(
     /**
      * Error details if state is `'error'`
      */
-    val error: ErrorInfo? = null
+    val error: ErrorInfo? = null,
+    /**
+     * Whether this failed turn can be resumed without adding another message.
+     */
+    val resumable: Boolean? = null
 )
 
 @Serializable
@@ -4288,10 +4288,6 @@ data class ErrorInfo(
      * Stack trace
      */
     val stack: String? = null,
-    /**
-     * Whether the failed operation can be resumed without adding new user input.
-     */
-    val resumable: Boolean? = null,
     /**
      * Additional provider-specific metadata for this error.
      * Clients MAY look for well-known optional keys here to provide enhanced UI

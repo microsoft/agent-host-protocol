@@ -593,8 +593,6 @@ type AgentCapabilities struct {
 	// set and MUST NOT set more than one entry in
 	// {@link CreateSessionParams.workingDirectories}.
 	MultipleWorkingDirectories *MultipleWorkingDirectoriesCapability `json:"multipleWorkingDirectories,omitempty"`
-	// The agent can resume a failed turn without adding another message.
-	ResumeTurn *json.RawMessage `json:"resumeTurn,omitempty"`
 }
 
 // Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -1289,6 +1287,8 @@ type Turn struct {
 	State TurnState `json:"state"`
 	// Error details if state is `'error'`
 	Error *ErrorInfo `json:"error,omitempty"`
+	// Whether this failed turn can be resumed without adding another message.
+	Resumable *bool `json:"resumable,omitempty"`
 }
 
 // An in-progress turn — the assistant is actively streaming.
@@ -3223,8 +3223,6 @@ type ErrorInfo struct {
 	Message string `json:"message"`
 	// Stack trace
 	Stack *string `json:"stack,omitempty"`
-	// Whether the failed operation can be resumed without adding new user input.
-	Resumable *bool `json:"resumable,omitempty"`
 	// Additional provider-specific metadata for this error.
 	// Clients MAY look for well-known optional keys here to provide enhanced UI
 	// (e.g. a structured chat fetch error for richer, localized messaging).

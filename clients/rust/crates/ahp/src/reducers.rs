@@ -341,6 +341,7 @@ fn end_turn(
     turn_state: TurnState,
     terminal_status: Option<SessionStatus>,
     error: Option<ErrorInfo>,
+    resumable: Option<bool>,
 ) -> ReduceOutcome {
     let Some(active) = state.active_turn.as_ref() else {
         return ReduceOutcome::NoOp;
@@ -409,6 +410,7 @@ fn end_turn(
         usage: active.usage,
         state: turn_state,
         error,
+        resumable,
     };
 
     state.turns.push(turn);
@@ -978,12 +980,14 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             TurnState::Complete,
             None,
             None,
+            None,
         ),
         StateAction::ChatTurnCancelled(a) => end_turn(
             state,
             &a.turn_id,
             a.duration,
             TurnState::Cancelled,
+            None,
             None,
             None,
         ),
@@ -994,6 +998,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             TurnState::Error,
             Some(SessionStatus::Error),
             Some(a.error.clone()),
+            a.resumable,
         ),
         StateAction::ChatActivityChanged(a) => {
             state.activity = a.activity.clone();
@@ -1256,10 +1261,7 @@ fn apply_turn_resumed(state: &mut ChatState, a: &ChatTurnResumedAction) -> Reduc
     let Some(turn) = state.turns.last() else {
         return ReduceOutcome::NoOp;
     };
-    if turn.id != a.turn_id
-        || turn.state != TurnState::Error
-        || turn.error.as_ref().and_then(|error| error.resumable) != Some(true)
-    {
+    if turn.id != a.turn_id || turn.state != TurnState::Error || turn.resumable != Some(true) {
         return ReduceOutcome::NoOp;
     }
 

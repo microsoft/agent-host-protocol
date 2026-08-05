@@ -215,7 +215,7 @@ func touchChatModified(state *ahptypes.ChatState) {
 
 // ─── Active-turn helpers ───────────────────────────────────────────────
 
-func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState ahptypes.TurnState, terminalStatus *ahptypes.SessionStatus, errInfo *ahptypes.ErrorInfo) ReduceOutcome {
+func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState ahptypes.TurnState, terminalStatus *ahptypes.SessionStatus, errInfo *ahptypes.ErrorInfo, resumable *bool) ReduceOutcome {
 	if state.ActiveTurn == nil || state.ActiveTurn.Id != turnID {
 		return ReduceOutcomeNoOp
 	}
@@ -269,6 +269,7 @@ func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState
 		Usage:         active.Usage,
 		State:         turnState,
 		Error:         errInfo,
+		Resumable:     resumable,
 	}
 
 	state.Turns = append(state.Turns, turn)
@@ -520,13 +521,13 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		state.ActiveTurn.ResponseParts = append(state.ActiveTurn.ResponseParts, a.Part)
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatTurnCompleteAction:
-		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateComplete, nil, nil)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateComplete, nil, nil, nil)
 	case *ahptypes.ChatTurnCancelledAction:
-		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateCancelled, nil, nil)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateCancelled, nil, nil, nil)
 	case *ahptypes.ChatErrorAction:
 		errCopy := a.Error
 		errStatus := ahptypes.SessionStatusError
-		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateError, &errStatus, &errCopy)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateError, &errStatus, &errCopy, a.Resumable)
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
@@ -1043,7 +1044,7 @@ func applyTurnResumed(state *ahptypes.ChatState, a *ahptypes.ChatTurnResumedActi
 	turnIndex := len(state.Turns) - 1
 	turn := state.Turns[turnIndex]
 	if turn.Id != a.TurnId || turn.State != ahptypes.TurnStateError ||
-		turn.Error == nil || turn.Error.Resumable == nil || !*turn.Error.Resumable {
+		turn.Resumable == nil || !*turn.Resumable {
 		return ReduceOutcomeNoOp
 	}
 

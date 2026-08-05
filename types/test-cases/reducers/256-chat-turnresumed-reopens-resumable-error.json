@@ -34,9 +34,9 @@
         "state": "error",
         "error": {
           "errorType": "runtime",
-          "message": "Request failed",
-          "resumable": true
-        }
+          "message": "Request failed"
+        },
+        "resumable": true
       }
     ]
   },

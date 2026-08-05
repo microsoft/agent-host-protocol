@@ -910,6 +910,8 @@ public struct ChatErrorAction: Codable, Sendable {
     public var duration: Int
     /// Error details
     public var error: ErrorInfo
+    /// Whether the failed turn can be resumed without adding another message.
+    public var resumable: Bool?
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -924,6 +926,7 @@ public struct ChatErrorAction: Codable, Sendable {
         case turnId
         case duration
         case error
+        case resumable
         case meta = "_meta"
     }
 
@@ -932,12 +935,14 @@ public struct ChatErrorAction: Codable, Sendable {
         turnId: String,
         duration: Int,
         error: ErrorInfo,
+        resumable: Bool? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
         self.type = type
         self.turnId = turnId
         self.duration = duration
         self.error = error
+        self.resumable = resumable
         self.meta = meta
     }
 }

@@ -171,6 +171,7 @@ function endTurn(
   duration: number,
   terminalStatus?: SessionStatus.Error,
   error?: { errorType: string; message: string; stack?: string },
+  resumable?: boolean,
 ): ChatState {
   if (!state.activeTurn || state.activeTurn.id !== turnId) {
     return state;
@@ -209,6 +210,7 @@ function endTurn(
     usage: active.usage,
     state: turnState,
     error,
+    ...(resumable === true ? { resumable: true } : {}),
   };
 
   const next: ChatState = {
@@ -382,7 +384,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
       if (!turn || turn.id !== action.turnId) {
         return state;
       }
-      if (turn.state !== TurnState.Error || turn.error?.resumable !== true) {
+      if (turn.state !== TurnState.Error || turn.resumable !== true) {
         return state;
       }
       const turns = state.turns.slice();
@@ -432,7 +434,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
       return endTurn(state, action.turnId, TurnState.Cancelled, action.duration);
 
     case ActionType.ChatError:
-      return endTurn(state, action.turnId, TurnState.Error, action.duration, SessionStatus.Error, action.error);
+      return endTurn(state, action.turnId, TurnState.Error, action.duration, SessionStatus.Error, action.error, action.resumable);
 
     case ActionType.ChatActivityChanged:
       return { ...state, activity: action.activity };

@@ -599,6 +599,8 @@ type ChatErrorAction struct {
 	Duration int64 `json:"duration"`
 	// Error details
 	Error ErrorInfo `json:"error"`
+	// Whether the failed turn can be resumed without adding another message.
+	Resumable *bool `json:"resumable,omitempty"`
 	// Additional provider-specific metadata for this action.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI, and

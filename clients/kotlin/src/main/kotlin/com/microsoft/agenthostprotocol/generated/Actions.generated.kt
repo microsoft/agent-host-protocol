@@ -766,6 +766,10 @@ data class ChatErrorAction(
      */
     val error: ErrorInfo,
     /**
+     * Whether the failed turn can be resumed without adding another message.
+     */
+    val resumable: Boolean? = null,
+    /**
      * Additional provider-specific metadata for this action.
      *
      * Clients MAY look for well-known keys here to provide enhanced UI, and

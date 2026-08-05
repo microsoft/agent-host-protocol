@@ -23,9 +23,9 @@
         "state": "error",
         "error": {
           "errorType": "runtime",
-          "message": "First failure",
-          "resumable": true
-        }
+          "message": "First failure"
+        },
+        "resumable": true
       }
     ]
   },
@@ -40,9 +40,9 @@
       "duration": 1000,
       "error": {
         "errorType": "runtime",
-        "message": "Second failure",
-        "resumable": true
-      }
+        "message": "Second failure"
+      },
+      "resumable": true
     },
     {
       "type": "chat/turnResumed",

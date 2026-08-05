@@ -122,8 +122,6 @@ export interface AgentCapabilities {
    * {@link CreateSessionParams.workingDirectories}.
    */
   multipleWorkingDirectories?: MultipleWorkingDirectoriesCapability;
-  /** The agent can resume a failed turn without adding another message. */
-  resumeTurn?: {};
 }
 
 /**

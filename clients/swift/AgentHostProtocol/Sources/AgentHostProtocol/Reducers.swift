@@ -158,7 +158,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
               let turn = state.turns.last,
               turn.id == a.turnId,
               turn.state == .error,
-              turn.error?.resumable == true else {
+              turn.resumable == true else {
             return state
         }
         var next = state
@@ -197,7 +197,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .cancelled)
 
     case .chatError(let a):
-        return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .error, terminalStatus: .error, error: a.error)
+        return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .error, terminalStatus: .error, error: a.error, resumable: a.resumable)
 
     case .chatActivityChanged(let a):
         var next = state
@@ -1070,7 +1070,8 @@ private func endTurn(
     duration: Int,
     turnState: TurnState,
     terminalStatus: SessionStatus? = nil,
-    error: ErrorInfo? = nil
+    error: ErrorInfo? = nil,
+    resumable: Bool? = nil
 ) -> ChatState {
     guard let activeTurn = state.activeTurn, activeTurn.id == turnId else {
         return state
@@ -1127,7 +1128,8 @@ private func endTurn(
         responseParts: responseParts,
         usage: activeTurn.usage,
         state: turnState,
-        error: error
+        error: error,
+        resumable: resumable
     )
 
     var next = state

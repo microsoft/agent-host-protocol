@@ -503,6 +503,8 @@ export interface ChatErrorAction {
   duration: number;
   /** Error details */
   error: ErrorInfo;
+  /** Whether the failed turn can be resumed without adding another message. */
+  resumable?: boolean;
   /**
    * Additional provider-specific metadata for this action.
    *
