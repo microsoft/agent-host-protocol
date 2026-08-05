@@ -36,4 +36,3 @@ export interface AutomationRunsLoadedAction {
   runs: AutomationRunSummary[];
   nextCursor?: string;
 }
-
