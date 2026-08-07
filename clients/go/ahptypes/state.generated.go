@@ -1287,8 +1287,6 @@ type Turn struct {
 	State TurnState `json:"state"`
 	// Error details if state is `'error'`
 	Error *ErrorInfo `json:"error,omitempty"`
-	// Whether this failed turn can be resumed without adding another message.
-	Resumable *bool `json:"resumable,omitempty"`
 }
 
 // An in-progress turn — the assistant is actively streaming.

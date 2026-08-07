@@ -44,8 +44,6 @@ enum class ActionType {
     SESSION_DEFAULT_CHAT_CHANGED,
     @SerialName("chat/turnStarted")
     CHAT_TURN_STARTED,
-    @SerialName("chat/turnResumed")
-    CHAT_TURN_RESUMED,
     @SerialName("chat/delta")
     CHAT_DELTA,
     @SerialName("chat/responsePart")
@@ -327,15 +325,6 @@ data class ChatTurnStartedAction(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
-)
-
-@Serializable
-data class ChatTurnResumedAction(
-    val type: ActionType,
-    /**
-     * Identifier of the resumable failed turn.
-     */
-    val turnId: String
 )
 
 @Serializable
@@ -765,10 +754,6 @@ data class ChatErrorAction(
      * Error details
      */
     val error: ErrorInfo,
-    /**
-     * Whether the failed turn can be resumed without adding another message.
-     */
-    val resumable: Boolean? = null,
     /**
      * Additional provider-specific metadata for this action.
      *
@@ -1561,7 +1546,6 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionChatUpdated(val value: SessionChatUpdatedAction) : StateAction
 @JvmInline value class StateActionSessionDefaultChatChanged(val value: SessionDefaultChatChangedAction) : StateAction
 @JvmInline value class StateActionChatTurnStarted(val value: ChatTurnStartedAction) : StateAction
-@JvmInline value class StateActionChatTurnResumed(val value: ChatTurnResumedAction) : StateAction
 @JvmInline value class StateActionChatDelta(val value: ChatDeltaAction) : StateAction
 @JvmInline value class StateActionChatResponsePart(val value: ChatResponsePartAction) : StateAction
 @JvmInline value class StateActionChatToolCallStart(val value: ChatToolCallStartAction) : StateAction
@@ -1662,7 +1646,6 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/chatUpdated" -> StateActionSessionChatUpdated(input.json.decodeFromJsonElement(SessionChatUpdatedAction.serializer(), element))
             "session/defaultChatChanged" -> StateActionSessionDefaultChatChanged(input.json.decodeFromJsonElement(SessionDefaultChatChangedAction.serializer(), element))
             "chat/turnStarted" -> StateActionChatTurnStarted(input.json.decodeFromJsonElement(ChatTurnStartedAction.serializer(), element))
-            "chat/turnResumed" -> StateActionChatTurnResumed(input.json.decodeFromJsonElement(ChatTurnResumedAction.serializer(), element))
             "chat/delta" -> StateActionChatDelta(input.json.decodeFromJsonElement(ChatDeltaAction.serializer(), element))
             "chat/responsePart" -> StateActionChatResponsePart(input.json.decodeFromJsonElement(ChatResponsePartAction.serializer(), element))
             "chat/toolCallStart" -> StateActionChatToolCallStart(input.json.decodeFromJsonElement(ChatToolCallStartAction.serializer(), element))
@@ -1756,7 +1739,6 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionChatUpdated -> output.json.encodeToJsonElement(SessionChatUpdatedAction.serializer(), value.value)
             is StateActionSessionDefaultChatChanged -> output.json.encodeToJsonElement(SessionDefaultChatChangedAction.serializer(), value.value)
             is StateActionChatTurnStarted -> output.json.encodeToJsonElement(ChatTurnStartedAction.serializer(), value.value)
-            is StateActionChatTurnResumed -> output.json.encodeToJsonElement(ChatTurnResumedAction.serializer(), value.value)
             is StateActionChatDelta -> output.json.encodeToJsonElement(ChatDeltaAction.serializer(), value.value)
             is StateActionChatResponsePart -> output.json.encodeToJsonElement(ChatResponsePartAction.serializer(), value.value)
             is StateActionChatToolCallStart -> output.json.encodeToJsonElement(ChatToolCallStartAction.serializer(), value.value)

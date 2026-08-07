@@ -3022,10 +3022,6 @@
         "error": {
           "$ref": "#/$defs/ErrorInfo",
           "description": "Error details if state is `'error'`"
-        },
-        "resumable": {
-          "type": "boolean",
-          "description": "Whether this failed turn can be resumed without adding another message."
         }
       },
       "required": [
@@ -7183,9 +7179,6 @@
           "$ref": "#/$defs/ChatTurnStartedAction"
         },
         {
-          "$ref": "#/$defs/ChatTurnResumedAction"
-        },
-        {
           "$ref": "#/$defs/ChatDeltaAction"
         },
         {
@@ -8096,23 +8089,6 @@
         "message"
       ]
     },
-    "ChatTurnResumedAction": {
-      "type": "object",
-      "description": "Resumes a failed turn without adding another message.",
-      "properties": {
-        "type": {
-          "const": "chat/turnResumed"
-        },
-        "turnId": {
-          "type": "string",
-          "description": "Identifier of the resumable failed turn."
-        }
-      },
-      "required": [
-        "type",
-        "turnId"
-      ]
-    },
     "ChatDeltaAction": {
       "type": "object",
       "description": "Streaming text chunk from the assistant, appended to a specific response part.\n\nThe server MUST first emit a `chat/responsePart` to create the target\npart (markdown or reasoning), then use this action to append text to it.",
@@ -8579,10 +8555,6 @@
         "error": {
           "$ref": "#/$defs/ErrorInfo",
           "description": "Error details"
-        },
-        "resumable": {
-          "type": "boolean",
-          "description": "Whether the failed turn can be resumed without adding another message."
         },
         "_meta": {
           "type": "object",

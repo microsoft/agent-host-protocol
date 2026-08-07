@@ -1619,9 +1619,6 @@ pub struct Turn {
     /// Error details if state is `'error'`
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorInfo>,
-    /// Whether this failed turn can be resumed without adding another message.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resumable: Option<bool>,
 }
 
 /// An in-progress turn — the assistant is actively streaming.

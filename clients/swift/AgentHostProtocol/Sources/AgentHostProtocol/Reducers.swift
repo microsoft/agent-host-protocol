@@ -153,27 +153,6 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.status = withStatusFlag(chatSummaryStatus(next), .isRead, false)
         return next
 
-    case .chatTurnResumed(let a):
-        guard state.activeTurn == nil,
-              let turn = state.turns.last,
-              turn.id == a.turnId,
-              turn.state == .error,
-              turn.resumable == true else {
-            return state
-        }
-        var next = state
-        next.turns.removeLast()
-        next.activeTurn = ActiveTurn(
-            id: turn.id,
-            startedAt: turn.startedAt ?? state.modifiedAt,
-            message: turn.message,
-            responseParts: turn.responseParts,
-            usage: turn.usage
-        )
-        next.modifiedAt = currentTimestamp()
-        next.status = withStatusFlag(chatSummaryStatus(next), .isRead, false)
-        return next
-
     case .chatDelta(let a):
         return updateResponsePart(state: state, turnId: a.turnId, partId: a.partId) { part in
             guard case .markdown(var md) = part else { return part }
@@ -197,7 +176,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .cancelled)
 
     case .chatError(let a):
-        return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .error, terminalStatus: .error, error: a.error, resumable: a.resumable)
+        return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .error, terminalStatus: .error, error: a.error)
 
     case .chatActivityChanged(let a):
         var next = state
@@ -1070,8 +1049,7 @@ private func endTurn(
     duration: Int,
     turnState: TurnState,
     terminalStatus: SessionStatus? = nil,
-    error: ErrorInfo? = nil,
-    resumable: Bool? = nil
+    error: ErrorInfo? = nil
 ) -> ChatState {
     guard let activeTurn = state.activeTurn, activeTurn.id == turnId else {
         return state
@@ -1128,8 +1106,7 @@ private func endTurn(
         responseParts: responseParts,
         usage: activeTurn.usage,
         state: turnState,
-        error: error,
-        resumable: resumable
+        error: error
     )
 
     var next = state

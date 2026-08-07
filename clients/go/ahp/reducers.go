@@ -215,7 +215,7 @@ func touchChatModified(state *ahptypes.ChatState) {
 
 // ─── Active-turn helpers ───────────────────────────────────────────────
 
-func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState ahptypes.TurnState, terminalStatus *ahptypes.SessionStatus, errInfo *ahptypes.ErrorInfo, resumable *bool) ReduceOutcome {
+func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState ahptypes.TurnState, terminalStatus *ahptypes.SessionStatus, errInfo *ahptypes.ErrorInfo) ReduceOutcome {
 	if state.ActiveTurn == nil || state.ActiveTurn.Id != turnID {
 		return ReduceOutcomeNoOp
 	}
@@ -269,7 +269,6 @@ func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState
 		Usage:         active.Usage,
 		State:         turnState,
 		Error:         errInfo,
-		Resumable:     resumable,
 	}
 
 	state.Turns = append(state.Turns, turn)
@@ -506,8 +505,6 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	switch a := action.Value.(type) {
 	case *ahptypes.ChatTurnStartedAction:
 		return applyTurnStarted(state, a)
-	case *ahptypes.ChatTurnResumedAction:
-		return applyTurnResumed(state, a)
 	case *ahptypes.ChatDeltaAction:
 		return updateResponsePart(state, a.TurnId, a.PartId, func(p *ahptypes.ResponsePart) {
 			if m, ok := p.Value.(*ahptypes.MarkdownResponsePart); ok {
@@ -521,13 +518,13 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		state.ActiveTurn.ResponseParts = append(state.ActiveTurn.ResponseParts, a.Part)
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatTurnCompleteAction:
-		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateComplete, nil, nil, nil)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateComplete, nil, nil)
 	case *ahptypes.ChatTurnCancelledAction:
-		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateCancelled, nil, nil, nil)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateCancelled, nil, nil)
 	case *ahptypes.ChatErrorAction:
 		errCopy := a.Error
 		errStatus := ahptypes.SessionStatusError
-		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateError, &errStatus, &errCopy, a.Resumable)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateError, &errStatus, &errCopy)
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
@@ -1034,35 +1031,6 @@ func applyTurnStarted(state *ahptypes.ChatState, a *ahptypes.ChatTurnStartedActi
 			}
 		}
 	}
-	return ReduceOutcomeApplied
-}
-
-func applyTurnResumed(state *ahptypes.ChatState, a *ahptypes.ChatTurnResumedAction) ReduceOutcome {
-	if state.ActiveTurn != nil || len(state.Turns) == 0 {
-		return ReduceOutcomeNoOp
-	}
-	turnIndex := len(state.Turns) - 1
-	turn := state.Turns[turnIndex]
-	if turn.Id != a.TurnId || turn.State != ahptypes.TurnStateError ||
-		turn.Resumable == nil || !*turn.Resumable {
-		return ReduceOutcomeNoOp
-	}
-
-	startedAt := state.ModifiedAt
-	if turn.StartedAt != nil {
-		startedAt = *turn.StartedAt
-	}
-	state.Turns = state.Turns[:turnIndex]
-	state.ActiveTurn = &ahptypes.ActiveTurn{
-		Id:            turn.Id,
-		StartedAt:     startedAt,
-		Message:       turn.Message,
-		ResponseParts: turn.ResponseParts,
-		Usage:         turn.Usage,
-	}
-	state.Status = summaryStatus(state, nil)
-	state.ModifiedAt = nowISOString()
-	state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsRead, false)
 	return ReduceOutcomeApplied
 }
 

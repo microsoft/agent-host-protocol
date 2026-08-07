@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "`chat/turnResumed` and per-turn `resumable` eligibility let clients continue failed turns without adding another user message."
-}

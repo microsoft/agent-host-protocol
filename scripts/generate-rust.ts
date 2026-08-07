@@ -1217,7 +1217,6 @@ const ACTION_VARIANTS: {
   { type: 'session/chatUpdated', variantName: 'SessionChatUpdated', tsInterface: 'SessionChatUpdatedAction' },
   { type: 'session/defaultChatChanged', variantName: 'SessionDefaultChatChanged', tsInterface: 'SessionDefaultChatChangedAction' },
   { type: 'chat/turnStarted', variantName: 'ChatTurnStarted', tsInterface: 'ChatTurnStartedAction' },
-  { type: 'chat/turnResumed', variantName: 'ChatTurnResumed', tsInterface: 'ChatTurnResumedAction' },
   { type: 'chat/delta', variantName: 'ChatDelta', tsInterface: 'ChatDeltaAction' },
   { type: 'chat/responsePart', variantName: 'ChatResponsePart', tsInterface: 'ChatResponsePartAction' },
   { type: 'chat/toolCallStart', variantName: 'ChatToolCallStart', tsInterface: 'ChatToolCallStartAction' },

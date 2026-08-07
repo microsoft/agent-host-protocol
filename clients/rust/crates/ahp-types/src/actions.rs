@@ -46,8 +46,6 @@ pub enum ActionType {
     SessionDefaultChatChanged,
     #[serde(rename = "chat/turnStarted")]
     ChatTurnStarted,
-    #[serde(rename = "chat/turnResumed")]
-    ChatTurnResumed,
     #[serde(rename = "chat/delta")]
     ChatDelta,
     #[serde(rename = "chat/responsePart")]
@@ -352,14 +350,6 @@ pub struct ChatTurnStartedAction {
     /// convention.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-}
-
-/// Resumes a failed turn without adding another message.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatTurnResumedAction {
-    /// Identifier of the resumable failed turn.
-    pub turn_id: String,
 }
 
 /// Streaming text chunk from the assistant, appended to a specific response part.
@@ -773,9 +763,6 @@ pub struct ChatErrorAction {
     pub duration: i64,
     /// Error details
     pub error: ErrorInfo,
-    /// Whether the failed turn can be resumed without adding another message.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resumable: Option<bool>,
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -1812,8 +1799,6 @@ pub enum StateAction {
     SessionDefaultChatChanged(SessionDefaultChatChangedAction),
     #[serde(rename = "chat/turnStarted")]
     ChatTurnStarted(ChatTurnStartedAction),
-    #[serde(rename = "chat/turnResumed")]
-    ChatTurnResumed(ChatTurnResumedAction),
     #[serde(rename = "chat/delta")]
     ChatDelta(ChatDeltaAction),
     #[serde(rename = "chat/responsePart")]

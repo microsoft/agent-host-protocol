@@ -567,8 +567,6 @@ export interface Turn {
   state: TurnState;
   /** Error details if state is `'error'` */
   error?: ErrorInfo;
-  /** Whether this failed turn can be resumed without adding another message. */
-  resumable?: boolean;
 }
 
 /**

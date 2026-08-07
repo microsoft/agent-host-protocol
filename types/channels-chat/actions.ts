@@ -87,19 +87,6 @@ export interface ChatTurnStartedAction {
 }
 
 /**
- * Resumes a failed turn without adding another message.
- *
- * @category Chat Actions
- * @version 1
- * @clientDispatchable
- */
-export interface ChatTurnResumedAction {
-  type: ActionType.ChatTurnResumed;
-  /** Identifier of the resumable failed turn. */
-  turnId: string;
-}
-
-/**
  * Streaming text chunk from the assistant, appended to a specific response part.
  *
  * The server MUST first emit a `chat/responsePart` to create the target
@@ -503,8 +490,6 @@ export interface ChatErrorAction {
   duration: number;
   /** Error details */
   error: ErrorInfo;
-  /** Whether the failed turn can be resumed without adding another message. */
-  resumable?: boolean;
   /**
    * Additional provider-specific metadata for this action.
    *
@@ -822,7 +807,6 @@ export interface ChatInputCompletedAction {
 
 export type ChatAction =
   | ChatTurnStartedAction
-  | ChatTurnResumedAction
   | ChatDeltaAction
   | ChatResponsePartAction
   | ChatToolCallStartAction

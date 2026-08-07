@@ -1547,8 +1547,6 @@ public struct Turn: Codable, Sendable {
     public var state: TurnState
     /// Error details if state is `'error'`
     public var error: ErrorInfo?
-    /// Whether this failed turn can be resumed without adding another message.
-    public var resumable: Bool?
 
     public init(
         id: String,
@@ -1558,8 +1556,7 @@ public struct Turn: Codable, Sendable {
         responseParts: [ResponsePart],
         usage: UsageInfo? = nil,
         state: TurnState,
-        error: ErrorInfo? = nil,
-        resumable: Bool? = nil
+        error: ErrorInfo? = nil
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -1569,7 +1566,6 @@ public struct Turn: Codable, Sendable {
         self.usage = usage
         self.state = state
         self.error = error
-        self.resumable = resumable
     }
 }
 

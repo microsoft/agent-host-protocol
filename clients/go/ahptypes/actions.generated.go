@@ -28,7 +28,6 @@ const (
 	ActionTypeSessionChatUpdated                ActionType = "session/chatUpdated"
 	ActionTypeSessionDefaultChatChanged         ActionType = "session/defaultChatChanged"
 	ActionTypeChatTurnStarted                   ActionType = "chat/turnStarted"
-	ActionTypeChatTurnResumed                   ActionType = "chat/turnResumed"
 	ActionTypeChatDelta                         ActionType = "chat/delta"
 	ActionTypeChatResponsePart                  ActionType = "chat/responsePart"
 	ActionTypeChatToolCallStart                 ActionType = "chat/toolCallStart"
@@ -233,13 +232,6 @@ type ChatTurnStartedAction struct {
 	// (such as a sub-agent acting within the turn). Mirrors the MCP `_meta`
 	// convention.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-}
-
-// Resumes a failed turn without adding another message.
-type ChatTurnResumedAction struct {
-	Type ActionType `json:"type"`
-	// Identifier of the resumable failed turn.
-	TurnId string `json:"turnId"`
 }
 
 // Streaming text chunk from the assistant, appended to a specific response part.
@@ -599,8 +591,6 @@ type ChatErrorAction struct {
 	Duration int64 `json:"duration"`
 	// Error details
 	Error ErrorInfo `json:"error"`
-	// Whether the failed turn can be resumed without adding another message.
-	Resumable *bool `json:"resumable,omitempty"`
 	// Additional provider-specific metadata for this action.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -1511,7 +1501,6 @@ func (*SessionChatRemovedAction) isStateAction()                {}
 func (*SessionChatUpdatedAction) isStateAction()                {}
 func (*SessionDefaultChatChangedAction) isStateAction()         {}
 func (*ChatTurnStartedAction) isStateAction()                   {}
-func (*ChatTurnResumedAction) isStateAction()                   {}
 func (*ChatDeltaAction) isStateAction()                         {}
 func (*ChatResponsePartAction) isStateAction()                  {}
 func (*ChatToolCallStartAction) isStateAction()                 {}
@@ -1658,12 +1647,6 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/turnStarted":
 		var value ChatTurnStartedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "chat/turnResumed":
-		var value ChatTurnResumedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

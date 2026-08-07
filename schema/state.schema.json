@@ -2933,10 +2933,6 @@
         "error": {
           "$ref": "#/$defs/ErrorInfo",
           "description": "Error details if state is `'error'`"
-        },
-        "resumable": {
-          "type": "boolean",
-          "description": "Whether this failed turn can be resumed without adding another message."
         }
       },
       "required": [

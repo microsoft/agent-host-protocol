@@ -55,7 +55,7 @@ use ahp_types::actions::{
     ChatInputAnswerChangedAction, ChatToolCallAuthRequiredAction, ChatToolCallAuthResolvedAction,
     ChatToolCallCompleteAction, ChatToolCallConfirmedAction, ChatToolCallContentChangedAction,
     ChatToolCallDeltaAction, ChatToolCallReadyAction, ChatToolCallResultConfirmedAction,
-    ChatTurnResumedAction, ChatTurnStartedAction, StateAction,
+    ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
@@ -341,7 +341,6 @@ fn end_turn(
     turn_state: TurnState,
     terminal_status: Option<SessionStatus>,
     error: Option<ErrorInfo>,
-    resumable: Option<bool>,
 ) -> ReduceOutcome {
     let Some(active) = state.active_turn.as_ref() else {
         return ReduceOutcome::NoOp;
@@ -410,7 +409,6 @@ fn end_turn(
         usage: active.usage,
         state: turn_state,
         error,
-        resumable,
     };
 
     state.turns.push(turn);
@@ -957,7 +955,6 @@ fn update_mcp_server_customization_state(
 pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> ReduceOutcome {
     match action {
         StateAction::ChatTurnStarted(a) => apply_turn_started(state, a),
-        StateAction::ChatTurnResumed(a) => apply_turn_resumed(state, a),
         StateAction::ChatDelta(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
             if let ResponsePart::Markdown(m) = p {
                 m.content.push_str(&a.content);
@@ -980,14 +977,12 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             TurnState::Complete,
             None,
             None,
-            None,
         ),
         StateAction::ChatTurnCancelled(a) => end_turn(
             state,
             &a.turn_id,
             a.duration,
             TurnState::Cancelled,
-            None,
             None,
             None,
         ),
@@ -998,7 +993,6 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             TurnState::Error,
             Some(SessionStatus::Error),
             Some(a.error.clone()),
-            a.resumable,
         ),
         StateAction::ChatActivityChanged(a) => {
             state.activity = a.activity.clone();
@@ -1251,31 +1245,6 @@ fn apply_turn_started(state: &mut ChatState, a: &ChatTurnStartedAction) -> Reduc
             }
         }
     }
-    ReduceOutcome::Applied
-}
-
-fn apply_turn_resumed(state: &mut ChatState, a: &ChatTurnResumedAction) -> ReduceOutcome {
-    if state.active_turn.is_some() {
-        return ReduceOutcome::NoOp;
-    }
-    let Some(turn) = state.turns.last() else {
-        return ReduceOutcome::NoOp;
-    };
-    if turn.id != a.turn_id || turn.state != TurnState::Error || turn.resumable != Some(true) {
-        return ReduceOutcome::NoOp;
-    }
-
-    let turn = state.turns.pop().expect("last turn must exist");
-    state.active_turn = Some(ActiveTurn {
-        id: turn.id,
-        started_at: turn.started_at.unwrap_or_else(|| state.modified_at.clone()),
-        message: turn.message,
-        response_parts: turn.response_parts,
-        usage: turn.usage,
-    });
-    state.status = summary_status(state, None);
-    touch_chat_modified(state);
-    state.status = with_status_flag(state.status, SessionStatus::IsRead, false);
     ReduceOutcome::Applied
 }
 
