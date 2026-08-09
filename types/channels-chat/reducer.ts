@@ -17,6 +17,7 @@ import type {
   ConfirmationOption,
   ToolCallContributor,
   ContinuationMessage,
+  TurnError,
   TurnMessage,
 } from './state.js';
 import {
@@ -177,7 +178,7 @@ function endTurn(
   turnState: TurnState,
   duration: number,
   terminalStatus?: SessionStatus.Error,
-  error?: { errorType: string; message: string; stack?: string },
+  error?: TurnError,
 ): ChatState {
   if (!state.activeTurn || state.activeTurn.id !== turnId) {
     return state;
@@ -355,8 +356,8 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         if (
           state.activeTurn
           || !previousTurn
-          || previousTurn.id !== action.message.origin.turnId
           || previousTurn.state !== TurnState.Error
+          || previousTurn.error?.continuation !== true
           || state.turns.some(turn => turn.id === action.turnId)
           || action.message.text.length > 0
           || action.message.attachments !== undefined

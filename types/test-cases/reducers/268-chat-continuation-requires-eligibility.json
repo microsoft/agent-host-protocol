@@ -1,5 +1,5 @@
 {
-  "description": "a continuation cannot start while another turn is active",
+  "description": "a failed turn without continuation eligibility cannot be continued",
   "reducer": "chat",
   "initial": {
     "turns": [
@@ -15,33 +15,20 @@
         "usage": null,
         "state": "error",
         "error": {
-          "errorType": "runtime",
-          "message": "Something broke",
-          "continuation": true
+          "errorType": "invalidRequest",
+          "message": "The request cannot be retried"
         }
       }
     ],
-    "activeTurn": {
-      "id": "turn-2",
-      "startedAt": "1970-01-01T00:00:02.000Z",
-      "message": {
-        "text": "Other work",
-        "origin": {
-          "kind": "user"
-        }
-      },
-      "responseParts": [],
-      "usage": null
-    },
     "resource": "copilot:/test-session",
     "title": "Test Session",
-    "status": 8,
+    "status": 2,
     "modifiedAt": "1970-01-01T00:00:02.000Z"
   },
   "actions": [
     {
       "type": "chat/turnStarted",
-      "turnId": "turn-3",
+      "turnId": "turn-2",
       "startedAt": "1970-01-01T00:00:03.000Z",
       "message": {
         "text": "",
@@ -65,27 +52,14 @@
         "usage": null,
         "state": "error",
         "error": {
-          "errorType": "runtime",
-          "message": "Something broke",
-          "continuation": true
+          "errorType": "invalidRequest",
+          "message": "The request cannot be retried"
         }
       }
     ],
-    "activeTurn": {
-      "id": "turn-2",
-      "startedAt": "1970-01-01T00:00:02.000Z",
-      "message": {
-        "text": "Other work",
-        "origin": {
-          "kind": "user"
-        }
-      },
-      "responseParts": [],
-      "usage": null
-    },
     "resource": "copilot:/test-session",
     "title": "Test Session",
-    "status": 8,
+    "status": 2,
     "modifiedAt": "1970-01-01T00:00:02.000Z"
   }
 }

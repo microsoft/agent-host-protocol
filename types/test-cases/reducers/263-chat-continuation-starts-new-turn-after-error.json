@@ -24,7 +24,8 @@
         "state": "error",
         "error": {
           "errorType": "runtime",
-          "message": "Something broke"
+          "message": "Something broke",
+          "continuation": true
         }
       }
     ],
@@ -41,8 +42,7 @@
       "message": {
         "text": "",
         "origin": {
-          "kind": "continuation",
-          "turnId": "turn-1"
+          "kind": "continuation"
         }
       }
     }
@@ -70,7 +70,8 @@
         "state": "error",
         "error": {
           "errorType": "runtime",
-          "message": "Something broke"
+          "message": "Something broke",
+          "continuation": true
         }
       }
     ],
@@ -80,8 +81,7 @@
       "message": {
         "text": "",
         "origin": {
-          "kind": "continuation",
-          "turnId": "turn-1"
+          "kind": "continuation"
         }
       },
       "responseParts": [],

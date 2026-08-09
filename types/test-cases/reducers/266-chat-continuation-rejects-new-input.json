@@ -16,7 +16,8 @@
         "state": "error",
         "error": {
           "errorType": "runtime",
-          "message": "Something broke"
+          "message": "Something broke",
+          "continuation": true
         }
       }
     ],
@@ -33,8 +34,7 @@
       "message": {
         "text": "Try again",
         "origin": {
-          "kind": "continuation",
-          "turnId": "turn-1"
+          "kind": "continuation"
         }
       }
     },
@@ -45,8 +45,7 @@
       "message": {
         "text": "",
         "origin": {
-          "kind": "continuation",
-          "turnId": "turn-1"
+          "kind": "continuation"
         },
         "attachments": []
       }
@@ -58,8 +57,7 @@
       "message": {
         "text": "",
         "origin": {
-          "kind": "continuation",
-          "turnId": "turn-1"
+          "kind": "continuation"
         }
       },
       "queuedMessageId": "queued-1"
@@ -71,8 +69,7 @@
       "message": {
         "text": "",
         "origin": {
-          "kind": "continuation",
-          "turnId": "turn-1"
+          "kind": "continuation"
         }
       }
     }
@@ -92,7 +89,8 @@
         "state": "error",
         "error": {
           "errorType": "runtime",
-          "message": "Something broke"
+          "message": "Something broke",
+          "continuation": true
         }
       }
     ],

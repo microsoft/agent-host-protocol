@@ -523,6 +523,20 @@ export const enum TurnState {
 }
 
 /**
+ * Error details for a failed turn.
+ *
+ * When {@link continuation} is present, a client may start a new adjacent turn
+ * with a {@link ContinuationMessage}. The continuation proceeds from the
+ * failed turn without adding user input or changing the failed turn.
+ *
+ * @category Turn Types
+ */
+export interface TurnError extends ErrorInfo {
+  /** Whether the latest failed turn may be continued. */
+  continuation?: true;
+}
+
+/**
  * Discriminant for {@link MessageAttachment} variants.
  *
  * @category Turn Types
@@ -566,7 +580,7 @@ export interface Turn {
   /** How the turn ended */
   state: TurnState;
   /** Error details if state is `'error'` */
-  error?: ErrorInfo;
+  error?: TurnError;
 }
 
 /**
@@ -633,20 +647,17 @@ export interface ActorMessageOrigin {
 }
 
 /**
- * Identifies a message that starts a new turn as a continuation of a preceding
- * failed turn.
+ * Identifies a message that starts a new turn as a continuation of the
+ * immediately preceding failed turn.
  *
- * Continuation messages carry no new user input: {@link Message.text} MUST be
- * empty and {@link Message.attachments} MUST be absent. The referenced turn
- * remains unchanged in history.
+ * Continuation messages carry no new user input: their text is empty and they
+ * have no attachments. The preceding turn remains unchanged in history.
  *
  * @category Turn Types
  */
 export interface ContinuationMessageOrigin {
   /** Discriminant */
   kind: MessageKind.Continuation;
-  /** Identifier of the failed turn being continued. */
-  turnId: string;
 }
 
 /**

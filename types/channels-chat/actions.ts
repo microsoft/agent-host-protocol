@@ -5,7 +5,7 @@
  */
 
 import { ActionType } from '../common/actions.js';
-import type { StringOrMarkdown, ErrorInfo, FileEdit, UsageInfo, URI } from '../common/state.js';
+import type { StringOrMarkdown, FileEdit, UsageInfo, URI } from '../common/state.js';
 import type { McpAuthRequirement } from '../channels-session/state.js';
 import type {
   Message,
@@ -20,6 +20,7 @@ import type {
   ToolCallRiskAssessment,
   ToolInput,
   Turn,
+  TurnError,
   TurnMessage,
 } from './state.js';
 import {
@@ -492,8 +493,8 @@ export interface ChatErrorAction {
    * data.
    */
   duration: number;
-  /** Error details */
-  error: ErrorInfo;
+  /** Error details and optional continuation eligibility. */
+  error: TurnError;
   /**
    * Additional provider-specific metadata for this action.
    *
