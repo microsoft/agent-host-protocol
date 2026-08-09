@@ -20,6 +20,7 @@ import type {
   ToolCallRiskAssessment,
   ToolInput,
   Turn,
+  TurnMessage,
 } from './state.js';
 import {
   ToolCallConfirmationReason,
@@ -56,9 +57,12 @@ interface ToolCallActionBase {
 // ─── Chat Actions ───────────────────────────────────────────────────────────
 
 /**
- * A new message has been sent to the agent, and a new turn starts.
+ * A new turn starts from a user message or continuation.
  *
- * A client is only allowed to send {@link MessageKind.User} messages.
+ * A client may start a turn with a {@link MessageKind.User} message, or
+ * continue the latest failed turn with a {@link MessageKind.Continuation}
+ * message. A continuation starts a new turn and leaves the failed turn
+ * unchanged in history.
  *
  * @category Chat Actions
  * @version 1
@@ -70,8 +74,8 @@ export interface ChatTurnStartedAction {
   turnId: string;
   /** ISO 8601 timestamp when this turn started. */
   startedAt: string;
-  /** The new message */
-  message: Message;
+  /** The message that initiates the turn. */
+  message: TurnMessage;
   /** If this turn was auto-started from a queued message, the ID of that message */
   queuedMessageId?: string;
   /**

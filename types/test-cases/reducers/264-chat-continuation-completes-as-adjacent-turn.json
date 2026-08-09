@@ -1,0 +1,103 @@
+{
+  "description": "a continuation completes as a distinct turn adjacent to the failed source turn",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "Fix the bug",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "Something broke"
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 2,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-2",
+      "startedAt": "1970-01-01T00:00:03.000Z",
+      "message": {
+        "text": "",
+        "origin": {
+          "kind": "continuation",
+          "turnId": "turn-1"
+        }
+      }
+    },
+    {
+      "type": "chat/responsePart",
+      "turnId": "turn-2",
+      "part": {
+        "kind": "markdown",
+        "id": "markdown-2",
+        "content": "Recovered"
+      }
+    },
+    {
+      "type": "chat/turnComplete",
+      "turnId": "turn-2",
+      "duration": 2000
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "Fix the bug",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "Something broke"
+        }
+      },
+      {
+        "id": "turn-2",
+        "startedAt": "1970-01-01T00:00:03.000Z",
+        "duration": 2000,
+        "message": {
+          "text": "",
+          "origin": {
+            "kind": "continuation",
+            "turnId": "turn-1"
+          }
+        },
+        "responseParts": [
+          {
+            "kind": "markdown",
+            "id": "markdown-2",
+            "content": "Recovered"
+          }
+        ],
+        "usage": null,
+        "state": "complete",
+        "error": null
+      }
+    ],
+    "activeTurn": null,
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:09.999Z"
+  }
+}
