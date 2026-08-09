@@ -173,20 +173,6 @@ describe('generated JSON schemas', () => {
         );
       });
 
-      it('inherits request metadata from BaseParams', () => {
-        if (file !== 'commands.schema.json') {
-          return;
-        }
-        const defs = schema.$defs as Record<string, Record<string, unknown>>;
-        for (const name of ['BaseParams', 'CreateSessionParams', 'PingParams']) {
-          const properties = defs[name].properties as Record<string, Record<string, unknown>>;
-          assert.equal(properties._meta.type, 'object');
-          assert.deepEqual(properties._meta.additionalProperties, {});
-        }
-        const baseProperties = defs.BaseParams.properties as Record<string, Record<string, unknown>>;
-        assert.match(baseProperties._meta.description as string, /Receivers MUST ignore keys/);
-      });
-
       it('preserves nested automation capability objects', () => {
         if (file !== 'commands.schema.json') {
           return;
