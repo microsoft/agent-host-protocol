@@ -7294,6 +7294,11 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "limit": {
           "type": "number",
           "description": "Maximum number of entries to return in this page. The server SHOULD respect\nthis bound but MAY return fewer entries and MAY impose its own upper cap.\nOmit to let the server choose the page size."
@@ -7337,6 +7342,11 @@
             "ahp-root://"
           ]
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "provider": {
           "type": "string"
         },
@@ -7374,6 +7384,11 @@
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "definition": {
           "$ref": "#/$defs/AutomationDefinition"
@@ -7436,6 +7451,11 @@
         "channel": {
           "$ref": "#/$defs/URI"
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "expectedRevision": {
           "type": "number"
         },
@@ -7455,6 +7475,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Channel URI this command targets."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         }
       },
       "required": [
@@ -7467,6 +7492,11 @@
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Channel URI this command targets."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "requestId": {
           "type": "string"
@@ -7495,6 +7525,11 @@
           "$ref": "#/$defs/URI",
           "description": "Channel URI this command targets."
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
         "cursor": {
           "type": "string"
         }
@@ -7515,6 +7550,11 @@
           "enum": [
             "ahp-root://"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
         },
         "schedule": {
           "$ref": "#/$defs/AutomationSchedule"

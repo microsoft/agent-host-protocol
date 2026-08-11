@@ -1545,6 +1545,12 @@ data class ListAutomationsParams(
      */
     val channel: String,
     /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Maximum number of entries to return in this page. The server SHOULD respect
      * this bound but MAY return fewer entries and MAY impose its own upper cap.
      * Omit to let the server choose the page size.
@@ -1577,6 +1583,12 @@ data class ListAutomationTriggerDefinitionsParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     val provider: String? = null,
     val workingDirectories: List<String>? = null,
     val sessionConfig: Map<String, JsonElement>? = null
@@ -1593,6 +1605,12 @@ data class CreateAutomationParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     val definition: AutomationDefinition,
     @SerialName("import")
     val `import`: JsonElement? = null
@@ -1615,6 +1633,12 @@ data class UpdateAutomationParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     val expectedRevision: Long,
     val changes: AutomationDefinitionPatch
 )
@@ -1624,7 +1648,13 @@ data class DisposeAutomationParams(
     /**
      * Channel URI this command targets.
      */
-    val channel: String
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -1633,6 +1663,12 @@ data class RunAutomationParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     val requestId: String
 )
 
@@ -1647,6 +1683,12 @@ data class FetchAutomationRunsParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     val cursor: String? = null
 )
 
@@ -1659,6 +1701,12 @@ data class PreviewAutomationScheduleParams(
      * Channel URI this command targets.
      */
     val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
     val schedule: AutomationSchedule,
     val count: Long? = null
 )

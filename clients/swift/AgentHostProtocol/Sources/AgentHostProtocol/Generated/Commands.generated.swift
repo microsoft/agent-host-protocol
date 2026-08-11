@@ -1912,6 +1912,9 @@ public struct ChangesetOperationFollowUp: Codable, Sendable {
 public struct ListAutomationsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     /// Maximum number of entries to return in this page. The server SHOULD respect
     /// this bound but MAY return fewer entries and MAY impose its own upper cap.
     /// Omit to let the server choose the page size.
@@ -1923,13 +1926,23 @@ public struct ListAutomationsParams: Codable, Sendable {
     public var cursor: String?
     public var enabled: Bool?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case limit
+        case cursor
+        case enabled
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         limit: Int? = nil,
         cursor: String? = nil,
         enabled: Bool? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.limit = limit
         self.cursor = cursor
         self.enabled = enabled
@@ -1955,17 +1968,30 @@ public struct ListAutomationsResult: Codable, Sendable {
 public struct ListAutomationTriggerDefinitionsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     public var provider: String?
     public var workingDirectories: [String]?
     public var sessionConfig: [String: AnyCodable]?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case provider
+        case workingDirectories
+        case sessionConfig
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectories: [String]? = nil,
         sessionConfig: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.provider = provider
         self.workingDirectories = workingDirectories
         self.sessionConfig = sessionConfig
@@ -1985,21 +2011,27 @@ public struct ListAutomationTriggerDefinitionsResult: Codable, Sendable {
 public struct CreateAutomationParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     public var definition: AutomationDefinition
     public var `import`: AnyCodable?
 
     enum CodingKeys: String, CodingKey {
         case channel
+        case meta = "_meta"
         case definition
         case `import` = "import"
     }
 
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         definition: AutomationDefinition,
         `import`: AnyCodable? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.definition = definition
         self.`import` = `import`
     }
@@ -2042,15 +2074,27 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
 public struct UpdateAutomationParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     public var expectedRevision: Int
     public var changes: AutomationDefinitionPatch
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case expectedRevision
+        case changes
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         expectedRevision: Int,
         changes: AutomationDefinitionPatch
     ) {
         self.channel = channel
+        self.meta = meta
         self.expectedRevision = expectedRevision
         self.changes = changes
     }
@@ -2059,24 +2103,45 @@ public struct UpdateAutomationParams: Codable, Sendable {
 public struct DisposeAutomationParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
 
     public init(
-        channel: String
+        channel: String,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
+        self.meta = meta
     }
 }
 
 public struct RunAutomationParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     public var requestId: String
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case requestId
+    }
 
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         requestId: String
     ) {
         self.channel = channel
+        self.meta = meta
         self.requestId = requestId
     }
 }
@@ -2094,13 +2159,24 @@ public struct RunAutomationResult: Codable, Sendable {
 public struct FetchAutomationRunsParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     public var cursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case cursor
+    }
 
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         cursor: String? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.cursor = cursor
     }
 }
@@ -2116,15 +2192,27 @@ public struct FetchAutomationRunsResult: Codable, Sendable {
 public struct PreviewAutomationScheduleParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
     public var schedule: AutomationSchedule
     public var count: Int?
 
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case schedule
+        case count
+    }
+
     public init(
         channel: String,
+        meta: [String: AnyCodable]? = nil,
         schedule: AutomationSchedule,
         count: Int? = nil
     ) {
         self.channel = channel
+        self.meta = meta
         self.schedule = schedule
         self.count = count
     }

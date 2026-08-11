@@ -1488,6 +1488,10 @@ pub struct ChangesetOperationFollowUp {
 pub struct ListAutomationsParams {
     /// Channel URI this command targets.
     pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Maximum number of entries to return in this page. The server SHOULD respect
     /// this bound but MAY return fewer entries and MAY impose its own upper cap.
     /// Omit to let the server choose the page size.
@@ -1519,6 +1523,10 @@ pub struct ListAutomationsResult {
 pub struct ListAutomationTriggerDefinitionsParams {
     /// Channel URI this command targets.
     pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1538,6 +1546,10 @@ pub struct ListAutomationTriggerDefinitionsResult {
 pub struct CreateAutomationParams {
     /// Channel URI this command targets.
     pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     pub definition: AutomationDefinition,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub import: Option<AnyValue>,
@@ -1565,6 +1577,10 @@ pub struct AutomationDefinitionPatch {
 pub struct UpdateAutomationParams {
     /// Channel URI this command targets.
     pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     pub expected_revision: i64,
     pub changes: AutomationDefinitionPatch,
 }
@@ -1574,6 +1590,10 @@ pub struct UpdateAutomationParams {
 pub struct DisposeAutomationParams {
     /// Channel URI this command targets.
     pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1581,6 +1601,10 @@ pub struct DisposeAutomationParams {
 pub struct RunAutomationParams {
     /// Channel URI this command targets.
     pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     pub request_id: String,
 }
 
@@ -1595,6 +1619,10 @@ pub struct RunAutomationResult {
 pub struct FetchAutomationRunsParams {
     /// Channel URI this command targets.
     pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,
 }
@@ -1608,6 +1636,10 @@ pub struct FetchAutomationRunsResult {}
 pub struct PreviewAutomationScheduleParams {
     /// Channel URI this command targets.
     pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     pub schedule: AutomationSchedule,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<i64>,

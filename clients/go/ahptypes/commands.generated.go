@@ -1214,6 +1214,9 @@ type ChangesetOperationFollowUp struct {
 type ListAutomationsParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Maximum number of entries to return in this page. The server SHOULD respect
 	// this bound but MAY return fewer entries and MAY impose its own upper cap.
 	// Omit to let the server choose the page size.
@@ -1236,7 +1239,10 @@ type ListAutomationsResult struct {
 
 type ListAutomationTriggerDefinitionsParams struct {
 	// Channel URI this command targets.
-	Channel            URI                        `json:"channel"`
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta               map[string]json.RawMessage `json:"_meta,omitempty"`
 	Provider           *string                    `json:"provider,omitempty"`
 	WorkingDirectories []URI                      `json:"workingDirectories,omitempty"`
 	SessionConfig      map[string]json.RawMessage `json:"sessionConfig,omitempty"`
@@ -1248,9 +1254,12 @@ type ListAutomationTriggerDefinitionsResult struct {
 
 type CreateAutomationParams struct {
 	// Channel URI this command targets.
-	Channel    URI                  `json:"channel"`
-	Definition AutomationDefinition `json:"definition"`
-	Import     *json.RawMessage     `json:"import,omitempty"`
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta       map[string]json.RawMessage `json:"_meta,omitempty"`
+	Definition AutomationDefinition       `json:"definition"`
+	Import     *json.RawMessage           `json:"import,omitempty"`
 }
 
 type AutomationDefinitionPatch struct {
@@ -1264,20 +1273,29 @@ type AutomationDefinitionPatch struct {
 
 type UpdateAutomationParams struct {
 	// Channel URI this command targets.
-	Channel          URI                       `json:"channel"`
-	ExpectedRevision int64                     `json:"expectedRevision"`
-	Changes          AutomationDefinitionPatch `json:"changes"`
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta             map[string]json.RawMessage `json:"_meta,omitempty"`
+	ExpectedRevision int64                      `json:"expectedRevision"`
+	Changes          AutomationDefinitionPatch  `json:"changes"`
 }
 
 type DisposeAutomationParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 type RunAutomationParams struct {
 	// Channel URI this command targets.
-	Channel   URI    `json:"channel"`
-	RequestId string `json:"requestId"`
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta      map[string]json.RawMessage `json:"_meta,omitempty"`
+	RequestId string                     `json:"requestId"`
 }
 
 type RunAutomationResult struct {
@@ -1286,8 +1304,11 @@ type RunAutomationResult struct {
 
 type FetchAutomationRunsParams struct {
 	// Channel URI this command targets.
-	Channel URI     `json:"channel"`
-	Cursor  *string `json:"cursor,omitempty"`
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta   map[string]json.RawMessage `json:"_meta,omitempty"`
+	Cursor *string                    `json:"cursor,omitempty"`
 }
 
 type FetchAutomationRunsResult struct {
@@ -1295,9 +1316,12 @@ type FetchAutomationRunsResult struct {
 
 type PreviewAutomationScheduleParams struct {
 	// Channel URI this command targets.
-	Channel  URI                `json:"channel"`
-	Schedule AutomationSchedule `json:"schedule"`
-	Count    *int64             `json:"count,omitempty"`
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta     map[string]json.RawMessage `json:"_meta,omitempty"`
+	Schedule AutomationSchedule         `json:"schedule"`
+	Count    *int64                     `json:"count,omitempty"`
 }
 
 type PreviewAutomationScheduleResult struct {
