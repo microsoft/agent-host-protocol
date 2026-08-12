@@ -30,7 +30,12 @@
     {
       "type": "session/customizationToggled",
       "id": "does-not-exist",
-      "enabled": false
+      "enablement": [
+        {
+          "kind": "session",
+          "enabled": false
+        }
+      ]
     }
   ],
   "expected": {

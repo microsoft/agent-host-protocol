@@ -47,7 +47,12 @@
     {
       "type": "session/customizationToggled",
       "id": "skill-1",
-      "enabled": false
+      "enablement": [
+        {
+          "kind": "session",
+          "enabled": false
+        }
+      ]
     }
   ],
   "expected": {
@@ -79,6 +84,12 @@
             "uri": "https://plugins.example/a#skills/lint",
             "name": "lint",
             "enabled": false,
+            "enablement": [
+              {
+                "kind": "session",
+                "enabled": false
+              }
+            ],
             "disableUserInvocation": true
           },
           {

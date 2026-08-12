@@ -609,7 +609,7 @@ const STATE_ENUMS = [
   'ToolCallRiskAssessmentStatus',
   'ToolCallCancellationReason', 'ConfirmationOptionKind',
   'ToolCallContributorKind',
-  'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
+  'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
 ];
@@ -1151,6 +1151,10 @@ function generateStateFile(project: Project): string {
     }
   }
 
+  lines.push('// MARK: - Customization Enablement Union\n');
+  lines.push(generateCustomizationEnablementSwift());
+  lines.push('');
+
   lines.push('// MARK: - Tool Input\n');
   lines.push(generateToolInput());
   lines.push('');
@@ -1557,6 +1561,70 @@ function generateCommandsFile(project: Project): string {
   lines.push('');
 
   return lines.join('\n');
+}
+
+function generateCustomizationEnablementSwift(): string {
+  return `/// A single explicit customization enablement decision.
+public enum CustomizationEnablement: Codable, Sendable {
+    case global(CustomizationEnablementGlobal)
+    case workspace(CustomizationEnablementWorkspace)
+    case session(CustomizationEnablementSession)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case kind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        switch try container.decode(String.self, forKey: .kind) {
+        case "global":
+            self = .global(try CustomizationEnablementGlobal(from: decoder))
+        case "workspace":
+            self = .workspace(try CustomizationEnablementWorkspace(from: decoder))
+        case "session":
+            self = .session(try CustomizationEnablementSession(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: "Unknown CustomizationEnablement kind")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .global(let value): try value.encode(to: encoder)
+        case .workspace(let value): try value.encode(to: encoder)
+        case .session(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public struct CustomizationEnablementGlobal: Codable, Sendable {
+    public var kind: String = "global"
+    public var enabled: Bool
+
+    public init(enabled: Bool) {
+        self.enabled = enabled
+    }
+}
+
+public struct CustomizationEnablementWorkspace: Codable, Sendable {
+    public var kind: String = "workspace"
+    public var uri: URI
+    public var enabled: Bool
+
+    public init(uri: URI, enabled: Bool) {
+        self.uri = uri
+        self.enabled = enabled
+    }
+}
+
+public struct CustomizationEnablementSession: Codable, Sendable {
+    public var kind: String = "session"
+    public var enabled: Bool
+
+    public init(enabled: Bool) {
+        self.enabled = enabled
+    }
+}`;
 }
 
 function generateChangesetOperationTargetSwift(): string {
@@ -2139,6 +2207,7 @@ function checkExhaustiveness(project: Project): void {
     'ForkChatSource',               // generateFixedChatSourceBranchSwift()
     'SideChatSource',               // generateFixedChatSourceBranchSwift()
     'ChangesetOperationTarget',     // TS discriminated union; consumers should add a Swift case-iterable enum
+    'CustomizationEnablement',      // generateCustomizationEnablementSwift()
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));
