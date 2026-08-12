@@ -1759,74 +1759,134 @@ pub struct ResourceWatchChangedAction {
     pub changes: AnyValue,
 }
 
+/// Replace the editable definition after a successful `updateAutomation` or
+/// another host-authorized definition change.
+///
+/// Full replacement semantics apply to `definition`. The reducer also replaces
+/// the revision and modification timestamp. Omitting `nextRunAt` clears the
+/// previously projected next occurrence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationDefinitionChangedAction {
+    /// Complete replacement definition.
     pub definition: AutomationDefinition,
+    /// New monotonic revision.
     pub revision: i64,
+    /// Definition modification timestamp in ISO 8601 format.
     pub modified_at: String,
+    /// Earliest known future scheduled occurrence, or omitted to clear it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
 }
 
+/// Upsert one run summary in the retained history.
+///
+/// Existing entries are replaced by {@link AutomationRunSummary.resource}. A
+/// previously unseen run is inserted at the front because history is
+/// newest-first.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunSummarySetAction {
+    /// New or replacement run summary.
     pub run: AutomationRunSummary,
 }
 
+/// Remove one retained run summary by its automation-run URI.
+///
+/// The action is a no-op when the URI is not present in the current history
+/// window.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunSummaryRemovedAction {
+    /// {@link AutomationRunSummary.resource} to remove.
     pub run: Uri,
 }
 
+/// Append an older page of run summaries returned by
+/// `fetchAutomationRuns`.
+///
+/// Entries already present by resource URI are ignored, preserving the
+/// newest-first ordering of the existing history followed by the fetched page.
+/// Omitting `nextCursor` marks the end of retained history.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunsLoadedAction {
+    /// Older run summaries in newest-first order within this page.
     pub runs: Vec<AutomationRunSummary>,
+    /// Opaque cursor for the next older page, or omitted at the end.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_cursor: Option<String>,
 }
 
+/// Replace the run lifecycle and currently allowed operations atomically.
+///
+/// The host dispatches this action for every lifecycle transition. Terminal
+/// lifecycles normally carry an empty operations list.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunLifecycleChangedAction {
+    /// Complete replacement lifecycle.
     pub lifecycle: AutomationRunLifecycle,
+    /// Complete replacement operation list.
     pub operations: Vec<AutomationRunOperation>,
 }
 
+/// Add a session to the run's ordered session catalogue.
+///
+/// Session URIs are unique. Setting an existing URI is a no-op.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunSessionSetAction {
+    /// Session URI to append when it is not already linked.
     pub session: Uri,
 }
 
+/// Remove a linked session from the run.
+///
+/// Removing the current primary session also clears
+/// {@link AutomationRunState.primarySession}. An unknown URI is a no-op.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunSessionRemovedAction {
+    /// Linked session URI to remove.
     pub session: Uri,
 }
 
+/// Select or clear the session clients should open first for this run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunPrimarySessionChangedAction {
+    /// New primary linked session, or omitted to clear the selection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_session: Option<Uri>,
 }
 
+/// Upsert a run-scoped artifact by {@link AutomationRunArtifact.id}.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunArtifactSetAction {
+    /// New or replacement artifact.
     pub artifact: AutomationRunArtifact,
 }
 
+/// Remove a run-scoped artifact by id.
+///
+/// The action is a no-op when the id is not present.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunArtifactRemovedAction {
+    /// {@link AutomationRunArtifact.id} to remove.
     pub artifact_id: String,
 }
 
+/// Ask the host to cancel this run.
+///
+/// This is the only client-dispatchable automation-run action. It is a
+/// side-effect request and deliberately leaves optimistic state unchanged. The
+/// authoritative outcome arrives later through
+/// {@link AutomationRunLifecycleChangedAction}: cancellation may transition to
+/// `cancelled`, or the run may complete or fail before cancellation takes
+/// effect.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunCancelRequestedAction {}

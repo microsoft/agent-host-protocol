@@ -18,8 +18,9 @@ revision ordering, trigger evaluation, run claims, and run history.
 host-computed next scheduled run, a newest-first window of
 `AutomationRunSummary` entries, and allowed operations.
 
-An empty trigger list means manual-only. Schedule triggers are typed; event
-triggers use a host-defined type plus schema-defined configuration returned by
+An empty trigger list means manual-only. Schedule triggers use the portable
+five-field AHP cron format plus an IANA time zone. Event triggers use a
+host-defined type plus schema-defined configuration returned by
 `listAutomationTriggerDefinitions`.
 
 The session template can select a provider, model, and custom agent, and carries
@@ -59,7 +60,14 @@ The host sequences all actions. Automation actions are server-originated.
 
 ## Scheduling
 
-Scheduling belongs to the host. Calendar schedules persist an IANA time zone.
+Scheduling belongs to the host. A schedule contains exactly five cron fields
+(`minute hour day-of-month month day-of-week`) and an IANA time zone. The
+portable grammar supports wildcards, values, inclusive ranges,
+comma-separated lists, and steps over wildcards or ranges. It does not support
+seconds, years, macros, or Quartz extensions. See the
+[Automations guide](/guide/automations#scheduled-triggers) for the complete
+grammar and day-field semantics.
+
 `enabled` controls automatic triggers only; manual runs remain available when
 the operation is advertised. A host atomically associates a scheduled
 occurrence with at most one run.

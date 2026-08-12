@@ -85,18 +85,33 @@ type SessionSummaryChangedParams struct {
 	Changes PartialSessionSummary `json:"changes"`
 }
 
+// Announces a newly visible automation catalogue entry.
+//
+// Root notifications are live signals and are not replayed after reconnect.
+// Clients that reconnect MUST refresh the catalogue with `listAutomations`.
 type AutomationAddedParams struct {
-	Channel URI               `json:"channel"`
+	// Root channel URI.
+	Channel URI `json:"channel"`
+	// Complete summary for the newly visible automation.
 	Summary AutomationSummary `json:"summary"`
 }
 
+// Announces that an automation is no longer present in the root catalogue.
 type AutomationRemovedParams struct {
-	Channel    URI `json:"channel"`
+	// Root channel URI.
+	Channel URI `json:"channel"`
+	// Removed `ahp-automation:` URI.
 	Automation URI `json:"automation"`
 }
 
+// Replaces the root-catalogue summary for an existing automation.
+//
+// Full replacement semantics apply to `summary`; this is not a patch. The
+// corresponding subscribed automation channel remains authoritative.
 type AutomationSummaryChangedParams struct {
-	Channel URI               `json:"channel"`
+	// Root channel URI.
+	Channel URI `json:"channel"`
+	// Complete replacement catalogue summary.
 	Summary AutomationSummary `json:"summary"`
 }
 

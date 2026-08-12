@@ -173,18 +173,14 @@ describe('generated JSON schemas', () => {
         );
       });
 
-      it('preserves nested automation capability objects', () => {
+      it('preserves automation schedule restrictions', () => {
         if (file !== 'commands.schema.json') {
           return;
         }
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const schedules = defs.AutomationScheduleCapabilities;
         const properties = schedules.properties as Record<string, Record<string, unknown>>;
-        assert.deepEqual(properties.cron.$ref, '#/$defs/AutomationCronScheduleCapability');
-        const cron = defs.AutomationCronScheduleCapability;
-        const cronProperties = cron.properties as Record<string, Record<string, unknown>>;
-        assert.deepEqual(cronProperties.dialect.enum, ['unix5']);
-        assert.equal(cronProperties.minIntervalMinutes.type, 'number');
+        assert.equal(properties.minIntervalMinutes.type, 'number');
       });
 
       it('constrains every ChatOrigin branch to a distinct kind', () => {

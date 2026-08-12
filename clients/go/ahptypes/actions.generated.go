@@ -1491,61 +1491,121 @@ type ResourceWatchChangedAction struct {
 	Changes json.RawMessage `json:"changes"`
 }
 
+// Replace the editable definition after a successful `updateAutomation` or
+// another host-authorized definition change.
+//
+// Full replacement semantics apply to `definition`. The reducer also replaces
+// the revision and modification timestamp. Omitting `nextRunAt` clears the
+// previously projected next occurrence.
 type AutomationDefinitionChangedAction struct {
-	Type       ActionType           `json:"type"`
+	Type ActionType `json:"type"`
+	// Complete replacement definition.
 	Definition AutomationDefinition `json:"definition"`
-	Revision   int64                `json:"revision"`
-	ModifiedAt string               `json:"modifiedAt"`
-	NextRunAt  *string              `json:"nextRunAt,omitempty"`
+	// New monotonic revision.
+	Revision int64 `json:"revision"`
+	// Definition modification timestamp in ISO 8601 format.
+	ModifiedAt string `json:"modifiedAt"`
+	// Earliest known future scheduled occurrence, or omitted to clear it.
+	NextRunAt *string `json:"nextRunAt,omitempty"`
 }
 
+// Upsert one run summary in the retained history.
+//
+// Existing entries are replaced by {@link AutomationRunSummary.resource}. A
+// previously unseen run is inserted at the front because history is
+// newest-first.
 type AutomationRunSummarySetAction struct {
-	Type ActionType           `json:"type"`
-	Run  AutomationRunSummary `json:"run"`
+	Type ActionType `json:"type"`
+	// New or replacement run summary.
+	Run AutomationRunSummary `json:"run"`
 }
 
+// Remove one retained run summary by its automation-run URI.
+//
+// The action is a no-op when the URI is not present in the current history
+// window.
 type AutomationRunSummaryRemovedAction struct {
 	Type ActionType `json:"type"`
-	Run  URI        `json:"run"`
+	// {@link AutomationRunSummary.resource} to remove.
+	Run URI `json:"run"`
 }
 
+// Append an older page of run summaries returned by
+// `fetchAutomationRuns`.
+//
+// Entries already present by resource URI are ignored, preserving the
+// newest-first ordering of the existing history followed by the fetched page.
+// Omitting `nextCursor` marks the end of retained history.
 type AutomationRunsLoadedAction struct {
-	Type       ActionType             `json:"type"`
-	Runs       []AutomationRunSummary `json:"runs"`
-	NextCursor *string                `json:"nextCursor,omitempty"`
+	Type ActionType `json:"type"`
+	// Older run summaries in newest-first order within this page.
+	Runs []AutomationRunSummary `json:"runs"`
+	// Opaque cursor for the next older page, or omitted at the end.
+	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+// Replace the run lifecycle and currently allowed operations atomically.
+//
+// The host dispatches this action for every lifecycle transition. Terminal
+// lifecycles normally carry an empty operations list.
 type AutomationRunLifecycleChangedAction struct {
-	Type       ActionType               `json:"type"`
-	Lifecycle  AutomationRunLifecycle   `json:"lifecycle"`
+	Type ActionType `json:"type"`
+	// Complete replacement lifecycle.
+	Lifecycle AutomationRunLifecycle `json:"lifecycle"`
+	// Complete replacement operation list.
 	Operations []AutomationRunOperation `json:"operations"`
 }
 
+// Add a session to the run's ordered session catalogue.
+//
+// Session URIs are unique. Setting an existing URI is a no-op.
 type AutomationRunSessionSetAction struct {
-	Type    ActionType `json:"type"`
-	Session URI        `json:"session"`
+	Type ActionType `json:"type"`
+	// Session URI to append when it is not already linked.
+	Session URI `json:"session"`
 }
 
+// Remove a linked session from the run.
+//
+// Removing the current primary session also clears
+// {@link AutomationRunState.primarySession}. An unknown URI is a no-op.
 type AutomationRunSessionRemovedAction struct {
-	Type    ActionType `json:"type"`
-	Session URI        `json:"session"`
+	Type ActionType `json:"type"`
+	// Linked session URI to remove.
+	Session URI `json:"session"`
 }
 
+// Select or clear the session clients should open first for this run.
 type AutomationRunPrimarySessionChangedAction struct {
-	Type           ActionType `json:"type"`
-	PrimarySession *URI       `json:"primarySession,omitempty"`
+	Type ActionType `json:"type"`
+	// New primary linked session, or omitted to clear the selection.
+	PrimarySession *URI `json:"primarySession,omitempty"`
 }
 
+// Upsert a run-scoped artifact by {@link AutomationRunArtifact.id}.
 type AutomationRunArtifactSetAction struct {
-	Type     ActionType            `json:"type"`
+	Type ActionType `json:"type"`
+	// New or replacement artifact.
 	Artifact AutomationRunArtifact `json:"artifact"`
 }
 
+// Remove a run-scoped artifact by id.
+//
+// The action is a no-op when the id is not present.
 type AutomationRunArtifactRemovedAction struct {
-	Type       ActionType `json:"type"`
-	ArtifactId string     `json:"artifactId"`
+	Type ActionType `json:"type"`
+	// {@link AutomationRunArtifact.id} to remove.
+	ArtifactId string `json:"artifactId"`
 }
 
+// Ask the host to cancel this run.
+//
+// This is the only client-dispatchable automation-run action. It is a
+// side-effect request and deliberately leaves optimistic state unchanged. The
+// authoritative outcome arrives later through
+// {@link AutomationRunLifecycleChangedAction}: cancellation may transition to
+// `cancelled`, or the run may complete or fail before cancellation takes
+// effect.
 type AutomationRunCancelRequestedAction struct {
 	Type ActionType `json:"type"`
 }

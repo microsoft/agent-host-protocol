@@ -86,19 +86,37 @@ data class SessionSummaryChangedParams(
 
 @Serializable
 data class AutomationAddedParams(
+    /**
+     * Root channel URI.
+     */
     val channel: String,
+    /**
+     * Complete summary for the newly visible automation.
+     */
     val summary: AutomationSummary
 )
 
 @Serializable
 data class AutomationRemovedParams(
+    /**
+     * Root channel URI.
+     */
     val channel: String,
+    /**
+     * Removed `ahp-automation:` URI.
+     */
     val automation: String
 )
 
 @Serializable
 data class AutomationSummaryChangedParams(
+    /**
+     * Root channel URI.
+     */
     val channel: String,
+    /**
+     * Complete replacement catalogue summary.
+     */
     val summary: AutomationSummary
 )
 

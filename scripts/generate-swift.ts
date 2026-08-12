@@ -622,8 +622,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
-  'AutomationOperation', 'AutomationExecutionLifetime', 'AutomationScheduleKind',
-  'AutomationWeekday', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationOperation', 'AutomationExecutionLifetime', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
   'AutomationRunOperation',
 ];
@@ -681,9 +680,7 @@ const STATE_STRUCTS = [
   'AnnotationsSummary', 'AnnotationsState', 'Annotation', 'AnnotationEntry',
   'TelemetryCapabilities',
   'ResourceWatchState', 'ResourceChange',
-  'AutomationSessionOrigin',
-  'AutomationLocalTime', 'AutomationHourlySchedule', 'AutomationDailySchedule',
-  'AutomationWeeklySchedule', 'AutomationCronSchedule',
+  'AutomationSessionOrigin', 'AutomationSchedule',
   'AutomationScheduleTrigger', 'AutomationEventTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
   'AutomationSessionTemplate', 'AutomationDefinition', 'AutomationRuntimeState',
@@ -1164,18 +1161,6 @@ const SESSION_ORIGIN_UNION: UnionConfig = {
   injectDiscriminantOnEncode: true,
 };
 
-const AUTOMATION_SCHEDULE_UNION: UnionConfig = {
-  name: 'AutomationSchedule',
-  discriminantField: 'kind',
-  variants: [
-    { caseName: 'hourly', structName: 'AutomationHourlySchedule', discriminantValue: 'hourly' },
-    { caseName: 'daily', structName: 'AutomationDailySchedule', discriminantValue: 'daily' },
-    { caseName: 'weekly', structName: 'AutomationWeeklySchedule', discriminantValue: 'weekly' },
-    { caseName: 'cron', structName: 'AutomationCronSchedule', discriminantValue: 'cron' },
-  ],
-  injectDiscriminantOnEncode: true,
-};
-
 const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   name: 'AutomationTrigger',
   discriminantField: 'kind',
@@ -1280,8 +1265,6 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(SESSION_INPUT_REQUEST_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_ORIGIN_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(AUTOMATION_SCHEDULE_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_TRIGGER_UNION));
   lines.push('');
@@ -1568,7 +1551,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
   'AutomationExecutionCapabilities', 'AutomationCreateCapability',
-  'AutomationScheduleCapabilities', 'AutomationCronScheduleCapability',
+  'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability', 'AutomationSchedulePreviewCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
@@ -1599,7 +1582,7 @@ const COMMAND_STRUCTS = [
   'ChangesetOperationFollowUp',
   'ListAutomationsParams', 'ListAutomationsResult',
   'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',
-  'CreateAutomationParams', 'AutomationDefinitionPatch', 'UpdateAutomationParams',
+  'CreateAutomationParams', 'AutomationImportIdentity', 'AutomationDefinitionPatch', 'UpdateAutomationParams',
   'DisposeAutomationParams', 'RunAutomationParams', 'RunAutomationResult',
   'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
   'PreviewAutomationScheduleParams', 'PreviewAutomationScheduleResult',
@@ -2259,7 +2242,6 @@ function checkExhaustiveness(project: Project): void {
     'JsonRpcErrorCode',             // type-level alias over JsonRpcErrorCodes const enum
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
     'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
-    'AutomationSchedule',           // AUTOMATION_SCHEDULE_UNION discriminated union
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationRunCause',           // AUTOMATION_RUN_CAUSE_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union

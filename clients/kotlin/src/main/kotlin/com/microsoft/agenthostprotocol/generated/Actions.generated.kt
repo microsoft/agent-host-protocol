@@ -1506,65 +1506,110 @@ data class ResourceWatchChangedAction(
 @Serializable
 data class AutomationDefinitionChangedAction(
     val type: ActionType,
+    /**
+     * Complete replacement definition.
+     */
     val definition: AutomationDefinition,
+    /**
+     * New monotonic revision.
+     */
     val revision: Long,
+    /**
+     * Definition modification timestamp in ISO 8601 format.
+     */
     val modifiedAt: String,
+    /**
+     * Earliest known future scheduled occurrence, or omitted to clear it.
+     */
     val nextRunAt: String? = null
 )
 
 @Serializable
 data class AutomationRunSummarySetAction(
     val type: ActionType,
+    /**
+     * New or replacement run summary.
+     */
     val run: AutomationRunSummary
 )
 
 @Serializable
 data class AutomationRunSummaryRemovedAction(
     val type: ActionType,
+    /**
+     * {@link AutomationRunSummary.resource} to remove.
+     */
     val run: String
 )
 
 @Serializable
 data class AutomationRunsLoadedAction(
     val type: ActionType,
+    /**
+     * Older run summaries in newest-first order within this page.
+     */
     val runs: List<AutomationRunSummary>,
+    /**
+     * Opaque cursor for the next older page, or omitted at the end.
+     */
     val nextCursor: String? = null
 )
 
 @Serializable
 data class AutomationRunLifecycleChangedAction(
     val type: ActionType,
+    /**
+     * Complete replacement lifecycle.
+     */
     val lifecycle: AutomationRunLifecycle,
+    /**
+     * Complete replacement operation list.
+     */
     val operations: List<AutomationRunOperation>
 )
 
 @Serializable
 data class AutomationRunSessionSetAction(
     val type: ActionType,
+    /**
+     * Session URI to append when it is not already linked.
+     */
     val session: String
 )
 
 @Serializable
 data class AutomationRunSessionRemovedAction(
     val type: ActionType,
+    /**
+     * Linked session URI to remove.
+     */
     val session: String
 )
 
 @Serializable
 data class AutomationRunPrimarySessionChangedAction(
     val type: ActionType,
+    /**
+     * New primary linked session, or omitted to clear the selection.
+     */
     val primarySession: String? = null
 )
 
 @Serializable
 data class AutomationRunArtifactSetAction(
     val type: ActionType,
+    /**
+     * New or replacement artifact.
+     */
     val artifact: AutomationRunArtifact
 )
 
 @Serializable
 data class AutomationRunArtifactRemovedAction(
     val type: ActionType,
+    /**
+     * {@link AutomationRunArtifact.id} to remove.
+     */
     val artifactId: String
 )
 

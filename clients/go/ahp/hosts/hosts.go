@@ -739,14 +739,9 @@ func cloneAutomationCapabilities(capabilities *ahptypes.AutomationCapabilities) 
 	}
 	if capabilities.Schedules != nil {
 		value := *capabilities.Schedules
-		value.Kinds = append([]ahptypes.AutomationScheduleKind(nil), capabilities.Schedules.Kinds...)
-		if capabilities.Schedules.Cron != nil {
-			cron := *capabilities.Schedules.Cron
-			if capabilities.Schedules.Cron.MinIntervalMinutes != nil {
-				minIntervalMinutes := *capabilities.Schedules.Cron.MinIntervalMinutes
-				cron.MinIntervalMinutes = &minIntervalMinutes
-			}
-			value.Cron = &cron
+		if capabilities.Schedules.MinIntervalMinutes != nil {
+			minIntervalMinutes := *capabilities.Schedules.MinIntervalMinutes
+			value.MinIntervalMinutes = &minIntervalMinutes
 		}
 		clone.Schedules = &value
 	}

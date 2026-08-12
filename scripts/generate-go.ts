@@ -715,8 +715,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
-  'AutomationOperation', 'AutomationExecutionLifetime', 'AutomationScheduleKind',
-  'AutomationWeekday', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationOperation', 'AutomationExecutionLifetime', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
   'AutomationRunOperation',
 ];
@@ -851,11 +850,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'ResourceWatchState' },
   { name: 'ResourceChange' },
   { name: 'AutomationSessionOrigin' },
-  { name: 'AutomationLocalTime' },
-  { name: 'AutomationHourlySchedule' },
-  { name: 'AutomationDailySchedule' },
-  { name: 'AutomationWeeklySchedule' },
-  { name: 'AutomationCronSchedule' },
+  { name: 'AutomationSchedule' },
   { name: 'AutomationScheduleTrigger' },
   { name: 'AutomationEventTrigger' },
   { name: 'AutomationTriggerEventDefinition' },
@@ -1108,19 +1103,6 @@ const SESSION_ORIGIN_UNION: UnionConfig = {
   doc: 'SessionOrigin is the durable origin of a session.',
   variants: [
     { variantName: 'Automation', innerType: 'AutomationSessionOrigin', wireValue: 'automation' },
-  ],
-  injectDiscriminantOnMarshal: true,
-};
-
-const AUTOMATION_SCHEDULE_UNION: UnionConfig = {
-  name: 'AutomationSchedule',
-  discriminantField: 'kind',
-  doc: 'AutomationSchedule is the calendar schedule for an automation trigger.',
-  variants: [
-    { variantName: 'Hourly', innerType: 'AutomationHourlySchedule', wireValue: 'hourly' },
-    { variantName: 'Daily', innerType: 'AutomationDailySchedule', wireValue: 'daily' },
-    { variantName: 'Weekly', innerType: 'AutomationWeeklySchedule', wireValue: 'weekly' },
-    { variantName: 'Cron', innerType: 'AutomationCronSchedule', wireValue: 'cron' },
   ],
   injectDiscriminantOnMarshal: true,
 };
@@ -1483,8 +1465,6 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(SESSION_ORIGIN_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(AUTOMATION_SCHEDULE_UNION));
-  lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_TRIGGER_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_CAUSE_UNION));
@@ -1709,7 +1689,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationExecutionCapabilities' }, { name: 'AutomationCreateCapability' },
-  { name: 'AutomationScheduleCapabilities' }, { name: 'AutomationCronScheduleCapability' },
+  { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' }, { name: 'AutomationSchedulePreviewCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
@@ -1743,7 +1723,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'ChangesetOperationFollowUp' },
   { name: 'ListAutomationsParams' }, { name: 'ListAutomationsResult' },
   { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
-  { name: 'CreateAutomationParams' }, { name: 'AutomationDefinitionPatch' },
+  { name: 'CreateAutomationParams' }, { name: 'AutomationImportIdentity' }, { name: 'AutomationDefinitionPatch' },
   { name: 'UpdateAutomationParams' }, { name: 'DisposeAutomationParams' },
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
@@ -2250,7 +2230,6 @@ function checkExhaustiveness(project: Project): void {
     'ToolCallConfirmationState',
     'ReconnectResult',
     'SessionOrigin',
-    'AutomationSchedule',
     'AutomationTrigger',
     'AutomationRunCause',
     'AutomationRunLifecycle',

@@ -1980,9 +1980,13 @@ public struct ResourceWatchChangedAction: Codable, Sendable {
 
 public struct AutomationDefinitionChangedAction: Codable, Sendable {
     public var type: ActionType
+    /// Complete replacement definition.
     public var definition: AutomationDefinition
+    /// New monotonic revision.
     public var revision: Int
+    /// Definition modification timestamp in ISO 8601 format.
     public var modifiedAt: String
+    /// Earliest known future scheduled occurrence, or omitted to clear it.
     public var nextRunAt: String?
 
     public init(
@@ -2002,6 +2006,7 @@ public struct AutomationDefinitionChangedAction: Codable, Sendable {
 
 public struct AutomationRunSummarySetAction: Codable, Sendable {
     public var type: ActionType
+    /// New or replacement run summary.
     public var run: AutomationRunSummary
 
     public init(
@@ -2015,6 +2020,7 @@ public struct AutomationRunSummarySetAction: Codable, Sendable {
 
 public struct AutomationRunSummaryRemovedAction: Codable, Sendable {
     public var type: ActionType
+    /// {@link AutomationRunSummary.resource} to remove.
     public var run: String
 
     public init(
@@ -2028,7 +2034,9 @@ public struct AutomationRunSummaryRemovedAction: Codable, Sendable {
 
 public struct AutomationRunsLoadedAction: Codable, Sendable {
     public var type: ActionType
+    /// Older run summaries in newest-first order within this page.
     public var runs: [AutomationRunSummary]
+    /// Opaque cursor for the next older page, or omitted at the end.
     public var nextCursor: String?
 
     public init(
@@ -2044,7 +2052,9 @@ public struct AutomationRunsLoadedAction: Codable, Sendable {
 
 public struct AutomationRunLifecycleChangedAction: Codable, Sendable {
     public var type: ActionType
+    /// Complete replacement lifecycle.
     public var lifecycle: AutomationRunLifecycle
+    /// Complete replacement operation list.
     public var operations: [AutomationRunOperation]
 
     public init(
@@ -2060,6 +2070,7 @@ public struct AutomationRunLifecycleChangedAction: Codable, Sendable {
 
 public struct AutomationRunSessionSetAction: Codable, Sendable {
     public var type: ActionType
+    /// Session URI to append when it is not already linked.
     public var session: String
 
     public init(
@@ -2073,6 +2084,7 @@ public struct AutomationRunSessionSetAction: Codable, Sendable {
 
 public struct AutomationRunSessionRemovedAction: Codable, Sendable {
     public var type: ActionType
+    /// Linked session URI to remove.
     public var session: String
 
     public init(
@@ -2086,6 +2098,7 @@ public struct AutomationRunSessionRemovedAction: Codable, Sendable {
 
 public struct AutomationRunPrimarySessionChangedAction: Codable, Sendable {
     public var type: ActionType
+    /// New primary linked session, or omitted to clear the selection.
     public var primarySession: String?
 
     public init(
@@ -2099,6 +2112,7 @@ public struct AutomationRunPrimarySessionChangedAction: Codable, Sendable {
 
 public struct AutomationRunArtifactSetAction: Codable, Sendable {
     public var type: ActionType
+    /// New or replacement artifact.
     public var artifact: AutomationRunArtifact
 
     public init(
@@ -2112,6 +2126,7 @@ public struct AutomationRunArtifactSetAction: Codable, Sendable {
 
 public struct AutomationRunArtifactRemovedAction: Codable, Sendable {
     public var type: ActionType
+    /// {@link AutomationRunArtifact.id} to remove.
     public var artifactId: String
 
     public init(

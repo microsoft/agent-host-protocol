@@ -67,7 +67,9 @@ public struct SessionSummaryChangedParams: Codable, Sendable {
 }
 
 public struct AutomationAddedParams: Codable, Sendable {
+    /// Root channel URI.
     public var channel: String
+    /// Complete summary for the newly visible automation.
     public var summary: AutomationSummary
 
     public init(
@@ -80,7 +82,9 @@ public struct AutomationAddedParams: Codable, Sendable {
 }
 
 public struct AutomationRemovedParams: Codable, Sendable {
+    /// Root channel URI.
     public var channel: String
+    /// Removed `ahp-automation:` URI.
     public var automation: String
 
     public init(
@@ -93,7 +97,9 @@ public struct AutomationRemovedParams: Codable, Sendable {
 }
 
 public struct AutomationSummaryChangedParams: Codable, Sendable {
+    /// Root channel URI.
     public var channel: String
+    /// Complete replacement catalogue summary.
     public var summary: AutomationSummary
 
     public init(

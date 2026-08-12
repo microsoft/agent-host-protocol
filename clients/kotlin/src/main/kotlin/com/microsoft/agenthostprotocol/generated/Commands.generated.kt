@@ -342,7 +342,8 @@ data class InitializeResult(
      */
     val telemetry: TelemetryCapabilities? = null,
     /**
-     * Host automation support. Absence means unsupported.
+     * Host-owned automation support. Absence means the host does not expose an
+     * automation catalogue or automation commands.
      */
     val automations: AutomationCapabilities? = null
 )
@@ -367,16 +368,39 @@ data class ClientCapabilities(
 
 @Serializable
 data class AutomationCapabilities(
+    /**
+     * Availability guarantee for automatic trigger execution.
+     */
     val execution: AutomationExecutionCapabilities,
+    /**
+     * Present when clients may call `createAutomation`.
+     */
     val create: AutomationCreateCapability? = null,
+    /**
+     * Present when definitions may contain schedule triggers.
+     */
     val schedules: AutomationScheduleCapabilities? = null,
+    /**
+     * Present when clients may request cancellation on eligible runs.
+     */
     val runCancellation: AutomationRunCancellationCapability? = null,
+    /**
+     * Present when clients may call `previewAutomationSchedule`.
+     */
     val schedulePreview: AutomationSchedulePreviewCapability? = null,
+    /**
+     * Maximum terminal run summaries retained per automation. Active runs are not
+     * counted toward the limit. Absence means the retention limit is
+     * implementation-defined.
+     */
     val runHistoryLimit: Long? = null
 )
 
 @Serializable
 data class AutomationExecutionCapabilities(
+    /**
+     * How long automatic trigger evaluation remains available.
+     */
     val lifetime: AutomationExecutionLifetime
 )
 
@@ -385,13 +409,10 @@ class AutomationCreateCapability
 
 @Serializable
 data class AutomationScheduleCapabilities(
-    val kinds: List<AutomationScheduleKind>,
-    val cron: AutomationCronScheduleCapability? = null
-)
-
-@Serializable
-data class AutomationCronScheduleCapability(
-    val dialect: String,
+    /**
+     * Smallest permitted interval between consecutive occurrences. Omission
+     * means no restriction beyond the cron format's one-minute resolution.
+     */
     val minIntervalMinutes: Long? = null
 )
 
@@ -1563,6 +1584,9 @@ data class ListAutomationsParams(
      * unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
      */
     val cursor: String? = null,
+    /**
+     * Optional exact filter on {@link AutomationDefinition.enabled}.
+     */
     val enabled: Boolean? = null
 )
 
@@ -1574,6 +1598,9 @@ data class ListAutomationsResult(
      * {@link PaginatedParams.cursor} to fetch the following page.
      */
     val nextCursor: String? = null,
+    /**
+     * Automation summaries in host-defined catalogue order.
+     */
     val items: List<AutomationSummary>
 )
 
@@ -1589,13 +1616,25 @@ data class ListAutomationTriggerDefinitionsParams(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
+    /**
+     * Prospective provider id, or omitted for the host default.
+     */
     val provider: String? = null,
+    /**
+     * Prospective ordered working-directory list.
+     */
     val workingDirectories: List<String>? = null,
+    /**
+     * Prospective resolved session configuration values.
+     */
     val sessionConfig: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class ListAutomationTriggerDefinitionsResult(
+    /**
+     * Available event trigger definitions.
+     */
     val items: List<AutomationTriggerDefinition>
 )
 
@@ -1611,18 +1650,58 @@ data class CreateAutomationParams(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
+    /**
+     * Complete initial definition.
+     */
     val definition: AutomationDefinition,
+    /**
+     * Optional idempotency identity when importing a legacy definition.
+     */
     @SerialName("import")
-    val `import`: JsonElement? = null
+    val `import`: AutomationImportIdentity? = null
+)
+
+@Serializable
+data class AutomationImportIdentity(
+    /**
+     * Stable namespace identifying the source implementation or store.
+     */
+    val source: String,
+    /**
+     * Identifier shared by every item in one import attempt.
+     */
+    val batchId: String,
+    /**
+     * Stable source-side identifier for this definition within the batch.
+     */
+    val itemId: String
 )
 
 @Serializable
 data class AutomationDefinitionPatch(
+    /**
+     * Replacement human-readable title.
+     */
     val title: String? = null,
+    /**
+     * Replacement initial user message.
+     */
     val message: Message? = null,
+    /**
+     * Replacement session template.
+     */
     val session: AutomationSessionTemplate? = null,
+    /**
+     * Replacement automatic-trigger enabled state.
+     */
     val enabled: Boolean? = null,
+    /**
+     * Complete replacement trigger list.
+     */
     val triggers: List<AutomationTrigger>? = null,
+    /**
+     * Complete replacement implementation-defined metadata.
+     */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
 )
@@ -1639,7 +1718,13 @@ data class UpdateAutomationParams(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
+    /**
+     * Revision on which the client based {@link changes}.
+     */
     val expectedRevision: Long,
+    /**
+     * Editable fields to replace.
+     */
     val changes: AutomationDefinitionPatch
 )
 
@@ -1669,11 +1754,19 @@ data class RunAutomationParams(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
+    /**
+     * Durable client-generated idempotency key. Retrying with the same key and
+     * automation MUST return the original run URI rather than create another
+     * run.
+     */
     val requestId: String
 )
 
 @Serializable
 data class RunAutomationResult(
+    /**
+     * Subscribable `ahp-automation-run:` URI.
+     */
     val run: String
 )
 
@@ -1689,6 +1782,10 @@ data class FetchAutomationRunsParams(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
+    /**
+     * Cursor previously received as {@link AutomationState.runsNextCursor}.
+     * Omit to request the first page not already included by the snapshot.
+     */
     val cursor: String? = null
 )
 
@@ -1707,12 +1804,21 @@ data class PreviewAutomationScheduleParams(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
+    /**
+     * Portable AHP cron schedule to evaluate.
+     */
     val schedule: AutomationSchedule,
+    /**
+     * Requested maximum number of future occurrences; the host MAY cap it.
+     */
     val count: Long? = null
 )
 
 @Serializable
 data class PreviewAutomationScheduleResult(
+    /**
+     * Ascending ISO 8601 timestamps.
+     */
     val items: List<String>
 )
 

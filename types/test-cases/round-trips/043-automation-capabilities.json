@@ -11,8 +11,7 @@
       "execution": { "lifetime": "managed" },
       "create": {},
       "schedules": {
-        "kinds": ["hourly", "daily", "weekly", "cron"],
-        "cron": { "dialect": "unix5", "minIntervalMinutes": 5 }
+        "minIntervalMinutes": 5
       },
       "runCancellation": {},
       "schedulePreview": {},
@@ -27,8 +26,7 @@
       "execution": { "lifetime": "managed" },
       "create": {},
       "schedules": {
-        "kinds": ["hourly", "daily", "weekly", "cron"],
-        "cron": { "dialect": "unix5", "minIntervalMinutes": 5 }
+        "minIntervalMinutes": 5
       },
       "runCancellation": {},
       "schedulePreview": {},

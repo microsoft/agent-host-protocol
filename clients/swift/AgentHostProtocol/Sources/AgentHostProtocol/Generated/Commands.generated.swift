@@ -266,7 +266,8 @@ public struct InitializeResult: Codable, Sendable {
     /// defines a template variable, `{level}`, for subscriber-side severity
     /// filtering). Clients MAY ignore signals they cannot process.
     public var telemetry: TelemetryCapabilities?
-    /// Host automation support. Absence means unsupported.
+    /// Host-owned automation support. Absence means the host does not expose an
+    /// automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
 
     public init(
@@ -314,11 +315,19 @@ public struct ClientCapabilities: Codable, Sendable {
 }
 
 public struct AutomationCapabilities: Codable, Sendable {
+    /// Availability guarantee for automatic trigger execution.
     public var execution: AutomationExecutionCapabilities
+    /// Present when clients may call `createAutomation`.
     public var create: AutomationCreateCapability?
+    /// Present when definitions may contain schedule triggers.
     public var schedules: AutomationScheduleCapabilities?
+    /// Present when clients may request cancellation on eligible runs.
     public var runCancellation: AutomationRunCancellationCapability?
+    /// Present when clients may call `previewAutomationSchedule`.
     public var schedulePreview: AutomationSchedulePreviewCapability?
+    /// Maximum terminal run summaries retained per automation. Active runs are not
+    /// counted toward the limit. Absence means the retention limit is
+    /// implementation-defined.
     public var runHistoryLimit: Int?
 
     public init(
@@ -339,6 +348,7 @@ public struct AutomationCapabilities: Codable, Sendable {
 }
 
 public struct AutomationExecutionCapabilities: Codable, Sendable {
+    /// How long automatic trigger evaluation remains available.
     public var lifetime: AutomationExecutionLifetime
 
     public init(
@@ -357,27 +367,13 @@ public struct AutomationCreateCapability: Codable, Sendable {
 }
 
 public struct AutomationScheduleCapabilities: Codable, Sendable {
-    public var kinds: [AutomationScheduleKind]
-    public var cron: AutomationCronScheduleCapability?
-
-    public init(
-        kinds: [AutomationScheduleKind],
-        cron: AutomationCronScheduleCapability? = nil
-    ) {
-        self.kinds = kinds
-        self.cron = cron
-    }
-}
-
-public struct AutomationCronScheduleCapability: Codable, Sendable {
-    public var dialect: String
+    /// Smallest permitted interval between consecutive occurrences. Omission
+    /// means no restriction beyond the cron format's one-minute resolution.
     public var minIntervalMinutes: Int?
 
     public init(
-        dialect: String,
         minIntervalMinutes: Int? = nil
     ) {
-        self.dialect = dialect
         self.minIntervalMinutes = minIntervalMinutes
     }
 }
@@ -1924,6 +1920,7 @@ public struct ListAutomationsParams: Codable, Sendable {
     /// as opaque — do not parse, modify, or persist them across connections. An
     /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
     public var cursor: String?
+    /// Optional exact filter on {@link AutomationDefinition.enabled}.
     public var enabled: Bool?
 
     enum CodingKeys: String, CodingKey {
@@ -1954,6 +1951,7 @@ public struct ListAutomationsResult: Codable, Sendable {
     /// returned page; absent signals the end of the collection. Pass it back as
     /// {@link PaginatedParams.cursor} to fetch the following page.
     public var nextCursor: String?
+    /// Automation summaries in host-defined catalogue order.
     public var items: [AutomationSummary]
 
     public init(
@@ -1971,8 +1969,11 @@ public struct ListAutomationTriggerDefinitionsParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
+    /// Prospective provider id, or omitted for the host default.
     public var provider: String?
+    /// Prospective ordered working-directory list.
     public var workingDirectories: [String]?
+    /// Prospective resolved session configuration values.
     public var sessionConfig: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
@@ -1999,6 +2000,7 @@ public struct ListAutomationTriggerDefinitionsParams: Codable, Sendable {
 }
 
 public struct ListAutomationTriggerDefinitionsResult: Codable, Sendable {
+    /// Available event trigger definitions.
     public var items: [AutomationTriggerDefinition]
 
     public init(
@@ -2014,8 +2016,10 @@ public struct CreateAutomationParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
+    /// Complete initial definition.
     public var definition: AutomationDefinition
-    public var `import`: AnyCodable?
+    /// Optional idempotency identity when importing a legacy definition.
+    public var `import`: AutomationImportIdentity?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -2028,7 +2032,7 @@ public struct CreateAutomationParams: Codable, Sendable {
         channel: String,
         meta: [String: AnyCodable]? = nil,
         definition: AutomationDefinition,
-        `import`: AnyCodable? = nil
+        `import`: AutomationImportIdentity? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -2037,12 +2041,37 @@ public struct CreateAutomationParams: Codable, Sendable {
     }
 }
 
+public struct AutomationImportIdentity: Codable, Sendable {
+    /// Stable namespace identifying the source implementation or store.
+    public var source: String
+    /// Identifier shared by every item in one import attempt.
+    public var batchId: String
+    /// Stable source-side identifier for this definition within the batch.
+    public var itemId: String
+
+    public init(
+        source: String,
+        batchId: String,
+        itemId: String
+    ) {
+        self.source = source
+        self.batchId = batchId
+        self.itemId = itemId
+    }
+}
+
 public struct AutomationDefinitionPatch: Codable, Sendable {
+    /// Replacement human-readable title.
     public var title: String?
+    /// Replacement initial user message.
     public var message: Message?
+    /// Replacement session template.
     public var session: AutomationSessionTemplate?
+    /// Replacement automatic-trigger enabled state.
     public var enabled: Bool?
+    /// Complete replacement trigger list.
     public var triggers: [AutomationTrigger]?
+    /// Complete replacement implementation-defined metadata.
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
@@ -2077,7 +2106,9 @@ public struct UpdateAutomationParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
+    /// Revision on which the client based {@link changes}.
     public var expectedRevision: Int
+    /// Editable fields to replace.
     public var changes: AutomationDefinitionPatch
 
     enum CodingKeys: String, CodingKey {
@@ -2127,6 +2158,9 @@ public struct RunAutomationParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
+    /// Durable client-generated idempotency key. Retrying with the same key and
+    /// automation MUST return the original run URI rather than create another
+    /// run.
     public var requestId: String
 
     enum CodingKeys: String, CodingKey {
@@ -2147,6 +2181,7 @@ public struct RunAutomationParams: Codable, Sendable {
 }
 
 public struct RunAutomationResult: Codable, Sendable {
+    /// Subscribable `ahp-automation-run:` URI.
     public var run: String
 
     public init(
@@ -2162,6 +2197,8 @@ public struct FetchAutomationRunsParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
+    /// Cursor previously received as {@link AutomationState.runsNextCursor}.
+    /// Omit to request the first page not already included by the snapshot.
     public var cursor: String?
 
     enum CodingKeys: String, CodingKey {
@@ -2195,7 +2232,9 @@ public struct PreviewAutomationScheduleParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
+    /// Portable AHP cron schedule to evaluate.
     public var schedule: AutomationSchedule
+    /// Requested maximum number of future occurrences; the host MAY cap it.
     public var count: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -2219,6 +2258,7 @@ public struct PreviewAutomationScheduleParams: Codable, Sendable {
 }
 
 public struct PreviewAutomationScheduleResult: Codable, Sendable {
+    /// Ascending ISO 8601 timestamps.
     public var items: [String]
 
     public init(

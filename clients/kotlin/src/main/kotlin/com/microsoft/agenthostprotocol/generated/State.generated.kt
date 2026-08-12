@@ -751,114 +751,202 @@ enum class ResourceChangeType {
     DELETED
 }
 
+/**
+ * Discriminant describing the durable provenance of a session.
+ */
 @Serializable
 enum class SessionOriginKind {
+    /**
+     * The session was created as part of an automation run.
+     */
     @SerialName("automation")
     AUTOMATION
 }
 
+/**
+ * Operations the host currently permits for an automation.
+ *
+ * The list on {@link AutomationState.operations} is authoritative and may
+ * change over time. Clients MUST NOT infer permission from capabilities alone:
+ * capabilities describe what the host implementation can support, while
+ * operations describe what is allowed for this particular automation now.
+ */
 @Serializable
 enum class AutomationOperation {
+    /**
+     * Replace editable fields using `updateAutomation`.
+     */
     @SerialName("update")
     UPDATE,
+    /**
+     * Permanently remove the automation using `disposeAutomation`.
+     */
     @SerialName("dispose")
     DISPOSE,
+    /**
+     * Start a manual run using `runAutomation`.
+     */
     @SerialName("run")
     RUN
 }
 
+/**
+ * Availability guarantee for host-owned automatic trigger evaluation.
+ *
+ * This describes the authority that owns one automation catalogue. It does not
+ * prevent a client from connecting to several authorities with different
+ * lifetimes (for example, one local host and one managed service).
+ */
 @Serializable
 enum class AutomationExecutionLifetime {
+    /**
+     * Automatic triggers are evaluated only while this host process is running.
+     * Definitions may remain durable across restarts, but occurrences while the
+     * process is unavailable are handled according to the trigger's
+     * {@link AutomationMisfirePolicy}.
+     */
     @SerialName("hostLifetime")
     HOST_LIFETIME,
+    /**
+     * Automatic triggers continue to be evaluated independently of connected
+     * clients and any particular interactive host process.
+     */
     @SerialName("managed")
     MANAGED
 }
 
-@Serializable
-enum class AutomationScheduleKind {
-    @SerialName("hourly")
-    HOURLY,
-    @SerialName("daily")
-    DAILY,
-    @SerialName("weekly")
-    WEEKLY,
-    @SerialName("cron")
-    CRON
-}
-
-@Serializable
-enum class AutomationWeekday {
-    @SerialName("monday")
-    MONDAY,
-    @SerialName("tuesday")
-    TUESDAY,
-    @SerialName("wednesday")
-    WEDNESDAY,
-    @SerialName("thursday")
-    THURSDAY,
-    @SerialName("friday")
-    FRIDAY,
-    @SerialName("saturday")
-    SATURDAY,
-    @SerialName("sunday")
-    SUNDAY
-}
-
+/**
+ * How a host handles schedule occurrences missed while automatic execution was
+ * unavailable.
+ */
 @Serializable
 enum class AutomationMisfirePolicy {
+    /**
+     * Discard missed occurrences and wait for the next future occurrence.
+     */
     @SerialName("skip")
     SKIP,
+    /**
+     * Start at most one catch-up run when execution becomes available, regardless
+     * of how many occurrences were missed.
+     */
     @SerialName("runOnce")
     RUN_ONCE
 }
 
+/**
+ * Discriminant for automatic trigger definitions.
+ */
 @Serializable
 enum class AutomationTriggerKind {
+    /**
+     * A portable recurring {@link AutomationSchedule}.
+     */
     @SerialName("schedule")
     SCHEDULE,
+    /**
+     * A host-defined external event discovered from trigger definitions.
+     */
     @SerialName("event")
     EVENT
 }
 
+/**
+ * Lifecycle status of one automation run.
+ *
+ * `completed`, `failed`, and `cancelled` are terminal. `blocked` is
+ * non-terminal: the host may return the run to `running` after the linked
+ * session resolves the blocker.
+ */
 @Serializable
 enum class AutomationRunStatus {
+    /**
+     * The durable run record exists but execution has not started.
+     */
     @SerialName("pending")
     PENDING,
+    /**
+     * One or more linked sessions are actively executing.
+     */
     @SerialName("running")
     RUNNING,
+    /**
+     * Execution is paused on an interaction or client-side dependency.
+     */
     @SerialName("blocked")
     BLOCKED,
+    /**
+     * Execution finished successfully.
+     */
     @SerialName("completed")
     COMPLETED,
+    /**
+     * Execution ended with an error.
+     */
     @SerialName("failed")
     FAILED,
+    /**
+     * Execution ended because cancellation was accepted.
+     */
     @SerialName("cancelled")
     CANCELLED
 }
 
+/**
+ * Coarse reason a run is blocked.
+ *
+ * Detailed prompts, confirmations, authentication requests, and tool state
+ * remain authoritative on linked session and chat channels.
+ */
 @Serializable
 enum class AutomationRunBlockerKind {
+    /**
+     * A linked session is waiting for an answer to a user-input request.
+     */
     @SerialName("userInput")
     USER_INPUT,
+    /**
+     * A linked session is waiting for tool confirmation.
+     */
     @SerialName("toolConfirmation")
     TOOL_CONFIRMATION,
+    /**
+     * Execution requires authentication or renewed credentials.
+     */
     @SerialName("authentication")
     AUTHENTICATION,
+    /**
+     * Work must be performed by or delegated to a connected client.
+     */
     @SerialName("clientExecution")
     CLIENT_EXECUTION
 }
 
+/**
+ * Discriminant describing what created an automation run.
+ */
 @Serializable
 enum class AutomationRunCauseKind {
+    /**
+     * A client explicitly invoked `runAutomation`.
+     */
     @SerialName("manual")
     MANUAL,
+    /**
+     * An automatic schedule or event trigger fired.
+     */
     @SerialName("trigger")
     TRIGGER
 }
 
+/**
+ * Operations the host currently permits for a run.
+ */
 @Serializable
 enum class AutomationRunOperation {
+    /**
+     * Request cancellation with `automationRun/cancelRequested`.
+     */
     @SerialName("cancel")
     CANCEL
 }
@@ -4786,51 +4874,25 @@ data class ResourceChange(
 @Serializable
 data class AutomationSessionOrigin(
     val kind: SessionOriginKind,
+    /**
+     * Owning `ahp-automation:` URI.
+     */
     val automation: String,
+    /**
+     * Owning `ahp-automation-run:` URI.
+     */
     val run: String
 )
 
 @Serializable
-data class AutomationLocalTime(
-    val hour: Long,
-    val minute: Long
-)
-
-@Serializable
-data class AutomationHourlySchedule(
-    val kind: AutomationScheduleKind
-)
-
-@Serializable
-data class AutomationDailySchedule(
-    val kind: AutomationScheduleKind,
-    val time: AutomationLocalTime,
+data class AutomationSchedule(
     /**
-     * IANA time-zone identifier.
-     */
-    val timeZone: String
-)
-
-@Serializable
-data class AutomationWeeklySchedule(
-    val kind: AutomationScheduleKind,
-    val weekday: AutomationWeekday,
-    val time: AutomationLocalTime,
-    /**
-     * IANA time-zone identifier.
-     */
-    val timeZone: String
-)
-
-@Serializable
-data class AutomationCronSchedule(
-    val kind: AutomationScheduleKind,
-    /**
-     * Standard five-field Unix cron expression.
+     * Five-field AHP cron expression described by {@link AutomationSchedule}.
      */
     val expression: String,
     /**
-     * IANA time-zone identifier.
+     * IANA Time Zone Database identifier used to interpret the expression, for
+     * example `"UTC"` or `"Europe/Berlin"`.
      */
     val timeZone: String
 )
@@ -4838,130 +4900,263 @@ data class AutomationCronSchedule(
 @Serializable
 data class AutomationScheduleTrigger(
     /**
-     * Stable within the automation definition.
+     * Identifier unique and stable within this automation definition. Run causes
+     * refer back to this value.
      */
     val id: String,
     val kind: AutomationTriggerKind,
+    /**
+     * Recurrence and time zone evaluated by the host.
+     */
     val schedule: AutomationSchedule,
+    /**
+     * Policy for missed occurrences. Omission is equivalent to
+     * {@link AutomationMisfirePolicy.RunOnce}.
+     */
     val misfirePolicy: AutomationMisfirePolicy? = null
 )
 
 @Serializable
 data class AutomationEventTrigger(
     /**
-     * Stable within the automation definition.
+     * Identifier unique and stable within this automation definition. Run causes
+     * refer back to this value.
      */
     val id: String,
     val kind: AutomationTriggerKind,
     /**
-     * Stable host-defined trigger type.
+     * Matches {@link AutomationTriggerDefinition.type}.
      */
     val type: String,
     /**
-     * Selected event actions.
+     * Selected {@link AutomationTriggerEventDefinition.id | event ids} for this
+     * trigger type.
      */
     val events: List<String>,
     /**
-     * Schema-defined values. Unknown entries must survive round-trips.
+     * Values described by {@link AutomationTriggerDefinition.configSchema}.
+     * Clients MUST preserve unknown entries when editing other fields.
      */
     val config: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class AutomationTriggerEventDefinition(
+    /**
+     * Stable event id stored in {@link AutomationEventTrigger.events}.
+     */
     val id: String,
+    /**
+     * Human-readable label suitable for selection UI.
+     */
     val title: String,
+    /**
+     * Optional longer explanation of when this event fires.
+     */
     val description: String? = null
 )
 
 @Serializable
 data class AutomationTriggerDefinition(
+    /**
+     * Stable type id stored in {@link AutomationEventTrigger.type}.
+     */
     val type: String,
+    /**
+     * Human-readable trigger type name.
+     */
     val title: String,
+    /**
+     * Optional longer explanation of the trigger source.
+     */
     val description: String? = null,
+    /**
+     * Events clients may select for this trigger type.
+     */
     val events: List<AutomationTriggerEventDefinition>,
+    /**
+     * Optional schema for {@link AutomationEventTrigger.config}.
+     */
     val configSchema: ConfigSchema? = null
 )
 
 @Serializable
 data class AutomationSessionTemplate(
+    /**
+     * Provider id. Omit to use the host's default provider.
+     */
     val provider: String? = null,
+    /**
+     * Optional model selection resolved when a run starts.
+     */
     val model: ModelSelection? = null,
+    /**
+     * Optional custom agent selection resolved when a run starts.
+     */
     val agent: AgentSelection? = null,
     /**
-     * Absence means a workspace-less session.
+     * Ordered working-directory URIs for each created session. Absence means a
+     * workspace-less session.
      */
     val workingDirectories: List<String>? = null,
     /**
-     * Values resolved through `resolveSessionConfig`.
+     * Session configuration values accepted by `createSession`, normally
+     * obtained from `resolveSessionConfig`.
      */
     val config: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class AutomationDefinition(
+    /**
+     * Human-readable automation name.
+     */
     val title: String,
     /**
-     * Initial user message sent to each new session.
+     * Initial message sent to every newly created run session. Its origin MUST be
+     * `user`.
      */
     val message: Message,
+    /**
+     * Template used to create fresh sessions for each run.
+     */
     val session: AutomationSessionTemplate,
     /**
-     * Controls automatic triggers; manual runs remain permitted.
+     * Whether automatic triggers may create runs. Manual runs remain available
+     * whenever {@link AutomationOperation.Run} is advertised.
      */
     val enabled: Boolean,
     /**
-     * Empty means manual-only.
+     * Automatic triggers. An empty list means manual-only.
      */
     val triggers: List<AutomationTrigger>,
+    /**
+     * Opaque implementation-defined metadata. Clients MUST preserve unknown
+     * entries when updating the definition.
+     */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class AutomationRuntimeState(
+    /**
+     * Effective working directories after host-side preparation, such as
+     * materializing a managed workspace.
+     */
     val workingDirectories: List<String>? = null,
+    /**
+     * Opaque host-defined runtime metadata.
+     */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class AutomationSummary(
+    /**
+     * Subscribable `ahp-automation:` URI.
+     */
     val resource: String,
+    /**
+     * Current {@link AutomationDefinition.title}.
+     */
     val title: String,
+    /**
+     * Current {@link AutomationDefinition.enabled} value.
+     */
     val enabled: Boolean,
+    /**
+     * Number of automatic triggers in the current definition.
+     */
     val triggerCount: Long,
+    /**
+     * Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+     */
     val nextRunAt: String? = null,
+    /**
+     * Most recent retained run, when any run exists.
+     */
     val lastRun: AutomationRunSummary? = null,
+    /**
+     * Monotonic definition revision used for optimistic concurrency.
+     */
     val revision: Long,
+    /**
+     * Operations currently permitted for this automation.
+     */
     val operations: List<AutomationOperation>,
+    /**
+     * Creation timestamp in ISO 8601 format.
+     */
     val createdAt: String,
+    /**
+     * Last definition modification timestamp in ISO 8601 format.
+     */
     val modifiedAt: String,
+    /**
+     * Opaque host-defined catalogue metadata.
+     */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class AutomationState(
+    /**
+     * URI of this automation channel.
+     */
     val resource: String,
+    /**
+     * Current durable definition.
+     */
     val definition: AutomationDefinition,
+    /**
+     * Monotonically increasing definition revision. Clients pass the revision
+     * they observed as `updateAutomation.expectedRevision`.
+     */
     val revision: Long,
+    /**
+     * Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+     */
     val nextRunAt: String? = null,
     /**
-     * Newest-first retained run summaries.
+     * Newest-first retained run summaries. This is a bounded window; use
+     * `fetchAutomationRuns` when {@link runsNextCursor} is present.
      */
     val runs: List<AutomationRunSummary>,
+    /**
+     * Opaque cursor for the next older run-history page.
+     */
     val runsNextCursor: String? = null,
+    /**
+     * Optional host-resolved execution context.
+     */
     val runtime: AutomationRuntimeState? = null,
+    /**
+     * Operations currently permitted for this automation.
+     */
     val operations: List<AutomationOperation>,
+    /**
+     * Creation timestamp in ISO 8601 format.
+     */
     val createdAt: String,
+    /**
+     * Last definition modification timestamp in ISO 8601 format.
+     */
     val modifiedAt: String,
+    /**
+     * Opaque host-defined state metadata.
+     */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class AutomationRunBlocker(
+    /**
+     * Category of the outstanding dependency.
+     */
     val kind: AutomationRunBlockerKind
 )
 
@@ -4973,11 +5168,23 @@ data class AutomationManualRunCause(
 @Serializable
 data class AutomationTriggeredRunCause(
     val kind: AutomationRunCauseKind,
+    /**
+     * Matches the stable {@link AutomationTrigger.id} in the definition.
+     */
     val triggerId: String,
+    /**
+     * Intended schedule occurrence as an ISO 8601 timestamp. Present for
+     * schedule triggers and normally absent for event triggers.
+     */
     val scheduledFor: String? = null,
+    /**
+     * `true` when this is a catch-up run created by
+     * {@link AutomationMisfirePolicy.RunOnce}.
+     */
     val catchUp: Boolean? = null,
     /**
-     * Host-defined event provenance containing no secrets.
+     * Host-defined, non-secret event provenance suitable for display or audit.
+     * This is descriptive context, not an input that clients replay.
      */
     val event: Map<String, JsonElement>? = null
 )
@@ -4985,47 +5192,98 @@ data class AutomationTriggeredRunCause(
 @Serializable
 data class AutomationPendingRunLifecycle(
     val status: AutomationRunStatus,
+    /**
+     * Run creation timestamp in ISO 8601 format.
+     */
     val createdAt: String
 )
 
 @Serializable
 data class AutomationRunningRunLifecycle(
     val status: AutomationRunStatus,
+    /**
+     * Run creation timestamp in ISO 8601 format.
+     */
     val createdAt: String,
+    /**
+     * First execution start timestamp in ISO 8601 format.
+     */
     val startedAt: String
 )
 
 @Serializable
 data class AutomationBlockedRunLifecycle(
     val status: AutomationRunStatus,
+    /**
+     * Run creation timestamp in ISO 8601 format.
+     */
     val createdAt: String,
+    /**
+     * First execution start timestamp in ISO 8601 format.
+     */
     val startedAt: String,
+    /**
+     * Coarse blocker summary; linked sessions contain interaction details.
+     */
     val blocker: AutomationRunBlocker
 )
 
 @Serializable
 data class AutomationCompletedRunLifecycle(
     val status: AutomationRunStatus,
+    /**
+     * Run creation timestamp in ISO 8601 format.
+     */
     val createdAt: String,
+    /**
+     * First execution start timestamp in ISO 8601 format.
+     */
     val startedAt: String,
+    /**
+     * Completion timestamp in ISO 8601 format.
+     */
     val completedAt: String,
+    /**
+     * Optional aggregate model usage across all linked sessions.
+     */
     val usage: UsageInfo? = null
 )
 
 @Serializable
 data class AutomationFailedRunLifecycle(
     val status: AutomationRunStatus,
+    /**
+     * Run creation timestamp in ISO 8601 format.
+     */
     val createdAt: String,
+    /**
+     * First execution start timestamp in ISO 8601 format, when execution began.
+     */
     val startedAt: String? = null,
+    /**
+     * Failure timestamp in ISO 8601 format.
+     */
     val completedAt: String,
+    /**
+     * Stable machine-readable and human-readable failure information.
+     */
     val error: ErrorInfo
 )
 
 @Serializable
 data class AutomationCancelledRunLifecycle(
     val status: AutomationRunStatus,
+    /**
+     * Run creation timestamp in ISO 8601 format.
+     */
     val createdAt: String,
+    /**
+     * First execution start timestamp in ISO 8601 format, when execution began.
+     */
     val startedAt: String? = null,
+    /**
+     * Cancellation completion timestamp in ISO 8601 format.
+     */
     val completedAt: String
 )
 
@@ -5047,36 +5305,100 @@ data class AutomationRunArtifact(
      * Content nonce
      */
     val nonce: String? = null,
+    /**
+     * Stable artifact id within this run, used by artifact actions.
+     */
     val id: String,
+    /**
+     * Human-readable label suitable for run-history UI.
+     */
     val label: String,
+    /**
+     * Opaque host-defined artifact metadata.
+     */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class AutomationRunSummary(
+    /**
+     * Subscribable `ahp-automation-run:` URI.
+     */
     val resource: String,
+    /**
+     * Owning `ahp-automation:` URI.
+     */
     val automation: String,
+    /**
+     * Immutable reason this run was created.
+     */
     val cause: AutomationRunCause,
+    /**
+     * Current or terminal lifecycle snapshot.
+     */
     val lifecycle: AutomationRunLifecycle,
+    /**
+     * Session the host recommends opening first, when one has been selected.
+     */
     val primarySession: String? = null,
+    /**
+     * Number of linked sessions, including attempts and workers.
+     */
     val sessionCount: Long,
+    /**
+     * Number of run-scoped artifacts, when cheaply available.
+     */
     val artifactCount: Long? = null,
+    /**
+     * Operations currently permitted for this run.
+     */
     val operations: List<AutomationRunOperation>,
+    /**
+     * Opaque host-defined summary metadata.
+     */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
 )
 
 @Serializable
 data class AutomationRunState(
+    /**
+     * URI of this automation-run channel.
+     */
     val resource: String,
+    /**
+     * Owning `ahp-automation:` URI.
+     */
     val automation: String,
+    /**
+     * Immutable reason this run was created.
+     */
     val cause: AutomationRunCause,
+    /**
+     * Current or terminal lifecycle.
+     */
     val lifecycle: AutomationRunLifecycle,
+    /**
+     * Ordered, unique session URIs belonging to this run. Entries may represent
+     * retries, parallel workers, or delegated attempts.
+     */
     val sessions: List<String>,
+    /**
+     * Session the host recommends opening first, when one has been selected.
+     */
     val primarySession: String? = null,
+    /**
+     * Run-scoped artifacts keyed by {@link AutomationRunArtifact.id}.
+     */
     val artifacts: List<AutomationRunArtifact>,
+    /**
+     * Operations currently permitted for this run.
+     */
     val operations: List<AutomationRunOperation>,
+    /**
+     * Opaque host-defined run metadata.
+     */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
 )
@@ -6128,60 +6450,6 @@ internal object SessionOriginSerializer : KSerializer<SessionOrigin> {
         val encodedObject = element.jsonObject.toMutableMap()
         val discriminant = when (value) {
             is SessionOriginAutomation -> "automation"
-        }
-        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
-        output.encodeJsonElement(JsonObject(encodedObject))
-    }
-}
-
-@Serializable(with = AutomationScheduleSerializer::class)
-sealed interface AutomationSchedule
-
-@JvmInline
-value class AutomationScheduleHourly(val value: AutomationHourlySchedule) : AutomationSchedule
-@JvmInline
-value class AutomationScheduleDaily(val value: AutomationDailySchedule) : AutomationSchedule
-@JvmInline
-value class AutomationScheduleWeekly(val value: AutomationWeeklySchedule) : AutomationSchedule
-@JvmInline
-value class AutomationScheduleCron(val value: AutomationCronSchedule) : AutomationSchedule
-
-internal object AutomationScheduleSerializer : KSerializer<AutomationSchedule> {
-    override val descriptor: SerialDescriptor =
-        buildClassSerialDescriptor("AutomationSchedule")
-
-    override fun deserialize(decoder: Decoder): AutomationSchedule {
-        val input = decoder as? JsonDecoder
-            ?: error("AutomationSchedule can only be deserialized from JSON")
-        val element = input.decodeJsonElement()
-        val obj = element as? JsonObject
-            ?: error("Expected JsonObject for AutomationSchedule")
-        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
-            ?: error("Missing kind discriminator on AutomationSchedule")
-        return when (discriminant) {
-            "hourly" -> AutomationScheduleHourly(input.json.decodeFromJsonElement(AutomationHourlySchedule.serializer(), element))
-            "daily" -> AutomationScheduleDaily(input.json.decodeFromJsonElement(AutomationDailySchedule.serializer(), element))
-            "weekly" -> AutomationScheduleWeekly(input.json.decodeFromJsonElement(AutomationWeeklySchedule.serializer(), element))
-            "cron" -> AutomationScheduleCron(input.json.decodeFromJsonElement(AutomationCronSchedule.serializer(), element))
-            else -> error("Unknown AutomationSchedule discriminator: $discriminant")
-        }
-    }
-
-    override fun serialize(encoder: Encoder, value: AutomationSchedule) {
-        val output = encoder as? JsonEncoder
-            ?: error("AutomationSchedule can only be serialized to JSON")
-        val element: JsonElement = when (value) {
-            is AutomationScheduleHourly -> output.json.encodeToJsonElement(AutomationHourlySchedule.serializer(), value.value)
-            is AutomationScheduleDaily -> output.json.encodeToJsonElement(AutomationDailySchedule.serializer(), value.value)
-            is AutomationScheduleWeekly -> output.json.encodeToJsonElement(AutomationWeeklySchedule.serializer(), value.value)
-            is AutomationScheduleCron -> output.json.encodeToJsonElement(AutomationCronSchedule.serializer(), value.value)
-        }
-        val encodedObject = element.jsonObject.toMutableMap()
-        val discriminant = when (value) {
-            is AutomationScheduleHourly -> "hourly"
-            is AutomationScheduleDaily -> "daily"
-            is AutomationScheduleWeekly -> "weekly"
-            is AutomationScheduleCron -> "cron"
         }
         if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))

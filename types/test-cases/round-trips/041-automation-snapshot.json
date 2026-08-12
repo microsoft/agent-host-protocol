@@ -1,7 +1,7 @@
 {
   "name": "automation-snapshot",
   "group": "A",
-  "description": "An automation snapshot preserves schedule and event triggers plus run summaries.",
+  "description": "An automation snapshot preserves cron and event triggers plus run summaries.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-automation:/a1",
@@ -14,11 +14,10 @@
         "enabled": true,
         "triggers": [
           {
-            "id": "daily",
+            "id": "morning",
             "kind": "schedule",
             "schedule": {
-              "kind": "daily",
-              "time": { "hour": 9, "minute": 30 },
+              "expression": "30 9 * * *",
               "timeZone": "Europe/Berlin"
             },
             "misfirePolicy": "runOnce"
@@ -59,11 +58,10 @@
         "enabled": true,
         "triggers": [
           {
-            "id": "daily",
+            "id": "morning",
             "kind": "schedule",
             "schedule": {
-              "kind": "daily",
-              "time": { "hour": 9, "minute": 30 },
+              "expression": "30 9 * * *",
               "timeZone": "Europe/Berlin"
             },
             "misfirePolicy": "runOnce"

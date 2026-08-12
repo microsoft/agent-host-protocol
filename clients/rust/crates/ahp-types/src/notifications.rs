@@ -97,24 +97,39 @@ pub struct SessionSummaryChangedParams {
     pub changes: PartialSessionSummary,
 }
 
+/// Announces a newly visible automation catalogue entry.
+///
+/// Root notifications are live signals and are not replayed after reconnect.
+/// Clients that reconnect MUST refresh the catalogue with `listAutomations`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationAddedParams {
+    /// Root channel URI.
     pub channel: Uri,
+    /// Complete summary for the newly visible automation.
     pub summary: AutomationSummary,
 }
 
+/// Announces that an automation is no longer present in the root catalogue.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRemovedParams {
+    /// Root channel URI.
     pub channel: Uri,
+    /// Removed `ahp-automation:` URI.
     pub automation: Uri,
 }
 
+/// Replaces the root-catalogue summary for an existing automation.
+///
+/// Full replacement semantics apply to `summary`; this is not a patch. The
+/// corresponding subscribed automation channel remains authoritative.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSummaryChangedParams {
+    /// Root channel URI.
     pub channel: Uri,
+    /// Complete replacement catalogue summary.
     pub summary: AutomationSummary,
 }
 
