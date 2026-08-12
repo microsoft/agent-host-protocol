@@ -14,7 +14,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
-    ProjectInfo, SessionStatus, SessionSummary,
+    ProjectInfo, ProtectedResourceMetadata, SessionStatus, SessionSummary,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -153,8 +153,8 @@ pub struct ProgressParams {
 /// This notification MAY be associated with any channel — for example, an
 /// agent advertised on the root channel, or a per-session resource. The
 /// `channel` field identifies the subscription the auth requirement belongs
-/// to; the `resource` field carries the OAuth-protected resource identifier
-/// (per RFC 9728).
+/// to; the `resource` field carries the complete OAuth protected resource
+/// metadata (per RFC 9728).
 ///
 /// Clients should obtain a fresh token and push it via the `authenticate`
 /// command.
@@ -163,8 +163,8 @@ pub struct ProgressParams {
 pub struct AuthRequiredParams {
     /// Channel URI this notification belongs to
     pub channel: Uri,
-    /// The protected resource identifier that requires authentication
-    pub resource: String,
+    /// Complete RFC 9728 metadata for the protected resource that requires authentication
+    pub resource: ProtectedResourceMetadata,
     /// Why authentication is required
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<AuthRequiredReason>,

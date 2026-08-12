@@ -7,15 +7,15 @@
   "$defs": {
     "AuthRequiredParams": {
       "type": "object",
-      "description": "Sent by the server when a protected resource requires (re-)authentication.\n\nThis notification MAY be associated with any channel — for example, an\nagent advertised on the root channel, or a per-session resource. The\n`channel` field identifies the subscription the auth requirement belongs\nto; the `resource` field carries the OAuth-protected resource identifier\n(per RFC 9728).\n\nClients should obtain a fresh token and push it via the `authenticate`\ncommand.",
+      "description": "Sent by the server when a protected resource requires (re-)authentication.\n\nThis notification MAY be associated with any channel — for example, an\nagent advertised on the root channel, or a per-session resource. The\n`channel` field identifies the subscription the auth requirement belongs\nto; the `resource` field carries the complete OAuth protected resource\nmetadata (per RFC 9728).\n\nClients should obtain a fresh token and push it via the `authenticate`\ncommand.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
           "description": "Channel URI this notification belongs to"
         },
         "resource": {
-          "type": "string",
-          "description": "The protected resource identifier that requires authentication"
+          "$ref": "#/$defs/ProtectedResourceMetadata",
+          "description": "Complete RFC 9728 metadata for the protected resource that requires authentication"
         },
         "reason": {
           "$ref": "#/$defs/AuthRequiredReason",
