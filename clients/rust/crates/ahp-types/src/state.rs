@@ -3498,10 +3498,6 @@ pub struct McpServerCustomization {
     /// the effective enabled value from that set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enablement: Option<Vec<CustomizationEnablement>>,
-    /// Whether the client explicitly bundled this server and owns its Global
-    /// enablement decision.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub is_client_bundled: Option<bool>,
     /// Current lifecycle state of the MCP server.
     pub state: McpServerState,
     /// An `mcp://`-protocol channel the client uses to side-channel traffic

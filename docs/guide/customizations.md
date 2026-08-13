@@ -118,7 +118,7 @@ SkillCustomization        { type: 'skill';       description?, disableModelInvoc
 PromptCustomization       { type: 'prompt';      description? }
 RuleCustomization         { type: 'rule';        description?, alwaysApply?, globs? }    // covers "instruction" formats too
 HookCustomization         { type: 'hook';        event?, matcher? }
-McpServerCustomization    { type: 'mcpServer';   enablement?, isClientBundled?, state, channel?, mcpApp? }   // see /guide/mcp
+McpServerCustomization    { type: 'mcpServer';   enablement?, state, channel?, mcpApp? }   // see /guide/mcp
 ```
 
 Agents and skills carry a symmetric invocation matrix. `disableModelInvocation` removes the entry from the agent's automatic choices — a custom agent it won't auto-delegate to, or a skill it won't auto-invoke — while leaving it available for the user to pick. `disableUserInvocation` does the reverse: the entry stays available for the agent to invoke but is hidden from user-facing pickers and slash-commands. Both are absent/`false` by default (invocable by either party), and they are independent, so an entry can be agent-only, user-only, both, or neither.

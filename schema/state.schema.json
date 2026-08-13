@@ -2085,10 +2085,6 @@
           },
           "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nFlows in both directions. A client publishes this alongside a customization\nto assert its global decision, which is authoritative for the Global scope;\na client always includes its global entry, even when enabled. The host\npublishes the fully resolved set across all scopes, and consumers derive\nthe effective enabled value from that set."
         },
-        "isClientBundled": {
-          "type": "boolean",
-          "description": "Whether the client explicitly bundled this server and owns its Global\nenablement decision."
-        },
         "state": {
           "$ref": "#/$defs/McpServerState",
           "description": "Current lifecycle state of the MCP server."

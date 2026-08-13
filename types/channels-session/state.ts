@@ -1072,11 +1072,6 @@ export interface McpServerCustomization extends CustomizationBase {
    */
   enablement?: CustomizationEnablement[];
   /**
-   * Whether the client explicitly bundled this server and owns its Global
-   * enablement decision.
-   */
-  isClientBundled?: boolean;
-  /**
    * Current lifecycle state of the MCP server.
    */
   state: McpServerState;

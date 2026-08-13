@@ -3920,11 +3920,6 @@ data class McpServerCustomization(
      */
     val enablement: List<CustomizationEnablement>? = null,
     /**
-     * Whether the client explicitly bundled this server and owns its Global
-     * enablement decision.
-     */
-    val isClientBundled: Boolean? = null,
-    /**
      * Current lifecycle state of the MCP server.
      */
     val state: McpServerState,

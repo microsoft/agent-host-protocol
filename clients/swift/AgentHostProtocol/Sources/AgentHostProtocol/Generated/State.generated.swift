@@ -4292,9 +4292,6 @@ public struct McpServerCustomization: Codable, Sendable {
     /// publishes the fully resolved set across all scopes, and consumers derive
     /// the effective enabled value from that set.
     public var enablement: [CustomizationEnablement]?
-    /// Whether the client explicitly bundled this server and owns its Global
-    /// enablement decision.
-    public var isClientBundled: Bool?
     /// Current lifecycle state of the MCP server.
     public var state: McpServerState
     /// An `mcp://`-protocol channel the client uses to side-channel traffic
@@ -4326,7 +4323,6 @@ public struct McpServerCustomization: Codable, Sendable {
         case meta = "_meta"
         case type
         case enablement
-        case isClientBundled
         case state
         case channel
         case mcpApp
@@ -4341,7 +4337,6 @@ public struct McpServerCustomization: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         type: CustomizationType,
         enablement: [CustomizationEnablement]? = nil,
-        isClientBundled: Bool? = nil,
         state: McpServerState,
         channel: String? = nil,
         mcpApp: McpServerCustomizationApps? = nil
@@ -4354,7 +4349,6 @@ public struct McpServerCustomization: Codable, Sendable {
         self.meta = meta
         self.type = type
         self.enablement = enablement
-        self.isClientBundled = isClientBundled
         self.state = state
         self.channel = channel
         self.mcpApp = mcpApp

@@ -2900,9 +2900,6 @@ type McpServerCustomization struct {
 	// publishes the fully resolved set across all scopes, and consumers derive
 	// the effective enabled value from that set.
 	Enablement []CustomizationEnablement `json:"enablement,omitempty"`
-	// Whether the client explicitly bundled this server and owns its Global
-	// enablement decision.
-	IsClientBundled *bool `json:"isClientBundled,omitempty"`
 	// Current lifecycle state of the MCP server.
 	State McpServerState `json:"state"`
 	// An `mcp://`-protocol channel the client uses to side-channel traffic
