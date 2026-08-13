@@ -2924,19 +2924,6 @@ pub struct PluginCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -2953,8 +2940,6 @@ pub struct PluginCustomization {
     /// out-of-band.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Whether this container is currently enabled.
-    pub enabled: bool,
     /// `clientId` of the client that contributed this container. Absent for
     /// server-originated entries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2970,6 +2955,9 @@ pub struct PluginCustomization {
     /// nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<ChildCustomization>>,
+    /// Explicit enablement decisions. See {@link McpServerCustomization.enablement}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Version of the plugin, sourced from the
     /// [Open Plugins](https://open-plugins.com/) manifest's optional
     /// `version` field (semver, e.g. `"1.2.0"`). Absent when the manifest
@@ -3006,19 +2994,6 @@ pub struct ClientPluginCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3035,8 +3010,6 @@ pub struct ClientPluginCustomization {
     /// out-of-band.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Whether this container is currently enabled.
-    pub enabled: bool,
     /// `clientId` of the client that contributed this container. Absent for
     /// server-originated entries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -3052,6 +3025,9 @@ pub struct ClientPluginCustomization {
     /// nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<ChildCustomization>>,
+    /// Explicit enablement decisions. See {@link McpServerCustomization.enablement}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Version of the plugin, sourced from the
     /// [Open Plugins](https://open-plugins.com/) manifest's optional
     /// `version` field (semver, e.g. `"1.2.0"`). Absent when the manifest
@@ -3063,6 +3039,16 @@ pub struct ClientPluginCustomization {
     /// Opaque version token used by the host to detect changes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
+    /// Explicit enablement decisions for children this plugin contributes,
+    /// keyed by child name (for MCP servers, the server name as it appears in
+    /// the bundled `.mcp.json`).
+    ///
+    /// Bundled children are discovered by the host rather than published by the
+    /// client, so the client cannot attach `enablement` to them directly. This
+    /// carries the client's global decision for each one; the host applies it
+    /// under the child's durable key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub child_enablement: Option<std::collections::HashMap<String, Vec<CustomizationEnablement>>>,
 }
 
 /// A directory the host watches for this session.
@@ -3091,19 +3077,6 @@ pub struct DirectoryCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3120,8 +3093,6 @@ pub struct DirectoryCustomization {
     /// out-of-band.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Whether this container is currently enabled.
-    pub enabled: bool,
     /// `clientId` of the client that contributed this container. Absent for
     /// server-originated entries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -3137,6 +3108,8 @@ pub struct DirectoryCustomization {
     /// nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<ChildCustomization>>,
+    /// Whether this container is currently enabled.
+    pub enabled: bool,
     /// Which child customization type this directory holds.
     pub contents: CustomizationType,
     /// Whether clients may write into this directory.
@@ -3165,19 +3138,6 @@ pub struct AgentCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3199,9 +3159,10 @@ pub struct AgentCustomization {
     /// turned off on its own.
     ///
     /// This flag is independent of the parent container's: the **effective**
-    /// enabled state of a child is
-    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
-    /// disables every child regardless of each child's own flag.
+    /// enabled state of a plugin child is the plugin's derived enabled value and
+    /// `(child.enabled ?? true)`, so a disabled plugin disables every child
+    /// regardless of each child's own flag. A directory child instead uses the
+    /// directory's `enabled` value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3260,19 +3221,6 @@ pub struct SkillCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3294,9 +3242,10 @@ pub struct SkillCustomization {
     /// turned off on its own.
     ///
     /// This flag is independent of the parent container's: the **effective**
-    /// enabled state of a child is
-    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
-    /// disables every child regardless of each child's own flag.
+    /// enabled state of a plugin child is the plugin's derived enabled value and
+    /// `(child.enabled ?? true)`, so a disabled plugin disables every child
+    /// regardless of each child's own flag. A directory child instead uses the
+    /// directory's `enabled` value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3336,19 +3285,6 @@ pub struct PromptCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3370,9 +3306,10 @@ pub struct PromptCustomization {
     /// turned off on its own.
     ///
     /// This flag is independent of the parent container's: the **effective**
-    /// enabled state of a child is
-    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
-    /// disables every child regardless of each child's own flag.
+    /// enabled state of a plugin child is the plugin's derived enabled value and
+    /// `(child.enabled ?? true)`, so a disabled plugin disables every child
+    /// regardless of each child's own flag. A directory child instead uses the
+    /// directory's `enabled` value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3409,19 +3346,6 @@ pub struct RuleCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3443,9 +3367,10 @@ pub struct RuleCustomization {
     /// turned off on its own.
     ///
     /// This flag is independent of the parent container's: the **effective**
-    /// enabled state of a child is
-    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
-    /// disables every child regardless of each child's own flag.
+    /// enabled state of a plugin child is the plugin's derived enabled value and
+    /// `(child.enabled ?? true)`, so a disabled plugin disables every child
+    /// regardless of each child's own flag. A directory child instead uses the
+    /// directory's `enabled` value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3483,19 +3408,6 @@ pub struct HookCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3517,9 +3429,10 @@ pub struct HookCustomization {
     /// turned off on its own.
     ///
     /// This flag is independent of the parent container's: the **effective**
-    /// enabled state of a child is
-    /// `container.enabled && (child.enabled ?? true)`, so a disabled container
-    /// disables every child regardless of each child's own flag.
+    /// enabled state of a plugin child is the plugin's derived enabled value and
+    /// `(child.enabled ?? true)`, so a disabled plugin disables every child
+    /// regardless of each child's own flag. A directory child instead uses the
+    /// directory's `enabled` value and its own flag.
     ///
     /// A child is turned on or off by id with
     /// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3552,19 +3465,6 @@ pub struct McpServerCustomization {
     pub uri: Uri,
     /// Human-readable name.
     pub name: String,
-    /// Explicit enablement decisions for this customization, one entry per scope
-    /// that has one. This is a wire contract: producers MUST publish entries
-    /// sorted by descending specificity (Session, Workspace, then Global).
-    /// The agent host emits at most one Workspace entry, for the session's primary
-    /// working directory. Consumers MAY treat
-    /// `enablement[0]` as the decisive decision and
-    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-    /// absent or empty array means no explicit decision exists, so the
-    /// customization is enabled by default.
-    ///
-    /// Only the agent host publishes this; clients treat it as read-only provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enablement: Option<Vec<CustomizationEnablement>>,
     /// Icons for UI display.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icons: Option<Vec<Icon>>,
@@ -3581,9 +3481,35 @@ pub struct McpServerCustomization {
     /// out-of-band.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Whether this MCP server is effectively enabled after resolving all scopes.
-    /// {@link CustomizationBase.enablement | `enablement`} records its inputs.
-    pub enabled: bool,
+    /// Source URI of the plugin that contributes this server. A plugin-provided
+    /// server keeps this durable identity while temporarily published top-level;
+    /// its durable enablement key is derived from this URI.
+    ///
+    /// Absent means this is an unowned server, whose durable key is
+    /// `mcpServers#<name>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owning_plugin_uri: Option<Uri>,
+    /// Explicit enablement decisions for this customization, one entry per scope
+    /// that has one. This is a wire contract: producers MUST publish entries
+    /// sorted by descending specificity (Session, Workspace, then Global).
+    /// The agent host emits at most one Workspace entry, for the session's primary
+    /// working directory. Consumers MAY treat
+    /// `enablement[0]` as the decisive decision and
+    /// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+    /// absent or empty array means no explicit decision exists, so the
+    /// customization is enabled by default.
+    ///
+    /// Flows in both directions. A client publishes this alongside a customization
+    /// to assert its global decision, which is authoritative for the Global scope;
+    /// a client always includes its global entry, even when enabled. The host
+    /// publishes the fully resolved set across all scopes, and consumers derive
+    /// the effective enabled value from that set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enablement: Option<Vec<CustomizationEnablement>>,
+    /// Whether the client explicitly bundled this server and owns its Global
+    /// enablement decision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_client_bundled: Option<bool>,
     /// Current lifecycle state of the MCP server.
     pub state: McpServerState,
     /// An `mcp://`-protocol channel the client uses to side-channel traffic

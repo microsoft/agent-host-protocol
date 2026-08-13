@@ -282,9 +282,9 @@ private fun withCustomizationEnablement(c: Customization, enablement: List<Custo
     val enabled = effectiveEnablement(enablement)
     val provenance = enablement.takeIf { it.isNotEmpty() }?.toList()
     return when (c) {
-    is CustomizationPlugin -> CustomizationPlugin(c.value.copy(enabled = enabled, enablement = provenance))
-    is CustomizationDirectory -> CustomizationDirectory(c.value.copy(enabled = enabled, enablement = provenance))
-    is CustomizationMcpServer -> CustomizationMcpServer(c.value.copy(enabled = enabled, enablement = provenance))
+    is CustomizationPlugin -> CustomizationPlugin(c.value.copy(enablement = provenance))
+    is CustomizationDirectory -> CustomizationDirectory(c.value.copy(enabled = enabled))
+    is CustomizationMcpServer -> CustomizationMcpServer(c.value.copy(enablement = provenance))
     is CustomizationUnknown -> c
     }
 }
@@ -293,12 +293,12 @@ private fun withChildCustomizationEnablement(c: ChildCustomization, enablement: 
     val enabled = effectiveEnablement(enablement)
     val provenance = enablement.takeIf { it.isNotEmpty() }?.toList()
     return when (c) {
-    is ChildCustomizationAgent -> ChildCustomizationAgent(c.value.copy(enabled = enabled, enablement = provenance))
-    is ChildCustomizationSkill -> ChildCustomizationSkill(c.value.copy(enabled = enabled, enablement = provenance))
-    is ChildCustomizationPrompt -> ChildCustomizationPrompt(c.value.copy(enabled = enabled, enablement = provenance))
-    is ChildCustomizationRule -> ChildCustomizationRule(c.value.copy(enabled = enabled, enablement = provenance))
-    is ChildCustomizationHook -> ChildCustomizationHook(c.value.copy(enabled = enabled, enablement = provenance))
-    is ChildCustomizationMcpServer -> ChildCustomizationMcpServer(c.value.copy(enabled = enabled, enablement = provenance))
+    is ChildCustomizationAgent -> ChildCustomizationAgent(c.value.copy(enabled = enabled))
+    is ChildCustomizationSkill -> ChildCustomizationSkill(c.value.copy(enabled = enabled))
+    is ChildCustomizationPrompt -> ChildCustomizationPrompt(c.value.copy(enabled = enabled))
+    is ChildCustomizationRule -> ChildCustomizationRule(c.value.copy(enabled = enabled))
+    is ChildCustomizationHook -> ChildCustomizationHook(c.value.copy(enabled = enabled))
+    is ChildCustomizationMcpServer -> ChildCustomizationMcpServer(c.value.copy(enablement = provenance))
     is ChildCustomizationUnknown -> c
     }
 }

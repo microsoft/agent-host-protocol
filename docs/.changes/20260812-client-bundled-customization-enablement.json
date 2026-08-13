@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`McpServerCustomization` now exposes plugin ownership and client-bundled enablement metadata, and `ClientPluginCustomization` can publish child enablement decisions."
+}

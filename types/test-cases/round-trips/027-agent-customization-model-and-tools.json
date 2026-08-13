@@ -8,7 +8,6 @@
     "id": "plugin-1",
     "uri": "https://example.com/plugins/coding",
     "name": "Coding Plugin",
-    "enabled": true,
     "children": [
       {
         "type": "agent",
@@ -27,7 +26,6 @@
       "id": "plugin-1",
       "uri": "https://example.com/plugins/coding",
       "name": "Coding Plugin",
-      "enabled": true,
       "children": [
         {
           "type": "agent",

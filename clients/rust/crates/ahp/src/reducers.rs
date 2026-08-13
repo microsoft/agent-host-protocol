@@ -511,15 +511,12 @@ fn apply_container_enablement(c: &mut Customization, enablement: &[Customization
     let provenance = (!enablement.is_empty()).then(|| enablement.to_vec());
     match c {
         Customization::Plugin(p) => {
-            p.enabled = enabled;
             p.enablement = provenance;
         }
         Customization::Directory(d) => {
             d.enabled = enabled;
-            d.enablement = provenance;
         }
         Customization::McpServer(m) => {
-            m.enabled = enabled;
             m.enablement = provenance;
         }
         Customization::Unknown(_) => {}
@@ -532,26 +529,20 @@ fn apply_child_enablement(c: &mut ChildCustomization, enablement: &[Customizatio
     match c {
         ChildCustomization::Agent(x) => {
             x.enabled = Some(enabled);
-            x.enablement = provenance;
         }
         ChildCustomization::Skill(x) => {
             x.enabled = Some(enabled);
-            x.enablement = provenance;
         }
         ChildCustomization::Prompt(x) => {
             x.enabled = Some(enabled);
-            x.enablement = provenance;
         }
         ChildCustomization::Rule(x) => {
             x.enabled = Some(enabled);
-            x.enablement = provenance;
         }
         ChildCustomization::Hook(x) => {
             x.enabled = Some(enabled);
-            x.enablement = provenance;
         }
         ChildCustomization::McpServer(x) => {
-            x.enabled = enabled;
             x.enablement = provenance;
         }
         ChildCustomization::Unknown(_) => {}

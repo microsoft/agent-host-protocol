@@ -1356,7 +1356,7 @@ public struct SessionCustomizationToggledAction: Codable, Sendable {
     public var type: ActionType
     /// The id of the container or child to update.
     public var id: String
-    /// The complete set of explicit decisions, replacing any existing set.
+    /// Explicit enablement decisions, replacing the previous list entirely.
     public var enablement: [CustomizationEnablement]
 
     public init(

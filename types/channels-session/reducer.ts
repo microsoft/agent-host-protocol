@@ -109,20 +109,24 @@ function updateMcpServerCustomization(
 }
 
 /**
- * Replaces a customization's explicit enablement decisions and recomputes its
- * effective {@link CustomizationBase.enabled | `enabled`} value. An empty set
- * drops the field entirely, so a customization at its default carries no
- * provenance.
+ * Replaces explicit decisions for plugins and MCP servers; other customizations
+ * retain their legacy `enabled` field, derived from the incoming decisions.
  */
-function applyCustomizationEnablement<T extends Customization | ChildCustomization>(customization: T, enablement: readonly CustomizationEnablement[]): T {
-  const next = { ...customization };
-  next.enabled = enablement[0]?.enabled ?? true;
-  if (enablement.length > 0) {
-    next.enablement = [...enablement];
-  } else {
-    delete next.enablement;
+function applyCustomizationEnablement(customization: Customization, enablement: readonly CustomizationEnablement[]): Customization;
+function applyCustomizationEnablement(customization: ChildCustomization, enablement: readonly CustomizationEnablement[]): ChildCustomization;
+function applyCustomizationEnablement(customization: Customization | ChildCustomization, enablement: readonly CustomizationEnablement[]): Customization | ChildCustomization {
+  switch (customization.type) {
+    case CustomizationType.Plugin:
+    case CustomizationType.McpServer: {
+      if (enablement.length > 0) {
+        return { ...customization, enablement: [...enablement] };
+      }
+      const { enablement: _enablement, ...withoutEnablement } = customization;
+      return withoutEnablement;
+    }
+    default:
+      return { ...customization, enabled: enablement[0]?.enabled ?? true };
   }
-  return next;
 }
 
 // ─── Session Reducer ─────────────────────────────────────────────────────────

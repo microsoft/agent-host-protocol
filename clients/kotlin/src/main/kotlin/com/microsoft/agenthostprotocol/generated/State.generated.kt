@@ -3270,20 +3270,6 @@ data class PluginCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3304,10 +3290,6 @@ data class PluginCustomization(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Whether this container is currently enabled.
-     */
-    val enabled: Boolean,
-    /**
      * `clientId` of the client that contributed this container. Absent for
      * server-originated entries.
      */
@@ -3326,6 +3308,10 @@ data class PluginCustomization(
      */
     val children: List<ChildCustomization>? = null,
     val type: CustomizationType,
+    /**
+     * Explicit enablement decisions. See {@link McpServerCustomization.enablement}.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
     /**
      * Version of the plugin, sourced from the
      * [Open Plugins](https://open-plugins.com/) manifest's optional
@@ -3360,20 +3346,6 @@ data class ClientPluginCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3394,10 +3366,6 @@ data class ClientPluginCustomization(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Whether this container is currently enabled.
-     */
-    val enabled: Boolean,
-    /**
      * `clientId` of the client that contributed this container. Absent for
      * server-originated entries.
      */
@@ -3417,6 +3385,10 @@ data class ClientPluginCustomization(
     val children: List<ChildCustomization>? = null,
     val type: CustomizationType,
     /**
+     * Explicit enablement decisions. See {@link McpServerCustomization.enablement}.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
+    /**
      * Version of the plugin, sourced from the
      * [Open Plugins](https://open-plugins.com/) manifest's optional
      * `version` field (semver, e.g. `"1.2.0"`). Absent when the manifest
@@ -3428,7 +3400,18 @@ data class ClientPluginCustomization(
     /**
      * Opaque version token used by the host to detect changes.
      */
-    val nonce: String? = null
+    val nonce: String? = null,
+    /**
+     * Explicit enablement decisions for children this plugin contributes,
+     * keyed by child name (for MCP servers, the server name as it appears in
+     * the bundled `.mcp.json`).
+     *
+     * Bundled children are discovered by the host rather than published by the
+     * client, so the client cannot attach `enablement` to them directly. This
+     * carries the client's global decision for each one; the host applies it
+     * under the child's durable key.
+     */
+    val childEnablement: Map<String, List<CustomizationEnablement>>? = null
 )
 
 @Serializable
@@ -3454,20 +3437,6 @@ data class DirectoryCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3488,10 +3457,6 @@ data class DirectoryCustomization(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Whether this container is currently enabled.
-     */
-    val enabled: Boolean,
-    /**
      * `clientId` of the client that contributed this container. Absent for
      * server-originated entries.
      */
@@ -3510,6 +3475,10 @@ data class DirectoryCustomization(
      */
     val children: List<ChildCustomization>? = null,
     val type: CustomizationType,
+    /**
+     * Whether this container is currently enabled.
+     */
+    val enabled: Boolean,
     /**
      * Which child customization type this directory holds.
      */
@@ -3543,20 +3512,6 @@ data class AgentCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3582,9 +3537,10 @@ data class AgentCustomization(
      * turned off on its own.
      *
      * This flag is independent of the parent container's: the **effective**
-     * enabled state of a child is
-     * `container.enabled && (child.enabled ?? true)`, so a disabled container
-     * disables every child regardless of each child's own flag.
+     * enabled state of a plugin child is the plugin's derived enabled value and
+     * `(child.enabled ?? true)`, so a disabled plugin disables every child
+     * regardless of each child's own flag. A directory child instead uses the
+     * directory's `enabled` value and its own flag.
      *
      * A child is turned on or off by id with
      * {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3649,20 +3605,6 @@ data class SkillCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3688,9 +3630,10 @@ data class SkillCustomization(
      * turned off on its own.
      *
      * This flag is independent of the parent container's: the **effective**
-     * enabled state of a child is
-     * `container.enabled && (child.enabled ?? true)`, so a disabled container
-     * disables every child regardless of each child's own flag.
+     * enabled state of a plugin child is the plugin's derived enabled value and
+     * `(child.enabled ?? true)`, so a disabled plugin disables every child
+     * regardless of each child's own flag. A directory child instead uses the
+     * directory's `enabled` value and its own flag.
      *
      * A child is turned on or off by id with
      * {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3739,20 +3682,6 @@ data class PromptCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3778,9 +3707,10 @@ data class PromptCustomization(
      * turned off on its own.
      *
      * This flag is independent of the parent container's: the **effective**
-     * enabled state of a child is
-     * `container.enabled && (child.enabled ?? true)`, so a disabled container
-     * disables every child regardless of each child's own flag.
+     * enabled state of a plugin child is the plugin's derived enabled value and
+     * `(child.enabled ?? true)`, so a disabled plugin disables every child
+     * regardless of each child's own flag. A directory child instead uses the
+     * directory's `enabled` value and its own flag.
      *
      * A child is turned on or off by id with
      * {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3816,20 +3746,6 @@ data class RuleCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3855,9 +3771,10 @@ data class RuleCustomization(
      * turned off on its own.
      *
      * This flag is independent of the parent container's: the **effective**
-     * enabled state of a child is
-     * `container.enabled && (child.enabled ?? true)`, so a disabled container
-     * disables every child regardless of each child's own flag.
+     * enabled state of a plugin child is the plugin's derived enabled value and
+     * `(child.enabled ?? true)`, so a disabled plugin disables every child
+     * regardless of each child's own flag. A directory child instead uses the
+     * directory's `enabled` value and its own flag.
      *
      * A child is turned on or off by id with
      * {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3904,20 +3821,6 @@ data class HookCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -3943,9 +3846,10 @@ data class HookCustomization(
      * turned off on its own.
      *
      * This flag is independent of the parent container's: the **effective**
-     * enabled state of a child is
-     * `container.enabled && (child.enabled ?? true)`, so a disabled container
-     * disables every child regardless of each child's own flag.
+     * enabled state of a plugin child is the plugin's derived enabled value and
+     * `(child.enabled ?? true)`, so a disabled plugin disables every child
+     * regardless of each child's own flag. A directory child instead uses the
+     * directory's `enabled` value and its own flag.
      *
      * A child is turned on or off by id with
      * {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -3977,20 +3881,6 @@ data class McpServerCustomization(
      */
     val name: String,
     /**
-     * Explicit enablement decisions for this customization, one entry per scope
-     * that has one. This is a wire contract: producers MUST publish entries
-     * sorted by descending specificity (Session, Workspace, then Global).
-     * The agent host emits at most one Workspace entry, for the session's primary
-     * working directory. Consumers MAY treat
-     * `enablement[0]` as the decisive decision and
-     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
-     * absent or empty array means no explicit decision exists, so the
-     * customization is enabled by default.
-     *
-     * Only the agent host publishes this; clients treat it as read-only provenance.
-     */
-    val enablement: List<CustomizationEnablement>? = null,
-    /**
      * Icons for UI display.
      */
     val icons: List<Icon>? = null,
@@ -4012,10 +3902,37 @@ data class McpServerCustomization(
     val meta: Map<String, JsonElement>? = null,
     val type: CustomizationType,
     /**
-     * Whether this MCP server is effectively enabled after resolving all scopes.
-     * {@link CustomizationBase.enablement | `enablement`} records its inputs.
+     * Source URI of the plugin that contributes this server. A plugin-provided
+     * server keeps this durable identity while temporarily published top-level;
+     * its durable enablement key is derived from this URI.
+     *
+     * Absent means this is an unowned server, whose durable key is
+     * `mcpServers#<name>`.
      */
-    val enabled: Boolean,
+    val owningPluginUri: String? = null,
+    /**
+     * Explicit enablement decisions for this customization, one entry per scope
+     * that has one. This is a wire contract: producers MUST publish entries
+     * sorted by descending specificity (Session, Workspace, then Global).
+     * The agent host emits at most one Workspace entry, for the session's primary
+     * working directory. Consumers MAY treat
+     * `enablement[0]` as the decisive decision and
+     * `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+     * absent or empty array means no explicit decision exists, so the
+     * customization is enabled by default.
+     *
+     * Flows in both directions. A client publishes this alongside a customization
+     * to assert its global decision, which is authoritative for the Global scope;
+     * a client always includes its global entry, even when enabled. The host
+     * publishes the fully resolved set across all scopes, and consumers derive
+     * the effective enabled value from that set.
+     */
+    val enablement: List<CustomizationEnablement>? = null,
+    /**
+     * Whether the client explicitly bundled this server and owns its Global
+     * enablement decision.
+     */
+    val isClientBundled: Boolean? = null,
     /**
      * Current lifecycle state of the MCP server.
      */

@@ -1062,7 +1062,7 @@ data class SessionCustomizationToggledAction(
      */
     val id: String,
     /**
-     * The complete set of explicit decisions, replacing any existing set.
+     * Explicit enablement decisions, replacing the previous list entirely.
      */
     val enablement: List<CustomizationEnablement>
 )

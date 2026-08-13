@@ -11,8 +11,7 @@
         "type": "plugin",
         "id": "plugin-a",
         "uri": "https://plugins.example/a",
-        "name": "Plugin A",
-        "enabled": true
+        "name": "Plugin A"
       }
     ],
     "activeClients": [],
@@ -26,8 +25,7 @@
           "type": "plugin",
           "id": "plugin-b",
           "uri": "https://plugins.example/b",
-          "name": "Plugin B",
-          "enabled": false
+          "name": "Plugin B"
         }
       ]
     }
@@ -42,8 +40,7 @@
         "type": "plugin",
         "id": "plugin-b",
         "uri": "https://plugins.example/b",
-        "name": "Plugin B",
-        "enabled": false
+        "name": "Plugin B"
       }
     ],
     "activeClients": [],

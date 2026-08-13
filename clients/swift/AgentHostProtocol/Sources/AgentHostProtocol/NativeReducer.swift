@@ -230,15 +230,12 @@ func applyCustomizationEnablement(_ c: inout Customization, _ enablement: [Custo
     let provenance = enablement.isEmpty ? nil : enablement
     switch c {
     case .plugin(var p):
-        p.enabled = enabled
         p.enablement = provenance
         c = .plugin(p)
     case .directory(var d):
         d.enabled = enabled
-        d.enablement = provenance
         c = .directory(d)
     case .mcpServer(var m):
-        m.enabled = enabled
         m.enablement = provenance
         c = .mcpServer(m)
     // Unknown/future customization: opaque payload, nothing to mutate.
@@ -253,26 +250,20 @@ func applyChildCustomizationEnablement(_ c: inout ChildCustomization, _ enableme
     switch c {
     case .agent(var x):
         x.enabled = enabled
-        x.enablement = provenance
         c = .agent(x)
     case .skill(var x):
         x.enabled = enabled
-        x.enablement = provenance
         c = .skill(x)
     case .prompt(var x):
         x.enabled = enabled
-        x.enablement = provenance
         c = .prompt(x)
     case .rule(var x):
         x.enabled = enabled
-        x.enablement = provenance
         c = .rule(x)
     case .hook(var x):
         x.enabled = enabled
-        x.enablement = provenance
         c = .hook(x)
     case .mcpServer(var x):
-        x.enabled = enabled
         x.enablement = provenance
         c = .mcpServer(x)
     // Unknown/future child customization: opaque payload, nothing to mutate.

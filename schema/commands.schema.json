@@ -2844,13 +2844,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -2948,13 +2941,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -2970,10 +2956,6 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether this container is currently enabled."
         },
         "clientId": {
           "type": "string",
@@ -2994,8 +2976,7 @@
       "required": [
         "id",
         "uri",
-        "name",
-        "enabled"
+        "name"
       ]
     },
     "PluginCustomization": {
@@ -3014,13 +2995,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3036,10 +3010,6 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether this container is currently enabled."
         },
         "clientId": {
           "type": "string",
@@ -3059,6 +3029,13 @@
         "type": {
           "const": "plugin"
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions. See {@link McpServerCustomization.enablement}."
+        },
         "version": {
           "type": "string",
           "description": "Version of the plugin, sourced from the\n[Open Plugins](https://open-plugins.com/) manifest's optional\n`version` field (semver, e.g. `\"1.2.0\"`). Absent when the manifest\ndeclares no version — the field is optional there — or the source\nhas no version concept. Provenance / display only: the host neither\nparses nor enforces it."
@@ -3068,7 +3045,6 @@
         "id",
         "uri",
         "name",
-        "enabled",
         "type"
       ]
     },
@@ -3088,13 +3064,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3110,10 +3079,6 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether this container is currently enabled."
         },
         "clientId": {
           "type": "string",
@@ -3133,6 +3098,13 @@
         "type": {
           "const": "plugin"
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions. See {@link McpServerCustomization.enablement}."
+        },
         "version": {
           "type": "string",
           "description": "Version of the plugin, sourced from the\n[Open Plugins](https://open-plugins.com/) manifest's optional\n`version` field (semver, e.g. `\"1.2.0\"`). Absent when the manifest\ndeclares no version — the field is optional there — or the source\nhas no version concept. Provenance / display only: the host neither\nparses nor enforces it."
@@ -3140,13 +3112,22 @@
         "nonce": {
           "type": "string",
           "description": "Opaque version token used by the host to detect changes."
+        },
+        "childEnablement": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CustomizationEnablement"
+            }
+          },
+          "description": "Explicit enablement decisions for children this plugin contributes,\nkeyed by child name (for MCP servers, the server name as it appears in\nthe bundled `.mcp.json`).\n\nBundled children are discovered by the host rather than published by the\nclient, so the client cannot attach `enablement` to them directly. This\ncarries the client's global decision for each one; the host applies it\nunder the child's durable key."
         }
       },
       "required": [
         "id",
         "uri",
         "name",
-        "enabled",
         "type"
       ]
     },
@@ -3166,13 +3147,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3188,10 +3162,6 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether this container is currently enabled."
         },
         "clientId": {
           "type": "string",
@@ -3211,6 +3181,10 @@
         "type": {
           "const": "directory"
         },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this container is currently enabled."
+        },
         "contents": {
           "$ref": "#/$defs/ChildCustomizationType",
           "description": "Which child customization type this directory holds."
@@ -3224,15 +3198,15 @@
         "id",
         "uri",
         "name",
-        "enabled",
         "type",
+        "enabled",
         "contents",
         "writable"
       ]
     },
     "ChildCustomizationBase": {
       "type": "object",
-      "description": "Fields shared by the leaf child customizations that live inside a\ncontainer — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase: it always carries an explicit {@link McpServerCustomization.enabled}\nbecause it can appear as a top-level customization too.",
+      "description": "Fields shared by the leaf child customizations that live inside a\ncontainer — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase because it can appear as a top-level customization too.",
       "properties": {
         "id": {
           "type": "string",
@@ -3245,13 +3219,6 @@
         "name": {
           "type": "string",
           "description": "Human-readable name."
-        },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
         },
         "icons": {
           "type": "array",
@@ -3271,7 +3238,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         }
       },
       "required": [
@@ -3296,13 +3263,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3321,7 +3281,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "agent"
@@ -3373,13 +3333,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3398,7 +3351,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "skill"
@@ -3439,13 +3392,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3464,7 +3410,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "prompt"
@@ -3497,13 +3443,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3522,7 +3461,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "rule"
@@ -3566,13 +3505,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3591,7 +3523,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "hook"
@@ -3620,13 +3552,6 @@
           "type": "string",
           "description": "Human-readable name."
         },
-        "enablement": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CustomizationEnablement"
-          },
-          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nOnly the agent host publishes this; clients treat it as read-only provenance."
-        },
         "icons": {
           "type": "array",
           "items": {
@@ -3646,9 +3571,20 @@
         "type": {
           "const": "mcpServer"
         },
-        "enabled": {
+        "owningPluginUri": {
+          "$ref": "#/$defs/URI",
+          "description": "Source URI of the plugin that contributes this server. A plugin-provided\nserver keeps this durable identity while temporarily published top-level;\nits durable enablement key is derived from this URI.\n\nAbsent means this is an unowned server, whose durable key is\n`mcpServers#<name>`."
+        },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nFlows in both directions. A client publishes this alongside a customization\nto assert its global decision, which is authoritative for the Global scope;\na client always includes its global entry, even when enabled. The host\npublishes the fully resolved set across all scopes, and consumers derive\nthe effective enabled value from that set."
+        },
+        "isClientBundled": {
           "type": "boolean",
-          "description": "Whether this MCP server is effectively enabled after resolving all scopes.\n{@link CustomizationBase.enablement | `enablement`} records its inputs."
+          "description": "Whether the client explicitly bundled this server and owns its Global\nenablement decision."
         },
         "state": {
           "$ref": "#/$defs/McpServerState",
@@ -3668,7 +3604,6 @@
         "uri",
         "name",
         "type",
-        "enabled",
         "state"
       ]
     },
@@ -6957,7 +6892,7 @@
     },
     "SessionCustomizationToggledAction": {
       "type": "object",
-      "description": "A client toggled a customization on or off.\n\nMatches `id` against every top-level customization first — a plugin or\ndirectory container, or a bare top-level MCP server — then against the\nchildren inside each container (a skill, agent, or other entry), and\nsets the matched entry's `enabled` flag. Disabling a container still\ndisables all of its children — the effective state of a child is\n`container.enabled && (child.enabled ?? true)` — so toggling a child\nonly matters while its container is enabled. Is a no-op when no\ncustomization has the given `id`.\n\nThe `enablement` array completely replaces all explicit decisions. A caller\nchanging one scope must include every decision it intends to preserve.",
+      "description": "A client updated a customization's enablement decisions.\n\nMatches `id` against every top-level customization first — a plugin or\ndirectory container, or a bare top-level MCP server — then against the\nchildren inside each container (a skill, agent, or other entry). Plugins\nand MCP servers retain the matched entry's explicit decisions; other\nentries update their `enabled` flag. Disabling a plugin still disables all\nof its children — the effective state of a plugin child is the plugin's\nderived enabled value and `(child.enabled ?? true)` — so toggling a child\nonly matters while its plugin is enabled. Is a no-op when no\ncustomization has the given `id`.\n\nThe `enablement` array completely replaces all explicit decisions. A caller\nchanging one scope must include every decision it intends to preserve.",
       "properties": {
         "type": {
           "const": "session/customizationToggled"
@@ -6971,7 +6906,7 @@
           "items": {
             "$ref": "#/$defs/CustomizationEnablement"
           },
-          "description": "The complete set of explicit decisions, replacing any existing set."
+          "description": "Explicit enablement decisions, replacing the previous list entirely."
         }
       },
       "required": [
@@ -9078,6 +9013,46 @@
       ],
       "description": "Discriminated union of all tool call lifecycle states.\n\nSee the [state model guide](/guide/state-model.html#tool-call-lifecycle)\nfor the full state machine diagram."
     },
+    "CustomizationLoadState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CustomizationLoadingState"
+        },
+        {
+          "$ref": "#/$defs/CustomizationLoadedState"
+        },
+        {
+          "$ref": "#/$defs/CustomizationDegradedState"
+        },
+        {
+          "$ref": "#/$defs/CustomizationErrorState"
+        }
+      ],
+      "description": "Discriminated load state for a container customization\n({@link PluginCustomization} or {@link DirectoryCustomization})."
+    },
+    "ChildCustomization": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AgentCustomization"
+        },
+        {
+          "$ref": "#/$defs/SkillCustomization"
+        },
+        {
+          "$ref": "#/$defs/PromptCustomization"
+        },
+        {
+          "$ref": "#/$defs/RuleCustomization"
+        },
+        {
+          "$ref": "#/$defs/HookCustomization"
+        },
+        {
+          "$ref": "#/$defs/McpServerCustomization"
+        }
+      ],
+      "description": "Child customizations that live inside a {@link PluginCustomization} or\n{@link DirectoryCustomization}."
+    },
     "CustomizationEnablement": {
       "oneOf": [
         {
@@ -9131,46 +9106,6 @@
         }
       ],
       "description": "A single explicit enablement decision."
-    },
-    "CustomizationLoadState": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/CustomizationLoadingState"
-        },
-        {
-          "$ref": "#/$defs/CustomizationLoadedState"
-        },
-        {
-          "$ref": "#/$defs/CustomizationDegradedState"
-        },
-        {
-          "$ref": "#/$defs/CustomizationErrorState"
-        }
-      ],
-      "description": "Discriminated load state for a container customization\n({@link PluginCustomization} or {@link DirectoryCustomization})."
-    },
-    "ChildCustomization": {
-      "oneOf": [
-        {
-          "$ref": "#/$defs/AgentCustomization"
-        },
-        {
-          "$ref": "#/$defs/SkillCustomization"
-        },
-        {
-          "$ref": "#/$defs/PromptCustomization"
-        },
-        {
-          "$ref": "#/$defs/RuleCustomization"
-        },
-        {
-          "$ref": "#/$defs/HookCustomization"
-        },
-        {
-          "$ref": "#/$defs/McpServerCustomization"
-        }
-      ],
-      "description": "Child customizations that live inside a {@link PluginCustomization} or\n{@link DirectoryCustomization}."
     },
     "ChildCustomizationType": {
       "oneOf": [

@@ -388,13 +388,10 @@ func applyContainerEnablement(c *ahptypes.Customization, enablement []ahptypes.C
 	provenance := append([]ahptypes.CustomizationEnablement(nil), enablement...)
 	switch v := c.Value.(type) {
 	case *ahptypes.PluginCustomization:
-		v.Enabled = enabled
 		v.Enablement = provenance
 	case *ahptypes.DirectoryCustomization:
 		v.Enabled = enabled
-		v.Enablement = provenance
 	case *ahptypes.McpServerCustomization:
-		v.Enabled = enabled
 		v.Enablement = provenance
 	}
 }
@@ -405,21 +402,15 @@ func applyChildEnablement(c *ahptypes.ChildCustomization, enablement []ahptypes.
 	switch v := c.Value.(type) {
 	case *ahptypes.AgentCustomization:
 		v.Enabled = &enabled
-		v.Enablement = provenance
 	case *ahptypes.SkillCustomization:
 		v.Enabled = &enabled
-		v.Enablement = provenance
 	case *ahptypes.PromptCustomization:
 		v.Enabled = &enabled
-		v.Enablement = provenance
 	case *ahptypes.RuleCustomization:
 		v.Enabled = &enabled
-		v.Enablement = provenance
 	case *ahptypes.HookCustomization:
 		v.Enabled = &enabled
-		v.Enablement = provenance
 	case *ahptypes.McpServerCustomization:
-		v.Enabled = enabled
 		v.Enablement = provenance
 	}
 }
