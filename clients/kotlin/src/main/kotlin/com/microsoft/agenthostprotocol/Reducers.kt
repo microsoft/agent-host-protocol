@@ -283,21 +283,36 @@ private fun withCustomizationChildren(c: Customization, children: List<ChildCust
     is CustomizationUnknown -> c
 }
 
-private fun withCustomizationEnabled(c: Customization, enabled: Boolean): Customization = when (c) {
-    is CustomizationPlugin -> CustomizationPlugin(c.value.copy(enabled = enabled))
-    is CustomizationDirectory -> CustomizationDirectory(c.value.copy(enabled = enabled))
-    is CustomizationMcpServer -> CustomizationMcpServer(c.value.copy(enabled = enabled))
-    is CustomizationUnknown -> c
+private fun effectiveEnablement(enablement: List<CustomizationEnablement>): Boolean = when (val decision = enablement.firstOrNull()) {
+    is CustomizationEnablement.Global -> decision.value.enabled
+    is CustomizationEnablement.Workspace -> decision.value.enabled
+    is CustomizationEnablement.Session -> decision.value.enabled
+    null -> true
 }
 
-private fun withChildCustomizationEnabled(c: ChildCustomization, enabled: Boolean): ChildCustomization = when (c) {
+private fun withCustomizationEnablement(c: Customization, enablement: List<CustomizationEnablement>): Customization {
+    val enabled = effectiveEnablement(enablement)
+    val provenance = enablement.takeIf { it.isNotEmpty() }?.toList()
+    return when (c) {
+    is CustomizationPlugin -> CustomizationPlugin(c.value.copy(enablement = provenance))
+    is CustomizationDirectory -> CustomizationDirectory(c.value.copy(enabled = enabled))
+    is CustomizationMcpServer -> CustomizationMcpServer(c.value.copy(enablement = provenance))
+    is CustomizationUnknown -> c
+    }
+}
+
+private fun withChildCustomizationEnablement(c: ChildCustomization, enablement: List<CustomizationEnablement>): ChildCustomization {
+    val enabled = effectiveEnablement(enablement)
+    val provenance = enablement.takeIf { it.isNotEmpty() }?.toList()
+    return when (c) {
     is ChildCustomizationAgent -> ChildCustomizationAgent(c.value.copy(enabled = enabled))
     is ChildCustomizationSkill -> ChildCustomizationSkill(c.value.copy(enabled = enabled))
     is ChildCustomizationPrompt -> ChildCustomizationPrompt(c.value.copy(enabled = enabled))
     is ChildCustomizationRule -> ChildCustomizationRule(c.value.copy(enabled = enabled))
     is ChildCustomizationHook -> ChildCustomizationHook(c.value.copy(enabled = enabled))
-    is ChildCustomizationMcpServer -> ChildCustomizationMcpServer(c.value.copy(enabled = enabled))
+    is ChildCustomizationMcpServer -> ChildCustomizationMcpServer(c.value.copy(enablement = provenance))
     is ChildCustomizationUnknown -> c
+    }
 }
 
 private fun childCustomizationId(c: ChildCustomization): String? = when (c) {
@@ -697,7 +712,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
             val idx = list.indexOfFirst { customizationId(it) == a.id }
             if (idx >= 0) {
                 val updated = list.toMutableList()
-                updated[idx] = withCustomizationEnabled(updated[idx], a.enabled)
+                updated[idx] = withCustomizationEnablement(updated[idx], a.enablement)
                 state.copy(customizations = updated)
             } else run {
                 for (i in list.indices) {
@@ -705,7 +720,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                     val childIdx = children.indexOfFirst { childCustomizationId(it) == a.id }
                     if (childIdx < 0) continue
                     val newChildren = children.toMutableList()
-                    newChildren[childIdx] = withChildCustomizationEnabled(newChildren[childIdx], a.enabled)
+                    newChildren[childIdx] = withChildCustomizationEnablement(newChildren[childIdx], a.enablement)
                     val updated = list.toMutableList()
                     updated[i] = withCustomizationChildren(list[i], newChildren)
                     return@run state.copy(customizations = updated)

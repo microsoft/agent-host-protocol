@@ -1823,10 +1823,6 @@
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether this container is currently enabled."
-        },
         "clientId": {
           "type": "string",
           "description": "`clientId` of the client that contributed this container. Absent for\nserver-originated entries."
@@ -1846,8 +1842,7 @@
       "required": [
         "id",
         "uri",
-        "name",
-        "enabled"
+        "name"
       ]
     },
     "PluginCustomization": {
@@ -1882,10 +1877,6 @@
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether this container is currently enabled."
-        },
         "clientId": {
           "type": "string",
           "description": "`clientId` of the client that contributed this container. Absent for\nserver-originated entries."
@@ -1904,6 +1895,13 @@
         "type": {
           "const": "plugin"
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions. See {@link McpServerCustomization.enablement}."
+        },
         "version": {
           "type": "string",
           "description": "Version of the plugin, sourced from the\n[Open Plugins](https://open-plugins.com/) manifest's optional\n`version` field (semver, e.g. `\"1.2.0\"`). Absent when the manifest\ndeclares no version — the field is optional there — or the source\nhas no version concept. Provenance / display only: the host neither\nparses nor enforces it."
@@ -1913,7 +1911,6 @@
         "id",
         "uri",
         "name",
-        "enabled",
         "type"
       ]
     },
@@ -1949,10 +1946,6 @@
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether this container is currently enabled."
-        },
         "clientId": {
           "type": "string",
           "description": "`clientId` of the client that contributed this container. Absent for\nserver-originated entries."
@@ -1971,6 +1964,13 @@
         "type": {
           "const": "plugin"
         },
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions. See {@link McpServerCustomization.enablement}."
+        },
         "version": {
           "type": "string",
           "description": "Version of the plugin, sourced from the\n[Open Plugins](https://open-plugins.com/) manifest's optional\n`version` field (semver, e.g. `\"1.2.0\"`). Absent when the manifest\ndeclares no version — the field is optional there — or the source\nhas no version concept. Provenance / display only: the host neither\nparses nor enforces it."
@@ -1978,13 +1978,22 @@
         "nonce": {
           "type": "string",
           "description": "Opaque version token used by the host to detect changes."
+        },
+        "childEnablement": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CustomizationEnablement"
+            }
+          },
+          "description": "Explicit enablement decisions for children this plugin contributes,\nkeyed by child name (for MCP servers, the server name as it appears in\nthe bundled `.mcp.json`).\n\nBundled children are discovered by the host rather than published by the\nclient, so the client cannot attach `enablement` to them directly. This\ncarries the client's global decision for each one; the host applies it\nunder the child's durable key."
         }
       },
       "required": [
         "id",
         "uri",
         "name",
-        "enabled",
         "type"
       ]
     },
@@ -2020,10 +2029,6 @@
           "additionalProperties": {},
           "description": "Additional provider-specific metadata for this customization.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the\nprotocol; producers and consumers agree on its contents\nout-of-band."
         },
-        "enabled": {
-          "type": "boolean",
-          "description": "Whether this container is currently enabled."
-        },
         "clientId": {
           "type": "string",
           "description": "`clientId` of the client that contributed this container. Absent for\nserver-originated entries."
@@ -2042,6 +2047,10 @@
         "type": {
           "const": "directory"
         },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this container is currently enabled."
+        },
         "contents": {
           "$ref": "#/$defs/ChildCustomizationType",
           "description": "Which child customization type this directory holds."
@@ -2055,15 +2064,15 @@
         "id",
         "uri",
         "name",
-        "enabled",
         "type",
+        "enabled",
         "contents",
         "writable"
       ]
     },
     "ChildCustomizationBase": {
       "type": "object",
-      "description": "Fields shared by the leaf child customizations that live inside a\ncontainer — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase: it always carries an explicit {@link McpServerCustomization.enabled}\nbecause it can appear as a top-level customization too.",
+      "description": "Fields shared by the leaf child customizations that live inside a\ncontainer — {@link AgentCustomization}, {@link SkillCustomization},\n{@link PromptCustomization}, {@link RuleCustomization}, and\n{@link HookCustomization}.\n\n{@link McpServerCustomization} is also a child but does not extend this\nbase because it can appear as a top-level customization too.",
       "properties": {
         "id": {
           "type": "string",
@@ -2095,7 +2104,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         }
       },
       "required": [
@@ -2138,7 +2147,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "agent"
@@ -2208,7 +2217,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "skill"
@@ -2267,7 +2276,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "prompt"
@@ -2318,7 +2327,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "rule"
@@ -2380,7 +2389,7 @@
         },
         "enabled": {
           "type": "boolean",
-          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a child is\n`container.enabled && (child.enabled ?? true)`, so a disabled container\ndisables every child regardless of each child's own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
+          "description": "Whether this child is individually enabled. Absent means enabled, so a\nproducer only needs to set it to surface a child that exists but is\nturned off on its own.\n\nThis flag is independent of the parent container's: the **effective**\nenabled state of a plugin child is the plugin's derived enabled value and\n`(child.enabled ?? true)`, so a disabled plugin disables every child\nregardless of each child's own flag. A directory child instead uses the\ndirectory's `enabled` value and its own flag.\n\nA child is turned on or off by id with\n{@link SessionCustomizationToggledAction | `session/customizationToggled`}."
         },
         "type": {
           "const": "hook"
@@ -2428,9 +2437,16 @@
         "type": {
           "const": "mcpServer"
         },
-        "enabled": {
+        "enablement": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CustomizationEnablement"
+          },
+          "description": "Explicit enablement decisions for this customization, one entry per scope\nthat has one. This is a wire contract: producers MUST publish entries\nsorted by descending specificity (Session, Workspace, then Global).\nThe agent host emits at most one Workspace entry, for the session's primary\nworking directory. Consumers MAY treat\n`enablement[0]` as the decisive decision and\n`enablement?.[0]?.enabled ?? true` as the effective enabled value. An\nabsent or empty array means no explicit decision exists, so the\ncustomization is enabled by default.\n\nFlows in both directions. A client publishes this alongside a customization\nto assert its global decision, which is authoritative for the Global scope;\na client always includes its global entry, even when enabled. The host\npublishes the fully resolved set across all scopes, and consumers derive\nthe effective enabled value from that set."
+        },
+        "isClientBundled": {
           "type": "boolean",
-          "description": "Whether this MCP server is currently enabled."
+          "description": "Whether the client explicitly bundled this server and owns its Global\nenablement decision."
         },
         "state": {
           "$ref": "#/$defs/McpServerState",
@@ -2450,7 +2466,6 @@
         "uri",
         "name",
         "type",
-        "enabled",
         "state"
       ]
     },
@@ -6137,6 +6152,60 @@
         }
       ],
       "description": "Child customizations that live inside a {@link PluginCustomization} or\n{@link DirectoryCustomization}."
+    },
+    "CustomizationEnablement": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "global"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "enabled"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "workspace"
+            },
+            "uri": {
+              "$ref": "#/$defs/URI"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "uri",
+            "enabled"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "session"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "enabled"
+          ]
+        }
+      ],
+      "description": "A single explicit enablement decision."
     },
     "ChildCustomizationType": {
       "oneOf": [

@@ -658,7 +658,7 @@ const STATE_ENUMS = [
   'ToolCallRiskAssessmentStatus',
   'ToolCallCancellationReason',
   'ConfirmationOptionKind', 'ToolCallContributorKind',
-  'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
+  'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
@@ -1223,6 +1223,10 @@ function generateStateFile(project: Project): string {
     }
   }
 
+  lines.push('// ─── Customization Enablement Union ───────────────────────────────────────\n');
+  lines.push(generateCustomizationEnablementRust());
+  lines.push('');
+
   lines.push(generateToolInput());
   lines.push('');
 
@@ -1421,7 +1425,7 @@ pub struct ${scope}ToolCallConfirmedAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AutomationDefinition, AutomationRunArtifact, AutomationRunLifecycle, AutomationRunOperation, AutomationRunSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AutomationDefinition, AutomationRunArtifact, AutomationRunLifecycle, AutomationRunOperation, AutomationRunSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1638,6 +1642,27 @@ function generateCommandsFile(project: Project): string {
   lines.push('');
 
   return lines.join('\n');
+}
+
+function generateCustomizationEnablementRust(): string {
+  return `/// A single explicit customization enablement decision.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum CustomizationEnablement {
+    #[serde(rename = "global")]
+    Global {
+        enabled: bool,
+    },
+    #[serde(rename = "workspace")]
+    Workspace {
+        uri: Uri,
+        enabled: bool,
+    },
+    #[serde(rename = "session")]
+    Session {
+        enabled: bool,
+    },
+}`;
 }
 
 function generateSubscribeParamsImplRust(): string {
@@ -2036,6 +2061,7 @@ function checkExhaustiveness(project: Project): void {
     'AhpErrorCodeWithData',
     'JsonRpcErrorCode',
     'ChangesetOperationTarget',
+    'CustomizationEnablement',
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

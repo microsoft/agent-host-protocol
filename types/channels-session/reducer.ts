@@ -8,6 +8,9 @@ import { ActionType } from '../common/actions.js';
 import type {
   SessionState,
   SessionInputRequest,
+  ChildCustomization,
+  Customization,
+  CustomizationEnablement,
   McpServerCustomization,
 } from './state.js';
 import {
@@ -103,6 +106,27 @@ function updateMcpServerCustomization(
     return state;
   }
   return { ...state, customizations: updated };
+}
+
+/**
+ * Replaces explicit decisions for plugins and MCP servers; other customizations
+ * retain their legacy `enabled` field, derived from the incoming decisions.
+ */
+function applyCustomizationEnablement(customization: Customization, enablement: readonly CustomizationEnablement[]): Customization;
+function applyCustomizationEnablement(customization: ChildCustomization, enablement: readonly CustomizationEnablement[]): ChildCustomization;
+function applyCustomizationEnablement(customization: Customization | ChildCustomization, enablement: readonly CustomizationEnablement[]): Customization | ChildCustomization {
+  switch (customization.type) {
+    case CustomizationType.Plugin:
+    case CustomizationType.McpServer: {
+      if (enablement.length > 0) {
+        return { ...customization, enablement: [...enablement] };
+      }
+      const { enablement: _enablement, ...withoutEnablement } = customization;
+      return withoutEnablement;
+    }
+    default:
+      return { ...customization, enabled: enablement[0]?.enabled ?? true };
+  }
 }
 
 // ─── Session Reducer ─────────────────────────────────────────────────────────
@@ -308,7 +332,7 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
       const topIdx = list.findIndex(c => c.id === action.id);
       if (topIdx >= 0) {
         const updated = list.slice();
-        updated[topIdx] = { ...list[topIdx], enabled: action.enabled };
+        updated[topIdx] = applyCustomizationEnablement(list[topIdx], action.enablement);
         return { ...state, customizations: updated };
       }
       for (let i = 0; i < list.length; i++) {
@@ -325,7 +349,7 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
           continue;
         }
         const newChildren = children.slice();
-        newChildren[childIdx] = { ...children[childIdx], enabled: action.enabled };
+        newChildren[childIdx] = applyCustomizationEnablement(children[childIdx], action.enablement);
         const updated = list.slice();
         updated[i] = { ...container, children: newChildren };
         return { ...state, customizations: updated };

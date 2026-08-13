@@ -60,15 +60,15 @@ use ahp_types::actions::{
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, ChangesetOperationStatus,
     ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization,
-    ConfirmationOption, Customization, ErrorInfo, InputRequestResponsePart, McpServerStartingState,
-    McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
-    ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
-    TerminalCommandPart, TerminalContentPart, TerminalState, TerminalUnclassifiedPart,
-    ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
-    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
-    ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
-    ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn,
-    TurnState,
+    ConfirmationOption, Customization, CustomizationEnablement, ErrorInfo,
+    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
+    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
+    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
+    TerminalContentPart, TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState,
+    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallPendingConfirmationState,
+    ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
+    ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn, TurnState,
 };
 
 /// What happened when an action was applied.
@@ -497,36 +497,71 @@ fn container_children_mut(c: &mut Customization) -> Option<&mut Vec<ChildCustomi
     }
 }
 
-fn set_container_enabled(c: &mut Customization, enabled: bool) {
+fn effective_enablement(enablement: &[CustomizationEnablement]) -> bool {
+    match enablement.first() {
+        Some(CustomizationEnablement::Global { enabled }) => *enabled,
+        Some(CustomizationEnablement::Workspace { enabled, .. }) => *enabled,
+        Some(CustomizationEnablement::Session { enabled }) => *enabled,
+        None => true,
+    }
+}
+
+fn apply_container_enablement(c: &mut Customization, enablement: &[CustomizationEnablement]) {
+    let enabled = effective_enablement(enablement);
+    let provenance = (!enablement.is_empty()).then(|| enablement.to_vec());
     match c {
-        Customization::Plugin(p) => p.enabled = enabled,
-        Customization::Directory(d) => d.enabled = enabled,
-        Customization::McpServer(m) => m.enabled = enabled,
+        Customization::Plugin(p) => {
+            p.enablement = provenance;
+        }
+        Customization::Directory(d) => {
+            d.enabled = enabled;
+        }
+        Customization::McpServer(m) => {
+            m.enablement = provenance;
+        }
         Customization::Unknown(_) => {}
     }
 }
 
-fn set_child_enabled(c: &mut ChildCustomization, enabled: bool) {
+fn apply_child_enablement(c: &mut ChildCustomization, enablement: &[CustomizationEnablement]) {
+    let enabled = effective_enablement(enablement);
+    let provenance = (!enablement.is_empty()).then(|| enablement.to_vec());
     match c {
-        ChildCustomization::Agent(x) => x.enabled = Some(enabled),
-        ChildCustomization::Skill(x) => x.enabled = Some(enabled),
-        ChildCustomization::Prompt(x) => x.enabled = Some(enabled),
-        ChildCustomization::Rule(x) => x.enabled = Some(enabled),
-        ChildCustomization::Hook(x) => x.enabled = Some(enabled),
-        ChildCustomization::McpServer(x) => x.enabled = enabled,
+        ChildCustomization::Agent(x) => {
+            x.enabled = Some(enabled);
+        }
+        ChildCustomization::Skill(x) => {
+            x.enabled = Some(enabled);
+        }
+        ChildCustomization::Prompt(x) => {
+            x.enabled = Some(enabled);
+        }
+        ChildCustomization::Rule(x) => {
+            x.enabled = Some(enabled);
+        }
+        ChildCustomization::Hook(x) => {
+            x.enabled = Some(enabled);
+        }
+        ChildCustomization::McpServer(x) => {
+            x.enablement = provenance;
+        }
         ChildCustomization::Unknown(_) => {}
     }
 }
 
-fn apply_toggle(list: &mut [Customization], id: &str, enabled: bool) -> bool {
+fn apply_toggle(
+    list: &mut [Customization],
+    id: &str,
+    enablement: &[CustomizationEnablement],
+) -> bool {
     if let Some(container) = list.iter_mut().find(|c| customization_id(c) == Some(id)) {
-        set_container_enabled(container, enabled);
+        apply_container_enablement(container, enablement);
         return true;
     }
     for container in list.iter_mut() {
         if let Some(children) = container_children_mut(container) {
             if let Some(child) = children.iter_mut().find(|c| child_id_of(c) == Some(id)) {
-                set_child_enabled(child, enabled);
+                apply_child_enablement(child, enablement);
                 return true;
             }
         }
@@ -842,7 +877,7 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             let Some(list) = state.customizations.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
-            if apply_toggle(list, &a.id, a.enabled) {
+            if apply_toggle(list, &a.id, &a.enablement) {
                 ReduceOutcome::Applied
             } else {
                 ReduceOutcome::NoOp

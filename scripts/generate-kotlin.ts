@@ -927,7 +927,7 @@ const STATE_ENUMS = [
   'ToolCallRiskAssessmentStatus',
   'ToolCallCancellationReason', 'ConfirmationOptionKind',
   'ToolCallContributorKind',
-  'ToolResultContentType', 'CustomizationType', 'CustomizationLoadStatus', 'TerminalClaimKind',
+  'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus', 'TerminalClaimKind',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
@@ -1340,6 +1340,11 @@ function generateStateFile(project: Project): string {
     }
   }
 
+  lines.push('// ─── Customization Enablement Union ─────────────────────────────────────');
+  lines.push('');
+  lines.push(generateCustomizationEnablementKotlin());
+  lines.push('');
+
   lines.push('// ─── Tool Input ──────────────────────────────────────────────────────────────');
   lines.push('');
   lines.push(generateToolInput());
@@ -1712,6 +1717,76 @@ const CHAT_SOURCE_UNION: UnionConfig = {
     { caseName: 'SideChat', structName: 'SideChatSource', discriminantValue: 'sideChat' },
   ],
 };
+
+function generateCustomizationEnablementKotlin(): string {
+  return `/**
+ * A single explicit customization enablement decision.
+ */
+@Serializable(with = CustomizationEnablementSerializer::class)
+sealed interface CustomizationEnablement {
+    @JvmInline value class Global(val value: CustomizationEnablementGlobal) : CustomizationEnablement
+    @JvmInline value class Workspace(val value: CustomizationEnablementWorkspace) : CustomizationEnablement
+    @JvmInline value class Session(val value: CustomizationEnablementSession) : CustomizationEnablement
+}
+
+@Serializable
+data class CustomizationEnablementGlobal(
+    val enabled: Boolean,
+    val kind: String = "global",
+)
+
+@Serializable
+data class CustomizationEnablementWorkspace(
+    val uri: URI,
+    val enabled: Boolean,
+    val kind: String = "workspace",
+)
+
+@Serializable
+data class CustomizationEnablementSession(
+    val enabled: Boolean,
+    val kind: String = "session",
+)
+
+internal object CustomizationEnablementSerializer : KSerializer<CustomizationEnablement> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CustomizationEnablement")
+
+    override fun deserialize(decoder: Decoder): CustomizationEnablement {
+        val input = decoder as? JsonDecoder
+            ?: error("CustomizationEnablement can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CustomizationEnablement")
+        return when ((obj["kind"] as? JsonPrimitive)?.contentOrNull) {
+            "global" -> CustomizationEnablement.Global(
+                input.json.decodeFromJsonElement(CustomizationEnablementGlobal.serializer(), element),
+            )
+            "workspace" -> CustomizationEnablement.Workspace(
+                input.json.decodeFromJsonElement(CustomizationEnablementWorkspace.serializer(), element),
+            )
+            "session" -> CustomizationEnablement.Session(
+                input.json.decodeFromJsonElement(CustomizationEnablementSession.serializer(), element),
+            )
+            else -> error("Unknown CustomizationEnablement kind")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CustomizationEnablement) {
+        val output = encoder as? JsonEncoder
+            ?: error("CustomizationEnablement can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CustomizationEnablement.Global ->
+                output.json.encodeToJsonElement(CustomizationEnablementGlobal.serializer(), value.value)
+            is CustomizationEnablement.Workspace ->
+                output.json.encodeToJsonElement(CustomizationEnablementWorkspace.serializer(), value.value)
+            is CustomizationEnablement.Session ->
+                output.json.encodeToJsonElement(CustomizationEnablementSession.serializer(), value.value)
+        }
+        output.encodeJsonElement(element)
+    }
+}`;
+}
 
 /**
  * ChangesetOperationTarget — TS discriminated union over `{ kind: "resource" }`
@@ -2240,6 +2315,7 @@ function checkExhaustiveness(project: Project): void {
     'ForkChatSource',               // generateFixedChatSourceBranchKotlin()
     'SideChatSource',               // generateFixedChatSourceBranchKotlin()
     'ChangesetOperationTarget',     // generateChangesetOperationTargetKotlin()
+    'CustomizationEnablement',      // generateCustomizationEnablementKotlin()
   ]);
 
   const missing = [...imported].filter(n => !coveredByLists.has(n) && !knownSpecial.has(n));

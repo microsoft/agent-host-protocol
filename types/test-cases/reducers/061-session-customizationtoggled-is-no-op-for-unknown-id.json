@@ -11,8 +11,7 @@
         "type": "plugin",
         "id": "plugin-a",
         "uri": "https://plugins.example/a",
-        "name": "Plugin A",
-        "enabled": true
+        "name": "Plugin A"
       }
     ],
     "activeClients": [],
@@ -22,7 +21,12 @@
     {
       "type": "session/customizationToggled",
       "id": "plugin-unknown",
-      "enabled": false
+      "enablement": [
+        {
+          "kind": "session",
+          "enabled": false
+        }
+      ]
     }
   ],
   "expected": {
@@ -35,8 +39,7 @@
         "type": "plugin",
         "id": "plugin-a",
         "uri": "https://plugins.example/a",
-        "name": "Plugin A",
-        "enabled": true
+        "name": "Plugin A"
       }
     ],
     "activeClients": [],

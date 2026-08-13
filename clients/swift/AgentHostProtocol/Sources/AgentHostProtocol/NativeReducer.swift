@@ -216,16 +216,27 @@ func setCustomizationChildren(_ c: inout Customization, _ children: [ChildCustom
     }
 }
 
-func setCustomizationEnabled(_ c: inout Customization, _ enabled: Bool) {
+func effectiveEnablement(_ enablement: [CustomizationEnablement]) -> Bool {
+    guard let decision = enablement.first else { return true }
+    switch decision {
+    case .global(let value): return value.enabled
+    case .workspace(let value): return value.enabled
+    case .session(let value): return value.enabled
+    }
+}
+
+func applyCustomizationEnablement(_ c: inout Customization, _ enablement: [CustomizationEnablement]) {
+    let enabled = effectiveEnablement(enablement)
+    let provenance = enablement.isEmpty ? nil : enablement
     switch c {
     case .plugin(var p):
-        p.enabled = enabled
+        p.enablement = provenance
         c = .plugin(p)
     case .directory(var d):
         d.enabled = enabled
         c = .directory(d)
     case .mcpServer(var m):
-        m.enabled = enabled
+        m.enablement = provenance
         c = .mcpServer(m)
     // Unknown/future customization: opaque payload, nothing to mutate.
     case .unknown:
@@ -233,7 +244,9 @@ func setCustomizationEnabled(_ c: inout Customization, _ enabled: Bool) {
     }
 }
 
-func setChildCustomizationEnabled(_ c: inout ChildCustomization, _ enabled: Bool) {
+func applyChildCustomizationEnablement(_ c: inout ChildCustomization, _ enablement: [CustomizationEnablement]) {
+    let enabled = effectiveEnablement(enablement)
+    let provenance = enablement.isEmpty ? nil : enablement
     switch c {
     case .agent(var x):
         x.enabled = enabled
@@ -251,7 +264,7 @@ func setChildCustomizationEnabled(_ c: inout ChildCustomization, _ enabled: Bool
         x.enabled = enabled
         c = .hook(x)
     case .mcpServer(var x):
-        x.enabled = enabled
+        x.enablement = provenance
         c = .mcpServer(x)
     // Unknown/future child customization: opaque payload, nothing to mutate.
     case .unknown:
@@ -259,11 +272,11 @@ func setChildCustomizationEnabled(_ c: inout ChildCustomization, _ enabled: Bool
     }
 }
 
-func toggleCustomization(in list: inout [Customization], id: String, enabled: Bool) -> Bool {
+func toggleCustomization(in list: inout [Customization], id: String, enablement: [CustomizationEnablement]) -> Bool {
     for i in list.indices {
         if customizationId(list[i]) == id {
             var entry = list[i]
-            setCustomizationEnabled(&entry, enabled)
+            applyCustomizationEnablement(&entry, enablement)
             list[i] = entry
             return true
         }
@@ -273,7 +286,7 @@ func toggleCustomization(in list: inout [Customization], id: String, enabled: Bo
         guard var children = customizationChildren(container) else { continue }
         guard let childIdx = children.firstIndex(where: { childId($0) == id }) else { continue }
         var child = children[childIdx]
-        setChildCustomizationEnabled(&child, enabled)
+        applyChildCustomizationEnablement(&child, enablement)
         children[childIdx] = child
         setCustomizationChildren(&container, children)
         list[containerIdx] = container

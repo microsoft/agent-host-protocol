@@ -11,6 +11,7 @@ import type {
   SessionActiveClient,
   SessionInputRequest,
   Customization,
+  CustomizationEnablement,
   McpServerState,
 } from './state.js';
 import type { URI } from '../common/state.js';
@@ -359,16 +360,20 @@ export interface SessionCustomizationsChangedAction {
 }
 
 /**
- * A client toggled a customization on or off.
+ * A client updated a customization's enablement decisions.
  *
  * Matches `id` against every top-level customization first — a plugin or
  * directory container, or a bare top-level MCP server — then against the
- * children inside each container (a skill, agent, or other entry), and
- * sets the matched entry's `enabled` flag. Disabling a container still
- * disables all of its children — the effective state of a child is
- * `container.enabled && (child.enabled ?? true)` — so toggling a child
- * only matters while its container is enabled. Is a no-op when no
+ * children inside each container (a skill, agent, or other entry). Plugins
+ * and MCP servers retain the matched entry's explicit decisions; other
+ * entries update their `enabled` flag. Disabling a plugin still disables all
+ * of its children — the effective state of a plugin child is the plugin's
+ * derived enabled value and `(child.enabled ?? true)` — so toggling a child
+ * only matters while its plugin is enabled. Is a no-op when no
  * customization has the given `id`.
+ *
+ * The `enablement` array completely replaces all explicit decisions. A caller
+ * changing one scope must include every decision it intends to preserve.
  *
  * @category Session Actions
  * @version 1
@@ -376,10 +381,10 @@ export interface SessionCustomizationsChangedAction {
  */
 export interface SessionCustomizationToggledAction {
   type: ActionType.SessionCustomizationToggled;
-  /** The id of the container or child to toggle. */
+  /** The id of the container or child to update. */
   id: string;
-  /** Whether to enable or disable the targeted customization. */
-  enabled: boolean;
+  /** Explicit enablement decisions, replacing the previous list entirely. */
+  enablement: CustomizationEnablement[];
 }
 
 /**

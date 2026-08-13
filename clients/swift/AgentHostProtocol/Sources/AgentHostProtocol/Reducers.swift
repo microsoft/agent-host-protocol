@@ -817,7 +817,7 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
 
     case .sessionCustomizationToggled(let a):
         guard var list = state.customizations else { return state }
-        guard toggleCustomization(in: &list, id: a.id, enabled: a.enabled) else { return state }
+        guard toggleCustomization(in: &list, id: a.id, enablement: a.enablement) else { return state }
         var next = state
         next.customizations = list
         return next

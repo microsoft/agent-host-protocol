@@ -5,7 +5,7 @@ Customizations extend agent sessions with additional capabilities — agents, sk
 - **Top-level entries are typically containers**: a `PluginCustomization` (an [Open Plugins](https://open-plugins.com/) package) or a `DirectoryCustomization` (a directory the host watches on disk). The host MAY also surface a bare `McpServerCustomization` at the top level (for example, a globally-configured MCP server that isn't bundled in a plugin).
 - **Other children live inside a container**: `AgentCustomization`, `SkillCustomization`, `PromptCustomization`, `RuleCustomization`, `HookCustomization`, `McpServerCustomization`. MCP servers can therefore appear in either position.
 
-The agent host is authoritative on the effective tree. Clients publish plugins, the host expands them into children, and the host owns disk-backed directories and bare top-level MCP servers.
+The agent host is authoritative on the effective tree and its enablement. Clients publish plugins, the host expands them into children, and the host owns disk-backed directories and bare top-level MCP servers.
 
 For MCP-specific behaviour (server lifecycle, authentication, App support), see [MCP Servers](/guide/mcp).
 
@@ -57,7 +57,7 @@ PluginCustomization {
   uri: URI                       // plugin URL or marketplace id
   name: string
   icons?: Icon[]
-  enabled: boolean
+  enablement?: CustomizationEnablement[] // explicit scoped decisions
   clientId?: string              // set when published by a client
   load?: CustomizationLoadState  // host-reported parse/load state
   children?: ChildCustomization[]
@@ -108,7 +108,7 @@ stateDiagram-v2
 
 ## Children
 
-Every child carries the same base fields (`id`, `uri`, `name`, optional `icons`) plus an `enabled` flag — optional for the five leaf children (absent means enabled) and always present on an `McpServerCustomization`. Children are leaf nodes — no further nesting — and their parent is implied by which container holds them in its `children` array. A child's `enabled` is independent of its container's. Children have no `clientId`: client provenance lives on the container since clients can only contribute containers, not individual children.
+Every child carries the same base fields (`id`, `uri`, `name`, optional `icons`). The five leaf children carry an optional `enabled` flag (absent means enabled), while `McpServerCustomization` carries explicit scoped `enablement` decisions. Children are leaf nodes — no further nesting — and their parent is implied by which container holds them in its `children` array. A child's `enabled` is independent of its container's. Children have no `clientId`: client provenance lives on the container since clients can only contribute containers, not individual children.
 
 Each child type carries optional metadata sourced from its [Open Plugins](https://open-plugins.com/plugin-builders/specification.md) component definition (typically the file's YAML frontmatter):
 
@@ -118,7 +118,7 @@ SkillCustomization        { type: 'skill';       description?, disableModelInvoc
 PromptCustomization       { type: 'prompt';      description? }
 RuleCustomization         { type: 'rule';        description?, alwaysApply?, globs? }    // covers "instruction" formats too
 HookCustomization         { type: 'hook';        event?, matcher? }
-McpServerCustomization    { type: 'mcpServer';   enabled, state, channel?, mcpApp? }   // see /guide/mcp
+McpServerCustomization    { type: 'mcpServer';   enablement?, isClientBundled?, state, channel?, mcpApp? }   // see /guide/mcp
 ```
 
 Agents and skills carry a symmetric invocation matrix. `disableModelInvocation` removes the entry from the agent's automatic choices — a custom agent it won't auto-delegate to, or a skill it won't auto-invoke — while leaving it available for the user to pick. `disableUserInvocation` does the reverse: the entry stays available for the agent to invoke but is hidden from user-facing pickers and slash-commands. Both are absent/`false` by default (invocable by either party), and they are independent, so an entry can be agent-only, user-only, both, or neither.
@@ -133,19 +133,60 @@ state.customizations
   .filter(c => c.type === CustomizationType.Agent)
 ```
 
+## Enablement
+
+Plugins and MCP servers may carry an `enablement` array of explicit decisions:
+
+```typescript
+CustomizationEnablement =
+  | { kind: 'global'; enabled: boolean }
+  | { kind: 'workspace'; uri: URI; enabled: boolean }
+  | { kind: 'session'; enabled: boolean }
+```
+
+Producers MUST publish the entries in descending specificity: session,
+workspace, then global. The host emits at most one workspace decision, for the
+session's primary working directory. Consumers MAY use `enablement[0]` as the
+decisive decision, with `enablement?.[0]?.enabled ?? true` as the effective
+value. An absent or empty array has no explicit decision and means enabled by
+default.
+
+For MCP servers, enablement flows both ways. A client publishing a server
+includes its global decision (even when enabled), and the host publishes the
+fully resolved decisions across all scopes. Client-published plugins can supply
+global decisions for their discovered children through
+`ClientPluginCustomization.childEnablement`, keyed by child name.
+
+`DirectoryCustomization` and the five leaf child kinds retain their plain
+`enabled` fields. A plugin's effective value is derived from its `enablement`;
+a plugin child is effectively enabled when that derived value and
+`(child.enabled ?? true)` are both true. A directory child instead uses
+`directory.enabled && (child.enabled ?? true)`.
+
 ## Toggling
 
-Any client can enable or disable any customization by dispatching `session/customizationToggled` with that entry's `id`:
+Any client can request an enablement update with
+`session/customizationToggled`. It carries the complete set of explicit
+decisions for the entry:
 
 ```typescript
 {
   type: 'session/customizationToggled'
   id: string         // any customization id
-  enabled: boolean
+  enablement: CustomizationEnablement[]
 }
 ```
 
-Both containers and children carry an `enabled` flag. The reducer matches `id` against every top-level customization first — plugins, directories, and bare top-level MCP servers — then against the children inside every container, and sets that entry's `enabled`. A child's effective state is `container.enabled && (child.enabled ?? true)`, so disabling a container disables all of its children regardless of each child's own flag, and a child toggle only takes effect while its container is enabled. The action is a no-op if no customization has that id.
+The action replaces the entry's array wholesale rather than merging a single
+scope. A caller changing one scope must include every decision it intends to
+preserve. The reducer matches `id` against every top-level customization first
+— plugins, directories, and bare top-level MCP servers — then against the
+children inside every container. For plugins and MCP servers it replaces the
+matched entry's `enablement`; for directories and leaf children it updates the
+plain `enabled` value from the first decision. An empty array clears explicit
+provenance from plugins and MCP servers and restores the default enabled value
+for directories and leaf children. The action is a no-op if no customization
+has that id.
 
 ```mermaid
 sequenceDiagram
@@ -154,7 +195,7 @@ sequenceDiagram
 
     Note over Server: customizations: [Plugin A (enabled), Plugin B (enabled)]
 
-    Client->>Server: customizationToggled (id: plugin-a, enabled: false)
+    Client->>Server: customizationToggled (id: plugin-a, enablement: [session: false])
     Server->>Client: action echoed
     Note over Server: customizations: [Plugin A (disabled), Plugin B (enabled)]
 ```
@@ -195,7 +236,7 @@ dispatch({
         id: 'client-plugin-1',
         uri: 'virtual://my-client/workspace-skills',
         name: 'Workspace Skills',
-        enabled: true,
+        enablement: [{ kind: 'global', enabled: true }],
         nonce: 'sha256:...',
       },
     ],
@@ -423,7 +464,7 @@ sequenceDiagram
 
     Note over Client,Server: 3. Client disables Plugin A
 
-    Client->>Server: customizationToggled (id: plugin-a, enabled: false)
+    Client->>Server: customizationToggled (id: plugin-a, enablement: [session: false])
     Server->>Client: action echoed
 
     Note over Client,Server: 4. Active client disconnects

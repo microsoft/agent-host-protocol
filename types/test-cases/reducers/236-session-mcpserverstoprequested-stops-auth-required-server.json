@@ -14,7 +14,6 @@
         "id": "mcp-1",
         "uri": "file:///workspace/.mcp/servers.json",
         "name": "Filesystem",
-        "enabled": true,
         "state": {
           "kind": "authRequired",
           "reason": "required",
@@ -47,7 +46,6 @@
         "id": "mcp-1",
         "uri": "file:///workspace/.mcp/servers.json",
         "name": "Filesystem",
-        "enabled": true,
         "state": {
           "kind": "stopped"
         },

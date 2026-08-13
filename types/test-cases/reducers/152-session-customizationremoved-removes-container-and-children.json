@@ -12,7 +12,6 @@
         "id": "plugin-a",
         "uri": "https://plugins.example/a",
         "name": "Plugin A",
-        "enabled": true,
         "children": [
           {
             "type": "skill",
@@ -26,8 +25,7 @@
         "type": "plugin",
         "id": "plugin-b",
         "uri": "https://plugins.example/b",
-        "name": "Plugin B",
-        "enabled": true
+        "name": "Plugin B"
       }
     ],
     "activeClients": [],
@@ -49,8 +47,7 @@
         "type": "plugin",
         "id": "plugin-b",
         "uri": "https://plugins.example/b",
-        "name": "Plugin B",
-        "enabled": true
+        "name": "Plugin B"
       }
     ],
     "activeClients": [],

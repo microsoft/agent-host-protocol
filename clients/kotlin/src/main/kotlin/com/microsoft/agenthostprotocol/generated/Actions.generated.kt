@@ -1081,13 +1081,13 @@ data class SessionCustomizationsChangedAction(
 data class SessionCustomizationToggledAction(
     val type: ActionType,
     /**
-     * The id of the container or child to toggle.
+     * The id of the container or child to update.
      */
     val id: String,
     /**
-     * Whether to enable or disable the targeted customization.
+     * Explicit enablement decisions, replacing the previous list entirely.
      */
-    val enabled: Boolean
+    val enablement: List<CustomizationEnablement>
 )
 
 @Serializable

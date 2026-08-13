@@ -17,11 +17,12 @@ use crate::state::{
     AutomationRunArtifact, AutomationRunLifecycle, AutomationRunOperation, AutomationRunSummary,
     Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
     ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
-    ChatSummary, ConfirmationOption, ContentRef, Customization, ErrorInfo, McpAuthRequirement,
-    McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
-    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
-    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
-    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
+    McpAuthRequirement, McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart,
+    SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo,
+    TextRange, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn,
+    UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -1181,23 +1182,27 @@ pub struct SessionCustomizationsChangedAction {
     pub customizations: Vec<Customization>,
 }
 
-/// A client toggled a customization on or off.
+/// A client updated a customization's enablement decisions.
 ///
 /// Matches `id` against every top-level customization first — a plugin or
 /// directory container, or a bare top-level MCP server — then against the
-/// children inside each container (a skill, agent, or other entry), and
-/// sets the matched entry's `enabled` flag. Disabling a container still
-/// disables all of its children — the effective state of a child is
-/// `container.enabled && (child.enabled ?? true)` — so toggling a child
-/// only matters while its container is enabled. Is a no-op when no
+/// children inside each container (a skill, agent, or other entry). Plugins
+/// and MCP servers retain the matched entry's explicit decisions; other
+/// entries update their `enabled` flag. Disabling a plugin still disables all
+/// of its children — the effective state of a plugin child is the plugin's
+/// derived enabled value and `(child.enabled ?? true)` — so toggling a child
+/// only matters while its plugin is enabled. Is a no-op when no
 /// customization has the given `id`.
+///
+/// The `enablement` array completely replaces all explicit decisions. A caller
+/// changing one scope must include every decision it intends to preserve.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionCustomizationToggledAction {
-    /// The id of the container or child to toggle.
+    /// The id of the container or child to update.
     pub id: String,
-    /// Whether to enable or disable the targeted customization.
-    pub enabled: bool,
+    /// Explicit enablement decisions, replacing the previous list entirely.
+    pub enablement: Vec<CustomizationEnablement>,
 }
 
 /// Upserts a top-level customization (plugin or directory).

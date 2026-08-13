@@ -2,7 +2,7 @@
 
 [Model Context Protocol](https://modelcontextprotocol.io/) servers are surfaced in AHP as a [`McpServerCustomization`](/reference/session#mcpservercustomization) — a customization that represents one running (or registered) MCP server within a session. AHP intentionally does **not** re-spec MCP. It exposes:
 
-- Enough state for clients to render the server (name, icon, enabled flag, runtime status).
+- Enough state for clients to render the server (name, icon, scoped enablement, runtime status).
 - Enough state for clients to drive authentication when the server demands it.
 - An optional [`mcp://` side-channel](/specification/mcp-channel) the client can use to talk to the upstream server when it needs to render an [MCP App](#mcp-apps).
 
@@ -33,14 +33,18 @@ McpServerCustomization {
   name: string
   icons?: Icon[]
   range?: TextRange              // span inside `uri` for inline declarations
-  enabled: boolean               // user-toggleable (see Customizations guide)
+  enablement?: CustomizationEnablement[] // user-toggleable (see Customizations guide)
+  isClientBundled?: boolean      // client owns the Global enablement decision
   state: McpServerState // discriminated union — see below
   channel?: URI                  // optional mcp:// side-channel
   mcpApp?: McpServerCustomizationApps
 }
 ```
 
-`enabled` follows the same model as any other container — it's toggled with `session/customizationToggled`. Disabling a server signals the host to stop it; the host then transitions the runtime through `stopped` and removes it from the session (or leaves it as `stopped` until removal, host's choice).
+`enablement` is toggled with `session/customizationToggled`; its first entry
+is the effective decision. Disabling a server signals the host to stop it; the
+host then transitions the runtime through `stopped` and removes it from the
+session (or leaves it as `stopped` until removal, host's choice).
 
 Clients can also ask the host to manage the server process without changing the customization's enabled intent:
 
@@ -49,7 +53,7 @@ Clients can also ask the host to manage the server process without changing the 
 
 ## Runtime status
 
-`state` is a [discriminated union on `kind`](/reference/session#mcpserverstatus). It is the host's view of the server's lifecycle, separate from `enabled` (which is the user's intent).
+`state` is a [discriminated union on `kind`](/reference/session#mcpserverstatus). It is the host's view of the server's lifecycle, separate from `enablement` (which records the user's scoped intent).
 
 ```mermaid
 stateDiagram-v2

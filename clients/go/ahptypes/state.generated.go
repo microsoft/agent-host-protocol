@@ -320,6 +320,15 @@ const (
 	CustomizationTypeMcpServer CustomizationType = "mcpServer"
 )
 
+// Scope at which customization enablement is decided.
+type CustomizationEnablementKind string
+
+const (
+	CustomizationEnablementKindGlobal    CustomizationEnablementKind = "global"
+	CustomizationEnablementKindWorkspace CustomizationEnablementKind = "workspace"
+	CustomizationEnablementKindSession   CustomizationEnablementKind = "session"
+)
+
 // Discriminant values for {@link CustomizationLoadState}.
 type CustomizationLoadStatus string
 
@@ -2523,8 +2532,6 @@ type PluginCustomization struct {
 	// protocol; producers and consumers agree on its contents
 	// out-of-band.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Whether this container is currently enabled.
-	Enabled bool `json:"enabled"`
 	// `clientId` of the client that contributed this container. Absent for
 	// server-originated entries.
 	ClientId *string `json:"clientId,omitempty"`
@@ -2538,6 +2545,8 @@ type PluginCustomization struct {
 	// nothing.
 	Children []ChildCustomization `json:"children,omitempty"`
 	Type     CustomizationType    `json:"type"`
+	// Explicit enablement decisions. See {@link McpServerCustomization.enablement}.
+	Enablement []CustomizationEnablement `json:"enablement,omitempty"`
 	// Version of the plugin, sourced from the
 	// [Open Plugins](https://open-plugins.com/) manifest's optional
 	// `version` field (semver, e.g. `"1.2.0"`). Absent when the manifest
@@ -2584,8 +2593,6 @@ type ClientPluginCustomization struct {
 	// protocol; producers and consumers agree on its contents
 	// out-of-band.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Whether this container is currently enabled.
-	Enabled bool `json:"enabled"`
 	// `clientId` of the client that contributed this container. Absent for
 	// server-originated entries.
 	ClientId *string `json:"clientId,omitempty"`
@@ -2599,6 +2606,8 @@ type ClientPluginCustomization struct {
 	// nothing.
 	Children []ChildCustomization `json:"children,omitempty"`
 	Type     CustomizationType    `json:"type"`
+	// Explicit enablement decisions. See {@link McpServerCustomization.enablement}.
+	Enablement []CustomizationEnablement `json:"enablement,omitempty"`
 	// Version of the plugin, sourced from the
 	// [Open Plugins](https://open-plugins.com/) manifest's optional
 	// `version` field (semver, e.g. `"1.2.0"`). Absent when the manifest
@@ -2608,6 +2617,15 @@ type ClientPluginCustomization struct {
 	Version *string `json:"version,omitempty"`
 	// Opaque version token used by the host to detect changes.
 	Nonce *string `json:"nonce,omitempty"`
+	// Explicit enablement decisions for children this plugin contributes,
+	// keyed by child name (for MCP servers, the server name as it appears in
+	// the bundled `.mcp.json`).
+	//
+	// Bundled children are discovered by the host rather than published by the
+	// client, so the client cannot attach `enablement` to them directly. This
+	// carries the client's global decision for each one; the host applies it
+	// under the child's durable key.
+	ChildEnablement map[string][]CustomizationEnablement `json:"childEnablement,omitempty"`
 }
 
 // A directory the host watches for this session.
@@ -2647,8 +2665,6 @@ type DirectoryCustomization struct {
 	// protocol; producers and consumers agree on its contents
 	// out-of-band.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Whether this container is currently enabled.
-	Enabled bool `json:"enabled"`
 	// `clientId` of the client that contributed this container. Absent for
 	// server-originated entries.
 	ClientId *string `json:"clientId,omitempty"`
@@ -2662,6 +2678,8 @@ type DirectoryCustomization struct {
 	// nothing.
 	Children []ChildCustomization `json:"children,omitempty"`
 	Type     CustomizationType    `json:"type"`
+	// Whether this container is currently enabled.
+	Enabled bool `json:"enabled"`
 	// Which child customization type this directory holds.
 	Contents CustomizationType `json:"contents"`
 	// Whether clients may write into this directory.
@@ -2706,9 +2724,10 @@ type AgentCustomization struct {
 	// turned off on its own.
 	//
 	// This flag is independent of the parent container's: the **effective**
-	// enabled state of a child is
-	// `container.enabled && (child.enabled ?? true)`, so a disabled container
-	// disables every child regardless of each child's own flag.
+	// enabled state of a plugin child is the plugin's derived enabled value and
+	// `(child.enabled ?? true)`, so a disabled plugin disables every child
+	// regardless of each child's own flag. A directory child instead uses the
+	// directory's `enabled` value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -2778,9 +2797,10 @@ type SkillCustomization struct {
 	// turned off on its own.
 	//
 	// This flag is independent of the parent container's: the **effective**
-	// enabled state of a child is
-	// `container.enabled && (child.enabled ?? true)`, so a disabled container
-	// disables every child regardless of each child's own flag.
+	// enabled state of a plugin child is the plugin's derived enabled value and
+	// `(child.enabled ?? true)`, so a disabled plugin disables every child
+	// regardless of each child's own flag. A directory child instead uses the
+	// directory's `enabled` value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -2833,9 +2853,10 @@ type PromptCustomization struct {
 	// turned off on its own.
 	//
 	// This flag is independent of the parent container's: the **effective**
-	// enabled state of a child is
-	// `container.enabled && (child.enabled ?? true)`, so a disabled container
-	// disables every child regardless of each child's own flag.
+	// enabled state of a plugin child is the plugin's derived enabled value and
+	// `(child.enabled ?? true)`, so a disabled plugin disables every child
+	// regardless of each child's own flag. A directory child instead uses the
+	// directory's `enabled` value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -2887,9 +2908,10 @@ type RuleCustomization struct {
 	// turned off on its own.
 	//
 	// This flag is independent of the parent container's: the **effective**
-	// enabled state of a child is
-	// `container.enabled && (child.enabled ?? true)`, so a disabled container
-	// disables every child regardless of each child's own flag.
+	// enabled state of a plugin child is the plugin's derived enabled value and
+	// `(child.enabled ?? true)`, so a disabled plugin disables every child
+	// regardless of each child's own flag. A directory child instead uses the
+	// directory's `enabled` value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -2940,9 +2962,10 @@ type HookCustomization struct {
 	// turned off on its own.
 	//
 	// This flag is independent of the parent container's: the **effective**
-	// enabled state of a child is
-	// `container.enabled && (child.enabled ?? true)`, so a disabled container
-	// disables every child regardless of each child's own flag.
+	// enabled state of a plugin child is the plugin's derived enabled value and
+	// `(child.enabled ?? true)`, so a disabled plugin disables every child
+	// regardless of each child's own flag. A directory child instead uses the
+	// directory's `enabled` value and its own flag.
 	//
 	// A child is turned on or off by id with
 	// {@link SessionCustomizationToggledAction | `session/customizationToggled`}.
@@ -2987,8 +3010,25 @@ type McpServerCustomization struct {
 	// out-of-band.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	Type CustomizationType          `json:"type"`
-	// Whether this MCP server is currently enabled.
-	Enabled bool `json:"enabled"`
+	// Explicit enablement decisions for this customization, one entry per scope
+	// that has one. This is a wire contract: producers MUST publish entries
+	// sorted by descending specificity (Session, Workspace, then Global).
+	// The agent host emits at most one Workspace entry, for the session's primary
+	// working directory. Consumers MAY treat
+	// `enablement[0]` as the decisive decision and
+	// `enablement?.[0]?.enabled ?? true` as the effective enabled value. An
+	// absent or empty array means no explicit decision exists, so the
+	// customization is enabled by default.
+	//
+	// Flows in both directions. A client publishes this alongside a customization
+	// to assert its global decision, which is authoritative for the Global scope;
+	// a client always includes its global entry, even when enabled. The host
+	// publishes the fully resolved set across all scopes, and consumers derive
+	// the effective enabled value from that set.
+	Enablement []CustomizationEnablement `json:"enablement,omitempty"`
+	// Whether the client explicitly bundled this server and owns its Global
+	// enablement decision.
+	IsClientBundled *bool `json:"isClientBundled,omitempty"`
 	// Current lifecycle state of the MCP server.
 	State McpServerState `json:"state"`
 	// An `mcp://`-protocol channel the client uses to side-channel traffic
@@ -4075,6 +4115,74 @@ type AutomationRunState struct {
 	Operations []AutomationRunOperation `json:"operations"`
 	// Opaque host-defined run metadata.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// ─── Customization Enablement Union ───────────────────────────────────────
+
+// CustomizationEnablement is a single explicit customization enablement decision.
+type CustomizationEnablement struct {
+	Value isCustomizationEnablement
+}
+
+type isCustomizationEnablement interface{ isCustomizationEnablement() }
+
+type CustomizationEnablementGlobal struct {
+	Kind    string `json:"kind"`
+	Enabled bool   `json:"enabled"`
+}
+
+func (*CustomizationEnablementGlobal) isCustomizationEnablement() {}
+
+type CustomizationEnablementWorkspace struct {
+	Kind    string `json:"kind"`
+	URI     URI    `json:"uri"`
+	Enabled bool   `json:"enabled"`
+}
+
+func (*CustomizationEnablementWorkspace) isCustomizationEnablement() {}
+
+type CustomizationEnablementSession struct {
+	Kind    string `json:"kind"`
+	Enabled bool   `json:"enabled"`
+}
+
+func (*CustomizationEnablementSession) isCustomizationEnablement() {}
+
+func (e *CustomizationEnablement) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "global":
+		var value CustomizationEnablementGlobal
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		e.Value = &value
+	case "workspace":
+		var value CustomizationEnablementWorkspace
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		e.Value = &value
+	case "session":
+		var value CustomizationEnablementSession
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		e.Value = &value
+	default:
+		return &json.UnmarshalTypeError{Value: "CustomizationEnablement"}
+	}
+	return nil
+}
+
+func (e CustomizationEnablement) MarshalJSON() ([]byte, error) {
+	if e.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(e.Value)
 }
 
 // ToolInput is raw tool input represented inline or by content reference.
