@@ -60,15 +60,15 @@ use ahp_types::actions::{
 use ahp_types::state::{
     ActiveTurn, AnnotationsState, ChangesetOperationStatus, ChangesetState, ChangesetStatus,
     ChatInputRequest, ChatState, ChildCustomization, ConfirmationOption, Customization,
-    CustomizationEnablement, ErrorInfo,
-    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState,
-    ToolCallCancellationReason, ToolCallCancelledState, ToolCallCompletedState,
-    ToolCallConfirmationReason, ToolCallContributor, ToolCallPendingConfirmationState,
-    ToolCallPendingResultConfirmationState, ToolCallResponsePart, ToolCallRunningState,
-    ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn, TurnState,
+    CustomizationEnablement, ErrorInfo, InputRequestResponsePart, McpServerStartingState,
+    McpServerState, McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState,
+    ResponsePart, RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalState, TerminalUnclassifiedPart,
+    ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
+    ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
+    ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
+    ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn,
+    TurnState,
 };
 
 /// What happened when an action was applied.
@@ -549,7 +549,11 @@ fn apply_child_enablement(c: &mut ChildCustomization, enablement: &[Customizatio
     }
 }
 
-fn apply_toggle(list: &mut [Customization], id: &str, enablement: &[CustomizationEnablement]) -> bool {
+fn apply_toggle(
+    list: &mut [Customization],
+    id: &str,
+    enablement: &[CustomizationEnablement],
+) -> bool {
     if let Some(container) = list.iter_mut().find(|c| customization_id(c) == Some(id)) {
         apply_container_enablement(container, enablement);
         return true;
