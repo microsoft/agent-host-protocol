@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Reserve the `x-` prefix for implementation-defined channel URI schemes, commands, notifications, and actions.",
+  "issues": [367]
+}

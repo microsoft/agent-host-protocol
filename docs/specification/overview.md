@@ -12,6 +12,12 @@ This specification is a working draft and is under active development. Breaking 
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this specification are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 
+### Extensions
+
+The `x-` prefix is reserved for implementation-defined extensions to channel URI schemes, command methods, notification methods, and action types. AHP-defined names in these namespaces MUST NOT begin with `x-`, and future protocol versions will not assign names with that prefix.
+
+Implementations MAY use `x-` names by prior agreement between peers. Such names are not part of the AHP standard; their semantics, discovery, and negotiation are implementation-defined.
+
 ## Protocol Version
 
 Protocol versions are [SemVer](https://semver.org) `MAJOR.MINOR.PATCH` strings; see the [GitHub Releases](https://github.com/microsoft/agent-host-protocol/releases) page for the current published version. Peers negotiate a shared version at initialization: the client offers `InitializeParams.protocolVersions` (an array, most-preferred first) and the server selects one and returns it as `InitializeResult.protocolVersion`.
