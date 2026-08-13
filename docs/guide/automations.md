@@ -328,19 +328,28 @@ full rather than merging recursively.
 ### Idempotent migration imports
 
 `createAutomation.import` carries a stable source, batch, and item identity for
-legacy migration:
+legacy migration. It may also carry the source scheduler's next unevaluated
+occurrence for each schedule trigger:
 
 ```typescript
 {
   source: 'legacy-client-store'
   batchId: 'migration-2026-08-12'
   itemId: 'automation-42'
+  triggerNextRuns: [{
+    triggerId: 'weekday-morning'
+    nextRunAt: '2026-08-12T07:00:00Z'
+  }]
 }
 ```
 
 Retrying an interrupted migration with the same identity resolves to the
-already imported item rather than creating a duplicate. Migration should move
-one definition to exactly one authority:
+already imported item rather than creating a duplicate. An imported definition
+must be created disabled. The host persists supplied trigger occurrences while
+the definition is disabled; after cutover, enabling it evaluates an overdue
+occurrence according to that trigger's misfire policy.
+
+Migration should move one definition to exactly one authority:
 
 1. Create the host definition disabled.
 2. Verify the imported definition.
@@ -348,7 +357,9 @@ one definition to exactly one authority:
 4. Enable the host definition.
 
 Never leave both copies schedulable and never deduplicate definitions by
-content; identical-looking automations may be intentional.
+content; identical-looking automations may be intentional. The host must
+durably claim a due occurrence together with its run record before starting
+external execution, so restart cannot dispatch the same catch-up twice.
 
 ## Runs
 
@@ -478,4 +489,3 @@ applications.
 - Event provenance and `_meta` values must not contain secrets.
 - Linked session channels use the ordinary AHP confirmation, authentication,
   and client-execution mechanisms.
-

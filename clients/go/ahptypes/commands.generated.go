@@ -1314,22 +1314,33 @@ type CreateAutomationParams struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Complete initial definition.
 	Definition AutomationDefinition `json:"definition"`
-	// Optional idempotency identity when importing a legacy definition.
-	Import *AutomationImportIdentity `json:"import,omitempty"`
+	// Optional legacy import state. When present, {@link definition} MUST be
+	// disabled so automatic triggers cannot run before migration cutover.
+	Import *AutomationImport `json:"import,omitempty"`
 }
 
-// Stable source identity used to make legacy automation import idempotent.
+// Stable source identity and scheduler state for a legacy automation import.
 //
-// The host remembers this identity independently of the client-chosen
-// automation URI. Retrying an interrupted migration with the same values MUST
-// resolve to the previously imported item rather than creating a duplicate.
-type AutomationImportIdentity struct {
+// The host remembers the identity independently of the client-chosen automation
+// URI. Retrying with the same identity MUST resolve to the previously imported
+// item rather than creating a duplicate.
+type AutomationImport struct {
 	// Stable namespace identifying the source implementation or store.
 	Source string `json:"source"`
 	// Identifier shared by every item in one import attempt.
 	BatchId string `json:"batchId"`
 	// Stable source-side identifier for this definition within the batch.
 	ItemId string `json:"itemId"`
+	// Source schedule occurrences to retain until the imported definition is enabled.
+	TriggerNextRuns []AutomationImportTriggerNextRun `json:"triggerNextRuns,omitempty"`
+}
+
+// Initial schedule occurrence retained while an imported automation is disabled.
+type AutomationImportTriggerNextRun struct {
+	// Stable id of a schedule trigger in the imported definition.
+	TriggerId string `json:"triggerId"`
+	// Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp.
+	NextRunAt string `json:"nextRunAt"`
 }
 
 // Partial replacement of editable {@link AutomationDefinition} fields.

@@ -3857,7 +3857,7 @@ type AutomationSummary struct {
 	Enabled bool `json:"enabled"`
 	// Number of automatic triggers in the current definition.
 	TriggerCount int64 `json:"triggerCount"`
-	// Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
 	// Most recent retained run, when any run exists.
 	LastRun *AutomationRunSummary `json:"lastRun,omitempty"`
@@ -3886,7 +3886,7 @@ type AutomationState struct {
 	// Monotonically increasing definition revision. Clients pass the revision
 	// they observed as `updateAutomation.expectedRevision`.
 	Revision int64 `json:"revision"`
-	// Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
 	// Newest-first retained run summaries. This is a bounded window; use
 	// `fetchAutomationRuns` when {@link runsNextCursor} is present.

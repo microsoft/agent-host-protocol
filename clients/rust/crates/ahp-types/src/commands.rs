@@ -1603,25 +1603,39 @@ pub struct CreateAutomationParams {
     pub meta: Option<JsonObject>,
     /// Complete initial definition.
     pub definition: AutomationDefinition,
-    /// Optional idempotency identity when importing a legacy definition.
+    /// Optional legacy import state. When present, {@link definition} MUST be
+    /// disabled so automatic triggers cannot run before migration cutover.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub import: Option<AutomationImportIdentity>,
+    pub import: Option<AutomationImport>,
 }
 
-/// Stable source identity used to make legacy automation import idempotent.
+/// Stable source identity and scheduler state for a legacy automation import.
 ///
-/// The host remembers this identity independently of the client-chosen
-/// automation URI. Retrying an interrupted migration with the same values MUST
-/// resolve to the previously imported item rather than creating a duplicate.
+/// The host remembers the identity independently of the client-chosen automation
+/// URI. Retrying with the same identity MUST resolve to the previously imported
+/// item rather than creating a duplicate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationImportIdentity {
+pub struct AutomationImport {
     /// Stable namespace identifying the source implementation or store.
     pub source: String,
     /// Identifier shared by every item in one import attempt.
     pub batch_id: String,
     /// Stable source-side identifier for this definition within the batch.
     pub item_id: String,
+    /// Source schedule occurrences to retain until the imported definition is enabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trigger_next_runs: Option<Vec<AutomationImportTriggerNextRun>>,
+}
+
+/// Initial schedule occurrence retained while an imported automation is disabled.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationImportTriggerNextRun {
+    /// Stable id of a schedule trigger in the imported definition.
+    pub trigger_id: String,
+    /// Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp.
+    pub next_run_at: String,
 }
 
 /// Partial replacement of editable {@link AutomationDefinition} fields.

@@ -1582,7 +1582,7 @@ const COMMAND_STRUCTS = [
   'ChangesetOperationFollowUp',
   'ListAutomationsParams', 'ListAutomationsResult',
   'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',
-  'CreateAutomationParams', 'AutomationImportIdentity', 'AutomationDefinitionPatch', 'UpdateAutomationParams',
+  'CreateAutomationParams', 'AutomationImport', 'AutomationImportTriggerNextRun', 'AutomationDefinitionPatch', 'UpdateAutomationParams',
   'DisposeAutomationParams', 'RunAutomationParams', 'RunAutomationResult',
   'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
   'PreviewAutomationScheduleParams', 'PreviewAutomationScheduleResult',

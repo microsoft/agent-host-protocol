@@ -5176,7 +5176,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest known future scheduled occurrence, as an ISO 8601 timestamp."
+          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "lastRun": {
           "$ref": "#/$defs/AutomationRunSummary",
@@ -5236,7 +5236,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest known future scheduled occurrence, as an ISO 8601 timestamp."
+          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "runs": {
           "type": "array",

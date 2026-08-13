@@ -5265,7 +5265,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest known future scheduled occurrence, as an ISO 8601 timestamp."
+          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "lastRun": {
           "$ref": "#/$defs/AutomationRunSummary",
@@ -5325,7 +5325,7 @@
         },
         "nextRunAt": {
           "type": "string",
-          "description": "Earliest known future scheduled occurrence, as an ISO 8601 timestamp."
+          "description": "Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending."
         },
         "runs": {
           "type": "array",
@@ -7411,9 +7411,27 @@
         "items"
       ]
     },
-    "AutomationImportIdentity": {
+    "AutomationImportTriggerNextRun": {
       "type": "object",
-      "description": "Stable source identity used to make legacy automation import idempotent.\n\nThe host remembers this identity independently of the client-chosen\nautomation URI. Retrying an interrupted migration with the same values MUST\nresolve to the previously imported item rather than creating a duplicate.",
+      "description": "Initial schedule occurrence retained while an imported automation is disabled.",
+      "properties": {
+        "triggerId": {
+          "type": "string",
+          "description": "Stable id of a schedule trigger in the imported definition."
+        },
+        "nextRunAt": {
+          "type": "string",
+          "description": "Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp."
+        }
+      },
+      "required": [
+        "triggerId",
+        "nextRunAt"
+      ]
+    },
+    "AutomationImport": {
+      "type": "object",
+      "description": "Stable source identity and scheduler state for a legacy automation import.\n\nThe host remembers the identity independently of the client-chosen automation\nURI. Retrying with the same identity MUST resolve to the previously imported\nitem rather than creating a duplicate.",
       "properties": {
         "source": {
           "type": "string",
@@ -7426,6 +7444,13 @@
         "itemId": {
           "type": "string",
           "description": "Stable source-side identifier for this definition within the batch."
+        },
+        "triggerNextRuns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationImportTriggerNextRun"
+          },
+          "description": "Source schedule occurrences to retain until the imported definition is enabled."
         }
       },
       "required": [
@@ -7452,8 +7477,8 @@
           "description": "Complete initial definition."
         },
         "import": {
-          "$ref": "#/$defs/AutomationImportIdentity",
-          "description": "Optional idempotency identity when importing a legacy definition."
+          "$ref": "#/$defs/AutomationImport",
+          "description": "Optional legacy import state. When present, {@link definition} MUST be\ndisabled so automatic triggers cannot run before migration cutover."
         }
       },
       "required": [

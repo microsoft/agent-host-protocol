@@ -5071,7 +5071,7 @@ data class AutomationSummary(
      */
     val triggerCount: Long,
     /**
-     * Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+     * Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
      */
     val nextRunAt: String? = null,
     /**
@@ -5117,7 +5117,7 @@ data class AutomationState(
      */
     val revision: Long,
     /**
-     * Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+     * Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
      */
     val nextRunAt: String? = null,
     /**

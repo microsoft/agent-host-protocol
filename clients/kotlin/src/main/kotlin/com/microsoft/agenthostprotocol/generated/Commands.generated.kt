@@ -1655,14 +1655,15 @@ data class CreateAutomationParams(
      */
     val definition: AutomationDefinition,
     /**
-     * Optional idempotency identity when importing a legacy definition.
+     * Optional legacy import state. When present, {@link definition} MUST be
+     * disabled so automatic triggers cannot run before migration cutover.
      */
     @SerialName("import")
-    val `import`: AutomationImportIdentity? = null
+    val `import`: AutomationImport? = null
 )
 
 @Serializable
-data class AutomationImportIdentity(
+data class AutomationImport(
     /**
      * Stable namespace identifying the source implementation or store.
      */
@@ -1674,7 +1675,23 @@ data class AutomationImportIdentity(
     /**
      * Stable source-side identifier for this definition within the batch.
      */
-    val itemId: String
+    val itemId: String,
+    /**
+     * Source schedule occurrences to retain until the imported definition is enabled.
+     */
+    val triggerNextRuns: List<AutomationImportTriggerNextRun>? = null
+)
+
+@Serializable
+data class AutomationImportTriggerNextRun(
+    /**
+     * Stable id of a schedule trigger in the imported definition.
+     */
+    val triggerId: String,
+    /**
+     * Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp.
+     */
+    val nextRunAt: String
 )
 
 @Serializable

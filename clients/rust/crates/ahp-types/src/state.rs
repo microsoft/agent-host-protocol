@@ -4604,7 +4604,7 @@ pub struct AutomationSummary {
     pub enabled: bool,
     /// Number of automatic triggers in the current definition.
     pub trigger_count: i64,
-    /// Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
     /// Most recent retained run, when any run exists.
@@ -4638,7 +4638,7 @@ pub struct AutomationState {
     /// Monotonically increasing definition revision. Clients pass the revision
     /// they observed as `updateAutomation.expectedRevision`.
     pub revision: i64,
-    /// Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_run_at: Option<String>,
     /// Newest-first retained run summaries. This is a bounded window; use

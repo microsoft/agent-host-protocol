@@ -1561,7 +1561,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ChangesetOperationFollowUp' },
   { name: 'ListAutomationsParams' }, { name: 'ListAutomationsResult' },
   { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
-  { name: 'CreateAutomationParams' }, { name: 'AutomationImportIdentity' }, { name: 'AutomationDefinitionPatch' },
+  { name: 'CreateAutomationParams' }, { name: 'AutomationImport' }, { name: 'AutomationImportTriggerNextRun' }, { name: 'AutomationDefinitionPatch' },
   { name: 'UpdateAutomationParams' }, { name: 'DisposeAutomationParams' },
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },

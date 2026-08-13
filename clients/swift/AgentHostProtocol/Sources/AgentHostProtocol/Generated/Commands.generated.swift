@@ -2018,8 +2018,9 @@ public struct CreateAutomationParams: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Complete initial definition.
     public var definition: AutomationDefinition
-    /// Optional idempotency identity when importing a legacy definition.
-    public var `import`: AutomationImportIdentity?
+    /// Optional legacy import state. When present, {@link definition} MUST be
+    /// disabled so automatic triggers cannot run before migration cutover.
+    public var `import`: AutomationImport?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -2032,7 +2033,7 @@ public struct CreateAutomationParams: Codable, Sendable {
         channel: String,
         meta: [String: AnyCodable]? = nil,
         definition: AutomationDefinition,
-        `import`: AutomationImportIdentity? = nil
+        `import`: AutomationImport? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -2041,22 +2042,41 @@ public struct CreateAutomationParams: Codable, Sendable {
     }
 }
 
-public struct AutomationImportIdentity: Codable, Sendable {
+public struct AutomationImport: Codable, Sendable {
     /// Stable namespace identifying the source implementation or store.
     public var source: String
     /// Identifier shared by every item in one import attempt.
     public var batchId: String
     /// Stable source-side identifier for this definition within the batch.
     public var itemId: String
+    /// Source schedule occurrences to retain until the imported definition is enabled.
+    public var triggerNextRuns: [AutomationImportTriggerNextRun]?
 
     public init(
         source: String,
         batchId: String,
-        itemId: String
+        itemId: String,
+        triggerNextRuns: [AutomationImportTriggerNextRun]? = nil
     ) {
         self.source = source
         self.batchId = batchId
         self.itemId = itemId
+        self.triggerNextRuns = triggerNextRuns
+    }
+}
+
+public struct AutomationImportTriggerNextRun: Codable, Sendable {
+    /// Stable id of a schedule trigger in the imported definition.
+    public var triggerId: String
+    /// Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp.
+    public var nextRunAt: String
+
+    public init(
+        triggerId: String,
+        nextRunAt: String
+    ) {
+        self.triggerId = triggerId
+        self.nextRunAt = nextRunAt
     }
 }
 

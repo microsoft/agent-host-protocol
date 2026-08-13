@@ -5576,7 +5576,7 @@ public struct AutomationSummary: Codable, Sendable {
     public var enabled: Bool
     /// Number of automatic triggers in the current definition.
     public var triggerCount: Int
-    /// Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     public var nextRunAt: String?
     /// Most recent retained run, when any run exists.
     public var lastRun: AutomationRunSummary?
@@ -5640,7 +5640,7 @@ public struct AutomationState: Codable, Sendable {
     /// Monotonically increasing definition revision. Clients pass the revision
     /// they observed as `updateAutomation.expectedRevision`.
     public var revision: Int
-    /// Earliest known future scheduled occurrence, as an ISO 8601 timestamp.
+    /// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
     public var nextRunAt: String?
     /// Newest-first retained run summaries. This is a bounded window; use
     /// `fetchAutomationRuns` when {@link runsNextCursor} is present.
