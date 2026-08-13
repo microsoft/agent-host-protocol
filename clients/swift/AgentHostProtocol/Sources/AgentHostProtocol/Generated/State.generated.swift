@@ -4276,13 +4276,6 @@ public struct McpServerCustomization: Codable, Sendable {
     /// out-of-band.
     public var meta: [String: AnyCodable]?
     public var type: CustomizationType
-    /// Source URI of the plugin that contributes this server. A plugin-provided
-    /// server keeps this durable identity while temporarily published top-level;
-    /// its durable enablement key is derived from this URI.
-    ///
-    /// Absent means this is an unowned server, whose durable key is
-    /// `mcpServers#<name>`.
-    public var owningPluginUri: String?
     /// Explicit enablement decisions for this customization, one entry per scope
     /// that has one. This is a wire contract: producers MUST publish entries
     /// sorted by descending specificity (Session, Workspace, then Global).
@@ -4332,7 +4325,6 @@ public struct McpServerCustomization: Codable, Sendable {
         case range
         case meta = "_meta"
         case type
-        case owningPluginUri
         case enablement
         case isClientBundled
         case state
@@ -4348,7 +4340,6 @@ public struct McpServerCustomization: Codable, Sendable {
         range: TextRange? = nil,
         meta: [String: AnyCodable]? = nil,
         type: CustomizationType,
-        owningPluginUri: String? = nil,
         enablement: [CustomizationEnablement]? = nil,
         isClientBundled: Bool? = nil,
         state: McpServerState,
@@ -4362,7 +4353,6 @@ public struct McpServerCustomization: Codable, Sendable {
         self.range = range
         self.meta = meta
         self.type = type
-        self.owningPluginUri = owningPluginUri
         self.enablement = enablement
         self.isClientBundled = isClientBundled
         self.state = state

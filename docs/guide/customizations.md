@@ -118,7 +118,7 @@ SkillCustomization        { type: 'skill';       description?, disableModelInvoc
 PromptCustomization       { type: 'prompt';      description? }
 RuleCustomization         { type: 'rule';        description?, alwaysApply?, globs? }    // covers "instruction" formats too
 HookCustomization         { type: 'hook';        event?, matcher? }
-McpServerCustomization    { type: 'mcpServer';   owningPluginUri?, enablement?, isClientBundled?, state, channel?, mcpApp? }   // see /guide/mcp
+McpServerCustomization    { type: 'mcpServer';   enablement?, isClientBundled?, state, channel?, mcpApp? }   // see /guide/mcp
 ```
 
 Agents and skills carry a symmetric invocation matrix. `disableModelInvocation` removes the entry from the agent's automatic choices — a custom agent it won't auto-delegate to, or a skill it won't auto-invoke — while leaving it available for the user to pick. `disableUserInvocation` does the reverse: the entry stays available for the agent to invoke but is hidden from user-facing pickers and slash-commands. Both are absent/`false` by default (invocable by either party), and they are independent, so an entry can be agent-only, user-only, both, or neither.
@@ -155,10 +155,7 @@ For MCP servers, enablement flows both ways. A client publishing a server
 includes its global decision (even when enabled), and the host publishes the
 fully resolved decisions across all scopes. Client-published plugins can supply
 global decisions for their discovered children through
-`ClientPluginCustomization.childEnablement`, keyed by child name. The host
-applies these under each child's durable key. A plugin-provided MCP server
-retains `owningPluginUri` while temporarily surfaced at the top level; an
-unowned server uses `mcpServers#<name>` as its durable key.
+`ClientPluginCustomization.childEnablement`, keyed by child name.
 
 `DirectoryCustomization` and the five leaf child kinds retain their plain
 `enabled` fields. A plugin's effective value is derived from its `enablement`;

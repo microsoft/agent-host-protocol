@@ -2078,10 +2078,6 @@
         "type": {
           "const": "mcpServer"
         },
-        "owningPluginUri": {
-          "$ref": "#/$defs/URI",
-          "description": "Source URI of the plugin that contributes this server. A plugin-provided\nserver keeps this durable identity while temporarily published top-level;\nits durable enablement key is derived from this URI.\n\nAbsent means this is an unowned server, whose durable key is\n`mcpServers#<name>`."
-        },
         "enablement": {
           "type": "array",
           "items": {

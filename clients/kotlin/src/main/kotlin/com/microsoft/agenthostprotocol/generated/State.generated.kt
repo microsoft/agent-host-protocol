@@ -3902,15 +3902,6 @@ data class McpServerCustomization(
     val meta: Map<String, JsonElement>? = null,
     val type: CustomizationType,
     /**
-     * Source URI of the plugin that contributes this server. A plugin-provided
-     * server keeps this durable identity while temporarily published top-level;
-     * its durable enablement key is derived from this URI.
-     *
-     * Absent means this is an unowned server, whose durable key is
-     * `mcpServers#<name>`.
-     */
-    val owningPluginUri: String? = null,
-    /**
      * Explicit enablement decisions for this customization, one entry per scope
      * that has one. This is a wire contract: producers MUST publish entries
      * sorted by descending specificity (Session, Workspace, then Global).

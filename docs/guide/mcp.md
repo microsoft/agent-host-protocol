@@ -33,7 +33,6 @@ McpServerCustomization {
   name: string
   icons?: Icon[]
   range?: TextRange              // span inside `uri` for inline declarations
-  owningPluginUri?: URI          // durable identity for a plugin-provided server
   enablement?: CustomizationEnablement[] // user-toggleable (see Customizations guide)
   isClientBundled?: boolean      // client owns the Global enablement decision
   state: McpServerState // discriminated union — see below
