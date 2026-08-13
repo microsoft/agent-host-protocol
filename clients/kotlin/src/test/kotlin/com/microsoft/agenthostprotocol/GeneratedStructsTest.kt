@@ -169,12 +169,15 @@ class GeneratedStructsTest {
 
         val authWire = """{
             "channel": "ahp-root://",
-            "resource": "https://api.github.com",
+            "resource": {
+                "resource": "https://api.github.com",
+                "authorization_servers": ["https://github.com/login/oauth"]
+            },
             "reason": "expired"
         }""".trimIndent()
         val auth = json.decodeFromString(AuthRequiredParams.serializer(), authWire)
         assertEquals("ahp-root://", auth.channel)
-        assertEquals("https://api.github.com", auth.resource)
+        assertEquals("https://api.github.com", auth.resource.resource)
     }
 
     @Test

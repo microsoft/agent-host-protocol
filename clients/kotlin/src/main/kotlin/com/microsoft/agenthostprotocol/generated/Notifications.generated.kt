@@ -157,9 +157,9 @@ data class AuthRequiredParams(
      */
     val channel: String,
     /**
-     * The protected resource identifier that requires authentication
+     * Complete RFC 9728 metadata for the protected resource that requires authentication
      */
-    val resource: String,
+    val resource: ProtectedResourceMetadata,
     /**
      * Why authentication is required
      */

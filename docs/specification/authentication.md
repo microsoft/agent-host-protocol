@@ -174,13 +174,18 @@ The server MAY send an [`auth/required`](/reference/common#authrequired) notific
   "method": "auth/required",
   "params": {
     "channel": "ahp-root://",
-    "resource": "https://api.github.com",
+    "resource": {
+      "resource": "https://api.github.com",
+      "resource_name": "GitHub Copilot",
+      "authorization_servers": ["https://github.com/login/oauth"],
+      "scopes_supported": ["read:user", "user:email"]
+    },
     "reason": "expired"
   }
 }
 ```
 
-The `reason` field indicates why authentication is required:
+The `resource` field carries the complete [`ProtectedResourceMetadata`](/reference/common#protectedresourcemetadata) object for the resource that requires authentication. The `reason` field indicates why authentication is required:
 
 | Value | Description |
 |---|---|

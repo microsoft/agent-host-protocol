@@ -147,14 +147,14 @@ public struct ProgressParams: Codable, Sendable {
 public struct AuthRequiredParams: Codable, Sendable {
     /// Channel URI this notification belongs to
     public var channel: String
-    /// The protected resource identifier that requires authentication
-    public var resource: String
+    /// Complete RFC 9728 metadata for the protected resource that requires authentication
+    public var resource: ProtectedResourceMetadata
     /// Why authentication is required
     public var reason: AuthRequiredReason?
 
     public init(
         channel: String,
-        resource: String,
+        resource: ProtectedResourceMetadata,
         reason: AuthRequiredReason? = nil
     ) {
         self.channel = channel
