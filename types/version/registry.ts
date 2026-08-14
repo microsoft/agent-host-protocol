@@ -93,6 +93,7 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.SessionActiveClientRemoved]: '0.5.0',
   [ActionType.SessionWorkingDirectorySet]: '0.7.0',
   [ActionType.SessionWorkingDirectoryRemoved]: '0.7.0',
+  [ActionType.SessionWorkingDirectoryReplaced]: '0.8.0',
   [ActionType.SessionInputNeededSet]: '0.5.1',
   [ActionType.SessionInputNeededRemoved]: '0.5.1',
   [ActionType.SessionCustomizationsChanged]: '0.1.0',

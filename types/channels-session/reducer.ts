@@ -287,6 +287,20 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
       return { ...state, workingDirectories: updated };
     }
 
+    case ActionType.SessionWorkingDirectoryReplaced: {
+      const list = state.workingDirectories;
+      if (!list?.length || list[0] !== action.directory) {
+        return state;
+      }
+      return {
+        ...state,
+        workingDirectories: [
+          action.replacement,
+          ...list.slice(1).filter(directory => directory !== action.replacement),
+        ],
+      };
+    }
+
     // ── Input Needed ────────────────────────────────────────────────────
 
     case ActionType.SessionInputNeededSet: {

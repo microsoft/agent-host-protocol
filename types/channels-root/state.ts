@@ -114,8 +114,8 @@ export interface AgentCapabilities {
   /**
    * The session's agent can be granted tool access to more than one working
    * directory. The directories are treated as equal peers except where the
-   * agent advertises {@link MultipleWorkingDirectoriesCapability.immutablePrimary}
-   * (some backends pin their first directory as a fixed process root).
+   * agent advertises a protected primary-slot option (some backends pin or
+   * replace their first directory as a process root).
    *
    * When absent, clients MUST NOT mutate a session's or chat's working-directory
    * set and MUST NOT set more than one entry in
@@ -166,11 +166,23 @@ export interface MultipleWorkingDirectoriesCapability {
    * added and removed freely.
    *
    * Advertised by backends whose agent process is rooted at a single directory
-   * that cannot change once the session has started (e.g. the SDK's primary
-   * `workingDirectory`). When absent or `false`, all directories are equal
-   * peers and any of them may be removed.
+   * that cannot change once the session has started. When absent or `false`,
+   * all directories are equal peers unless {@link primaryReplacement} is
+   * `true`.
    */
   immutablePrimary?: boolean;
+  /**
+   * The agent's first working-directory slot (index `0`) is a protected primary
+   * whose URI can be atomically replaced with
+   * `session/workingDirectoryReplaced`. Clients MUST NOT remove that slot with
+   * generic membership actions; additional directories remain equal peers.
+   *
+   * Backends use this when their cwd-bearing directory can move during a
+   * session. A backend MUST NOT set this to `true` together with
+   * `immutablePrimary: true`: an immutable primary fixes the value, while a
+   * replaceable primary permits changing it.
+   */
+  primaryReplacement?: boolean;
 }
 
 /**

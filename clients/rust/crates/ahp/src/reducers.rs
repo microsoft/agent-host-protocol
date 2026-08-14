@@ -827,6 +827,23 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             list.remove(idx);
             ReduceOutcome::Applied
         }
+        StateAction::SessionWorkingDirectoryReplaced(a) => {
+            let Some(list) = state.working_directories.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            if list.first() != Some(&a.directory) {
+                return ReduceOutcome::NoOp;
+            }
+            let mut updated = Vec::with_capacity(list.len());
+            updated.push(a.replacement.clone());
+            for directory in list.iter().skip(1) {
+                if directory != &a.replacement {
+                    updated.push(directory.clone());
+                }
+            }
+            *list = updated;
+            ReduceOutcome::Applied
+        }
         StateAction::SessionInputNeededSet(a) => {
             let Some(action_id) = session_input_request_id(&a.request) else {
                 return ReduceOutcome::NoOp;

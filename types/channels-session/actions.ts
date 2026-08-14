@@ -286,7 +286,10 @@ export interface SessionWorkingDirectorySetAction {
  * reduced set — so this action is safe to model as idempotent. A host MAY
  * decline to apply the removal (e.g. an immutable primary directory, see
  * {@link MultipleWorkingDirectoriesCapability.immutablePrimary}); it then leaves
- * the set unchanged.
+ * the set unchanged. When the agent advertises
+ * {@link MultipleWorkingDirectoriesCapability.primaryReplacement}, clients MUST
+ * NOT use this generic membership action to remove index `0`; the host MUST
+ * reject such a removal, leaving the protected slot intact.
  *
  * @category Session Actions
  * @version 1
@@ -296,6 +299,34 @@ export interface SessionWorkingDirectoryRemovedAction {
   type: ActionType.SessionWorkingDirectoryRemoved;
   /** The working directory to revoke the session's agent tool access to. */
   directory: URI;
+}
+
+/**
+ * Atomically replaces the session's protected primary working-directory slot.
+ *
+ * This is a targeted compare-and-swap: the reducer is a no-op when
+ * {@link SessionState.workingDirectories} is absent or empty, or when index
+ * `0` is not `directory`. Otherwise it replaces index `0` with `replacement`
+ * and removes a later duplicate of `replacement`, preserving every other
+ * directory's relative order. For example, `[A, C]` with `A → B` becomes
+ * `[B, C]`, while `[A, B, C]` with `A → B` becomes `[B, C]`.
+ *
+ * Only valid when the agent advertises
+ * {@link MultipleWorkingDirectoriesCapability.primaryReplacement}. The host
+ * MUST validate and apply its backend side effect before broadcasting an
+ * accepted action, or reject it. Clients MUST NOT dispatch this action for an
+ * immutable primary.
+ *
+ * @category Session Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface SessionWorkingDirectoryReplacedAction {
+  type: ActionType.SessionWorkingDirectoryReplaced;
+  /** Expected current URI in the protected primary slot. */
+  directory: URI;
+  /** New URI for the protected primary slot. */
+  replacement: URI;
 }
 
 // ─── Input Needed Actions ────────────────────────────────────────────────────

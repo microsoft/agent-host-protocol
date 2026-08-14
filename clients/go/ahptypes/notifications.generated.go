@@ -218,12 +218,13 @@ type PartialSessionSummary struct {
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
 	// The working directories the session's agent has tool access to, as
-	// maintained by the `session/workingDirectorySet` /
-	// `session/workingDirectoryRemoved` actions. Directories are equal peers
-	// except when the agent advertises
+	// maintained by working-directory actions. Directories are equal peers except
+	// when the agent advertises
 	// {@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first
-	// entry is then a fixed process root). Individual chats MAY restrict to a
-	// subset via {@link ChatSummary.workingDirectories | their own
+	// entry is then a fixed process root) or
+	// {@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first
+	// entry is a protected, replaceable primary slot). Individual chats MAY
+	// restrict to a subset via {@link ChatSummary.workingDirectories | their own
 	// `workingDirectories`}; a chat that sets none operates against this full
 	// set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`

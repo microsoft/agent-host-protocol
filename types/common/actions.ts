@@ -28,6 +28,7 @@ import type {
   SessionActiveClientRemovedAction,
   SessionWorkingDirectorySetAction,
   SessionWorkingDirectoryRemovedAction,
+  SessionWorkingDirectoryReplacedAction,
   SessionInputNeededSetAction,
   SessionInputNeededRemovedAction,
   SessionCustomizationsChangedAction,
@@ -156,6 +157,7 @@ export const enum ActionType {
   SessionActiveClientRemoved = 'session/activeClientRemoved',
   SessionWorkingDirectorySet = 'session/workingDirectorySet',
   SessionWorkingDirectoryRemoved = 'session/workingDirectoryRemoved',
+  SessionWorkingDirectoryReplaced = 'session/workingDirectoryReplaced',
   SessionInputNeededSet = 'session/inputNeededSet',
   SessionInputNeededRemoved = 'session/inputNeededRemoved',
   ChatPendingMessageSet = 'chat/pendingMessageSet',
@@ -259,6 +261,7 @@ export type StateAction =
   | SessionActiveClientRemovedAction
   | SessionWorkingDirectorySetAction
   | SessionWorkingDirectoryRemovedAction
+  | SessionWorkingDirectoryReplacedAction
   | SessionInputNeededSetAction
   | SessionInputNeededRemovedAction
   | SessionCustomizationsChangedAction
