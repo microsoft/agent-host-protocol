@@ -1,5 +1,5 @@
 {
-  "description": "session-workingDirectoryReplaced is a no-op when the expected primary does not match",
+  "description": "session-workingDirectoryReplaced is a no-op when the directory is absent",
   "reducer": "session",
   "initial": {
     "provider": "copilot",

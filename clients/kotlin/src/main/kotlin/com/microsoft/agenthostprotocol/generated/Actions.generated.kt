@@ -924,11 +924,11 @@ data class SessionWorkingDirectoryRemovedAction(
 data class SessionWorkingDirectoryReplacedAction(
     val type: ActionType,
     /**
-     * Expected current URI in the protected primary slot.
+     * URI of the existing entry to replace.
      */
     val directory: String,
     /**
-     * New URI for the protected primary slot.
+     * URI to place in the replaced entry's position.
      */
     val replacement: String
 )

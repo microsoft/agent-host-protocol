@@ -289,15 +289,18 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
 
     case ActionType.SessionWorkingDirectoryReplaced: {
       const list = state.workingDirectories;
-      if (!list?.length || list[0] !== action.directory) {
+      if (!list) {
+        return state;
+      }
+      const idx = list.indexOf(action.directory);
+      if (idx < 0) {
         return state;
       }
       return {
         ...state,
-        workingDirectories: [
-          action.replacement,
-          ...list.slice(1).filter(directory => directory !== action.replacement),
-        ],
+        workingDirectories: list
+          .map((directory, index) => (index === idx ? action.replacement : directory))
+          .filter((directory, index) => index === idx || directory !== action.replacement),
       };
     }
 

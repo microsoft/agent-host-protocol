@@ -1,5 +1,5 @@
 {
   "type": "added",
-  "message": "`session/workingDirectoryReplaced` atomically replaces a replaceable primary working-directory slot.",
+  "message": "`session/workingDirectoryReplaced` atomically replaces a working-directory entry, including a replaceable primary.",
   "issues": [392]
 }

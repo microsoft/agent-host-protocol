@@ -1,5 +1,5 @@
 {
-  "description": "session-workingDirectoryReplaced replaces an entry and deduplicates a later replacement",
+  "description": "session-workingDirectoryReplaced replaces a non-primary entry in place",
   "reducer": "session",
   "initial": {
     "provider": "copilot",
@@ -18,7 +18,7 @@
     {
       "type": "session/workingDirectoryReplaced",
       "directory": "file:///repo-b",
-      "replacement": "file:///repo-c"
+      "replacement": "file:///repo-d"
     }
   ],
   "expected": {
@@ -30,6 +30,7 @@
     "chats": [],
     "workingDirectories": [
       "file:///repo-a",
+      "file:///repo-d",
       "file:///repo-c"
     ]
   }

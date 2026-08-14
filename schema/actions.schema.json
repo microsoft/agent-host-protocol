@@ -441,18 +441,18 @@
     },
     "SessionWorkingDirectoryReplacedAction": {
       "type": "object",
-      "description": "Atomically replaces the session's protected primary working-directory slot.\n\nThis is a targeted compare-and-swap: the reducer is a no-op when\n{@link SessionState.workingDirectories} is absent or empty, or when index\n`0` is not `directory`. Otherwise it replaces index `0` with `replacement`\nand removes a later duplicate of `replacement`, preserving every other\ndirectory's relative order. For example, `[A, C]` with `A → B` becomes\n`[B, C]`, while `[A, B, C]` with `A → B` becomes `[B, C]`.\n\nOnly valid when the agent advertises\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement}. The host\nMUST validate and apply its backend side effect before broadcasting an\naccepted action, or reject it. Clients MUST NOT dispatch this action for an\nimmutable primary.",
+      "description": "Atomically replaces one of the session's working directories.\n\nThis is a targeted compare-and-swap: the reducer is a no-op when\n{@link SessionState.workingDirectories} does not contain `directory`.\nOtherwise it replaces that entry in place with `replacement` and removes\nany other occurrence of `replacement`, preserving every other directory's\nrelative order. For example, `[A, B, C]` with `B → D` becomes `[A, D, C]`,\nwhile `[A, B, C]` with `B → C` becomes `[A, C]`.\n\nOnly valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}. Replacing index `0`\nadditionally requires\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement}; clients\nMUST NOT target an immutable primary. The host MUST validate and apply its\nbackend side effect before broadcasting an accepted action, or reject it.",
       "properties": {
         "type": {
           "const": "session/workingDirectoryReplaced"
         },
         "directory": {
           "$ref": "#/$defs/URI",
-          "description": "Expected current URI in the protected primary slot."
+          "description": "URI of the existing entry to replace."
         },
         "replacement": {
           "$ref": "#/$defs/URI",
-          "description": "New URI for the protected primary slot."
+          "description": "URI to place in the replaced entry's position."
         }
       },
       "required": [

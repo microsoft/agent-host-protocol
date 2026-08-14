@@ -296,8 +296,8 @@ interface SessionWorkingDirectoryRemovedAction {
 }
 interface SessionWorkingDirectoryReplacedAction {
   type: ActionType.SessionWorkingDirectoryReplaced; // 'session/workingDirectoryReplaced'
-  directory: URI;                                   // expected current index-0 URI
-  replacement: URI;                                 // replacement index-0 URI
+  directory: URI;                                   // existing entry to replace
+  replacement: URI;                                 // replacement URI at the same position
 }
 
 // ── Chat — channels-chat/state.ts, commands.ts & actions.ts ──────────────
@@ -334,8 +334,8 @@ interface ChatWorkingDirectoryRemovedAction {
   released `0.6.0`), and pre-1.0 breaking changes land in a MINOR.
   `SUPPORTED_PROTOCOL_VERSIONS` = `[0.7.0, 0.6.0, 0.5.2, 0.5.1]`.
 - The directory mutations are **state actions**. The original four carry
-  `ACTION_INTRODUCED_IN` entries at `0.7.0`; the session-only protected-primary
-  replacement carries one at `0.8.0`. All are `@clientDispatchable`.
+  `ACTION_INTRODUCED_IN` entries at `0.7.0`; the session-only atomic replacement
+  carries one at `0.8.0`. All are `@clientDispatchable`.
   Everything else — the capability and the create-time / state fields — is gated
   by the `multipleWorkingDirectories` capability plus the `initialize` version
   handshake.
@@ -391,10 +391,11 @@ interface ChatWorkingDirectoryRemovedAction {
 - **Replaceable primary.** *Resolved:* a backend that must move its cwd-bearing
   first directory advertises `primaryReplacement`; it MUST NOT also set
   `immutablePrimary: true`. `session/workingDirectoryReplaced` is a session-only,
-  client-dispatchable compare-and-swap action for index `0`. The host validates
-  the capability and applies the backend side effect before broadcasting it;
-  reducers replace only when the expected URI matches and remove a later
-  duplicate replacement URI.
+  client-dispatchable compare-and-swap action for any directory. The host
+  validates `primaryReplacement` when the target is index `0` and applies the
+  backend side effect before broadcasting it; reducers replace only when the
+  expected URI is present and remove any other occurrence of the replacement
+  URI.
 
 ---
 

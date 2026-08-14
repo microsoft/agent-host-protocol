@@ -831,13 +831,14 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             let Some(list) = state.working_directories.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
-            if list.first() != Some(&a.directory) {
+            let Some(idx) = list.iter().position(|directory| directory == &a.directory) else {
                 return ReduceOutcome::NoOp;
-            }
+            };
             let mut updated = Vec::with_capacity(list.len());
-            updated.push(a.replacement.clone());
-            for directory in list.iter().skip(1) {
-                if directory != &a.replacement {
+            for (i, directory) in list.iter().enumerate() {
+                if i == idx {
+                    updated.push(a.replacement.clone());
+                } else if directory != &a.replacement {
                     updated.push(directory.clone());
                 }
             }

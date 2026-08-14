@@ -626,7 +626,7 @@ mutate it by **dispatching actions**, not by calling commands:
 | --- | --- |
 | `session/workingDirectorySet` | Adds `directory` to the set (creating it if absent). A no-op when the directory is already present. |
 | `session/workingDirectoryRemoved` | Removes `directory` from the set. A no-op when it is not present. There is no atomic backend "remove one" primitive — the host reconfigures its agent to the reduced set. A host MAY decline to apply the removal (e.g. the immutable primary at index 0), leaving the set unchanged. |
-| `session/workingDirectoryReplaced` | Targeted compare-and-swap replacement of index `0`: when `directory` is its expected current URI, replaces it with `replacement` and deduplicates a later `replacement`, preserving the relative order of all other directories. A no-op when the set is absent or empty, or index `0` differs. Only valid with `primaryReplacement`. |
+| `session/workingDirectoryReplaced` | Targeted compare-and-swap replacement of any entry: replaces `directory` in place with `replacement` and removes any other occurrence of `replacement`, preserving the relative order of all other directories. A no-op when `directory` is absent. Replacing index `0` additionally requires `primaryReplacement`. |
 
 All three are `@clientDispatchable`. The resulting set is observed on
 `SessionState.workingDirectories` like any other state — there is no separate
@@ -640,11 +640,11 @@ result payload.
 > layer, not in the reducer: a client MUST NOT dispatch a removal (or reorder) of
 > the primary, and a host MAY reject or reconcile one that arrives.
 
-> **How replacement is enforced.** The host validates the
-> `primaryReplacement` capability and applies the backend side effect before
-> broadcasting `session/workingDirectoryReplaced`; otherwise it rejects the
-> action. The compare-and-swap payload prevents a stale client from replacing a
-> primary URI it no longer observed.
+> **How replacement is enforced.** The host applies the backend side effect
+> before broadcasting `session/workingDirectoryReplaced`; otherwise it rejects
+> the action. When the target is index `0`, the host also validates the
+> `primaryReplacement` capability. The compare-and-swap payload prevents a stale
+> client from replacing a directory URI it no longer observes.
 
 Before dispatching any directory action, a client MUST verify that the agent advertises
 `multipleWorkingDirectories`.

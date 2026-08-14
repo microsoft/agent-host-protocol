@@ -917,25 +917,26 @@ type SessionWorkingDirectoryRemovedAction struct {
 	Directory URI `json:"directory"`
 }
 
-// Atomically replaces the session's protected primary working-directory slot.
+// Atomically replaces one of the session's working directories.
 //
 // This is a targeted compare-and-swap: the reducer is a no-op when
-// {@link SessionState.workingDirectories} is absent or empty, or when index
-// `0` is not `directory`. Otherwise it replaces index `0` with `replacement`
-// and removes a later duplicate of `replacement`, preserving every other
-// directory's relative order. For example, `[A, C]` with `A → B` becomes
-// `[B, C]`, while `[A, B, C]` with `A → B` becomes `[B, C]`.
+// {@link SessionState.workingDirectories} does not contain `directory`.
+// Otherwise it replaces that entry in place with `replacement` and removes
+// any other occurrence of `replacement`, preserving every other directory's
+// relative order. For example, `[A, B, C]` with `B → D` becomes `[A, D, C]`,
+// while `[A, B, C]` with `B → C` becomes `[A, C]`.
 //
 // Only valid when the agent advertises
-// {@link MultipleWorkingDirectoriesCapability.primaryReplacement}. The host
-// MUST validate and apply its backend side effect before broadcasting an
-// accepted action, or reject it. Clients MUST NOT dispatch this action for an
-// immutable primary.
+// {@link AgentCapabilities.multipleWorkingDirectories}. Replacing index `0`
+// additionally requires
+// {@link MultipleWorkingDirectoriesCapability.primaryReplacement}; clients
+// MUST NOT target an immutable primary. The host MUST validate and apply its
+// backend side effect before broadcasting an accepted action, or reject it.
 type SessionWorkingDirectoryReplacedAction struct {
 	Type ActionType `json:"type"`
-	// Expected current URI in the protected primary slot.
+	// URI of the existing entry to replace.
 	Directory URI `json:"directory"`
-	// New URI for the protected primary slot.
+	// URI to place in the replaced entry's position.
 	Replacement URI `json:"replacement"`
 }
 

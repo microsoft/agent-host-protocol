@@ -1159,9 +1159,9 @@ public struct SessionWorkingDirectoryRemovedAction: Codable, Sendable {
 
 public struct SessionWorkingDirectoryReplacedAction: Codable, Sendable {
     public var type: ActionType
-    /// Expected current URI in the protected primary slot.
+    /// URI of the existing entry to replace.
     public var directory: String
-    /// New URI for the protected primary slot.
+    /// URI to place in the replaced entry's position.
     public var replacement: String
 
     public init(

@@ -663,12 +663,18 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
 
     is StateActionSessionWorkingDirectoryReplaced -> {
         val list = state.workingDirectories
-        if (list.isNullOrEmpty() || list.first() != action.value.directory) {
+        val idx = list?.indexOf(action.value.directory) ?: -1
+        if (list == null || idx < 0) {
             state
         } else {
             state.copy(
-                workingDirectories = listOf(action.value.replacement) +
-                    list.drop(1).filter { it != action.value.replacement },
+                workingDirectories = list.mapIndexedNotNull { index, directory ->
+                    when {
+                        index == idx -> action.value.replacement
+                        directory == action.value.replacement -> null
+                        else -> directory
+                    }
+                },
             )
         }
     }

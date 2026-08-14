@@ -788,10 +788,12 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
 
     case .sessionWorkingDirectoryReplaced(let a):
         guard let directories = state.workingDirectories,
-              directories.first == a.directory else { return state }
+              let idx = directories.firstIndex(of: a.directory) else { return state }
         var next = state
-        next.workingDirectories = [a.replacement] +
-            directories.dropFirst().filter { $0 != a.replacement }
+        next.workingDirectories = directories.enumerated().compactMap { index, directory in
+            if index == idx { return a.replacement }
+            return directory == a.replacement ? nil : directory
+        }
         return next
 
     case .sessionInputNeededSet(let a):
