@@ -14,13 +14,16 @@ import type { ResolveSessionConfigResult } from '../channels-root/commands.js';
 import type { AgentInfo, ModelSelection, SessionModelInfo } from '../channels-root/state.js';
 import type { CreateSessionParams } from '../channels-session/commands.js';
 import type { AgentSelection } from '../channels-session/state.js';
-import type { AutomationRemovedAction, AutomationSetAction } from './actions.js';
 import type {
-  DisposeAutomationParams,
+  AutomationCreateRequestedAction,
+  AutomationRemovedAction,
+  AutomationSetAction,
+  AutomationUpdateRequestedAction,
+} from './actions.js';
+import type {
   FetchAutomationRunsParams,
   ListAutomationTriggerDefinitionsParams,
   RunAutomationParams,
-  UpdateAutomationParams,
 } from './commands.js';
 
 /**
@@ -34,9 +37,9 @@ import type {
  * @category Automation State
  */
 export const enum AutomationOperation {
-  /** Replace editable fields using {@link UpdateAutomationParams | updateAutomation}. */
+  /** Replace editable fields using {@link AutomationUpdateRequestedAction | `automation/updateRequested`}. */
   Update = 'update',
-  /** Permanently remove the automation using {@link DisposeAutomationParams | disposeAutomation}. */
+  /** Permanently remove the automation using {@link AutomationRemovedAction | `automation/removed`}. */
   Dispose = 'dispose',
   /** Start a manual run using {@link RunAutomationParams | runAutomation}. */
   Run = 'run',
@@ -314,7 +317,7 @@ export interface AutomationState {
   definition: AutomationDefinition;
   /**
    * Monotonically increasing definition revision. Clients pass the value they
-   * observed as {@link UpdateAutomationParams.expectedRevision}.
+   * observed as {@link AutomationUpdateRequestedAction.expectedRevision}.
    */
   revision: number;
   /** Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */

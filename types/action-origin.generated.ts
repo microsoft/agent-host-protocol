@@ -88,6 +88,8 @@ import type {
   TerminalCommandExecutedAction,
   TerminalCommandFinishedAction,
   ResourceWatchChangedAction,
+  AutomationCreateRequestedAction,
+  AutomationUpdateRequestedAction,
   AutomationSetAction,
   AutomationRemovedAction,
   AutomationRunLifecycleChangedAction,
@@ -361,19 +363,22 @@ export type ServerResourceWatchAction =
 
 /** Union of all automation-scoped actions. */
 export type AutomationAction =
+  | AutomationCreateRequestedAction
+  | AutomationUpdateRequestedAction
   | AutomationSetAction
   | AutomationRemovedAction
 ;
 
 /** Union of automation actions that clients may dispatch. */
 export type ClientAutomationAction =
-  never
+  | AutomationCreateRequestedAction
+  | AutomationUpdateRequestedAction
+  | AutomationRemovedAction
 ;
 
 /** Union of automation actions that only the server may produce. */
 export type ServerAutomationAction =
   | AutomationSetAction
-  | AutomationRemovedAction
 ;
 
 /** Union of all automation-run-scoped actions. */
@@ -494,8 +499,10 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.TerminalCommandExecuted]: false,
   [ActionType.TerminalCommandFinished]: false,
   [ActionType.ResourceWatchChanged]: false,
+  [ActionType.AutomationCreateRequested]: true,
+  [ActionType.AutomationUpdateRequested]: true,
   [ActionType.AutomationSet]: false,
-  [ActionType.AutomationRemoved]: false,
+  [ActionType.AutomationRemoved]: true,
   [ActionType.AutomationRunLifecycleChanged]: false,
   [ActionType.AutomationRunSessionSet]: false,
   [ActionType.AutomationRunSessionRemoved]: false,

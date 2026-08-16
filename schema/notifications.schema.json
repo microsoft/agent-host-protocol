@@ -650,7 +650,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-automations://`, or `ahp-session:/<uuid>`)"
+          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)"
         },
         "state": {
           "oneOf": [
@@ -5439,7 +5439,7 @@
         },
         "revision": {
           "type": "number",
-          "description": "Monotonically increasing definition revision. Clients pass the value they\nobserved as {@link UpdateAutomationParams.expectedRevision}."
+          "description": "Monotonically increasing definition revision. Clients pass the value they\nobserved as {@link AutomationUpdateRequestedAction.expectedRevision}."
         },
         "nextRunAt": {
           "type": "string",

@@ -32,6 +32,23 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/terminalsChanged` | No | Lightweight terminal catalogue changed (full replacement) |
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
 
+## Automation Catalogue Actions
+
+Automation catalogue actions travel on `ahp-automations://`.
+
+| Type | Client-dispatchable? | When |
+|---|---|---|
+| `automation/createRequested` | **Yes** | A client asks the host to persist a complete definition at a client-chosen resource. |
+| `automation/updateRequested` | **Yes** | A client asks the host to apply a definition patch at an expected revision. |
+| `automation/set` | No | The host adds or replaces one complete automation state. |
+| `automation/removed` | **Yes** | A client permanently removes an automation while its `dispose` operation is available, or the host removes an entry that is no longer visible. |
+
+Create and update requests leave catalogue state unchanged until the host
+publishes an authoritative `automation/set`. The host revalidates
+client-dispatched removals. Rejected actions carry
+`ActionEnvelope.rejectionReason`; a rejected removal causes the originating
+client to restore its optimistic state.
+
 ## Session & Chat Actions
 
 Actions travel on the channel named by their prefix: `session/*` actions on the [Session Channel](/specification/session-channel) (`ahp-session:/<uuid>`), and `chat/*` actions on a [Chat Channel](/specification/chat-channel) (`ahp-chat:/<cid>`). A session is a catalog of chats; its per-conversation activity — turns, streaming, tool calls, pending messages, and input requests — lives on the chat channels, while lifecycle, metadata, tool-registry, and customization actions live on the session channel. Some actions are server-only (produced by the agent backend), others are client-dispatchable.

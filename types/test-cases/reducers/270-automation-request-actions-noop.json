@@ -1,0 +1,59 @@
+{
+  "description": "automation create and update requests leave authoritative catalogue state unchanged",
+  "reducer": "automation",
+  "initial": {
+    "automations": [{
+      "resource": "ahp-automation:/a1",
+      "definition": {
+        "title": "A",
+        "message": { "text": "go", "origin": { "kind": "user" } },
+        "session": {},
+        "enabled": true,
+        "triggers": []
+      },
+      "revision": 1,
+      "runs": [],
+      "operations": ["update", "dispose", "run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-01T00:00:00Z"
+    }]
+  },
+  "actions": [
+    {
+      "type": "automation/createRequested",
+      "resource": "ahp-automation:/a2",
+      "definition": {
+        "title": "B",
+        "message": { "text": "go", "origin": { "kind": "user" } },
+        "session": {},
+        "enabled": true,
+        "triggers": []
+      }
+    },
+    {
+      "type": "automation/updateRequested",
+      "resource": "ahp-automation:/a1",
+      "expectedRevision": 1,
+      "changes": {
+        "title": "Updated"
+      }
+    }
+  ],
+  "expected": {
+    "automations": [{
+      "resource": "ahp-automation:/a1",
+      "definition": {
+        "title": "A",
+        "message": { "text": "go", "origin": { "kind": "user" } },
+        "session": {},
+        "enabled": true,
+        "triggers": []
+      },
+      "revision": 1,
+      "runs": [],
+      "operations": ["update", "dispose", "run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-01T00:00:00Z"
+    }]
+  }
+}

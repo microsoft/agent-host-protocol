@@ -73,9 +73,6 @@ import type {
 import type {
   ListAutomationTriggerDefinitionsParams,
   ListAutomationTriggerDefinitionsResult,
-  CreateAutomationParams,
-  UpdateAutomationParams,
-  DisposeAutomationParams,
   RunAutomationParams,
   RunAutomationResult,
   FetchAutomationRunsParams,
@@ -188,9 +185,6 @@ export interface CommandMap {
   'completions': { params: CompletionsParams; result: CompletionsResult };
   'invokeChangesetOperation': { params: InvokeChangesetOperationParams; result: InvokeChangesetOperationResult };
   'listAutomationTriggerDefinitions': { params: ListAutomationTriggerDefinitionsParams; result: ListAutomationTriggerDefinitionsResult };
-  'createAutomation': { params: CreateAutomationParams; result: null };
-  'updateAutomation': { params: UpdateAutomationParams; result: null };
-  'disposeAutomation': { params: DisposeAutomationParams; result: null };
   'runAutomation': { params: RunAutomationParams; result: RunAutomationResult };
   'fetchAutomationRuns': { params: FetchAutomationRunsParams; result: FetchAutomationRunsResult };
   'previewAutomationSchedule': { params: PreviewAutomationScheduleParams; result: PreviewAutomationScheduleResult };

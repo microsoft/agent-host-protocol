@@ -11,9 +11,10 @@ ahp-automations://
 ```
 
 Each `AutomationState.resource` is a stable `ahp-automation:/<id>` identifier
-chosen during `createAutomation`. Those identifiers target commands and
-relationships but are not independently subscribable channels. The host owns
-persistence, revision ordering, trigger evaluation, run claims, and run history.
+chosen by `automation/createRequested`. Those identifiers target commands,
+actions, and relationships but are not independently subscribable channels. The
+host owns persistence, revision ordering, trigger evaluation, run claims, and
+run history.
 
 ## State
 
@@ -41,13 +42,9 @@ the host returns a fresh catalogue snapshot.
 
 ## Commands
 
-All mutation commands use `channel: "ahp-automations://"`. Creation carries the
-new `resource`; commands for existing entries carry that identifier as
-`automation`.
+Run and run-history commands use `channel: "ahp-automations://"` and carry the
+target entry's identifier as `automation`.
 
-- `createAutomation` creates a client-chosen URI.
-- `updateAutomation` applies a patch guarded by `expectedRevision`.
-- `disposeAutomation` removes a definition with no active run.
 - `runAutomation` idempotently creates a run by `requestId`.
 - `fetchAutomationRuns` loads older summaries and publishes the updated full
   entry through `automation/set`.
@@ -56,11 +53,30 @@ new `resource`; commands for existing entries carry that identifier as
 
 ## Actions
 
-- `automation/set` adds or replaces one full `AutomationState` by `resource`.
-- `automation/removed` removes one entry by `resource`.
+- `automation/createRequested` asks the host to persist a complete definition
+  at a client-chosen `resource` (client-dispatchable).
+- `automation/updateRequested` asks the host to apply a definition patch
+  guarded by `expectedRevision` (client-dispatchable).
+- `automation/set` adds or replaces one full `AutomationState` by `resource`
+  (server-only).
+- `automation/removed` permanently deletes one entry by `resource`
+  (client-dispatchable or server-originated).
 
-The host sequences all actions on `ahp-automations://`. Automation catalogue
-actions are server-originated.
+The host sequences all actions on `ahp-automations://`.
+
+Create and update requests are side-effect-only: their reducers leave catalogue
+state unchanged. The host validates and persists the requested mutation, then
+publishes the resulting full `AutomationState` through `automation/set`. A
+rejected request carries `ActionEnvelope.rejectionReason` and produces no
+catalogue mutation.
+
+Before dispatching `automation/removed`, a client SHOULD verify that the target
+advertises `AutomationOperation.Dispose`. The host MUST revalidate the operation
+and the client's authorization. If disposal is no longer allowed, the host
+rejects the action with `ActionEnvelope.rejectionReason`; the originating client
+restores its optimistic removal. An accepted action permanently deletes the
+automation before it is echoed to catalogue subscribers. Removing an unknown
+resource is an idempotent no-op.
 
 ## Scheduling
 

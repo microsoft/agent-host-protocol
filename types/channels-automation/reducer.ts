@@ -12,6 +12,10 @@ import type { AutomationCatalogState } from './state.js';
 /** Pure reducer for automation catalogue state. */
 export function automationReducer(state: AutomationCatalogState, action: AutomationAction, log?: (msg: string) => void): AutomationCatalogState {
   switch (action.type) {
+    case ActionType.AutomationCreateRequested:
+    case ActionType.AutomationUpdateRequested:
+      return state;
+
     case ActionType.AutomationSet: {
       const idx = state.automations.findIndex(automation => automation.resource === action.automation.resource);
       if (idx < 0) {

@@ -11,10 +11,8 @@ import type { URI, Snapshot } from './state.js';
 import type { ActionEnvelope, StateAction } from './actions.js';
 import type { AutomationRunCancelRequestedAction } from '../channels-automation-run/actions.js';
 import type { AutomationRunOperation, AutomationRunState } from '../channels-automation-run/state.js';
-import type {
-  CreateAutomationParams,
-  PreviewAutomationScheduleParams,
-} from '../channels-automation/commands.js';
+import type { AutomationCreateRequestedAction } from '../channels-automation/actions.js';
+import type { PreviewAutomationScheduleParams } from '../channels-automation/commands.js';
 import type {
   AutomationSchedule,
   AutomationScheduleTrigger,
@@ -303,7 +301,7 @@ export interface InitializeResult {
  * @category Commands
  */
 export interface AutomationCapabilities {
-  /** Present when clients may call {@link CreateAutomationParams | createAutomation}. */
+  /** Present when clients may dispatch {@link AutomationCreateRequestedAction}. */
   create?: AutomationCreateCapability;
   /** Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}. */
   schedules?: AutomationScheduleCapabilities;
@@ -320,7 +318,8 @@ export interface AutomationCapabilities {
 }
 
 /**
- * Presence capability for {@link CreateAutomationParams | createAutomation}.
+ * Presence capability for {@link AutomationCreateRequestedAction |
+ * `automation/createRequested`}.
  *
  * The empty object means "supported"; fields are reserved for future
  * create-specific options.

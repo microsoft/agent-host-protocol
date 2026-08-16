@@ -1,6 +1,6 @@
 /**
- * Automation Commands — trigger discovery and mutation of
- * `ahp-automation:` resources.
+ * Automation Commands — trigger discovery, manual execution, run-history
+ * loading, and schedule preview.
  *
  * @module channels-automation/commands
  */
@@ -12,15 +12,11 @@ import type { AgentInfo } from '../channels-root/state.js';
 import type { AutomationSetAction } from './actions.js';
 import type {
   AutomationDefinition,
-  AutomationOperation,
   AutomationSchedule,
-  AutomationScheduleTrigger,
   AutomationSessionTemplate,
   AutomationState,
-  AutomationTrigger,
   AutomationTriggerDefinition,
 } from './state.js';
-import type { Message } from '../channels-chat/state.js';
 
 /**
  * Discover event-trigger types available for a prospective session template.
@@ -54,136 +50,6 @@ export interface ListAutomationTriggerDefinitionsParams extends BaseParams {
 export interface ListAutomationTriggerDefinitionsResult {
   /** Available event trigger definitions. */
   items: AutomationTriggerDefinition[];
-}
-
-/**
- * Initial schedule occurrence retained while an imported automation is disabled.
- *
- * @category Commands
- */
-export interface AutomationImportTriggerNextRun {
-  /** Stable {@link AutomationScheduleTrigger.id} in the imported definition. */
-  triggerId: string;
-  /** Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp. */
-  nextRunAt: string;
-}
-
-/**
- * Stable source identity and scheduler state for a legacy automation import.
- *
- * The host remembers the identity independently of the client-chosen automation
- * URI. Retrying with the same identity MUST resolve to the previously imported
- * item rather than creating a duplicate.
- *
- * @category Commands
- */
-export interface AutomationImport {
-  /** Stable namespace identifying the source implementation or store. */
-  source: string;
-  /** Identifier shared by every item in one import attempt. */
-  batchId: string;
-  /** Stable source-side identifier for this definition within the batch. */
-  itemId: string;
-  /** Source schedule occurrences to retain until {@link AutomationDefinition.enabled} becomes `true`. */
-  triggerNextRuns?: AutomationImportTriggerNextRun[];
-}
-
-/**
- * Create a durable automation at a client-chosen URI.
- *
- * {@link CreateAutomationParams.resource | `resource`} MUST use the
- * `ahp-automation:` scheme and MUST NOT already identify an unrelated
- * automation. The host validates the complete definition, persists it, and
- * makes it visible through the automation catalogue before returning success.
- *
- * @category Commands
- * @method createAutomation
- * @direction Client → Server
- * @messageType Request
- * @version 1
- */
-export interface CreateAutomationParams extends BaseParams {
-  /** Automation creation is scoped to the catalogue channel. */
-  channel: 'ahp-automations://';
-  /** Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}. */
-  resource: URI;
-  /** Complete initial {@link AutomationState.definition}. */
-  definition: AutomationDefinition;
-  /**
-   * Optional legacy import state. When present,
-   * {@link CreateAutomationParams.definition} MUST have
-   * {@link AutomationDefinition.enabled} set to `false` so automatic triggers
-   * cannot run before migration cutover.
-   */
-  import?: AutomationImport;
-}
-
-/**
- * Partial replacement of editable {@link AutomationDefinition} fields.
- *
- * Omitted fields are unchanged. Supplied arrays and objects replace their
- * corresponding values in full; they are not merged recursively.
- *
- * @category Commands
- */
-export interface AutomationDefinitionPatch {
-  /** Replacement {@link AutomationDefinition.title}. */
-  title?: string;
-  /** Replacement {@link AutomationDefinition.message}. */
-  message?: Message;
-  /** Replacement {@link AutomationDefinition.session}. */
-  session?: AutomationSessionTemplate;
-  /** Replacement {@link AutomationDefinition.enabled}. */
-  enabled?: boolean;
-  /** Complete replacement {@link AutomationDefinition.triggers}. */
-  triggers?: AutomationTrigger[];
-  /** Complete replacement {@link AutomationDefinition._meta}. */
-  _meta?: Record<string, unknown>;
-}
-
-/**
- * Update editable fields of an existing automation using optimistic
- * concurrency.
- *
- * The host accepts the patch only when `expectedRevision` equals the current
- * {@link AutomationState.revision}. A stale revision is rejected; clients
- * SHOULD reconcile the latest state before retrying.
- *
- * @category Commands
- * @method updateAutomation
- * @direction Client → Server
- * @messageType Request
- * @version 1
- */
-export interface UpdateAutomationParams extends BaseParams {
-  /** Automation updates are scoped to the catalogue channel. */
-  channel: 'ahp-automations://';
-  /** Target {@link AutomationState.resource}. */
-  automation: URI;
-  /** {@link AutomationState.revision} on which the client based {@link UpdateAutomationParams.changes}. */
-  expectedRevision: number;
-  /** Editable {@link AutomationDefinition} fields to replace. */
-  changes: AutomationDefinitionPatch;
-}
-
-/**
- * Permanently remove an automation.
- *
- * The host rejects the command when {@link AutomationOperation.Dispose} is not
- * currently advertised, for example while a non-terminal run prevents
- * disposal.
- *
- * @category Commands
- * @method disposeAutomation
- * @direction Client → Server
- * @messageType Request
- * @version 1
- */
-export interface DisposeAutomationParams extends BaseParams {
-  /** Automation disposal is scoped to the catalogue channel. */
-  channel: 'ahp-automations://';
-  /** Target {@link AutomationState.resource}. */
-  automation: URI;
 }
 
 /**

@@ -89,8 +89,10 @@ The host keeps the catalogue synchronized with full-entry actions:
 
 | Action | Meaning |
 | --- | --- |
+| `automation/createRequested` | Ask the host to persist a complete definition at a client-chosen resource. |
+| `automation/updateRequested` | Ask the host to apply a definition patch at an expected revision. |
 | `automation/set` | Add or replace one complete `AutomationState`, keyed by `resource`. |
-| `automation/removed` | Remove the entry identified by `resource`. |
+| `automation/removed` | Permanently delete the entry identified by `resource`; clients may dispatch this while `dispose` is advertised. |
 
 These are ordinary ordered AHP actions. After reconnect, the host either replays
 missed catalogue actions or returns a fresh snapshot; clients do not issue a
@@ -281,24 +283,32 @@ Unknown configuration entries must survive client edits. Event provenance
 recorded on a run must contain no secrets; it is descriptive context, not a
 payload clients should replay.
 
-## Creating and updating
+## Creating, updating, and removing
 
-| Command | Purpose |
+| Action | Purpose |
 | --- | --- |
-| `createAutomation` | Persist a complete definition at a client-chosen `ahp-automation:/<id>` resource. |
-| `updateAutomation` | Replace selected editable fields using an expected revision. |
-| `disposeAutomation` | Permanently remove a definition when disposal is currently allowed. |
+| `automation/createRequested` | Persist a complete definition at a client-chosen `ahp-automation:/<id>` resource. |
+| `automation/updateRequested` | Replace selected editable fields using an expected revision. |
+| `automation/removed` | Permanently remove a definition when disposal is currently allowed. |
 
-Definition revisions increase monotonically. `updateAutomation` includes the
-revision the client observed:
+Create and update requests are side-effect-only. They leave catalogue state
+unchanged until the host validates and persists the mutation, then publishes
+the authoritative full state through `automation/set`.
+
+Definition revisions increase monotonically. `automation/updateRequested`
+includes the revision the client observed:
 
 ```typescript
 {
   channel: 'ahp-automations://'
-  automation: 'ahp-automation:/triage'
-  expectedRevision: 7
-  changes: {
-    enabled: false
+  clientSeq: 7
+  action: {
+    type: 'automation/updateRequested'
+    resource: 'ahp-automation:/triage'
+    expectedRevision: 7
+    changes: {
+      enabled: false
+    }
   }
 }
 ```
@@ -308,11 +318,32 @@ The host rejects a stale revision. The client then reconciles the latest
 fields remain unchanged; supplied arrays and objects replace their fields in
 full rather than merging recursively.
 
+To permanently remove an automation, a client dispatches
+`automation/removed` on `ahp-automations://`:
+
+```typescript
+{
+  channel: 'ahp-automations://'
+  clientSeq: 8
+  action: {
+    type: 'automation/removed'
+    resource: 'ahp-automation:/triage'
+  }
+}
+```
+
+The client checks that the automation advertises `dispose` and may remove it
+optimistically. The host revalidates permission and current operation
+availability. If the host rejects the action, `ActionEnvelope.rejectionReason`
+causes the originating client to restore its prediction; accepted removals are
+permanent and ordered for every catalogue subscriber. Removing an unknown
+resource is a no-op.
+
 ### Idempotent migration imports
 
-`createAutomation.import` carries a stable source, batch, and item identity for
-legacy migration. It may also carry the source scheduler's next unevaluated
-occurrence for each schedule trigger:
+`automation/createRequested.import` carries a stable source, batch, and item
+identity for legacy migration. It may also carry the source scheduler's next
+unevaluated occurrence for each schedule trigger:
 
 ```typescript
 {

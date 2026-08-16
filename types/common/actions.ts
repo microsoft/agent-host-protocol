@@ -114,8 +114,10 @@ import type {
   ResourceWatchChangedAction,
 } from '../channels-resource-watch/actions.js';
 import type {
+  AutomationCreateRequestedAction,
   AutomationRemovedAction,
   AutomationSetAction,
+  AutomationUpdateRequestedAction,
 } from '../channels-automation/actions.js';
 import type {
   AutomationRunLifecycleChangedAction,
@@ -220,6 +222,8 @@ export const enum ActionType {
   TerminalCommandExecuted = 'terminal/commandExecuted',
   TerminalCommandFinished = 'terminal/commandFinished',
   ResourceWatchChanged = 'resourceWatch/changed',
+  AutomationCreateRequested = 'automation/createRequested',
+  AutomationUpdateRequested = 'automation/updateRequested',
   AutomationSet = 'automation/set',
   AutomationRemoved = 'automation/removed',
   AutomationRunLifecycleChanged = 'automationRun/lifecycleChanged',
@@ -350,6 +354,8 @@ export type StateAction =
   | TerminalCommandExecutedAction
   | TerminalCommandFinishedAction
   | ResourceWatchChangedAction
+  | AutomationCreateRequestedAction
+  | AutomationUpdateRequestedAction
   | AutomationSetAction
   | AutomationRemovedAction
   | AutomationRunLifecycleChangedAction

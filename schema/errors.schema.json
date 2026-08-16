@@ -483,7 +483,7 @@
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-automations://`, or `ahp-session:/<uuid>`)"
+          "description": "The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)"
         },
         "state": {
           "oneOf": [
@@ -5272,7 +5272,7 @@
         },
         "revision": {
           "type": "number",
-          "description": "Monotonically increasing definition revision. Clients pass the value they\nobserved as {@link UpdateAutomationParams.expectedRevision}."
+          "description": "Monotonically increasing definition revision. Clients pass the value they\nobserved as {@link AutomationUpdateRequestedAction.expectedRevision}."
         },
         "nextRunAt": {
           "type": "string",
@@ -5894,7 +5894,7 @@
       "properties": {
         "create": {
           "$ref": "#/$defs/AutomationCreateCapability",
-          "description": "Present when clients may call {@link CreateAutomationParams | createAutomation}."
+          "description": "Present when clients may dispatch {@link AutomationCreateRequestedAction}."
         },
         "schedules": {
           "$ref": "#/$defs/AutomationScheduleCapabilities",
@@ -5916,7 +5916,7 @@
     },
     "AutomationCreateCapability": {
       "type": "object",
-      "description": "Presence capability for {@link CreateAutomationParams | createAutomation}.\n\nThe empty object means \"supported\"; fields are reserved for future\ncreate-specific options.",
+      "description": "Presence capability for {@link AutomationCreateRequestedAction |\n`automation/createRequested`}.\n\nThe empty object means \"supported\"; fields are reserved for future\ncreate-specific options.",
       "properties": {}
     },
     "AutomationScheduleCapabilities": {
@@ -7310,185 +7310,6 @@
         "items"
       ]
     },
-    "AutomationImportTriggerNextRun": {
-      "type": "object",
-      "description": "Initial schedule occurrence retained while an imported automation is disabled.",
-      "properties": {
-        "triggerId": {
-          "type": "string",
-          "description": "Stable {@link AutomationScheduleTrigger.id} in the imported definition."
-        },
-        "nextRunAt": {
-          "type": "string",
-          "description": "Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp."
-        }
-      },
-      "required": [
-        "triggerId",
-        "nextRunAt"
-      ]
-    },
-    "AutomationImport": {
-      "type": "object",
-      "description": "Stable source identity and scheduler state for a legacy automation import.\n\nThe host remembers the identity independently of the client-chosen automation\nURI. Retrying with the same identity MUST resolve to the previously imported\nitem rather than creating a duplicate.",
-      "properties": {
-        "source": {
-          "type": "string",
-          "description": "Stable namespace identifying the source implementation or store."
-        },
-        "batchId": {
-          "type": "string",
-          "description": "Identifier shared by every item in one import attempt."
-        },
-        "itemId": {
-          "type": "string",
-          "description": "Stable source-side identifier for this definition within the batch."
-        },
-        "triggerNextRuns": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationImportTriggerNextRun"
-          },
-          "description": "Source schedule occurrences to retain until {@link AutomationDefinition.enabled} becomes `true`."
-        }
-      },
-      "required": [
-        "source",
-        "batchId",
-        "itemId"
-      ]
-    },
-    "CreateAutomationParams": {
-      "type": "object",
-      "description": "Create a durable automation at a client-chosen URI.\n\n{@link CreateAutomationParams.resource | `resource`} MUST use the\n`ahp-automation:` scheme and MUST NOT already identify an unrelated\nautomation. The host validates the complete definition, persists it, and\nmakes it visible through the automation catalogue before returning success.",
-      "properties": {
-        "channel": {
-          "type": "string",
-          "enum": [
-            "ahp-automations://"
-          ],
-          "description": "Automation creation is scoped to the catalogue channel."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "resource": {
-          "$ref": "#/$defs/URI",
-          "description": "Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}."
-        },
-        "definition": {
-          "$ref": "#/$defs/AutomationDefinition",
-          "description": "Complete initial {@link AutomationState.definition}."
-        },
-        "import": {
-          "$ref": "#/$defs/AutomationImport",
-          "description": "Optional legacy import state. When present,\n{@link CreateAutomationParams.definition} MUST have\n{@link AutomationDefinition.enabled} set to `false` so automatic triggers\ncannot run before migration cutover."
-        }
-      },
-      "required": [
-        "channel",
-        "resource",
-        "definition"
-      ]
-    },
-    "AutomationDefinitionPatch": {
-      "type": "object",
-      "description": "Partial replacement of editable {@link AutomationDefinition} fields.\n\nOmitted fields are unchanged. Supplied arrays and objects replace their\ncorresponding values in full; they are not merged recursively.",
-      "properties": {
-        "title": {
-          "type": "string",
-          "description": "Replacement {@link AutomationDefinition.title}."
-        },
-        "message": {
-          "$ref": "#/$defs/Message",
-          "description": "Replacement {@link AutomationDefinition.message}."
-        },
-        "session": {
-          "$ref": "#/$defs/AutomationSessionTemplate",
-          "description": "Replacement {@link AutomationDefinition.session}."
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "Replacement {@link AutomationDefinition.enabled}."
-        },
-        "triggers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationTrigger"
-          },
-          "description": "Complete replacement {@link AutomationDefinition.triggers}."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Complete replacement {@link AutomationDefinition._meta}."
-        }
-      }
-    },
-    "UpdateAutomationParams": {
-      "type": "object",
-      "description": "Update editable fields of an existing automation using optimistic\nconcurrency.\n\nThe host accepts the patch only when `expectedRevision` equals the current\n{@link AutomationState.revision}. A stale revision is rejected; clients\nSHOULD reconcile the latest state before retrying.",
-      "properties": {
-        "channel": {
-          "type": "string",
-          "enum": [
-            "ahp-automations://"
-          ],
-          "description": "Automation updates are scoped to the catalogue channel."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "automation": {
-          "$ref": "#/$defs/URI",
-          "description": "Target {@link AutomationState.resource}."
-        },
-        "expectedRevision": {
-          "type": "number",
-          "description": "{@link AutomationState.revision} on which the client based {@link UpdateAutomationParams.changes}."
-        },
-        "changes": {
-          "$ref": "#/$defs/AutomationDefinitionPatch",
-          "description": "Editable {@link AutomationDefinition} fields to replace."
-        }
-      },
-      "required": [
-        "channel",
-        "automation",
-        "expectedRevision",
-        "changes"
-      ]
-    },
-    "DisposeAutomationParams": {
-      "type": "object",
-      "description": "Permanently remove an automation.\n\nThe host rejects the command when {@link AutomationOperation.Dispose} is not\ncurrently advertised, for example while a non-terminal run prevents\ndisposal.",
-      "properties": {
-        "channel": {
-          "type": "string",
-          "enum": [
-            "ahp-automations://"
-          ],
-          "description": "Automation disposal is scoped to the catalogue channel."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "automation": {
-          "$ref": "#/$defs/URI",
-          "description": "Target {@link AutomationState.resource}."
-        }
-      },
-      "required": [
-        "channel",
-        "automation"
-      ]
-    },
     "RunAutomationParams": {
       "type": "object",
       "description": "Start a manual run of an automation.\n\nManual execution is independent of {@link AutomationDefinition.enabled}.\nThe host persists the run before beginning session side effects.",
@@ -8615,6 +8436,12 @@
         },
         {
           "$ref": "#/$defs/ResourceWatchChangedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationCreateRequestedAction"
+        },
+        {
+          "$ref": "#/$defs/AutomationUpdateRequestedAction"
         },
         {
           "$ref": "#/$defs/AutomationSetAction"
@@ -10690,6 +10517,59 @@
         "changes"
       ]
     },
+    "AutomationCreateRequestedAction": {
+      "type": "object",
+      "description": "Ask the host to create a durable automation at a client-chosen resource.\n\nClients may dispatch this action only when the host advertises its `create`\nautomation capability. {@link AutomationCreateRequestedAction.resource |\n`resource`} MUST use the `ahp-automation:` scheme and MUST NOT already\nidentify an unrelated automation.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost validates and persists the definition, then publishes the authoritative\nresult with {@link AutomationSetAction | `automation/set`}. Rejections leave\nthe catalogue unchanged.",
+      "properties": {
+        "type": {
+          "const": "automation/createRequested"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}."
+        },
+        "definition": {
+          "$ref": "#/$defs/AutomationDefinition",
+          "description": "Complete initial {@link AutomationState.definition}."
+        },
+        "import": {
+          "$ref": "#/$defs/AutomationImport",
+          "description": "Optional legacy import state. When present,\n{@link AutomationCreateRequestedAction.definition} MUST have\n{@link AutomationDefinition.enabled} set to `false` so automatic triggers\ncannot run before migration cutover."
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "definition"
+      ]
+    },
+    "AutomationUpdateRequestedAction": {
+      "type": "object",
+      "description": "Ask the host to update editable fields of an existing automation.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Update}. The host revalidates that operation and\nthe client's authorization.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost accepts the patch only when\n{@link AutomationUpdateRequestedAction.expectedRevision} equals the current\n{@link AutomationState.revision}, then publishes the authoritative result\nwith {@link AutomationSetAction | `automation/set`}.",
+      "properties": {
+        "type": {
+          "const": "automation/updateRequested"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Target {@link AutomationState.resource}."
+        },
+        "expectedRevision": {
+          "type": "number",
+          "description": "{@link AutomationState.revision} on which the client based the changes."
+        },
+        "changes": {
+          "$ref": "#/$defs/AutomationDefinitionPatch",
+          "description": "Editable {@link AutomationDefinition} fields to replace."
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "expectedRevision",
+        "changes"
+      ]
+    },
     "AutomationSetAction": {
       "type": "object",
       "description": "Add or replace one full automation state in\n{@link AutomationCatalogState.automations}.\n\nExisting entries are matched by {@link AutomationState.resource} and\nreplaced in place. A previously unseen resource is appended.",
@@ -10709,7 +10589,7 @@
     },
     "AutomationRemovedAction": {
       "type": "object",
-      "description": "Remove one automation from {@link AutomationCatalogState.automations}.",
+      "description": "Remove one automation from {@link AutomationCatalogState.automations}.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Dispose}. The host revalidates that operation\nbefore permanently deleting the automation. A rejected action leaves the\nauthoritative catalogue and durable definition unchanged.\n\nRemoving an unknown resource is a no-op.",
       "properties": {
         "type": {
           "const": "automation/removed"
@@ -10951,6 +10831,88 @@
       ],
       "type": "string",
       "description": "Discriminant for pending message kinds."
+    },
+    "AutomationImport": {
+      "type": "object",
+      "description": "Stable source identity and scheduler state for a legacy automation import.\n\nThe host remembers the identity independently of the client-chosen automation\nURI. Retrying with the same identity MUST resolve to the previously imported\nitem rather than creating a duplicate.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Stable namespace identifying the source implementation or store."
+        },
+        "batchId": {
+          "type": "string",
+          "description": "Identifier shared by every item in one import attempt."
+        },
+        "itemId": {
+          "type": "string",
+          "description": "Stable source-side identifier for this definition within the batch."
+        },
+        "triggerNextRuns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationImportTriggerNextRun"
+          },
+          "description": "Source schedule occurrences to retain until {@link AutomationDefinition.enabled} becomes `true`."
+        }
+      },
+      "required": [
+        "source",
+        "batchId",
+        "itemId"
+      ]
+    },
+    "AutomationDefinitionPatch": {
+      "type": "object",
+      "description": "Partial replacement of editable {@link AutomationDefinition} fields.\n\nOmitted fields are unchanged. Supplied arrays and objects replace their\ncorresponding values in full; they are not merged recursively.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Replacement {@link AutomationDefinition.title}."
+        },
+        "message": {
+          "$ref": "#/$defs/Message",
+          "description": "Replacement {@link AutomationDefinition.message}."
+        },
+        "session": {
+          "$ref": "#/$defs/AutomationSessionTemplate",
+          "description": "Replacement {@link AutomationDefinition.session}."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Replacement {@link AutomationDefinition.enabled}."
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AutomationTrigger"
+          },
+          "description": "Complete replacement {@link AutomationDefinition.triggers}."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Complete replacement {@link AutomationDefinition._meta}."
+        }
+      }
+    },
+    "AutomationImportTriggerNextRun": {
+      "type": "object",
+      "description": "Initial schedule occurrence retained while an imported automation is\ndisabled.",
+      "properties": {
+        "triggerId": {
+          "type": "string",
+          "description": "Stable {@link AutomationScheduleTrigger.id} in the imported definition."
+        },
+        "nextRunAt": {
+          "type": "string",
+          "description": "Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp."
+        }
+      },
+      "required": [
+        "triggerId",
+        "nextRunAt"
+      ]
     }
   }
 }

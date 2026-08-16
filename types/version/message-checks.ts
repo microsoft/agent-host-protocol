@@ -78,9 +78,6 @@ type _ExpectedCommands =
   | 'completions'
   | 'invokeChangesetOperation'
   | 'listAutomationTriggerDefinitions'
-  | 'createAutomation'
-  | 'updateAutomation'
-  | 'disposeAutomation'
   | 'runAutomation'
   | 'fetchAutomationRuns'
   | 'previewAutomationSchedule';
