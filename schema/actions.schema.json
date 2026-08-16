@@ -2090,54 +2090,6 @@
         "changes"
       ]
     },
-    "AutomationImportTriggerNextRun": {
-      "type": "object",
-      "description": "Initial schedule occurrence retained while an imported automation is\ndisabled.",
-      "properties": {
-        "triggerId": {
-          "type": "string",
-          "description": "Stable {@link AutomationScheduleTrigger.id} in the imported definition."
-        },
-        "nextRunAt": {
-          "type": "string",
-          "description": "Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp."
-        }
-      },
-      "required": [
-        "triggerId",
-        "nextRunAt"
-      ]
-    },
-    "AutomationImport": {
-      "type": "object",
-      "description": "Stable source identity and scheduler state for a legacy automation import.\n\nThe host remembers the identity independently of the client-chosen automation\nURI. Retrying with the same identity MUST resolve to the previously imported\nitem rather than creating a duplicate.",
-      "properties": {
-        "source": {
-          "type": "string",
-          "description": "Stable namespace identifying the source implementation or store."
-        },
-        "batchId": {
-          "type": "string",
-          "description": "Identifier shared by every item in one import attempt."
-        },
-        "itemId": {
-          "type": "string",
-          "description": "Stable source-side identifier for this definition within the batch."
-        },
-        "triggerNextRuns": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationImportTriggerNextRun"
-          },
-          "description": "Source schedule occurrences to retain until {@link AutomationDefinition.enabled} becomes `true`."
-        }
-      },
-      "required": [
-        "source",
-        "batchId",
-        "itemId"
-      ]
-    },
     "AutomationDefinitionPatch": {
       "type": "object",
       "description": "Partial replacement of editable {@link AutomationDefinition} fields.\n\nOmitted fields are unchanged. Supplied arrays and objects replace their\ncorresponding values in full; they are not merged recursively.",
@@ -2186,10 +2138,6 @@
         "definition": {
           "$ref": "#/$defs/AutomationDefinition",
           "description": "Complete initial {@link AutomationState.definition}."
-        },
-        "import": {
-          "$ref": "#/$defs/AutomationImport",
-          "description": "Optional legacy import state. When present,\n{@link AutomationCreateRequestedAction.definition} MUST have\n{@link AutomationDefinition.enabled} set to `false` so automatic triggers\ncannot run before migration cutover."
         }
       },
       "required": [

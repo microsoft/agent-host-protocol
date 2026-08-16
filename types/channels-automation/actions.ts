@@ -12,44 +12,10 @@ import type {
   AutomationCatalogState,
   AutomationDefinition,
   AutomationOperation,
-  AutomationScheduleTrigger,
   AutomationSessionTemplate,
   AutomationState,
   AutomationTrigger,
 } from './state.js';
-
-/**
- * Initial schedule occurrence retained while an imported automation is
- * disabled.
- *
- * @category Automation Actions
- */
-export interface AutomationImportTriggerNextRun {
-  /** Stable {@link AutomationScheduleTrigger.id} in the imported definition. */
-  triggerId: string;
-  /** Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp. */
-  nextRunAt: string;
-}
-
-/**
- * Stable source identity and scheduler state for a legacy automation import.
- *
- * The host remembers the identity independently of the client-chosen automation
- * URI. Retrying with the same identity MUST resolve to the previously imported
- * item rather than creating a duplicate.
- *
- * @category Automation Actions
- */
-export interface AutomationImport {
-  /** Stable namespace identifying the source implementation or store. */
-  source: string;
-  /** Identifier shared by every item in one import attempt. */
-  batchId: string;
-  /** Stable source-side identifier for this definition within the batch. */
-  itemId: string;
-  /** Source schedule occurrences to retain until {@link AutomationDefinition.enabled} becomes `true`. */
-  triggerNextRuns?: AutomationImportTriggerNextRun[];
-}
 
 /**
  * Partial replacement of editable {@link AutomationDefinition} fields.
@@ -97,13 +63,6 @@ export interface AutomationCreateRequestedAction {
   resource: URI;
   /** Complete initial {@link AutomationState.definition}. */
   definition: AutomationDefinition;
-  /**
-   * Optional legacy import state. When present,
-   * {@link AutomationCreateRequestedAction.definition} MUST have
-   * {@link AutomationDefinition.enabled} set to `false` so automatic triggers
-   * cannot run before migration cutover.
-   */
-  import?: AutomationImport;
 }
 
 /**

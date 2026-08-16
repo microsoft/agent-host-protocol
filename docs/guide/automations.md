@@ -16,8 +16,8 @@ and run history instead of each client maintaining a local copy.
   `ahp-session:` channels, which remain authoritative for transcripts, tool
   calls, confirmations, changesets, and per-session lifecycle.
 - **Automatic execution never belongs to the client.** A client may render,
-  edit, run, cancel, and migrate automations, but it does not run a fallback
-  scheduler after an uncertain host response.
+  edit, run, and cancel automations, but it does not run a fallback scheduler
+  after an uncertain host response.
 - **Capabilities and operations are distinct.** Initialize capabilities say
   what a host implementation supports. State-level `operations` say what is
   allowed for one automation or run at this moment.
@@ -338,42 +338,6 @@ availability. If the host rejects the action, `ActionEnvelope.rejectionReason`
 causes the originating client to restore its prediction; accepted removals are
 permanent and ordered for every catalogue subscriber. Removing an unknown
 resource is a no-op.
-
-### Idempotent migration imports
-
-`automation/createRequested.import` carries a stable source, batch, and item
-identity for legacy migration. It may also carry the source scheduler's next
-unevaluated occurrence for each schedule trigger:
-
-```typescript
-{
-  source: 'legacy-client-store'
-  batchId: 'migration-2026-08-12'
-  itemId: 'automation-42'
-  triggerNextRuns: [{
-    triggerId: 'weekday-morning'
-    nextRunAt: '2026-08-12T07:00:00Z'
-  }]
-}
-```
-
-Retrying an interrupted migration with the same identity resolves to the
-already imported item rather than creating a duplicate. An imported definition
-must be created disabled. The host persists supplied trigger occurrences while
-the definition is disabled; after cutover, enabling it evaluates an overdue
-occurrence according to that trigger's misfire policy.
-
-Migration should move one definition to exactly one authority:
-
-1. Create the host definition disabled.
-2. Verify the imported definition.
-3. Remove the legacy copy from scheduler-visible storage.
-4. Enable the host definition.
-
-Never leave both copies schedulable and never deduplicate definitions by
-content; identical-looking automations may be intentional. The host must
-durably claim a due occurrence together with its run record before starting
-external execution, so restart cannot dispatch the same catch-up twice.
 
 ## Runs
 
