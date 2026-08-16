@@ -1,14 +1,13 @@
 {
   "name": "automation-capabilities",
   "group": "A",
-  "description": "Automation capability markers preserve present empty objects and nested cron configuration.",
+  "description": "Automation capability markers preserve present empty objects and nested schedule configuration.",
   "type": "InitializeResult",
   "input": {
     "protocolVersion": "0.8.0",
     "serverSeq": 1,
     "snapshots": [],
     "automations": {
-      "execution": { "lifetime": "managed" },
       "create": {},
       "schedules": {
         "minIntervalMinutes": 5
@@ -23,7 +22,6 @@
     "serverSeq": 1,
     "snapshots": [],
     "automations": {
-      "execution": { "lifetime": "managed" },
       "create": {},
       "schedules": {
         "minIntervalMinutes": 5

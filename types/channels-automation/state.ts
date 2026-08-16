@@ -30,30 +30,6 @@ export const enum AutomationOperation {
 }
 
 /**
- * Availability guarantee for host-owned automatic trigger evaluation.
- *
- * This describes the authority that owns one automation catalogue. It does not
- * prevent a client from connecting to several authorities with different
- * lifetimes (for example, one local host and one managed service).
- *
- * @category Automation State
- */
-export const enum AutomationExecutionLifetime {
-  /**
-   * Automatic triggers are evaluated only while this host process is running.
-   * Definitions may remain durable across restarts, but occurrences while the
-   * process is unavailable are handled according to the trigger's
-   * {@link AutomationMisfirePolicy}.
-   */
-  HostLifetime = 'hostLifetime',
-  /**
-   * Automatic triggers continue to be evaluated independently of connected
-   * clients and any particular interactive host process.
-   */
-  Managed = 'managed',
-}
-
-/**
  * A portable recurring schedule evaluated in a named time zone.
  *
  * The expression uses exactly five whitespace-separated fields, in this

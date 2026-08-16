@@ -5933,12 +5933,8 @@
     },
     "AutomationCapabilities": {
       "type": "object",
-      "description": "Automation features supported by this host authority.\n\nCapabilities describe implementation support. Per-resource\n{@link AutomationState.operations} and\n{@link AutomationRunState.operations} remain authoritative for whether a\nparticular operation is currently allowed.",
+      "description": "Automation features supported by this host authority.\n\nThe presence of this object advertises the baseline automation catalogue.\nOptional fields describe additional host features and restrictions.\n\nCapabilities describe implementation support. Per-resource\n{@link AutomationState.operations} and\n{@link AutomationRunState.operations} remain authoritative for whether a\nparticular operation is currently allowed.",
       "properties": {
-        "execution": {
-          "$ref": "#/$defs/AutomationExecutionCapabilities",
-          "description": "Availability guarantee for automatic trigger execution."
-        },
         "create": {
           "$ref": "#/$defs/AutomationCreateCapability",
           "description": "Present when clients may call `createAutomation`."
@@ -5959,23 +5955,7 @@
           "type": "number",
           "description": "Maximum terminal run summaries retained per automation. Active runs are not\ncounted toward the limit. Absence means the retention limit is\nimplementation-defined."
         }
-      },
-      "required": [
-        "execution"
-      ]
-    },
-    "AutomationExecutionCapabilities": {
-      "type": "object",
-      "description": "Automatic trigger execution availability.",
-      "properties": {
-        "lifetime": {
-          "$ref": "#/$defs/AutomationExecutionLifetime",
-          "description": "How long automatic trigger evaluation remains available."
-        }
-      },
-      "required": [
-        "lifetime"
-      ]
+      }
     },
     "AutomationCreateCapability": {
       "type": "object",
@@ -8407,14 +8387,6 @@
       ],
       "type": "string",
       "description": "Operations the host currently permits for a run."
-    },
-    "AutomationExecutionLifetime": {
-      "enum": [
-        "hostLifetime",
-        "managed"
-      ],
-      "type": "string",
-      "description": "Availability guarantee for host-owned automatic trigger evaluation.\n\nThis describes the authority that owns one automation catalogue. It does not\nprevent a client from connecting to several authorities with different\nlifetimes (for example, one local host and one managed service)."
     },
     "ActionEnvelope": {
       "type": "object",

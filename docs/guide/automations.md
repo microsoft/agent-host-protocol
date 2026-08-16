@@ -28,9 +28,6 @@ A host advertises automation support in `InitializeResult.automations`:
 
 ```typescript
 AutomationCapabilities {
-  execution: {
-    lifetime: 'hostLifetime' | 'managed'
-  }
   create?: {}
   schedules?: {
     minIntervalMinutes?: number
@@ -44,21 +41,15 @@ AutomationCapabilities {
 If `automations` is absent, the client treats the authority as having no
 automation catalogue.
 
+An empty `automations` object advertises the baseline catalogue. Additional
+fields describe optional features and restrictions; clients use each
+automation's and run's `operations` to determine which actions are currently
+allowed.
+
 `create`, `runCancellation`, and `schedulePreview` are presence capabilities:
 an empty object means the feature is supported, and absence means it is not.
 The object shape leaves room for future feature-specific options without
 changing capability detection.
-
-`execution.lifetime` describes automatic-trigger availability:
-
-| Lifetime | Guarantee |
-| --- | --- |
-| `hostLifetime` | Triggers are evaluated only while this host process is running. Missed occurrences follow the trigger's misfire policy. |
-| `managed` | Triggers continue to be evaluated independently of connected clients and any particular interactive host process. |
-
-Lifetime applies to one host authority. A client can connect to several
-authorities at once—for example, local host-lifetime automations and managed
-cloud automations—without combining their catalogues or execution ownership.
 
 ## Resource model
 
@@ -248,7 +239,7 @@ is the only interval restriction.
 ### Misfires
 
 A misfire is a scheduled occurrence that happens while automatic execution is
-unavailable, for example while a host-lifetime authority is stopped:
+unavailable, for example while the host's scheduler is stopped:
 
 | Policy | Behavior |
 | --- | --- |
@@ -261,8 +252,8 @@ Omitting `misfirePolicy` is equivalent to `runOnce`. A catch-up run records
 ### Event triggers
 
 Event triggers are defined by the host rather than standardized by AHP. A
-GitHub-aware managed authority might expose events such as pull-request
-creation; a local authority may expose no event triggers.
+GitHub-aware host service might expose events such as pull-request creation;
+another host may expose no event triggers.
 
 Clients discover event types with `listAutomationTriggerDefinitions`, passing
 the prospective provider, working directories, and resolved session

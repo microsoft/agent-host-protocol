@@ -931,7 +931,7 @@ const STATE_ENUMS = [
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
-  'AutomationOperation', 'AutomationExecutionLifetime', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
+  'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
   'AutomationRunOperation',
 ];
@@ -1662,7 +1662,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
   'ClientCapabilities', 'AutomationCapabilities',
-  'AutomationExecutionCapabilities', 'AutomationCreateCapability',
+  'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability', 'AutomationSchedulePreviewCapability',
   'Implementation',

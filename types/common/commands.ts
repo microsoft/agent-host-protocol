@@ -10,7 +10,6 @@
 import type { URI, Snapshot } from './state.js';
 import type { ActionEnvelope, StateAction } from './actions.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
-import type { AutomationExecutionLifetime } from '../channels-automation/state.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -279,6 +278,9 @@ export interface InitializeResult {
 /**
  * Automation features supported by this host authority.
  *
+ * The presence of this object advertises the baseline automation catalogue.
+ * Optional fields describe additional host features and restrictions.
+ *
  * Capabilities describe implementation support. Per-resource
  * {@link AutomationState.operations} and
  * {@link AutomationRunState.operations} remain authoritative for whether a
@@ -287,8 +289,6 @@ export interface InitializeResult {
  * @category Commands
  */
 export interface AutomationCapabilities {
-  /** Availability guarantee for automatic trigger execution. */
-  execution: AutomationExecutionCapabilities;
   /** Present when clients may call `createAutomation`. */
   create?: AutomationCreateCapability;
   /** Present when definitions may contain schedule triggers. */
@@ -303,16 +303,6 @@ export interface AutomationCapabilities {
    * implementation-defined.
    */
   runHistoryLimit?: number;
-}
-
-/**
- * Automatic trigger execution availability.
- *
- * @category Commands
- */
-export interface AutomationExecutionCapabilities {
-  /** How long automatic trigger evaluation remains available. */
-  lifetime: AutomationExecutionLifetime;
 }
 
 /**
