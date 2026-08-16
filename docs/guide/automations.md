@@ -9,8 +9,8 @@ and run history instead of each client maintaining a local copy.
 
 - **The host is the single writable authority.** It persists definitions,
   evaluates triggers, claims occurrences, creates runs, and records history.
-- **Definitions and executions have separate channels.** An
-  `ahp-automation:` channel owns the reusable definition; each
+- **Definitions and executions have separate channels.** The
+  `ahp-automations://` catalogue channel owns every reusable definition; each
   `ahp-automation-run:` channel owns one task-level execution.
 - **Sessions remain ordinary AHP sessions.** A run may link one or more
   `ahp-session:` channels, which remain authoritative for transcripts, tool
@@ -55,7 +55,8 @@ changing capability detection.
 
 ```mermaid
 flowchart TD
-  R["ahp-root:// catalogue"] --> A["ahp-automation:/&lt;id&gt;"]
+  R["ahp-root:// capabilities"] --> C["ahp-automations:// catalogue"]
+  C --> A["AutomationState identified by ahp-automation:/&lt;id&gt;"]
   A --> RS["newest-first run summaries"]
   RS --> AR["ahp-automation-run:/&lt;id&gt;"]
   AR --> S1["ahp-session:/&lt;id&gt;"]
@@ -67,45 +68,35 @@ The resource layers answer different questions:
 
 | Resource | Owns |
 | --- | --- |
-| `ahp-root://` | Lightweight automation catalogue and live catalogue notifications |
-| `ahp-automation:` | Definition, revision, next schedule occurrence, retained run summaries, and permitted operations |
+| `ahp-root://` | Automation capability negotiation |
+| `ahp-automations://` | Full states for every visible automation |
+| `ahp-automation:/<id>` | Stable command and relationship identifier for one catalogue entry; it is not independently subscribable |
 | `ahp-automation-run:` | Execution provenance, lifecycle, linked sessions, run-scoped artifacts, and cancellation |
 | `ahp-session:` / `ahp-chat:` | Conversation, tools, confirmations, input requests, changesets, and session-specific state |
 
 ## Catalogue and subscriptions
 
-Clients fetch the catalogue with `listAutomations`. Each
-`AutomationSummary` contains enough information to render a list without
-subscribing to every automation:
+When `InitializeResult.automations` is present, clients subscribe to
+`ahp-automations://`. The snapshot contains the complete catalogue:
 
 ```typescript
-AutomationSummary {
-  resource: URI
-  title: string
-  enabled: boolean
-  triggerCount: number
-  nextRunAt?: string
-  lastRun?: AutomationRunSummary
-  revision: number
-  operations: AutomationOperation[]
-  createdAt: string
-  modifiedAt: string
+AutomationCatalogState {
+  automations: AutomationState[]
 }
 ```
 
-Root subscribers receive live catalogue changes:
+The host keeps the catalogue synchronized with full-entry actions:
 
-| Notification | Meaning |
+| Action | Meaning |
 | --- | --- |
-| `root/automationAdded` | A complete summary became visible. |
-| `root/automationRemoved` | An automation URI left the catalogue. |
-| `root/automationSummaryChanged` | A complete replacement summary is available. |
+| `automation/set` | Add or replace one complete `AutomationState`, keyed by `resource`. |
+| `automation/removed` | Remove the entry identified by `resource`. |
 
-Root notifications are not replayed. After reconnect, clients call
-`listAutomations` again and reconcile by resource URI.
-
-Subscribing to an `ahp-automation:` URI returns the full
-`AutomationState`, including the definition and retained run-history window.
+These are ordinary ordered AHP actions. After reconnect, the host either replays
+missed catalogue actions or returns a fresh snapshot; clients do not issue a
+special list command. The `ahp-automation:/<id>` value on each entry identifies
+the target of mutation commands and relationships but is not a separate
+subscription.
 
 ## Definitions
 
@@ -294,7 +285,7 @@ payload clients should replay.
 
 | Command | Purpose |
 | --- | --- |
-| `createAutomation` | Persist a complete definition at a client-chosen `ahp-automation:` URI. |
+| `createAutomation` | Persist a complete definition at a client-chosen `ahp-automation:/<id>` resource. |
 | `updateAutomation` | Replace selected editable fields using an expected revision. |
 | `disposeAutomation` | Permanently remove a definition when disposal is currently allowed. |
 
@@ -303,7 +294,8 @@ revision the client observed:
 
 ```typescript
 {
-  channel: 'ahp-automation:/triage'
+  channel: 'ahp-automations://'
+  automation: 'ahp-automation:/triage'
   expectedRevision: 7
   changes: {
     enabled: false
@@ -359,7 +351,8 @@ external execution, so restart cannot dispatch the same catch-up twice.
 
 ```typescript
 {
-  channel: 'ahp-automation:/triage'
+  channel: 'ahp-automations://'
+  automation: 'ahp-automation:/triage'
   requestId: 'client-generated-idempotency-key'
 }
 ```
@@ -442,8 +435,8 @@ effect.
 
 `AutomationState.runs` is a newest-first, bounded window of
 `AutomationRunSummary` values. If `runsNextCursor` is present, the client calls
-`fetchAutomationRuns`; older summaries arrive through
-`automation/runsLoaded` so every subscriber applies the same reducer update.
+`fetchAutomationRuns`; the host then publishes the updated full state through
+`automation/set` so every catalogue subscriber applies the same reducer update.
 
 `AutomationCapabilities.runHistoryLimit` advertises the maximum number of
 terminal summaries retained per automation. Active runs do not count toward
@@ -452,15 +445,15 @@ automation-run channel remains subscribable.
 
 ## Multiple clients and reconciliation
 
-Several clients may subscribe to the same authority:
+Several clients may subscribe to the same `ahp-automations://` catalogue:
 
-- the host sequences every definition and run action;
+- the host sequences every catalogue and run action;
 - revisions prevent lost updates;
 - manual `requestId` values prevent duplicate runs after retry;
 - one trigger occurrence is atomically associated with at most one run;
-- root catalogue notifications keep live clients updated; and
-- reconnecting clients re-list and re-subscribe instead of replaying local
-  scheduling decisions.
+- `automation/set` and `automation/removed` keep live clients updated; and
+- reconnecting clients receive replayed actions or a fresh catalogue snapshot
+  instead of re-listing or replaying local scheduling decisions.
 
 The core invariant is:
 

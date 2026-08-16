@@ -159,7 +159,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -826,8 +826,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationSessionTemplate' },
   { name: 'AutomationDefinition' },
   { name: 'AutomationRuntimeState' },
-  { name: 'AutomationSummary' },
   { name: 'AutomationState' },
+  { name: 'AutomationCatalogState' },
   { name: 'AutomationRunBlocker' },
   { name: 'AutomationManualRunCause', omitDiscriminants: true },
   { name: 'AutomationTriggeredRunCause', omitDiscriminants: true },
@@ -1165,7 +1165,8 @@ function generateSnapshotState(): string {
 /// chat (has required \`turns\`), then terminal (has required \`content\`),
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
 /// (has required \`root\` and \`recursive\`), then annotations (has required
-/// \`annotations\`), then root.
+/// \`annotations\`), then the automation catalogue (has required
+/// \`automations\`), then root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -1175,7 +1176,7 @@ pub enum SnapshotState {
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
     Annotations(Box<AnnotationsState>),
-    Automation(Box<AutomationState>),
+    Automations(Box<AutomationCatalogState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
 }`;
@@ -1376,10 +1377,8 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
-  { type: 'automation/definitionChanged', variantName: 'AutomationDefinitionChanged', tsInterface: 'AutomationDefinitionChangedAction', boxed: true },
-  { type: 'automation/runSummarySet', variantName: 'AutomationRunSummarySet', tsInterface: 'AutomationRunSummarySetAction', boxed: true },
-  { type: 'automation/runSummaryRemoved', variantName: 'AutomationRunSummaryRemoved', tsInterface: 'AutomationRunSummaryRemovedAction' },
-  { type: 'automation/runsLoaded', variantName: 'AutomationRunsLoaded', tsInterface: 'AutomationRunsLoadedAction', boxed: true },
+  { type: 'automation/set', variantName: 'AutomationSet', tsInterface: 'AutomationSetAction', boxed: true },
+  { type: 'automation/removed', variantName: 'AutomationRemoved', tsInterface: 'AutomationRemovedAction' },
   { type: 'automationRun/lifecycleChanged', variantName: 'AutomationRunLifecycleChanged', tsInterface: 'AutomationRunLifecycleChangedAction', boxed: true },
   { type: 'automationRun/sessionSet', variantName: 'AutomationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
@@ -1563,7 +1562,6 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'CompletionsParams' }, { name: 'CompletionItem' }, { name: 'CompletionsResult' },
   { name: 'InvokeChangesetOperationParams' }, { name: 'InvokeChangesetOperationResult' },
   { name: 'ChangesetOperationFollowUp' },
-  { name: 'ListAutomationsParams' }, { name: 'ListAutomationsResult' },
   { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
   { name: 'CreateAutomationParams' }, { name: 'AutomationImport' }, { name: 'AutomationImportTriggerNextRun' }, { name: 'AutomationDefinitionPatch' },
   { name: 'UpdateAutomationParams' }, { name: 'DisposeAutomationParams' },
@@ -1597,7 +1595,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationSummary, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1728,9 +1726,6 @@ const NOTIFICATION_STRUCTS = [
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
-  'AutomationAddedParams',
-  'AutomationRemovedParams',
-  'AutomationSummaryChangedParams',
   'ProgressParams',
   'AuthRequiredParams',
   'OtlpExportLogsParams',
@@ -1741,7 +1736,7 @@ const NOTIFICATION_STRUCTS = [
 function generateNotificationsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, AutomationOperation, AutomationRunSummary, AutomationSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionOrigin, SessionStatus, SessionSummary};');
+  lines.push('use crate::state::{AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo, ProtectedResourceMetadata, SessionOrigin, SessionStatus, SessionSummary};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');

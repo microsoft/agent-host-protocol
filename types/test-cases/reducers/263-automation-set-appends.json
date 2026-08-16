@@ -1,0 +1,42 @@
+{
+  "description": "automation set appends a new catalogue entry",
+  "reducer": "automation",
+  "initial": {
+    "automations": []
+  },
+  "actions": [{
+    "type": "automation/set",
+    "automation": {
+      "resource": "ahp-automation:/a1",
+      "definition": {
+        "title": "A",
+        "message": { "text": "go", "origin": { "kind": "user" } },
+        "session": {},
+        "enabled": true,
+        "triggers": []
+      },
+      "revision": 1,
+      "runs": [],
+      "operations": ["run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-01T00:00:00Z"
+    }
+  }],
+  "expected": {
+    "automations": [{
+      "resource": "ahp-automation:/a1",
+      "definition": {
+        "title": "A",
+        "message": { "text": "go", "origin": { "kind": "user" } },
+        "session": {},
+        "enabled": true,
+        "triggers": []
+      },
+      "revision": 1,
+      "runs": [],
+      "operations": ["run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-01T00:00:00Z"
+    }]
+  }
+}

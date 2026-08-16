@@ -149,7 +149,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -796,7 +796,7 @@ sealed interface SnapshotState {
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
-    @JvmInline value class Automation(val value: AutomationState) : SnapshotState
+    @JvmInline value class Automations(val value: AutomationCatalogState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
 }
 
@@ -811,8 +811,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. AutomationRunState has required
-        // \`automation\`, \`cause\`, and \`sessions\`; AutomationState has required
-        // \`definition\`; SessionState has required
+        // \`automation\`, \`cause\`, and \`sessions\`; AutomationCatalogState has
+        // required \`automations\`; SessionState has required
         // \`lifecycle\`; ChatState has required \`turns\`; ChangesetState has
         // required \`status\` + \`files\`; ResourceWatchState has required
         // \`root\` + \`recursive\`; AnnotationsState has required \`annotations\`
@@ -822,8 +822,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         return when {
             obj.containsKey("automation") && obj.containsKey("cause") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
-            obj.containsKey("definition") ->
-                SnapshotState.Automation(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
+            obj.containsKey("automations") ->
+                SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationCatalogState.serializer(), element))
             obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
@@ -849,7 +849,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
-            is SnapshotState.Automation -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
+            is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationCatalogState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
         }
         output.encodeJsonElement(element)
@@ -993,7 +993,7 @@ const STATE_STRUCTS = [
   'AutomationScheduleTrigger', 'AutomationEventTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
   'AutomationSessionTemplate', 'AutomationDefinition', 'AutomationRuntimeState',
-  'AutomationSummary', 'AutomationState',
+  'AutomationState', 'AutomationCatalogState',
   'AutomationRunBlocker', 'AutomationManualRunCause', 'AutomationTriggeredRunCause',
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
   'AutomationBlockedRunLifecycle', 'AutomationCompletedRunLifecycle',
@@ -1490,10 +1490,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
-  { type: 'automation/definitionChanged', caseName: 'AutomationDefinitionChanged', tsInterface: 'AutomationDefinitionChangedAction' },
-  { type: 'automation/runSummarySet', caseName: 'AutomationRunSummarySet', tsInterface: 'AutomationRunSummarySetAction' },
-  { type: 'automation/runSummaryRemoved', caseName: 'AutomationRunSummaryRemoved', tsInterface: 'AutomationRunSummaryRemovedAction' },
-  { type: 'automation/runsLoaded', caseName: 'AutomationRunsLoaded', tsInterface: 'AutomationRunsLoadedAction' },
+  { type: 'automation/set', caseName: 'AutomationSet', tsInterface: 'AutomationSetAction' },
+  { type: 'automation/removed', caseName: 'AutomationRemoved', tsInterface: 'AutomationRemovedAction' },
   { type: 'automationRun/lifecycleChanged', caseName: 'AutomationRunLifecycleChanged', tsInterface: 'AutomationRunLifecycleChangedAction' },
   { type: 'automationRun/sessionSet', caseName: 'AutomationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
   { type: 'automationRun/sessionRemoved', caseName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
@@ -1692,7 +1690,6 @@ const COMMAND_STRUCTS = [
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
-  'ListAutomationsParams', 'ListAutomationsResult',
   'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',
   'CreateAutomationParams', 'AutomationImport', 'AutomationImportTriggerNextRun', 'AutomationDefinitionPatch', 'UpdateAutomationParams',
   'DisposeAutomationParams', 'RunAutomationParams', 'RunAutomationResult',
@@ -1930,9 +1927,6 @@ const NOTIFICATION_STRUCTS = [
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
-  'AutomationAddedParams',
-  'AutomationRemovedParams',
-  'AutomationSummaryChangedParams',
   'ProgressParams',
   'AuthRequiredParams',
   'OtlpExportLogsParams',

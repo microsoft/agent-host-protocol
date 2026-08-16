@@ -7,8 +7,6 @@
 
 import type { URI } from '../common/state.js';
 import type { SessionSummary } from '../channels-session/state.js';
-import type { ListAutomationsParams } from '../channels-automation/commands.js';
-import type { AutomationSummary } from '../channels-automation/state.js';
 
 // ─── root/sessionAdded ───────────────────────────────────────────────────────
 
@@ -143,67 +141,6 @@ export interface SessionSummaryChangedParams {
    * MUST be omitted by senders; receivers SHOULD ignore them if present.
    */
   changes: Partial<SessionSummary>;
-}
-
-// ─── root/automationAdded ────────────────────────────────────────────────────
-
-/**
- * Announces a newly visible automation catalogue entry.
- *
- * Root notifications are live signals and are not replayed after reconnect.
- * Clients that reconnect MUST refresh the catalogue with
- * {@link ListAutomationsParams | listAutomations}.
- *
- * @category Protocol Notifications
- * @method root/automationAdded
- * @direction Server → Client
- * @messageType Notification
- * @version 1
- */
-export interface AutomationAddedParams {
-  /** Root channel URI. */
-  channel: URI;
-  /** Complete {@link AutomationSummary} for the newly visible automation. */
-  summary: AutomationSummary;
-}
-
-// ─── root/automationRemoved ──────────────────────────────────────────────────
-
-/**
- * Announces that an automation is no longer present in the root catalogue.
- *
- * @category Protocol Notifications
- * @method root/automationRemoved
- * @direction Server → Client
- * @messageType Notification
- * @version 1
- */
-export interface AutomationRemovedParams {
-  /** Root channel URI. */
-  channel: URI;
-  /** Removed {@link AutomationSummary.resource}. */
-  automation: URI;
-}
-
-// ─── root/automationSummaryChanged ───────────────────────────────────────────
-
-/**
- * Replaces the root-catalogue summary for an existing automation.
- *
- * Full replacement semantics apply to `summary`; this is not a patch. The
- * corresponding subscribed automation channel remains authoritative.
- *
- * @category Protocol Notifications
- * @method root/automationSummaryChanged
- * @direction Server → Client
- * @messageType Notification
- * @version 1
- */
-export interface AutomationSummaryChangedParams {
-  /** Root channel URI. */
-  channel: URI;
-  /** Complete replacement {@link AutomationSummary}. */
-  summary: AutomationSummary;
 }
 
 // ─── progress ────────────────────────────────────────────────────────────────

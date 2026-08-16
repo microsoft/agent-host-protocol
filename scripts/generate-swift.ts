@@ -115,7 +115,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -684,7 +684,7 @@ const STATE_STRUCTS = [
   'AutomationScheduleTrigger', 'AutomationEventTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
   'AutomationSessionTemplate', 'AutomationDefinition', 'AutomationRuntimeState',
-  'AutomationSummary', 'AutomationState',
+  'AutomationState', 'AutomationCatalogState',
   'AutomationRunBlocker', 'AutomationManualRunCause', 'AutomationTriggeredRunCause',
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
   'AutomationBlockedRunLifecycle', 'AutomationCompletedRunLifecycle',
@@ -1027,7 +1027,7 @@ public enum SnapshotState: Codable, Sendable {
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
     case annotations(AnnotationsState)
-    case automation(AutomationState)
+    case automations(AutomationCatalogState)
     case automationRun(AutomationRunState)
 
     public init(from decoder: Decoder) throws {
@@ -1047,8 +1047,8 @@ public enum SnapshotState: Codable, Sendable {
             self = .resourceWatch(resourceWatch)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
-        } else if let automation = try? AutomationState(from: decoder) {
-            self = .automation(automation)
+        } else if let automations = try? AutomationCatalogState(from: decoder) {
+            self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)
         } else {
@@ -1065,7 +1065,7 @@ public enum SnapshotState: Codable, Sendable {
         case .changeset(let state): try state.encode(to: encoder)
         case .resourceWatch(let state): try state.encode(to: encoder)
         case .annotations(let state): try state.encode(to: encoder)
-        case .automation(let state): try state.encode(to: encoder)
+        case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
         }
     }
@@ -1373,10 +1373,8 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'terminal/commandExecuted', caseName: 'terminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', caseName: 'terminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', caseName: 'resourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
-  { type: 'automation/definitionChanged', caseName: 'automationDefinitionChanged', tsInterface: 'AutomationDefinitionChangedAction' },
-  { type: 'automation/runSummarySet', caseName: 'automationRunSummarySet', tsInterface: 'AutomationRunSummarySetAction' },
-  { type: 'automation/runSummaryRemoved', caseName: 'automationRunSummaryRemoved', tsInterface: 'AutomationRunSummaryRemovedAction' },
-  { type: 'automation/runsLoaded', caseName: 'automationRunsLoaded', tsInterface: 'AutomationRunsLoadedAction' },
+  { type: 'automation/set', caseName: 'automationSet', tsInterface: 'AutomationSetAction' },
+  { type: 'automation/removed', caseName: 'automationRemoved', tsInterface: 'AutomationRemovedAction' },
   { type: 'automationRun/lifecycleChanged', caseName: 'automationRunLifecycleChanged', tsInterface: 'AutomationRunLifecycleChangedAction' },
   { type: 'automationRun/sessionSet', caseName: 'automationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
   { type: 'automationRun/sessionRemoved', caseName: 'automationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
@@ -1584,7 +1582,6 @@ const COMMAND_STRUCTS = [
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
-  'ListAutomationsParams', 'ListAutomationsResult',
   'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',
   'CreateAutomationParams', 'AutomationImport', 'AutomationImportTriggerNextRun', 'AutomationDefinitionPatch', 'UpdateAutomationParams',
   'DisposeAutomationParams', 'RunAutomationParams', 'RunAutomationResult',
@@ -1820,7 +1817,6 @@ const NOTIFICATION_ENUMS = ['AuthRequiredReason'];
 
 const NOTIFICATION_STRUCTS = [
   'SessionAddedParams', 'SessionRemovedParams', 'SessionSummaryChangedParams',
-  'AutomationAddedParams', 'AutomationRemovedParams', 'AutomationSummaryChangedParams',
   'ProgressParams', 'AuthRequiredParams',
   'OtlpExportLogsParams', 'OtlpExportTracesParams', 'OtlpExportMetricsParams',
 ];

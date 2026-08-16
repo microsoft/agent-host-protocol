@@ -71,8 +71,6 @@ import type {
   InvokeChangesetOperationResult,
 } from '../channels-changeset/commands.js';
 import type {
-  ListAutomationsParams,
-  ListAutomationsResult,
   ListAutomationTriggerDefinitionsParams,
   ListAutomationTriggerDefinitionsResult,
   CreateAutomationParams,
@@ -92,9 +90,6 @@ import type {
   SessionRemovedParams,
   SessionSummaryChangedParams,
   ProgressParams,
-  AutomationAddedParams,
-  AutomationRemovedParams,
-  AutomationSummaryChangedParams,
 } from '../channels-root/notifications.js';
 import type { AuthRequiredParams } from './notifications.js';
 import type {
@@ -192,7 +187,6 @@ export interface CommandMap {
   'sessionConfigCompletions': { params: SessionConfigCompletionsParams; result: SessionConfigCompletionsResult };
   'completions': { params: CompletionsParams; result: CompletionsResult };
   'invokeChangesetOperation': { params: InvokeChangesetOperationParams; result: InvokeChangesetOperationResult };
-  'listAutomations': { params: ListAutomationsParams; result: ListAutomationsResult };
   'listAutomationTriggerDefinitions': { params: ListAutomationTriggerDefinitionsParams; result: ListAutomationTriggerDefinitionsResult };
   'createAutomation': { params: CreateAutomationParams; result: null };
   'updateAutomation': { params: UpdateAutomationParams; result: null };
@@ -258,9 +252,6 @@ export interface ServerNotificationMap {
   'root/sessionAdded': { params: SessionAddedParams };
   'root/sessionRemoved': { params: SessionRemovedParams };
   'root/sessionSummaryChanged': { params: SessionSummaryChangedParams };
-  'root/automationAdded': { params: AutomationAddedParams };
-  'root/automationRemoved': { params: AutomationRemovedParams };
-  'root/automationSummaryChanged': { params: AutomationSummaryChangedParams };
   'root/progress': { params: ProgressParams };
   'auth/required': { params: AuthRequiredParams };
   'otlp/exportLogs': { params: OtlpExportLogsParams };

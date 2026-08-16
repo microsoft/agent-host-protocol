@@ -1,5 +1,5 @@
 /**
- * Automation Channel State Types.
+ * Automation Catalogue Channel State Types.
  *
  * @module channels-automation/state
  */
@@ -14,11 +14,11 @@ import type { ResolveSessionConfigResult } from '../channels-root/commands.js';
 import type { AgentInfo, ModelSelection, SessionModelInfo } from '../channels-root/state.js';
 import type { CreateSessionParams } from '../channels-session/commands.js';
 import type { AgentSelection } from '../channels-session/state.js';
+import type { AutomationRemovedAction, AutomationSetAction } from './actions.js';
 import type {
   DisposeAutomationParams,
   FetchAutomationRunsParams,
   ListAutomationTriggerDefinitionsParams,
-  ListAutomationsResult,
   RunAutomationParams,
   UpdateAutomationParams,
 } from './commands.js';
@@ -298,45 +298,8 @@ export interface AutomationRuntimeState {
 }
 
 /**
- * Lightweight root-catalogue projection of an automation.
- *
- * Returned in {@link ListAutomationsResult.items} and carried by root
- * automation notifications, this contains enough information to render a list
- * without subscribing to every `ahp-automation:` resource.
- *
- * @category Automation State
- */
-export interface AutomationSummary {
-  /** Subscribable `ahp-automation:` URI matching {@link AutomationState.resource}. */
-  resource: URI;
-  /** Current {@link AutomationDefinition.title}. */
-  title: string;
-  /** Current {@link AutomationDefinition.enabled} value. */
-  enabled: boolean;
-  /** Number of entries in {@link AutomationDefinition.triggers}. */
-  triggerCount: number;
-  /**
-   * Earliest schedule occurrence awaiting evaluation, matching
-   * {@link AutomationState.nextRunAt}, as an ISO 8601 timestamp. It may be in
-   * the past while catch-up is pending.
-   */
-  nextRunAt?: string;
-  /** Most recent entry in {@link AutomationState.runs}, when any run exists. */
-  lastRun?: AutomationRunSummary;
-  /** Current {@link AutomationState.revision}, used for optimistic concurrency. */
-  revision: number;
-  /** Operations currently permitted for this automation, matching {@link AutomationState.operations}. */
-  operations: AutomationOperation[];
-  /** Creation timestamp matching {@link AutomationState.createdAt}, in ISO 8601 format. */
-  createdAt: string;
-  /** Last definition modification timestamp matching {@link AutomationState.modifiedAt}, in ISO 8601 format. */
-  modifiedAt: string;
-  /** Opaque host-defined catalogue metadata. */
-  _meta?: Record<string, unknown>;
-}
-
-/**
- * Authoritative state of one subscribed `ahp-automation:` resource.
+ * Authoritative state of one automation in the
+ * {@link AutomationCatalogState.automations} catalogue.
  *
  * The host owns definition revisions, trigger evaluation, run claims, run
  * retention, and operation availability. Clients render this state and submit
@@ -345,7 +308,7 @@ export interface AutomationSummary {
  * @category Automation State
  */
 export interface AutomationState {
-  /** URI of this automation channel. */
+  /** Stable `ahp-automation:/<id>` resource identifier. */
   resource: URI;
   /** Current durable definition. */
   definition: AutomationDefinition;
@@ -373,5 +336,23 @@ export interface AutomationState {
   /** Last definition modification timestamp in ISO 8601 format. */
   modifiedAt: string;
   /** Opaque host-defined state metadata. */
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * Authoritative automation catalogue exposed on the `ahp-automations://`
+ * channel.
+ *
+ * A subscription snapshot contains every automation visible to the client.
+ * Subsequent {@link AutomationSetAction | `automation/set`} and
+ * {@link AutomationRemovedAction | `automation/removed`} actions keep the
+ * catalogue synchronized and participate in normal reconnect replay.
+ *
+ * @category Automation State
+ */
+export interface AutomationCatalogState {
+  /** Full automation states keyed by {@link AutomationState.resource}. */
+  automations: AutomationState[];
+  /** Opaque host-defined catalogue metadata. */
   _meta?: Record<string, unknown>;
 }

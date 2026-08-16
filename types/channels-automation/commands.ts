@@ -1,15 +1,15 @@
 /**
- * Automation Commands — catalogue discovery and mutation of
+ * Automation Commands — trigger discovery and mutation of
  * `ahp-automation:` resources.
  *
  * @module channels-automation/commands
  */
 
-import type { BaseParams, PaginatedParams, PaginatedResult } from '../common/commands.js';
+import type { BaseParams } from '../common/commands.js';
 import type { URI } from '../common/state.js';
 import type { AutomationRunState } from '../channels-automation-run/state.js';
 import type { AgentInfo } from '../channels-root/state.js';
-import type { AutomationRunsLoadedAction } from './actions.js';
+import type { AutomationSetAction } from './actions.js';
 import type {
   AutomationDefinition,
   AutomationOperation,
@@ -17,42 +17,10 @@ import type {
   AutomationScheduleTrigger,
   AutomationSessionTemplate,
   AutomationState,
-  AutomationSummary,
   AutomationTrigger,
   AutomationTriggerDefinition,
 } from './state.js';
 import type { Message } from '../channels-chat/state.js';
-
-/**
- * List the host's automation catalogue without subscribing to every
- * automation channel.
- *
- * Results are lightweight {@link AutomationSummary} entries. Clients SHOULD
- * re-run this command after reconnect because root catalogue notifications are
- * not replayed.
- *
- * @category Commands
- * @method listAutomations
- * @direction Client → Server
- * @messageType Request
- * @version 1
- */
-export interface ListAutomationsParams extends BaseParams, PaginatedParams {
-  /** Automation catalogues are listed from the root channel. */
-  channel: 'ahp-root://';
-  /** Optional exact filter on {@link AutomationDefinition.enabled}. */
-  enabled?: boolean;
-}
-
-/**
- * One page of the automation catalogue.
- *
- * @category Commands
- */
-export interface ListAutomationsResult extends PaginatedResult {
-  /** Automation summaries in host-defined catalogue order. */
-  items: AutomationSummary[];
-}
 
 /**
  * Discover event-trigger types available for a prospective session template.
@@ -123,10 +91,10 @@ export interface AutomationImport {
 /**
  * Create a durable automation at a client-chosen URI.
  *
- * {@link CreateAutomationParams.channel | `channel`} MUST use the
+ * {@link CreateAutomationParams.resource | `resource`} MUST use the
  * `ahp-automation:` scheme and MUST NOT already identify an unrelated
  * automation. The host validates the complete definition, persists it, and
- * makes it visible through the root catalogue before returning success.
+ * makes it visible through the automation catalogue before returning success.
  *
  * @category Commands
  * @method createAutomation
@@ -135,8 +103,10 @@ export interface AutomationImport {
  * @version 1
  */
 export interface CreateAutomationParams extends BaseParams {
+  /** Automation creation is scoped to the catalogue channel. */
+  channel: 'ahp-automations://';
   /** Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}. */
-  channel: URI;
+  resource: URI;
   /** Complete initial {@link AutomationState.definition}. */
   definition: AutomationDefinition;
   /**
@@ -186,8 +156,10 @@ export interface AutomationDefinitionPatch {
  * @version 1
  */
 export interface UpdateAutomationParams extends BaseParams {
+  /** Automation updates are scoped to the catalogue channel. */
+  channel: 'ahp-automations://';
   /** Target {@link AutomationState.resource}. */
-  channel: URI;
+  automation: URI;
   /** {@link AutomationState.revision} on which the client based {@link UpdateAutomationParams.changes}. */
   expectedRevision: number;
   /** Editable {@link AutomationDefinition} fields to replace. */
@@ -197,9 +169,9 @@ export interface UpdateAutomationParams extends BaseParams {
 /**
  * Permanently remove an automation.
  *
- * The target is supplied by {@link BaseParams.channel}. The host rejects the
- * command when {@link AutomationOperation.Dispose} is not currently
- * advertised, for example while a non-terminal run prevents disposal.
+ * The host rejects the command when {@link AutomationOperation.Dispose} is not
+ * currently advertised, for example while a non-terminal run prevents
+ * disposal.
  *
  * @category Commands
  * @method disposeAutomation
@@ -207,7 +179,12 @@ export interface UpdateAutomationParams extends BaseParams {
  * @messageType Request
  * @version 1
  */
-export interface DisposeAutomationParams extends BaseParams {}
+export interface DisposeAutomationParams extends BaseParams {
+  /** Automation disposal is scoped to the catalogue channel. */
+  channel: 'ahp-automations://';
+  /** Target {@link AutomationState.resource}. */
+  automation: URI;
+}
 
 /**
  * Start a manual run of an automation.
@@ -222,6 +199,10 @@ export interface DisposeAutomationParams extends BaseParams {}
  * @version 1
  */
 export interface RunAutomationParams extends BaseParams {
+  /** Manual runs are scoped to the catalogue channel. */
+  channel: 'ahp-automations://';
+  /** Target {@link AutomationState.resource}. */
+  automation: URI;
   /**
    * Durable client-generated idempotency key. Retrying with the same key and
    * automation MUST return the original run URI rather than create another
@@ -241,11 +222,12 @@ export interface RunAutomationResult {
 }
 
 /**
- * Load one older page into the subscribed automation's run-history state.
+ * Load one older page into a catalogued automation's run-history state.
  *
- * The response only acknowledges the request. Loaded entries arrive through
- * {@link AutomationRunsLoadedAction | `automation/runsLoaded`}, keeping all
- * subscribers synchronized through the normal action stream.
+ * The response only acknowledges the request. The updated full state arrives
+ * through {@link AutomationSetAction | `automation/set`} on the
+ * `ahp-automations://` channel, keeping all catalogue subscribers synchronized
+ * through the normal action stream.
  *
  * @category Commands
  * @method fetchAutomationRuns
@@ -254,6 +236,10 @@ export interface RunAutomationResult {
  * @version 1
  */
 export interface FetchAutomationRunsParams extends BaseParams {
+  /** Run-history loading is scoped to the catalogue channel. */
+  channel: 'ahp-automations://';
+  /** Target {@link AutomationState.resource}. */
+  automation: URI;
   /**
    * Cursor previously received as {@link AutomationState.runsNextCursor}.
    * Omit to request the first page not already included by the snapshot.
@@ -262,7 +248,7 @@ export interface FetchAutomationRunsParams extends BaseParams {
 }
 
 /**
- * Empty acknowledgement; run summaries are delivered by action.
+ * Empty acknowledgement; the updated automation state is delivered by action.
  *
  * @category Commands
  */

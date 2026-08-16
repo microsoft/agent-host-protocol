@@ -88,10 +88,8 @@ import type {
   TerminalCommandExecutedAction,
   TerminalCommandFinishedAction,
   ResourceWatchChangedAction,
-  AutomationDefinitionChangedAction,
-  AutomationRunSummarySetAction,
-  AutomationRunSummaryRemovedAction,
-  AutomationRunsLoadedAction,
+  AutomationSetAction,
+  AutomationRemovedAction,
   AutomationRunLifecycleChangedAction,
   AutomationRunSessionSetAction,
   AutomationRunSessionRemovedAction,
@@ -363,10 +361,8 @@ export type ServerResourceWatchAction =
 
 /** Union of all automation-scoped actions. */
 export type AutomationAction =
-  | AutomationDefinitionChangedAction
-  | AutomationRunSummarySetAction
-  | AutomationRunSummaryRemovedAction
-  | AutomationRunsLoadedAction
+  | AutomationSetAction
+  | AutomationRemovedAction
 ;
 
 /** Union of automation actions that clients may dispatch. */
@@ -376,10 +372,8 @@ export type ClientAutomationAction =
 
 /** Union of automation actions that only the server may produce. */
 export type ServerAutomationAction =
-  | AutomationDefinitionChangedAction
-  | AutomationRunSummarySetAction
-  | AutomationRunSummaryRemovedAction
-  | AutomationRunsLoadedAction
+  | AutomationSetAction
+  | AutomationRemovedAction
 ;
 
 /** Union of all automation-run-scoped actions. */
@@ -500,10 +494,8 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.TerminalCommandExecuted]: false,
   [ActionType.TerminalCommandFinished]: false,
   [ActionType.ResourceWatchChanged]: false,
-  [ActionType.AutomationDefinitionChanged]: false,
-  [ActionType.AutomationRunSummarySet]: false,
-  [ActionType.AutomationRunSummaryRemoved]: false,
-  [ActionType.AutomationRunsLoaded]: false,
+  [ActionType.AutomationSet]: false,
+  [ActionType.AutomationRemoved]: false,
   [ActionType.AutomationRunLifecycleChanged]: false,
   [ActionType.AutomationRunSessionSet]: false,
   [ActionType.AutomationRunSessionRemoved]: false,

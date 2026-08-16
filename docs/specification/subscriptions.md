@@ -1,6 +1,6 @@
 # Channels & Subscriptions
 
-AHP organises all push-based communication into **channels**. A channel is a URI-identified resource that a client subscribes to in order to receive updates. Channels MAY have state (root, sessions, terminals, changesets) or be stateless (future: logging, MCP relay, LSP relay). The subscription mechanism — `subscribe`, `unsubscribe`, and per-channel notifications — is uniform across channel types.
+AHP organises all push-based communication into **channels**. A channel is a URI-identified resource that a client subscribes to in order to receive updates. Channels MAY have state (root, automation catalogues, sessions, terminals, changesets) or be stateless (future: logging, MCP relay, LSP relay). The subscription mechanism — `subscribe`, `unsubscribe`, and per-channel notifications — is uniform across channel types.
 
 ## Every message carries `channel`
 
@@ -8,7 +8,7 @@ The channel concept is woven into every wire message. **Every command and every 
 
 | Direction | Methods | `channel` value |
 |---|---|---|
-| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation` | The target channel's URI (e.g. `ahp-session:/<uuid>`). |
+| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, and automation mutation/run-history commands | The owning channel's URI (e.g. `ahp-session:/<uuid>` or `ahp-automations://`). |
 | Client → Server commands (connection-level) | `initialize`, `ping`, `reconnect`, `listSessions`, `authenticate`, `resolveSessionConfig`, `sessionConfigCompletions`, `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | Literal `'ahp-root://'`. |
 | Server → Client commands (bidirectional `resource*` family) | The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins). | Literal `'ahp-root://'`. |
 | Client → Server | `dispatchAction` | The channel the action targets. |
@@ -18,13 +18,14 @@ The channel concept is woven into every wire message. **Every command and every 
 
 The constraint is encoded in the TypeScript types: every entry in `CommandMap` and the notification maps has params assignable to `BaseParams` (or, for notifications, structurally `{ channel: URI }`). The compile-time check in `types/version/message-checks.ts` fails if any new method omits the field.
 
-The rest of this page details the URI scheme and the lifecycle of a subscription. The mechanics of action delivery and protocol notifications are described under each channel page ([Root](/specification/root-channel), [Session](/specification/session-channel), [Terminal](/specification/terminal-channel)).
+The rest of this page details the URI scheme and the lifecycle of a subscription. The mechanics of action delivery and protocol notifications are described under each channel page ([Root](/specification/root-channel), [Automation Catalogue](/specification/automation-channel), [Session](/specification/session-channel), [Terminal](/specification/terminal-channel)).
 
 ## URI Scheme
 
 | URI | State type | Description |
 |---|---|---|
 | `ahp-root://` | `RootState` | Global state (agents, terminals, host config). Always present. |
+| `ahp-automations://` | `AutomationCatalogState` | Full state for every visible automation. Present when `InitializeResult.automations` is advertised. |
 | `ahp-session:/<uuid>` | `SessionState` | Per-session state (metadata plus the `chats` catalog). The session's provider is carried on `SessionSummary.provider`, not in the URI scheme. |
 | `ahp-chat:/<cid>` | `ChatState` | Per-chat conversation state (turns, streaming, tool calls, pending messages, input requests). A session starts with a default chat; multi-chat hosts add more via `createChat`. See [Chat Channel](/specification/chat-channel). |
 | `ahp-terminal:/<id>` | `TerminalState` | Per-terminal state. Server-defined id. |

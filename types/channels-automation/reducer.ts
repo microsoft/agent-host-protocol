@@ -1,5 +1,5 @@
 /**
- * Automation Channel Reducer.
+ * Automation Catalogue Channel Reducer.
  *
  * @module channels-automation/reducer
  */
@@ -7,63 +7,32 @@
 import type { AutomationAction } from '../action-origin.generated.js';
 import { ActionType } from '../common/actions.js';
 import { softAssertNever } from '../common/reducer-helpers.js';
-import type { AutomationRunSummary } from '../channels-automation-run/state.js';
-import type { AutomationState } from './state.js';
+import type { AutomationCatalogState } from './state.js';
 
-/** Pure reducer for automation state. */
-export function automationReducer(state: AutomationState, action: AutomationAction, log?: (msg: string) => void): AutomationState {
+/** Pure reducer for automation catalogue state. */
+export function automationReducer(state: AutomationCatalogState, action: AutomationAction, log?: (msg: string) => void): AutomationCatalogState {
   switch (action.type) {
-    case ActionType.AutomationDefinitionChanged: {
-      const next: AutomationState = {
-        ...state,
-        definition: action.definition,
-        revision: action.revision,
-        modifiedAt: action.modifiedAt,
-      };
-      if (action.nextRunAt === undefined) {
-        delete next.nextRunAt;
-      } else {
-        next.nextRunAt = action.nextRunAt;
+    case ActionType.AutomationSet: {
+      const idx = state.automations.findIndex(automation => automation.resource === action.automation.resource);
+      if (idx < 0) {
+        return {
+          ...state,
+          automations: [...state.automations, action.automation],
+        };
       }
-      return next;
+      const automations = state.automations.slice();
+      automations[idx] = action.automation;
+      return { ...state, automations };
     }
 
-    case ActionType.AutomationRunSummarySet: {
-      const index = state.runs.findIndex(run => run.resource === action.run.resource);
-      if (index < 0) {
-        return { ...state, runs: [action.run, ...state.runs] };
-      }
-      const runs: AutomationRunSummary[] = state.runs.slice();
-      runs[index] = action.run;
-      return { ...state, runs };
-    }
-
-    case ActionType.AutomationRunSummaryRemoved: {
-      const index = state.runs.findIndex(run => run.resource === action.run);
-      if (index < 0) {
+    case ActionType.AutomationRemoved: {
+      const idx = state.automations.findIndex(automation => automation.resource === action.resource);
+      if (idx < 0) {
         return state;
       }
-      const runs = state.runs.slice();
-      runs.splice(index, 1);
-      return { ...state, runs };
-    }
-
-    case ActionType.AutomationRunsLoaded: {
-      const known = new Set(state.runs.map(run => run.resource));
-      const runs = [...state.runs, ...action.runs.filter(run => {
-        if (known.has(run.resource)) {
-          return false;
-        }
-        known.add(run.resource);
-        return true;
-      })];
-      const next: AutomationState = { ...state, runs };
-      if (action.nextCursor === undefined) {
-        delete next.runsNextCursor;
-      } else {
-        next.runsNextCursor = action.nextCursor;
-      }
-      return next;
+      const automations = state.automations.slice();
+      automations.splice(idx, 1);
+      return { ...state, automations };
     }
 
     default:

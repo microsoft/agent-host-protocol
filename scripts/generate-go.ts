@@ -172,7 +172,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -858,8 +858,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationSessionTemplate' },
   { name: 'AutomationDefinition' },
   { name: 'AutomationRuntimeState' },
-  { name: 'AutomationSummary' },
   { name: 'AutomationState' },
+  { name: 'AutomationCatalogState' },
   { name: 'AutomationRunBlocker' },
   { name: 'AutomationManualRunCause' },
   { name: 'AutomationTriggeredRunCause' },
@@ -1244,11 +1244,11 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, annotations, automation, or
-// automation-run state. The active
+// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+// or automation-run state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automation → session → chat → terminal → changeset →
+// (automationRun → automations → session → chat → terminal → changeset →
 // resourceWatch → annotations → root).
 type SnapshotState struct {
 \tRoot          *RootState          \`json:"-"\`
@@ -1258,7 +1258,7 @@ type SnapshotState struct {
 \tChangeset     *ChangesetState     \`json:"-"\`
 \tResourceWatch *ResourceWatchState \`json:"-"\`
 \tAnnotations   *AnnotationsState   \`json:"-"\`
-\tAutomation    *AutomationState    \`json:"-"\`
+\tAutomations   *AutomationCatalogState \`json:"-"\`
 \tAutomationRun *AutomationRunState \`json:"-"\`
 }
 
@@ -1267,8 +1267,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \tswitch {
 \tcase s.AutomationRun != nil:
 \t\treturn json.Marshal(s.AutomationRun)
-\tcase s.Automation != nil:
-\t\treturn json.Marshal(s.Automation)
+\tcase s.Automations != nil:
+\t\treturn json.Marshal(s.Automations)
 \tcase s.Session != nil:
 \t\treturn json.Marshal(s.Session)
 \tcase s.Chat != nil:
@@ -1303,12 +1303,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.AutomationRun = &v
-\tcase containsAll(probe, "definition"):
-\t\tvar v AutomationState
+\tcase containsAll(probe, "automations"):
+\t\tvar v AutomationCatalogState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
 \t\t}
-\t\ts.Automation = &v
+\t\ts.Automations = &v
 \tcase containsAll(probe, "lifecycle"):
 \t\tvar v SessionState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1576,10 +1576,8 @@ const ACTION_VARIANTS: {
   { type: 'terminal/commandExecuted', variantName: 'TerminalCommandExecuted', tsInterface: 'TerminalCommandExecutedAction' },
   { type: 'terminal/commandFinished', variantName: 'TerminalCommandFinished', tsInterface: 'TerminalCommandFinishedAction' },
   { type: 'resourceWatch/changed', variantName: 'ResourceWatchChanged', tsInterface: 'ResourceWatchChangedAction' },
-  { type: 'automation/definitionChanged', variantName: 'AutomationDefinitionChanged', tsInterface: 'AutomationDefinitionChangedAction' },
-  { type: 'automation/runSummarySet', variantName: 'AutomationRunSummarySet', tsInterface: 'AutomationRunSummarySetAction' },
-  { type: 'automation/runSummaryRemoved', variantName: 'AutomationRunSummaryRemoved', tsInterface: 'AutomationRunSummaryRemovedAction' },
-  { type: 'automation/runsLoaded', variantName: 'AutomationRunsLoaded', tsInterface: 'AutomationRunsLoadedAction' },
+  { type: 'automation/set', variantName: 'AutomationSet', tsInterface: 'AutomationSetAction' },
+  { type: 'automation/removed', variantName: 'AutomationRemoved', tsInterface: 'AutomationRemovedAction' },
   { type: 'automationRun/lifecycleChanged', variantName: 'AutomationRunLifecycleChanged', tsInterface: 'AutomationRunLifecycleChangedAction' },
   { type: 'automationRun/sessionSet', variantName: 'AutomationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
@@ -1726,7 +1724,6 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'CompletionsParams' }, { name: 'CompletionItem' }, { name: 'CompletionsResult' },
   { name: 'InvokeChangesetOperationParams' }, { name: 'InvokeChangesetOperationResult' },
   { name: 'ChangesetOperationFollowUp' },
-  { name: 'ListAutomationsParams' }, { name: 'ListAutomationsResult' },
   { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
   { name: 'CreateAutomationParams' }, { name: 'AutomationImport' }, { name: 'AutomationImportTriggerNextRun' }, { name: 'AutomationDefinitionPatch' },
   { name: 'UpdateAutomationParams' }, { name: 'DisposeAutomationParams' },
@@ -1944,9 +1941,6 @@ const NOTIFICATION_STRUCTS = [
   'SessionAddedParams',
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
-  'AutomationAddedParams',
-  'AutomationRemovedParams',
-  'AutomationSummaryChangedParams',
   'ProgressParams',
   'AuthRequiredParams',
   'OtlpExportLogsParams',

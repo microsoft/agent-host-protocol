@@ -1298,7 +1298,7 @@ function generateAutomationChannelPage(project: Project): string {
   const stateSf = findChannelSourceFile(project, 'channels-automation', 'state.ts');
   const actionsSf = findChannelSourceFile(project, 'channels-automation', 'actions.ts');
   const commandsSf = findChannelSourceFile(project, 'channels-automation', 'commands.ts');
-  const lines: string[] = [GENERATED_HEADER, '# Automation Channel\n', schemaLink('state.schema.json')];
+  const lines: string[] = [GENERATED_HEADER, '# Automation Catalogue Channel\n', schemaLink('state.schema.json')];
   if (stateSf) {
     lines.push('## State Types\n', emitStateTypesSection([stateSf]));
   }

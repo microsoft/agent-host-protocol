@@ -1,0 +1,28 @@
+{
+  "description": "automation removed deletes an existing catalogue entry",
+  "reducer": "automation",
+  "initial": {
+    "automations": [{
+      "resource": "ahp-automation:/a1",
+      "definition": {
+        "title": "A",
+        "message": { "text": "go", "origin": { "kind": "user" } },
+        "session": {},
+        "enabled": true,
+        "triggers": []
+      },
+      "revision": 1,
+      "runs": [],
+      "operations": ["run"],
+      "createdAt": "2025-01-01T00:00:00Z",
+      "modifiedAt": "2025-01-01T00:00:00Z"
+    }]
+  },
+  "actions": [{
+    "type": "automation/removed",
+    "resource": "ahp-automation:/a1"
+  }],
+  "expected": {
+    "automations": []
+  }
+}

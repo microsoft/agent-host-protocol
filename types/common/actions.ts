@@ -114,10 +114,8 @@ import type {
   ResourceWatchChangedAction,
 } from '../channels-resource-watch/actions.js';
 import type {
-  AutomationDefinitionChangedAction,
-  AutomationRunSummarySetAction,
-  AutomationRunSummaryRemovedAction,
-  AutomationRunsLoadedAction,
+  AutomationRemovedAction,
+  AutomationSetAction,
 } from '../channels-automation/actions.js';
 import type {
   AutomationRunLifecycleChangedAction,
@@ -222,10 +220,8 @@ export const enum ActionType {
   TerminalCommandExecuted = 'terminal/commandExecuted',
   TerminalCommandFinished = 'terminal/commandFinished',
   ResourceWatchChanged = 'resourceWatch/changed',
-  AutomationDefinitionChanged = 'automation/definitionChanged',
-  AutomationRunSummarySet = 'automation/runSummarySet',
-  AutomationRunSummaryRemoved = 'automation/runSummaryRemoved',
-  AutomationRunsLoaded = 'automation/runsLoaded',
+  AutomationSet = 'automation/set',
+  AutomationRemoved = 'automation/removed',
   AutomationRunLifecycleChanged = 'automationRun/lifecycleChanged',
   AutomationRunSessionSet = 'automationRun/sessionSet',
   AutomationRunSessionRemoved = 'automationRun/sessionRemoved',
@@ -354,10 +350,8 @@ export type StateAction =
   | TerminalCommandExecutedAction
   | TerminalCommandFinishedAction
   | ResourceWatchChangedAction
-  | AutomationDefinitionChangedAction
-  | AutomationRunSummarySetAction
-  | AutomationRunSummaryRemovedAction
-  | AutomationRunsLoadedAction
+  | AutomationSetAction
+  | AutomationRemovedAction
   | AutomationRunLifecycleChangedAction
   | AutomationRunSessionSetAction
   | AutomationRunSessionRemovedAction
