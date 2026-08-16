@@ -5368,7 +5368,7 @@
     },
     "AutomationDefinition": {
       "type": "object",
-      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial user message, the session template used\nfor each run, and zero or more automatic triggers. Runtime state, run\nhistory, revisions, timestamps, and currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
+      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial user message, the session template used\nfor each run, and zero or more automatic triggers. Runtime state, run\nhistory, timestamps, and currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
       "properties": {
         "title": {
           "type": "string",
@@ -5427,7 +5427,7 @@
     },
     "AutomationState": {
       "type": "object",
-      "description": "Authoritative state of one automation in the\n{@link AutomationCatalogState.automations} catalogue.\n\nThe host owns definition revisions, trigger evaluation, run claims, run\nretention, and operation availability. Clients render this state and submit\ncommands; they never run a fallback scheduler for a host-owned definition.",
+      "description": "Authoritative state of one automation in the\n{@link AutomationCatalogState.automations} catalogue.\n\nThe host owns trigger evaluation, run claims, run retention, and operation\navailability. Clients render this state and submit actions or commands; they\nnever run a fallback scheduler for a host-owned definition.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -5436,10 +5436,6 @@
         "definition": {
           "$ref": "#/$defs/AutomationDefinition",
           "description": "Current durable definition."
-        },
-        "revision": {
-          "type": "number",
-          "description": "Monotonically increasing definition revision. Clients pass the value they\nobserved as {@link AutomationUpdateRequestedAction.expectedRevision}."
         },
         "nextRunAt": {
           "type": "string",
@@ -5484,7 +5480,6 @@
       "required": [
         "resource",
         "definition",
-        "revision",
         "runs",
         "operations",
         "createdAt",

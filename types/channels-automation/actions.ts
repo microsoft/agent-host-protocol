@@ -73,10 +73,11 @@ export interface AutomationCreateRequestedAction {
  * the client's authorization.
  *
  * This side-effect request leaves optimistic catalogue state unchanged. The
- * host accepts the patch only when
- * {@link AutomationUpdateRequestedAction.expectedRevision} equals the current
- * {@link AutomationState.revision}, then publishes the authoritative result
- * with {@link AutomationSetAction | `automation/set`}.
+ * host applies accepted patches to its current authoritative definition in
+ * action order, then publishes the result with
+ * {@link AutomationSetAction | `automation/set`}. Omitted fields remain
+ * unchanged; when accepted actions replace the same field, the later action in
+ * server order wins.
  *
  * @category Automation Actions
  * @version 1
@@ -86,8 +87,6 @@ export interface AutomationUpdateRequestedAction {
   type: ActionType.AutomationUpdateRequested;
   /** Target {@link AutomationState.resource}. */
   resource: URI;
-  /** {@link AutomationState.revision} on which the client based the changes. */
-  expectedRevision: number;
   /** Editable {@link AutomationDefinition} fields to replace. */
   changes: AutomationDefinitionPatch;
 }

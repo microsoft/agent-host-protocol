@@ -13,15 +13,15 @@ ahp-automations://
 Each `AutomationState.resource` is a stable `ahp-automation:/<id>` identifier
 chosen by `automation/createRequested`. Those identifiers target commands,
 actions, and relationships but are not independently subscribable channels. The
-host owns persistence, revision ordering, trigger evaluation, run claims, and
-run history.
+host owns persistence, action ordering, trigger evaluation, run claims, and run
+history.
 
 ## State
 
 `AutomationCatalogState.automations` contains the full `AutomationState` for
 every visible automation, keyed by `resource`. Each entry contains the complete
-definition, monotonic revision, host-computed next scheduled run, a newest-first
-window of `AutomationRunSummary` entries, and allowed operations.
+definition, host-computed next scheduled run, a newest-first window of
+`AutomationRunSummary` entries, and allowed operations.
 
 An empty trigger list means manual-only. Schedule triggers use the portable
 five-field AHP cron format plus an IANA time zone. Event triggers use a
@@ -56,7 +56,7 @@ target entry's identifier as `automation`.
 - `automation/createRequested` asks the host to persist a complete definition
   at a client-chosen `resource` (client-dispatchable).
 - `automation/updateRequested` asks the host to apply a definition patch
-  guarded by `expectedRevision` (client-dispatchable).
+  in action order (client-dispatchable).
 - `automation/set` adds or replaces one full `AutomationState` by `resource`
   (server-only).
 - `automation/removed` permanently deletes one entry by `resource`
@@ -69,6 +69,13 @@ state unchanged. The host validates and persists the requested mutation, then
 publishes the resulting full `AutomationState` through `automation/set`. A
 rejected request carries `ActionEnvelope.rejectionReason` and produces no
 catalogue mutation.
+
+The host applies accepted update patches to its current authoritative
+definition in action order. Omitted fields remain unchanged, so disjoint
+patches compose. If accepted actions replace the same field, the later action
+in server order wins. The host MUST reject an action that is unauthorized, is
+not permitted by the current operations, or is invalid for the current
+definition.
 
 Before dispatching `automation/removed`, a client SHOULD verify that the target
 advertises `AutomationOperation.Dispose`. The host MUST revalidate the operation

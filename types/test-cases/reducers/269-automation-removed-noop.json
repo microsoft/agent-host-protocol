@@ -11,7 +11,6 @@
         "enabled": true,
         "triggers": []
       },
-      "revision": 1,
       "runs": [],
       "operations": ["run"],
       "createdAt": "2025-01-01T00:00:00Z",
@@ -32,7 +31,6 @@
         "enabled": true,
         "triggers": []
       },
-      "revision": 1,
       "runs": [],
       "operations": ["run"],
       "createdAt": "2025-01-01T00:00:00Z",

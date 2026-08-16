@@ -39,15 +39,15 @@ Automation catalogue actions travel on `ahp-automations://`.
 | Type | Client-dispatchable? | When |
 |---|---|---|
 | `automation/createRequested` | **Yes** | A client asks the host to persist a complete definition at a client-chosen resource. |
-| `automation/updateRequested` | **Yes** | A client asks the host to apply a definition patch at an expected revision. |
+| `automation/updateRequested` | **Yes** | A client asks the host to apply a definition patch in action order. |
 | `automation/set` | No | The host adds or replaces one complete automation state. |
 | `automation/removed` | **Yes** | A client permanently removes an automation while its `dispose` operation is available, or the host removes an entry that is no longer visible. |
 
 Create and update requests leave catalogue state unchanged until the host
-publishes an authoritative `automation/set`. The host revalidates
-client-dispatched removals. Rejected actions carry
-`ActionEnvelope.rejectionReason`; a rejected removal causes the originating
-client to restore its optimistic state.
+publishes an authoritative `automation/set`. The host applies accepted patches
+to its current definition in action order and revalidates client-dispatched
+removals. Rejected actions carry `ActionEnvelope.rejectionReason`; a rejected
+removal causes the originating client to restore its optimistic state.
 
 ## Session & Chat Actions
 

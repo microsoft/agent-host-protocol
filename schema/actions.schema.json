@@ -2148,7 +2148,7 @@
     },
     "AutomationUpdateRequestedAction": {
       "type": "object",
-      "description": "Ask the host to update editable fields of an existing automation.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Update}. The host revalidates that operation and\nthe client's authorization.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost accepts the patch only when\n{@link AutomationUpdateRequestedAction.expectedRevision} equals the current\n{@link AutomationState.revision}, then publishes the authoritative result\nwith {@link AutomationSetAction | `automation/set`}.",
+      "description": "Ask the host to update editable fields of an existing automation.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Update}. The host revalidates that operation and\nthe client's authorization.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost applies accepted patches to its current authoritative definition in\naction order, then publishes the result with\n{@link AutomationSetAction | `automation/set`}. Omitted fields remain\nunchanged; when accepted actions replace the same field, the later action in\nserver order wins.",
       "properties": {
         "type": {
           "const": "automation/updateRequested"
@@ -2156,10 +2156,6 @@
         "resource": {
           "$ref": "#/$defs/URI",
           "description": "Target {@link AutomationState.resource}."
-        },
-        "expectedRevision": {
-          "type": "number",
-          "description": "{@link AutomationState.revision} on which the client based the changes."
         },
         "changes": {
           "$ref": "#/$defs/AutomationDefinitionPatch",
@@ -2169,7 +2165,6 @@
       "required": [
         "type",
         "resource",
-        "expectedRevision",
         "changes"
       ]
     },
@@ -7537,7 +7532,7 @@
     },
     "AutomationDefinition": {
       "type": "object",
-      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial user message, the session template used\nfor each run, and zero or more automatic triggers. Runtime state, run\nhistory, revisions, timestamps, and currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
+      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial user message, the session template used\nfor each run, and zero or more automatic triggers. Runtime state, run\nhistory, timestamps, and currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
       "properties": {
         "title": {
           "type": "string",
@@ -7596,7 +7591,7 @@
     },
     "AutomationState": {
       "type": "object",
-      "description": "Authoritative state of one automation in the\n{@link AutomationCatalogState.automations} catalogue.\n\nThe host owns definition revisions, trigger evaluation, run claims, run\nretention, and operation availability. Clients render this state and submit\ncommands; they never run a fallback scheduler for a host-owned definition.",
+      "description": "Authoritative state of one automation in the\n{@link AutomationCatalogState.automations} catalogue.\n\nThe host owns trigger evaluation, run claims, run retention, and operation\navailability. Clients render this state and submit actions or commands; they\nnever run a fallback scheduler for a host-owned definition.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -7605,10 +7600,6 @@
         "definition": {
           "$ref": "#/$defs/AutomationDefinition",
           "description": "Current durable definition."
-        },
-        "revision": {
-          "type": "number",
-          "description": "Monotonically increasing definition revision. Clients pass the value they\nobserved as {@link AutomationUpdateRequestedAction.expectedRevision}."
         },
         "nextRunAt": {
           "type": "string",
@@ -7653,7 +7644,6 @@
       "required": [
         "resource",
         "definition",
-        "revision",
         "runs",
         "operations",
         "createdAt",

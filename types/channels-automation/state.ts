@@ -255,7 +255,7 @@ export interface AutomationSessionTemplate {
  *
  * A definition combines the initial user message, the session template used
  * for each run, and zero or more automatic triggers. Runtime state, run
- * history, revisions, timestamps, and currently allowed operations live on
+ * history, timestamps, and currently allowed operations live on
  * {@link AutomationState} rather than in the definition.
  *
  * @category Automation State
@@ -304,9 +304,9 @@ export interface AutomationRuntimeState {
  * Authoritative state of one automation in the
  * {@link AutomationCatalogState.automations} catalogue.
  *
- * The host owns definition revisions, trigger evaluation, run claims, run
- * retention, and operation availability. Clients render this state and submit
- * commands; they never run a fallback scheduler for a host-owned definition.
+ * The host owns trigger evaluation, run claims, run retention, and operation
+ * availability. Clients render this state and submit actions or commands; they
+ * never run a fallback scheduler for a host-owned definition.
  *
  * @category Automation State
  */
@@ -315,11 +315,6 @@ export interface AutomationState {
   resource: URI;
   /** Current durable definition. */
   definition: AutomationDefinition;
-  /**
-   * Monotonically increasing definition revision. Clients pass the value they
-   * observed as {@link AutomationUpdateRequestedAction.expectedRevision}.
-   */
-  revision: number;
   /** Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
   nextRunAt?: string;
   /**

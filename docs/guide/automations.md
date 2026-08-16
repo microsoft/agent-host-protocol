@@ -90,7 +90,7 @@ The host keeps the catalogue synchronized with full-entry actions:
 | Action | Meaning |
 | --- | --- |
 | `automation/createRequested` | Ask the host to persist a complete definition at a client-chosen resource. |
-| `automation/updateRequested` | Ask the host to apply a definition patch at an expected revision. |
+| `automation/updateRequested` | Ask the host to apply a definition patch in action order. |
 | `automation/set` | Add or replace one complete `AutomationState`, keyed by `resource`. |
 | `automation/removed` | Permanently delete the entry identified by `resource`; clients may dispatch this while `dispose` is advertised. |
 
@@ -288,15 +288,12 @@ payload clients should replay.
 | Action | Purpose |
 | --- | --- |
 | `automation/createRequested` | Persist a complete definition at a client-chosen `ahp-automation:/<id>` resource. |
-| `automation/updateRequested` | Replace selected editable fields using an expected revision. |
+| `automation/updateRequested` | Replace selected editable fields in action order. |
 | `automation/removed` | Permanently remove a definition when disposal is currently allowed. |
 
 Create and update requests are side-effect-only. They leave catalogue state
 unchanged until the host validates and persists the mutation, then publishes
 the authoritative full state through `automation/set`.
-
-Definition revisions increase monotonically. `automation/updateRequested`
-includes the revision the client observed:
 
 ```typescript
 {
@@ -305,7 +302,6 @@ includes the revision the client observed:
   action: {
     type: 'automation/updateRequested'
     resource: 'ahp-automation:/triage'
-    expectedRevision: 7
     changes: {
       enabled: false
     }
@@ -313,10 +309,12 @@ includes the revision the client observed:
 }
 ```
 
-The host rejects a stale revision. The client then reconciles the latest
-`AutomationState` before deciding whether to reapply its change. Omitted patch
-fields remain unchanged; supplied arrays and objects replace their fields in
-full rather than merging recursively.
+The host evaluates the patch against its current authoritative definition in
+action order. Omitted fields remain unchanged, so concurrent patches to
+different fields compose. Supplied arrays and objects replace their fields in
+full rather than merging recursively. When accepted actions replace the same
+field, the later action in server order wins. The host rejects actions that are
+unauthorized, no longer permitted, or invalid for the current definition.
 
 To permanently remove an automation, a client dispatches
 `automation/removed` on `ahp-automations://`:
@@ -443,7 +441,8 @@ automation-run channel remains subscribable.
 Several clients may subscribe to the same `ahp-automations://` catalogue:
 
 - the host sequences every catalogue and run action;
-- revisions prevent lost updates;
+- ordered patches preserve disjoint changes and deterministically resolve
+  overlapping writes;
 - manual `requestId` values prevent duplicate runs after retry;
 - one trigger occurrence is atomically associated with at most one run;
 - `automation/set` and `automation/removed` keep live clients updated; and
