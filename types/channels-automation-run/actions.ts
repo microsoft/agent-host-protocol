@@ -7,7 +7,12 @@
 
 import { ActionType } from '../common/actions.js';
 import type { URI } from '../common/state.js';
-import type { AutomationRunArtifact, AutomationRunLifecycle, AutomationRunOperation } from './state.js';
+import type {
+  AutomationRunArtifact,
+  AutomationRunLifecycle,
+  AutomationRunOperation,
+  AutomationRunState,
+} from './state.js';
 
 /**
  * Replace the run lifecycle and currently allowed operations atomically.
@@ -20,14 +25,14 @@ import type { AutomationRunArtifact, AutomationRunLifecycle, AutomationRunOperat
  */
 export interface AutomationRunLifecycleChangedAction {
   type: ActionType.AutomationRunLifecycleChanged;
-  /** Complete replacement lifecycle. */
+  /** Complete replacement {@link AutomationRunState.lifecycle}. */
   lifecycle: AutomationRunLifecycle;
-  /** Complete replacement operation list. */
+  /** Complete replacement {@link AutomationRunState.operations}. */
   operations: AutomationRunOperation[];
 }
 
 /**
- * Add a session to the run's ordered session catalogue.
+ * Add a session to {@link AutomationRunState.sessions}.
  *
  * Session URIs are unique. Setting an existing URI is a no-op.
  *
@@ -36,7 +41,7 @@ export interface AutomationRunLifecycleChangedAction {
  */
 export interface AutomationRunSessionSetAction {
   type: ActionType.AutomationRunSessionSet;
-  /** Session URI to append when it is not already linked. */
+  /** Session URI to append to {@link AutomationRunState.sessions} when not already linked. */
   session: URI;
 }
 
@@ -51,7 +56,7 @@ export interface AutomationRunSessionSetAction {
  */
 export interface AutomationRunSessionRemovedAction {
   type: ActionType.AutomationRunSessionRemoved;
-  /** Linked session URI to remove. */
+  /** Entry in {@link AutomationRunState.sessions} to remove. */
   session: URI;
 }
 
@@ -63,7 +68,7 @@ export interface AutomationRunSessionRemovedAction {
  */
 export interface AutomationRunPrimarySessionChangedAction {
   type: ActionType.AutomationRunPrimarySessionChanged;
-  /** New primary linked session, or omitted to clear the selection. */
+  /** New {@link AutomationRunState.primarySession}, or omitted to clear the selection. */
   primarySession?: URI;
 }
 
@@ -75,7 +80,7 @@ export interface AutomationRunPrimarySessionChangedAction {
  */
 export interface AutomationRunArtifactSetAction {
   type: ActionType.AutomationRunArtifactSet;
-  /** New or replacement artifact. */
+  /** New or replacement entry in {@link AutomationRunState.artifacts}. */
   artifact: AutomationRunArtifact;
 }
 

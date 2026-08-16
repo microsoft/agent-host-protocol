@@ -7,10 +7,16 @@
 
 import type { BaseParams, PaginatedParams, PaginatedResult } from '../common/commands.js';
 import type { URI } from '../common/state.js';
+import type { AutomationRunState } from '../channels-automation-run/state.js';
+import type { AgentInfo } from '../channels-root/state.js';
+import type { AutomationRunsLoadedAction } from './actions.js';
 import type {
   AutomationDefinition,
+  AutomationOperation,
   AutomationSchedule,
+  AutomationScheduleTrigger,
   AutomationSessionTemplate,
+  AutomationState,
   AutomationSummary,
   AutomationTrigger,
   AutomationTriggerDefinition,
@@ -64,11 +70,11 @@ export interface ListAutomationsResult extends PaginatedResult {
 export interface ListAutomationTriggerDefinitionsParams extends BaseParams {
   /** Trigger definitions are discovered from the root channel. */
   channel: 'ahp-root://';
-  /** Prospective provider id, or omitted for the host default. */
+  /** Prospective provider id matching {@link AgentInfo.provider}, or omitted for the host default. */
   provider?: string;
-  /** Prospective ordered working-directory list. */
+  /** Prospective {@link AutomationSessionTemplate.workingDirectories}. */
   workingDirectories?: URI[];
-  /** Prospective resolved session configuration values. */
+  /** Prospective resolved {@link AutomationSessionTemplate.config}. */
   sessionConfig?: Record<string, unknown>;
 }
 
@@ -88,7 +94,7 @@ export interface ListAutomationTriggerDefinitionsResult {
  * @category Commands
  */
 export interface AutomationImportTriggerNextRun {
-  /** Stable id of a schedule trigger in the imported definition. */
+  /** Stable {@link AutomationScheduleTrigger.id} in the imported definition. */
   triggerId: string;
   /** Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp. */
   nextRunAt: string;
@@ -110,17 +116,17 @@ export interface AutomationImport {
   batchId: string;
   /** Stable source-side identifier for this definition within the batch. */
   itemId: string;
-  /** Source schedule occurrences to retain until the imported definition is enabled. */
+  /** Source schedule occurrences to retain until {@link AutomationDefinition.enabled} becomes `true`. */
   triggerNextRuns?: AutomationImportTriggerNextRun[];
 }
 
 /**
  * Create a durable automation at a client-chosen URI.
  *
- * `channel` MUST use the `ahp-automation:` scheme and MUST NOT already identify
- * an unrelated automation. The host validates the complete definition,
- * persists it, and makes it visible through the root catalogue before
- * returning success.
+ * {@link CreateAutomationParams.channel | `channel`} MUST use the
+ * `ahp-automation:` scheme and MUST NOT already identify an unrelated
+ * automation. The host validates the complete definition, persists it, and
+ * makes it visible through the root catalogue before returning success.
  *
  * @category Commands
  * @method createAutomation
@@ -129,13 +135,15 @@ export interface AutomationImport {
  * @version 1
  */
 export interface CreateAutomationParams extends BaseParams {
-  /** Client-chosen `ahp-automation:` URI for the new definition. */
+  /** Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}. */
   channel: URI;
-  /** Complete initial definition. */
+  /** Complete initial {@link AutomationState.definition}. */
   definition: AutomationDefinition;
   /**
-   * Optional legacy import state. When present, {@link definition} MUST be
-   * disabled so automatic triggers cannot run before migration cutover.
+   * Optional legacy import state. When present,
+   * {@link CreateAutomationParams.definition} MUST have
+   * {@link AutomationDefinition.enabled} set to `false` so automatic triggers
+   * cannot run before migration cutover.
    */
   import?: AutomationImport;
 }
@@ -149,17 +157,17 @@ export interface CreateAutomationParams extends BaseParams {
  * @category Commands
  */
 export interface AutomationDefinitionPatch {
-  /** Replacement human-readable title. */
+  /** Replacement {@link AutomationDefinition.title}. */
   title?: string;
-  /** Replacement initial user message. */
+  /** Replacement {@link AutomationDefinition.message}. */
   message?: Message;
-  /** Replacement session template. */
+  /** Replacement {@link AutomationDefinition.session}. */
   session?: AutomationSessionTemplate;
-  /** Replacement automatic-trigger enabled state. */
+  /** Replacement {@link AutomationDefinition.enabled}. */
   enabled?: boolean;
-  /** Complete replacement trigger list. */
+  /** Complete replacement {@link AutomationDefinition.triggers}. */
   triggers?: AutomationTrigger[];
-  /** Complete replacement implementation-defined metadata. */
+  /** Complete replacement {@link AutomationDefinition._meta}. */
   _meta?: Record<string, unknown>;
 }
 
@@ -178,11 +186,11 @@ export interface AutomationDefinitionPatch {
  * @version 1
  */
 export interface UpdateAutomationParams extends BaseParams {
-  /** Target `ahp-automation:` URI. */
+  /** Target {@link AutomationState.resource}. */
   channel: URI;
-  /** Revision on which the client based {@link changes}. */
+  /** {@link AutomationState.revision} on which the client based {@link UpdateAutomationParams.changes}. */
   expectedRevision: number;
-  /** Editable fields to replace. */
+  /** Editable {@link AutomationDefinition} fields to replace. */
   changes: AutomationDefinitionPatch;
 }
 
@@ -228,7 +236,7 @@ export interface RunAutomationParams extends BaseParams {
  * @category Commands
  */
 export interface RunAutomationResult {
-  /** Subscribable `ahp-automation-run:` URI. */
+  /** Subscribable `ahp-automation-run:` URI matching {@link AutomationRunState.resource}. */
   run: URI;
 }
 
@@ -236,8 +244,8 @@ export interface RunAutomationResult {
  * Load one older page into the subscribed automation's run-history state.
  *
  * The response only acknowledges the request. Loaded entries arrive through
- * `automation/runsLoaded`, keeping all subscribers synchronized through the
- * normal action stream.
+ * {@link AutomationRunsLoadedAction | `automation/runsLoaded`}, keeping all
+ * subscribers synchronized through the normal action stream.
  *
  * @category Commands
  * @method fetchAutomationRuns

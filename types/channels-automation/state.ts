@@ -4,11 +4,24 @@
  * @module channels-automation/state
  */
 
-import type { Message } from '../channels-chat/state.js';
+import type { Message, MessageKind } from '../channels-chat/state.js';
 import type { ConfigSchema, URI } from '../common/state.js';
-import type { AutomationRunSummary } from '../channels-automation-run/state.js';
-import type { ModelSelection } from '../channels-root/state.js';
+import type {
+  AutomationRunSummary,
+  AutomationTriggeredRunCause,
+} from '../channels-automation-run/state.js';
+import type { ResolveSessionConfigResult } from '../channels-root/commands.js';
+import type { AgentInfo, ModelSelection, SessionModelInfo } from '../channels-root/state.js';
+import type { CreateSessionParams } from '../channels-session/commands.js';
 import type { AgentSelection } from '../channels-session/state.js';
+import type {
+  DisposeAutomationParams,
+  FetchAutomationRunsParams,
+  ListAutomationTriggerDefinitionsParams,
+  ListAutomationsResult,
+  RunAutomationParams,
+  UpdateAutomationParams,
+} from './commands.js';
 
 /**
  * Operations the host currently permits for an automation.
@@ -21,11 +34,11 @@ import type { AgentSelection } from '../channels-session/state.js';
  * @category Automation State
  */
 export const enum AutomationOperation {
-  /** Replace editable fields using `updateAutomation`. */
+  /** Replace editable fields using {@link UpdateAutomationParams | updateAutomation}. */
   Update = 'update',
-  /** Permanently remove the automation using `disposeAutomation`. */
+  /** Permanently remove the automation using {@link DisposeAutomationParams | disposeAutomation}. */
   Dispose = 'dispose',
-  /** Start a manual run using `runAutomation`. */
+  /** Start a manual run using {@link RunAutomationParams | runAutomation}. */
   Run = 'run',
 }
 
@@ -104,8 +117,9 @@ export const enum AutomationTriggerKind {
  */
 export interface AutomationScheduleTrigger {
   /**
-   * Identifier unique and stable within this automation definition. Run causes
-   * refer back to this value.
+   * Identifier unique and stable within this automation definition. Recorded in
+   * {@link AutomationTriggeredRunCause.triggerId} when this trigger creates a
+   * run.
    */
   id: string;
   kind: AutomationTriggerKind.Schedule;
@@ -122,7 +136,8 @@ export interface AutomationScheduleTrigger {
  * Starts runs from events understood by the owning host.
  *
  * Event trigger types, event ids, and configuration are discovered through
- * `listAutomationTriggerDefinitions`. A client that does not understand a
+ * {@link ListAutomationTriggerDefinitionsParams |
+ * listAutomationTriggerDefinitions}. A client that does not understand a
  * host-defined trigger can still preserve and display it without interpreting
  * its configuration.
  *
@@ -130,8 +145,9 @@ export interface AutomationScheduleTrigger {
  */
 export interface AutomationEventTrigger {
   /**
-   * Identifier unique and stable within this automation definition. Run causes
-   * refer back to this value.
+   * Identifier unique and stable within this automation definition. Recorded in
+   * {@link AutomationTriggeredRunCause.triggerId} when this trigger creates a
+   * run.
    */
   id: string;
   kind: AutomationTriggerKind.Event;
@@ -192,7 +208,7 @@ export interface AutomationTriggerDefinition {
   title: string;
   /** Optional longer explanation of the trigger source. */
   description?: string;
-  /** Events clients may select for this trigger type. */
+  /** Events whose {@link AutomationTriggerEventDefinition.id | ids} may appear in {@link AutomationEventTrigger.events}. */
   events: AutomationTriggerEventDefinition[];
   /** Optional schema for {@link AutomationEventTrigger.config}. */
   configSchema?: ConfigSchema;
@@ -207,20 +223,26 @@ export interface AutomationTriggerDefinition {
  * @category Automation State
  */
 export interface AutomationSessionTemplate {
-  /** Provider id. Omit to use the host's default provider. */
+  /** Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider. */
   provider?: string;
-  /** Optional model selection resolved when a run starts. */
+  /**
+   * Optional model selection resolved when a run starts. Its
+   * {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
+   * by the selected provider.
+   */
   model?: ModelSelection;
-  /** Optional custom agent selection resolved when a run starts. */
+  /** Optional custom agent selection identified by {@link AgentSelection.uri}. */
   agent?: AgentSelection;
   /**
-   * Ordered working-directory URIs for each created session. Absence means a
+   * Ordered working-directory URIs for each created session, equivalent to
+   * {@link CreateSessionParams.workingDirectories}. Absence means a
    * workspace-less session.
    */
   workingDirectories?: URI[];
   /**
-   * Session configuration values accepted by `createSession`, normally
-   * obtained from `resolveSessionConfig`.
+   * Session configuration values equivalent to
+   * {@link CreateSessionParams.config}, normally obtained from
+   * {@link ResolveSessionConfigResult.values}.
    */
   config?: Record<string, unknown>;
 }
@@ -239,8 +261,8 @@ export interface AutomationDefinition {
   /** Human-readable automation name. */
   title: string;
   /**
-   * Initial message sent to every newly created run session. Its origin MUST be
-   * `user`.
+   * Initial message sent to every newly created run session. Its
+   * {@link Message.origin} kind MUST be {@link MessageKind.User}.
    */
   message: Message;
   /** Template used to create fresh sessions for each run. */
@@ -267,8 +289,8 @@ export interface AutomationDefinition {
  */
 export interface AutomationRuntimeState {
   /**
-   * Effective working directories after host-side preparation, such as
-   * materializing a managed workspace.
+   * Effective {@link AutomationSessionTemplate.workingDirectories} after
+   * host-side preparation, such as materializing a managed workspace.
    */
   workingDirectories?: URI[];
   /** Opaque host-defined runtime metadata. */
@@ -278,32 +300,36 @@ export interface AutomationRuntimeState {
 /**
  * Lightweight root-catalogue projection of an automation.
  *
- * Returned by `listAutomations` and carried by root automation notifications,
- * this contains enough information to render a list without subscribing to
- * every `ahp-automation:` resource.
+ * Returned in {@link ListAutomationsResult.items} and carried by root
+ * automation notifications, this contains enough information to render a list
+ * without subscribing to every `ahp-automation:` resource.
  *
  * @category Automation State
  */
 export interface AutomationSummary {
-  /** Subscribable `ahp-automation:` URI. */
+  /** Subscribable `ahp-automation:` URI matching {@link AutomationState.resource}. */
   resource: URI;
   /** Current {@link AutomationDefinition.title}. */
   title: string;
   /** Current {@link AutomationDefinition.enabled} value. */
   enabled: boolean;
-  /** Number of automatic triggers in the current definition. */
+  /** Number of entries in {@link AutomationDefinition.triggers}. */
   triggerCount: number;
-  /** Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
+  /**
+   * Earliest schedule occurrence awaiting evaluation, matching
+   * {@link AutomationState.nextRunAt}, as an ISO 8601 timestamp. It may be in
+   * the past while catch-up is pending.
+   */
   nextRunAt?: string;
-  /** Most recent retained run, when any run exists. */
+  /** Most recent entry in {@link AutomationState.runs}, when any run exists. */
   lastRun?: AutomationRunSummary;
-  /** Monotonic definition revision used for optimistic concurrency. */
+  /** Current {@link AutomationState.revision}, used for optimistic concurrency. */
   revision: number;
-  /** Operations currently permitted for this automation. */
+  /** Operations currently permitted for this automation, matching {@link AutomationState.operations}. */
   operations: AutomationOperation[];
-  /** Creation timestamp in ISO 8601 format. */
+  /** Creation timestamp matching {@link AutomationState.createdAt}, in ISO 8601 format. */
   createdAt: string;
-  /** Last definition modification timestamp in ISO 8601 format. */
+  /** Last definition modification timestamp matching {@link AutomationState.modifiedAt}, in ISO 8601 format. */
   modifiedAt: string;
   /** Opaque host-defined catalogue metadata. */
   _meta?: Record<string, unknown>;
@@ -324,18 +350,19 @@ export interface AutomationState {
   /** Current durable definition. */
   definition: AutomationDefinition;
   /**
-   * Monotonically increasing definition revision. Clients pass the revision
-   * they observed as `updateAutomation.expectedRevision`.
+   * Monotonically increasing definition revision. Clients pass the value they
+   * observed as {@link UpdateAutomationParams.expectedRevision}.
    */
   revision: number;
   /** Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending. */
   nextRunAt?: string;
   /**
    * Newest-first retained run summaries. This is a bounded window; use
-   * `fetchAutomationRuns` when {@link runsNextCursor} is present.
+   * {@link FetchAutomationRunsParams | fetchAutomationRuns} when
+   * {@link AutomationState.runsNextCursor} is present.
    */
   runs: AutomationRunSummary[];
-  /** Opaque cursor for the next older run-history page. */
+  /** Opaque cursor passed as {@link FetchAutomationRunsParams.cursor} for the next older run-history page. */
   runsNextCursor?: string;
   /** Optional host-resolved execution context. */
   runtime?: AutomationRuntimeState;

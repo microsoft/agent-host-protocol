@@ -9,6 +9,17 @@
 
 import type { URI, Snapshot } from './state.js';
 import type { ActionEnvelope, StateAction } from './actions.js';
+import type { AutomationRunCancelRequestedAction } from '../channels-automation-run/actions.js';
+import type { AutomationRunOperation, AutomationRunState } from '../channels-automation-run/state.js';
+import type {
+  CreateAutomationParams,
+  PreviewAutomationScheduleParams,
+} from '../channels-automation/commands.js';
+import type {
+  AutomationSchedule,
+  AutomationScheduleTrigger,
+  AutomationState,
+} from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
@@ -289,24 +300,24 @@ export interface InitializeResult {
  * @category Commands
  */
 export interface AutomationCapabilities {
-  /** Present when clients may call `createAutomation`. */
+  /** Present when clients may call {@link CreateAutomationParams | createAutomation}. */
   create?: AutomationCreateCapability;
-  /** Present when definitions may contain schedule triggers. */
+  /** Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}. */
   schedules?: AutomationScheduleCapabilities;
-  /** Present when clients may request cancellation on eligible runs. */
+  /** Present when clients may dispatch {@link AutomationRunCancelRequestedAction}. */
   runCancellation?: AutomationRunCancellationCapability;
-  /** Present when clients may call `previewAutomationSchedule`. */
+  /** Present when clients may call {@link PreviewAutomationScheduleParams | previewAutomationSchedule}. */
   schedulePreview?: AutomationSchedulePreviewCapability;
   /**
-   * Maximum terminal run summaries retained per automation. Active runs are not
-   * counted toward the limit. Absence means the retention limit is
+   * Maximum terminal entries retained in {@link AutomationState.runs}. Active
+   * runs are not counted toward the limit. Absence means the retention limit is
    * implementation-defined.
    */
   runHistoryLimit?: number;
 }
 
 /**
- * Presence capability for `createAutomation`.
+ * Presence capability for {@link CreateAutomationParams | createAutomation}.
  *
  * The empty object means "supported"; fields are reserved for future
  * create-specific options.
@@ -325,14 +336,16 @@ export interface AutomationCreateCapability {}
  */
 export interface AutomationScheduleCapabilities {
   /**
-   * Smallest permitted interval between consecutive occurrences. Omission
-   * means no restriction beyond the cron format's one-minute resolution.
+   * Smallest permitted interval between consecutive occurrences produced by
+   * {@link AutomationSchedule.expression}. Omission means no restriction beyond
+   * the cron format's one-minute resolution.
    */
   minIntervalMinutes?: number;
 }
 
 /**
- * Presence capability for `automationRun/cancelRequested`.
+ * Presence capability for {@link AutomationRunCancelRequestedAction |
+ * `automationRun/cancelRequested`}.
  *
  * The empty object means "supported"; clients must additionally check for
  * {@link AutomationRunOperation.Cancel} on each run.
@@ -342,7 +355,8 @@ export interface AutomationScheduleCapabilities {
 export interface AutomationRunCancellationCapability {}
 
 /**
- * Presence capability for `previewAutomationSchedule`.
+ * Presence capability for
+ * {@link PreviewAutomationScheduleParams | previewAutomationSchedule}.
  *
  * The empty object means "supported"; fields are reserved for future preview
  * limits or options.

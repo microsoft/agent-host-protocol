@@ -13,6 +13,8 @@ import type {
   ToolCallState,
   ToolCallAuthRequiredState,
 } from '../channels-chat/state.js';
+import type { AutomationRunState } from '../channels-automation-run/state.js';
+import type { AutomationState } from '../channels-automation/state.js';
 import type {
   ConfigPropertySchema,
   ErrorInfo,
@@ -80,9 +82,9 @@ export const enum SessionOriginKind {
  */
 export interface AutomationSessionOrigin {
   kind: SessionOriginKind.Automation;
-  /** Owning `ahp-automation:` URI. */
+  /** Owning {@link AutomationState.resource}. */
   automation: URI;
-  /** Owning `ahp-automation-run:` URI. */
+  /** Owning {@link AutomationRunState.resource}. */
   run: URI;
 }
 
@@ -115,7 +117,7 @@ export interface SessionMetadata {
   status: SessionStatus;
   /** Human-readable description of what the session is currently doing */
   activity?: string;
-  /** Durable origin of this session, when another AHP resource created it. */
+  /** Durable {@link AutomationSessionOrigin}, when an automation run created this session. */
   origin?: SessionOrigin;
   /** Server-owned project for this session */
   project?: ProjectInfo;

@@ -7,6 +7,7 @@
 
 import type { URI } from '../common/state.js';
 import type { SessionSummary } from '../channels-session/state.js';
+import type { ListAutomationsParams } from '../channels-automation/commands.js';
 import type { AutomationSummary } from '../channels-automation/state.js';
 
 // ─── root/sessionAdded ───────────────────────────────────────────────────────
@@ -150,7 +151,8 @@ export interface SessionSummaryChangedParams {
  * Announces a newly visible automation catalogue entry.
  *
  * Root notifications are live signals and are not replayed after reconnect.
- * Clients that reconnect MUST refresh the catalogue with `listAutomations`.
+ * Clients that reconnect MUST refresh the catalogue with
+ * {@link ListAutomationsParams | listAutomations}.
  *
  * @category Protocol Notifications
  * @method root/automationAdded
@@ -161,7 +163,7 @@ export interface SessionSummaryChangedParams {
 export interface AutomationAddedParams {
   /** Root channel URI. */
   channel: URI;
-  /** Complete summary for the newly visible automation. */
+  /** Complete {@link AutomationSummary} for the newly visible automation. */
   summary: AutomationSummary;
 }
 
@@ -179,7 +181,7 @@ export interface AutomationAddedParams {
 export interface AutomationRemovedParams {
   /** Root channel URI. */
   channel: URI;
-  /** Removed `ahp-automation:` URI. */
+  /** Removed {@link AutomationSummary.resource}. */
   automation: URI;
 }
 
@@ -200,7 +202,7 @@ export interface AutomationRemovedParams {
 export interface AutomationSummaryChangedParams {
   /** Root channel URI. */
   channel: URI;
-  /** Complete replacement catalogue summary. */
+  /** Complete replacement {@link AutomationSummary}. */
   summary: AutomationSummary;
 }
 

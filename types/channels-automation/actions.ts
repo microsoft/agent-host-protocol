@@ -7,15 +7,19 @@
 
 import { ActionType } from '../common/actions.js';
 import type { URI } from '../common/state.js';
-import type { AutomationDefinition } from './state.js';
 import type { AutomationRunSummary } from '../channels-automation-run/state.js';
+import type { FetchAutomationRunsParams, UpdateAutomationParams } from './commands.js';
+import type { AutomationDefinition, AutomationState } from './state.js';
 
 /**
- * Replace the editable definition after a successful `updateAutomation` or
- * another host-authorized definition change.
+ * Replace the editable definition after a successful
+ * {@link UpdateAutomationParams | updateAutomation} or another host-authorized
+ * definition change.
  *
- * Full replacement semantics apply to `definition`. The reducer also replaces
- * the revision and modification timestamp. Omitting `nextRunAt` clears the
+ * Full replacement semantics apply to
+ * {@link AutomationDefinitionChangedAction.definition | definition}. The
+ * reducer also replaces the revision and modification timestamp. Omitting
+ * {@link AutomationDefinitionChangedAction.nextRunAt | nextRunAt} clears the
  * previously projected next occurrence.
  *
  * @category Automation Actions
@@ -23,13 +27,13 @@ import type { AutomationRunSummary } from '../channels-automation-run/state.js';
  */
 export interface AutomationDefinitionChangedAction {
   type: ActionType.AutomationDefinitionChanged;
-  /** Complete replacement definition. */
+  /** Complete replacement {@link AutomationState.definition}. */
   definition: AutomationDefinition;
-  /** New monotonic revision. */
+  /** New {@link AutomationState.revision}. */
   revision: number;
-  /** Definition modification timestamp in ISO 8601 format. */
+  /** New {@link AutomationState.modifiedAt}, in ISO 8601 format. */
   modifiedAt: string;
-  /** Earliest known future scheduled occurrence, or omitted to clear it. */
+  /** New {@link AutomationState.nextRunAt}, or omitted to clear it. */
   nextRunAt?: string;
 }
 
@@ -45,7 +49,7 @@ export interface AutomationDefinitionChangedAction {
  */
 export interface AutomationRunSummarySetAction {
   type: ActionType.AutomationRunSummarySet;
-  /** New or replacement run summary. */
+  /** New or replacement entry in {@link AutomationState.runs}. */
   run: AutomationRunSummary;
 }
 
@@ -66,19 +70,20 @@ export interface AutomationRunSummaryRemovedAction {
 
 /**
  * Append an older page of run summaries returned by
- * `fetchAutomationRuns`.
+ * {@link FetchAutomationRunsParams | fetchAutomationRuns}.
  *
  * Entries already present by resource URI are ignored, preserving the
  * newest-first ordering of the existing history followed by the fetched page.
- * Omitting `nextCursor` marks the end of retained history.
+ * Omitting {@link AutomationRunsLoadedAction.nextCursor | nextCursor} marks the
+ * end of retained history.
  *
  * @category Automation Actions
  * @version 1
  */
 export interface AutomationRunsLoadedAction {
   type: ActionType.AutomationRunsLoaded;
-  /** Older run summaries in newest-first order within this page. */
+  /** Older entries to append to {@link AutomationState.runs}, in newest-first order within this page. */
   runs: AutomationRunSummary[];
-  /** Opaque cursor for the next older page, or omitted at the end. */
+  /** New {@link AutomationState.runsNextCursor}, or omitted at the end. */
   nextCursor?: string;
 }

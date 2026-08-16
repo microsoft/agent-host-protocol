@@ -5,6 +5,15 @@
  */
 
 import type { ContentRef, ErrorInfo, URI, UsageInfo } from '../common/state.js';
+import type {
+  AutomationEventTrigger,
+  AutomationMisfirePolicy,
+  AutomationScheduleTrigger,
+  AutomationState,
+} from '../channels-automation/state.js';
+import type { RunAutomationParams } from '../channels-automation/commands.js';
+import type { SessionState } from '../channels-session/state.js';
+import type { AutomationRunCancelRequestedAction } from './actions.js';
 
 /**
  * Lifecycle status of one automation run.
@@ -65,7 +74,7 @@ export interface AutomationRunBlocker {
  * @category Automation Run State
  */
 export const enum AutomationRunCauseKind {
-  /** A client explicitly invoked `runAutomation`. */
+  /** A client explicitly invoked {@link RunAutomationParams | runAutomation}. */
   Manual = 'manual',
   /** An automatic schedule or event trigger fired. */
   Trigger = 'trigger',
@@ -87,7 +96,10 @@ export interface AutomationManualRunCause {
  */
 export interface AutomationTriggeredRunCause {
   kind: AutomationRunCauseKind.Trigger;
-  /** Matches the stable {@link AutomationTrigger.id} in the definition. */
+  /**
+   * Matches the stable {@link AutomationScheduleTrigger.id} or
+   * {@link AutomationEventTrigger.id} in the definition.
+   */
   triggerId: string;
   /**
    * Intended schedule occurrence as an ISO 8601 timestamp. Present for
@@ -228,7 +240,7 @@ export type AutomationRunLifecycle =
  * @category Automation Run State
  */
 export const enum AutomationRunOperation {
-  /** Request cancellation with `automationRun/cancelRequested`. */
+  /** Request cancellation with {@link AutomationRunCancelRequestedAction | `automationRun/cancelRequested`}. */
   Cancel = 'cancel',
 }
 
@@ -259,21 +271,21 @@ export interface AutomationRunArtifact extends ContentRef {
  * @category Automation Run State
  */
 export interface AutomationRunSummary {
-  /** Subscribable `ahp-automation-run:` URI. */
+  /** Subscribable `ahp-automation-run:` URI matching {@link AutomationRunState.resource}. */
   resource: URI;
-  /** Owning `ahp-automation:` URI. */
+  /** Owning `ahp-automation:` URI matching {@link AutomationRunState.automation}. */
   automation: URI;
-  /** Immutable reason this run was created. */
+  /** Immutable reason this run was created, matching {@link AutomationRunState.cause}. */
   cause: AutomationRunCause;
-  /** Current or terminal lifecycle snapshot. */
+  /** Current or terminal lifecycle snapshot matching {@link AutomationRunState.lifecycle}. */
   lifecycle: AutomationRunLifecycle;
-  /** Session the host recommends opening first, when one has been selected. */
+  /** Session matching {@link AutomationRunState.primarySession}, when selected. */
   primarySession?: URI;
-  /** Number of linked sessions, including attempts and workers. */
+  /** Number of entries in {@link AutomationRunState.sessions}. */
   sessionCount: number;
-  /** Number of run-scoped artifacts, when cheaply available. */
+  /** Number of entries in {@link AutomationRunState.artifacts}, when cheaply available. */
   artifactCount?: number;
-  /** Operations currently permitted for this run. */
+  /** Operations currently permitted for this run, matching {@link AutomationRunState.operations}. */
   operations: AutomationRunOperation[];
   /** Opaque host-defined summary metadata. */
   _meta?: Record<string, unknown>;
@@ -292,18 +304,19 @@ export interface AutomationRunSummary {
 export interface AutomationRunState {
   /** URI of this automation-run channel. */
   resource: URI;
-  /** Owning `ahp-automation:` URI. */
+  /** Owning `ahp-automation:` URI matching {@link AutomationState.resource}. */
   automation: URI;
   /** Immutable reason this run was created. */
   cause: AutomationRunCause;
   /** Current or terminal lifecycle. */
   lifecycle: AutomationRunLifecycle;
   /**
-   * Ordered, unique session URIs belonging to this run. Entries may represent
-   * retries, parallel workers, or delegated attempts.
+   * Ordered, unique session URIs belonging to this run, each matching
+   * {@link SessionState.resource}. Entries may represent retries, parallel
+   * workers, or delegated attempts.
    */
   sessions: URI[];
-  /** Session the host recommends opening first, when one has been selected. */
+  /** Member of {@link AutomationRunState.sessions} that the host recommends opening first. */
   primarySession?: URI;
   /** Run-scoped artifacts keyed by {@link AutomationRunArtifact.id}. */
   artifacts: AutomationRunArtifact[];
