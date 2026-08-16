@@ -7532,7 +7532,7 @@
     },
     "AutomationDefinition": {
       "type": "object",
-      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial user message, the session template used\nfor each run, and zero or more automatic triggers. Runtime state, run\nhistory, timestamps, and currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
+      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial user message, the session template used\nfor each run, and zero or more automatic triggers. Run history, timestamps,\nand currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
       "properties": {
         "title": {
           "type": "string",
@@ -7571,24 +7571,6 @@
         "triggers"
       ]
     },
-    "AutomationRuntimeState": {
-      "type": "object",
-      "description": "Host-resolved execution context that is useful to clients but is not part of\nthe editable definition.",
-      "properties": {
-        "workingDirectories": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/URI"
-          },
-          "description": "Effective {@link AutomationSessionTemplate.workingDirectories} after\nhost-side preparation, such as materializing a managed workspace."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Opaque host-defined runtime metadata."
-        }
-      }
-    },
     "AutomationState": {
       "type": "object",
       "description": "Authoritative state of one automation in the\n{@link AutomationCatalogState.automations} catalogue.\n\nThe host owns trigger evaluation, run claims, run retention, and operation\navailability. Clients render this state and submit actions or commands; they\nnever run a fallback scheduler for a host-owned definition.",
@@ -7615,10 +7597,6 @@
         "runsNextCursor": {
           "type": "string",
           "description": "Opaque cursor passed as {@link FetchAutomationRunsParams.cursor} for the next older run-history page."
-        },
-        "runtime": {
-          "$ref": "#/$defs/AutomationRuntimeState",
-          "description": "Optional host-resolved execution context."
         },
         "operations": {
           "type": "array",

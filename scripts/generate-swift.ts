@@ -683,7 +683,7 @@ const STATE_STRUCTS = [
   'AutomationSessionOrigin', 'AutomationSchedule',
   'AutomationScheduleTrigger', 'AutomationEventTrigger',
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
-  'AutomationSessionTemplate', 'AutomationDefinition', 'AutomationRuntimeState',
+  'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
   'AutomationState', 'AutomationCatalogState',
   'AutomationRunBlocker', 'AutomationManualRunCause', 'AutomationTriggeredRunCause',

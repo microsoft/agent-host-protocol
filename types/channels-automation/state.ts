@@ -254,8 +254,8 @@ export interface AutomationSessionTemplate {
  * Durable, client-editable definition of an automation.
  *
  * A definition combines the initial user message, the session template used
- * for each run, and zero or more automatic triggers. Runtime state, run
- * history, timestamps, and currently allowed operations live on
+ * for each run, and zero or more automatic triggers. Run history, timestamps,
+ * and currently allowed operations live on
  * {@link AutomationState} rather than in the definition.
  *
  * @category Automation State
@@ -285,22 +285,6 @@ export interface AutomationDefinition {
 }
 
 /**
- * Host-resolved execution context that is useful to clients but is not part of
- * the editable definition.
- *
- * @category Automation State
- */
-export interface AutomationRuntimeState {
-  /**
-   * Effective {@link AutomationSessionTemplate.workingDirectories} after
-   * host-side preparation, such as materializing a managed workspace.
-   */
-  workingDirectories?: URI[];
-  /** Opaque host-defined runtime metadata. */
-  _meta?: Record<string, unknown>;
-}
-
-/**
  * Authoritative state of one automation in the
  * {@link AutomationCatalogState.automations} catalogue.
  *
@@ -325,8 +309,6 @@ export interface AutomationState {
   runs: AutomationRunSummary[];
   /** Opaque cursor passed as {@link FetchAutomationRunsParams.cursor} for the next older run-history page. */
   runsNextCursor?: string;
-  /** Optional host-resolved execution context. */
-  runtime?: AutomationRuntimeState;
   /** Operations currently permitted for this automation. */
   operations: AutomationOperation[];
   /** Creation timestamp in ISO 8601 format. */

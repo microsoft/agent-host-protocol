@@ -825,7 +825,6 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
   { name: 'AutomationDefinition' },
-  { name: 'AutomationRuntimeState' },
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationState' },
   { name: 'AutomationCatalogState' },

@@ -857,7 +857,6 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationTriggerDefinition' },
   { name: 'AutomationSessionTemplate' },
   { name: 'AutomationDefinition' },
-  { name: 'AutomationRuntimeState' },
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationState' },
   { name: 'AutomationCatalogState' },

@@ -140,9 +140,9 @@ the provider, model, agent, directories, and configuration every time a run
 starts because availability and policy may have changed since the definition
 was saved.
 
-Host-prepared execution details—such as materialized managed workspace
-directories—belong in `AutomationState.runtime`, not in the editable
-definition.
+After a run creates a session, that session's `SessionState.workingDirectories`
+is authoritative for the directories it actually uses. This keeps per-run
+workspace preparation out of the durable automation definition and catalogue.
 
 ### Enabled state
 
