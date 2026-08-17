@@ -1,6 +1,6 @@
 /**
- * Automation Commands — trigger discovery, manual execution, run-history
- * loading, and schedule preview.
+ * Automation Commands — trigger discovery, manual execution, and run-history
+ * loading.
  *
  * @module channels-automation/commands
  */
@@ -12,7 +12,6 @@ import type { AgentInfo } from '../channels-root/state.js';
 import type { AutomationSetAction } from './actions.js';
 import type {
   AutomationDefinition,
-  AutomationSchedule,
   AutomationSessionTemplate,
   AutomationState,
   AutomationTriggerDefinition,
@@ -119,35 +118,3 @@ export interface FetchAutomationRunsParams extends BaseParams {
  * @category Commands
  */
 export interface FetchAutomationRunsResult {}
-
-/**
- * Ask the host to evaluate a schedule without creating an automation.
- *
- * Clients SHOULD use this command for validation and preview instead of
- * implementing their own cron evaluator, especially around time-zone
- * transitions.
- *
- * @category Commands
- * @method previewAutomationSchedule
- * @direction Client → Server
- * @messageType Request
- * @version 1
- */
-export interface PreviewAutomationScheduleParams extends BaseParams {
-  /** Schedule preview is requested from the root channel. */
-  channel: 'ahp-root://';
-  /** Portable AHP cron schedule to evaluate. */
-  schedule: AutomationSchedule;
-  /** Requested maximum number of future occurrences; the host MAY cap it. */
-  count?: number;
-}
-
-/**
- * Host-canonical future schedule occurrences.
- *
- * @category Commands
- */
-export interface PreviewAutomationScheduleResult {
-  /** Ascending ISO 8601 timestamps. */
-  items: string[];
-}

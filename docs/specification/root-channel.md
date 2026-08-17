@@ -70,7 +70,6 @@ target channel instead.
 | `resolveSessionConfig` | request | Pre-creation config resolution happens before any session channel exists. |
 | `sessionConfigCompletions` | request | Completes dynamic fields in pre-creation session config. |
 | `listAutomationTriggerDefinitions` | request | Describes host-defined event triggers. |
-| `previewAutomationSchedule` | request | Computes host-canonical future schedule occurrences. |
 
 ### Notifications (`params.channel = "ahp-root://"`)
 

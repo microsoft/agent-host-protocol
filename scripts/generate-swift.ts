@@ -1557,7 +1557,7 @@ const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
-  'AutomationRunCancellationCapability', 'AutomationSchedulePreviewCapability',
+  'AutomationRunCancellationCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
@@ -1588,7 +1588,6 @@ const COMMAND_STRUCTS = [
   'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',
   'RunAutomationParams', 'RunAutomationResult',
   'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
-  'PreviewAutomationScheduleParams', 'PreviewAutomationScheduleResult',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {

@@ -79,8 +79,7 @@ type _ExpectedCommands =
   | 'invokeChangesetOperation'
   | 'listAutomationTriggerDefinitions'
   | 'runAutomation'
-  | 'fetchAutomationRuns'
-  | 'previewAutomationSchedule';
+  | 'fetchAutomationRuns';
 
 /** All methods annotated `@messageType Notification` (client → server). */
 type _ExpectedClientNotifications =

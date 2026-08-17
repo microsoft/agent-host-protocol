@@ -1532,7 +1532,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
-  { name: 'AutomationRunCancellationCapability' }, { name: 'AutomationSchedulePreviewCapability' },
+  { name: 'AutomationRunCancellationCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },
@@ -1567,7 +1567,6 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
-  { name: 'PreviewAutomationScheduleParams' }, { name: 'PreviewAutomationScheduleResult' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {

@@ -33,7 +33,6 @@ AutomationCapabilities {
     minIntervalMinutes?: number
   }
   runCancellation?: {}
-  schedulePreview?: {}
   runHistoryLimit?: number
 }
 ```
@@ -46,10 +45,9 @@ fields describe optional features and restrictions; clients use each
 automation's and run's `operations` to determine which actions are currently
 allowed.
 
-`create`, `runCancellation`, and `schedulePreview` are presence capabilities:
-an empty object means the feature is supported, and absence means it is not.
-The object shape leaves room for future feature-specific options without
-changing capability detection.
+`create` and `runCancellation` are presence capabilities: an empty object means
+the feature is supported, and absence means it is not. The object shape leaves
+room for future feature-specific options without changing capability detection.
 
 ## Resource model
 
@@ -220,9 +218,8 @@ Examples:
 The host evaluates the fields against local calendar time in `timeZone`. A
 nonexistent local minute during a daylight-saving transition produces no
 occurrence; a repeated local minute represents each matching instant. Clients
-should use `previewAutomationSchedule`, when advertised, rather than
-implementing independent time-zone evaluation. The host's preview and
-`nextRunAt` projection are canonical.
+that preview schedules apply these same portable evaluation rules. The host's
+`nextRunAt` projection is authoritative after the automation is persisted.
 
 When `AutomationCapabilities.schedules.minIntervalMinutes` is present, the
 host rejects schedules that can produce consecutive occurrences more

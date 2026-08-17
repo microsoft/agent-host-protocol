@@ -5877,10 +5877,6 @@
           "$ref": "#/$defs/AutomationRunCancellationCapability",
           "description": "Present when clients may dispatch {@link AutomationRunCancelRequestedAction}."
         },
-        "schedulePreview": {
-          "$ref": "#/$defs/AutomationSchedulePreviewCapability",
-          "description": "Present when clients may call {@link PreviewAutomationScheduleParams | previewAutomationSchedule}."
-        },
         "runHistoryLimit": {
           "type": "number",
           "description": "Maximum terminal entries retained in {@link AutomationState.runs}. Active\nruns are not counted toward the limit. Absence means the retention limit is\nimplementation-defined."
@@ -5905,11 +5901,6 @@
     "AutomationRunCancellationCapability": {
       "type": "object",
       "description": "Presence capability for {@link AutomationRunCancelRequestedAction |\n`automationRun/cancelRequested`}.\n\nThe empty object means \"supported\"; clients must additionally check for\n{@link AutomationRunOperation.Cancel} on each run.",
-      "properties": {}
-    },
-    "AutomationSchedulePreviewCapability": {
-      "type": "object",
-      "description": "Presence capability for\n{@link PreviewAutomationScheduleParams | previewAutomationSchedule}.\n\nThe empty object means \"supported\"; fields are reserved for future preview\nlimits or options.",
       "properties": {}
     },
     "PingParams": {
@@ -7361,52 +7352,6 @@
       "type": "object",
       "description": "Empty acknowledgement; the updated automation state is delivered by action.",
       "properties": {}
-    },
-    "PreviewAutomationScheduleParams": {
-      "type": "object",
-      "description": "Ask the host to evaluate a schedule without creating an automation.\n\nClients SHOULD use this command for validation and preview instead of\nimplementing their own cron evaluator, especially around time-zone\ntransitions.",
-      "properties": {
-        "channel": {
-          "type": "string",
-          "enum": [
-            "ahp-root://"
-          ],
-          "description": "Schedule preview is requested from the root channel."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
-        },
-        "schedule": {
-          "$ref": "#/$defs/AutomationSchedule",
-          "description": "Portable AHP cron schedule to evaluate."
-        },
-        "count": {
-          "type": "number",
-          "description": "Requested maximum number of future occurrences; the host MAY cap it."
-        }
-      },
-      "required": [
-        "channel",
-        "schedule"
-      ]
-    },
-    "PreviewAutomationScheduleResult": {
-      "type": "object",
-      "description": "Host-canonical future schedule occurrences.",
-      "properties": {
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Ascending ISO 8601 timestamps."
-        }
-      },
-      "required": [
-        "items"
-      ]
     },
     "URI": {
       "type": "string",

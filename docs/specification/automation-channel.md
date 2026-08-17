@@ -50,7 +50,6 @@ target entry's identifier as `automation`.
 - `fetchAutomationRuns` loads older summaries and publishes the updated full
   entry through `automation/set`.
 - `listAutomationTriggerDefinitions` returns host trigger schemas.
-- `previewAutomationSchedule` returns host-canonical future occurrences.
 
 ## Actions
 

@@ -13,7 +13,6 @@
         "minIntervalMinutes": 5
       },
       "runCancellation": {},
-      "schedulePreview": {},
       "runHistoryLimit": 50
     }
   },
@@ -27,7 +26,6 @@
         "minIntervalMinutes": 5
       },
       "runCancellation": {},
-      "schedulePreview": {},
       "runHistoryLimit": 50
     }
   }]

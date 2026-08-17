@@ -77,8 +77,6 @@ import type {
   RunAutomationResult,
   FetchAutomationRunsParams,
   FetchAutomationRunsResult,
-  PreviewAutomationScheduleParams,
-  PreviewAutomationScheduleResult,
 } from '../channels-automation/commands.js';
 
 import type { ActionEnvelope } from './actions.js';
@@ -187,7 +185,6 @@ export interface CommandMap {
   'listAutomationTriggerDefinitions': { params: ListAutomationTriggerDefinitionsParams; result: ListAutomationTriggerDefinitionsResult };
   'runAutomation': { params: RunAutomationParams; result: RunAutomationResult };
   'fetchAutomationRuns': { params: FetchAutomationRunsParams; result: FetchAutomationRunsResult };
-  'previewAutomationSchedule': { params: PreviewAutomationScheduleParams; result: PreviewAutomationScheduleResult };
 }
 
 /**

@@ -12,7 +12,6 @@ import type { ActionEnvelope, StateAction } from './actions.js';
 import type { AutomationRunCancelRequestedAction } from '../channels-automation-run/actions.js';
 import type { AutomationRunOperation, AutomationRunState } from '../channels-automation-run/state.js';
 import type { AutomationCreateRequestedAction } from '../channels-automation/actions.js';
-import type { PreviewAutomationScheduleParams } from '../channels-automation/commands.js';
 import type {
   AutomationSchedule,
   AutomationScheduleTrigger,
@@ -307,8 +306,6 @@ export interface AutomationCapabilities {
   schedules?: AutomationScheduleCapabilities;
   /** Present when clients may dispatch {@link AutomationRunCancelRequestedAction}. */
   runCancellation?: AutomationRunCancellationCapability;
-  /** Present when clients may call {@link PreviewAutomationScheduleParams | previewAutomationSchedule}. */
-  schedulePreview?: AutomationSchedulePreviewCapability;
   /**
    * Maximum terminal entries retained in {@link AutomationState.runs}. Active
    * runs are not counted toward the limit. Absence means the retention limit is
@@ -355,17 +352,6 @@ export interface AutomationScheduleCapabilities {
  * @category Commands
  */
 export interface AutomationRunCancellationCapability {}
-
-/**
- * Presence capability for
- * {@link PreviewAutomationScheduleParams | previewAutomationSchedule}.
- *
- * The empty object means "supported"; fields are reserved for future preview
- * limits or options.
- *
- * @category Commands
- */
-export interface AutomationSchedulePreviewCapability {}
 
 // ─── ping ────────────────────────────────────────────────────────────────────
 
