@@ -790,9 +790,15 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         guard let directories = state.workingDirectories,
               let idx = directories.firstIndex(of: a.directory) else { return state }
         var next = state
-        next.workingDirectories = directories.enumerated().compactMap { index, directory in
-            if index == idx { return a.replacement }
-            return directory == a.replacement ? nil : directory
+        if let replacementIdx = directories.firstIndex(of: a.replacement), replacementIdx < idx {
+            next.workingDirectories = directories.enumerated().compactMap { index, directory in
+                index == idx ? nil : directory
+            }
+        } else {
+            next.workingDirectories = directories.enumerated().compactMap { index, directory in
+                if index == idx { return a.replacement }
+                return directory == a.replacement ? nil : directory
+            }
         }
         return next
 
