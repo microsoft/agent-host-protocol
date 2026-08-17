@@ -4,7 +4,7 @@
   "initial": {
     "resource": "ahp-automation-run:/r1",
     "automation": "ahp-automation:/a1",
-    "cause": { "kind": "manual" },
+    "origin": { "kind": "manual" },
     "lifecycle": { "status": "pending", "createdAt": "2025-01-01T00:00:00Z" },
     "sessions": [],
     "artifacts": [],
@@ -28,7 +28,7 @@
   "expected": {
     "resource": "ahp-automation-run:/r1",
     "automation": "ahp-automation:/a1",
-    "cause": { "kind": "manual" },
+    "origin": { "kind": "manual" },
     "lifecycle": {
       "status": "running",
       "createdAt": "2025-01-01T00:00:00Z",

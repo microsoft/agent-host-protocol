@@ -157,7 +157,7 @@ An empty `triggers` list means manual-only. Automatic triggers are either
 portable schedules or host-defined events.
 
 Each trigger has an `id` that is unique and stable within its definition. Runs
-created automatically record that id in `AutomationTriggeredRunCause`, so
+created automatically record that id in `AutomationTriggeredRunOrigin`, so
 clients can explain why the run exists even if they do not understand the
 trigger's configuration.
 
@@ -240,7 +240,7 @@ unavailable, for example while the host's scheduler is stopped:
 | `runOnce` | Start at most one catch-up run when execution becomes available, regardless of how many occurrences were missed. |
 
 Omitting `misfirePolicy` is equivalent to `runOnce`. A catch-up run records
-`cause.catchUp: true` and the original `scheduledFor` timestamp.
+`origin.catchUp: true` and the original `scheduledFor` timestamp.
 
 ### Event triggers
 
@@ -340,13 +340,18 @@ resource is a no-op.
 ## Runs
 
 `runAutomation` starts a manual run and returns its
-`ahp-automation-run:` URI:
+`ahp-automation-run:` URI as `resource`:
 
 ```typescript
 {
   channel: 'ahp-automations://'
   automation: 'ahp-automation:/triage'
   requestId: 'client-generated-idempotency-key'
+}
+
+// result
+{
+  resource: 'ahp-automation-run:/run-123'
 }
 ```
 

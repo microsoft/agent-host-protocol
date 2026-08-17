@@ -8,7 +8,7 @@
     "state": {
       "resource": "ahp-automation-run:/r1",
       "automation": "ahp-automation:/a1",
-      "cause": { "kind": "manual" },
+      "origin": { "kind": "manual" },
       "lifecycle": {
         "status": "completed",
         "createdAt": "2026-08-05T12:00:00Z",
@@ -32,7 +32,7 @@
     "state": {
       "resource": "ahp-automation-run:/r1",
       "automation": "ahp-automation:/a1",
-      "cause": { "kind": "manual" },
+      "origin": { "kind": "manual" },
       "lifecycle": {
         "status": "completed",
         "createdAt": "2026-08-05T12:00:00Z",

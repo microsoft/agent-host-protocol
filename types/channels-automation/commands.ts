@@ -84,7 +84,7 @@ export interface RunAutomationParams extends BaseParams {
  */
 export interface RunAutomationResult {
   /** Subscribable `ahp-automation-run:` URI matching {@link AutomationRunState.resource}. */
-  run: URI;
+  resource: URI;
 }
 
 /**

@@ -8,7 +8,7 @@ import type { Message, MessageKind } from '../channels-chat/state.js';
 import type { ConfigSchema, URI } from '../common/state.js';
 import type {
   AutomationRunSummary,
-  AutomationTriggeredRunCause,
+  AutomationTriggeredRunOrigin,
 } from '../channels-automation-run/state.js';
 import type { ResolveSessionConfigResult } from '../channels-root/commands.js';
 import type { AgentInfo, ModelSelection, SessionModelInfo } from '../channels-root/state.js';
@@ -121,7 +121,7 @@ export const enum AutomationTriggerKind {
 export interface AutomationScheduleTrigger {
   /**
    * Identifier unique and stable within this automation definition. Recorded in
-   * {@link AutomationTriggeredRunCause.triggerId} when this trigger creates a
+   * {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
    * run.
    */
   id: string;
@@ -149,7 +149,7 @@ export interface AutomationScheduleTrigger {
 export interface AutomationEventTrigger {
   /**
    * Identifier unique and stable within this automation definition. Recorded in
-   * {@link AutomationTriggeredRunCause.triggerId} when this trigger creates a
+   * {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
    * run.
    */
   id: string;
@@ -169,7 +169,7 @@ export interface AutomationEventTrigger {
 }
 
 /**
- * An automatic cause that can create runs for an enabled automation.
+ * An automatic trigger that can create runs for an enabled automation.
  *
  * Manual execution is not represented as a trigger. An empty trigger list
  * therefore means the automation is manual-only.

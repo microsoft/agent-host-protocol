@@ -45,7 +45,8 @@ the host returns a fresh catalogue snapshot.
 Run and run-history commands use `channel: "ahp-automations://"` and carry the
 target entry's identifier as `automation`.
 
-- `runAutomation` idempotently creates a run by `requestId`.
+- `runAutomation` idempotently creates a run by `requestId` and returns its
+  `resource`.
 - `fetchAutomationRuns` loads older summaries and publishes the updated full
   entry through `automation/set`.
 - `listAutomationTriggerDefinitions` returns host trigger schemas.

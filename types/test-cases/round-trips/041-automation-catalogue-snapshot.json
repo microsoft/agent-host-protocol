@@ -36,7 +36,7 @@
         "runs": [{
           "resource": "ahp-automation-run:/r1",
           "automation": "ahp-automation:/a1",
-          "cause": { "kind": "trigger", "triggerId": "issue", "event": { "issue": 42 } },
+          "origin": { "kind": "trigger", "triggerId": "issue", "event": { "issue": 42 } },
           "lifecycle": { "status": "pending", "createdAt": "2026-08-05T12:00:00Z" },
           "sessionCount": 0,
           "operations": ["cancel"]
@@ -81,7 +81,7 @@
         "runs": [{
           "resource": "ahp-automation-run:/r1",
           "automation": "ahp-automation:/a1",
-          "cause": { "kind": "trigger", "triggerId": "issue", "event": { "issue": 42 } },
+          "origin": { "kind": "trigger", "triggerId": "issue", "event": { "issue": 42 } },
           "lifecycle": { "status": "pending", "createdAt": "2026-08-05T12:00:00Z" },
           "sessionCount": 0,
           "operations": ["cancel"]

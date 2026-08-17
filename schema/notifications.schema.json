@@ -5225,7 +5225,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Identifier unique and stable within this automation definition. Recorded in\n{@link AutomationTriggeredRunCause.triggerId} when this trigger creates a\nrun."
+          "description": "Identifier unique and stable within this automation definition. Recorded in\n{@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a\nrun."
         },
         "kind": {
           "const": "schedule"
@@ -5251,7 +5251,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Identifier unique and stable within this automation definition. Recorded in\n{@link AutomationTriggeredRunCause.triggerId} when this trigger creates a\nrun."
+          "description": "Identifier unique and stable within this automation definition. Recorded in\n{@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a\nrun."
         },
         "kind": {
           "const": "event"
@@ -5498,9 +5498,9 @@
         "kind"
       ]
     },
-    "AutomationManualRunCause": {
+    "AutomationManualRunOrigin": {
       "type": "object",
-      "description": "Cause recorded for a client-requested manual run.",
+      "description": "Origin recorded for a client-requested manual run.",
       "properties": {
         "kind": {
           "const": "manual"
@@ -5510,9 +5510,9 @@
         "kind"
       ]
     },
-    "AutomationTriggeredRunCause": {
+    "AutomationTriggeredRunOrigin": {
       "type": "object",
-      "description": "Cause recorded for a run created by one of the automation's triggers.",
+      "description": "Origin recorded for a run created by one of the automation's triggers.",
       "properties": {
         "kind": {
           "const": "trigger"
@@ -5746,9 +5746,9 @@
           "$ref": "#/$defs/URI",
           "description": "Owning `ahp-automation:` URI matching {@link AutomationRunState.automation}."
         },
-        "cause": {
-          "$ref": "#/$defs/AutomationRunCause",
-          "description": "Immutable reason this run was created, matching {@link AutomationRunState.cause}."
+        "origin": {
+          "$ref": "#/$defs/AutomationRunOrigin",
+          "description": "Immutable provenance matching {@link AutomationRunState.origin}."
         },
         "lifecycle": {
           "$ref": "#/$defs/AutomationRunLifecycle",
@@ -5782,7 +5782,7 @@
       "required": [
         "resource",
         "automation",
-        "cause",
+        "origin",
         "lifecycle",
         "sessionCount",
         "operations"
@@ -5800,9 +5800,9 @@
           "$ref": "#/$defs/URI",
           "description": "Owning `ahp-automation:` URI matching {@link AutomationState.resource}."
         },
-        "cause": {
-          "$ref": "#/$defs/AutomationRunCause",
-          "description": "Immutable reason this run was created."
+        "origin": {
+          "$ref": "#/$defs/AutomationRunOrigin",
+          "description": "Immutable provenance describing how this run was created."
         },
         "lifecycle": {
           "$ref": "#/$defs/AutomationRunLifecycle",
@@ -5842,7 +5842,7 @@
       "required": [
         "resource",
         "automation",
-        "cause",
+        "origin",
         "lifecycle",
         "sessions",
         "artifacts",
@@ -6513,7 +6513,7 @@
           "$ref": "#/$defs/AutomationEventTrigger"
         }
       ],
-      "description": "An automatic cause that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
+      "description": "An automatic trigger that can create runs for an enabled automation.\n\nManual execution is not represented as a trigger. An empty trigger list\ntherefore means the automation is manual-only."
     },
     "AutomationOperation": {
       "enum": [
@@ -6534,13 +6534,13 @@
       "type": "string",
       "description": "Coarse reason a run is blocked.\n\nDetailed prompts, confirmations, authentication requests, and tool state\nremain authoritative on linked session and chat channels."
     },
-    "AutomationRunCause": {
+    "AutomationRunOrigin": {
       "oneOf": [
         {
-          "$ref": "#/$defs/AutomationManualRunCause"
+          "$ref": "#/$defs/AutomationManualRunOrigin"
         },
         {
-          "$ref": "#/$defs/AutomationTriggeredRunCause"
+          "$ref": "#/$defs/AutomationTriggeredRunOrigin"
         }
       ],
       "description": "Immutable provenance describing why a run was created."

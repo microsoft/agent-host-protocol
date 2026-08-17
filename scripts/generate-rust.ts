@@ -663,7 +663,7 @@ const STATE_ENUMS = [
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
-  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
+  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunOriginKind',
   'AutomationRunOperation',
 ];
 
@@ -829,8 +829,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationState' },
   { name: 'AutomationCatalogState' },
   { name: 'AutomationRunBlocker' },
-  { name: 'AutomationManualRunCause', omitDiscriminants: true },
-  { name: 'AutomationTriggeredRunCause', omitDiscriminants: true },
+  { name: 'AutomationManualRunOrigin', omitDiscriminants: true },
+  { name: 'AutomationTriggeredRunOrigin', omitDiscriminants: true },
   { name: 'AutomationPendingRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationRunningRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationBlockedRunLifecycle', omitDiscriminants: true },
@@ -1089,13 +1089,13 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   ],
 };
 
-const AUTOMATION_RUN_CAUSE_UNION: UnionConfig = {
-  name: 'AutomationRunCause',
+const AUTOMATION_RUN_ORIGIN_UNION: UnionConfig = {
+  name: 'AutomationRunOrigin',
   discriminantField: 'kind',
-  doc: 'Cause of an automation run.',
+  doc: 'Provenance describing how an automation run was created.',
   variants: [
-    { variantName: 'Manual', innerType: 'AutomationManualRunCause', wireValue: 'manual' },
-    { variantName: 'Trigger', innerType: 'AutomationTriggeredRunCause', wireValue: 'trigger' },
+    { variantName: 'Manual', innerType: 'AutomationManualRunOrigin', wireValue: 'manual' },
+    { variantName: 'Trigger', innerType: 'AutomationTriggeredRunOrigin', wireValue: 'trigger' },
   ],
 };
 
@@ -1272,7 +1272,7 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_TRIGGER_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_CAUSE_UNION));
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
@@ -2045,7 +2045,7 @@ function checkExhaustiveness(project: Project): void {
     'ReconnectResult',
     'SessionOrigin',
     'AutomationTrigger',
-    'AutomationRunCause',
+    'AutomationRunOrigin',
     'AutomationRunLifecycle',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',

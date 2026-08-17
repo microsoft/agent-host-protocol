@@ -73,7 +73,7 @@ export interface AutomationRunBlocker {
  *
  * @category Automation Run State
  */
-export const enum AutomationRunCauseKind {
+export const enum AutomationRunOriginKind {
   /** A client explicitly invoked {@link RunAutomationParams | runAutomation}. */
   Manual = 'manual',
   /** An automatic schedule or event trigger fired. */
@@ -81,21 +81,21 @@ export const enum AutomationRunCauseKind {
 }
 
 /**
- * Cause recorded for a client-requested manual run.
+ * Origin recorded for a client-requested manual run.
  *
  * @category Automation Run State
  */
-export interface AutomationManualRunCause {
-  kind: AutomationRunCauseKind.Manual;
+export interface AutomationManualRunOrigin {
+  kind: AutomationRunOriginKind.Manual;
 }
 
 /**
- * Cause recorded for a run created by one of the automation's triggers.
+ * Origin recorded for a run created by one of the automation's triggers.
  *
  * @category Automation Run State
  */
-export interface AutomationTriggeredRunCause {
-  kind: AutomationRunCauseKind.Trigger;
+export interface AutomationTriggeredRunOrigin {
+  kind: AutomationRunOriginKind.Trigger;
   /**
    * Matches the stable {@link AutomationScheduleTrigger.id} or
    * {@link AutomationEventTrigger.id} in the definition.
@@ -123,9 +123,9 @@ export interface AutomationTriggeredRunCause {
  *
  * @category Automation Run State
  */
-export type AutomationRunCause =
-  | AutomationManualRunCause
-  | AutomationTriggeredRunCause;
+export type AutomationRunOrigin =
+  | AutomationManualRunOrigin
+  | AutomationTriggeredRunOrigin;
 
 /**
  * A durable run exists but has not begun external execution.
@@ -275,8 +275,8 @@ export interface AutomationRunSummary {
   resource: URI;
   /** Owning `ahp-automation:` URI matching {@link AutomationRunState.automation}. */
   automation: URI;
-  /** Immutable reason this run was created, matching {@link AutomationRunState.cause}. */
-  cause: AutomationRunCause;
+  /** Immutable provenance matching {@link AutomationRunState.origin}. */
+  origin: AutomationRunOrigin;
   /** Current or terminal lifecycle snapshot matching {@link AutomationRunState.lifecycle}. */
   lifecycle: AutomationRunLifecycle;
   /** Session matching {@link AutomationRunState.primarySession}, when selected. */
@@ -306,8 +306,8 @@ export interface AutomationRunState {
   resource: URI;
   /** Owning `ahp-automation:` URI matching {@link AutomationState.resource}. */
   automation: URI;
-  /** Immutable reason this run was created. */
-  cause: AutomationRunCause;
+  /** Immutable provenance describing how this run was created. */
+  origin: AutomationRunOrigin;
   /** Current or terminal lifecycle. */
   lifecycle: AutomationRunLifecycle;
   /**

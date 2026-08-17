@@ -820,7 +820,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // key); TerminalState has required \`content\`; RootState is the
         // catch-all.
         return when {
-            obj.containsKey("automation") && obj.containsKey("cause") && obj.containsKey("sessions") ->
+            obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("automations") ->
                 SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationCatalogState.serializer(), element))
@@ -932,7 +932,7 @@ const STATE_ENUMS = [
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
-  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
+  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunOriginKind',
   'AutomationRunOperation',
 ];
 
@@ -995,7 +995,7 @@ const STATE_STRUCTS = [
   'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
   'AutomationState', 'AutomationCatalogState',
-  'AutomationRunBlocker', 'AutomationManualRunCause', 'AutomationTriggeredRunCause',
+  'AutomationRunBlocker', 'AutomationManualRunOrigin', 'AutomationTriggeredRunOrigin',
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
   'AutomationBlockedRunLifecycle', 'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
@@ -1282,12 +1282,12 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   injectDiscriminantOnSerialize: true,
 };
 
-const AUTOMATION_RUN_CAUSE_UNION: UnionConfig = {
-  name: 'AutomationRunCause',
+const AUTOMATION_RUN_ORIGIN_UNION: UnionConfig = {
+  name: 'AutomationRunOrigin',
   discriminantField: 'kind',
   variants: [
-    { caseName: 'Manual', structName: 'AutomationManualRunCause', discriminantValue: 'manual' },
-    { caseName: 'Trigger', structName: 'AutomationTriggeredRunCause', discriminantValue: 'trigger' },
+    { caseName: 'Manual', structName: 'AutomationManualRunOrigin', discriminantValue: 'manual' },
+    { caseName: 'Trigger', structName: 'AutomationTriggeredRunOrigin', discriminantValue: 'trigger' },
   ],
   injectDiscriminantOnSerialize: true,
 };
@@ -1391,7 +1391,7 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_TRIGGER_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_CAUSE_UNION));
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
@@ -2306,7 +2306,7 @@ function checkExhaustiveness(project: Project): void {
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
     'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
-    'AutomationRunCause',           // AUTOMATION_RUN_CAUSE_UNION discriminated union
+    'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union
     'ForkChatSource',               // generateFixedChatSourceBranchKotlin()
     'SideChatSource',               // generateFixedChatSourceBranchKotlin()

@@ -716,7 +716,7 @@ const STATE_ENUMS = [
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
-  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunCauseKind',
+  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunOriginKind',
   'AutomationRunOperation',
 ];
 
@@ -861,8 +861,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationState' },
   { name: 'AutomationCatalogState' },
   { name: 'AutomationRunBlocker' },
-  { name: 'AutomationManualRunCause' },
-  { name: 'AutomationTriggeredRunCause' },
+  { name: 'AutomationManualRunOrigin' },
+  { name: 'AutomationTriggeredRunOrigin' },
   { name: 'AutomationPendingRunLifecycle' },
   { name: 'AutomationRunningRunLifecycle' },
   { name: 'AutomationBlockedRunLifecycle' },
@@ -1118,13 +1118,13 @@ const AUTOMATION_TRIGGER_UNION: UnionConfig = {
   injectDiscriminantOnMarshal: true,
 };
 
-const AUTOMATION_RUN_CAUSE_UNION: UnionConfig = {
-  name: 'AutomationRunCause',
+const AUTOMATION_RUN_ORIGIN_UNION: UnionConfig = {
+  name: 'AutomationRunOrigin',
   discriminantField: 'kind',
-  doc: 'AutomationRunCause is the cause of an automation run.',
+  doc: 'AutomationRunOrigin describes how an automation run was created.',
   variants: [
-    { variantName: 'Manual', innerType: 'AutomationManualRunCause', wireValue: 'manual' },
-    { variantName: 'Trigger', innerType: 'AutomationTriggeredRunCause', wireValue: 'trigger' },
+    { variantName: 'Manual', innerType: 'AutomationManualRunOrigin', wireValue: 'manual' },
+    { variantName: 'Trigger', innerType: 'AutomationTriggeredRunOrigin', wireValue: 'trigger' },
   ],
   injectDiscriminantOnMarshal: true,
 };
@@ -1297,7 +1297,7 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\treturn err
 \t}
 \tswitch {
-\tcase containsAll(probe, "automation", "cause", "sessions"):
+\tcase containsAll(probe, "automation", "origin", "sessions"):
 \t\tvar v AutomationRunState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
@@ -1472,7 +1472,7 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_TRIGGER_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_CAUSE_UNION));
+  lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
@@ -2298,7 +2298,7 @@ function checkExhaustiveness(project: Project): void {
     'ReconnectResult',
     'SessionOrigin',
     'AutomationTrigger',
-    'AutomationRunCause',
+    'AutomationRunOrigin',
     'AutomationRunLifecycle',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',

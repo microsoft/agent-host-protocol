@@ -12,9 +12,9 @@ ahp-automation-run:/<id>
 
 ## State
 
-`AutomationRunState` contains immutable automation/trigger provenance,
-discriminated lifecycle, an ordered session catalogue, optional primary
-session, artifacts, and allowed operations.
+`AutomationRunState` contains an immutable `origin` describing manual or
+trigger provenance, a discriminated lifecycle, an ordered session catalogue,
+an optional primary session, artifacts, and allowed operations.
 
 Linked `ahp-session:` and `ahp-chat:` channels remain authoritative for
 conversation, tool-call, input-request, changeset, and per-session state.
@@ -50,4 +50,3 @@ durable result arrives through `lifecycleChanged`.
 The host persists a run before external side effects and records each session
 URI before sending its first message. Retrying `runAutomation` with the same
 request ID returns the existing run URI.
-
