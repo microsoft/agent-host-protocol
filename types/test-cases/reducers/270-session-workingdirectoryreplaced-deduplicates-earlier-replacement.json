@@ -1,5 +1,5 @@
 {
-  "description": "session-workingDirectoryReplaced keeps the replacement at the target position when deduplicating an earlier entry",
+  "description": "session-workingDirectoryReplaced retains an earlier replacement when deduplicating",
   "reducer": "session",
   "initial": {
     "provider": "copilot",
@@ -29,8 +29,8 @@
     "activeClients": [],
     "chats": [],
     "workingDirectories": [
-      "file:///repo-b",
-      "file:///repo-a"
+      "file:///repo-a",
+      "file:///repo-b"
     ]
   }
 }

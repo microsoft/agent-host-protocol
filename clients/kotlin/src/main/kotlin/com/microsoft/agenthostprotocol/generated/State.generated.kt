@@ -1007,14 +1007,19 @@ data class MultipleWorkingDirectoriesCapability(
     /**
      * The agent's **first** working directory (index `0` of
      * {@link CreateSessionParams.workingDirectories}) is an immutable primary:
-     * it is fixed for the lifetime of the session — clients MUST NOT remove or
-     * reorder it. Additional directories after it remain equal peers that can be
-     * added and removed freely.
+     * its URI is fixed for the lifetime of the session — clients MUST NOT remove,
+     * reorder, or replace it. Additional directories after it remain equal peers
+     * that can be added and removed freely. When
+     * {@link primaryReplacement} is also `true`, clients that recognize that
+     * capability MUST instead treat the primary as protected and replaceable.
      *
      * Advertised by backends whose agent process is rooted at a single directory
-     * that cannot change once the session has started. When absent or `false`,
-     * all directories are equal peers unless {@link primaryReplacement} is
-     * `true`.
+     * that cannot change once the session has started. A backend MAY also
+     * advertise this with {@link primaryReplacement} for compatibility with
+     * clients that do not recognize the newer capability: those clients retain
+     * the safe immutable-primary behavior, while newer clients allow only the
+     * targeted replacement action. When both are absent or `false`, all
+     * directories are equal peers.
      */
     val immutablePrimary: Boolean? = null,
     /**
@@ -1024,9 +1029,10 @@ data class MultipleWorkingDirectoriesCapability(
      * generic membership actions; additional directories remain equal peers.
      *
      * Backends use this when their cwd-bearing directory can move during a
-     * session. A backend MUST NOT set this to `true` together with
-     * `immutablePrimary: true`: an immutable primary fixes the value, while a
-     * replaceable primary permits changing it.
+     * session. It MAY be `true` together with {@link immutablePrimary}; this
+     * preserves the immutable-primary guarantee for older clients that do not
+     * recognize this capability. Clients that recognize this capability MUST
+     * allow a targeted replacement even when `immutablePrimary` is also `true`.
      */
     val primaryReplacement: Boolean? = null
 )
@@ -1362,13 +1368,13 @@ data class SessionState(
      * The working directories the session's agent has tool access to, as
      * maintained by working-directory actions. Directories are equal peers except
      * when the agent advertises
-     * {@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first
-     * entry is then a fixed process root) or
+     * {@link MultipleWorkingDirectoriesCapability.immutablePrimary} without
      * {@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first
-     * entry is a protected, replaceable primary slot). Individual chats MAY
-     * restrict to a subset via {@link ChatSummary.workingDirectories | their own
-     * `workingDirectories`}; a chat that sets none operates against this full
-     * set.
+     * entry is then a fixed process root), or advertises `primaryReplacement`
+     * (the first entry is a protected, replaceable primary slot). Individual chats
+     * MAY restrict to a subset via
+     * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
+     * chat that sets none operates against this full set.
      */
     val workingDirectories: List<String>? = null,
     /**
@@ -1640,13 +1646,13 @@ data class SessionSummary(
      * The working directories the session's agent has tool access to, as
      * maintained by working-directory actions. Directories are equal peers except
      * when the agent advertises
-     * {@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first
-     * entry is then a fixed process root) or
+     * {@link MultipleWorkingDirectoriesCapability.immutablePrimary} without
      * {@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first
-     * entry is a protected, replaceable primary slot). Individual chats MAY
-     * restrict to a subset via {@link ChatSummary.workingDirectories | their own
-     * `workingDirectories`}; a chat that sets none operates against this full
-     * set.
+     * entry is then a fixed process root), or advertises `primaryReplacement`
+     * (the first entry is a protected, replaceable primary slot). Individual chats
+     * MAY restrict to a subset via
+     * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
+     * chat that sets none operates against this full set.
      */
     val workingDirectories: List<String>? = null,
     /**

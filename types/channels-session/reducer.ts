@@ -296,6 +296,13 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
       if (idx < 0) {
         return state;
       }
+      const replacementIdx = list.indexOf(action.replacement);
+      if (replacementIdx >= 0 && replacementIdx < idx) {
+        return {
+          ...state,
+          workingDirectories: list.filter((_, index) => index !== idx),
+        };
+      }
       return {
         ...state,
         workingDirectories: list

@@ -604,15 +604,18 @@ A client MUST NOT pass more than one entry unless the agent advertises
 `multipleWorkingDirectories`. Servers without that capability treat only the
 first entry as the session's working directory and ignore the rest.
 
-When the agent advertises `multipleWorkingDirectories.immutablePrimary`, the
-first entry (`workingDirectories[0]`) is a fixed process root for the lifetime of
-the session — clients MUST NOT remove or reorder it.
+When the agent advertises `multipleWorkingDirectories.immutablePrimary` without
+`primaryReplacement`, the first entry (`workingDirectories[0]`) is a fixed
+process root for the lifetime of the session — clients MUST NOT remove, reorder,
+or replace it.
 
 When the agent advertises `multipleWorkingDirectories.primaryReplacement`, the
 first entry is a protected, replaceable primary slot. Clients MUST NOT remove it
 with a generic membership action; they instead use
-`session/workingDirectoryReplaced`. A backend MUST NOT advertise both
-`immutablePrimary: true` and `primaryReplacement: true`.
+`session/workingDirectoryReplaced`. A backend MAY also advertise
+`immutablePrimary: true` for compatibility with older clients: clients that do
+not recognize `primaryReplacement` retain the safe immutable-primary behavior,
+while clients that do recognize it allow only the targeted replacement action.
 
 Forked sessions ignore `workingDirectories` — they inherit the working
 directories of the source session.
@@ -626,7 +629,7 @@ mutate it by **dispatching actions**, not by calling commands:
 | --- | --- |
 | `session/workingDirectorySet` | Adds `directory` to the set (creating it if absent). A no-op when the directory is already present. |
 | `session/workingDirectoryRemoved` | Removes `directory` from the set. A no-op when it is not present. There is no atomic backend "remove one" primitive — the host reconfigures its agent to the reduced set. A host MAY decline to apply the removal (e.g. the immutable primary at index 0), leaving the set unchanged. |
-| `session/workingDirectoryReplaced` | Targeted compare-and-swap replacement of any entry: replaces `directory` in place with `replacement` and removes any other occurrence of `replacement`, preserving the relative order of all other directories. A no-op when `directory` is absent. Replacing index `0` additionally requires `primaryReplacement`. |
+| `session/workingDirectoryReplaced` | Targeted compare-and-swap replacement of any entry that deduplicates `replacement`, preserving every other directory's relative order. An existing replacement after the target moves to the target's position (`[A, B, C]`, `B -> C` becomes `[A, C]`); an earlier replacement stays in place and the target is removed (`[A, B, C]`, `C -> A` becomes `[A, B]`). A no-op when `directory` is absent. Replacing index `0` additionally requires `primaryReplacement`. |
 
 All three are `@clientDispatchable`. The resulting set is observed on
 `SessionState.workingDirectories` like any other state — there is no separate
@@ -643,8 +646,11 @@ result payload.
 > **How replacement is enforced.** The host applies the backend side effect
 > before broadcasting `session/workingDirectoryReplaced`; otherwise it rejects
 > the action. When the target is index `0`, the host also validates the
-> `primaryReplacement` capability. The compare-and-swap payload prevents a stale
-> client from replacing a directory URI it no longer observes.
+> `primaryReplacement` capability, including when `immutablePrimary` is also
+> `true`. The compare-and-swap payload prevents a stale client from replacing a
+> directory URI it no longer observes. Deduplication retains an existing earlier
+> replacement, so an action targeting a later entry cannot move the primary at
+> index `0`.
 
 Before dispatching any directory action, a client MUST verify that the agent advertises
 `multipleWorkingDirectories`.

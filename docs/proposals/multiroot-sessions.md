@@ -389,12 +389,14 @@ interface ChatWorkingDirectoryRemovedAction {
   idempotent and safe to retry. A host MAY decline (e.g. an immutable primary).
 
 - **Replaceable primary.** *Resolved:* a backend that must move its cwd-bearing
-  first directory advertises `primaryReplacement`; it MUST NOT also set
-  `immutablePrimary: true`. `session/workingDirectoryReplaced` is a session-only,
-  client-dispatchable compare-and-swap action for any directory. The host
-  validates `primaryReplacement` when the target is index `0` and applies the
-  backend side effect before broadcasting it; reducers replace only when the
-  expected URI is present and remove any other occurrence of the replacement
+  first directory advertises `primaryReplacement`. It MAY also advertise
+  `immutablePrimary: true` so clients that do not recognize `primaryReplacement`
+  retain the safe immutable-primary behavior; clients that recognize
+  `primaryReplacement` allow a targeted replacement. `session/workingDirectoryReplaced`
+  is a session-only, client-dispatchable compare-and-swap action for any
+  directory. The host validates `primaryReplacement` when the target is index
+  `0` and applies the backend side effect before broadcasting it; reducers
+  replace only when the expected URI is present and deduplicate the replacement
   URI.
 
 ---

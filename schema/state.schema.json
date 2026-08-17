@@ -551,11 +551,11 @@
       "properties": {
         "immutablePrimary": {
           "type": "boolean",
-          "description": "The agent's **first** working directory (index `0` of\n{@link CreateSessionParams.workingDirectories}) is an immutable primary:\nit is fixed for the lifetime of the session — clients MUST NOT remove or\nreorder it. Additional directories after it remain equal peers that can be\nadded and removed freely.\n\nAdvertised by backends whose agent process is rooted at a single directory\nthat cannot change once the session has started. When absent or `false`,\nall directories are equal peers unless {@link primaryReplacement} is\n`true`."
+          "description": "The agent's **first** working directory (index `0` of\n{@link CreateSessionParams.workingDirectories}) is an immutable primary:\nits URI is fixed for the lifetime of the session — clients MUST NOT remove,\nreorder, or replace it. Additional directories after it remain equal peers\nthat can be added and removed freely. When\n{@link primaryReplacement} is also `true`, clients that recognize that\ncapability MUST instead treat the primary as protected and replaceable.\n\nAdvertised by backends whose agent process is rooted at a single directory\nthat cannot change once the session has started. A backend MAY also\nadvertise this with {@link primaryReplacement} for compatibility with\nclients that do not recognize the newer capability: those clients retain\nthe safe immutable-primary behavior, while newer clients allow only the\ntargeted replacement action. When both are absent or `false`, all\ndirectories are equal peers."
         },
         "primaryReplacement": {
           "type": "boolean",
-          "description": "The agent's first working-directory slot (index `0`) is a protected primary\nwhose URI can be atomically replaced with\n`session/workingDirectoryReplaced`. Clients MUST NOT remove that slot with\ngeneric membership actions; additional directories remain equal peers.\n\nBackends use this when their cwd-bearing directory can move during a\nsession. A backend MUST NOT set this to `true` together with\n`immutablePrimary: true`: an immutable primary fixes the value, while a\nreplaceable primary permits changing it."
+          "description": "The agent's first working-directory slot (index `0`) is a protected primary\nwhose URI can be atomically replaced with\n`session/workingDirectoryReplaced`. Clients MUST NOT remove that slot with\ngeneric membership actions; additional directories remain equal peers.\n\nBackends use this when their cwd-bearing directory can move during a\nsession. It MAY be `true` together with {@link immutablePrimary}; this\npreserves the immutable-primary guarantee for older clients that do not\nrecognize this capability. Clients that recognize this capability MUST\nallow a targeted replacement even when `immutablePrimary` is also `true`."
         }
       }
     },
@@ -678,7 +678,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first\nentry is then a fixed process root) or\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is a protected, replaceable primary slot). Individual chats MAY\nrestrict to a subset via {@link ChatSummary.workingDirectories | their own\n`workingDirectories`}; a chat that sets none operates against this full\nset."
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -720,7 +720,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first\nentry is then a fixed process root) or\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is a protected, replaceable primary slot). Individual chats MAY\nrestrict to a subset via {@link ChatSummary.workingDirectories | their own\n`workingDirectories`}; a chat that sets none operates against this full\nset."
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -1024,7 +1024,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first\nentry is then a fixed process root) or\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is a protected, replaceable primary slot). Individual chats MAY\nrestrict to a subset via {@link ChatSummary.workingDirectories | their own\n`workingDirectories`}; a chat that sets none operates against this full\nset."
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",

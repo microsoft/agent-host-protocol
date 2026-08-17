@@ -834,6 +834,13 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             let Some(idx) = list.iter().position(|directory| directory == &a.directory) else {
                 return ReduceOutcome::NoOp;
             };
+            if list[..idx]
+                .iter()
+                .any(|directory| directory == &a.replacement)
+            {
+                list.remove(idx);
+                return ReduceOutcome::Applied;
+            }
             let mut updated = Vec::with_capacity(list.len());
             for (i, directory) in list.iter().enumerate() {
                 if i == idx {

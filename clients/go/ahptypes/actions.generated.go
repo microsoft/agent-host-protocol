@@ -921,10 +921,12 @@ type SessionWorkingDirectoryRemovedAction struct {
 //
 // This is a targeted compare-and-swap: the reducer is a no-op when
 // {@link SessionState.workingDirectories} does not contain `directory`.
-// Otherwise it replaces that entry in place with `replacement` and removes
-// any other occurrence of `replacement`, preserving every other directory's
-// relative order. For example, `[A, B, C]` with `B → D` becomes `[A, D, C]`,
-// while `[A, B, C]` with `B → C` becomes `[A, C]`.
+// Otherwise it replaces that entry with `replacement` and deduplicates the
+// result, preserving every other directory's relative order. When
+// `replacement` occurs after the target, it moves to the target's position;
+// for example, `[A, B, C]` with `B → C` becomes `[A, C]`. When it occurs
+// before the target, it retains its earlier position and the target is removed;
+// `[A, B, C]` with `C → A` becomes `[A, B]`.
 //
 // Only valid when the agent advertises
 // {@link AgentCapabilities.multipleWorkingDirectories}. Replacing index `0`

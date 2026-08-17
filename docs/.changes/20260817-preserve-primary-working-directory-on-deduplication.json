@@ -1,0 +1,4 @@
+{
+  "type": "fixed",
+  "message": "`session/workingDirectoryReplaced` retains an earlier duplicate replacement so a later replacement cannot move a protected primary, and `primaryReplacement` may accompany `immutablePrimary` for safe legacy-client compatibility."
+}

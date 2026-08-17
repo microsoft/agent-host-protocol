@@ -87,13 +87,13 @@ export interface SessionMetadata {
    * The working directories the session's agent has tool access to, as
    * maintained by working-directory actions. Directories are equal peers except
    * when the agent advertises
-   * {@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first
-   * entry is then a fixed process root) or
+   * {@link MultipleWorkingDirectoriesCapability.immutablePrimary} without
    * {@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first
-   * entry is a protected, replaceable primary slot). Individual chats MAY
-   * restrict to a subset via {@link ChatSummary.workingDirectories | their own
-   * `workingDirectories`}; a chat that sets none operates against this full
-   * set.
+   * entry is then a fixed process root), or advertises `primaryReplacement`
+   * (the first entry is a protected, replaceable primary slot). Individual chats
+   * MAY restrict to a subset via
+   * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
+   * chat that sets none operates against this full set.
    */
   workingDirectories?: URI[];
   /**
