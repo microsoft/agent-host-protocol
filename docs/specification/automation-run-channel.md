@@ -21,16 +21,20 @@ conversation, tool-call, input-request, changeset, and per-session state.
 
 ## Lifecycle
 
-```text
-pending -> running -> completed
-                   -> blocked -> running
-                   -> failed
-                   -> cancelled
+```mermaid
+stateDiagram-v2
+  [*] --> pending
+  pending --> running
+  pending --> failed
+  pending --> cancelled
+  running --> completed
+  running --> failed
+  running --> cancelled
 ```
 
-`blocked` summarizes a user input, confirmation, authentication, or
-client-execution dependency. Detailed response routing remains in linked
-session state.
+The run remains `running` while linked sessions await interaction. Their
+`SessionSummary.status` and `SessionState.inputNeeded` fields remain
+authoritative for attention state and response routing.
 
 ## Actions
 

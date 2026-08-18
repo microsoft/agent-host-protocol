@@ -5494,19 +5494,6 @@
         "automations"
       ]
     },
-    "AutomationRunBlocker": {
-      "type": "object",
-      "description": "Summary of why a run cannot currently make progress.",
-      "properties": {
-        "kind": {
-          "$ref": "#/$defs/AutomationRunBlockerKind",
-          "description": "Category of the outstanding dependency."
-        }
-      },
-      "required": [
-        "kind"
-      ]
-    },
     "AutomationManualRunOrigin": {
       "type": "object",
       "description": "Origin recorded for a client-requested manual run.",
@@ -5568,7 +5555,7 @@
     },
     "AutomationRunningRunLifecycle": {
       "type": "object",
-      "description": "The run is actively executing linked sessions.",
+      "description": "The run is executing linked sessions or awaiting interaction on them.\n\nLinked {@link SessionState.status} and {@link SessionState.inputNeeded}\nremain authoritative for whether user attention or client-side work is\nrequired.",
       "properties": {
         "status": {
           "const": "running"
@@ -5586,33 +5573,6 @@
         "status",
         "createdAt",
         "startedAt"
-      ]
-    },
-    "AutomationBlockedRunLifecycle": {
-      "type": "object",
-      "description": "The run started but is temporarily unable to progress.",
-      "properties": {
-        "status": {
-          "const": "blocked"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Run creation timestamp in ISO 8601 format."
-        },
-        "startedAt": {
-          "type": "string",
-          "description": "First execution start timestamp in ISO 8601 format."
-        },
-        "blocker": {
-          "$ref": "#/$defs/AutomationRunBlocker",
-          "description": "Coarse blocker summary; linked sessions contain interaction details."
-        }
-      },
-      "required": [
-        "status",
-        "createdAt",
-        "startedAt",
-        "blocker"
       ]
     },
     "AutomationCompletedRunLifecycle": {
@@ -5755,7 +5715,7 @@
     },
     "AutomationRunState": {
       "type": "object",
-      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, linked-session\nmembership, and cancellation availability. Linked session and chat channels\nremain authoritative for transcripts, tools, confirmations, changesets, and\nper-session lifecycle.",
+      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, linked-session\nmembership, and cancellation availability. Linked session and chat channels\nremain authoritative for transcripts, tools, interaction requirements,\nchangesets, and per-session lifecycle.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -6481,16 +6441,6 @@
       "type": "string",
       "description": "Operations the host currently permits for an automation.\n\nThe list on {@link AutomationState.operations} is authoritative and may\nchange over time. Clients MUST NOT infer permission from capabilities alone:\ncapabilities describe what the host implementation can support, while\noperations describe what is allowed for this particular automation now."
     },
-    "AutomationRunBlockerKind": {
-      "enum": [
-        "userInput",
-        "toolConfirmation",
-        "authentication",
-        "clientExecution"
-      ],
-      "type": "string",
-      "description": "Coarse reason a run is blocked.\n\nDetailed prompts, confirmations, authentication requests, and tool state\nremain authoritative on linked session and chat channels."
-    },
     "AutomationRunOrigin": {
       "oneOf": [
         {
@@ -6509,9 +6459,6 @@
         },
         {
           "$ref": "#/$defs/AutomationRunningRunLifecycle"
-        },
-        {
-          "$ref": "#/$defs/AutomationBlockedRunLifecycle"
         },
         {
           "$ref": "#/$defs/AutomationCompletedRunLifecycle"

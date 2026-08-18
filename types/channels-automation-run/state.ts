@@ -18,54 +18,23 @@ import type { AutomationRunCancelRequestedAction } from './actions.js';
 /**
  * Lifecycle status of one automation run.
  *
- * `completed`, `failed`, and `cancelled` are terminal. `blocked` is
- * non-terminal: the host may return the run to `running` after the linked
- * session resolves the blocker.
+ * `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
+ * while any linked session awaits input or client-side work; linked session
+ * state is authoritative for those interactions.
  *
  * @category Automation Run State
  */
 export const enum AutomationRunStatus {
   /** The durable run record exists but execution has not started. */
   Pending = 'pending',
-  /** One or more linked sessions are actively executing. */
+  /** One or more linked sessions are executing or awaiting interaction. */
   Running = 'running',
-  /** Execution is paused on an interaction or client-side dependency. */
-  Blocked = 'blocked',
   /** Execution finished successfully. */
   Completed = 'completed',
   /** Execution ended with an error. */
   Failed = 'failed',
   /** Execution ended because cancellation was accepted. */
   Cancelled = 'cancelled',
-}
-
-/**
- * Coarse reason a run is blocked.
- *
- * Detailed prompts, confirmations, authentication requests, and tool state
- * remain authoritative on linked session and chat channels.
- *
- * @category Automation Run State
- */
-export const enum AutomationRunBlockerKind {
-  /** A linked session is waiting for an answer to a user-input request. */
-  UserInput = 'userInput',
-  /** A linked session is waiting for tool confirmation. */
-  ToolConfirmation = 'toolConfirmation',
-  /** Execution requires authentication or renewed credentials. */
-  Authentication = 'authentication',
-  /** Work must be performed by or delegated to a connected client. */
-  ClientExecution = 'clientExecution',
-}
-
-/**
- * Summary of why a run cannot currently make progress.
- *
- * @category Automation Run State
- */
-export interface AutomationRunBlocker {
-  /** Category of the outstanding dependency. */
-  kind: AutomationRunBlockerKind;
 }
 
 /**
@@ -139,7 +108,11 @@ export interface AutomationPendingRunLifecycle {
 }
 
 /**
- * The run is actively executing linked sessions.
+ * The run is executing linked sessions or awaiting interaction on them.
+ *
+ * Linked {@link SessionState.status} and {@link SessionState.inputNeeded}
+ * remain authoritative for whether user attention or client-side work is
+ * required.
  *
  * @category Automation Run State
  */
@@ -149,21 +122,6 @@ export interface AutomationRunningRunLifecycle {
   createdAt: string;
   /** First execution start timestamp in ISO 8601 format. */
   startedAt: string;
-}
-
-/**
- * The run started but is temporarily unable to progress.
- *
- * @category Automation Run State
- */
-export interface AutomationBlockedRunLifecycle {
-  status: AutomationRunStatus.Blocked;
-  /** Run creation timestamp in ISO 8601 format. */
-  createdAt: string;
-  /** First execution start timestamp in ISO 8601 format. */
-  startedAt: string;
-  /** Coarse blocker summary; linked sessions contain interaction details. */
-  blocker: AutomationRunBlocker;
 }
 
 /**
@@ -229,7 +187,6 @@ export interface AutomationCancelledRunLifecycle {
 export type AutomationRunLifecycle =
   | AutomationPendingRunLifecycle
   | AutomationRunningRunLifecycle
-  | AutomationBlockedRunLifecycle
   | AutomationCompletedRunLifecycle
   | AutomationFailedRunLifecycle
   | AutomationCancelledRunLifecycle;
@@ -276,8 +233,8 @@ export interface AutomationRunSummary {
  *
  * The run channel owns task-level lifecycle, provenance, linked-session
  * membership, and cancellation availability. Linked session and chat channels
- * remain authoritative for transcripts, tools, confirmations, changesets, and
- * per-session lifecycle.
+ * remain authoritative for transcripts, tools, interaction requirements,
+ * changesets, and per-session lifecycle.
  *
  * @category Automation Run State
  */

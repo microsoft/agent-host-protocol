@@ -623,7 +623,7 @@ const STATE_ENUMS = [
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
-  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunOriginKind',
+  'AutomationRunStatus', 'AutomationRunOriginKind',
   'AutomationRunOperation',
 ];
 
@@ -686,9 +686,9 @@ const STATE_STRUCTS = [
   'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
   'AutomationState', 'AutomationCatalogState',
-  'AutomationRunBlocker', 'AutomationManualRunOrigin', 'AutomationTriggeredRunOrigin',
+  'AutomationManualRunOrigin', 'AutomationTriggeredRunOrigin',
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
-  'AutomationBlockedRunLifecycle', 'AutomationCompletedRunLifecycle',
+  'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
 ];
@@ -1188,7 +1188,6 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   variants: [
     { caseName: 'pending', structName: 'AutomationPendingRunLifecycle', discriminantValue: 'pending' },
     { caseName: 'running', structName: 'AutomationRunningRunLifecycle', discriminantValue: 'running' },
-    { caseName: 'blocked', structName: 'AutomationBlockedRunLifecycle', discriminantValue: 'blocked' },
     { caseName: 'completed', structName: 'AutomationCompletedRunLifecycle', discriminantValue: 'completed' },
     { caseName: 'failed', structName: 'AutomationFailedRunLifecycle', discriminantValue: 'failed' },
     { caseName: 'cancelled', structName: 'AutomationCancelledRunLifecycle', discriminantValue: 'cancelled' },

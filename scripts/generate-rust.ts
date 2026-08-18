@@ -663,7 +663,7 @@ const STATE_ENUMS = [
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
-  'AutomationRunStatus', 'AutomationRunBlockerKind', 'AutomationRunOriginKind',
+  'AutomationRunStatus', 'AutomationRunOriginKind',
   'AutomationRunOperation',
 ];
 
@@ -828,12 +828,10 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationDefinitionPatch' },
   { name: 'AutomationState' },
   { name: 'AutomationCatalogState' },
-  { name: 'AutomationRunBlocker' },
   { name: 'AutomationManualRunOrigin', omitDiscriminants: true },
   { name: 'AutomationTriggeredRunOrigin', omitDiscriminants: true },
   { name: 'AutomationPendingRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationRunningRunLifecycle', omitDiscriminants: true },
-  { name: 'AutomationBlockedRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationCompletedRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationFailedRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationCancelledRunLifecycle', omitDiscriminants: true },
@@ -1105,7 +1103,6 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   variants: [
     { variantName: 'Pending', innerType: 'AutomationPendingRunLifecycle', wireValue: 'pending' },
     { variantName: 'Running', innerType: 'AutomationRunningRunLifecycle', wireValue: 'running' },
-    { variantName: 'Blocked', innerType: 'AutomationBlockedRunLifecycle', wireValue: 'blocked' },
     { variantName: 'Completed', innerType: 'AutomationCompletedRunLifecycle', wireValue: 'completed' },
     { variantName: 'Failed', innerType: 'AutomationFailedRunLifecycle', wireValue: 'failed' },
     { variantName: 'Cancelled', innerType: 'AutomationCancelledRunLifecycle', wireValue: 'cancelled' },

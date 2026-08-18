@@ -388,28 +388,20 @@ stateDiagram-v2
   pending --> running
   pending --> failed
   pending --> cancelled
-  running --> blocked
-  blocked --> running
   running --> completed
   running --> failed
   running --> cancelled
-  blocked --> failed
-  blocked --> cancelled
 ```
 
 `completed`, `failed`, and `cancelled` are terminal. `failed.startedAt` and
 `cancelled.startedAt` are optional because validation, workspace preparation,
 or cancellation may finish before execution begins.
 
-`blocked` is a coarse task-level summary:
-
-- `userInput`
-- `toolConfirmation`
-- `authentication`
-- `clientExecution`
-
-The detailed prompt, confirmation, authentication request, or tool state lives
-on a linked session channel.
+The run remains `running` while a linked session awaits user input,
+confirmation, authentication, or client-side tool execution. Linked
+`SessionSummary.status` values provide lightweight attention state, and
+`SessionState.inputNeeded` contains the actionable requests. The run channel
+does not duplicate that interaction state.
 
 ### Linked sessions
 
