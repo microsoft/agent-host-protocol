@@ -999,7 +999,7 @@ const STATE_STRUCTS = [
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
   'AutomationBlockedRunLifecycle', 'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
-  'AutomationRunArtifact', 'AutomationRunSummary', 'AutomationRunState',
+  'AutomationRunSummary', 'AutomationRunState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1499,8 +1499,6 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'automationRun/sessionSet', caseName: 'AutomationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
   { type: 'automationRun/sessionRemoved', caseName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', caseName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
-  { type: 'automationRun/artifactSet', caseName: 'AutomationRunArtifactSet', tsInterface: 'AutomationRunArtifactSetAction' },
-  { type: 'automationRun/artifactRemoved', caseName: 'AutomationRunArtifactRemoved', tsInterface: 'AutomationRunArtifactRemovedAction' },
   { type: 'automationRun/cancelRequested', caseName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
 ];
 

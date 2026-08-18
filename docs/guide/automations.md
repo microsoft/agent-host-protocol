@@ -59,7 +59,6 @@ flowchart TD
   RS --> AR["ahp-automation-run:/&lt;id&gt;"]
   AR --> S1["ahp-session:/&lt;id&gt;"]
   AR --> S2["ahp-session:/&lt;id&gt;"]
-  AR --> F["run-scoped artifacts"]
 ```
 
 The resource layers answer different questions:
@@ -69,7 +68,7 @@ The resource layers answer different questions:
 | `ahp-root://` | Automation capability negotiation |
 | `ahp-automations://` | Full states for every visible automation |
 | `ahp-automation:/<id>` | Stable command and relationship identifier for one catalogue entry; it is not independently subscribable |
-| `ahp-automation-run:` | Execution provenance, lifecycle, linked sessions, run-scoped artifacts, and cancellation |
+| `ahp-automation-run:` | Execution provenance, lifecycle, linked sessions, and cancellation |
 | `ahp-session:` / `ahp-chat:` | Conversation, tools, confirmations, input requests, changesets, and session-specific state |
 
 ## Catalogue and subscriptions
@@ -429,13 +428,6 @@ origin: {
 
 This provenance survives persistence and allows navigation in both directions.
 The run channel does not duplicate session transcript or tool state.
-
-### Artifacts
-
-`AutomationRunArtifact` represents output owned by the task as a whole rather
-than one particular session. It extends `ContentRef`, so the client fetches
-content through the normal resource APIs. Session-specific edits and outputs
-remain on their session channels.
 
 ### Cancellation
 

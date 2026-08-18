@@ -5447,46 +5447,6 @@
         "completedAt"
       ]
     },
-    "AutomationRunArtifact": {
-      "type": "object",
-      "description": "Fetchable output produced at run scope rather than by one specific session.\n\nThe inherited {@link ContentRef} identifies how the client obtains the\ncontent. Session-specific edits, transcripts, and tool results remain on\ntheir session and chat channels.",
-      "properties": {
-        "uri": {
-          "$ref": "#/$defs/URI",
-          "description": "Content URI"
-        },
-        "sizeHint": {
-          "type": "number",
-          "description": "Approximate size in bytes"
-        },
-        "contentType": {
-          "type": "string",
-          "description": "Content MIME type"
-        },
-        "nonce": {
-          "type": "string",
-          "description": "Content nonce"
-        },
-        "id": {
-          "type": "string",
-          "description": "Stable artifact id within this run, used by artifact actions."
-        },
-        "label": {
-          "type": "string",
-          "description": "Human-readable label suitable for run-history UI."
-        },
-        "_meta": {
-          "type": "object",
-          "additionalProperties": {},
-          "description": "Opaque host-defined artifact metadata."
-        }
-      },
-      "required": [
-        "uri",
-        "id",
-        "label"
-      ]
-    },
     "AutomationRunSummary": {
       "type": "object",
       "description": "Lightweight projection of a run retained in its automation's history.\n\nA summary contains enough information to render run history without\nsubscribing to every `ahp-automation-run:` resource.",
@@ -5515,10 +5475,6 @@
           "type": "number",
           "description": "Number of entries in {@link AutomationRunState.sessions}."
         },
-        "artifactCount": {
-          "type": "number",
-          "description": "Number of entries in {@link AutomationRunState.artifacts}, when cheaply available."
-        },
         "operations": {
           "type": "array",
           "items": {
@@ -5543,7 +5499,7 @@
     },
     "AutomationRunState": {
       "type": "object",
-      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, linked-session\nmembership, artifacts, and cancellation availability. Linked session and\nchat channels remain authoritative for transcripts, tools, confirmations,\nchangesets, and per-session lifecycle.",
+      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, linked-session\nmembership, and cancellation availability. Linked session and chat channels\nremain authoritative for transcripts, tools, confirmations, changesets, and\nper-session lifecycle.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -5572,13 +5528,6 @@
           "$ref": "#/$defs/URI",
           "description": "Member of {@link AutomationRunState.sessions} that the host recommends opening first."
         },
-        "artifacts": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunArtifact"
-          },
-          "description": "Run-scoped artifacts keyed by {@link AutomationRunArtifact.id}."
-        },
         "operations": {
           "type": "array",
           "items": {
@@ -5598,7 +5547,6 @@
         "origin",
         "lifecycle",
         "sessions",
-        "artifacts",
         "operations"
       ]
     },

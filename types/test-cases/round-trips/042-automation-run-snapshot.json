@@ -1,7 +1,7 @@
 {
   "name": "automation-run-snapshot",
   "group": "A",
-  "description": "An automation-run snapshot preserves multiple session attempts and artifacts.",
+  "description": "An automation-run snapshot preserves multiple session attempts.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-automation-run:/r1",
@@ -17,12 +17,6 @@
       },
       "sessions": ["ahp-session:/old", "ahp-session:/retry"],
       "primarySession": "ahp-session:/retry",
-      "artifacts": [{
-        "id": "report",
-        "label": "Report",
-        "uri": "https://example.test/report",
-        "contentType": "text/markdown"
-      }],
       "operations": []
     },
     "fromSeq": 9
@@ -41,12 +35,6 @@
       },
       "sessions": ["ahp-session:/old", "ahp-session:/retry"],
       "primarySession": "ahp-session:/retry",
-      "artifacts": [{
-        "id": "report",
-        "label": "Report",
-        "uri": "https://example.test/report",
-        "contentType": "text/markdown"
-      }],
       "operations": []
     },
     "fromSeq": 9

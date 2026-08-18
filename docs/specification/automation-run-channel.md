@@ -14,7 +14,7 @@ ahp-automation-run:/<id>
 
 `AutomationRunState` contains an immutable `origin` describing manual or
 trigger provenance, a discriminated lifecycle, an ordered session catalogue,
-an optional primary session, artifacts, and allowed operations.
+an optional primary session, and allowed operations.
 
 Linked `ahp-session:` and `ahp-chat:` channels remain authoritative for
 conversation, tool-call, input-request, changeset, and per-session state.
@@ -38,8 +38,6 @@ session state.
 - `automationRun/sessionSet`
 - `automationRun/sessionRemoved`
 - `automationRun/primarySessionChanged`
-- `automationRun/artifactSet`
-- `automationRun/artifactRemoved`
 - `automationRun/cancelRequested`
 
 Only `cancelRequested` is client-dispatchable. It is a side-effect request; the

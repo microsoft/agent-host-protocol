@@ -82,7 +82,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Root Channel](/specification/root-channel)** — `ahp-root://` — agents, terminals catalogue, host config, session catalogue events.
 - **[Session Channel](/specification/session-channel)** — `ahp-session:/<uuid>` — per-session state: the `chats` catalog, default chat, active clients, customizations, changesets, and aggregated status.
 - **[Automation Catalogue Channel](/specification/automation-channel)** — `ahp-automations://` — synchronized full states for durable trigger-based session workflows.
-- **[Automation Run Channel](/specification/automation-run-channel)** — `ahp-automation-run:/<id>` — task lifecycle, sessions, and artifacts.
+- **[Automation Run Channel](/specification/automation-run-channel)** — `ahp-automation-run:/<id>` — task lifecycle and linked sessions.
 - **[Chat Channel](/specification/chat-channel)** — `ahp-chat:/<cid>` — per-chat conversation state: turns, streaming, tool calls, pending messages, and input requests.
 - **[Terminal Channel](/specification/terminal-channel)** — per-terminal pty state, data flow, claims, command detection.
 - **[Telemetry Channel](/specification/telemetry-channel)** — `ahp-otlp:` — OpenTelemetry logs, traces, and metrics emitted by the agent host.

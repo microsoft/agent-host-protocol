@@ -8,7 +8,6 @@
 import { ActionType } from '../common/actions.js';
 import type { URI } from '../common/state.js';
 import type {
-  AutomationRunArtifact,
   AutomationRunLifecycle,
   AutomationRunOperation,
   AutomationRunState,
@@ -70,32 +69,6 @@ export interface AutomationRunPrimarySessionChangedAction {
   type: ActionType.AutomationRunPrimarySessionChanged;
   /** New {@link AutomationRunState.primarySession}, or omitted to clear the selection. */
   primarySession?: URI;
-}
-
-/**
- * Upsert a run-scoped artifact by {@link AutomationRunArtifact.id}.
- *
- * @category Automation Run Actions
- * @version 1
- */
-export interface AutomationRunArtifactSetAction {
-  type: ActionType.AutomationRunArtifactSet;
-  /** New or replacement entry in {@link AutomationRunState.artifacts}. */
-  artifact: AutomationRunArtifact;
-}
-
-/**
- * Remove a run-scoped artifact by id.
- *
- * The action is a no-op when the id is not present.
- *
- * @category Automation Run Actions
- * @version 1
- */
-export interface AutomationRunArtifactRemovedAction {
-  type: ActionType.AutomationRunArtifactRemoved;
-  /** {@link AutomationRunArtifact.id} to remove. */
-  artifactId: string;
 }
 
 /**

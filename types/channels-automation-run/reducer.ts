@@ -7,7 +7,7 @@
 import type { AutomationRunAction } from '../action-origin.generated.js';
 import { ActionType } from '../common/actions.js';
 import { softAssertNever } from '../common/reducer-helpers.js';
-import type { AutomationRunArtifact, AutomationRunState } from './state.js';
+import type { AutomationRunState } from './state.js';
 
 /** Pure reducer for automation-run state. */
 export function automationRunReducer(state: AutomationRunState, action: AutomationRunAction, log?: (msg: string) => void): AutomationRunState {
@@ -43,26 +43,6 @@ export function automationRunReducer(state: AutomationRunState, action: Automati
         next.primarySession = action.primarySession;
       }
       return next;
-    }
-
-    case ActionType.AutomationRunArtifactSet: {
-      const index = state.artifacts.findIndex(artifact => artifact.id === action.artifact.id);
-      if (index < 0) {
-        return { ...state, artifacts: [...state.artifacts, action.artifact] };
-      }
-      const artifacts: AutomationRunArtifact[] = state.artifacts.slice();
-      artifacts[index] = action.artifact;
-      return { ...state, artifacts };
-    }
-
-    case ActionType.AutomationRunArtifactRemoved: {
-      const index = state.artifacts.findIndex(artifact => artifact.id === action.artifactId);
-      if (index < 0) {
-        return state;
-      }
-      const artifacts = state.artifacts.slice();
-      artifacts.splice(index, 1);
-      return { ...state, artifacts };
     }
 
     case ActionType.AutomationRunCancelRequested:

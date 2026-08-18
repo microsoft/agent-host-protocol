@@ -172,8 +172,6 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.AutomationRunSessionSet]: '0.8.0',
   [ActionType.AutomationRunSessionRemoved]: '0.8.0',
   [ActionType.AutomationRunPrimarySessionChanged]: '0.8.0',
-  [ActionType.AutomationRunArtifactSet]: '0.8.0',
-  [ActionType.AutomationRunArtifactRemoved]: '0.8.0',
   [ActionType.AutomationRunCancelRequested]: '0.8.0',
 };
 

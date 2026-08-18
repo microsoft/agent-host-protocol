@@ -4,7 +4,7 @@
  * @module channels-automation-run/state
  */
 
-import type { ContentRef, ErrorInfo, URI, UsageInfo } from '../common/state.js';
+import type { ErrorInfo, URI, UsageInfo } from '../common/state.js';
 import type {
   AutomationEventTrigger,
   AutomationMisfirePolicy,
@@ -245,24 +245,6 @@ export const enum AutomationRunOperation {
 }
 
 /**
- * Fetchable output produced at run scope rather than by one specific session.
- *
- * The inherited {@link ContentRef} identifies how the client obtains the
- * content. Session-specific edits, transcripts, and tool results remain on
- * their session and chat channels.
- *
- * @category Automation Run State
- */
-export interface AutomationRunArtifact extends ContentRef {
-  /** Stable artifact id within this run, used by artifact actions. */
-  id: string;
-  /** Human-readable label suitable for run-history UI. */
-  label: string;
-  /** Opaque host-defined artifact metadata. */
-  _meta?: Record<string, unknown>;
-}
-
-/**
  * Lightweight projection of a run retained in its automation's history.
  *
  * A summary contains enough information to render run history without
@@ -283,8 +265,6 @@ export interface AutomationRunSummary {
   primarySession?: URI;
   /** Number of entries in {@link AutomationRunState.sessions}. */
   sessionCount: number;
-  /** Number of entries in {@link AutomationRunState.artifacts}, when cheaply available. */
-  artifactCount?: number;
   /** Operations currently permitted for this run, matching {@link AutomationRunState.operations}. */
   operations: AutomationRunOperation[];
   /** Opaque host-defined summary metadata. */
@@ -295,9 +275,9 @@ export interface AutomationRunSummary {
  * Authoritative state of one subscribed `ahp-automation-run:` resource.
  *
  * The run channel owns task-level lifecycle, provenance, linked-session
- * membership, artifacts, and cancellation availability. Linked session and
- * chat channels remain authoritative for transcripts, tools, confirmations,
- * changesets, and per-session lifecycle.
+ * membership, and cancellation availability. Linked session and chat channels
+ * remain authoritative for transcripts, tools, confirmations, changesets, and
+ * per-session lifecycle.
  *
  * @category Automation Run State
  */
@@ -318,8 +298,6 @@ export interface AutomationRunState {
   sessions: URI[];
   /** Member of {@link AutomationRunState.sessions} that the host recommends opening first. */
   primarySession?: URI;
-  /** Run-scoped artifacts keyed by {@link AutomationRunArtifact.id}. */
-  artifacts: AutomationRunArtifact[];
   /** Operations currently permitted for this run. */
   operations: AutomationRunOperation[];
   /** Opaque host-defined run metadata. */

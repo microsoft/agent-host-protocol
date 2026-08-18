@@ -96,8 +96,6 @@ import type {
   AutomationRunSessionSetAction,
   AutomationRunSessionRemovedAction,
   AutomationRunPrimarySessionChangedAction,
-  AutomationRunArtifactSetAction,
-  AutomationRunArtifactRemovedAction,
   AutomationRunCancelRequestedAction,
 } from './actions.js';
 
@@ -387,8 +385,6 @@ export type AutomationRunAction =
   | AutomationRunSessionSetAction
   | AutomationRunSessionRemovedAction
   | AutomationRunPrimarySessionChangedAction
-  | AutomationRunArtifactSetAction
-  | AutomationRunArtifactRemovedAction
   | AutomationRunCancelRequestedAction
 ;
 
@@ -403,8 +399,6 @@ export type ServerAutomationRunAction =
   | AutomationRunSessionSetAction
   | AutomationRunSessionRemovedAction
   | AutomationRunPrimarySessionChangedAction
-  | AutomationRunArtifactSetAction
-  | AutomationRunArtifactRemovedAction
 ;
 
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
@@ -507,7 +501,5 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.AutomationRunSessionSet]: false,
   [ActionType.AutomationRunSessionRemoved]: false,
   [ActionType.AutomationRunPrimarySessionChanged]: false,
-  [ActionType.AutomationRunArtifactSet]: false,
-  [ActionType.AutomationRunArtifactRemoved]: false,
   [ActionType.AutomationRunCancelRequested]: true,
 };

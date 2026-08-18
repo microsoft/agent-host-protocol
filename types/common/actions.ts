@@ -124,8 +124,6 @@ import type {
   AutomationRunSessionSetAction,
   AutomationRunSessionRemovedAction,
   AutomationRunPrimarySessionChangedAction,
-  AutomationRunArtifactSetAction,
-  AutomationRunArtifactRemovedAction,
   AutomationRunCancelRequestedAction,
 } from '../channels-automation-run/actions.js';
 
@@ -230,8 +228,6 @@ export const enum ActionType {
   AutomationRunSessionSet = 'automationRun/sessionSet',
   AutomationRunSessionRemoved = 'automationRun/sessionRemoved',
   AutomationRunPrimarySessionChanged = 'automationRun/primarySessionChanged',
-  AutomationRunArtifactSet = 'automationRun/artifactSet',
-  AutomationRunArtifactRemoved = 'automationRun/artifactRemoved',
   AutomationRunCancelRequested = 'automationRun/cancelRequested',
 }
 
@@ -362,6 +358,4 @@ export type StateAction =
   | AutomationRunSessionSetAction
   | AutomationRunSessionRemovedAction
   | AutomationRunPrimarySessionChangedAction
-  | AutomationRunArtifactSetAction
-  | AutomationRunArtifactRemovedAction
   | AutomationRunCancelRequestedAction;

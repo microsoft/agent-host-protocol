@@ -869,7 +869,6 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationCompletedRunLifecycle' },
   { name: 'AutomationFailedRunLifecycle' },
   { name: 'AutomationCancelledRunLifecycle' },
-  { name: 'AutomationRunArtifact' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
 ];
@@ -1584,8 +1583,6 @@ const ACTION_VARIANTS: {
   { type: 'automationRun/sessionSet', variantName: 'AutomationRunSessionSet', tsInterface: 'AutomationRunSessionSetAction' },
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', variantName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
-  { type: 'automationRun/artifactSet', variantName: 'AutomationRunArtifactSet', tsInterface: 'AutomationRunArtifactSetAction' },
-  { type: 'automationRun/artifactRemoved', variantName: 'AutomationRunArtifactRemoved', tsInterface: 'AutomationRunArtifactRemovedAction' },
   { type: 'automationRun/cancelRequested', variantName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
 ];
 

@@ -12,7 +12,6 @@
     },
     "sessions": ["ahp-session:/s1"],
     "primarySession": "ahp-session:/s1",
-    "artifacts": [],
     "operations": ["cancel"]
   },
   "actions": [{
@@ -37,7 +36,6 @@
     },
     "sessions": ["ahp-session:/s1"],
     "primarySession": "ahp-session:/s1",
-    "artifacts": [],
     "operations": []
   }
 }

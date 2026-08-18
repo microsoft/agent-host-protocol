@@ -7,7 +7,6 @@
     "origin": { "kind": "manual" },
     "lifecycle": { "status": "pending", "createdAt": "2025-01-01T00:00:00Z" },
     "sessions": [],
-    "artifacts": [],
     "operations": ["cancel"]
   },
   "actions": [
@@ -35,7 +34,6 @@
       "startedAt": "2025-01-01T00:00:01Z"
     },
     "sessions": [],
-    "artifacts": [],
     "operations": ["cancel"]
   }
 }
