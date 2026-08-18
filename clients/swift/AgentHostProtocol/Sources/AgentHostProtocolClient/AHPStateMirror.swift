@@ -70,9 +70,7 @@ public actor AHPStateMirror {
         }
         if channel == "ahp-automations://" {
             automationCatalog = automationReducer(state: automationCatalog, action: action)
-            automations = Dictionary(
-                uniqueKeysWithValues: automationCatalog.automations.map { ($0.resource, $0) }
-            )
+            rebuildAutomationIndex()
             return
         }
         if var run = automationRuns[channel] {
@@ -101,10 +99,18 @@ public actor AHPStateMirror {
             annotations[snapshot.resource] = state
         case .automations(let state):
             automationCatalog = state
-            automations = Dictionary(uniqueKeysWithValues: state.automations.map { ($0.resource, $0) })
+            rebuildAutomationIndex()
         case .automationRun(let state):
             automationRuns[snapshot.resource] = state
         }
+    }
+
+    private func rebuildAutomationIndex() {
+        var indexed: [String: AutomationState] = [:]
+        for automation in automationCatalog.automations {
+            indexed[automation.resource] = automation
+        }
+        automations = indexed
     }
 
     /// Reset the mirror to its initial empty state.

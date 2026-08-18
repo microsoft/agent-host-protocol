@@ -42,6 +42,38 @@ final class AHPStateMirrorTests: XCTestCase {
         XCTAssertNotNil(sessions["ahp-session:/s1"])
     }
 
+    func testAutomationIndexUsesLastDuplicateResourceAcrossSnapshotAndAction() async {
+        let mirror = AHPStateMirror()
+        let resource = "ahp-automation:/a1"
+        let first = makeAutomationState(resource: resource, title: "First")
+        let latest = makeAutomationState(resource: resource, title: "Latest")
+
+        await mirror.applySnapshot(Snapshot(
+            resource: "ahp-automations://",
+            state: .automations(AutomationCatalogState(automations: [first, latest])),
+            fromSeq: 0
+        ))
+
+        var automations = await mirror.automations
+        XCTAssertEqual(automations.count, 1)
+        XCTAssertEqual(automations[resource]?.definition.title, "Latest")
+
+        let added = makeAutomationState(resource: "ahp-automation:/a2", title: "Added")
+        await mirror.apply(ActionEnvelope(
+            channel: "ahp-automations://",
+            action: .automationSet(AutomationSetAction(
+                type: .automationSet,
+                automation: added
+            )),
+            serverSeq: 1
+        ))
+
+        automations = await mirror.automations
+        XCTAssertEqual(automations.count, 2)
+        XCTAssertEqual(automations[resource]?.definition.title, "Latest")
+        XCTAssertEqual(automations[added.resource]?.definition.title, "Added")
+    }
+
     func testApplyRootActionUpdatesRoot() async {
         let mirror = AHPStateMirror()
         let agents = [
@@ -103,4 +135,21 @@ final class AHPStateMirrorTests: XCTestCase {
         let root = await mirror.rootState
         XCTAssertEqual(root.agents.count, 0)
     }
+}
+
+private func makeAutomationState(resource: String, title: String) -> AutomationState {
+    AutomationState(
+        resource: resource,
+        definition: AutomationDefinition(
+            title: title,
+            message: Message(text: "Run", origin: MessageOrigin(kind: .user)),
+            session: AutomationSessionTemplate(),
+            enabled: true,
+            triggers: []
+        ),
+        runs: [],
+        operations: [.update, .run],
+        createdAt: "2026-08-05T12:00:00Z",
+        modifiedAt: "2026-08-05T12:00:00Z"
+    )
 }

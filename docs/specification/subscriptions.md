@@ -8,7 +8,7 @@ The channel concept is woven into every wire message. **Every command and every 
 
 | Direction | Methods | `channel` value |
 |---|---|---|
-| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, and automation mutation/run-history commands | The owning channel's URI (e.g. `ahp-session:/<uuid>` or `ahp-automations://`). |
+| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, `runAutomation`, and `fetchAutomationRuns` | The owning channel's URI (e.g. `ahp-session:/<uuid>` or `ahp-automations://`). |
 | Client → Server commands (connection-level) | `initialize`, `ping`, `reconnect`, `listSessions`, `authenticate`, `resolveSessionConfig`, `sessionConfigCompletions`, `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | Literal `'ahp-root://'`. |
 | Server → Client commands (bidirectional `resource*` family) | The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins). | Literal `'ahp-root://'`. |
 | Client → Server | `dispatchAction` | The channel the action targets. |

@@ -6650,7 +6650,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. AutomationRunState has required
-        // `automation`, `cause`, and `sessions`; AutomationCatalogState has
+        // `automation`, `origin`, and `sessions`; AutomationCatalogState has
         // required `automations`; SessionState has required
         // `lifecycle`; ChatState has required `turns`; ChangesetState has
         // required `status` + `files`; ResourceWatchState has required
