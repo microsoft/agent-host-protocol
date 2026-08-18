@@ -13,9 +13,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[allow(unused_imports)]
 use crate::state::{
-    AgentSelection, AnnotationsSummary, AutomationOperation, AutomationRunSummary,
-    AutomationSummary, ChangesSummary, Changeset, FileEdit, ModelSelection, ProjectInfo,
-    ProtectedResourceMetadata, SessionOrigin, SessionStatus, SessionSummary,
+    AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
+    ProjectInfo, ProtectedResourceMetadata, SessionOrigin, SessionStatus, SessionSummary,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -95,42 +94,6 @@ pub struct SessionSummaryChangedParams {
     /// Identity fields (`resource`, `provider`, `createdAt`) never change and
     /// MUST be omitted by senders; receivers SHOULD ignore them if present.
     pub changes: PartialSessionSummary,
-}
-
-/// Announces a newly visible automation catalogue entry.
-///
-/// Root notifications are live signals and are not replayed after reconnect.
-/// Clients that reconnect MUST refresh the catalogue with `listAutomations`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationAddedParams {
-    /// Root channel URI.
-    pub channel: Uri,
-    /// Complete summary for the newly visible automation.
-    pub summary: AutomationSummary,
-}
-
-/// Announces that an automation is no longer present in the root catalogue.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationRemovedParams {
-    /// Root channel URI.
-    pub channel: Uri,
-    /// Removed `ahp-automation:` URI.
-    pub automation: Uri,
-}
-
-/// Replaces the root-catalogue summary for an existing automation.
-///
-/// Full replacement semantics apply to `summary`; this is not a patch. The
-/// corresponding subscribed automation channel remains authoritative.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationSummaryChangedParams {
-    /// Root channel URI.
-    pub channel: Uri,
-    /// Complete replacement catalogue summary.
-    pub summary: AutomationSummary,
 }
 
 /// Generic progress notification for a long-running operation.
@@ -282,7 +245,7 @@ pub struct PartialSessionSummary {
     /// Human-readable description of what the session is currently doing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
-    /// Durable origin of this session, when another AHP resource created it.
+    /// Durable {@link AutomationSessionOrigin}, when an automation run created this session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<SessionOrigin>,
     /// Server-owned project for this session

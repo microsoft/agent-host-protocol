@@ -1816,46 +1816,28 @@ func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahpty
 	return ReduceOutcomeOutOfScope
 }
 
-// ApplyActionToAutomation applies an action to automation state.
-func ApplyActionToAutomation(state *ahptypes.AutomationState, action ahptypes.StateAction) ReduceOutcome {
+// ApplyActionToAutomation applies an action to automation catalogue state.
+func ApplyActionToAutomation(state *ahptypes.AutomationCatalogState, action ahptypes.StateAction) ReduceOutcome {
 	switch a := action.Value.(type) {
-	case *ahptypes.AutomationDefinitionChangedAction:
-		state.Definition = a.Definition
-		state.Revision = a.Revision
-		state.ModifiedAt = a.ModifiedAt
-		state.NextRunAt = a.NextRunAt
-		return ReduceOutcomeApplied
-	case *ahptypes.AutomationRunSummarySetAction:
-		for i := range state.Runs {
-			if state.Runs[i].Resource == a.Run.Resource {
-				state.Runs[i] = a.Run
+	case *ahptypes.AutomationCreateRequestedAction, *ahptypes.AutomationUpdateRequestedAction:
+		return ReduceOutcomeNoOp
+	case *ahptypes.AutomationSetAction:
+		for i := range state.Automations {
+			if state.Automations[i].Resource == a.Automation.Resource {
+				state.Automations[i] = a.Automation
 				return ReduceOutcomeApplied
 			}
 		}
-		state.Runs = append([]ahptypes.AutomationRunSummary{a.Run}, state.Runs...)
+		state.Automations = append(state.Automations, a.Automation)
 		return ReduceOutcomeApplied
-	case *ahptypes.AutomationRunSummaryRemovedAction:
-		for i := range state.Runs {
-			if state.Runs[i].Resource == a.Run {
-				state.Runs = append(state.Runs[:i], state.Runs[i+1:]...)
+	case *ahptypes.AutomationRemovedAction:
+		for i := range state.Automations {
+			if state.Automations[i].Resource == a.Resource {
+				state.Automations = append(state.Automations[:i], state.Automations[i+1:]...)
 				return ReduceOutcomeApplied
 			}
 		}
 		return ReduceOutcomeNoOp
-	case *ahptypes.AutomationRunsLoadedAction:
-		known := make(map[ahptypes.URI]struct{}, len(state.Runs))
-		for _, run := range state.Runs {
-			known[run.Resource] = struct{}{}
-		}
-		for _, run := range a.Runs {
-			if _, ok := known[run.Resource]; ok {
-				continue
-			}
-			state.Runs = append(state.Runs, run)
-			known[run.Resource] = struct{}{}
-		}
-		state.RunsNextCursor = a.NextCursor
-		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
 }
@@ -1865,7 +1847,6 @@ func ApplyActionToAutomationRun(state *ahptypes.AutomationRunState, action ahpty
 	switch a := action.Value.(type) {
 	case *ahptypes.AutomationRunLifecycleChangedAction:
 		state.Lifecycle = a.Lifecycle
-		state.Operations = a.Operations
 		return ReduceOutcomeApplied
 	case *ahptypes.AutomationRunSessionSetAction:
 		for _, session := range state.Sessions {
@@ -1890,23 +1871,6 @@ func ApplyActionToAutomationRun(state *ahptypes.AutomationRunState, action ahpty
 	case *ahptypes.AutomationRunPrimarySessionChangedAction:
 		state.PrimarySession = a.PrimarySession
 		return ReduceOutcomeApplied
-	case *ahptypes.AutomationRunArtifactSetAction:
-		for i := range state.Artifacts {
-			if state.Artifacts[i].Id == a.Artifact.Id {
-				state.Artifacts[i] = a.Artifact
-				return ReduceOutcomeApplied
-			}
-		}
-		state.Artifacts = append(state.Artifacts, a.Artifact)
-		return ReduceOutcomeApplied
-	case *ahptypes.AutomationRunArtifactRemovedAction:
-		for i := range state.Artifacts {
-			if state.Artifacts[i].Id == a.ArtifactId {
-				state.Artifacts = append(state.Artifacts[:i], state.Artifacts[i+1:]...)
-				return ReduceOutcomeApplied
-			}
-		}
-		return ReduceOutcomeNoOp
 	case *ahptypes.AutomationRunCancelRequestedAction:
 		return ReduceOutcomeNoOp
 	}

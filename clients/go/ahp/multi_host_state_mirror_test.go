@@ -11,15 +11,22 @@ func TestMultiHostStateMirrorDropHostWithoutChangesets(t *testing.T) {
 	automationURI := ahptypes.URI("ahp-automation:/nightly")
 	runURI := ahptypes.URI("ahp-automation-run:/nightly/1")
 
-	mirror.PutAutomation("removed", automationURI, ahptypes.AutomationState{Resource: automationURI})
+	mirror.PutAutomationCatalog("removed", ahptypes.AutomationCatalogState{
+		Automations: []ahptypes.AutomationState{{Resource: automationURI}},
+	})
 	mirror.PutAutomationRun("removed", runURI, ahptypes.AutomationRunState{Resource: runURI})
-	mirror.PutAutomation("retained", automationURI, ahptypes.AutomationState{Resource: automationURI})
+	mirror.PutAutomationCatalog("retained", ahptypes.AutomationCatalogState{
+		Automations: []ahptypes.AutomationState{{Resource: automationURI}},
+	})
 	mirror.PutAutomationRun("retained", runURI, ahptypes.AutomationRunState{Resource: runURI})
 
 	mirror.DropHost("removed")
 
 	if _, ok := mirror.Automation("removed", automationURI); ok {
 		t.Error("automation for dropped host was retained")
+	}
+	if _, ok := mirror.AutomationCatalog("removed"); ok {
+		t.Error("automation catalogue for dropped host was retained")
 	}
 	if _, ok := mirror.AutomationRun("removed", runURI); ok {
 		t.Error("automation run for dropped host was retained")
@@ -32,17 +39,22 @@ func TestMultiHostStateMirrorDropHostWithoutChangesets(t *testing.T) {
 	}
 }
 
-func TestMultiHostStateMirrorDropResourceRemovesAutomationState(t *testing.T) {
+func TestMultiHostStateMirrorDropResourceRemovesAutomationCatalogue(t *testing.T) {
 	mirror := NewMultiHostStateMirror()
 	automationURI := ahptypes.URI("ahp-automation:/nightly")
 	runURI := ahptypes.URI("ahp-automation-run:/nightly/1")
 
-	mirror.PutAutomation("host", automationURI, ahptypes.AutomationState{Resource: automationURI})
+	mirror.PutAutomationCatalog("host", ahptypes.AutomationCatalogState{
+		Automations: []ahptypes.AutomationState{{Resource: automationURI}},
+	})
 	mirror.PutAutomationRun("host", runURI, ahptypes.AutomationRunState{Resource: runURI})
 
-	mirror.DropResource("host", automationURI)
+	mirror.DropResource("host", "ahp-automations://")
 	mirror.DropResource("host", runURI)
 
+	if _, ok := mirror.AutomationCatalog("host"); ok {
+		t.Error("automation catalogue for dropped resource was retained")
+	}
 	if _, ok := mirror.Automation("host", automationURI); ok {
 		t.Error("automation for dropped resource was retained")
 	}

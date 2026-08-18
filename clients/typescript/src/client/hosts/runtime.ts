@@ -815,9 +815,6 @@ export class HostRuntime {
       case 'sessionSummaryChanged':
         applySummaryChange(this.shared.sessionSummaries, event.event.params);
         break;
-      case 'automationAdded':
-      case 'automationRemoved':
-      case 'automationSummaryChanged':
       case 'authRequired':
         // No cache update; consumers observe via the event stream.
         break;

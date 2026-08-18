@@ -749,10 +749,6 @@ func cloneAutomationCapabilities(capabilities *ahptypes.AutomationCapabilities) 
 		value := *capabilities.RunCancellation
 		clone.RunCancellation = &value
 	}
-	if capabilities.SchedulePreview != nil {
-		value := *capabilities.SchedulePreview
-		clone.SchedulePreview = &value
-	}
 	if capabilities.RunHistoryLimit != nil {
 		value := *capabilities.RunHistoryLimit
 		clone.RunHistoryLimit = &value

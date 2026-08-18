@@ -580,11 +580,6 @@ impl HostRuntime {
                     apply_summary_changes(existing, &n.changes);
                 }
             }
-            SubscriptionEvent::AutomationAdded(_)
-            | SubscriptionEvent::AutomationRemoved(_)
-            | SubscriptionEvent::AutomationSummaryChanged(_) => {
-                // No cache update; consumers observe via the event stream.
-            }
             SubscriptionEvent::AuthRequired(_) => {
                 // No cache update; consumers observe via the event stream.
             }

@@ -78,21 +78,22 @@ fn session_snapshot(title: &str, resource: &str) -> Snapshot {
 
 fn automation_snapshot() -> Snapshot {
     serde_json::from_value(serde_json::json!({
-        "resource": "ahp-automation:/a1",
+        "resource": "ahp-automations://",
         "state": {
-            "resource": "ahp-automation:/a1",
-            "definition": {
-                "title": "Old",
-                "message": { "text": "triage", "origin": { "kind": "user" } },
-                "session": {},
-                "enabled": true,
-                "triggers": []
-            },
-            "revision": 1,
-            "runs": [],
-            "operations": ["update", "run"],
-            "createdAt": "2026-08-01T00:00:00Z",
-            "modifiedAt": "2026-08-01T00:00:00Z"
+            "automations": [{
+                "resource": "ahp-automation:/a1",
+                "definition": {
+                    "title": "Old",
+                    "message": { "text": "triage", "origin": { "kind": "user" } },
+                    "session": {},
+                    "enabled": true,
+                    "triggers": []
+                },
+                "runs": [],
+                "operations": ["update", "run"],
+                "createdAt": "2026-08-01T00:00:00Z",
+                "modifiedAt": "2026-08-01T00:00:00Z"
+            }]
         },
         "fromSeq": 1
     }))
@@ -105,14 +106,12 @@ fn automation_run_snapshot() -> Snapshot {
         "state": {
             "resource": "ahp-automation-run:/r1",
             "automation": "ahp-automation:/a1",
-            "cause": { "kind": "manual" },
+            "origin": { "kind": "manual" },
             "lifecycle": {
                 "status": "pending",
                 "createdAt": "2026-08-05T12:00:00Z"
             },
-            "sessions": [],
-            "artifacts": [],
-            "operations": ["cancel"]
+            "sessions": []
         },
         "fromSeq": 2
     }))
@@ -266,24 +265,29 @@ fn automation_snapshots_and_actions_are_mirrored() {
     mirror.apply_snapshot(&host, &automation_snapshot());
     mirror.apply_snapshot(&host, &automation_run_snapshot());
 
-    let definition_changed = serde_json::from_value(serde_json::json!({
-        "type": "automation/definitionChanged",
-        "definition": {
-            "title": "New",
-            "message": { "text": "triage", "origin": { "kind": "user" } },
-            "session": {},
-            "enabled": false,
-            "triggers": []
-        },
-        "revision": 2,
-        "modifiedAt": "2026-08-05T13:00:00Z"
+    let automation_set = serde_json::from_value(serde_json::json!({
+        "type": "automation/set",
+        "automation": {
+            "resource": "ahp-automation:/a1",
+            "definition": {
+                "title": "New",
+                "message": { "text": "triage", "origin": { "kind": "user" } },
+                "session": {},
+                "enabled": false,
+                "triggers": []
+            },
+            "runs": [],
+            "operations": ["update", "run"],
+            "createdAt": "2026-08-01T00:00:00Z",
+            "modifiedAt": "2026-08-05T13:00:00Z"
+        }
     }))
-    .expect("definitionChanged action");
+    .expect("automation/set action");
     mirror.apply_envelope(
         &host,
         &ActionEnvelope {
-            channel: "ahp-automation:/a1".into(),
-            action: definition_changed,
+            channel: "ahp-automations://".into(),
+            action: automation_set,
             server_seq: 3,
             origin: None,
             rejection_reason: None,
@@ -312,8 +316,8 @@ fn automation_snapshots_and_actions_are_mirrored() {
         mirror
             .automations()
             .get(&automation_key)
-            .map(|state| (state.definition.title.as_str(), state.revision)),
-        Some(("New", 2))
+            .map(|state| state.definition.title.as_str()),
+        Some("New")
     );
     assert_eq!(
         mirror
@@ -324,6 +328,7 @@ fn automation_snapshots_and_actions_are_mirrored() {
     );
 
     mirror.reset_host(&host);
+    assert!(mirror.automation_catalogs().is_empty());
     assert!(mirror.automations().is_empty());
     assert!(mirror.automation_runs().is_empty());
 }

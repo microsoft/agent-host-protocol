@@ -31,6 +31,7 @@ type MultiHostStateMirror struct {
 	chat          map[HostedResourceKey]ahptypes.ChatState
 	term          map[HostedResourceKey]ahptypes.TerminalState
 	changes       map[HostedResourceKey]ahptypes.ChangesetState
+	automationCat map[string]ahptypes.AutomationCatalogState
 	automation    map[HostedResourceKey]ahptypes.AutomationState
 	automationRun map[HostedResourceKey]ahptypes.AutomationRunState
 }
@@ -43,6 +44,7 @@ func NewMultiHostStateMirror() *MultiHostStateMirror {
 		chat:          make(map[HostedResourceKey]ahptypes.ChatState),
 		term:          make(map[HostedResourceKey]ahptypes.TerminalState),
 		changes:       make(map[HostedResourceKey]ahptypes.ChangesetState),
+		automationCat: make(map[string]ahptypes.AutomationCatalogState),
 		automation:    make(map[HostedResourceKey]ahptypes.AutomationState),
 		automationRun: make(map[HostedResourceKey]ahptypes.AutomationRunState),
 	}
@@ -128,11 +130,28 @@ func (m *MultiHostStateMirror) Changeset(hostID string, uri ahptypes.URI) (ahpty
 	return v, ok
 }
 
-// PutAutomation stores an automation snapshot under (hostID, uri).
-func (m *MultiHostStateMirror) PutAutomation(hostID string, uri ahptypes.URI, automation ahptypes.AutomationState) {
+// PutAutomationCatalog stores a host's automation catalogue snapshot and
+// refreshes the per-automation lookup.
+func (m *MultiHostStateMirror) PutAutomationCatalog(hostID string, catalog ahptypes.AutomationCatalogState) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.automation[HostedResourceKey{hostID, uri}] = automation
+	m.automationCat[hostID] = catalog
+	for key := range m.automation {
+		if key.HostID == hostID {
+			delete(m.automation, key)
+		}
+	}
+	for _, automation := range catalog.Automations {
+		m.automation[HostedResourceKey{hostID, automation.Resource}] = automation
+	}
+}
+
+// AutomationCatalog returns the automation catalogue for hostID.
+func (m *MultiHostStateMirror) AutomationCatalog(hostID string) (ahptypes.AutomationCatalogState, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.automationCat[hostID]
+	return v, ok
 }
 
 // Automation returns the automation snapshot at (hostID, uri).
@@ -164,6 +183,7 @@ func (m *MultiHostStateMirror) DropHost(hostID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.roots, hostID)
+	delete(m.automationCat, hostID)
 	for k := range m.session {
 		if k.HostID == hostID {
 			delete(m.session, k)
@@ -202,6 +222,14 @@ func (m *MultiHostStateMirror) DropResource(hostID string, uri ahptypes.URI) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	k := HostedResourceKey{hostID, uri}
+	if uri == "ahp-automations://" {
+		delete(m.automationCat, hostID)
+		for key := range m.automation {
+			if key.HostID == hostID {
+				delete(m.automation, key)
+			}
+		}
+	}
 	delete(m.session, k)
 	delete(m.chat, k)
 	delete(m.term, k)

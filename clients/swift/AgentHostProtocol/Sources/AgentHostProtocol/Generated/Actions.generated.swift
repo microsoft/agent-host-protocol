@@ -91,16 +91,14 @@ public enum ActionType: String, Codable, Sendable {
     case terminalCommandExecuted = "terminal/commandExecuted"
     case terminalCommandFinished = "terminal/commandFinished"
     case resourceWatchChanged = "resourceWatch/changed"
-    case automationDefinitionChanged = "automation/definitionChanged"
-    case automationRunSummarySet = "automation/runSummarySet"
-    case automationRunSummaryRemoved = "automation/runSummaryRemoved"
-    case automationRunsLoaded = "automation/runsLoaded"
+    case automationCreateRequested = "automation/createRequested"
+    case automationUpdateRequested = "automation/updateRequested"
+    case automationSet = "automation/set"
+    case automationRemoved = "automation/removed"
     case automationRunLifecycleChanged = "automationRun/lifecycleChanged"
     case automationRunSessionSet = "automationRun/sessionSet"
     case automationRunSessionRemoved = "automationRun/sessionRemoved"
     case automationRunPrimarySessionChanged = "automationRun/primarySessionChanged"
-    case automationRunArtifactSet = "automationRun/artifactSet"
-    case automationRunArtifactRemoved = "automationRun/artifactRemoved"
     case automationRunCancelRequested = "automationRun/cancelRequested"
 }
 
@@ -1978,99 +1976,87 @@ public struct ResourceWatchChangedAction: Codable, Sendable {
     }
 }
 
-public struct AutomationDefinitionChangedAction: Codable, Sendable {
+public struct AutomationCreateRequestedAction: Codable, Sendable {
     public var type: ActionType
-    /// Complete replacement definition.
+    /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.
+    public var resource: String
+    /// Complete initial {@link AutomationState.definition}.
     public var definition: AutomationDefinition
-    /// New monotonic revision.
-    public var revision: Int
-    /// Definition modification timestamp in ISO 8601 format.
-    public var modifiedAt: String
-    /// Earliest known future scheduled occurrence, or omitted to clear it.
-    public var nextRunAt: String?
 
     public init(
         type: ActionType,
-        definition: AutomationDefinition,
-        revision: Int,
-        modifiedAt: String,
-        nextRunAt: String? = nil
+        resource: String,
+        definition: AutomationDefinition
     ) {
         self.type = type
+        self.resource = resource
         self.definition = definition
-        self.revision = revision
-        self.modifiedAt = modifiedAt
-        self.nextRunAt = nextRunAt
     }
 }
 
-public struct AutomationRunSummarySetAction: Codable, Sendable {
+public struct AutomationUpdateRequestedAction: Codable, Sendable {
     public var type: ActionType
-    /// New or replacement run summary.
-    public var run: AutomationRunSummary
+    /// Target {@link AutomationState.resource}.
+    public var resource: String
+    /// Editable {@link AutomationDefinition} fields to replace.
+    public var changes: AutomationDefinitionPatch
 
     public init(
         type: ActionType,
-        run: AutomationRunSummary
+        resource: String,
+        changes: AutomationDefinitionPatch
     ) {
         self.type = type
-        self.run = run
+        self.resource = resource
+        self.changes = changes
     }
 }
 
-public struct AutomationRunSummaryRemovedAction: Codable, Sendable {
+public struct AutomationSetAction: Codable, Sendable {
     public var type: ActionType
-    /// {@link AutomationRunSummary.resource} to remove.
-    public var run: String
+    /// Full new or replacement automation state.
+    public var automation: AutomationState
 
     public init(
         type: ActionType,
-        run: String
+        automation: AutomationState
     ) {
         self.type = type
-        self.run = run
+        self.automation = automation
     }
 }
 
-public struct AutomationRunsLoadedAction: Codable, Sendable {
+public struct AutomationRemovedAction: Codable, Sendable {
     public var type: ActionType
-    /// Older run summaries in newest-first order within this page.
-    public var runs: [AutomationRunSummary]
-    /// Opaque cursor for the next older page, or omitted at the end.
-    public var nextCursor: String?
+    /// {@link AutomationState.resource} to remove.
+    public var resource: String
 
     public init(
         type: ActionType,
-        runs: [AutomationRunSummary],
-        nextCursor: String? = nil
+        resource: String
     ) {
         self.type = type
-        self.runs = runs
-        self.nextCursor = nextCursor
+        self.resource = resource
     }
 }
 
 public struct AutomationRunLifecycleChangedAction: Codable, Sendable {
     public var type: ActionType
-    /// Complete replacement lifecycle.
+    /// Complete replacement {@link AutomationRunState.lifecycle}.
     public var lifecycle: AutomationRunLifecycle
-    /// Complete replacement operation list.
-    public var operations: [AutomationRunOperation]
 
     public init(
         type: ActionType,
-        lifecycle: AutomationRunLifecycle,
-        operations: [AutomationRunOperation]
+        lifecycle: AutomationRunLifecycle
     ) {
         self.type = type
         self.lifecycle = lifecycle
-        self.operations = operations
     }
 }
 
 public struct AutomationRunSessionSetAction: Codable, Sendable {
     public var type: ActionType
-    /// Session URI to append when it is not already linked.
+    /// Session URI to append to {@link AutomationRunState.sessions} when not already linked.
     public var session: String
 
     public init(
@@ -2084,7 +2070,7 @@ public struct AutomationRunSessionSetAction: Codable, Sendable {
 
 public struct AutomationRunSessionRemovedAction: Codable, Sendable {
     public var type: ActionType
-    /// Linked session URI to remove.
+    /// Entry in {@link AutomationRunState.sessions} to remove.
     public var session: String
 
     public init(
@@ -2098,7 +2084,7 @@ public struct AutomationRunSessionRemovedAction: Codable, Sendable {
 
 public struct AutomationRunPrimarySessionChangedAction: Codable, Sendable {
     public var type: ActionType
-    /// New primary linked session, or omitted to clear the selection.
+    /// New {@link AutomationRunState.primarySession}, or omitted to clear the selection.
     public var primarySession: String?
 
     public init(
@@ -2107,34 +2093,6 @@ public struct AutomationRunPrimarySessionChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.primarySession = primarySession
-    }
-}
-
-public struct AutomationRunArtifactSetAction: Codable, Sendable {
-    public var type: ActionType
-    /// New or replacement artifact.
-    public var artifact: AutomationRunArtifact
-
-    public init(
-        type: ActionType,
-        artifact: AutomationRunArtifact
-    ) {
-        self.type = type
-        self.artifact = artifact
-    }
-}
-
-public struct AutomationRunArtifactRemovedAction: Codable, Sendable {
-    public var type: ActionType
-    /// {@link AutomationRunArtifact.id} to remove.
-    public var artifactId: String
-
-    public init(
-        type: ActionType,
-        artifactId: String
-    ) {
-        self.type = type
-        self.artifactId = artifactId
     }
 }
 
@@ -2283,16 +2241,14 @@ public enum StateAction: Codable, Sendable {
     case terminalCommandExecuted(TerminalCommandExecutedAction)
     case terminalCommandFinished(TerminalCommandFinishedAction)
     case resourceWatchChanged(ResourceWatchChangedAction)
-    case automationDefinitionChanged(AutomationDefinitionChangedAction)
-    case automationRunSummarySet(AutomationRunSummarySetAction)
-    case automationRunSummaryRemoved(AutomationRunSummaryRemovedAction)
-    case automationRunsLoaded(AutomationRunsLoadedAction)
+    case automationCreateRequested(AutomationCreateRequestedAction)
+    case automationUpdateRequested(AutomationUpdateRequestedAction)
+    case automationSet(AutomationSetAction)
+    case automationRemoved(AutomationRemovedAction)
     case automationRunLifecycleChanged(AutomationRunLifecycleChangedAction)
     case automationRunSessionSet(AutomationRunSessionSetAction)
     case automationRunSessionRemoved(AutomationRunSessionRemovedAction)
     case automationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction)
-    case automationRunArtifactSet(AutomationRunArtifactSetAction)
-    case automationRunArtifactRemoved(AutomationRunArtifactRemovedAction)
     case automationRunCancelRequested(AutomationRunCancelRequestedAction)
     /// Unknown or future action type; reducers treat this as a no-op.
     /// The raw payload (including its `type` discriminant) is preserved
@@ -2476,14 +2432,14 @@ public enum StateAction: Codable, Sendable {
             self = .terminalCommandFinished(try TerminalCommandFinishedAction(from: decoder))
         case "resourceWatch/changed":
             self = .resourceWatchChanged(try ResourceWatchChangedAction(from: decoder))
-        case "automation/definitionChanged":
-            self = .automationDefinitionChanged(try AutomationDefinitionChangedAction(from: decoder))
-        case "automation/runSummarySet":
-            self = .automationRunSummarySet(try AutomationRunSummarySetAction(from: decoder))
-        case "automation/runSummaryRemoved":
-            self = .automationRunSummaryRemoved(try AutomationRunSummaryRemovedAction(from: decoder))
-        case "automation/runsLoaded":
-            self = .automationRunsLoaded(try AutomationRunsLoadedAction(from: decoder))
+        case "automation/createRequested":
+            self = .automationCreateRequested(try AutomationCreateRequestedAction(from: decoder))
+        case "automation/updateRequested":
+            self = .automationUpdateRequested(try AutomationUpdateRequestedAction(from: decoder))
+        case "automation/set":
+            self = .automationSet(try AutomationSetAction(from: decoder))
+        case "automation/removed":
+            self = .automationRemoved(try AutomationRemovedAction(from: decoder))
         case "automationRun/lifecycleChanged":
             self = .automationRunLifecycleChanged(try AutomationRunLifecycleChangedAction(from: decoder))
         case "automationRun/sessionSet":
@@ -2492,10 +2448,6 @@ public enum StateAction: Codable, Sendable {
             self = .automationRunSessionRemoved(try AutomationRunSessionRemovedAction(from: decoder))
         case "automationRun/primarySessionChanged":
             self = .automationRunPrimarySessionChanged(try AutomationRunPrimarySessionChangedAction(from: decoder))
-        case "automationRun/artifactSet":
-            self = .automationRunArtifactSet(try AutomationRunArtifactSetAction(from: decoder))
-        case "automationRun/artifactRemoved":
-            self = .automationRunArtifactRemoved(try AutomationRunArtifactRemovedAction(from: decoder))
         case "automationRun/cancelRequested":
             self = .automationRunCancelRequested(try AutomationRunCancelRequestedAction(from: decoder))
         default:
@@ -2590,16 +2542,14 @@ public enum StateAction: Codable, Sendable {
         case .terminalCommandExecuted(let v): try v.encode(to: encoder)
         case .terminalCommandFinished(let v): try v.encode(to: encoder)
         case .resourceWatchChanged(let v): try v.encode(to: encoder)
-        case .automationDefinitionChanged(let v): try v.encode(to: encoder)
-        case .automationRunSummarySet(let v): try v.encode(to: encoder)
-        case .automationRunSummaryRemoved(let v): try v.encode(to: encoder)
-        case .automationRunsLoaded(let v): try v.encode(to: encoder)
+        case .automationCreateRequested(let v): try v.encode(to: encoder)
+        case .automationUpdateRequested(let v): try v.encode(to: encoder)
+        case .automationSet(let v): try v.encode(to: encoder)
+        case .automationRemoved(let v): try v.encode(to: encoder)
         case .automationRunLifecycleChanged(let v): try v.encode(to: encoder)
         case .automationRunSessionSet(let v): try v.encode(to: encoder)
         case .automationRunSessionRemoved(let v): try v.encode(to: encoder)
         case .automationRunPrimarySessionChanged(let v): try v.encode(to: encoder)
-        case .automationRunArtifactSet(let v): try v.encode(to: encoder)
-        case .automationRunArtifactRemoved(let v): try v.encode(to: encoder)
         case .automationRunCancelRequested(let v): try v.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }

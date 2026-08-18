@@ -132,17 +132,18 @@ final class MultiHostStateMirrorTests: XCTestCase {
         await mirror.applySnapshot(
             host: "alpha",
             snapshot: Snapshot(
-                resource: automationResource,
-                state: .automation(AutomationState(
-                    resource: automationResource,
-                    definition: initialDefinition,
-                    revision: 1,
-                    nextRunAt: "2026-08-06T12:00:00Z",
-                    runs: [],
-                    operations: [.update, .run],
-                    createdAt: "2026-08-05T12:00:00Z",
-                    modifiedAt: "2026-08-05T12:00:00Z"
-                )),
+                resource: "ahp-automations://",
+                state: .automations(AutomationCatalogState(automations: [
+                    AutomationState(
+                        resource: automationResource,
+                        definition: initialDefinition,
+                        nextRunAt: "2026-08-06T12:00:00Z",
+                        runs: [],
+                        operations: [.update, .run],
+                        createdAt: "2026-08-05T12:00:00Z",
+                        modifiedAt: "2026-08-05T12:00:00Z"
+                    )
+                ])),
                 fromSeq: 0
             )
         )
@@ -153,11 +154,9 @@ final class MultiHostStateMirrorTests: XCTestCase {
                 state: .automationRun(AutomationRunState(
                     resource: runResource,
                     automation: automationResource,
-                    cause: .manual(AutomationManualRunCause(kind: .manual)),
+                    origin: .manual(AutomationManualRunOrigin(kind: .manual)),
                     lifecycle: initialLifecycle,
-                    sessions: [],
-                    artifacts: [],
-                    operations: [.cancel]
+                    sessions: []
                 )),
                 fromSeq: 0
             )
@@ -166,12 +165,17 @@ final class MultiHostStateMirrorTests: XCTestCase {
         await mirror.apply(
             host: "alpha",
             envelope: ActionEnvelope(
-                channel: automationResource,
-                action: .automationDefinitionChanged(AutomationDefinitionChangedAction(
-                    type: .automationDefinitionChanged,
-                    definition: makeAutomationDefinition(title: "New"),
-                    revision: 2,
-                    modifiedAt: "2026-08-05T13:00:00Z"
+                channel: "ahp-automations://",
+                action: .automationSet(AutomationSetAction(
+                    type: .automationSet,
+                    automation: AutomationState(
+                        resource: automationResource,
+                        definition: makeAutomationDefinition(title: "New"),
+                        runs: [],
+                        operations: [.update, .run],
+                        createdAt: "2026-08-05T12:00:00Z",
+                        modifiedAt: "2026-08-05T13:00:00Z"
+                    )
                 )),
                 serverSeq: 1
             )
@@ -193,7 +197,6 @@ final class MultiHostStateMirrorTests: XCTestCase {
         let automations = await mirror.automations
         let runs = await mirror.automationRuns
         XCTAssertEqual(automations[key]?.definition.title, "New")
-        XCTAssertEqual(automations[key]?.revision, 2)
         XCTAssertNil(automations[key]?.nextRunAt)
         XCTAssertEqual(runs[runKey]?.sessions, ["ahp-session:/s1"])
     }

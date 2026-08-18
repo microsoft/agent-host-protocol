@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 
 import {
   AhpClient,
+  AhpStateMirror,
   ClientClosedError,
   InMemoryTransport,
   RpcError,
@@ -39,8 +40,11 @@ import type {
   UnsubscribeParams,
 } from '../src/types/common/commands.js';
 import { JsonRpcErrorCodes } from '../src/types/common/errors.js';
+import { AutomationOperation, type AutomationState } from '../src/types/channels-automation/state.js';
+import { MessageKind } from '../src/types/channels-chat/state.js';
 
 const ROOT = 'ahp-root://' as const;
+const AUTOMATIONS = 'ahp-automations://' as const;
 
 async function readRequest(server: AhpTransport): Promise<JsonRpcRequest> {
   const frame = await server.recv();
@@ -114,34 +118,6 @@ test('subscribe attaches before sending the request and fans out an action', asy
     view: { turns: 30 },
   });
 
-  test('root automation catalogue notifications reach subscriptions', async () => {
-    const [c, s] = InMemoryTransport.pair();
-    const client = new AhpClient(c);
-    client.connect();
-    const subscription = client.attachSubscription(ROOT);
-
-    pushNotification(s, 'root/automationAdded', {
-      channel: ROOT,
-      summary: {
-        resource: 'ahp-automation:/a1',
-        title: 'Daily triage',
-        enabled: true,
-        triggerCount: 1,
-        revision: 1,
-        operations: ['run'],
-        createdAt: '2026-08-01T00:00:00Z',
-        modifiedAt: '2026-08-01T00:00:00Z',
-      },
-    });
-
-    const next = await subscription.next();
-    assert.equal(next.done, false);
-    assert.equal(next.value?.type, 'automationAdded');
-    if (next.value?.type !== 'automationAdded') throw new Error('unreachable');
-    assert.equal(next.value.params.summary.resource, 'ahp-automation:/a1');
-
-    await client.shutdown();
-  });
   const req = await readRequest(s);
   assert.equal(req.method, 'subscribe');
   assert.equal((req.params as SubscribeParams).channel, 'ahp-session:/s1');
@@ -178,6 +154,52 @@ test('subscribe attaches before sending the request and fans out an action', asy
   assert.equal(event.params.serverSeq, 7);
 
   await client.shutdown();
+});
+
+test('state mirror applies automation catalogue snapshots and actions', () => {
+  const mirror = new AhpStateMirror();
+  const automation: AutomationState = {
+    resource: 'ahp-automation:/a1',
+    definition: {
+      title: 'Daily triage',
+      message: { text: 'Triage issues', origin: { kind: MessageKind.User } },
+      session: {},
+      enabled: true,
+      triggers: [],
+    },
+    runs: [],
+    operations: [AutomationOperation.Run],
+    createdAt: '2026-08-01T00:00:00Z',
+    modifiedAt: '2026-08-01T00:00:00Z',
+  };
+
+  mirror.applySnapshot({
+    resource: AUTOMATIONS,
+    state: { automations: [automation] },
+    fromSeq: 0,
+  });
+  assert.equal(mirror.getAutomation(automation.resource)?.definition.title, 'Daily triage');
+
+  const updated: AutomationState = {
+    ...automation,
+    definition: { ...automation.definition, title: 'Updated triage' },
+    modifiedAt: '2026-08-02T00:00:00Z',
+  };
+  mirror.apply({
+    channel: AUTOMATIONS,
+    serverSeq: 1,
+    action: { type: ActionType.AutomationSet, automation: updated } as StateAction,
+    origin: null,
+  });
+  assert.equal(mirror.getAutomation(automation.resource)?.definition.title, 'Updated triage');
+
+  mirror.apply({
+    channel: AUTOMATIONS,
+    serverSeq: 2,
+    action: { type: ActionType.AutomationRemoved, resource: automation.resource } as StateAction,
+    origin: null,
+  });
+  assert.equal(mirror.getAutomation(automation.resource), undefined);
 });
 
 test('attachSubscription delivers events without a subscribe round-trip', async () => {

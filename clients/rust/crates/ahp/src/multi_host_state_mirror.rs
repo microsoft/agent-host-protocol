@@ -39,8 +39,8 @@ use std::collections::HashMap;
 use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AnnotationsState, AutomationRunState, AutomationState, ChangesetState, ChatState,
-    ResourceWatchState, RootState, SessionState, SnapshotState, TerminalState,
+    AnnotationsState, AutomationCatalogState, AutomationRunState, AutomationState, ChangesetState,
+    ChatState, ResourceWatchState, RootState, SessionState, SnapshotState, TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
@@ -49,6 +49,8 @@ use crate::reducers::{
     apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
 };
 use crate::SubscriptionEvent;
+
+const AUTOMATIONS_RESOURCE_URI: &str = "ahp-automations://";
 
 /// Compound key tagging a channel URI with the host that produced it.
 ///
@@ -95,6 +97,7 @@ pub struct MultiHostStateMirror {
     changesets: HashMap<HostedResourceKey, ChangesetState>,
     annotations: HashMap<HostedResourceKey, AnnotationsState>,
     resource_watches: HashMap<HostedResourceKey, ResourceWatchState>,
+    automation_catalogs: HashMap<HostId, AutomationCatalogState>,
     automations: HashMap<HostedResourceKey, AutomationState>,
     automation_runs: HashMap<HostedResourceKey, AutomationRunState>,
 }
@@ -140,6 +143,11 @@ impl MultiHostStateMirror {
         &self.resource_watches
     }
 
+    /// Borrow automation catalogue states keyed by host.
+    pub fn automation_catalogs(&self) -> &HashMap<HostId, AutomationCatalogState> {
+        &self.automation_catalogs
+    }
+
     /// Borrow automation states keyed by `(host_id, uri)`.
     pub fn automations(&self) -> &HashMap<HostedResourceKey, AutomationState> {
         &self.automations
@@ -153,8 +161,8 @@ impl MultiHostStateMirror {
     /// Convenience: apply a [`HostSubscriptionEvent`] produced by
     /// [`crate::hosts::MultiHostClient::events`]. Action envelopes are
     /// routed through the reducer; non-action events (session-summary
-    /// notifications, automation-catalogue notifications, auth challenges)
-    /// are ignored — they don't move any of the reducer-tracked state shapes.
+    /// notifications and auth challenges) are ignored — they don't move any of
+    /// the reducer-tracked state shapes.
     pub fn apply_event(&mut self, event: &HostSubscriptionEvent) {
         if let SubscriptionEvent::Action(envelope) = &event.event {
             self.apply_envelope(&event.host_id, envelope);
@@ -180,6 +188,16 @@ impl MultiHostStateMirror {
             apply_action_to_root(root, &envelope.action);
             return;
         }
+        if envelope.channel == AUTOMATIONS_RESOURCE_URI {
+            let automations = self.automation_catalogs.get_mut(host).map(|catalog| {
+                apply_action_to_automation(catalog, &envelope.action);
+                catalog.automations.clone()
+            });
+            if let Some(automations) = automations {
+                self.replace_automations(host, automations);
+            }
+            return;
+        }
         let key = HostedResourceKey::new(host.clone(), envelope.channel.clone());
         if let Some(session) = self.sessions.get_mut(&key) {
             apply_action_to_session(session, &envelope.action);
@@ -191,10 +209,6 @@ impl MultiHostStateMirror {
         }
         if let Some(terminal) = self.terminals.get_mut(&key) {
             apply_action_to_terminal(terminal, &envelope.action);
-            return;
-        }
-        if let Some(automation) = self.automations.get_mut(&key) {
-            apply_action_to_automation(automation, &envelope.action);
             return;
         }
         if let Some(run) = self.automation_runs.get_mut(&key) {
@@ -234,8 +248,10 @@ impl MultiHostStateMirror {
             SnapshotState::Annotations(state) => {
                 self.annotations.insert(key, state.as_ref().clone());
             }
-            SnapshotState::Automation(state) => {
-                self.automations.insert(key, state.as_ref().clone());
+            SnapshotState::Automations(state) => {
+                let state = state.as_ref().clone();
+                self.replace_automations(host, state.automations.clone());
+                self.automation_catalogs.insert(host.clone(), state);
             }
             SnapshotState::AutomationRun(state) => {
                 self.automation_runs.insert(key, state.as_ref().clone());
@@ -254,6 +270,7 @@ impl MultiHostStateMirror {
         self.changesets.retain(|key, _| &key.host_id != host);
         self.annotations.retain(|key, _| &key.host_id != host);
         self.resource_watches.retain(|key, _| &key.host_id != host);
+        self.automation_catalogs.remove(host);
         self.automations.retain(|key, _| &key.host_id != host);
         self.automation_runs.retain(|key, _| &key.host_id != host);
     }
@@ -267,7 +284,18 @@ impl MultiHostStateMirror {
         self.changesets.clear();
         self.annotations.clear();
         self.resource_watches.clear();
+        self.automation_catalogs.clear();
         self.automations.clear();
         self.automation_runs.clear();
+    }
+
+    fn replace_automations(&mut self, host: &HostId, automations: Vec<AutomationState>) {
+        self.automations.retain(|key, _| &key.host_id != host);
+        for automation in automations {
+            self.automations.insert(
+                HostedResourceKey::new(host.clone(), automation.resource.clone()),
+                automation,
+            );
+        }
     }
 }

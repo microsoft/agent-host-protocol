@@ -5691,13 +5691,6 @@
           "type": "number",
           "description": "Number of entries in {@link AutomationRunState.sessions}."
         },
-        "operations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunOperation"
-          },
-          "description": "Operations currently permitted for this run, matching {@link AutomationRunState.operations}."
-        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -5709,13 +5702,12 @@
         "automation",
         "origin",
         "lifecycle",
-        "sessionCount",
-        "operations"
+        "sessionCount"
       ]
     },
     "AutomationRunState": {
       "type": "object",
-      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, linked-session\nmembership, and cancellation availability. Linked session and chat channels\nremain authoritative for transcripts, tools, interaction requirements,\nchangesets, and per-session lifecycle.",
+      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, and linked-session\nmembership. Linked session and chat channels remain authoritative for\ntranscripts, tools, interaction requirements, changesets, and per-session\nlifecycle.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -5744,13 +5736,6 @@
           "$ref": "#/$defs/URI",
           "description": "Member of {@link AutomationRunState.sessions} that the host recommends opening first."
         },
-        "operations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunOperation"
-          },
-          "description": "Operations currently permitted for this run."
-        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -5762,8 +5747,7 @@
         "automation",
         "origin",
         "lifecycle",
-        "sessions",
-        "operations"
+        "sessions"
       ]
     },
     "URI": {
@@ -6471,13 +6455,6 @@
         }
       ],
       "description": "Discriminated lifecycle of an automation run."
-    },
-    "AutomationRunOperation": {
-      "enum": [
-        "cancel"
-      ],
-      "type": "string",
-      "description": "Operations the host currently permits for a run."
     }
   }
 }

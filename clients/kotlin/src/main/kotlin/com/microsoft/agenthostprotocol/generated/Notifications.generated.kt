@@ -85,42 +85,6 @@ data class SessionSummaryChangedParams(
 )
 
 @Serializable
-data class AutomationAddedParams(
-    /**
-     * Root channel URI.
-     */
-    val channel: String,
-    /**
-     * Complete summary for the newly visible automation.
-     */
-    val summary: AutomationSummary
-)
-
-@Serializable
-data class AutomationRemovedParams(
-    /**
-     * Root channel URI.
-     */
-    val channel: String,
-    /**
-     * Removed `ahp-automation:` URI.
-     */
-    val automation: String
-)
-
-@Serializable
-data class AutomationSummaryChangedParams(
-    /**
-     * Root channel URI.
-     */
-    val channel: String,
-    /**
-     * Complete replacement catalogue summary.
-     */
-    val summary: AutomationSummary
-)
-
-@Serializable
 data class ProgressParams(
     /**
      * Channel URI this notification belongs to (the root channel).
@@ -229,7 +193,7 @@ data class PartialSessionSummary(
      */
     val activity: String? = null,
     /**
-     * Durable origin of this session, when another AHP resource created it.
+     * Durable {@link AutomationSessionOrigin}, when an automation run created this session.
      */
     val origin: SessionOrigin? = null,
     /**

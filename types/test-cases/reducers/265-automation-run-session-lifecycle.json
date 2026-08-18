@@ -6,8 +6,7 @@
     "automation": "ahp-automation:/a1",
     "origin": { "kind": "manual" },
     "lifecycle": { "status": "pending", "createdAt": "2025-01-01T00:00:00Z" },
-    "sessions": [],
-    "operations": ["cancel"]
+    "sessions": []
   },
   "actions": [
     { "type": "automationRun/sessionSet", "session": "ahp-session:/s1" },
@@ -19,8 +18,7 @@
         "status": "running",
         "createdAt": "2025-01-01T00:00:00Z",
         "startedAt": "2025-01-01T00:00:01Z"
-      },
-      "operations": ["cancel"]
+      }
     },
     { "type": "automationRun/sessionRemoved", "session": "ahp-session:/s1" }
   ],
@@ -33,7 +31,6 @@
       "createdAt": "2025-01-01T00:00:00Z",
       "startedAt": "2025-01-01T00:00:01Z"
     },
-    "sessions": [],
-    "operations": ["cancel"]
+    "sessions": []
   }
 }

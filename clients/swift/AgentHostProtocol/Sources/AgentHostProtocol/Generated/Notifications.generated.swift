@@ -66,51 +66,6 @@ public struct SessionSummaryChangedParams: Codable, Sendable {
     }
 }
 
-public struct AutomationAddedParams: Codable, Sendable {
-    /// Root channel URI.
-    public var channel: String
-    /// Complete summary for the newly visible automation.
-    public var summary: AutomationSummary
-
-    public init(
-        channel: String,
-        summary: AutomationSummary
-    ) {
-        self.channel = channel
-        self.summary = summary
-    }
-}
-
-public struct AutomationRemovedParams: Codable, Sendable {
-    /// Root channel URI.
-    public var channel: String
-    /// Removed `ahp-automation:` URI.
-    public var automation: String
-
-    public init(
-        channel: String,
-        automation: String
-    ) {
-        self.channel = channel
-        self.automation = automation
-    }
-}
-
-public struct AutomationSummaryChangedParams: Codable, Sendable {
-    /// Root channel URI.
-    public var channel: String
-    /// Complete replacement catalogue summary.
-    public var summary: AutomationSummary
-
-    public init(
-        channel: String,
-        summary: AutomationSummary
-    ) {
-        self.channel = channel
-        self.summary = summary
-    }
-}
-
 public struct ProgressParams: Codable, Sendable {
     /// Channel URI this notification belongs to (the root channel).
     public var channel: String
@@ -225,7 +180,7 @@ public struct PartialSessionSummary: Codable, Sendable {
     public var status: SessionStatus?
     /// Human-readable description of what the session is currently doing
     public var activity: String?
-    /// Durable origin of this session, when another AHP resource created it.
+    /// Durable {@link AutomationSessionOrigin}, when an automation run created this session.
     public var origin: SessionOrigin?
     /// Server-owned project for this session
     public var project: ProjectInfo?

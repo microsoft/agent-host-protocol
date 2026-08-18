@@ -5524,13 +5524,6 @@
           "type": "number",
           "description": "Number of entries in {@link AutomationRunState.sessions}."
         },
-        "operations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunOperation"
-          },
-          "description": "Operations currently permitted for this run, matching {@link AutomationRunState.operations}."
-        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -5542,13 +5535,12 @@
         "automation",
         "origin",
         "lifecycle",
-        "sessionCount",
-        "operations"
+        "sessionCount"
       ]
     },
     "AutomationRunState": {
       "type": "object",
-      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, linked-session\nmembership, and cancellation availability. Linked session and chat channels\nremain authoritative for transcripts, tools, interaction requirements,\nchangesets, and per-session lifecycle.",
+      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, and linked-session\nmembership. Linked session and chat channels remain authoritative for\ntranscripts, tools, interaction requirements, changesets, and per-session\nlifecycle.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -5577,13 +5569,6 @@
           "$ref": "#/$defs/URI",
           "description": "Member of {@link AutomationRunState.sessions} that the host recommends opening first."
         },
-        "operations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunOperation"
-          },
-          "description": "Operations currently permitted for this run."
-        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -5595,8 +5580,7 @@
         "automation",
         "origin",
         "lifecycle",
-        "sessions",
-        "operations"
+        "sessions"
       ]
     },
     "BaseParams": {
@@ -5780,7 +5764,7 @@
     },
     "AutomationCapabilities": {
       "type": "object",
-      "description": "Automation features supported by this host authority.\n\nThe presence of this object advertises the baseline `ahp-automations://`\ncatalogue. Optional fields describe additional host features and\nrestrictions.\n\nCapabilities describe implementation support. Per-resource\n{@link AutomationState.operations} and\n{@link AutomationRunState.operations} remain authoritative for whether a\nparticular operation is currently allowed.",
+      "description": "Automation features supported by this host authority.\n\nThe presence of this object advertises the baseline `ahp-automations://`\ncatalogue. Optional fields describe additional host features and\nrestrictions.\n\nCapabilities describe implementation support.\n{@link AutomationState.operations} remains authoritative for which\ndefinition mutations are currently allowed on a particular automation.",
       "properties": {
         "create": {
           "$ref": "#/$defs/AutomationCreateCapability",
@@ -5792,7 +5776,7 @@
         },
         "runCancellation": {
           "$ref": "#/$defs/AutomationRunCancellationCapability",
-          "description": "Present when clients may dispatch {@link AutomationRunCancelRequestedAction}."
+          "description": "Present when clients may request cancellation of `pending` or `running`\nautomation runs."
         },
         "runHistoryLimit": {
           "type": "number",
@@ -5817,7 +5801,7 @@
     },
     "AutomationRunCancellationCapability": {
       "type": "object",
-      "description": "Presence capability for {@link AutomationRunCancelRequestedAction |\n`automationRun/cancelRequested`}.\n\nThe empty object means \"supported\"; clients must additionally check for\n{@link AutomationRunOperation.Cancel} on each run.",
+      "description": "Presence capability for {@link AutomationRunCancelRequestedAction |\n`automationRun/cancelRequested`}.\n\nThe empty object means \"supported.\" Clients may dispatch the action for\n`pending` or `running` runs; terminal runs cannot be cancelled.",
       "properties": {}
     },
     "PingParams": {
@@ -7967,13 +7951,6 @@
         }
       ],
       "description": "Discriminated lifecycle of an automation run."
-    },
-    "AutomationRunOperation": {
-      "enum": [
-        "cancel"
-      ],
-      "type": "string",
-      "description": "Operations the host currently permits for a run."
     },
     "ActionEnvelope": {
       "type": "object",
@@ -10413,7 +10390,7 @@
     },
     "AutomationRunLifecycleChangedAction": {
       "type": "object",
-      "description": "Replace the run lifecycle and currently allowed operations atomically.\n\nThe host dispatches this action for every lifecycle transition. Terminal\nlifecycles normally carry an empty operations list.",
+      "description": "Replace the run lifecycle.\n\nThe host dispatches this action for every lifecycle transition.",
       "properties": {
         "type": {
           "const": "automationRun/lifecycleChanged"
@@ -10421,19 +10398,11 @@
         "lifecycle": {
           "$ref": "#/$defs/AutomationRunLifecycle",
           "description": "Complete replacement {@link AutomationRunState.lifecycle}."
-        },
-        "operations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunOperation"
-          },
-          "description": "Complete replacement {@link AutomationRunState.operations}."
         }
       },
       "required": [
         "type",
-        "lifecycle",
-        "operations"
+        "lifecycle"
       ]
     },
     "AutomationRunSessionSetAction": {
@@ -10488,7 +10457,7 @@
     },
     "AutomationRunCancelRequestedAction": {
       "type": "object",
-      "description": "Ask the host to cancel this run.\n\nThis is the only client-dispatchable automation-run action. It is a\nside-effect request and deliberately leaves optimistic state unchanged. The\nauthoritative outcome arrives later through\n{@link AutomationRunLifecycleChangedAction}: cancellation may transition to\n`cancelled`, or the run may complete or fail before cancellation takes\neffect.",
+      "description": "Ask the host to cancel this run.\n\nThis is the only client-dispatchable automation-run action. It is a\nside-effect request and deliberately leaves optimistic state unchanged. The\nclient may dispatch it only when the host advertises its `runCancellation`\ncapability and the current lifecycle is `pending` or `running`. The host\nrevalidates that the run is non-terminal. The authoritative outcome arrives\nlater through\n{@link AutomationRunLifecycleChangedAction}: cancellation may transition to\n`cancelled`, or the run may complete or fail before cancellation takes\neffect.",
       "properties": {
         "type": {
           "const": "automationRun/cancelRequested"

@@ -157,61 +157,56 @@ async fn request_response_and_action_fanout() {
 }
 
 #[tokio::test]
-async fn automation_catalogue_notifications_fan_out() {
+async fn automation_catalogue_actions_fan_out() {
     let (client_side, mut server_side) = pair();
     let client = Client::connect(client_side, ClientConfig::default())
         .await
         .expect("connect");
     let mut subscription = client
-        .attach_subscription(ahp_types::ROOT_RESOURCE_URI)
+        .attach_subscription("ahp-automations://".into())
         .await;
 
-    let summary = serde_json::json!({
-        "resource": "ahp-automation:/a1",
-        "title": "Nightly triage",
-        "enabled": true,
-        "triggerCount": 1,
-        "revision": 2,
-        "operations": ["update", "dispose", "run"],
-        "createdAt": "2026-08-01T00:00:00Z",
-        "modifiedAt": "2026-08-05T12:00:00Z"
-    });
-    for (method, params) in [
+    for (server_seq, action) in [
         (
-            "root/automationAdded",
+            1,
             serde_json::json!({
-                "channel": ahp_types::ROOT_RESOURCE_URI,
-                "summary": summary,
-            }),
-        ),
-        (
-            "root/automationSummaryChanged",
-            serde_json::json!({
-                "channel": ahp_types::ROOT_RESOURCE_URI,
-                "summary": {
+                "type": "automation/set",
+                "automation": {
                     "resource": "ahp-automation:/a1",
-                    "title": "Updated triage",
-                    "enabled": false,
-                    "triggerCount": 1,
-                    "revision": 3,
+                    "definition": {
+                        "title": "Nightly triage",
+                        "message": {
+                            "text": "Triage issues",
+                            "origin": { "kind": "user" }
+                        },
+                        "session": {},
+                        "enabled": true,
+                        "triggers": []
+                    },
+                    "runs": [],
                     "operations": ["update", "dispose", "run"],
                     "createdAt": "2026-08-01T00:00:00Z",
-                    "modifiedAt": "2026-08-05T13:00:00Z"
-                },
+                    "modifiedAt": "2026-08-05T12:00:00Z"
+                }
             }),
         ),
         (
-            "root/automationRemoved",
+            2,
             serde_json::json!({
-                "channel": ahp_types::ROOT_RESOURCE_URI,
-                "automation": "ahp-automation:/a1",
+                "type": "automation/removed",
+                "resource": "ahp-automation:/a1"
             }),
         ),
     ] {
         let notification = JsonRpcMessage::Notification(JsonRpcNotification {
             jsonrpc: JsonRpcVersion::V2,
-            method: method.into(),
-            params: Some(ahp_types::common::AnyValue::from(params)),
+            method: "action".into(),
+            params: Some(ahp_types::common::AnyValue::from(serde_json::json!({
+                "channel": "ahp-automations://",
+                "serverSeq": server_seq,
+                "action": action,
+                "origin": null
+            }))),
         });
         server_side
             .send(TransportMessage::encode(&notification).unwrap())
@@ -219,32 +214,26 @@ async fn automation_catalogue_notifications_fan_out() {
             .unwrap();
     }
 
-    let added = tokio::time::timeout(std::time::Duration::from_secs(2), subscription.recv())
+    let set = tokio::time::timeout(std::time::Duration::from_secs(2), subscription.recv())
         .await
         .expect("timed out")
         .expect("channel closed");
-    let added = match added {
-        SubscriptionEvent::AutomationAdded(params) => params,
-        other => panic!("expected AutomationAdded, got {other:?}"),
+    let SubscriptionEvent::Action(set) = set else {
+        panic!("expected automation/set action")
     };
-    assert_eq!(added.summary.resource, "ahp-automation:/a1");
-    assert_eq!(added.summary.title, "Nightly triage");
-
-    let changed = subscription.recv().await.expect("channel closed");
-    let changed = match changed {
-        SubscriptionEvent::AutomationSummaryChanged(params) => params,
-        other => panic!("expected AutomationSummaryChanged, got {other:?}"),
+    let StateAction::AutomationSet(set) = set.action else {
+        panic!("expected AutomationSet")
     };
-    assert_eq!(changed.summary.resource, "ahp-automation:/a1");
-    assert_eq!(changed.summary.title, "Updated triage");
-    assert!(!changed.summary.enabled);
+    assert_eq!(set.automation.resource, "ahp-automation:/a1");
 
     let removed = subscription.recv().await.expect("channel closed");
-    let removed = match removed {
-        SubscriptionEvent::AutomationRemoved(params) => params,
-        other => panic!("expected AutomationRemoved, got {other:?}"),
+    let SubscriptionEvent::Action(removed) = removed else {
+        panic!("expected automation/removed action")
     };
-    assert_eq!(removed.automation, "ahp-automation:/a1");
+    let StateAction::AutomationRemoved(removed) = removed.action else {
+        panic!("expected AutomationRemoved")
+    };
+    assert_eq!(removed.resource, "ahp-automation:/a1");
 
     client.shutdown().await;
 }

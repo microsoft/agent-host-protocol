@@ -9,15 +9,13 @@ import { ActionType } from '../common/actions.js';
 import type { URI } from '../common/state.js';
 import type {
   AutomationRunLifecycle,
-  AutomationRunOperation,
   AutomationRunState,
 } from './state.js';
 
 /**
- * Replace the run lifecycle and currently allowed operations atomically.
+ * Replace the run lifecycle.
  *
- * The host dispatches this action for every lifecycle transition. Terminal
- * lifecycles normally carry an empty operations list.
+ * The host dispatches this action for every lifecycle transition.
  *
  * @category Automation Run Actions
  * @version 1
@@ -26,8 +24,6 @@ export interface AutomationRunLifecycleChangedAction {
   type: ActionType.AutomationRunLifecycleChanged;
   /** Complete replacement {@link AutomationRunState.lifecycle}. */
   lifecycle: AutomationRunLifecycle;
-  /** Complete replacement {@link AutomationRunState.operations}. */
-  operations: AutomationRunOperation[];
 }
 
 /**
@@ -76,7 +72,10 @@ export interface AutomationRunPrimarySessionChangedAction {
  *
  * This is the only client-dispatchable automation-run action. It is a
  * side-effect request and deliberately leaves optimistic state unchanged. The
- * authoritative outcome arrives later through
+ * client may dispatch it only when the host advertises its `runCancellation`
+ * capability and the current lifecycle is `pending` or `running`. The host
+ * revalidates that the run is non-terminal. The authoritative outcome arrives
+ * later through
  * {@link AutomationRunLifecycleChangedAction}: cancellation may transition to
  * `cancelled`, or the run may complete or fail before cancellation takes
  * effect.

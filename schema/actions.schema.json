@@ -2204,7 +2204,7 @@
     },
     "AutomationRunLifecycleChangedAction": {
       "type": "object",
-      "description": "Replace the run lifecycle and currently allowed operations atomically.\n\nThe host dispatches this action for every lifecycle transition. Terminal\nlifecycles normally carry an empty operations list.",
+      "description": "Replace the run lifecycle.\n\nThe host dispatches this action for every lifecycle transition.",
       "properties": {
         "type": {
           "const": "automationRun/lifecycleChanged"
@@ -2212,19 +2212,11 @@
         "lifecycle": {
           "$ref": "#/$defs/AutomationRunLifecycle",
           "description": "Complete replacement {@link AutomationRunState.lifecycle}."
-        },
-        "operations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunOperation"
-          },
-          "description": "Complete replacement {@link AutomationRunState.operations}."
         }
       },
       "required": [
         "type",
-        "lifecycle",
-        "operations"
+        "lifecycle"
       ]
     },
     "AutomationRunSessionSetAction": {
@@ -2279,7 +2271,7 @@
     },
     "AutomationRunCancelRequestedAction": {
       "type": "object",
-      "description": "Ask the host to cancel this run.\n\nThis is the only client-dispatchable automation-run action. It is a\nside-effect request and deliberately leaves optimistic state unchanged. The\nauthoritative outcome arrives later through\n{@link AutomationRunLifecycleChangedAction}: cancellation may transition to\n`cancelled`, or the run may complete or fail before cancellation takes\neffect.",
+      "description": "Ask the host to cancel this run.\n\nThis is the only client-dispatchable automation-run action. It is a\nside-effect request and deliberately leaves optimistic state unchanged. The\nclient may dispatch it only when the host advertises its `runCancellation`\ncapability and the current lifecycle is `pending` or `running`. The host\nrevalidates that the run is non-terminal. The authoritative outcome arrives\nlater through\n{@link AutomationRunLifecycleChangedAction}: cancellation may transition to\n`cancelled`, or the run may complete or fail before cancellation takes\neffect.",
       "properties": {
         "type": {
           "const": "automationRun/cancelRequested"
@@ -7821,13 +7813,6 @@
           "type": "number",
           "description": "Number of entries in {@link AutomationRunState.sessions}."
         },
-        "operations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunOperation"
-          },
-          "description": "Operations currently permitted for this run, matching {@link AutomationRunState.operations}."
-        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -7839,13 +7824,12 @@
         "automation",
         "origin",
         "lifecycle",
-        "sessionCount",
-        "operations"
+        "sessionCount"
       ]
     },
     "AutomationRunState": {
       "type": "object",
-      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, linked-session\nmembership, and cancellation availability. Linked session and chat channels\nremain authoritative for transcripts, tools, interaction requirements,\nchangesets, and per-session lifecycle.",
+      "description": "Authoritative state of one subscribed `ahp-automation-run:` resource.\n\nThe run channel owns task-level lifecycle, provenance, and linked-session\nmembership. Linked session and chat channels remain authoritative for\ntranscripts, tools, interaction requirements, changesets, and per-session\nlifecycle.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -7874,13 +7858,6 @@
           "$ref": "#/$defs/URI",
           "description": "Member of {@link AutomationRunState.sessions} that the host recommends opening first."
         },
-        "operations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/AutomationRunOperation"
-          },
-          "description": "Operations currently permitted for this run."
-        },
         "_meta": {
           "type": "object",
           "additionalProperties": {},
@@ -7892,8 +7869,7 @@
         "automation",
         "origin",
         "lifecycle",
-        "sessions",
-        "operations"
+        "sessions"
       ]
     },
     "StringOrMarkdown": {
@@ -8786,13 +8762,6 @@
       ],
       "type": "string",
       "description": "Execution lifecycle of a {@link ChangesetOperation}.\n\nAn operation is invoked imperatively via `invokeChangesetOperation`, but\nits progress and outcome are reflected back into changeset state so that\nevery subscriber observes a consistent view (e.g. a spinner on a \"Create\nPull Request\" button, or an inline error after a failed \"revert\")."
-    },
-    "AutomationRunOperation": {
-      "enum": [
-        "cancel"
-      ],
-      "type": "string",
-      "description": "Operations the host currently permits for a run."
     },
     "PolicyState": {
       "enum": [

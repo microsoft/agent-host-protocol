@@ -197,14 +197,14 @@ enum class ActionType {
     TERMINAL_COMMAND_FINISHED,
     @SerialName("resourceWatch/changed")
     RESOURCE_WATCH_CHANGED,
-    @SerialName("automation/definitionChanged")
-    AUTOMATION_DEFINITION_CHANGED,
-    @SerialName("automation/runSummarySet")
-    AUTOMATION_RUN_SUMMARY_SET,
-    @SerialName("automation/runSummaryRemoved")
-    AUTOMATION_RUN_SUMMARY_REMOVED,
-    @SerialName("automation/runsLoaded")
-    AUTOMATION_RUNS_LOADED,
+    @SerialName("automation/createRequested")
+    AUTOMATION_CREATE_REQUESTED,
+    @SerialName("automation/updateRequested")
+    AUTOMATION_UPDATE_REQUESTED,
+    @SerialName("automation/set")
+    AUTOMATION_SET,
+    @SerialName("automation/removed")
+    AUTOMATION_REMOVED,
     @SerialName("automationRun/lifecycleChanged")
     AUTOMATION_RUN_LIFECYCLE_CHANGED,
     @SerialName("automationRun/sessionSet")
@@ -213,10 +213,6 @@ enum class ActionType {
     AUTOMATION_RUN_SESSION_REMOVED,
     @SerialName("automationRun/primarySessionChanged")
     AUTOMATION_RUN_PRIMARY_SESSION_CHANGED,
-    @SerialName("automationRun/artifactSet")
-    AUTOMATION_RUN_ARTIFACT_SET,
-    @SerialName("automationRun/artifactRemoved")
-    AUTOMATION_RUN_ARTIFACT_REMOVED,
     @SerialName("automationRun/cancelRequested")
     AUTOMATION_RUN_CANCEL_REQUESTED
 }
@@ -1504,75 +1500,63 @@ data class ResourceWatchChangedAction(
 )
 
 @Serializable
-data class AutomationDefinitionChangedAction(
+data class AutomationCreateRequestedAction(
     val type: ActionType,
     /**
-     * Complete replacement definition.
+     * Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.
      */
-    val definition: AutomationDefinition,
+    val resource: String,
     /**
-     * New monotonic revision.
+     * Complete initial {@link AutomationState.definition}.
      */
-    val revision: Long,
-    /**
-     * Definition modification timestamp in ISO 8601 format.
-     */
-    val modifiedAt: String,
-    /**
-     * Earliest known future scheduled occurrence, or omitted to clear it.
-     */
-    val nextRunAt: String? = null
+    val definition: AutomationDefinition
 )
 
 @Serializable
-data class AutomationRunSummarySetAction(
+data class AutomationUpdateRequestedAction(
     val type: ActionType,
     /**
-     * New or replacement run summary.
+     * Target {@link AutomationState.resource}.
      */
-    val run: AutomationRunSummary
+    val resource: String,
+    /**
+     * Editable {@link AutomationDefinition} fields to replace.
+     */
+    val changes: AutomationDefinitionPatch
 )
 
 @Serializable
-data class AutomationRunSummaryRemovedAction(
+data class AutomationSetAction(
     val type: ActionType,
     /**
-     * {@link AutomationRunSummary.resource} to remove.
+     * Full new or replacement automation state.
      */
-    val run: String
+    val automation: AutomationState
 )
 
 @Serializable
-data class AutomationRunsLoadedAction(
+data class AutomationRemovedAction(
     val type: ActionType,
     /**
-     * Older run summaries in newest-first order within this page.
+     * {@link AutomationState.resource} to remove.
      */
-    val runs: List<AutomationRunSummary>,
-    /**
-     * Opaque cursor for the next older page, or omitted at the end.
-     */
-    val nextCursor: String? = null
+    val resource: String
 )
 
 @Serializable
 data class AutomationRunLifecycleChangedAction(
     val type: ActionType,
     /**
-     * Complete replacement lifecycle.
+     * Complete replacement {@link AutomationRunState.lifecycle}.
      */
-    val lifecycle: AutomationRunLifecycle,
-    /**
-     * Complete replacement operation list.
-     */
-    val operations: List<AutomationRunOperation>
+    val lifecycle: AutomationRunLifecycle
 )
 
 @Serializable
 data class AutomationRunSessionSetAction(
     val type: ActionType,
     /**
-     * Session URI to append when it is not already linked.
+     * Session URI to append to {@link AutomationRunState.sessions} when not already linked.
      */
     val session: String
 )
@@ -1581,7 +1565,7 @@ data class AutomationRunSessionSetAction(
 data class AutomationRunSessionRemovedAction(
     val type: ActionType,
     /**
-     * Linked session URI to remove.
+     * Entry in {@link AutomationRunState.sessions} to remove.
      */
     val session: String
 )
@@ -1590,27 +1574,9 @@ data class AutomationRunSessionRemovedAction(
 data class AutomationRunPrimarySessionChangedAction(
     val type: ActionType,
     /**
-     * New primary linked session, or omitted to clear the selection.
+     * New {@link AutomationRunState.primarySession}, or omitted to clear the selection.
      */
     val primarySession: String? = null
-)
-
-@Serializable
-data class AutomationRunArtifactSetAction(
-    val type: ActionType,
-    /**
-     * New or replacement artifact.
-     */
-    val artifact: AutomationRunArtifact
-)
-
-@Serializable
-data class AutomationRunArtifactRemovedAction(
-    val type: ActionType,
-    /**
-     * {@link AutomationRunArtifact.id} to remove.
-     */
-    val artifactId: String
 )
 
 @Serializable
@@ -1760,16 +1726,14 @@ sealed interface StateAction
 @JvmInline value class StateActionTerminalCommandExecuted(val value: TerminalCommandExecutedAction) : StateAction
 @JvmInline value class StateActionTerminalCommandFinished(val value: TerminalCommandFinishedAction) : StateAction
 @JvmInline value class StateActionResourceWatchChanged(val value: ResourceWatchChangedAction) : StateAction
-@JvmInline value class StateActionAutomationDefinitionChanged(val value: AutomationDefinitionChangedAction) : StateAction
-@JvmInline value class StateActionAutomationRunSummarySet(val value: AutomationRunSummarySetAction) : StateAction
-@JvmInline value class StateActionAutomationRunSummaryRemoved(val value: AutomationRunSummaryRemovedAction) : StateAction
-@JvmInline value class StateActionAutomationRunsLoaded(val value: AutomationRunsLoadedAction) : StateAction
+@JvmInline value class StateActionAutomationCreateRequested(val value: AutomationCreateRequestedAction) : StateAction
+@JvmInline value class StateActionAutomationUpdateRequested(val value: AutomationUpdateRequestedAction) : StateAction
+@JvmInline value class StateActionAutomationSet(val value: AutomationSetAction) : StateAction
+@JvmInline value class StateActionAutomationRemoved(val value: AutomationRemovedAction) : StateAction
 @JvmInline value class StateActionAutomationRunLifecycleChanged(val value: AutomationRunLifecycleChangedAction) : StateAction
 @JvmInline value class StateActionAutomationRunSessionSet(val value: AutomationRunSessionSetAction) : StateAction
 @JvmInline value class StateActionAutomationRunSessionRemoved(val value: AutomationRunSessionRemovedAction) : StateAction
 @JvmInline value class StateActionAutomationRunPrimarySessionChanged(val value: AutomationRunPrimarySessionChangedAction) : StateAction
-@JvmInline value class StateActionAutomationRunArtifactSet(val value: AutomationRunArtifactSetAction) : StateAction
-@JvmInline value class StateActionAutomationRunArtifactRemoved(val value: AutomationRunArtifactRemovedAction) : StateAction
 @JvmInline value class StateActionAutomationRunCancelRequested(val value: AutomationRunCancelRequestedAction) : StateAction
 @JvmInline value class StateActionUnknown(val raw: JsonObject) : StateAction
 
@@ -1871,16 +1835,14 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "terminal/commandExecuted" -> StateActionTerminalCommandExecuted(input.json.decodeFromJsonElement(TerminalCommandExecutedAction.serializer(), element))
             "terminal/commandFinished" -> StateActionTerminalCommandFinished(input.json.decodeFromJsonElement(TerminalCommandFinishedAction.serializer(), element))
             "resourceWatch/changed" -> StateActionResourceWatchChanged(input.json.decodeFromJsonElement(ResourceWatchChangedAction.serializer(), element))
-            "automation/definitionChanged" -> StateActionAutomationDefinitionChanged(input.json.decodeFromJsonElement(AutomationDefinitionChangedAction.serializer(), element))
-            "automation/runSummarySet" -> StateActionAutomationRunSummarySet(input.json.decodeFromJsonElement(AutomationRunSummarySetAction.serializer(), element))
-            "automation/runSummaryRemoved" -> StateActionAutomationRunSummaryRemoved(input.json.decodeFromJsonElement(AutomationRunSummaryRemovedAction.serializer(), element))
-            "automation/runsLoaded" -> StateActionAutomationRunsLoaded(input.json.decodeFromJsonElement(AutomationRunsLoadedAction.serializer(), element))
+            "automation/createRequested" -> StateActionAutomationCreateRequested(input.json.decodeFromJsonElement(AutomationCreateRequestedAction.serializer(), element))
+            "automation/updateRequested" -> StateActionAutomationUpdateRequested(input.json.decodeFromJsonElement(AutomationUpdateRequestedAction.serializer(), element))
+            "automation/set" -> StateActionAutomationSet(input.json.decodeFromJsonElement(AutomationSetAction.serializer(), element))
+            "automation/removed" -> StateActionAutomationRemoved(input.json.decodeFromJsonElement(AutomationRemovedAction.serializer(), element))
             "automationRun/lifecycleChanged" -> StateActionAutomationRunLifecycleChanged(input.json.decodeFromJsonElement(AutomationRunLifecycleChangedAction.serializer(), element))
             "automationRun/sessionSet" -> StateActionAutomationRunSessionSet(input.json.decodeFromJsonElement(AutomationRunSessionSetAction.serializer(), element))
             "automationRun/sessionRemoved" -> StateActionAutomationRunSessionRemoved(input.json.decodeFromJsonElement(AutomationRunSessionRemovedAction.serializer(), element))
             "automationRun/primarySessionChanged" -> StateActionAutomationRunPrimarySessionChanged(input.json.decodeFromJsonElement(AutomationRunPrimarySessionChangedAction.serializer(), element))
-            "automationRun/artifactSet" -> StateActionAutomationRunArtifactSet(input.json.decodeFromJsonElement(AutomationRunArtifactSetAction.serializer(), element))
-            "automationRun/artifactRemoved" -> StateActionAutomationRunArtifactRemoved(input.json.decodeFromJsonElement(AutomationRunArtifactRemovedAction.serializer(), element))
             "automationRun/cancelRequested" -> StateActionAutomationRunCancelRequested(input.json.decodeFromJsonElement(AutomationRunCancelRequestedAction.serializer(), element))
             else -> StateActionUnknown(obj)
         }
@@ -1975,16 +1937,14 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionTerminalCommandExecuted -> output.json.encodeToJsonElement(TerminalCommandExecutedAction.serializer(), value.value)
             is StateActionTerminalCommandFinished -> output.json.encodeToJsonElement(TerminalCommandFinishedAction.serializer(), value.value)
             is StateActionResourceWatchChanged -> output.json.encodeToJsonElement(ResourceWatchChangedAction.serializer(), value.value)
-            is StateActionAutomationDefinitionChanged -> output.json.encodeToJsonElement(AutomationDefinitionChangedAction.serializer(), value.value)
-            is StateActionAutomationRunSummarySet -> output.json.encodeToJsonElement(AutomationRunSummarySetAction.serializer(), value.value)
-            is StateActionAutomationRunSummaryRemoved -> output.json.encodeToJsonElement(AutomationRunSummaryRemovedAction.serializer(), value.value)
-            is StateActionAutomationRunsLoaded -> output.json.encodeToJsonElement(AutomationRunsLoadedAction.serializer(), value.value)
+            is StateActionAutomationCreateRequested -> output.json.encodeToJsonElement(AutomationCreateRequestedAction.serializer(), value.value)
+            is StateActionAutomationUpdateRequested -> output.json.encodeToJsonElement(AutomationUpdateRequestedAction.serializer(), value.value)
+            is StateActionAutomationSet -> output.json.encodeToJsonElement(AutomationSetAction.serializer(), value.value)
+            is StateActionAutomationRemoved -> output.json.encodeToJsonElement(AutomationRemovedAction.serializer(), value.value)
             is StateActionAutomationRunLifecycleChanged -> output.json.encodeToJsonElement(AutomationRunLifecycleChangedAction.serializer(), value.value)
             is StateActionAutomationRunSessionSet -> output.json.encodeToJsonElement(AutomationRunSessionSetAction.serializer(), value.value)
             is StateActionAutomationRunSessionRemoved -> output.json.encodeToJsonElement(AutomationRunSessionRemovedAction.serializer(), value.value)
             is StateActionAutomationRunPrimarySessionChanged -> output.json.encodeToJsonElement(AutomationRunPrimarySessionChangedAction.serializer(), value.value)
-            is StateActionAutomationRunArtifactSet -> output.json.encodeToJsonElement(AutomationRunArtifactSetAction.serializer(), value.value)
-            is StateActionAutomationRunArtifactRemoved -> output.json.encodeToJsonElement(AutomationRunArtifactRemovedAction.serializer(), value.value)
             is StateActionAutomationRunCancelRequested -> output.json.encodeToJsonElement(AutomationRunCancelRequestedAction.serializer(), value.value)
             is StateActionUnknown -> value.raw
         }

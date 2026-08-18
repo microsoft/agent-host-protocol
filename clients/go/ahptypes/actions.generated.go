@@ -104,16 +104,14 @@ const (
 	ActionTypeTerminalCommandExecuted            ActionType = "terminal/commandExecuted"
 	ActionTypeTerminalCommandFinished            ActionType = "terminal/commandFinished"
 	ActionTypeResourceWatchChanged               ActionType = "resourceWatch/changed"
-	ActionTypeAutomationDefinitionChanged        ActionType = "automation/definitionChanged"
-	ActionTypeAutomationRunSummarySet            ActionType = "automation/runSummarySet"
-	ActionTypeAutomationRunSummaryRemoved        ActionType = "automation/runSummaryRemoved"
-	ActionTypeAutomationRunsLoaded               ActionType = "automation/runsLoaded"
+	ActionTypeAutomationCreateRequested          ActionType = "automation/createRequested"
+	ActionTypeAutomationUpdateRequested          ActionType = "automation/updateRequested"
+	ActionTypeAutomationSet                      ActionType = "automation/set"
+	ActionTypeAutomationRemoved                  ActionType = "automation/removed"
 	ActionTypeAutomationRunLifecycleChanged      ActionType = "automationRun/lifecycleChanged"
 	ActionTypeAutomationRunSessionSet            ActionType = "automationRun/sessionSet"
 	ActionTypeAutomationRunSessionRemoved        ActionType = "automationRun/sessionRemoved"
 	ActionTypeAutomationRunPrimarySessionChanged ActionType = "automationRun/primarySessionChanged"
-	ActionTypeAutomationRunArtifactSet           ActionType = "automationRun/artifactSet"
-	ActionTypeAutomationRunArtifactRemoved       ActionType = "automationRun/artifactRemoved"
 	ActionTypeAutomationRunCancelRequested       ActionType = "automationRun/cancelRequested"
 )
 
@@ -1495,77 +1493,87 @@ type ResourceWatchChangedAction struct {
 	Changes json.RawMessage `json:"changes"`
 }
 
-// Replace the editable definition after a successful `updateAutomation` or
-// another host-authorized definition change.
+// Ask the host to create a durable automation at a client-chosen resource.
 //
-// Full replacement semantics apply to `definition`. The reducer also replaces
-// the revision and modification timestamp. Omitting `nextRunAt` clears the
-// previously projected next occurrence.
-type AutomationDefinitionChangedAction struct {
+// Clients may dispatch this action only when the host advertises its `create`
+// automation capability. {@link AutomationCreateRequestedAction.resource |
+// `resource`} MUST use the `ahp-automation:` scheme and MUST NOT already
+// identify an unrelated automation.
+//
+// This side-effect request leaves optimistic catalogue state unchanged. The
+// host validates trigger ids and configuration, normalizes event-trigger
+// titles and descriptions, persists the definition, then publishes the
+// authoritative result with {@link AutomationSetAction | `automation/set`}.
+// Rejections leave the catalogue unchanged.
+type AutomationCreateRequestedAction struct {
 	Type ActionType `json:"type"`
-	// Complete replacement definition.
+	// Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.
+	Resource URI `json:"resource"`
+	// Complete initial {@link AutomationState.definition}.
 	Definition AutomationDefinition `json:"definition"`
-	// New monotonic revision.
-	Revision int64 `json:"revision"`
-	// Definition modification timestamp in ISO 8601 format.
-	ModifiedAt string `json:"modifiedAt"`
-	// Earliest known future scheduled occurrence, or omitted to clear it.
-	NextRunAt *string `json:"nextRunAt,omitempty"`
 }
 
-// Upsert one run summary in the retained history.
+// Ask the host to update editable fields of an existing automation.
 //
-// Existing entries are replaced by {@link AutomationRunSummary.resource}. A
-// previously unseen run is inserted at the front because history is
-// newest-first.
-type AutomationRunSummarySetAction struct {
+// Clients may dispatch this action only while the target advertises
+// {@link AutomationOperation.Update}. The host revalidates that operation and
+// the client's authorization.
+//
+// This side-effect request leaves optimistic catalogue state unchanged. The
+// host applies accepted patches to its current authoritative definition in
+// action order, revalidates and normalizes affected event triggers, then
+// publishes the result with
+// {@link AutomationSetAction | `automation/set`}. Omitted fields remain
+// unchanged; when accepted actions replace the same field, the later action in
+// server order wins.
+type AutomationUpdateRequestedAction struct {
 	Type ActionType `json:"type"`
-	// New or replacement run summary.
-	Run AutomationRunSummary `json:"run"`
+	// Target {@link AutomationState.resource}.
+	Resource URI `json:"resource"`
+	// Editable {@link AutomationDefinition} fields to replace.
+	Changes AutomationDefinitionPatch `json:"changes"`
 }
 
-// Remove one retained run summary by its automation-run URI.
+// Add or replace one full automation state in
+// {@link AutomationCatalogState.automations}.
 //
-// The action is a no-op when the URI is not present in the current history
-// window.
-type AutomationRunSummaryRemovedAction struct {
+// Existing entries are matched by {@link AutomationState.resource} and
+// replaced in place. A previously unseen resource is appended.
+type AutomationSetAction struct {
 	Type ActionType `json:"type"`
-	// {@link AutomationRunSummary.resource} to remove.
-	Run URI `json:"run"`
+	// Full new or replacement automation state.
+	Automation AutomationState `json:"automation"`
 }
 
-// Append an older page of run summaries returned by
-// `fetchAutomationRuns`.
+// Remove one automation from {@link AutomationCatalogState.automations}.
 //
-// Entries already present by resource URI are ignored, preserving the
-// newest-first ordering of the existing history followed by the fetched page.
-// Omitting `nextCursor` marks the end of retained history.
-type AutomationRunsLoadedAction struct {
+// Clients may dispatch this action only while the target advertises
+// {@link AutomationOperation.Dispose}. The host revalidates that operation
+// before permanently deleting the automation. A rejected action leaves the
+// authoritative catalogue and durable definition unchanged.
+//
+// Removing an unknown resource is a no-op.
+type AutomationRemovedAction struct {
 	Type ActionType `json:"type"`
-	// Older run summaries in newest-first order within this page.
-	Runs []AutomationRunSummary `json:"runs"`
-	// Opaque cursor for the next older page, or omitted at the end.
-	NextCursor *string `json:"nextCursor,omitempty"`
+	// {@link AutomationState.resource} to remove.
+	Resource URI `json:"resource"`
 }
 
-// Replace the run lifecycle and currently allowed operations atomically.
+// Replace the run lifecycle.
 //
-// The host dispatches this action for every lifecycle transition. Terminal
-// lifecycles normally carry an empty operations list.
+// The host dispatches this action for every lifecycle transition.
 type AutomationRunLifecycleChangedAction struct {
 	Type ActionType `json:"type"`
-	// Complete replacement lifecycle.
+	// Complete replacement {@link AutomationRunState.lifecycle}.
 	Lifecycle AutomationRunLifecycle `json:"lifecycle"`
-	// Complete replacement operation list.
-	Operations []AutomationRunOperation `json:"operations"`
 }
 
-// Add a session to the run's ordered session catalogue.
+// Add a session to {@link AutomationRunState.sessions}.
 //
 // Session URIs are unique. Setting an existing URI is a no-op.
 type AutomationRunSessionSetAction struct {
 	Type ActionType `json:"type"`
-	// Session URI to append when it is not already linked.
+	// Session URI to append to {@link AutomationRunState.sessions} when not already linked.
 	Session URI `json:"session"`
 }
 
@@ -1575,38 +1583,25 @@ type AutomationRunSessionSetAction struct {
 // {@link AutomationRunState.primarySession}. An unknown URI is a no-op.
 type AutomationRunSessionRemovedAction struct {
 	Type ActionType `json:"type"`
-	// Linked session URI to remove.
+	// Entry in {@link AutomationRunState.sessions} to remove.
 	Session URI `json:"session"`
 }
 
 // Select or clear the session clients should open first for this run.
 type AutomationRunPrimarySessionChangedAction struct {
 	Type ActionType `json:"type"`
-	// New primary linked session, or omitted to clear the selection.
+	// New {@link AutomationRunState.primarySession}, or omitted to clear the selection.
 	PrimarySession *URI `json:"primarySession,omitempty"`
-}
-
-// Upsert a run-scoped artifact by {@link AutomationRunArtifact.id}.
-type AutomationRunArtifactSetAction struct {
-	Type ActionType `json:"type"`
-	// New or replacement artifact.
-	Artifact AutomationRunArtifact `json:"artifact"`
-}
-
-// Remove a run-scoped artifact by id.
-//
-// The action is a no-op when the id is not present.
-type AutomationRunArtifactRemovedAction struct {
-	Type ActionType `json:"type"`
-	// {@link AutomationRunArtifact.id} to remove.
-	ArtifactId string `json:"artifactId"`
 }
 
 // Ask the host to cancel this run.
 //
 // This is the only client-dispatchable automation-run action. It is a
 // side-effect request and deliberately leaves optimistic state unchanged. The
-// authoritative outcome arrives later through
+// client may dispatch it only when the host advertises its `runCancellation`
+// capability and the current lifecycle is `pending` or `running`. The host
+// revalidates that the run is non-terminal. The authoritative outcome arrives
+// later through
 // {@link AutomationRunLifecycleChangedAction}: cancellation may transition to
 // `cancelled`, or the run may complete or fail before cancellation takes
 // effect.
@@ -1710,16 +1705,14 @@ func (*TerminalCommandDetectionAvailableAction) isStateAction()  {}
 func (*TerminalCommandExecutedAction) isStateAction()            {}
 func (*TerminalCommandFinishedAction) isStateAction()            {}
 func (*ResourceWatchChangedAction) isStateAction()               {}
-func (*AutomationDefinitionChangedAction) isStateAction()        {}
-func (*AutomationRunSummarySetAction) isStateAction()            {}
-func (*AutomationRunSummaryRemovedAction) isStateAction()        {}
-func (*AutomationRunsLoadedAction) isStateAction()               {}
+func (*AutomationCreateRequestedAction) isStateAction()          {}
+func (*AutomationUpdateRequestedAction) isStateAction()          {}
+func (*AutomationSetAction) isStateAction()                      {}
+func (*AutomationRemovedAction) isStateAction()                  {}
 func (*AutomationRunLifecycleChangedAction) isStateAction()      {}
 func (*AutomationRunSessionSetAction) isStateAction()            {}
 func (*AutomationRunSessionRemovedAction) isStateAction()        {}
 func (*AutomationRunPrimarySessionChangedAction) isStateAction() {}
-func (*AutomationRunArtifactSetAction) isStateAction()           {}
-func (*AutomationRunArtifactRemovedAction) isStateAction()       {}
 func (*AutomationRunCancelRequestedAction) isStateAction()       {}
 
 // StateActionUnknown carries an unrecognized StateAction variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
@@ -2246,26 +2239,26 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
-	case "automation/definitionChanged":
-		var value AutomationDefinitionChangedAction
+	case "automation/createRequested":
+		var value AutomationCreateRequestedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "automation/runSummarySet":
-		var value AutomationRunSummarySetAction
+	case "automation/updateRequested":
+		var value AutomationUpdateRequestedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "automation/runSummaryRemoved":
-		var value AutomationRunSummaryRemovedAction
+	case "automation/set":
+		var value AutomationSetAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
-	case "automation/runsLoaded":
-		var value AutomationRunsLoadedAction
+	case "automation/removed":
+		var value AutomationRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -2290,18 +2283,6 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "automationRun/primarySessionChanged":
 		var value AutomationRunPrimarySessionChangedAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "automationRun/artifactSet":
-		var value AutomationRunArtifactSetAction
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "automationRun/artifactRemoved":
-		var value AutomationRunArtifactRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

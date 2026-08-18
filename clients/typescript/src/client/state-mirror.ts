@@ -2,10 +2,9 @@
  * Convenience reducer-driven state store, mirroring the Swift
  * `AHPStateMirror` and the Rust reducers example.
  *
- * Tracks one {@link RootState}, a `Map<URI, SessionState>`, a
- * `Map<URI, TerminalState>`, and a `Map<URI, ChangesetState>`. Apply
- * {@link Snapshot}s and {@link ActionEnvelope}s and the mirror keeps
- * those maps up to date via the generated reducers.
+ * Tracks root, session, terminal, changeset, automation catalogue, and
+ * automation-run state. Apply {@link Snapshot}s and {@link ActionEnvelope}s and
+ * the mirror keeps those resources up to date via the generated reducers.
  *
  * Useful for simple clients. Larger apps will usually keep their own
  * state and call the reducers directly.
@@ -27,7 +26,7 @@ import type { ChangesetState } from '../types/channels-changeset/state.js';
 import type { RootState } from '../types/channels-root/state.js';
 import type { SessionState } from '../types/channels-session/state.js';
 import type { TerminalState } from '../types/channels-terminal/state.js';
-import type { AutomationState } from '../types/channels-automation/state.js';
+import type { AutomationCatalogState, AutomationState } from '../types/channels-automation/state.js';
 import type { AutomationRunState } from '../types/channels-automation-run/state.js';
 import { changesetReducer } from '../types/channels-changeset/reducer.js';
 import { rootReducer } from '../types/channels-root/reducer.js';
@@ -37,8 +36,10 @@ import { automationReducer } from '../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../types/channels-automation-run/reducer.js';
 
 const ROOT_URI = 'ahp-root://' as const;
+const AUTOMATIONS_URI = 'ahp-automations://' as const;
 
 const INITIAL_ROOT: RootState = { agents: [] };
+const INITIAL_AUTOMATION_CATALOG: AutomationCatalogState = { automations: [] };
 
 /** Reducer-driven state container synchronised with server events. */
 export class AhpStateMirror {
@@ -46,6 +47,7 @@ export class AhpStateMirror {
   private readonly sessionsMap = new Map<URI, SessionState>();
   private readonly terminalsMap = new Map<URI, TerminalState>();
   private readonly changesetsMap = new Map<URI, ChangesetState>();
+  private automationCatalogState: AutomationCatalogState = INITIAL_AUTOMATION_CATALOG;
   private readonly automationsMap = new Map<URI, AutomationState>();
   private readonly automationRunsMap = new Map<URI, AutomationRunState>();
 
@@ -69,6 +71,12 @@ export class AhpStateMirror {
     return this.changesetsMap;
   }
 
+  /** Current automation catalogue state. */
+  get automationCatalog(): AutomationCatalogState {
+    return this.automationCatalogState;
+  }
+
+  /** All catalogued automations keyed by their stable resource URI. */
   get automations(): ReadonlyMap<URI, AutomationState> {
     return this.automationsMap;
   }
@@ -88,6 +96,10 @@ export class AhpStateMirror {
     return this.terminalsMap.get(uri);
   }
 
+  /** Look up a catalogued automation by URI. */
+  getAutomation(uri: URI): AutomationState | undefined {
+    return this.automationsMap.get(uri);
+  }
 
   /**
    * Apply a server snapshot, replacing the state for the resource the
@@ -111,12 +123,12 @@ export class AhpStateMirror {
       this.changesetsMap.set(resource, snapshot.state as ChangesetState);
       return;
     }
-    if (resource.startsWith('ahp-automation-run:')) {
-      this.automationRunsMap.set(resource, snapshot.state as AutomationRunState);
+    if (resource === AUTOMATIONS_URI) {
+      this.setAutomationCatalog(snapshot.state as AutomationCatalogState);
       return;
     }
-    if (resource.startsWith('ahp-automation:')) {
-      this.automationsMap.set(resource, snapshot.state as AutomationState);
+    if (resource.startsWith('ahp-automation-run:')) {
+      this.automationRunsMap.set(resource, snapshot.state as AutomationRunState);
       return;
     }
   }
@@ -155,17 +167,23 @@ export class AhpStateMirror {
       this.changesetsMap.set(channel, changesetReducer(current, action as ChangesetAction));
       return;
     }
+    if (channel === AUTOMATIONS_URI) {
+      this.setAutomationCatalog(automationReducer(this.automationCatalogState, action as AutomationAction));
+      return;
+    }
     if (channel.startsWith('ahp-automation-run:')) {
       const current = this.automationRunsMap.get(channel);
       if (!current) return;
       this.automationRunsMap.set(channel, automationRunReducer(current, action as AutomationRunAction));
       return;
     }
-    if (channel.startsWith('ahp-automation:')) {
-      const current = this.automationsMap.get(channel);
-      if (!current) return;
-      this.automationsMap.set(channel, automationReducer(current, action as AutomationAction));
-      return;
+  }
+
+  private setAutomationCatalog(state: AutomationCatalogState): void {
+    this.automationCatalogState = state;
+    this.automationsMap.clear();
+    for (const automation of state.automations) {
+      this.automationsMap.set(automation.resource, automation);
     }
   }
 }

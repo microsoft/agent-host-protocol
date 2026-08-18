@@ -49,6 +49,7 @@ public actor MultiHostStateMirror {
     public private(set) var changesets: [HostedResourceKey: ChangesetState] = [:]
     public private(set) var annotations: [HostedResourceKey: AnnotationsState] = [:]
     public private(set) var resourceWatches: [HostedResourceKey: ResourceWatchState] = [:]
+    public private(set) var automationCatalogs: [HostId: AutomationCatalogState] = [:]
     public private(set) var automations: [HostedResourceKey: AutomationState] = [:]
     public private(set) var automationRuns: [HostedResourceKey: AutomationRunState] = [:]
 
@@ -107,9 +108,9 @@ public actor MultiHostStateMirror {
             // a reducer input. The slot is seeded by `applySnapshot`.
             return
         }
-        if var automation = automations[key] {
-            automation = automationReducer(state: automation, action: action)
-            automations[key] = automation
+        if channel == "ahp-automations://", var catalog = automationCatalogs[host] {
+            catalog = automationReducer(state: catalog, action: action)
+            setAutomationCatalog(host: host, catalog: catalog)
             return
         }
         if var run = automationRuns[key] {
@@ -140,8 +141,8 @@ public actor MultiHostStateMirror {
             resourceWatches[key] = state
         case .annotations(let state):
             annotations[key] = state
-        case .automation(let state):
-            automations[key] = state
+        case .automations(let state):
+            setAutomationCatalog(host: host, catalog: state)
         case .automationRun(let state):
             automationRuns[key] = state
         }
@@ -156,6 +157,7 @@ public actor MultiHostStateMirror {
         changesets = changesets.filter { $0.key.hostId != host }
         annotations = annotations.filter { $0.key.hostId != host }
         resourceWatches = resourceWatches.filter { $0.key.hostId != host }
+        automationCatalogs.removeValue(forKey: host)
         automations = automations.filter { $0.key.hostId != host }
         automationRuns = automationRuns.filter { $0.key.hostId != host }
     }
@@ -169,7 +171,16 @@ public actor MultiHostStateMirror {
         changesets.removeAll()
         annotations.removeAll()
         resourceWatches.removeAll()
+        automationCatalogs.removeAll()
         automations.removeAll()
         automationRuns.removeAll()
+    }
+
+    private func setAutomationCatalog(host: HostId, catalog: AutomationCatalogState) {
+        automationCatalogs[host] = catalog
+        automations = automations.filter { $0.key.hostId != host }
+        for automation in catalog.automations {
+            automations[HostedResourceKey(hostId: host, uri: automation.resource)] = automation
+        }
     }
 }

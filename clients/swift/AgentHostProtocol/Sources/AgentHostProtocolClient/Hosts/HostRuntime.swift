@@ -608,8 +608,6 @@ internal final class HostRuntime: Sendable {
                     state.sessionSummaries[n.session] = existing
                 }
             }
-        case .automationAdded, .automationRemoved, .automationSummaryChanged:
-            break
         case .authRequired:
             break
         }

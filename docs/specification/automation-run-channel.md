@@ -14,7 +14,7 @@ ahp-automation-run:/<id>
 
 `AutomationRunState` contains an immutable `origin` describing manual or
 trigger provenance, a discriminated lifecycle, an ordered session catalogue,
-an optional primary session, and allowed operations.
+and an optional primary session.
 
 Linked `ahp-session:` and `ahp-chat:` channels remain authoritative for
 conversation, tool-call, input-request, changeset, and per-session state.
@@ -35,6 +35,11 @@ stateDiagram-v2
 The run remains `running` while linked sessions await interaction. Their
 `SessionSummary.status` and `SessionState.inputNeeded` fields remain
 authoritative for attention state and response routing.
+
+When `InitializeResult.automations.runCancellation` is present, clients may
+dispatch `automationRun/cancelRequested` for `pending` or `running` runs.
+Terminal runs cannot be cancelled, and the host revalidates lifecycle when it
+receives the request.
 
 ## Actions
 

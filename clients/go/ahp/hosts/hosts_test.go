@@ -112,14 +112,14 @@ func TestAutomationCapabilitiesUpdatedAcrossReconnect(t *testing.T) {
 	cfg := NewHostConfig("automation-host", "Automation Host", func(_ context.Context, _ HostID) (ahp.Transport, error) {
 		attempt++
 		clientSide, serverSide := newFakePair()
-		lifetime := ahptypes.AutomationExecutionLifetimeHostLifetime
+		runHistoryLimit := int64(10)
 		if attempt > 1 {
-			lifetime = ahptypes.AutomationExecutionLifetimeManaged
+			runHistoryLimit = 25
 		}
 		go runFakeServerWithInitializeResult(t, serverSide, ahptypes.InitializeResult{
 			ProtocolVersion: ahptypes.ProtocolVersion,
 			Automations: &ahptypes.AutomationCapabilities{
-				Execution: ahptypes.AutomationExecutionCapabilities{Lifetime: lifetime},
+				RunHistoryLimit: &runHistoryLimit,
 			},
 		})
 		servers <- serverSide
@@ -140,8 +140,8 @@ func TestAutomationCapabilitiesUpdatedAcrossReconnect(t *testing.T) {
 	if handle.Automations == nil {
 		t.Fatal("initial Automations is nil")
 	}
-	if got := handle.Automations.Execution.Lifetime; got != ahptypes.AutomationExecutionLifetimeHostLifetime {
-		t.Fatalf("initial lifetime = %q, want %q", got, ahptypes.AutomationExecutionLifetimeHostLifetime)
+	if got := handle.Automations.RunHistoryLimit; got == nil || *got != 10 {
+		t.Fatalf("initial run history limit = %v, want 10", got)
 	}
 
 	firstServer := <-servers
@@ -154,7 +154,8 @@ func TestAutomationCapabilitiesUpdatedAcrossReconnect(t *testing.T) {
 		if handle != nil &&
 			handle.State.Kind == HostStateConnected &&
 			handle.Automations != nil &&
-			handle.Automations.Execution.Lifetime == ahptypes.AutomationExecutionLifetimeManaged {
+			handle.Automations.RunHistoryLimit != nil &&
+			*handle.Automations.RunHistoryLimit == 25 {
 			break
 		}
 		select {

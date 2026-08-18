@@ -161,7 +161,7 @@ func TestFixtureDrivenReducerParity(t *testing.T) {
 			case "resourceWatch":
 				runFixture[ahptypes.ResourceWatchState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToResourceWatch)
 			case "automation":
-				runFixture[ahptypes.AutomationState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAutomation)
+				runFixture[ahptypes.AutomationCatalogState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAutomation)
 			case "automationRun":
 				runFixture[ahptypes.AutomationRunState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAutomationRun)
 			default:

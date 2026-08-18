@@ -1,5 +1,5 @@
 {
-  "description": "automation run terminal lifecycle replaces allowed operations",
+  "description": "automation run transitions to a terminal lifecycle",
   "reducer": "automationRun",
   "initial": {
     "resource": "ahp-automation-run:/r1",
@@ -11,8 +11,7 @@
       "startedAt": "2025-01-01T00:00:01Z"
     },
     "sessions": ["ahp-session:/s1"],
-    "primarySession": "ahp-session:/s1",
-    "operations": ["cancel"]
+    "primarySession": "ahp-session:/s1"
   },
   "actions": [{
     "type": "automationRun/lifecycleChanged",
@@ -21,8 +20,7 @@
       "createdAt": "2025-01-01T00:00:00Z",
       "startedAt": "2025-01-01T00:00:01Z",
       "completedAt": "2025-01-01T00:01:00Z"
-    },
-    "operations": []
+    }
   }],
   "expected": {
     "resource": "ahp-automation-run:/r1",
@@ -35,7 +33,6 @@
       "completedAt": "2025-01-01T00:01:00Z"
     },
     "sessions": ["ahp-session:/s1"],
-    "primarySession": "ahp-session:/s1",
-    "operations": []
+    "primarySession": "ahp-session:/s1"
   }
 }

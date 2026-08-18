@@ -18,9 +18,10 @@ and run history instead of each client maintaining a local copy.
 - **Automatic execution never belongs to the client.** A client may render,
   edit, run, and cancel automations, but it does not run a fallback scheduler
   after an uncertain host response.
-- **Capabilities and operations are distinct.** Initialize capabilities say
-  what a host implementation supports. State-level `operations` say what is
-  allowed for one automation or run at this moment.
+- **Capabilities and per-automation operations are distinct.** Initialize
+  capabilities say what a host implementation supports. An automation's
+  `operations` say which definition controls are allowed for that catalogue
+  entry.
 
 ## Negotiating support
 
@@ -42,7 +43,7 @@ automation catalogue.
 
 An empty `automations` object advertises the baseline catalogue. Additional
 fields describe optional features and restrictions; clients use each
-automation's and run's `operations` to determine which actions are currently
+automation's `operations` to determine which definition actions are currently
 allowed.
 
 `create` and `runCancellation` are presence capabilities: an empty object means
@@ -423,16 +424,15 @@ The run channel does not duplicate session transcript or tool state.
 
 ### Cancellation
 
-Cancellation is available only when:
-
-1. `InitializeResult.automations.runCancellation` is present; and
-2. the run's `operations` contains `cancel`.
+Cancellation is available when
+`InitializeResult.automations.runCancellation` is present and the run lifecycle
+is `pending` or `running`. Terminal runs cannot be cancelled.
 
 The client dispatches `automationRun/cancelRequested`. This action is
-side-effect-only and does not optimistically change lifecycle. The host later
-emits `automationRun/lifecycleChanged` with the authoritative result. The run
-may become `cancelled`, or it may complete or fail before cancellation takes
-effect.
+side-effect-only and does not optimistically change lifecycle. The host
+revalidates that the run is still non-terminal, then later emits
+`automationRun/lifecycleChanged` with the authoritative result. The run may
+become `cancelled`, or it may complete or fail before cancellation takes effect.
 
 ## Run history and retention
 

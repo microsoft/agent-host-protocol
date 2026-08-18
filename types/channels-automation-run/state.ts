@@ -13,7 +13,6 @@ import type {
 } from '../channels-automation/state.js';
 import type { RunAutomationParams } from '../channels-automation/commands.js';
 import type { SessionState } from '../channels-session/state.js';
-import type { AutomationRunCancelRequestedAction } from './actions.js';
 
 /**
  * Lifecycle status of one automation run.
@@ -192,16 +191,6 @@ export type AutomationRunLifecycle =
   | AutomationCancelledRunLifecycle;
 
 /**
- * Operations the host currently permits for a run.
- *
- * @category Automation Run State
- */
-export const enum AutomationRunOperation {
-  /** Request cancellation with {@link AutomationRunCancelRequestedAction | `automationRun/cancelRequested`}. */
-  Cancel = 'cancel',
-}
-
-/**
  * Lightweight projection of a run retained in its automation's history.
  *
  * A summary contains enough information to render run history without
@@ -222,8 +211,6 @@ export interface AutomationRunSummary {
   primarySession?: URI;
   /** Number of entries in {@link AutomationRunState.sessions}. */
   sessionCount: number;
-  /** Operations currently permitted for this run, matching {@link AutomationRunState.operations}. */
-  operations: AutomationRunOperation[];
   /** Opaque host-defined summary metadata. */
   _meta?: Record<string, unknown>;
 }
@@ -231,10 +218,10 @@ export interface AutomationRunSummary {
 /**
  * Authoritative state of one subscribed `ahp-automation-run:` resource.
  *
- * The run channel owns task-level lifecycle, provenance, linked-session
- * membership, and cancellation availability. Linked session and chat channels
- * remain authoritative for transcripts, tools, interaction requirements,
- * changesets, and per-session lifecycle.
+ * The run channel owns task-level lifecycle, provenance, and linked-session
+ * membership. Linked session and chat channels remain authoritative for
+ * transcripts, tools, interaction requirements, changesets, and per-session
+ * lifecycle.
  *
  * @category Automation Run State
  */
@@ -255,8 +242,6 @@ export interface AutomationRunState {
   sessions: URI[];
   /** Member of {@link AutomationRunState.sessions} that the host recommends opening first. */
   primarySession?: URI;
-  /** Operations currently permitted for this run. */
-  operations: AutomationRunOperation[];
   /** Opaque host-defined run metadata. */
   _meta?: Record<string, unknown>;
 }

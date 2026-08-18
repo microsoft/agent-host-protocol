@@ -73,30 +73,6 @@ type SubscriptionEventSessionSummaryChanged struct {
 
 func (SubscriptionEventSessionSummaryChanged) isSubscriptionEvent() {}
 
-// SubscriptionEventAutomationAdded mirrors the `root/automationAdded`
-// notification.
-type SubscriptionEventAutomationAdded struct {
-	Params ahptypes.AutomationAddedParams
-}
-
-func (SubscriptionEventAutomationAdded) isSubscriptionEvent() {}
-
-// SubscriptionEventAutomationRemoved mirrors the
-// `root/automationRemoved` notification.
-type SubscriptionEventAutomationRemoved struct {
-	Params ahptypes.AutomationRemovedParams
-}
-
-func (SubscriptionEventAutomationRemoved) isSubscriptionEvent() {}
-
-// SubscriptionEventAutomationSummaryChanged mirrors the
-// `root/automationSummaryChanged` notification.
-type SubscriptionEventAutomationSummaryChanged struct {
-	Params ahptypes.AutomationSummaryChangedParams
-}
-
-func (SubscriptionEventAutomationSummaryChanged) isSubscriptionEvent() {}
-
 // SubscriptionEventAuthRequired mirrors the `auth/required`
 // notification.
 type SubscriptionEventAuthRequired struct {
@@ -523,24 +499,6 @@ func (c *Client) handleNotification(n ahptypes.JsonRpcNotification) {
 			return
 		}
 		c.fanOut(p.Channel, SubscriptionEventSessionSummaryChanged{Params: p})
-	case "root/automationAdded":
-		var p ahptypes.AutomationAddedParams
-		if err := json.Unmarshal(n.Params, &p); err != nil {
-			return
-		}
-		c.fanOut(p.Channel, SubscriptionEventAutomationAdded{Params: p})
-	case "root/automationRemoved":
-		var p ahptypes.AutomationRemovedParams
-		if err := json.Unmarshal(n.Params, &p); err != nil {
-			return
-		}
-		c.fanOut(p.Channel, SubscriptionEventAutomationRemoved{Params: p})
-	case "root/automationSummaryChanged":
-		var p ahptypes.AutomationSummaryChangedParams
-		if err := json.Unmarshal(n.Params, &p); err != nil {
-			return
-		}
-		c.fanOut(p.Channel, SubscriptionEventAutomationSummaryChanged{Params: p})
 	case "auth/required":
 		var p ahptypes.AuthRequiredParams
 		if err := json.Unmarshal(n.Params, &p); err != nil {

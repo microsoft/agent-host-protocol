@@ -624,7 +624,6 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
-  'AutomationRunOperation',
 ];
 
 const STATE_STRUCTS = [

@@ -135,7 +135,6 @@ final class MultiHostClientTests: XCTestCase {
     func testAutomationCapabilitiesPersistAcrossReconnect() async throws {
         let mode = ReconnectResponseModeSwitch()
         let capabilities = AutomationCapabilities(
-            execution: AutomationExecutionCapabilities(lifetime: .managed),
             create: AutomationCreateCapability(),
             runHistoryLimit: 25
         )

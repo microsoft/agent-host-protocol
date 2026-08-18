@@ -14,7 +14,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[allow(unused_imports)]
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AutomationDefinition,
-    AutomationRunArtifact, AutomationRunLifecycle, AutomationRunOperation, AutomationRunSummary,
+    AutomationDefinitionPatch, AutomationRunLifecycle, AutomationRunSummary, AutomationState,
     Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
     ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
     ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
@@ -200,14 +200,14 @@ pub enum ActionType {
     TerminalCommandFinished,
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged,
-    #[serde(rename = "automation/definitionChanged")]
-    AutomationDefinitionChanged,
-    #[serde(rename = "automation/runSummarySet")]
-    AutomationRunSummarySet,
-    #[serde(rename = "automation/runSummaryRemoved")]
-    AutomationRunSummaryRemoved,
-    #[serde(rename = "automation/runsLoaded")]
-    AutomationRunsLoaded,
+    #[serde(rename = "automation/createRequested")]
+    AutomationCreateRequested,
+    #[serde(rename = "automation/updateRequested")]
+    AutomationUpdateRequested,
+    #[serde(rename = "automation/set")]
+    AutomationSet,
+    #[serde(rename = "automation/removed")]
+    AutomationRemoved,
     #[serde(rename = "automationRun/lifecycleChanged")]
     AutomationRunLifecycleChanged,
     #[serde(rename = "automationRun/sessionSet")]
@@ -216,10 +216,6 @@ pub enum ActionType {
     AutomationRunSessionRemoved,
     #[serde(rename = "automationRun/primarySessionChanged")]
     AutomationRunPrimarySessionChanged,
-    #[serde(rename = "automationRun/artifactSet")]
-    AutomationRunArtifactSet,
-    #[serde(rename = "automationRun/artifactRemoved")]
-    AutomationRunArtifactRemoved,
     #[serde(rename = "automationRun/cancelRequested")]
     AutomationRunCancelRequested,
 }
@@ -1764,85 +1760,93 @@ pub struct ResourceWatchChangedAction {
     pub changes: AnyValue,
 }
 
-/// Replace the editable definition after a successful `updateAutomation` or
-/// another host-authorized definition change.
+/// Ask the host to create a durable automation at a client-chosen resource.
 ///
-/// Full replacement semantics apply to `definition`. The reducer also replaces
-/// the revision and modification timestamp. Omitting `nextRunAt` clears the
-/// previously projected next occurrence.
+/// Clients may dispatch this action only when the host advertises its `create`
+/// automation capability. {@link AutomationCreateRequestedAction.resource |
+/// `resource`} MUST use the `ahp-automation:` scheme and MUST NOT already
+/// identify an unrelated automation.
+///
+/// This side-effect request leaves optimistic catalogue state unchanged. The
+/// host validates trigger ids and configuration, normalizes event-trigger
+/// titles and descriptions, persists the definition, then publishes the
+/// authoritative result with {@link AutomationSetAction | `automation/set`}.
+/// Rejections leave the catalogue unchanged.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationDefinitionChangedAction {
-    /// Complete replacement definition.
+pub struct AutomationCreateRequestedAction {
+    /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.
+    pub resource: Uri,
+    /// Complete initial {@link AutomationState.definition}.
     pub definition: AutomationDefinition,
-    /// New monotonic revision.
-    pub revision: i64,
-    /// Definition modification timestamp in ISO 8601 format.
-    pub modified_at: String,
-    /// Earliest known future scheduled occurrence, or omitted to clear it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_run_at: Option<String>,
 }
 
-/// Upsert one run summary in the retained history.
+/// Ask the host to update editable fields of an existing automation.
 ///
-/// Existing entries are replaced by {@link AutomationRunSummary.resource}. A
-/// previously unseen run is inserted at the front because history is
-/// newest-first.
+/// Clients may dispatch this action only while the target advertises
+/// {@link AutomationOperation.Update}. The host revalidates that operation and
+/// the client's authorization.
+///
+/// This side-effect request leaves optimistic catalogue state unchanged. The
+/// host applies accepted patches to its current authoritative definition in
+/// action order, revalidates and normalizes affected event triggers, then
+/// publishes the result with
+/// {@link AutomationSetAction | `automation/set`}. Omitted fields remain
+/// unchanged; when accepted actions replace the same field, the later action in
+/// server order wins.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationRunSummarySetAction {
-    /// New or replacement run summary.
-    pub run: AutomationRunSummary,
+pub struct AutomationUpdateRequestedAction {
+    /// Target {@link AutomationState.resource}.
+    pub resource: Uri,
+    /// Editable {@link AutomationDefinition} fields to replace.
+    pub changes: AutomationDefinitionPatch,
 }
 
-/// Remove one retained run summary by its automation-run URI.
+/// Add or replace one full automation state in
+/// {@link AutomationCatalogState.automations}.
 ///
-/// The action is a no-op when the URI is not present in the current history
-/// window.
+/// Existing entries are matched by {@link AutomationState.resource} and
+/// replaced in place. A previously unseen resource is appended.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationRunSummaryRemovedAction {
-    /// {@link AutomationRunSummary.resource} to remove.
-    pub run: Uri,
+pub struct AutomationSetAction {
+    /// Full new or replacement automation state.
+    pub automation: AutomationState,
 }
 
-/// Append an older page of run summaries returned by
-/// `fetchAutomationRuns`.
+/// Remove one automation from {@link AutomationCatalogState.automations}.
 ///
-/// Entries already present by resource URI are ignored, preserving the
-/// newest-first ordering of the existing history followed by the fetched page.
-/// Omitting `nextCursor` marks the end of retained history.
+/// Clients may dispatch this action only while the target advertises
+/// {@link AutomationOperation.Dispose}. The host revalidates that operation
+/// before permanently deleting the automation. A rejected action leaves the
+/// authoritative catalogue and durable definition unchanged.
+///
+/// Removing an unknown resource is a no-op.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationRunsLoadedAction {
-    /// Older run summaries in newest-first order within this page.
-    pub runs: Vec<AutomationRunSummary>,
-    /// Opaque cursor for the next older page, or omitted at the end.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_cursor: Option<String>,
+pub struct AutomationRemovedAction {
+    /// {@link AutomationState.resource} to remove.
+    pub resource: Uri,
 }
 
-/// Replace the run lifecycle and currently allowed operations atomically.
+/// Replace the run lifecycle.
 ///
-/// The host dispatches this action for every lifecycle transition. Terminal
-/// lifecycles normally carry an empty operations list.
+/// The host dispatches this action for every lifecycle transition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunLifecycleChangedAction {
-    /// Complete replacement lifecycle.
+    /// Complete replacement {@link AutomationRunState.lifecycle}.
     pub lifecycle: AutomationRunLifecycle,
-    /// Complete replacement operation list.
-    pub operations: Vec<AutomationRunOperation>,
 }
 
-/// Add a session to the run's ordered session catalogue.
+/// Add a session to {@link AutomationRunState.sessions}.
 ///
 /// Session URIs are unique. Setting an existing URI is a no-op.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunSessionSetAction {
-    /// Session URI to append when it is not already linked.
+    /// Session URI to append to {@link AutomationRunState.sessions} when not already linked.
     pub session: Uri,
 }
 
@@ -1853,7 +1857,7 @@ pub struct AutomationRunSessionSetAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunSessionRemovedAction {
-    /// Linked session URI to remove.
+    /// Entry in {@link AutomationRunState.sessions} to remove.
     pub session: Uri,
 }
 
@@ -1861,34 +1865,19 @@ pub struct AutomationRunSessionRemovedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunPrimarySessionChangedAction {
-    /// New primary linked session, or omitted to clear the selection.
+    /// New {@link AutomationRunState.primarySession}, or omitted to clear the selection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_session: Option<Uri>,
-}
-
-/// Upsert a run-scoped artifact by {@link AutomationRunArtifact.id}.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationRunArtifactSetAction {
-    /// New or replacement artifact.
-    pub artifact: AutomationRunArtifact,
-}
-
-/// Remove a run-scoped artifact by id.
-///
-/// The action is a no-op when the id is not present.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationRunArtifactRemovedAction {
-    /// {@link AutomationRunArtifact.id} to remove.
-    pub artifact_id: String,
 }
 
 /// Ask the host to cancel this run.
 ///
 /// This is the only client-dispatchable automation-run action. It is a
 /// side-effect request and deliberately leaves optimistic state unchanged. The
-/// authoritative outcome arrives later through
+/// client may dispatch it only when the host advertises its `runCancellation`
+/// capability and the current lifecycle is `pending` or `running`. The host
+/// revalidates that the run is non-terminal. The authoritative outcome arrives
+/// later through
 /// {@link AutomationRunLifecycleChangedAction}: cancellation may transition to
 /// `cancelled`, or the run may complete or fail before cancellation takes
 /// effect.
@@ -2109,14 +2098,14 @@ pub enum StateAction {
     TerminalCommandFinished(TerminalCommandFinishedAction),
     #[serde(rename = "resourceWatch/changed")]
     ResourceWatchChanged(ResourceWatchChangedAction),
-    #[serde(rename = "automation/definitionChanged")]
-    AutomationDefinitionChanged(Box<AutomationDefinitionChangedAction>),
-    #[serde(rename = "automation/runSummarySet")]
-    AutomationRunSummarySet(Box<AutomationRunSummarySetAction>),
-    #[serde(rename = "automation/runSummaryRemoved")]
-    AutomationRunSummaryRemoved(AutomationRunSummaryRemovedAction),
-    #[serde(rename = "automation/runsLoaded")]
-    AutomationRunsLoaded(Box<AutomationRunsLoadedAction>),
+    #[serde(rename = "automation/createRequested")]
+    AutomationCreateRequested(Box<AutomationCreateRequestedAction>),
+    #[serde(rename = "automation/updateRequested")]
+    AutomationUpdateRequested(Box<AutomationUpdateRequestedAction>),
+    #[serde(rename = "automation/set")]
+    AutomationSet(Box<AutomationSetAction>),
+    #[serde(rename = "automation/removed")]
+    AutomationRemoved(AutomationRemovedAction),
     #[serde(rename = "automationRun/lifecycleChanged")]
     AutomationRunLifecycleChanged(Box<AutomationRunLifecycleChangedAction>),
     #[serde(rename = "automationRun/sessionSet")]
@@ -2125,10 +2114,6 @@ pub enum StateAction {
     AutomationRunSessionRemoved(AutomationRunSessionRemovedAction),
     #[serde(rename = "automationRun/primarySessionChanged")]
     AutomationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction),
-    #[serde(rename = "automationRun/artifactSet")]
-    AutomationRunArtifactSet(Box<AutomationRunArtifactSetAction>),
-    #[serde(rename = "automationRun/artifactRemoved")]
-    AutomationRunArtifactRemoved(AutomationRunArtifactRemovedAction),
     #[serde(rename = "automationRun/cancelRequested")]
     AutomationRunCancelRequested(AutomationRunCancelRequestedAction),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.

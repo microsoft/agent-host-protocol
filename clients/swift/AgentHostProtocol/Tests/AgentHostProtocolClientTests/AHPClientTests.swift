@@ -188,98 +188,49 @@ final class AHPClientTests: XCTestCase {
         await client.shutdown()
     }
 
-    func testAutomationCatalogueNotificationsDispatchToSubscriptionsAndEvents() async throws {
+    func testAutomationCatalogueActionsDispatchToSubscriptionsAndEvents() async throws {
         let (clientSide, serverSide) = InMemoryTransport.pair()
         let client = AHPClient(transport: clientSide)
         let events = await client.events
-        let subscription = await client.attachSubscription(RootResourceURI)
+        let subscription = await client.attachSubscription("ahp-automations://")
         try await client.connect()
 
-        let initial = AutomationSummary(
-            resource: "ahp-automation:/a1",
-            title: "Initial",
-            enabled: true,
-            triggerCount: 0,
-            revision: 1,
-            operations: [.run],
-            createdAt: "2026-08-05T12:00:00Z",
-            modifiedAt: "2026-08-05T12:00:00Z"
-        )
-        let changed = AutomationSummary(
-            resource: initial.resource,
-            title: "Changed",
-            enabled: false,
-            triggerCount: 1,
-            revision: 2,
-            operations: [.update, .run],
-            createdAt: initial.createdAt,
-            modifiedAt: "2026-08-05T13:00:00Z"
-        )
+        let resource = "ahp-automation:/a1"
 
         let serverTask = Task {
             try await pushNotification(
-                method: "root/automationAdded",
-                params: AutomationAddedParams(channel: RootResourceURI, summary: initial),
-                on: serverSide
-            )
-            try await pushNotification(
-                method: "root/automationRemoved",
-                params: AutomationRemovedParams(
-                    channel: RootResourceURI,
-                    automation: initial.resource
-                ),
-                on: serverSide
-            )
-            try await pushNotification(
-                method: "root/automationSummaryChanged",
-                params: AutomationSummaryChangedParams(
-                    channel: RootResourceURI,
-                    summary: changed
+                method: "action",
+                params: ActionEnvelope(
+                    channel: "ahp-automations://",
+                    action: .automationRemoved(AutomationRemovedAction(
+                        type: .automationRemoved,
+                        resource: resource
+                    )),
+                    serverSeq: 1
                 ),
                 on: serverSide
             )
         }
 
         var subscriptionIter = subscription.makeAsyncIterator()
-        let added = try await nextWithTimeout(&subscriptionIter)
-        guard case .automationAdded(let addedParams) = added else {
-            XCTFail("expected automationAdded, got \(String(describing: added))")
+        let event = try await nextWithTimeout(&subscriptionIter)
+        guard case .action(let envelope) = event,
+              case .automationRemoved(let removed) = envelope.action else {
+            XCTFail("expected automation/removed action, got \(String(describing: event))")
             return
         }
-        XCTAssertEqual(addedParams.summary.resource, initial.resource)
-
-        let removed = try await nextWithTimeout(&subscriptionIter)
-        guard case .automationRemoved(let removedParams) = removed else {
-            XCTFail("expected automationRemoved, got \(String(describing: removed))")
-            return
-        }
-        XCTAssertEqual(removedParams.automation, initial.resource)
-
-        let summaryChanged = try await nextWithTimeout(&subscriptionIter)
-        guard case .automationSummaryChanged(let changedParams) = summaryChanged else {
-            XCTFail("expected automationSummaryChanged, got \(String(describing: summaryChanged))")
-            return
-        }
-        XCTAssertEqual(changedParams.summary.title, "Changed")
+        XCTAssertEqual(removed.resource, resource)
 
         var eventIter = events.makeAsyncIterator()
-        var receivedKinds: Set<String> = []
-        for _ in 0..<3 {
-            let nextEvent = try await nextWithTimeout(&eventIter)
-            let event = try XCTUnwrap(nextEvent)
-            XCTAssertEqual(event.resource, RootResourceURI)
-            switch event.event {
-            case .automationAdded:
-                receivedKinds.insert("added")
-            case .automationRemoved:
-                receivedKinds.insert("removed")
-            case .automationSummaryChanged:
-                receivedKinds.insert("changed")
-            default:
-                XCTFail("unexpected event: \(event.event)")
-            }
+        let nextEvent = try await nextWithTimeout(&eventIter)
+        let clientEvent = try XCTUnwrap(nextEvent)
+        XCTAssertEqual(clientEvent.resource, "ahp-automations://")
+        guard case .action(let envelope) = clientEvent.event,
+              case .automationRemoved(let removed) = envelope.action else {
+            XCTFail("expected automation/removed client event")
+            return
         }
-        XCTAssertEqual(receivedKinds, ["added", "removed", "changed"])
+        XCTAssertEqual(removed.resource, resource)
 
         try await serverTask.value
         await client.shutdown()

@@ -15,11 +15,10 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
-    AgentSelection, AutomationDefinition, AutomationExecutionLifetime, AutomationSchedule,
-    AutomationSessionTemplate, AutomationSummary, AutomationTrigger, AutomationTriggerDefinition,
-    ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient,
-    SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState,
-    TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
+    AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
+    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
+    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -197,8 +196,9 @@ pub struct InitializeResult {
     /// filtering). Clients MAY ignore signals they cannot process.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub telemetry: Option<TelemetryCapabilities>,
-    /// Host-owned automation support. Absence means the host does not expose an
-    /// automation catalogue or automation commands.
+    /// Host-owned automation support. Presence means clients may subscribe to
+    /// `ahp-automations://` for {@link AutomationCatalogState}; absence means the
+    /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
 }
@@ -228,43 +228,35 @@ pub struct ClientCapabilities {
 
 /// Automation features supported by this host authority.
 ///
-/// Capabilities describe implementation support. Per-resource
-/// {@link AutomationState.operations} and
-/// {@link AutomationRunState.operations} remain authoritative for whether a
-/// particular operation is currently allowed.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// The presence of this object advertises the baseline `ahp-automations://`
+/// catalogue. Optional fields describe additional host features and
+/// restrictions.
+///
+/// Capabilities describe implementation support.
+/// {@link AutomationState.operations} remains authoritative for which
+/// definition mutations are currently allowed on a particular automation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCapabilities {
-    /// Availability guarantee for automatic trigger execution.
-    pub execution: AutomationExecutionCapabilities,
-    /// Present when clients may call `createAutomation`.
+    /// Present when clients may dispatch {@link AutomationCreateRequestedAction}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub create: Option<AutomationCreateCapability>,
-    /// Present when definitions may contain schedule triggers.
+    /// Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schedules: Option<AutomationScheduleCapabilities>,
-    /// Present when clients may request cancellation on eligible runs.
+    /// Present when clients may request cancellation of `pending` or `running`
+    /// automation runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_cancellation: Option<AutomationRunCancellationCapability>,
-    /// Present when clients may call `previewAutomationSchedule`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub schedule_preview: Option<AutomationSchedulePreviewCapability>,
-    /// Maximum terminal run summaries retained per automation. Active runs are not
-    /// counted toward the limit. Absence means the retention limit is
+    /// Maximum terminal entries retained in {@link AutomationState.runs}. Active
+    /// runs are not counted toward the limit. Absence means the retention limit is
     /// implementation-defined.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_history_limit: Option<i64>,
 }
 
-/// Automatic trigger execution availability.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationExecutionCapabilities {
-    /// How long automatic trigger evaluation remains available.
-    pub lifetime: AutomationExecutionLifetime,
-}
-
-/// Presence capability for `createAutomation`.
+/// Presence capability for {@link AutomationCreateRequestedAction |
+/// `automation/createRequested`}.
 ///
 /// The empty object means "supported"; fields are reserved for future
 /// create-specific options.
@@ -279,27 +271,21 @@ pub struct AutomationCreateCapability {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationScheduleCapabilities {
-    /// Smallest permitted interval between consecutive occurrences. Omission
-    /// means no restriction beyond the cron format's one-minute resolution.
+    /// Smallest permitted interval between consecutive occurrences produced by
+    /// {@link AutomationSchedule.expression}. Omission means no restriction beyond
+    /// the cron format's one-minute resolution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_interval_minutes: Option<i64>,
 }
 
-/// Presence capability for `automationRun/cancelRequested`.
+/// Presence capability for {@link AutomationRunCancelRequestedAction |
+/// `automationRun/cancelRequested`}.
 ///
-/// The empty object means "supported"; clients must additionally check for
-/// {@link AutomationRunOperation.Cancel} on each run.
+/// The empty object means "supported." Clients may dispatch the action for
+/// `pending` or `running` runs; terminal runs cannot be cancelled.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunCancellationCapability {}
-
-/// Presence capability for `previewAutomationSchedule`.
-///
-/// The empty object means "supported"; fields are reserved for future preview
-/// limits or options.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationSchedulePreviewCapability {}
 
 /// Identifies a protocol implementation — the software (and build) on one end
 /// of the connection, as distinct from the {@link AgentInfo | agent persona} it
@@ -1509,55 +1495,13 @@ pub struct ChangesetOperationFollowUp {
     pub external: Option<bool>,
 }
 
-/// List the host's automation catalogue without subscribing to every
-/// automation channel.
-///
-/// Results are lightweight {@link AutomationSummary} entries. Clients SHOULD
-/// re-run this command after reconnect because root catalogue notifications are
-/// not replayed.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListAutomationsParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
-    /// Maximum number of entries to return in this page. The server SHOULD respect
-    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
-    /// Omit to let the server choose the page size.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limit: Option<i64>,
-    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
-    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
-    /// as opaque — do not parse, modify, or persist them across connections. An
-    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cursor: Option<String>,
-    /// Optional exact filter on {@link AutomationDefinition.enabled}.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-}
-
-/// One page of the automation catalogue.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListAutomationsResult {
-    /// Opaque cursor for the next page. Present when more entries exist beyond the
-    /// returned page; absent signals the end of the collection. Pass it back as
-    /// {@link PaginatedParams.cursor} to fetch the following page.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_cursor: Option<String>,
-    /// Automation summaries in host-defined catalogue order.
-    pub items: Vec<AutomationSummary>,
-}
-
 /// Discover event-trigger types available for a prospective session template.
 ///
 /// Hosts may vary definitions by provider, workspace, and session
 /// configuration. Schedule triggers are protocol-defined and therefore do not
-/// appear in this result.
+/// appear in this result. The result describes current authoring and validation
+/// choices. Saved {@link AutomationEventTrigger} values retain their selected
+/// event descriptors for display but do not establish current availability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListAutomationTriggerDefinitionsParams {
@@ -1567,13 +1511,13 @@ pub struct ListAutomationTriggerDefinitionsParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Prospective provider id, or omitted for the host default.
+    /// Prospective provider id matching {@link AgentInfo.provider}, or omitted for the host default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
-    /// Prospective ordered working-directory list.
+    /// Prospective {@link AutomationSessionTemplate.workingDirectories}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
-    /// Prospective resolved session configuration values.
+    /// Prospective resolved {@link AutomationSessionTemplate.config}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_config: Option<JsonObject>,
 }
@@ -1584,122 +1528,6 @@ pub struct ListAutomationTriggerDefinitionsParams {
 pub struct ListAutomationTriggerDefinitionsResult {
     /// Available event trigger definitions.
     pub items: Vec<AutomationTriggerDefinition>,
-}
-
-/// Create a durable automation at a client-chosen URI.
-///
-/// `channel` MUST use the `ahp-automation:` scheme and MUST NOT already identify
-/// an unrelated automation. The host validates the complete definition,
-/// persists it, and makes it visible through the root catalogue before
-/// returning success.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateAutomationParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
-    /// Complete initial definition.
-    pub definition: AutomationDefinition,
-    /// Optional legacy import state. When present, {@link definition} MUST be
-    /// disabled so automatic triggers cannot run before migration cutover.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub import: Option<AutomationImport>,
-}
-
-/// Stable source identity and scheduler state for a legacy automation import.
-///
-/// The host remembers the identity independently of the client-chosen automation
-/// URI. Retrying with the same identity MUST resolve to the previously imported
-/// item rather than creating a duplicate.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationImport {
-    /// Stable namespace identifying the source implementation or store.
-    pub source: String,
-    /// Identifier shared by every item in one import attempt.
-    pub batch_id: String,
-    /// Stable source-side identifier for this definition within the batch.
-    pub item_id: String,
-    /// Source schedule occurrences to retain until the imported definition is enabled.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub trigger_next_runs: Option<Vec<AutomationImportTriggerNextRun>>,
-}
-
-/// Initial schedule occurrence retained while an imported automation is disabled.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationImportTriggerNextRun {
-    /// Stable id of a schedule trigger in the imported definition.
-    pub trigger_id: String,
-    /// Source scheduler's next unevaluated occurrence, as an ISO 8601 timestamp.
-    pub next_run_at: String,
-}
-
-/// Partial replacement of editable {@link AutomationDefinition} fields.
-///
-/// Omitted fields are unchanged. Supplied arrays and objects replace their
-/// corresponding values in full; they are not merged recursively.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct AutomationDefinitionPatch {
-    /// Replacement human-readable title.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    /// Replacement initial user message.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub message: Option<Message>,
-    /// Replacement session template.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub session: Option<AutomationSessionTemplate>,
-    /// Replacement automatic-trigger enabled state.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-    /// Complete replacement trigger list.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub triggers: Option<Vec<AutomationTrigger>>,
-    /// Complete replacement implementation-defined metadata.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
-}
-
-/// Update editable fields of an existing automation using optimistic
-/// concurrency.
-///
-/// The host accepts the patch only when `expectedRevision` equals the current
-/// {@link AutomationState.revision}. A stale revision is rejected; clients
-/// SHOULD reconcile the latest state before retrying.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateAutomationParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
-    /// Revision on which the client based {@link changes}.
-    pub expected_revision: i64,
-    /// Editable fields to replace.
-    pub changes: AutomationDefinitionPatch,
-}
-
-/// Permanently remove an automation.
-///
-/// The target is supplied by {@link BaseParams.channel}. The host rejects the
-/// command when {@link AutomationOperation.Dispose} is not currently
-/// advertised, for example while a non-terminal run prevents disposal.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DisposeAutomationParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
 }
 
 /// Start a manual run of an automation.
@@ -1715,6 +1543,8 @@ pub struct RunAutomationParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Target {@link AutomationState.resource}.
+    pub automation: Uri,
     /// Durable client-generated idempotency key. Retrying with the same key and
     /// automation MUST return the original run URI rather than create another
     /// run.
@@ -1725,15 +1555,16 @@ pub struct RunAutomationParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunAutomationResult {
-    /// Subscribable `ahp-automation-run:` URI.
-    pub run: Uri,
+    /// Subscribable `ahp-automation-run:` URI matching {@link AutomationRunState.resource}.
+    pub resource: Uri,
 }
 
-/// Load one older page into the subscribed automation's run-history state.
+/// Load one older page into a catalogued automation's run-history state.
 ///
-/// The response only acknowledges the request. Loaded entries arrive through
-/// `automation/runsLoaded`, keeping all subscribers synchronized through the
-/// normal action stream.
+/// The response only acknowledges the request. The updated full state arrives
+/// through {@link AutomationSetAction | `automation/set`} on the
+/// `ahp-automations://` channel, keeping all catalogue subscribers synchronized
+/// through the normal action stream.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchAutomationRunsParams {
@@ -1743,45 +1574,18 @@ pub struct FetchAutomationRunsParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Target {@link AutomationState.resource}.
+    pub automation: Uri,
     /// Cursor previously received as {@link AutomationState.runsNextCursor}.
     /// Omit to request the first page not already included by the snapshot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,
 }
 
-/// Empty acknowledgement; run summaries are delivered by action.
+/// Empty acknowledgement; the updated automation state is delivered by action.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchAutomationRunsResult {}
-
-/// Ask the host to evaluate a schedule without creating an automation.
-///
-/// Clients SHOULD use this command for validation and preview instead of
-/// implementing their own cron evaluator, especially around time-zone
-/// transitions.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PreviewAutomationScheduleParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
-    /// Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.
-    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
-    pub meta: Option<JsonObject>,
-    /// Portable AHP cron schedule to evaluate.
-    pub schedule: AutomationSchedule,
-    /// Requested maximum number of future occurrences; the host MAY cap it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub count: Option<i64>,
-}
-
-/// Host-canonical future schedule occurrences.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PreviewAutomationScheduleResult {
-    /// Ascending ISO 8601 timestamps.
-    pub items: Vec<String>,
-}
 
 // ─── ChatSource Union ─────────────────────────────────────────────────
 

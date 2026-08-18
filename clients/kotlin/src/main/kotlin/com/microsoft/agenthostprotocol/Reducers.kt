@@ -72,8 +72,8 @@ public object ResourceWatchReducer : Reducer<ResourceWatchState, StateAction> {
 }
 
 /** Pure automation reducer as a [Reducer] instance. Delegates to [automationReducer]. */
-public object AutomationReducer : Reducer<AutomationState, StateAction> {
-    override fun reduce(state: AutomationState, action: StateAction): AutomationState =
+public object AutomationReducer : Reducer<AutomationCatalogState, StateAction> {
+    override fun reduce(state: AutomationCatalogState, action: StateAction): AutomationCatalogState =
         automationReducer(state, action)
 }
 
@@ -1792,42 +1792,33 @@ public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction):
 
 // ─── Automation Reducer ─────────────────────────────────────────────────────
 
-/** Pure reducer for [AutomationState]. Handles automation-channel action variants. */
-public fun automationReducer(state: AutomationState, action: StateAction): AutomationState = when (action) {
-    is StateActionAutomationDefinitionChanged -> state.copy(
-        definition = action.value.definition,
-        revision = action.value.revision,
-        modifiedAt = action.value.modifiedAt,
-        nextRunAt = action.value.nextRunAt,
-    )
+/** Pure reducer for [AutomationCatalogState]. Handles automation-channel action variants. */
+public fun automationReducer(state: AutomationCatalogState, action: StateAction): AutomationCatalogState = when (action) {
+    is StateActionAutomationCreateRequested,
+    is StateActionAutomationUpdateRequested,
+    -> state
 
-    is StateActionAutomationRunSummarySet -> {
-        val run = action.value.run
-        val index = state.runs.indexOfFirst { it.resource == run.resource }
+    is StateActionAutomationSet -> {
+        val automation = action.value.automation
+        val index = state.automations.indexOfFirst { it.resource == automation.resource }
         if (index < 0) {
-            state.copy(runs = listOf(run) + state.runs)
+            state.copy(automations = state.automations + automation)
         } else {
-            val runs = state.runs.toMutableList()
-            runs[index] = run
-            state.copy(runs = runs)
+            val automations = state.automations.toMutableList()
+            automations[index] = automation
+            state.copy(automations = automations)
         }
     }
 
-    is StateActionAutomationRunSummaryRemoved -> {
-        val index = state.runs.indexOfFirst { it.resource == action.value.run }
+    is StateActionAutomationRemoved -> {
+        val index = state.automations.indexOfFirst { it.resource == action.value.resource }
         if (index < 0) {
             state
         } else {
-            val runs = state.runs.toMutableList()
-            runs.removeAt(index)
-            state.copy(runs = runs)
+            val automations = state.automations.toMutableList()
+            automations.removeAt(index)
+            state.copy(automations = automations)
         }
-    }
-
-    is StateActionAutomationRunsLoaded -> {
-        val known = state.runs.mapTo(mutableSetOf()) { it.resource }
-        val runs = state.runs + action.value.runs.filter { known.add(it.resource) }
-        state.copy(runs = runs, runsNextCursor = action.value.nextCursor)
     }
 
     else -> state
@@ -1838,7 +1829,7 @@ public fun automationReducer(state: AutomationState, action: StateAction): Autom
 /** Pure reducer for [AutomationRunState]. Handles automation-run-channel action variants. */
 public fun automationRunReducer(state: AutomationRunState, action: StateAction): AutomationRunState = when (action) {
     is StateActionAutomationRunLifecycleChanged ->
-        state.copy(lifecycle = action.value.lifecycle, operations = action.value.operations)
+        state.copy(lifecycle = action.value.lifecycle)
 
     is StateActionAutomationRunSessionSet ->
         if (action.value.session in state.sessions) {
@@ -1864,29 +1855,6 @@ public fun automationRunReducer(state: AutomationRunState, action: StateAction):
 
     is StateActionAutomationRunPrimarySessionChanged ->
         state.copy(primarySession = action.value.primarySession)
-
-    is StateActionAutomationRunArtifactSet -> {
-        val artifact = action.value.artifact
-        val index = state.artifacts.indexOfFirst { it.id == artifact.id }
-        if (index < 0) {
-            state.copy(artifacts = state.artifacts + artifact)
-        } else {
-            val artifacts = state.artifacts.toMutableList()
-            artifacts[index] = artifact
-            state.copy(artifacts = artifacts)
-        }
-    }
-
-    is StateActionAutomationRunArtifactRemoved -> {
-        val index = state.artifacts.indexOfFirst { it.id == action.value.artifactId }
-        if (index < 0) {
-            state
-        } else {
-            val artifacts = state.artifacts.toMutableList()
-            artifacts.removeAt(index)
-            state.copy(artifacts = artifacts)
-        }
-    }
 
     is StateActionAutomationRunCancelRequested -> state
 

@@ -18,6 +18,7 @@ public actor AHPStateMirror {
     public private(set) var changesets: [String: ChangesetState] = [:]
     public private(set) var annotations: [String: AnnotationsState] = [:]
     public private(set) var resourceWatches: [String: ResourceWatchState] = [:]
+    public private(set) var automationCatalog = AutomationCatalogState(automations: [])
     public private(set) var automations: [String: AutomationState] = [:]
     public private(set) var automationRuns: [String: AutomationRunState] = [:]
 
@@ -67,9 +68,11 @@ public actor AHPStateMirror {
             // a reducer input. The slot is seeded by `applySnapshot`.
             return
         }
-        if var automation = automations[channel] {
-            automation = automationReducer(state: automation, action: action)
-            automations[channel] = automation
+        if channel == "ahp-automations://" {
+            automationCatalog = automationReducer(state: automationCatalog, action: action)
+            automations = Dictionary(
+                uniqueKeysWithValues: automationCatalog.automations.map { ($0.resource, $0) }
+            )
             return
         }
         if var run = automationRuns[channel] {
@@ -96,8 +99,9 @@ public actor AHPStateMirror {
             resourceWatches[snapshot.resource] = state
         case .annotations(let state):
             annotations[snapshot.resource] = state
-        case .automation(let state):
-            automations[snapshot.resource] = state
+        case .automations(let state):
+            automationCatalog = state
+            automations = Dictionary(uniqueKeysWithValues: state.automations.map { ($0.resource, $0) })
         case .automationRun(let state):
             automationRuns[snapshot.resource] = state
         }
@@ -112,6 +116,7 @@ public actor AHPStateMirror {
         changesets.removeAll()
         annotations.removeAll()
         resourceWatches.removeAll()
+        automationCatalog = AutomationCatalogState(automations: [])
         automations.removeAll()
         automationRuns.removeAll()
     }

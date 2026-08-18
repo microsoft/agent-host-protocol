@@ -16,8 +16,7 @@
         "completedAt": "2026-08-05T12:03:00Z"
       },
       "sessions": ["ahp-session:/old", "ahp-session:/retry"],
-      "primarySession": "ahp-session:/retry",
-      "operations": []
+      "primarySession": "ahp-session:/retry"
     },
     "fromSeq": 9
   },
@@ -34,8 +33,7 @@
         "completedAt": "2026-08-05T12:03:00Z"
       },
       "sessions": ["ahp-session:/old", "ahp-session:/retry"],
-      "primarySession": "ahp-session:/retry",
-      "operations": []
+      "primarySession": "ahp-session:/retry"
     },
     "fromSeq": 9
   }]

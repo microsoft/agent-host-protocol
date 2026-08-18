@@ -468,30 +468,12 @@ const (
 type AutomationOperation string
 
 const (
-	// Replace editable fields using `updateAutomation`.
+	// Replace editable fields using {@link AutomationUpdateRequestedAction | `automation/updateRequested`}.
 	AutomationOperationUpdate AutomationOperation = "update"
-	// Permanently remove the automation using `disposeAutomation`.
+	// Permanently remove the automation using {@link AutomationRemovedAction | `automation/removed`}.
 	AutomationOperationDispose AutomationOperation = "dispose"
-	// Start a manual run using `runAutomation`.
+	// Start a manual run using {@link RunAutomationParams | runAutomation}.
 	AutomationOperationRun AutomationOperation = "run"
-)
-
-// Availability guarantee for host-owned automatic trigger evaluation.
-//
-// This describes the authority that owns one automation catalogue. It does not
-// prevent a client from connecting to several authorities with different
-// lifetimes (for example, one local host and one managed service).
-type AutomationExecutionLifetime string
-
-const (
-	// Automatic triggers are evaluated only while this host process is running.
-	// Definitions may remain durable across restarts, but occurrences while the
-	// process is unavailable are handled according to the trigger's
-	// {@link AutomationMisfirePolicy}.
-	AutomationExecutionLifetimeHostLifetime AutomationExecutionLifetime = "hostLifetime"
-	// Automatic triggers continue to be evaluated independently of connected
-	// clients and any particular interactive host process.
-	AutomationExecutionLifetimeManaged AutomationExecutionLifetime = "managed"
 )
 
 // How a host handles schedule occurrences missed while automatic execution was
@@ -518,18 +500,16 @@ const (
 
 // Lifecycle status of one automation run.
 //
-// `completed`, `failed`, and `cancelled` are terminal. `blocked` is
-// non-terminal: the host may return the run to `running` after the linked
-// session resolves the blocker.
+// `completed`, `failed`, and `cancelled` are terminal. A run remains `running`
+// while any linked session awaits input or client-side work; linked session
+// state is authoritative for those interactions.
 type AutomationRunStatus string
 
 const (
 	// The durable run record exists but execution has not started.
 	AutomationRunStatusPending AutomationRunStatus = "pending"
-	// One or more linked sessions are actively executing.
+	// One or more linked sessions are executing or awaiting interaction.
 	AutomationRunStatusRunning AutomationRunStatus = "running"
-	// Execution is paused on an interaction or client-side dependency.
-	AutomationRunStatusBlocked AutomationRunStatus = "blocked"
 	// Execution finished successfully.
 	AutomationRunStatusCompleted AutomationRunStatus = "completed"
 	// Execution ended with an error.
@@ -538,39 +518,14 @@ const (
 	AutomationRunStatusCancelled AutomationRunStatus = "cancelled"
 )
 
-// Coarse reason a run is blocked.
-//
-// Detailed prompts, confirmations, authentication requests, and tool state
-// remain authoritative on linked session and chat channels.
-type AutomationRunBlockerKind string
-
-const (
-	// A linked session is waiting for an answer to a user-input request.
-	AutomationRunBlockerKindUserInput AutomationRunBlockerKind = "userInput"
-	// A linked session is waiting for tool confirmation.
-	AutomationRunBlockerKindToolConfirmation AutomationRunBlockerKind = "toolConfirmation"
-	// Execution requires authentication or renewed credentials.
-	AutomationRunBlockerKindAuthentication AutomationRunBlockerKind = "authentication"
-	// Work must be performed by or delegated to a connected client.
-	AutomationRunBlockerKindClientExecution AutomationRunBlockerKind = "clientExecution"
-)
-
 // Discriminant describing what created an automation run.
-type AutomationRunCauseKind string
+type AutomationRunOriginKind string
 
 const (
-	// A client explicitly invoked `runAutomation`.
-	AutomationRunCauseKindManual AutomationRunCauseKind = "manual"
+	// A client explicitly invoked {@link RunAutomationParams | runAutomation}.
+	AutomationRunOriginKindManual AutomationRunOriginKind = "manual"
 	// An automatic schedule or event trigger fired.
-	AutomationRunCauseKindTrigger AutomationRunCauseKind = "trigger"
-)
-
-// Operations the host currently permits for a run.
-type AutomationRunOperation string
-
-const (
-	// Request cancellation with `automationRun/cancelRequested`.
-	AutomationRunOperationCancel AutomationRunOperation = "cancel"
+	AutomationRunOriginKindTrigger AutomationRunOriginKind = "trigger"
 )
 
 // ─── Structs ──────────────────────────────────────────────────────────
@@ -879,7 +834,7 @@ type SessionState struct {
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the session is currently doing
 	Activity *string `json:"activity,omitempty"`
-	// Durable origin of this session, when another AHP resource created it.
+	// Durable {@link AutomationSessionOrigin}, when an automation run created this session.
 	Origin *SessionOrigin `json:"origin,omitempty"`
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
@@ -1155,7 +1110,7 @@ type SessionSummary struct {
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the session is currently doing
 	Activity *string `json:"activity,omitempty"`
-	// Durable origin of this session, when another AHP resource created it.
+	// Durable {@link AutomationSessionOrigin}, when an automation run created this session.
 	Origin *SessionOrigin `json:"origin,omitempty"`
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
@@ -3730,9 +3685,9 @@ type ResourceChange struct {
 // for this session's transcript, tools, confirmations, and changes.
 type AutomationSessionOrigin struct {
 	Kind SessionOriginKind `json:"kind"`
-	// Owning `ahp-automation:` URI.
+	// Owning {@link AutomationState.resource}.
 	Automation URI `json:"automation"`
-	// Owning `ahp-automation-run:` URI.
+	// Owning {@link AutomationRunState.resource}.
 	Run URI `json:"run"`
 }
 
@@ -3769,8 +3724,9 @@ type AutomationSchedule struct {
 
 // Starts runs from a recurring cron schedule evaluated by the host.
 type AutomationScheduleTrigger struct {
-	// Identifier unique and stable within this automation definition. Run causes
-	// refer back to this value.
+	// Identifier unique and stable within this automation definition. Recorded in
+	// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+	// run.
 	Id   string                `json:"id"`
 	Kind AutomationTriggerKind `json:"kind"`
 	// Recurrence and time zone evaluated by the host.
@@ -3782,30 +3738,38 @@ type AutomationScheduleTrigger struct {
 
 // Starts runs from events understood by the owning host.
 //
-// Event trigger types, event ids, and configuration are discovered through
-// `listAutomationTriggerDefinitions`. A client that does not understand a
-// host-defined trigger can still preserve and display it without interpreting
-// its configuration.
+// Event trigger types, events, and configuration are discovered through
+// {@link ListAutomationTriggerDefinitionsParams |
+// listAutomationTriggerDefinitions}. The saved trigger includes the matching
+// human-readable metadata so it remains displayable without repeating
+// discovery.
 type AutomationEventTrigger struct {
-	// Identifier unique and stable within this automation definition. Run causes
-	// refer back to this value.
+	// Identifier unique and stable within this automation definition. Recorded in
+	// {@link AutomationTriggeredRunOrigin.triggerId} when this trigger creates a
+	// run.
 	Id   string                `json:"id"`
 	Kind AutomationTriggerKind `json:"kind"`
 	// Matches {@link AutomationTriggerDefinition.type}.
 	Type string `json:"type"`
-	// Selected {@link AutomationTriggerEventDefinition.id | event ids} for this
-	// trigger type.
-	Events []string `json:"events"`
+	// Host-normalized human-readable trigger type name.
+	Title string `json:"title"`
+	// Optional host-normalized explanation of the trigger source.
+	Description *string `json:"description,omitempty"`
+	// Selected events for this trigger type.
+	//
+	// Event ids carry the trigger semantics. Titles and descriptions are
+	// last-known display metadata and do not indicate current availability.
+	Events []AutomationTriggerEventDefinition `json:"events"`
 	// Values described by {@link AutomationTriggerDefinition.configSchema}.
 	// Clients MUST preserve unknown entries when editing other fields.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 }
 
-// One selectable event exposed by a host-defined trigger type.
+// Describes one host-defined trigger event.
 type AutomationTriggerEventDefinition struct {
-	// Stable event id stored in {@link AutomationEventTrigger.events}.
+	// Stable event id.
 	Id string `json:"id"`
-	// Human-readable label suitable for selection UI.
+	// Human-readable event name.
 	Title string `json:"title"`
 	// Optional longer explanation of when this event fires.
 	Description *string `json:"description,omitempty"`
@@ -3824,7 +3788,7 @@ type AutomationTriggerDefinition struct {
 	Title string `json:"title"`
 	// Optional longer explanation of the trigger source.
 	Description *string `json:"description,omitempty"`
-	// Events clients may select for this trigger type.
+	// Events available for selection. Saved triggers retain their selected event descriptors.
 	Events []AutomationTriggerEventDefinition `json:"events"`
 	// Optional schema for {@link AutomationEventTrigger.config}.
 	ConfigSchema *ConfigSchema `json:"configSchema,omitempty"`
@@ -3835,31 +3799,35 @@ type AutomationTriggerDefinition struct {
 // The host revalidates every selection when the run starts. Definitions never
 // carry credentials, confirmation decisions, or durable permission grants.
 type AutomationSessionTemplate struct {
-	// Provider id. Omit to use the host's default provider.
+	// Provider id matching {@link AgentInfo.provider}. Omit to use the host's default provider.
 	Provider *string `json:"provider,omitempty"`
-	// Optional model selection resolved when a run starts.
+	// Optional model selection resolved when a run starts. Its
+	// {@link ModelSelection.id} matches a {@link SessionModelInfo.id} advertised
+	// by the selected provider.
 	Model *ModelSelection `json:"model,omitempty"`
-	// Optional custom agent selection resolved when a run starts.
+	// Optional custom agent selection identified by {@link AgentSelection.uri}.
 	Agent *AgentSelection `json:"agent,omitempty"`
-	// Ordered working-directory URIs for each created session. Absence means a
+	// Ordered working-directory URIs for each created session, equivalent to
+	// {@link CreateSessionParams.workingDirectories}. Absence means a
 	// workspace-less session.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
-	// Session configuration values accepted by `createSession`, normally
-	// obtained from `resolveSessionConfig`.
+	// Session configuration values equivalent to
+	// {@link CreateSessionParams.config}, normally obtained from
+	// {@link ResolveSessionConfigResult.values}.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 }
 
 // Durable, client-editable definition of an automation.
 //
 // A definition combines the initial user message, the session template used
-// for each run, and zero or more automatic triggers. Runtime state, run
-// history, revisions, timestamps, and currently allowed operations live on
+// for each run, and zero or more automatic triggers. Run history, timestamps,
+// and currently allowed operations live on
 // {@link AutomationState} rather than in the definition.
 type AutomationDefinition struct {
 	// Human-readable automation name.
 	Title string `json:"title"`
-	// Initial message sent to every newly created run session. Its origin MUST be
-	// `user`.
+	// Initial message sent to every newly created run session. Its
+	// {@link Message.origin} kind MUST be {@link MessageKind.User}.
 	Message Message `json:"message"`
 	// Template used to create fresh sessions for each run.
 	Session AutomationSessionTemplate `json:"session"`
@@ -3873,68 +3841,46 @@ type AutomationDefinition struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// Host-resolved execution context that is useful to clients but is not part of
-// the editable definition.
-type AutomationRuntimeState struct {
-	// Effective working directories after host-side preparation, such as
-	// materializing a managed workspace.
-	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
-	// Opaque host-defined runtime metadata.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+// Partial replacement of editable {@link AutomationDefinition} fields.
+//
+// Omitted fields are unchanged. Supplied arrays and objects replace their
+// corresponding values in full; they are not merged recursively.
+type AutomationDefinitionPatch struct {
+	// Replacement {@link AutomationDefinition.title}.
+	Title *string `json:"title,omitempty"`
+	// Replacement {@link AutomationDefinition.message}.
+	Message *Message `json:"message,omitempty"`
+	// Replacement {@link AutomationDefinition.session}. The host revalidates
+	// affected event triggers when their discovery context changes.
+	Session *AutomationSessionTemplate `json:"session,omitempty"`
+	// Replacement {@link AutomationDefinition.enabled}.
+	Enabled *bool `json:"enabled,omitempty"`
+	// Complete replacement {@link AutomationDefinition.triggers}. The host
+	// validates event ids and normalizes event-trigger titles and descriptions.
+	Triggers *[]AutomationTrigger `json:"triggers,omitempty"`
+	// Complete replacement {@link AutomationDefinition._meta}.
+	Meta *map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// Lightweight root-catalogue projection of an automation.
+// Authoritative state of one automation in the
+// {@link AutomationCatalogState.automations} catalogue.
 //
-// Returned by `listAutomations` and carried by root automation notifications,
-// this contains enough information to render a list without subscribing to
-// every `ahp-automation:` resource.
-type AutomationSummary struct {
-	// Subscribable `ahp-automation:` URI.
-	Resource URI `json:"resource"`
-	// Current {@link AutomationDefinition.title}.
-	Title string `json:"title"`
-	// Current {@link AutomationDefinition.enabled} value.
-	Enabled bool `json:"enabled"`
-	// Number of automatic triggers in the current definition.
-	TriggerCount int64 `json:"triggerCount"`
-	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
-	NextRunAt *string `json:"nextRunAt,omitempty"`
-	// Most recent retained run, when any run exists.
-	LastRun *AutomationRunSummary `json:"lastRun,omitempty"`
-	// Monotonic definition revision used for optimistic concurrency.
-	Revision int64 `json:"revision"`
-	// Operations currently permitted for this automation.
-	Operations []AutomationOperation `json:"operations"`
-	// Creation timestamp in ISO 8601 format.
-	CreatedAt string `json:"createdAt"`
-	// Last definition modification timestamp in ISO 8601 format.
-	ModifiedAt string `json:"modifiedAt"`
-	// Opaque host-defined catalogue metadata.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-}
-
-// Authoritative state of one subscribed `ahp-automation:` resource.
-//
-// The host owns definition revisions, trigger evaluation, run claims, run
-// retention, and operation availability. Clients render this state and submit
-// commands; they never run a fallback scheduler for a host-owned definition.
+// The host owns trigger evaluation, run claims, run retention, and operation
+// availability. Clients render this state and submit actions or commands; they
+// never run a fallback scheduler for a host-owned definition.
 type AutomationState struct {
-	// URI of this automation channel.
+	// Stable `ahp-automation:/<id>` resource identifier.
 	Resource URI `json:"resource"`
 	// Current durable definition.
 	Definition AutomationDefinition `json:"definition"`
-	// Monotonically increasing definition revision. Clients pass the revision
-	// they observed as `updateAutomation.expectedRevision`.
-	Revision int64 `json:"revision"`
 	// Earliest schedule occurrence awaiting evaluation, as an ISO 8601 timestamp. It may be in the past while catch-up is pending.
 	NextRunAt *string `json:"nextRunAt,omitempty"`
 	// Newest-first retained run summaries. This is a bounded window; use
-	// `fetchAutomationRuns` when {@link runsNextCursor} is present.
+	// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
+	// {@link AutomationState.runsNextCursor} is present.
 	Runs []AutomationRunSummary `json:"runs"`
-	// Opaque cursor for the next older run-history page.
+	// Opaque cursor passed as {@link FetchAutomationRunsParams.cursor} for the next older run-history page.
 	RunsNextCursor *string `json:"runsNextCursor,omitempty"`
-	// Optional host-resolved execution context.
-	Runtime *AutomationRuntimeState `json:"runtime,omitempty"`
 	// Operations currently permitted for this automation.
 	Operations []AutomationOperation `json:"operations"`
 	// Creation timestamp in ISO 8601 format.
@@ -3945,21 +3891,30 @@ type AutomationState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// Summary of why a run cannot currently make progress.
-type AutomationRunBlocker struct {
-	// Category of the outstanding dependency.
-	Kind AutomationRunBlockerKind `json:"kind"`
+// Authoritative automation catalogue exposed on the `ahp-automations://`
+// channel.
+//
+// A subscription snapshot contains every automation visible to the client.
+// Subsequent {@link AutomationSetAction | `automation/set`} and
+// {@link AutomationRemovedAction | `automation/removed`} actions keep the
+// catalogue synchronized and participate in normal reconnect replay.
+type AutomationCatalogState struct {
+	// Full automation states keyed by {@link AutomationState.resource}.
+	Automations []AutomationState `json:"automations"`
+	// Opaque host-defined catalogue metadata.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// Cause recorded for a client-requested manual run.
-type AutomationManualRunCause struct {
-	Kind AutomationRunCauseKind `json:"kind"`
+// Origin recorded for a client-requested manual run.
+type AutomationManualRunOrigin struct {
+	Kind AutomationRunOriginKind `json:"kind"`
 }
 
-// Cause recorded for a run created by one of the automation's triggers.
-type AutomationTriggeredRunCause struct {
-	Kind AutomationRunCauseKind `json:"kind"`
-	// Matches the stable {@link AutomationTrigger.id} in the definition.
+// Origin recorded for a run created by one of the automation's triggers.
+type AutomationTriggeredRunOrigin struct {
+	Kind AutomationRunOriginKind `json:"kind"`
+	// Matches the stable {@link AutomationScheduleTrigger.id} or
+	// {@link AutomationEventTrigger.id} in the definition.
 	TriggerId string `json:"triggerId"`
 	// Intended schedule occurrence as an ISO 8601 timestamp. Present for
 	// schedule triggers and normally absent for event triggers.
@@ -3979,24 +3934,17 @@ type AutomationPendingRunLifecycle struct {
 	CreatedAt string `json:"createdAt"`
 }
 
-// The run is actively executing linked sessions.
+// The run is executing linked sessions or awaiting interaction on them.
+//
+// Linked {@link SessionState.status} and {@link SessionState.inputNeeded}
+// remain authoritative for whether user attention or client-side work is
+// required.
 type AutomationRunningRunLifecycle struct {
 	Status AutomationRunStatus `json:"status"`
 	// Run creation timestamp in ISO 8601 format.
 	CreatedAt string `json:"createdAt"`
 	// First execution start timestamp in ISO 8601 format.
 	StartedAt string `json:"startedAt"`
-}
-
-// The run started but is temporarily unable to progress.
-type AutomationBlockedRunLifecycle struct {
-	Status AutomationRunStatus `json:"status"`
-	// Run creation timestamp in ISO 8601 format.
-	CreatedAt string `json:"createdAt"`
-	// First execution start timestamp in ISO 8601 format.
-	StartedAt string `json:"startedAt"`
-	// Coarse blocker summary; linked sessions contain interaction details.
-	Blocker AutomationRunBlocker `json:"blocker"`
 }
 
 // Terminal lifecycle for a successfully completed run.
@@ -4042,77 +3990,48 @@ type AutomationCancelledRunLifecycle struct {
 	CompletedAt string `json:"completedAt"`
 }
 
-// Fetchable output produced at run scope rather than by one specific session.
-//
-// The inherited {@link ContentRef} identifies how the client obtains the
-// content. Session-specific edits, transcripts, and tool results remain on
-// their session and chat channels.
-type AutomationRunArtifact struct {
-	// Content URI
-	Uri URI `json:"uri"`
-	// Approximate size in bytes
-	SizeHint *int64 `json:"sizeHint,omitempty"`
-	// Content MIME type
-	ContentType *string `json:"contentType,omitempty"`
-	// Content nonce
-	Nonce *string `json:"nonce,omitempty"`
-	// Stable artifact id within this run, used by artifact actions.
-	Id string `json:"id"`
-	// Human-readable label suitable for run-history UI.
-	Label string `json:"label"`
-	// Opaque host-defined artifact metadata.
-	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-}
-
 // Lightweight projection of a run retained in its automation's history.
 //
 // A summary contains enough information to render run history without
 // subscribing to every `ahp-automation-run:` resource.
 type AutomationRunSummary struct {
-	// Subscribable `ahp-automation-run:` URI.
+	// Subscribable `ahp-automation-run:` URI matching {@link AutomationRunState.resource}.
 	Resource URI `json:"resource"`
-	// Owning `ahp-automation:` URI.
+	// Owning `ahp-automation:` URI matching {@link AutomationRunState.automation}.
 	Automation URI `json:"automation"`
-	// Immutable reason this run was created.
-	Cause AutomationRunCause `json:"cause"`
-	// Current or terminal lifecycle snapshot.
+	// Immutable provenance matching {@link AutomationRunState.origin}.
+	Origin AutomationRunOrigin `json:"origin"`
+	// Current or terminal lifecycle snapshot matching {@link AutomationRunState.lifecycle}.
 	Lifecycle AutomationRunLifecycle `json:"lifecycle"`
-	// Session the host recommends opening first, when one has been selected.
+	// Session matching {@link AutomationRunState.primarySession}, when selected.
 	PrimarySession *URI `json:"primarySession,omitempty"`
-	// Number of linked sessions, including attempts and workers.
+	// Number of entries in {@link AutomationRunState.sessions}.
 	SessionCount int64 `json:"sessionCount"`
-	// Number of run-scoped artifacts, when cheaply available.
-	ArtifactCount *int64 `json:"artifactCount,omitempty"`
-	// Operations currently permitted for this run.
-	Operations []AutomationRunOperation `json:"operations"`
 	// Opaque host-defined summary metadata.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // Authoritative state of one subscribed `ahp-automation-run:` resource.
 //
-// The run channel owns task-level lifecycle, provenance, linked-session
-// membership, artifacts, and cancellation availability. Linked session and
-// chat channels remain authoritative for transcripts, tools, confirmations,
-// changesets, and per-session lifecycle.
+// The run channel owns task-level lifecycle, provenance, and linked-session
+// membership. Linked session and chat channels remain authoritative for
+// transcripts, tools, interaction requirements, changesets, and per-session
+// lifecycle.
 type AutomationRunState struct {
 	// URI of this automation-run channel.
 	Resource URI `json:"resource"`
-	// Owning `ahp-automation:` URI.
+	// Owning `ahp-automation:` URI matching {@link AutomationState.resource}.
 	Automation URI `json:"automation"`
-	// Immutable reason this run was created.
-	Cause AutomationRunCause `json:"cause"`
+	// Immutable provenance describing how this run was created.
+	Origin AutomationRunOrigin `json:"origin"`
 	// Current or terminal lifecycle.
 	Lifecycle AutomationRunLifecycle `json:"lifecycle"`
-	// Ordered, unique session URIs belonging to this run. Entries may represent
-	// retries, parallel workers, or delegated attempts.
+	// Ordered, unique session URIs belonging to this run, each matching
+	// {@link SessionState.resource}. Entries may represent retries, parallel
+	// workers, or delegated attempts.
 	Sessions []URI `json:"sessions"`
-	// Session the host recommends opening first, when one has been selected.
+	// Member of {@link AutomationRunState.sessions} that the host recommends opening first.
 	PrimarySession *URI `json:"primarySession,omitempty"`
-	// Run-scoped artifacts keyed by {@link AutomationRunArtifact.id}.
-	Artifacts []AutomationRunArtifact `json:"artifacts"`
-	// Operations currently permitted for this run.
-	Operations []AutomationRunOperation `json:"operations"`
 	// Opaque host-defined run metadata.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
@@ -5603,48 +5522,48 @@ func (u AutomationTrigger) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
-// AutomationRunCause is the cause of an automation run.
-type AutomationRunCause struct {
-	Value isAutomationRunCause
+// AutomationRunOrigin describes how an automation run was created.
+type AutomationRunOrigin struct {
+	Value isAutomationRunOrigin
 }
 
-// isAutomationRunCause is the marker interface implemented by every
-// concrete variant of AutomationRunCause.
-type isAutomationRunCause interface{ isAutomationRunCause() }
+// isAutomationRunOrigin is the marker interface implemented by every
+// concrete variant of AutomationRunOrigin.
+type isAutomationRunOrigin interface{ isAutomationRunOrigin() }
 
-func (*AutomationManualRunCause) isAutomationRunCause()    {}
-func (*AutomationTriggeredRunCause) isAutomationRunCause() {}
+func (*AutomationManualRunOrigin) isAutomationRunOrigin()    {}
+func (*AutomationTriggeredRunOrigin) isAutomationRunOrigin() {}
 
 // UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
-func (u *AutomationRunCause) UnmarshalJSON(data []byte) error {
+func (u *AutomationRunOrigin) UnmarshalJSON(data []byte) error {
 	disc, ok, err := readDiscriminator(data, "kind")
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return missingDiscriminatorError("AutomationRunCause", "kind")
+		return missingDiscriminatorError("AutomationRunOrigin", "kind")
 	}
 	switch disc {
 	case "manual":
-		var value AutomationManualRunCause
+		var value AutomationManualRunOrigin
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	case "trigger":
-		var value AutomationTriggeredRunCause
+		var value AutomationTriggeredRunOrigin
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
 		u.Value = &value
 	default:
-		return unknownDiscriminatorError("AutomationRunCause", "kind", disc)
+		return unknownDiscriminatorError("AutomationRunOrigin", "kind", disc)
 	}
 	return nil
 }
 
 // MarshalJSON encodes the active variant back to JSON.
-func (u AutomationRunCause) MarshalJSON() ([]byte, error) {
+func (u AutomationRunOrigin) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
@@ -5657,9 +5576,9 @@ func (u AutomationRunCause) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	switch u.Value.(type) {
-	case *AutomationManualRunCause:
+	case *AutomationManualRunOrigin:
 		object["kind"] = json.RawMessage("\"manual\"")
-	case *AutomationTriggeredRunCause:
+	case *AutomationTriggeredRunOrigin:
 		object["kind"] = json.RawMessage("\"trigger\"")
 	}
 	return json.Marshal(object)
@@ -5676,7 +5595,6 @@ type isAutomationRunLifecycle interface{ isAutomationRunLifecycle() }
 
 func (*AutomationPendingRunLifecycle) isAutomationRunLifecycle()   {}
 func (*AutomationRunningRunLifecycle) isAutomationRunLifecycle()   {}
-func (*AutomationBlockedRunLifecycle) isAutomationRunLifecycle()   {}
 func (*AutomationCompletedRunLifecycle) isAutomationRunLifecycle() {}
 func (*AutomationFailedRunLifecycle) isAutomationRunLifecycle()    {}
 func (*AutomationCancelledRunLifecycle) isAutomationRunLifecycle() {}
@@ -5699,12 +5617,6 @@ func (u *AutomationRunLifecycle) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "running":
 		var value AutomationRunningRunLifecycle
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "blocked":
-		var value AutomationBlockedRunLifecycle
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
@@ -5751,8 +5663,6 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 		object["status"] = json.RawMessage("\"pending\"")
 	case *AutomationRunningRunLifecycle:
 		object["status"] = json.RawMessage("\"running\"")
-	case *AutomationBlockedRunLifecycle:
-		object["status"] = json.RawMessage("\"blocked\"")
 	case *AutomationCompletedRunLifecycle:
 		object["status"] = json.RawMessage("\"completed\"")
 	case *AutomationFailedRunLifecycle:
@@ -5860,22 +5770,22 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 }
 
 // SnapshotState is the state payload of a snapshot — root, session,
-// chat, terminal, changeset, resource-watch, annotations, automation, or
-// automation-run state. The active
+// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+// or automation-run state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (automationRun → automation → session → chat → terminal → changeset →
+// (automationRun → automations → session → chat → terminal → changeset →
 // resourceWatch → annotations → root).
 type SnapshotState struct {
-	Root          *RootState          `json:"-"`
-	Session       *SessionState       `json:"-"`
-	Chat          *ChatState          `json:"-"`
-	Terminal      *TerminalState      `json:"-"`
-	Changeset     *ChangesetState     `json:"-"`
-	ResourceWatch *ResourceWatchState `json:"-"`
-	Annotations   *AnnotationsState   `json:"-"`
-	Automation    *AutomationState    `json:"-"`
-	AutomationRun *AutomationRunState `json:"-"`
+	Root          *RootState              `json:"-"`
+	Session       *SessionState           `json:"-"`
+	Chat          *ChatState              `json:"-"`
+	Terminal      *TerminalState          `json:"-"`
+	Changeset     *ChangesetState         `json:"-"`
+	ResourceWatch *ResourceWatchState     `json:"-"`
+	Annotations   *AnnotationsState       `json:"-"`
+	Automations   *AutomationCatalogState `json:"-"`
+	AutomationRun *AutomationRunState     `json:"-"`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
@@ -5883,8 +5793,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	switch {
 	case s.AutomationRun != nil:
 		return json.Marshal(s.AutomationRun)
-	case s.Automation != nil:
-		return json.Marshal(s.Automation)
+	case s.Automations != nil:
+		return json.Marshal(s.Automations)
 	case s.Session != nil:
 		return json.Marshal(s.Session)
 	case s.Chat != nil:
@@ -5913,18 +5823,18 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch {
-	case containsAll(probe, "automation", "cause", "sessions"):
+	case containsAll(probe, "automation", "origin", "sessions"):
 		var v AutomationRunState
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err
 		}
 		s.AutomationRun = &v
-	case containsAll(probe, "definition"):
-		var v AutomationState
+	case containsAll(probe, "automations"):
+		var v AutomationCatalogState
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err
 		}
-		s.Automation = &v
+		s.Automations = &v
 	case containsAll(probe, "lifecycle"):
 		var v SessionState
 		if err := json.Unmarshal(data, &v); err != nil {

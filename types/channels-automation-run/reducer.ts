@@ -13,7 +13,7 @@ import type { AutomationRunState } from './state.js';
 export function automationRunReducer(state: AutomationRunState, action: AutomationRunAction, log?: (msg: string) => void): AutomationRunState {
   switch (action.type) {
     case ActionType.AutomationRunLifecycleChanged:
-      return { ...state, lifecycle: action.lifecycle, operations: action.operations };
+      return { ...state, lifecycle: action.lifecycle };
 
     case ActionType.AutomationRunSessionSet:
       if (state.sessions.includes(action.session)) {

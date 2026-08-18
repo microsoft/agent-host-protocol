@@ -17,11 +17,11 @@ use ahp::hosts::{
 };
 use ahp::transport::BoxedTransport;
 use ahp::{Transport, TransportError, TransportMessage};
-use ahp_types::commands::{AutomationCapabilities, AutomationExecutionCapabilities};
+use ahp_types::commands::AutomationCapabilities;
 use ahp_types::messages::{
     JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcSuccessResponse, JsonRpcVersion,
 };
-use ahp_types::state::{AgentInfo, AutomationExecutionLifetime};
+use ahp_types::state::AgentInfo;
 use tokio::sync::{mpsc, Mutex};
 
 // ─── In-memory transport ────────────────────────────────────────────────────
@@ -385,13 +385,9 @@ async fn host_client_handle_invalidates_after_reconnect() {
 #[tokio::test]
 async fn automation_capabilities_are_exposed_and_survive_reconnect() {
     let automations = AutomationCapabilities {
-        execution: AutomationExecutionCapabilities {
-            lifetime: AutomationExecutionLifetime::Managed,
-        },
         create: None,
         schedules: None,
         run_cancellation: None,
-        schedule_preview: None,
         run_history_limit: Some(25),
     };
     let drop_after_init = Arc::new(AtomicBool::new(false));

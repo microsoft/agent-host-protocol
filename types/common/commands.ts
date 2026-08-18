@@ -10,7 +10,6 @@
 import type { URI, Snapshot } from './state.js';
 import type { ActionEnvelope, StateAction } from './actions.js';
 import type { AutomationRunCancelRequestedAction } from '../channels-automation-run/actions.js';
-import type { AutomationRunOperation, AutomationRunState } from '../channels-automation-run/state.js';
 import type { AutomationCreateRequestedAction } from '../channels-automation/actions.js';
 import type {
   AutomationSchedule,
@@ -292,10 +291,9 @@ export interface InitializeResult {
  * catalogue. Optional fields describe additional host features and
  * restrictions.
  *
- * Capabilities describe implementation support. Per-resource
- * {@link AutomationState.operations} and
- * {@link AutomationRunState.operations} remain authoritative for whether a
- * particular operation is currently allowed.
+ * Capabilities describe implementation support.
+ * {@link AutomationState.operations} remains authoritative for which
+ * definition mutations are currently allowed on a particular automation.
  *
  * @category Commands
  */
@@ -304,7 +302,10 @@ export interface AutomationCapabilities {
   create?: AutomationCreateCapability;
   /** Present when definitions may contain {@link AutomationScheduleTrigger | schedule triggers}. */
   schedules?: AutomationScheduleCapabilities;
-  /** Present when clients may dispatch {@link AutomationRunCancelRequestedAction}. */
+  /**
+   * Present when clients may request cancellation of `pending` or `running`
+   * automation runs.
+   */
   runCancellation?: AutomationRunCancellationCapability;
   /**
    * Maximum terminal entries retained in {@link AutomationState.runs}. Active
@@ -346,8 +347,8 @@ export interface AutomationScheduleCapabilities {
  * Presence capability for {@link AutomationRunCancelRequestedAction |
  * `automationRun/cancelRequested`}.
  *
- * The empty object means "supported"; clients must additionally check for
- * {@link AutomationRunOperation.Cancel} on each run.
+ * The empty object means "supported." Clients may dispatch the action for
+ * `pending` or `running` runs; terminal runs cannot be cancelled.
  *
  * @category Commands
  */
