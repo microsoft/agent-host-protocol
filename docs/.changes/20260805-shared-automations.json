@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Automation catalogue and automation-run channels for shared trigger-based agent session workflows."
+  "message": "Automation catalogue and automation-run channels, including self-contained host-defined event triggers, for shared trigger-based agent session workflows."
 }

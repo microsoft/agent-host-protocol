@@ -1546,7 +1546,7 @@
     },
     "ListAutomationTriggerDefinitionsParams": {
       "type": "object",
-      "description": "Discover event-trigger types available for a prospective session template.\n\nHosts may vary definitions by provider, workspace, and session\nconfiguration. Schedule triggers are protocol-defined and therefore do not\nappear in this result.",
+      "description": "Discover event-trigger types available for a prospective session template.\n\nHosts may vary definitions by provider, workspace, and session\nconfiguration. Schedule triggers are protocol-defined and therefore do not\nappear in this result. The result describes current authoring and validation\nchoices. Saved {@link AutomationEventTrigger} values retain their selected\nevent descriptors for display but do not establish current availability.",
       "properties": {
         "channel": {
           "type": "string",
@@ -6662,7 +6662,7 @@
     },
     "AutomationEventTrigger": {
       "type": "object",
-      "description": "Starts runs from events understood by the owning host.\n\nEvent trigger types, event ids, and configuration are discovered through\n{@link ListAutomationTriggerDefinitionsParams |\nlistAutomationTriggerDefinitions}. A client that does not understand a\nhost-defined trigger can still preserve and display it without interpreting\nits configuration.",
+      "description": "Starts runs from events understood by the owning host.\n\nEvent trigger types, events, and configuration are discovered through\n{@link ListAutomationTriggerDefinitionsParams |\nlistAutomationTriggerDefinitions}. The saved trigger includes the matching\nhuman-readable metadata so it remains displayable without repeating\ndiscovery.",
       "properties": {
         "id": {
           "type": "string",
@@ -6675,12 +6675,20 @@
           "type": "string",
           "description": "Matches {@link AutomationTriggerDefinition.type}."
         },
+        "title": {
+          "type": "string",
+          "description": "Host-normalized human-readable trigger type name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional host-normalized explanation of the trigger source."
+        },
         "events": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/AutomationTriggerEventDefinition"
           },
-          "description": "Selected {@link AutomationTriggerEventDefinition.id | event ids} for this\ntrigger type."
+          "description": "Selected events for this trigger type.\n\nEvent ids carry the trigger semantics. Titles and descriptions are\nlast-known display metadata and do not indicate current availability."
         },
         "config": {
           "type": "object",
@@ -6692,20 +6700,21 @@
         "id",
         "kind",
         "type",
+        "title",
         "events"
       ]
     },
     "AutomationTriggerEventDefinition": {
       "type": "object",
-      "description": "One selectable event exposed by a host-defined trigger type.",
+      "description": "Describes one host-defined trigger event.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Stable event id stored in {@link AutomationEventTrigger.events}."
+          "description": "Stable event id."
         },
         "title": {
           "type": "string",
-          "description": "Human-readable label suitable for selection UI."
+          "description": "Human-readable event name."
         },
         "description": {
           "type": "string",
@@ -6738,7 +6747,7 @@
           "items": {
             "$ref": "#/$defs/AutomationTriggerEventDefinition"
           },
-          "description": "Events whose {@link AutomationTriggerEventDefinition.id | ids} may appear in {@link AutomationEventTrigger.events}."
+          "description": "Events available for selection. Saved triggers retain their selected event descriptors."
         },
         "configSchema": {
           "$ref": "#/$defs/ConfigSchema",
@@ -9363,7 +9372,7 @@
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",
-          "description": "Replacement {@link AutomationDefinition.session}."
+          "description": "Replacement {@link AutomationDefinition.session}. The host revalidates\naffected event triggers when their discovery context changes."
         },
         "enabled": {
           "type": "boolean",
@@ -9374,7 +9383,7 @@
           "items": {
             "$ref": "#/$defs/AutomationTrigger"
           },
-          "description": "Complete replacement {@link AutomationDefinition.triggers}."
+          "description": "Complete replacement {@link AutomationDefinition.triggers}. The host\nvalidates event ids and normalizes event-trigger titles and descriptions."
         },
         "_meta": {
           "type": "object",
@@ -9385,7 +9394,7 @@
     },
     "AutomationCreateRequestedAction": {
       "type": "object",
-      "description": "Ask the host to create a durable automation at a client-chosen resource.\n\nClients may dispatch this action only when the host advertises its `create`\nautomation capability. {@link AutomationCreateRequestedAction.resource |\n`resource`} MUST use the `ahp-automation:` scheme and MUST NOT already\nidentify an unrelated automation.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost validates and persists the definition, then publishes the authoritative\nresult with {@link AutomationSetAction | `automation/set`}. Rejections leave\nthe catalogue unchanged.",
+      "description": "Ask the host to create a durable automation at a client-chosen resource.\n\nClients may dispatch this action only when the host advertises its `create`\nautomation capability. {@link AutomationCreateRequestedAction.resource |\n`resource`} MUST use the `ahp-automation:` scheme and MUST NOT already\nidentify an unrelated automation.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost validates trigger ids and configuration, normalizes event-trigger\ntitles and descriptions, persists the definition, then publishes the\nauthoritative result with {@link AutomationSetAction | `automation/set`}.\nRejections leave the catalogue unchanged.",
       "properties": {
         "type": {
           "const": "automation/createRequested"
@@ -9407,7 +9416,7 @@
     },
     "AutomationUpdateRequestedAction": {
       "type": "object",
-      "description": "Ask the host to update editable fields of an existing automation.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Update}. The host revalidates that operation and\nthe client's authorization.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost applies accepted patches to its current authoritative definition in\naction order, then publishes the result with\n{@link AutomationSetAction | `automation/set`}. Omitted fields remain\nunchanged; when accepted actions replace the same field, the later action in\nserver order wins.",
+      "description": "Ask the host to update editable fields of an existing automation.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Update}. The host revalidates that operation and\nthe client's authorization.\n\nThis side-effect request leaves optimistic catalogue state unchanged. The\nhost applies accepted patches to its current authoritative definition in\naction order, revalidates and normalizes affected event triggers, then\npublishes the result with\n{@link AutomationSetAction | `automation/set`}. Omitted fields remain\nunchanged; when accepted actions replace the same field, the later action in\nserver order wins.",
       "properties": {
         "type": {
           "const": "automation/updateRequested"

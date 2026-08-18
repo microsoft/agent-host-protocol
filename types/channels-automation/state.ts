@@ -138,11 +138,11 @@ export interface AutomationScheduleTrigger {
 /**
  * Starts runs from events understood by the owning host.
  *
- * Event trigger types, event ids, and configuration are discovered through
+ * Event trigger types, events, and configuration are discovered through
  * {@link ListAutomationTriggerDefinitionsParams |
- * listAutomationTriggerDefinitions}. A client that does not understand a
- * host-defined trigger can still preserve and display it without interpreting
- * its configuration.
+ * listAutomationTriggerDefinitions}. The saved trigger includes the matching
+ * human-readable metadata so it remains displayable without repeating
+ * discovery.
  *
  * @category Automation State
  */
@@ -156,11 +156,17 @@ export interface AutomationEventTrigger {
   kind: AutomationTriggerKind.Event;
   /** Matches {@link AutomationTriggerDefinition.type}. */
   type: string;
+  /** Host-normalized human-readable trigger type name. */
+  title: string;
+  /** Optional host-normalized explanation of the trigger source. */
+  description?: string;
   /**
-   * Selected {@link AutomationTriggerEventDefinition.id | event ids} for this
-   * trigger type.
+   * Selected events for this trigger type.
+   *
+   * Event ids carry the trigger semantics. Titles and descriptions are
+   * last-known display metadata and do not indicate current availability.
    */
-  events: string[];
+  events: AutomationTriggerEventDefinition[];
   /**
    * Values described by {@link AutomationTriggerDefinition.configSchema}.
    * Clients MUST preserve unknown entries when editing other fields.
@@ -181,14 +187,14 @@ export type AutomationTrigger =
   | AutomationEventTrigger;
 
 /**
- * One selectable event exposed by a host-defined trigger type.
+ * Describes one host-defined trigger event.
  *
  * @category Automation State
  */
 export interface AutomationTriggerEventDefinition {
-  /** Stable event id stored in {@link AutomationEventTrigger.events}. */
+  /** Stable event id. */
   id: string;
-  /** Human-readable label suitable for selection UI. */
+  /** Human-readable event name. */
   title: string;
   /** Optional longer explanation of when this event fires. */
   description?: string;
@@ -211,7 +217,7 @@ export interface AutomationTriggerDefinition {
   title: string;
   /** Optional longer explanation of the trigger source. */
   description?: string;
-  /** Events whose {@link AutomationTriggerEventDefinition.id | ids} may appear in {@link AutomationEventTrigger.events}. */
+  /** Events available for selection. Saved triggers retain their selected event descriptors. */
   events: AutomationTriggerEventDefinition[];
   /** Optional schema for {@link AutomationEventTrigger.config}. */
   configSchema?: ConfigSchema;

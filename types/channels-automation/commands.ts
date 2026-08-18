@@ -22,7 +22,9 @@ import type {
  *
  * Hosts may vary definitions by provider, workspace, and session
  * configuration. Schedule triggers are protocol-defined and therefore do not
- * appear in this result.
+ * appear in this result. The result describes current authoring and validation
+ * choices. Saved {@link AutomationEventTrigger} values retain their selected
+ * event descriptors for display but do not establish current availability.
  *
  * @category Commands
  * @method listAutomationTriggerDefinitions

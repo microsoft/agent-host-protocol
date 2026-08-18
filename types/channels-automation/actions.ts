@@ -30,11 +30,17 @@ export interface AutomationDefinitionPatch {
   title?: string;
   /** Replacement {@link AutomationDefinition.message}. */
   message?: Message;
-  /** Replacement {@link AutomationDefinition.session}. */
+  /**
+   * Replacement {@link AutomationDefinition.session}. The host revalidates
+   * affected event triggers when their discovery context changes.
+   */
   session?: AutomationSessionTemplate;
   /** Replacement {@link AutomationDefinition.enabled}. */
   enabled?: boolean;
-  /** Complete replacement {@link AutomationDefinition.triggers}. */
+  /**
+   * Complete replacement {@link AutomationDefinition.triggers}. The host
+   * validates event ids and normalizes event-trigger titles and descriptions.
+   */
   triggers?: AutomationTrigger[];
   /** Complete replacement {@link AutomationDefinition._meta}. */
   _meta?: Record<string, unknown>;
@@ -49,9 +55,10 @@ export interface AutomationDefinitionPatch {
  * identify an unrelated automation.
  *
  * This side-effect request leaves optimistic catalogue state unchanged. The
- * host validates and persists the definition, then publishes the authoritative
- * result with {@link AutomationSetAction | `automation/set`}. Rejections leave
- * the catalogue unchanged.
+ * host validates trigger ids and configuration, normalizes event-trigger
+ * titles and descriptions, persists the definition, then publishes the
+ * authoritative result with {@link AutomationSetAction | `automation/set`}.
+ * Rejections leave the catalogue unchanged.
  *
  * @category Automation Actions
  * @version 1
@@ -74,7 +81,8 @@ export interface AutomationCreateRequestedAction {
  *
  * This side-effect request leaves optimistic catalogue state unchanged. The
  * host applies accepted patches to its current authoritative definition in
- * action order, then publishes the result with
+ * action order, revalidates and normalizes affected event triggers, then
+ * publishes the result with
  * {@link AutomationSetAction | `automation/set`}. Omitted fields remain
  * unchanged; when accepted actions replace the same field, the later action in
  * server order wins.

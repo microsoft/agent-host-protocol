@@ -245,9 +245,10 @@ Event triggers are defined by the host rather than standardized by AHP. A
 GitHub-aware host service might expose events such as pull-request creation;
 another host may expose no event triggers.
 
-Clients discover event types with `listAutomationTriggerDefinitions`, passing
-the prospective provider, working directories, and resolved session
-configuration. The host returns:
+While creating or editing a trigger, clients discover the currently available
+event types with `listAutomationTriggerDefinitions`, passing the prospective
+provider, working directories, and resolved session configuration. The host
+returns:
 
 ```typescript
 AutomationTriggerDefinition {
@@ -263,18 +264,41 @@ AutomationTriggerDefinition {
 }
 ```
 
-The durable trigger stores the selected type, event ids, and schema-defined
-configuration:
+The durable trigger stores the selected type and its human-readable metadata,
+the selected event descriptors, and schema-defined configuration:
 
 ```typescript
 AutomationEventTrigger {
   id: string
   kind: 'event'
   type: string
-  events: string[]
+  title: string
+  description?: string
+  events: {
+    id: string
+    title: string
+    description?: string
+  }[]
   config?: Record<string, unknown>
 }
 ```
+
+Routine catalogue rendering does not repeat that potentially expensive
+contextual discovery because the trigger is self-contained. The `type` and
+event `id` values carry its semantics. The titles and descriptions are
+last-known display metadata and do not prove that the trigger or event is
+currently available.
+
+When accepting a create request, a trigger replacement, or a session-context
+change, the host validates affected semantic ids and configuration against
+current discovery, normalizes the titles and descriptions, and publishes the
+authoritative definition through `automation/set`. An unrelated update
+preserves the saved trigger as a whole, including its labels.
+
+Clients call `listAutomationTriggerDefinitions` when editing and use that
+current result for availability, selectable events, configuration schema,
+validation, and current editing labels. If an existing trigger later disappears
+from discovery, its saved descriptors still keep the catalogue readable.
 
 Unknown configuration entries must survive client edits. Event provenance
 recorded on a run must contain no secrets; it is descriptive context, not a

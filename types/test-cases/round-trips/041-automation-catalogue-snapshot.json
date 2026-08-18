@@ -27,7 +27,13 @@
               "id": "issue",
               "kind": "event",
               "type": "issues",
-              "events": ["opened"],
+              "title": "Issues",
+              "description": "Runs when a matching issue changes.",
+              "events": [{
+                "id": "opened",
+                "title": "Issue opened",
+                "description": "A matching issue was opened."
+              }],
               "config": { "query": "label:bug" }
             }
           ]
@@ -72,7 +78,13 @@
               "id": "issue",
               "kind": "event",
               "type": "issues",
-              "events": ["opened"],
+              "title": "Issues",
+              "description": "Runs when a matching issue changes.",
+              "events": [{
+                "id": "opened",
+                "title": "Issue opened",
+                "description": "A matching issue was opened."
+              }],
               "config": { "query": "label:bug" }
             }
           ]
