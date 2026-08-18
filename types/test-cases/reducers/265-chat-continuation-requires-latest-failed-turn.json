@@ -1,0 +1,104 @@
+{
+  "description": "continuation starts are ignored unless they reference the latest failed turn",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "First failure",
+          "continuation": true
+        }
+      },
+      {
+        "id": "turn-2",
+        "message": {
+          "text": "Second",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete",
+        "error": null
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-3",
+      "startedAt": "1970-01-01T00:00:03.000Z",
+      "message": {
+        "text": "",
+        "origin": {
+          "kind": "continuation"
+        }
+      }
+    },
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-4",
+      "startedAt": "1970-01-01T00:00:04.000Z",
+      "message": {
+        "text": "",
+        "origin": {
+          "kind": "continuation"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "First",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "First failure",
+          "continuation": true
+        }
+      },
+      {
+        "id": "turn-2",
+        "message": {
+          "text": "Second",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete",
+        "error": null
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

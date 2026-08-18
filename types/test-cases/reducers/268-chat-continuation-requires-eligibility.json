@@ -1,0 +1,65 @@
+{
+  "description": "a failed turn without continuation eligibility cannot be continued",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "Fix the bug",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "invalidRequest",
+          "message": "The request cannot be retried"
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 2,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-2",
+      "startedAt": "1970-01-01T00:00:03.000Z",
+      "message": {
+        "text": "",
+        "origin": {
+          "kind": "continuation"
+        }
+      }
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": {
+          "text": "Fix the bug",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [],
+        "usage": null,
+        "state": "error",
+        "error": {
+          "errorType": "invalidRequest",
+          "message": "The request cannot be retried"
+        }
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 2,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

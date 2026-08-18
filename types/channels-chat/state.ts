@@ -523,6 +523,20 @@ export const enum TurnState {
 }
 
 /**
+ * Error details for a failed turn.
+ *
+ * When {@link continuation} is present, a client may start a new adjacent turn
+ * with a {@link ContinuationMessage}. The continuation proceeds from the
+ * failed turn without adding user input or changing the failed turn.
+ *
+ * @category Turn Types
+ */
+export interface TurnError extends ErrorInfo {
+  /** Whether the latest failed turn may be continued. */
+  continuation?: true;
+}
+
+/**
  * Discriminant for {@link MessageAttachment} variants.
  *
  * @category Turn Types
@@ -553,7 +567,7 @@ export interface Turn {
   /** Turn duration in milliseconds. */
   duration?: number;
   /** The message that initiated the turn */
-  message: Message;
+  message: TurnMessage;
   /**
    * All response content in stream order: text, tool calls, reasoning, and content refs.
    *
@@ -566,7 +580,7 @@ export interface Turn {
   /** How the turn ended */
   state: TurnState;
   /** Error details if state is `'error'` */
-  error?: ErrorInfo;
+  error?: TurnError;
 }
 
 /**
@@ -580,7 +594,7 @@ export interface ActiveTurn {
   /** ISO 8601 timestamp when this turn started. */
   startedAt: string;
   /** The message that initiated the turn */
-  message: Message;
+  message: TurnMessage;
   /**
    * All response content in stream order: text, tool calls, reasoning, and content refs.
    *
@@ -592,7 +606,8 @@ export interface ActiveTurn {
 }
 
 /**
- * Discriminant for {@link MessageOrigin} — identifies who produced a message.
+ * Discriminant for {@link MessageOrigin} — identifies a message's origin or
+ * continuation provenance.
  *
  * @category Turn Types
  */
@@ -611,23 +626,50 @@ export enum MessageKind {
   Tool = 'tool',
   /** A system-generated notification rather than a direct user message. */
   SystemNotification = 'systemNotification',
+  /**
+   * Starts a new turn that continues a preceding failed turn without adding
+   * another user message.
+   */
+  Continuation = 'continuation',
 }
 
 /**
- * Identifies the origin of a {@link Message} — who produced it. For the message
- * that initiates a turn ({@link Turn.message}), this is also the origin of the
- * turn; for steering or queued messages it is just the origin of that message.
+ * Identifies the actor that produced an ordinary {@link Message}.
  *
  * @category Turn Types
  */
-export interface MessageOrigin {
+export interface ActorMessageOrigin {
   /** The kind of actor that produced the message. */
-  kind: MessageKind;
+  kind: MessageKind.User
+    | MessageKind.Agent
+    | MessageKind.Tool
+    | MessageKind.SystemNotification;
 }
 
 /**
- * A message that initiates or steers a turn. Messages can originate from the
- * user, the agent, a tool, or be system-generated (see {@link MessageOrigin}).
+ * Identifies a message that starts a new turn as a continuation of the
+ * immediately preceding failed turn.
+ *
+ * Continuation messages carry no new user input: their text is empty and they
+ * have no attachments. The preceding turn remains unchanged in history.
+ *
+ * @category Turn Types
+ */
+export interface ContinuationMessageOrigin {
+  /** Discriminant */
+  kind: MessageKind.Continuation;
+}
+
+/**
+ * Identifies the origin or provenance of a {@link TurnMessage}.
+ *
+ * @category Turn Types
+ */
+export type MessageOrigin = ActorMessageOrigin | ContinuationMessageOrigin;
+
+/**
+ * An ordinary message that initiates or steers a turn. Messages can originate
+ * from the user, the agent, a tool, or be system-generated.
  *
  * Attachments MAY be referenced inside {@link Message.text} via their
  * {@link MessageAttachmentBase.range} field. Attachments without a range are
@@ -640,7 +682,7 @@ export interface Message {
   /** Message text */
   text: string;
   /** The origin of the message */
-  origin: MessageOrigin;
+  origin: ActorMessageOrigin;
   /** File/selection attachments */
   attachments?: MessageAttachment[];
   /**
@@ -670,6 +712,34 @@ export interface Message {
    */
   _meta?: Record<string, unknown>;
 }
+
+/**
+ * A message that starts a new turn to continue a preceding failed turn without
+ * adding user input.
+ *
+ * @category Turn Types
+ */
+export interface ContinuationMessage {
+  /** Continuations add no message text. */
+  text: '';
+  /** Continuation provenance. */
+  origin: ContinuationMessageOrigin;
+  /** Continuations cannot carry attachments. */
+  attachments?: never;
+  /** Optional model override for the continuation attempt. */
+  model?: ModelSelection;
+  /** Optional custom-agent override for the continuation attempt. */
+  agent?: AgentSelection;
+  /** Additional provider-specific metadata for this continuation. */
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * A message that starts a turn.
+ *
+ * @category Turn Types
+ */
+export type TurnMessage = Message | ContinuationMessage;
 
 /**
  * Common fields shared by all {@link MessageAttachment} variants.

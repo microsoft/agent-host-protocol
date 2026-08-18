@@ -16,6 +16,9 @@ import type {
   PendingMessage,
   ConfirmationOption,
   ToolCallContributor,
+  ContinuationMessage,
+  TurnError,
+  TurnMessage,
 } from './state.js';
 import {
   TurnState,
@@ -25,12 +28,17 @@ import {
   ToolCallContributorKind,
   ResponsePartKind,
   PendingMessageKind,
+  MessageKind,
 } from './state.js';
 import { SessionStatus } from '../channels-session/state.js';
 import type { ChatAction } from '../action-origin.generated.js';
 import { softAssertNever } from '../common/reducer-helpers.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function isContinuationMessage(message: TurnMessage): message is ContinuationMessage {
+  return message.origin.kind === MessageKind.Continuation;
+}
 
 /** Extracts the common base fields shared by all tool call lifecycle states. */
 function tcBase(tc: ToolCallState) {
@@ -170,7 +178,7 @@ function endTurn(
   turnState: TurnState,
   duration: number,
   terminalStatus?: SessionStatus.Error,
-  error?: { errorType: string; message: string; stack?: string },
+  error?: TurnError,
 ): ChatState {
   if (!state.activeTurn || state.activeTurn.id !== turnId) {
     return state;
@@ -343,6 +351,21 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
     // ── Turn Lifecycle ────────────────────────────────────────────────────
 
     case ActionType.ChatTurnStarted: {
+      if (isContinuationMessage(action.message)) {
+        const previousTurn = state.turns[state.turns.length - 1];
+        if (
+          state.activeTurn
+          || !previousTurn
+          || previousTurn.state !== TurnState.Error
+          || previousTurn.error?.continuation !== true
+          || state.turns.some(turn => turn.id === action.turnId)
+          || action.message.text.length > 0
+          || action.message.attachments !== undefined
+          || action.queuedMessageId !== undefined
+        ) {
+          return state;
+        }
+      }
       let next: ChatState = {
         ...state,
         activeTurn: {
