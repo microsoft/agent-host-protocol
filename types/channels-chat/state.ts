@@ -609,6 +609,8 @@ export enum MessageKind {
    * worker chat whose first message carries a seed prompt.
    */
   Tool = 'tool',
+  /** Emitted automatically when an automation run starts a session. */
+  Automation = 'automation',
   /** A system-generated notification rather than a direct user message. */
   SystemNotification = 'systemNotification',
 }
@@ -627,7 +629,8 @@ export interface MessageOrigin {
 
 /**
  * A message that initiates or steers a turn. Messages can originate from the
- * user, the agent, a tool, or be system-generated (see {@link MessageOrigin}).
+ * user, the agent, a tool, an automation, or be system-generated (see
+ * {@link MessageOrigin}).
  *
  * Attachments MAY be referenced inside {@link Message.text} via their
  * {@link MessageAttachmentBase.range} field. Attachments without a range are

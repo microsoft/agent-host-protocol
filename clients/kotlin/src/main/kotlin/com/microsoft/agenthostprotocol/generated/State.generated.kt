@@ -356,6 +356,11 @@ enum class MessageKind {
     @SerialName("tool")
     TOOL,
     /**
+     * Emitted automatically when an automation run starts a session.
+     */
+    @SerialName("automation")
+    AUTOMATION,
+    /**
      * A system-generated notification rather than a direct user message.
      */
     @SerialName("systemNotification")
@@ -5021,7 +5026,7 @@ data class AutomationDefinition(
     val title: String,
     /**
      * Initial message sent to every newly created run session. Its
-     * {@link Message.origin} kind MUST be {@link MessageKind.User}.
+     * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
      */
     val message: Message,
     /**

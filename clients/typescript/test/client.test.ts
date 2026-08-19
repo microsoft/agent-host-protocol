@@ -162,7 +162,7 @@ test('state mirror applies automation catalogue snapshots and actions', () => {
     resource: 'ahp-automation:/a1',
     definition: {
       title: 'Daily triage',
-      message: { text: 'Triage issues', origin: { kind: MessageKind.User } },
+      message: { text: 'Triage issues', origin: { kind: MessageKind.Automation } },
       session: {},
       enabled: true,
       triggers: [],

@@ -186,6 +186,8 @@ const (
 	// Produced by a tool rather than the user — for example, a tool that spawns a
 	// worker chat whose first message carries a seed prompt.
 	MessageKindTool MessageKind = "tool"
+	// Emitted automatically when an automation run starts a session.
+	MessageKindAutomation MessageKind = "automation"
 	// A system-generated notification rather than a direct user message.
 	MessageKindSystemNotification MessageKind = "systemNotification"
 )
@@ -1414,7 +1416,8 @@ type ActiveTurn struct {
 }
 
 // A message that initiates or steers a turn. Messages can originate from the
-// user, the agent, a tool, or be system-generated (see {@link MessageOrigin}).
+// user, the agent, a tool, an automation, or be system-generated (see
+// {@link MessageOrigin}).
 //
 // Attachments MAY be referenced inside {@link Message.text} via their
 // {@link MessageAttachmentBase.range} field. Attachments without a range are
@@ -3834,15 +3837,15 @@ type AutomationSessionTemplate struct {
 
 // Durable, client-editable definition of an automation.
 //
-// A definition combines the initial user message, the session template used
-// for each run, and zero or more automatic triggers. Run history, timestamps,
-// and currently allowed operations live on
+// A definition combines the initial automation message, the session template
+// used for each run, and zero or more automatic triggers. Run history,
+// timestamps, and currently allowed operations live on
 // {@link AutomationState} rather than in the definition.
 type AutomationDefinition struct {
 	// Human-readable automation name.
 	Title string `json:"title"`
 	// Initial message sent to every newly created run session. Its
-	// {@link Message.origin} kind MUST be {@link MessageKind.User}.
+	// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
 	Message Message `json:"message"`
 	// Template used to create fresh sessions for each run.
 	Session AutomationSessionTemplate `json:"session"`

@@ -6,7 +6,7 @@
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "A",
-        "message": { "text": "go", "origin": { "kind": "user" } },
+        "message": { "text": "go", "origin": { "kind": "automation" } },
         "session": {},
         "enabled": true,
         "triggers": []
@@ -23,7 +23,7 @@
       "resource": "ahp-automation:/a2",
       "definition": {
         "title": "B",
-        "message": { "text": "go", "origin": { "kind": "user" } },
+        "message": { "text": "go", "origin": { "kind": "automation" } },
         "session": {},
         "enabled": true,
         "triggers": []
@@ -42,7 +42,7 @@
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "A",
-        "message": { "text": "go", "origin": { "kind": "user" } },
+        "message": { "text": "go", "origin": { "kind": "automation" } },
         "session": {},
         "enabled": true,
         "triggers": []

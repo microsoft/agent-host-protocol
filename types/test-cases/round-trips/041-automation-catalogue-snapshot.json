@@ -10,7 +10,7 @@
         "resource": "ahp-automation:/a1",
         "definition": {
           "title": "Triage",
-          "message": { "text": "Triage the issue", "origin": { "kind": "user" } },
+          "message": { "text": "Triage the issue", "origin": { "kind": "automation" } },
           "session": { "provider": "copilot" },
           "enabled": true,
           "triggers": [
@@ -60,7 +60,7 @@
         "resource": "ahp-automation:/a1",
         "definition": {
           "title": "Triage",
-          "message": { "text": "Triage the issue", "origin": { "kind": "user" } },
+          "message": { "text": "Triage the issue", "origin": { "kind": "automation" } },
           "session": { "provider": "copilot" },
           "enabled": true,
           "triggers": [

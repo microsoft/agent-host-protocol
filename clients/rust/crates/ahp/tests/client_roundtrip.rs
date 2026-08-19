@@ -177,7 +177,7 @@ async fn automation_catalogue_actions_fan_out() {
                         "title": "Nightly triage",
                         "message": {
                             "text": "Triage issues",
-                            "origin": { "kind": "user" }
+                            "origin": { "kind": "automation" }
                         },
                         "session": {},
                         "enabled": true,

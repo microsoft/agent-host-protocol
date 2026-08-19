@@ -84,7 +84,7 @@ fn automation_snapshot() -> Snapshot {
                 "resource": "ahp-automation:/a1",
                 "definition": {
                     "title": "Old",
-                    "message": { "text": "triage", "origin": { "kind": "user" } },
+                    "message": { "text": "triage", "origin": { "kind": "automation" } },
                     "session": {},
                     "enabled": true,
                     "triggers": []
@@ -271,7 +271,7 @@ fn automation_snapshots_and_actions_are_mirrored() {
             "resource": "ahp-automation:/a1",
             "definition": {
                 "title": "New",
-                "message": { "text": "triage", "origin": { "kind": "user" } },
+                "message": { "text": "triage", "origin": { "kind": "automation" } },
                 "session": {},
                 "enabled": false,
                 "triggers": []

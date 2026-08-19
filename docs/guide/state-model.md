@@ -255,7 +255,7 @@ MessageResourceAttachment {
 }
 ```
 
-A message's `origin.kind` records who produced the message: `user` for a direct user message, `agent` for one the agent produces itself, `tool` for one a tool produces (for example, seeding the first message of a worker chat it spawned), and `systemNotification` for a system-generated notification. For the message that initiates a turn this is also the origin of the turn; for steering or queued messages it is just the origin of that message. A client is only allowed to send `user` messages.
+A message's `origin.kind` records who produced the message: `user` for a direct user message, `agent` for one the agent produces itself, `tool` for one a tool produces (for example, seeding the first message of a worker chat it spawned), `automation` for the initial message emitted by an automation run, and `systemNotification` for a system-generated notification. For the message that initiates a turn this is also the origin of the turn; for steering or queued messages it is just the origin of that message. Direct client-authored chat input uses `user`; clients may also submit an `automation`-origin message as part of an automation definition.
 
 A message's optional `model` / `agent` record the selection it was, or will be, sent with. For historic turns this is the selection actually used, so a client editing or resending a message can retain it; when omitted, the agent host's default applies. A chat also exposes a `draft`: the [`Message`](#user-messages) the user is composing but has not sent yet (including its `model` / `agent`). Clients MAY periodically sync their input state into `draft` via `chat/draftChanged` (debounced, not eager) and SHOULD initialize input UI for an existing chat from any present `draft`.
 

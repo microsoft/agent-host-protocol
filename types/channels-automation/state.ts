@@ -259,9 +259,9 @@ export interface AutomationSessionTemplate {
 /**
  * Durable, client-editable definition of an automation.
  *
- * A definition combines the initial user message, the session template used
- * for each run, and zero or more automatic triggers. Run history, timestamps,
- * and currently allowed operations live on
+ * A definition combines the initial automation message, the session template
+ * used for each run, and zero or more automatic triggers. Run history,
+ * timestamps, and currently allowed operations live on
  * {@link AutomationState} rather than in the definition.
  *
  * @category Automation State
@@ -271,7 +271,7 @@ export interface AutomationDefinition {
   title: string;
   /**
    * Initial message sent to every newly created run session. Its
-   * {@link Message.origin} kind MUST be {@link MessageKind.User}.
+   * {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
    */
   message: Message;
   /** Template used to create fresh sessions for each run. */

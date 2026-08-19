@@ -113,8 +113,9 @@ AutomationDefinition {
 }
 ```
 
-`message` is the initial user message sent to every newly created run session.
-Its origin must be `user`. The definition does not carry credentials,
+`message` is the initial message sent to every newly created run session. Its
+origin must be `automation`, allowing clients to distinguish the generated turn
+from direct user input. The definition does not carry credentials,
 confirmation decisions, or durable permission grants.
 
 ### Session template

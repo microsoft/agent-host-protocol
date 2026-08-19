@@ -182,6 +182,8 @@ public enum MessageKind: String, Codable, Sendable {
     /// Produced by a tool rather than the user — for example, a tool that spawns a
     /// worker chat whose first message carries a seed prompt.
     case tool = "tool"
+    /// Emitted automatically when an automation run starts a session.
+    case automation = "automation"
     /// A system-generated notification rather than a direct user message.
     case systemNotification = "systemNotification"
 }
@@ -5542,7 +5544,7 @@ public struct AutomationDefinition: Codable, Sendable {
     /// Human-readable automation name.
     public var title: String
     /// Initial message sent to every newly created run session. Its
-    /// {@link Message.origin} kind MUST be {@link MessageKind.User}.
+    /// {@link Message.origin} kind MUST be {@link MessageKind.Automation}.
     public var message: Message
     /// Template used to create fresh sessions for each run.
     public var session: AutomationSessionTemplate

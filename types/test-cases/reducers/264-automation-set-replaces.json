@@ -7,7 +7,7 @@
         "resource": "ahp-automation:/a1",
         "definition": {
           "title": "Old",
-          "message": { "text": "old", "origin": { "kind": "user" } },
+          "message": { "text": "old", "origin": { "kind": "automation" } },
           "session": {},
           "enabled": true,
           "triggers": []
@@ -21,7 +21,7 @@
         "resource": "ahp-automation:/a2",
         "definition": {
           "title": "Second",
-          "message": { "text": "second", "origin": { "kind": "user" } },
+          "message": { "text": "second", "origin": { "kind": "automation" } },
           "session": {},
           "enabled": true,
           "triggers": []
@@ -39,7 +39,7 @@
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "New",
-        "message": { "text": "new", "origin": { "kind": "user" } },
+        "message": { "text": "new", "origin": { "kind": "automation" } },
         "session": {},
         "enabled": false,
         "triggers": []
@@ -56,7 +56,7 @@
         "resource": "ahp-automation:/a1",
         "definition": {
           "title": "New",
-          "message": { "text": "new", "origin": { "kind": "user" } },
+          "message": { "text": "new", "origin": { "kind": "automation" } },
           "session": {},
           "enabled": false,
           "triggers": []
@@ -70,7 +70,7 @@
         "resource": "ahp-automation:/a2",
         "definition": {
           "title": "Second",
-          "message": { "text": "second", "origin": { "kind": "user" } },
+          "message": { "text": "second", "origin": { "kind": "automation" } },
           "session": {},
           "enabled": true,
           "triggers": []

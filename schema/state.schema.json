@@ -3047,7 +3047,7 @@
     },
     "Message": {
       "type": "object",
-      "description": "A message that initiates or steers a turn. Messages can originate from the\nuser, the agent, a tool, or be system-generated (see {@link MessageOrigin}).\n\nAttachments MAY be referenced inside {@link Message.text} via their\n{@link MessageAttachmentBase.range} field. Attachments without a range are\nstill associated with the message but do not correspond to a specific span\nin the text.",
+      "description": "A message that initiates or steers a turn. Messages can originate from the\nuser, the agent, a tool, an automation, or be system-generated (see\n{@link MessageOrigin}).\n\nAttachments MAY be referenced inside {@link Message.text} via their\n{@link MessageAttachmentBase.range} field. Attachments without a range are\nstill associated with the message but do not correspond to a specific span\nin the text.",
       "properties": {
         "text": {
           "type": "string",
@@ -5121,7 +5121,7 @@
     },
     "AutomationDefinition": {
       "type": "object",
-      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial user message, the session template used\nfor each run, and zero or more automatic triggers. Run history, timestamps,\nand currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
+      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial automation message, the session template\nused for each run, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
       "properties": {
         "title": {
           "type": "string",
@@ -5129,7 +5129,7 @@
         },
         "message": {
           "$ref": "#/$defs/Message",
-          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.User}."
+          "description": "Initial message sent to every newly created run session. Its\n{@link Message.origin} kind MUST be {@link MessageKind.Automation}."
         },
         "session": {
           "$ref": "#/$defs/AutomationSessionTemplate",
@@ -6091,6 +6091,7 @@
         "user",
         "agent",
         "tool",
+        "automation",
         "systemNotification"
       ],
       "type": "string",
