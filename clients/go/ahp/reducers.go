@@ -924,6 +924,33 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 			}
 		}
 		return ReduceOutcomeNoOp
+	case *ahptypes.SessionWorkingDirectoryReplacedAction:
+		idx := -1
+		for i, directory := range state.WorkingDirectories {
+			if directory == a.Directory {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 {
+			return ReduceOutcomeNoOp
+		}
+		for i := 0; i < idx; i++ {
+			if state.WorkingDirectories[i] == a.Replacement {
+				state.WorkingDirectories = append(state.WorkingDirectories[:idx], state.WorkingDirectories[idx+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		updated := make([]ahptypes.URI, 0, len(state.WorkingDirectories))
+		for i, directory := range state.WorkingDirectories {
+			if i == idx {
+				updated = append(updated, a.Replacement)
+			} else if directory != a.Replacement {
+				updated = append(updated, directory)
+			}
+		}
+		state.WorkingDirectories = updated
+		return ReduceOutcomeApplied
 	case *ahptypes.SessionInputNeededSetAction:
 		id, ok := sessionInputRequestID(a.Request)
 		if !ok {

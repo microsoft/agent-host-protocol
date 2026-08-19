@@ -1,4 +1,0 @@
-{
-  "type": "changed",
-  "message": "`auth/required` now carries complete `ProtectedResourceMetadata` in its required `resource` field."
-}

@@ -1,0 +1,36 @@
+{
+  "description": "session-workingDirectoryReplaced retains an earlier replacement when deduplicating",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "workingDirectories": [
+      "file:///repo-a",
+      "file:///repo-b",
+      "file:///repo-c"
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/workingDirectoryReplaced",
+      "directory": "file:///repo-c",
+      "replacement": "file:///repo-a"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "workingDirectories": [
+      "file:///repo-a",
+      "file:///repo-b"
+    ]
+  }
+}

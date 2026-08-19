@@ -673,6 +673,29 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         }
     }
 
+    is StateActionSessionWorkingDirectoryReplaced -> {
+        val list = state.workingDirectories
+        val idx = list?.indexOf(action.value.directory) ?: -1
+        if (list == null || idx < 0) {
+            state
+        } else {
+            val replacementIdx = list.indexOf(action.value.replacement)
+            if (replacementIdx in 0 until idx) {
+                state.copy(workingDirectories = list.filterIndexed { index, _ -> index != idx })
+            } else {
+                state.copy(
+                    workingDirectories = list.mapIndexedNotNull { index, directory ->
+                        when {
+                            index == idx -> action.value.replacement
+                            directory == action.value.replacement -> null
+                            else -> directory
+                        }
+                    },
+                )
+            }
+        }
+    }
+
     is StateActionSessionInputNeededSet -> {
         val request = action.value.request
         val id = sessionInputRequestId(request)

@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "`McpServerCustomization` now exposes client-bundled enablement metadata, and `ClientPluginCustomization` can publish child enablement decisions."
-}

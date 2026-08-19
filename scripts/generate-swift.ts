@@ -1323,6 +1323,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/activeClientRemoved', caseName: 'sessionActiveClientRemoved', tsInterface: 'SessionActiveClientRemovedAction' },
   { type: 'session/workingDirectorySet', caseName: 'sessionWorkingDirectorySet', tsInterface: 'SessionWorkingDirectorySetAction' },
   { type: 'session/workingDirectoryRemoved', caseName: 'sessionWorkingDirectoryRemoved', tsInterface: 'SessionWorkingDirectoryRemovedAction' },
+  { type: 'session/workingDirectoryReplaced', caseName: 'sessionWorkingDirectoryReplaced', tsInterface: 'SessionWorkingDirectoryReplacedAction' },
   { type: 'chat/workingDirectorySet', caseName: 'chatWorkingDirectorySet', tsInterface: 'ChatWorkingDirectorySetAction' },
   { type: 'chat/workingDirectoryRemoved', caseName: 'chatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'session/inputNeededSet', caseName: 'sessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction' },

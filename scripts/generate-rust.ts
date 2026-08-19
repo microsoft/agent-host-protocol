@@ -1324,6 +1324,7 @@ const ACTION_VARIANTS: {
   { type: 'session/activeClientRemoved', variantName: 'SessionActiveClientRemoved', tsInterface: 'SessionActiveClientRemovedAction' },
   { type: 'session/workingDirectorySet', variantName: 'SessionWorkingDirectorySet', tsInterface: 'SessionWorkingDirectorySetAction' },
   { type: 'session/workingDirectoryRemoved', variantName: 'SessionWorkingDirectoryRemoved', tsInterface: 'SessionWorkingDirectoryRemovedAction' },
+  { type: 'session/workingDirectoryReplaced', variantName: 'SessionWorkingDirectoryReplaced', tsInterface: 'SessionWorkingDirectoryReplacedAction' },
   { type: 'chat/workingDirectorySet', variantName: 'ChatWorkingDirectorySet', tsInterface: 'ChatWorkingDirectorySetAction' },
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'session/inputNeededSet', variantName: 'SessionInputNeededSet', tsInterface: 'SessionInputNeededSetAction', boxed: true },

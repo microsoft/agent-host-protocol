@@ -287,6 +287,30 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
       return { ...state, workingDirectories: updated };
     }
 
+    case ActionType.SessionWorkingDirectoryReplaced: {
+      const list = state.workingDirectories;
+      if (!list) {
+        return state;
+      }
+      const idx = list.indexOf(action.directory);
+      if (idx < 0) {
+        return state;
+      }
+      const replacementIdx = list.indexOf(action.replacement);
+      if (replacementIdx >= 0 && replacementIdx < idx) {
+        return {
+          ...state,
+          workingDirectories: list.filter((_, index) => index !== idx),
+        };
+      }
+      return {
+        ...state,
+        workingDirectories: list
+          .map((directory, index) => (index === idx ? action.replacement : directory))
+          .filter((directory, index) => index === idx || directory !== action.replacement),
+      };
+    }
+
     // ── Input Needed ────────────────────────────────────────────────────
 
     case ActionType.SessionInputNeededSet: {

@@ -15,6 +15,28 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-08-17
+
+Implements AHP 0.8.0.
+
+### Added
+
+- Optional `_meta` request metadata on all command parameters.
+- `ClientPluginCustomization` can publish child enablement decisions.
+- Reserve the `x-` prefix for implementation-defined channel URI schemes, commands, notifications, and actions. (#367)
+- `session/workingDirectoryReplaced` atomically replaces a working-directory entry, including a replaceable primary. (#392)
+
+### Changed
+
+- Renamed `ResourceReponsePart` to `ResourceResponsePart`, correcting a misspelling. The Rust and Go clients already exposed the corrected name via generator-level renames; the TypeScript, Kotlin and Swift clients previously carried the typo, so the type now has one consistent name across all five clients.
+- `SessionState.inputNeeded` entries of kind `toolClientExecution` no longer raise `SessionStatus.InputNeeded`. Such an entry is work delegated to a client, not a user prompt, so a session stays `InProgress` while a client tool runs.
+- `Customization` enablement now carries scoped host-published provenance, and `session/customizationToggled` replaces its complete decision set.
+- `auth/required` now carries complete `ProtectedResourceMetadata` in its required `resource` field.
+
+### Fixed
+
+- `session/workingDirectoryReplaced` retains an earlier duplicate replacement so a later replacement cannot move a protected primary, and `primaryReplacement` may accompany `immutablePrimary` for safe legacy-client compatibility.
+
 ## [0.7.0] — 2026-07-31
 
 Implements AHP 0.7.0.

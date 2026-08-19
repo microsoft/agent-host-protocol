@@ -109,7 +109,9 @@ function fail(mismatches: readonly Mismatch[]): never {
 /** Extracts `pub const PROTOCOL_VERSION: &str = "x.y.z";` from version.rs. */
 function rustVersionConstants(source: string): { current: string; supported: string[] } {
   const cur = source.match(/pub const PROTOCOL_VERSION: &str = "([^"]+)"/);
-  const sup = source.match(/pub const SUPPORTED_PROTOCOL_VERSIONS: &\[&str\] = &\[([^\]]*)\]/);
+  const sup = source.match(
+    /pub const SUPPORTED_PROTOCOL_VERSIONS: &\[&str\]\s*=\s*&\[([^\]]*)\]/,
+  );
   if (!cur || !sup) {
     throw new Error('rustVersionConstants: failed to parse version.rs');
   }

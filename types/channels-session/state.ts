@@ -123,14 +123,15 @@ export interface SessionMetadata {
   project?: ProjectInfo;
   /**
    * The working directories the session's agent has tool access to, as
-   * maintained by the `session/workingDirectorySet` /
-   * `session/workingDirectoryRemoved` actions. Directories are equal peers
-   * except when the agent advertises
-   * {@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first
-   * entry is then a fixed process root). Individual chats MAY restrict to a
-   * subset via {@link ChatSummary.workingDirectories | their own
-   * `workingDirectories`}; a chat that sets none operates against this full
-   * set.
+   * maintained by working-directory actions. Directories are equal peers except
+   * when the agent advertises
+   * {@link MultipleWorkingDirectoriesCapability.immutablePrimary} without
+   * {@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first
+   * entry is then a fixed process root), or advertises `primaryReplacement`
+   * (the first entry is a protected, replaceable primary slot). Individual chats
+   * MAY restrict to a subset via
+   * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
+   * chat that sets none operates against this full set.
    */
   workingDirectories?: URI[];
   /**
@@ -1109,11 +1110,6 @@ export interface McpServerCustomization extends CustomizationBase {
    * the effective enabled value from that set.
    */
   enablement?: CustomizationEnablement[];
-  /**
-   * Whether the client explicitly bundled this server and owns its Global
-   * enablement decision.
-   */
-  isClientBundled?: boolean;
   /**
    * Current lifecycle state of the MCP server.
    */

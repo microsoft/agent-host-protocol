@@ -672,8 +672,8 @@ type AgentCapabilities struct {
 	MultipleChats *MultipleChatsCapability `json:"multipleChats,omitempty"`
 	// The session's agent can be granted tool access to more than one working
 	// directory. The directories are treated as equal peers except where the
-	// agent advertises {@link MultipleWorkingDirectoriesCapability.immutablePrimary}
-	// (some backends pin their first directory as a fixed process root).
+	// agent advertises a protected primary-slot option (some backends pin or
+	// replace their first directory as a process root).
 	//
 	// When absent, clients MUST NOT mutate a session's or chat's working-directory
 	// set and MUST NOT set more than one entry in
@@ -705,15 +705,31 @@ type MultipleChatsCapability struct {
 type MultipleWorkingDirectoriesCapability struct {
 	// The agent's **first** working directory (index `0` of
 	// {@link CreateSessionParams.workingDirectories}) is an immutable primary:
-	// it is fixed for the lifetime of the session — clients MUST NOT remove or
-	// reorder it. Additional directories after it remain equal peers that can be
-	// added and removed freely.
+	// its URI is fixed for the lifetime of the session — clients MUST NOT remove,
+	// reorder, or replace it. Additional directories after it remain equal peers
+	// that can be added and removed freely. When
+	// {@link primaryReplacement} is also `true`, clients that recognize that
+	// capability MUST instead treat the primary as protected and replaceable.
 	//
 	// Advertised by backends whose agent process is rooted at a single directory
-	// that cannot change once the session has started (e.g. the SDK's primary
-	// `workingDirectory`). When absent or `false`, all directories are equal
-	// peers and any of them may be removed.
+	// that cannot change once the session has started. A backend MAY also
+	// advertise this with {@link primaryReplacement} for compatibility with
+	// clients that do not recognize the newer capability: those clients retain
+	// the safe immutable-primary behavior, while newer clients allow only the
+	// targeted replacement action. When both are absent or `false`, all
+	// directories are equal peers.
 	ImmutablePrimary *bool `json:"immutablePrimary,omitempty"`
+	// The agent's first working-directory slot (index `0`) is a protected primary
+	// whose URI can be atomically replaced with
+	// `session/workingDirectoryReplaced`. Clients MUST NOT remove that slot with
+	// generic membership actions; additional directories remain equal peers.
+	//
+	// Backends use this when their cwd-bearing directory can move during a
+	// session. It MAY be `true` together with {@link immutablePrimary}; this
+	// preserves the immutable-primary guarantee for older clients that do not
+	// recognize this capability. Clients that recognize this capability MUST
+	// allow a targeted replacement even when `immutablePrimary` is also `true`.
+	PrimaryReplacement *bool `json:"primaryReplacement,omitempty"`
 }
 
 type SessionModelInfo struct {
@@ -839,14 +855,15 @@ type SessionState struct {
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
 	// The working directories the session's agent has tool access to, as
-	// maintained by the `session/workingDirectorySet` /
-	// `session/workingDirectoryRemoved` actions. Directories are equal peers
-	// except when the agent advertises
-	// {@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first
-	// entry is then a fixed process root). Individual chats MAY restrict to a
-	// subset via {@link ChatSummary.workingDirectories | their own
-	// `workingDirectories`}; a chat that sets none operates against this full
-	// set.
+	// maintained by working-directory actions. Directories are equal peers except
+	// when the agent advertises
+	// {@link MultipleWorkingDirectoriesCapability.immutablePrimary} without
+	// {@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first
+	// entry is then a fixed process root), or advertises `primaryReplacement`
+	// (the first entry is a protected, replaceable primary slot). Individual chats
+	// MAY restrict to a subset via
+	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
+	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
@@ -1115,14 +1132,15 @@ type SessionSummary struct {
 	// Server-owned project for this session
 	Project *ProjectInfo `json:"project,omitempty"`
 	// The working directories the session's agent has tool access to, as
-	// maintained by the `session/workingDirectorySet` /
-	// `session/workingDirectoryRemoved` actions. Directories are equal peers
-	// except when the agent advertises
-	// {@link MultipleWorkingDirectoriesCapability.immutablePrimary} (the first
-	// entry is then a fixed process root). Individual chats MAY restrict to a
-	// subset via {@link ChatSummary.workingDirectories | their own
-	// `workingDirectories`}; a chat that sets none operates against this full
-	// set.
+	// maintained by working-directory actions. Directories are equal peers except
+	// when the agent advertises
+	// {@link MultipleWorkingDirectoriesCapability.immutablePrimary} without
+	// {@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first
+	// entry is then a fixed process root), or advertises `primaryReplacement`
+	// (the first entry is a protected, replaceable primary slot). Individual chats
+	// MAY restrict to a subset via
+	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
+	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
@@ -2981,9 +2999,6 @@ type McpServerCustomization struct {
 	// publishes the fully resolved set across all scopes, and consumers derive
 	// the effective enabled value from that set.
 	Enablement []CustomizationEnablement `json:"enablement,omitempty"`
-	// Whether the client explicitly bundled this server and owns its Global
-	// enablement decision.
-	IsClientBundled *bool `json:"isClientBundled,omitempty"`
 	// Current lifecycle state of the MCP server.
 	State McpServerState `json:"state"`
 	// An `mcp://`-protocol channel the client uses to side-channel traffic

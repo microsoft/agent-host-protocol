@@ -1,4 +1,0 @@
-{
-  "type": "added",
-  "message": "Optional `_meta` request metadata on all command parameters."
-}

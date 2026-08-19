@@ -1,5 +1,5 @@
 /**
- * Automation Catalogue Channel State Types.
+ * Automation Catalogue Channel State Types for `ahp-automations://`.
  *
  * @module channels-automation/state
  */

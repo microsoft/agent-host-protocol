@@ -98,6 +98,8 @@ pub enum ActionType {
     SessionWorkingDirectorySet,
     #[serde(rename = "session/workingDirectoryRemoved")]
     SessionWorkingDirectoryRemoved,
+    #[serde(rename = "session/workingDirectoryReplaced")]
+    SessionWorkingDirectoryReplaced,
     #[serde(rename = "session/inputNeededSet")]
     SessionInputNeededSet,
     #[serde(rename = "session/inputNeededRemoved")]
@@ -985,12 +987,41 @@ pub struct SessionWorkingDirectorySetAction {
 /// reduced set — so this action is safe to model as idempotent. A host MAY
 /// decline to apply the removal (e.g. an immutable primary directory, see
 /// {@link MultipleWorkingDirectoriesCapability.immutablePrimary}); it then leaves
-/// the set unchanged.
+/// the set unchanged. When the agent advertises
+/// {@link MultipleWorkingDirectoriesCapability.primaryReplacement}, clients MUST
+/// NOT use this generic membership action to remove index `0`; the host MUST
+/// reject such a removal, leaving the protected slot intact.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionWorkingDirectoryRemovedAction {
     /// The working directory to revoke the session's agent tool access to.
     pub directory: Uri,
+}
+
+/// Atomically replaces one of the session's working directories.
+///
+/// This is a targeted compare-and-swap: the reducer is a no-op when
+/// {@link SessionState.workingDirectories} does not contain `directory`.
+/// Otherwise it replaces that entry with `replacement` and deduplicates the
+/// result, preserving every other directory's relative order. When
+/// `replacement` occurs after the target, it moves to the target's position;
+/// for example, `[A, B, C]` with `B → C` becomes `[A, C]`. When it occurs
+/// before the target, it retains its earlier position and the target is removed;
+/// `[A, B, C]` with `C → A` becomes `[A, B]`.
+///
+/// Only valid when the agent advertises
+/// {@link AgentCapabilities.multipleWorkingDirectories}. Replacing index `0`
+/// additionally requires
+/// {@link MultipleWorkingDirectoriesCapability.primaryReplacement}; clients
+/// MUST NOT target an immutable primary. The host MUST validate and apply its
+/// backend side effect before broadcasting an accepted action, or reject it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionWorkingDirectoryReplacedAction {
+    /// URI of the existing entry to replace.
+    pub directory: Uri,
+    /// URI to place in the replaced entry's position.
+    pub replacement: Uri,
 }
 
 /// A working directory was added to this chat's
@@ -2002,6 +2033,8 @@ pub enum StateAction {
     SessionWorkingDirectorySet(SessionWorkingDirectorySetAction),
     #[serde(rename = "session/workingDirectoryRemoved")]
     SessionWorkingDirectoryRemoved(SessionWorkingDirectoryRemovedAction),
+    #[serde(rename = "session/workingDirectoryReplaced")]
+    SessionWorkingDirectoryReplaced(SessionWorkingDirectoryReplacedAction),
     #[serde(rename = "chat/workingDirectorySet")]
     ChatWorkingDirectorySet(ChatWorkingDirectorySetAction),
     #[serde(rename = "chat/workingDirectoryRemoved")]

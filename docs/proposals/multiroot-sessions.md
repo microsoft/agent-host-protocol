@@ -171,8 +171,11 @@ throughout — no juggling three disconnected sessions.
 
 - **No mandatory primary.** All directories are peers by default. A backend that
   *must* pin its first directory (a fixed process root) advertises
-  `immutablePrimary` on the capability; clients then keep index `0` fixed. The
-  protocol has no other notion of a "main" directory.
+  `immutablePrimary` on the capability; clients then keep index `0` fixed. A
+  backend whose cwd-bearing directory can move instead advertises
+  `primaryReplacement`, protecting index `0` from generic removal while allowing
+  its URI to change atomically. The protocol has no other notion of a "main"
+  directory.
 
 - **It is not multi-root *chats as sub-sessions*.** A chat narrowing to a subset
   is still one thread under one session's trust and identity. Independent agents
@@ -264,12 +267,14 @@ interface AgentCapabilities {
 interface MultipleWorkingDirectoriesCapability {
   /** First directory is a fixed process root; clients MUST NOT remove/reorder it. */
   immutablePrimary?: boolean;
+  /** Protected primary slot can be atomically replaced; cannot be true with immutablePrimary: true. */
+  primaryReplacement?: boolean;
 }
 
 // ── Session create — channels-session/commands.ts ────────────────────────
 interface CreateSessionParams extends BaseParams {
   // …existing…
-  /** The session's equal-peer working directories. */
+  /** The session's working directories; a capability may protect index 0. */
   workingDirectories?: URI[];
 }
 
@@ -288,6 +293,11 @@ interface SessionWorkingDirectorySetAction {
 interface SessionWorkingDirectoryRemovedAction {
   type: ActionType.SessionWorkingDirectoryRemoved; // 'session/workingDirectoryRemoved'
   directory: URI;                                   // removed; no-op if absent
+}
+interface SessionWorkingDirectoryReplacedAction {
+  type: ActionType.SessionWorkingDirectoryReplaced; // 'session/workingDirectoryReplaced'
+  directory: URI;                                   // existing entry to replace
+  replacement: URI;                                 // replacement URI at the same position
 }
 
 // ── Chat — channels-chat/state.ts, commands.ts & actions.ts ──────────────
@@ -323,8 +333,9 @@ interface ChatWorkingDirectoryRemovedAction {
   breaking (it removes the singular `workingDirectory` fields that shipped in the
   released `0.6.0`), and pre-1.0 breaking changes land in a MINOR.
   `SUPPORTED_PROTOCOL_VERSIONS` = `[0.7.0, 0.6.0, 0.5.2, 0.5.1]`.
-- The four directory mutations are **state actions**, so they carry
-  `ACTION_INTRODUCED_IN` entries at `0.7.0` (and are `@clientDispatchable`).
+- The directory mutations are **state actions**. The original four carry
+  `ACTION_INTRODUCED_IN` entries at `0.7.0`; the session-only atomic replacement
+  carries one at `0.8.0`. All are `@clientDispatchable`.
   Everything else — the capability and the create-time / state fields — is gated
   by the `multipleWorkingDirectories` capability plus the `initialize` version
   handshake.
@@ -376,6 +387,17 @@ interface ChatWorkingDirectoryRemovedAction {
 - **Removal semantics.** *Resolved:* no single-remove primitive is assumed; the
   `*/workingDirectoryRemoved` action reduces to the reduced set, so it is
   idempotent and safe to retry. A host MAY decline (e.g. an immutable primary).
+
+- **Replaceable primary.** *Resolved:* a backend that must move its cwd-bearing
+  first directory advertises `primaryReplacement`. It MAY also advertise
+  `immutablePrimary: true` so clients that do not recognize `primaryReplacement`
+  retain the safe immutable-primary behavior; clients that recognize
+  `primaryReplacement` allow a targeted replacement. `session/workingDirectoryReplaced`
+  is a session-only, client-dispatchable compare-and-swap action for any
+  directory. The host validates `primaryReplacement` when the target is index
+  `0` and applies the backend side effect before broadcasting it; reducers
+  replace only when the expected URI is present and deduplicate the replacement
+  URI.
 
 ---
 

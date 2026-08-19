@@ -34,7 +34,6 @@ McpServerCustomization {
   icons?: Icon[]
   range?: TextRange              // span inside `uri` for inline declarations
   enablement?: CustomizationEnablement[] // user-toggleable (see Customizations guide)
-  isClientBundled?: boolean      // client owns the Global enablement decision
   state: McpServerState // discriminated union — see below
   channel?: URI                  // optional mcp:// side-channel
   mcpApp?: McpServerCustomizationApps

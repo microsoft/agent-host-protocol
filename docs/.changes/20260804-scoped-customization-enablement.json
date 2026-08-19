@@ -1,4 +1,0 @@
-{
-  "type": "changed",
-  "message": "`Customization` enablement now carries scoped host-published provenance, and `session/customizationToggled` replaces its complete decision set."
-}

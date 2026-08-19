@@ -786,6 +786,22 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         next.workingDirectories?.remove(at: idx)
         return next
 
+    case .sessionWorkingDirectoryReplaced(let a):
+        guard let directories = state.workingDirectories,
+              let idx = directories.firstIndex(of: a.directory) else { return state }
+        var next = state
+        if let replacementIdx = directories.firstIndex(of: a.replacement), replacementIdx < idx {
+            next.workingDirectories = directories.enumerated().compactMap { index, directory in
+                index == idx ? nil : directory
+            }
+        } else {
+            next.workingDirectories = directories.enumerated().compactMap { index, directory in
+                if index == idx { return a.replacement }
+                return directory == a.replacement ? nil : directory
+            }
+        }
+        return next
+
     case .sessionInputNeededSet(let a):
         guard let id = sessionInputRequestID(a.request) else { return state }
         var next = state

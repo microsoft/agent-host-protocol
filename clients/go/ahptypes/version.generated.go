@@ -6,12 +6,13 @@ package ahptypes
 
 // ProtocolVersion is the current protocol version (SemVer
 // MAJOR.MINOR.PATCH) that this generated source speaks.
-const ProtocolVersion = "0.8.0"
+const ProtocolVersion = "1.0.0"
 
 // supportedProtocolVersions backs [SupportedProtocolVersions] — held
 // in an unexported slice so callers cannot accidentally mutate the
 // shared backing array.
 var supportedProtocolVersions = []string{
+	"1.0.0",
 	"0.8.0",
 	"0.7.0",
 	"0.6.0",

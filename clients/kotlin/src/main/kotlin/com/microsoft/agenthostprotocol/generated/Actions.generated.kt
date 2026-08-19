@@ -95,6 +95,8 @@ enum class ActionType {
     SESSION_WORKING_DIRECTORY_SET,
     @SerialName("session/workingDirectoryRemoved")
     SESSION_WORKING_DIRECTORY_REMOVED,
+    @SerialName("session/workingDirectoryReplaced")
+    SESSION_WORKING_DIRECTORY_REPLACED,
     @SerialName("session/inputNeededSet")
     SESSION_INPUT_NEEDED_SET,
     @SerialName("session/inputNeededRemoved")
@@ -938,6 +940,19 @@ data class SessionWorkingDirectoryRemovedAction(
 )
 
 @Serializable
+data class SessionWorkingDirectoryReplacedAction(
+    val type: ActionType,
+    /**
+     * URI of the existing entry to replace.
+     */
+    val directory: String,
+    /**
+     * URI to place in the replaced entry's position.
+     */
+    val replacement: String
+)
+
+@Serializable
 data class ChatWorkingDirectorySetAction(
     val type: ActionType,
     /**
@@ -1677,6 +1692,7 @@ sealed interface StateAction
 @JvmInline value class StateActionSessionActiveClientRemoved(val value: SessionActiveClientRemovedAction) : StateAction
 @JvmInline value class StateActionSessionWorkingDirectorySet(val value: SessionWorkingDirectorySetAction) : StateAction
 @JvmInline value class StateActionSessionWorkingDirectoryRemoved(val value: SessionWorkingDirectoryRemovedAction) : StateAction
+@JvmInline value class StateActionSessionWorkingDirectoryReplaced(val value: SessionWorkingDirectoryReplacedAction) : StateAction
 @JvmInline value class StateActionChatWorkingDirectorySet(val value: ChatWorkingDirectorySetAction) : StateAction
 @JvmInline value class StateActionChatWorkingDirectoryRemoved(val value: ChatWorkingDirectoryRemovedAction) : StateAction
 @JvmInline value class StateActionSessionInputNeededSet(val value: SessionInputNeededSetAction) : StateAction
@@ -1786,6 +1802,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "session/activeClientRemoved" -> StateActionSessionActiveClientRemoved(input.json.decodeFromJsonElement(SessionActiveClientRemovedAction.serializer(), element))
             "session/workingDirectorySet" -> StateActionSessionWorkingDirectorySet(input.json.decodeFromJsonElement(SessionWorkingDirectorySetAction.serializer(), element))
             "session/workingDirectoryRemoved" -> StateActionSessionWorkingDirectoryRemoved(input.json.decodeFromJsonElement(SessionWorkingDirectoryRemovedAction.serializer(), element))
+            "session/workingDirectoryReplaced" -> StateActionSessionWorkingDirectoryReplaced(input.json.decodeFromJsonElement(SessionWorkingDirectoryReplacedAction.serializer(), element))
             "chat/workingDirectorySet" -> StateActionChatWorkingDirectorySet(input.json.decodeFromJsonElement(ChatWorkingDirectorySetAction.serializer(), element))
             "chat/workingDirectoryRemoved" -> StateActionChatWorkingDirectoryRemoved(input.json.decodeFromJsonElement(ChatWorkingDirectoryRemovedAction.serializer(), element))
             "session/inputNeededSet" -> StateActionSessionInputNeededSet(input.json.decodeFromJsonElement(SessionInputNeededSetAction.serializer(), element))
@@ -1888,6 +1905,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionSessionActiveClientRemoved -> output.json.encodeToJsonElement(SessionActiveClientRemovedAction.serializer(), value.value)
             is StateActionSessionWorkingDirectorySet -> output.json.encodeToJsonElement(SessionWorkingDirectorySetAction.serializer(), value.value)
             is StateActionSessionWorkingDirectoryRemoved -> output.json.encodeToJsonElement(SessionWorkingDirectoryRemovedAction.serializer(), value.value)
+            is StateActionSessionWorkingDirectoryReplaced -> output.json.encodeToJsonElement(SessionWorkingDirectoryReplacedAction.serializer(), value.value)
             is StateActionChatWorkingDirectorySet -> output.json.encodeToJsonElement(ChatWorkingDirectorySetAction.serializer(), value.value)
             is StateActionChatWorkingDirectoryRemoved -> output.json.encodeToJsonElement(ChatWorkingDirectoryRemovedAction.serializer(), value.value)
             is StateActionSessionInputNeededSet -> output.json.encodeToJsonElement(SessionInputNeededSetAction.serializer(), value.value)

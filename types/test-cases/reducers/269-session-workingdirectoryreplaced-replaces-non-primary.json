@@ -1,0 +1,37 @@
+{
+  "description": "session-workingDirectoryReplaced replaces a non-primary entry in place",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "workingDirectories": [
+      "file:///repo-a",
+      "file:///repo-b",
+      "file:///repo-c"
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/workingDirectoryReplaced",
+      "directory": "file:///repo-b",
+      "replacement": "file:///repo-d"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "workingDirectories": [
+      "file:///repo-a",
+      "file:///repo-d",
+      "file:///repo-c"
+    ]
+  }
+}

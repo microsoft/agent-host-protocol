@@ -53,6 +53,7 @@ const (
 	ActionTypeSessionActiveClientRemoved         ActionType = "session/activeClientRemoved"
 	ActionTypeSessionWorkingDirectorySet         ActionType = "session/workingDirectorySet"
 	ActionTypeSessionWorkingDirectoryRemoved     ActionType = "session/workingDirectoryRemoved"
+	ActionTypeSessionWorkingDirectoryReplaced    ActionType = "session/workingDirectoryReplaced"
 	ActionTypeSessionInputNeededSet              ActionType = "session/inputNeededSet"
 	ActionTypeSessionInputNeededRemoved          ActionType = "session/inputNeededRemoved"
 	ActionTypeChatPendingMessageSet              ActionType = "chat/pendingMessageSet"
@@ -915,11 +916,39 @@ type SessionWorkingDirectorySetAction struct {
 // reduced set — so this action is safe to model as idempotent. A host MAY
 // decline to apply the removal (e.g. an immutable primary directory, see
 // {@link MultipleWorkingDirectoriesCapability.immutablePrimary}); it then leaves
-// the set unchanged.
+// the set unchanged. When the agent advertises
+// {@link MultipleWorkingDirectoriesCapability.primaryReplacement}, clients MUST
+// NOT use this generic membership action to remove index `0`; the host MUST
+// reject such a removal, leaving the protected slot intact.
 type SessionWorkingDirectoryRemovedAction struct {
 	Type ActionType `json:"type"`
 	// The working directory to revoke the session's agent tool access to.
 	Directory URI `json:"directory"`
+}
+
+// Atomically replaces one of the session's working directories.
+//
+// This is a targeted compare-and-swap: the reducer is a no-op when
+// {@link SessionState.workingDirectories} does not contain `directory`.
+// Otherwise it replaces that entry with `replacement` and deduplicates the
+// result, preserving every other directory's relative order. When
+// `replacement` occurs after the target, it moves to the target's position;
+// for example, `[A, B, C]` with `B → C` becomes `[A, C]`. When it occurs
+// before the target, it retains its earlier position and the target is removed;
+// `[A, B, C]` with `C → A` becomes `[A, B]`.
+//
+// Only valid when the agent advertises
+// {@link AgentCapabilities.multipleWorkingDirectories}. Replacing index `0`
+// additionally requires
+// {@link MultipleWorkingDirectoriesCapability.primaryReplacement}; clients
+// MUST NOT target an immutable primary. The host MUST validate and apply its
+// backend side effect before broadcasting an accepted action, or reject it.
+type SessionWorkingDirectoryReplacedAction struct {
+	Type ActionType `json:"type"`
+	// URI of the existing entry to replace.
+	Directory URI `json:"directory"`
+	// URI to place in the replaced entry's position.
+	Replacement URI `json:"replacement"`
 }
 
 // A working directory was added to this chat's
@@ -1666,6 +1695,7 @@ func (*SessionActiveClientSetAction) isStateAction()             {}
 func (*SessionActiveClientRemovedAction) isStateAction()         {}
 func (*SessionWorkingDirectorySetAction) isStateAction()         {}
 func (*SessionWorkingDirectoryRemovedAction) isStateAction()     {}
+func (*SessionWorkingDirectoryReplacedAction) isStateAction()    {}
 func (*ChatWorkingDirectorySetAction) isStateAction()            {}
 func (*ChatWorkingDirectoryRemovedAction) isStateAction()        {}
 func (*SessionInputNeededSetAction) isStateAction()              {}
@@ -2001,6 +2031,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "session/workingDirectoryRemoved":
 		var value SessionWorkingDirectoryRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/workingDirectoryReplaced":
+		var value SessionWorkingDirectoryReplacedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

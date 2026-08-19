@@ -1,5 +1,5 @@
 /**
- * Automation Run Channel State Types.
+ * Automation Run Channel State Types for `ahp-automation-run:`.
  *
  * @module channels-automation-run/state
  */

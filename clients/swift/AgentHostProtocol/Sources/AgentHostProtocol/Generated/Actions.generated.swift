@@ -40,6 +40,7 @@ public enum ActionType: String, Codable, Sendable {
     case sessionActiveClientRemoved = "session/activeClientRemoved"
     case sessionWorkingDirectorySet = "session/workingDirectorySet"
     case sessionWorkingDirectoryRemoved = "session/workingDirectoryRemoved"
+    case sessionWorkingDirectoryReplaced = "session/workingDirectoryReplaced"
     case sessionInputNeededSet = "session/inputNeededSet"
     case sessionInputNeededRemoved = "session/inputNeededRemoved"
     case chatPendingMessageSet = "chat/pendingMessageSet"
@@ -1165,6 +1166,24 @@ public struct SessionWorkingDirectoryRemovedAction: Codable, Sendable {
     }
 }
 
+public struct SessionWorkingDirectoryReplacedAction: Codable, Sendable {
+    public var type: ActionType
+    /// URI of the existing entry to replace.
+    public var directory: String
+    /// URI to place in the replaced entry's position.
+    public var replacement: String
+
+    public init(
+        type: ActionType,
+        directory: String,
+        replacement: String
+    ) {
+        self.type = type
+        self.directory = directory
+        self.replacement = replacement
+    }
+}
+
 public struct ChatWorkingDirectorySetAction: Codable, Sendable {
     public var type: ActionType
     /// The working directory to add to this chat's subset.
@@ -2192,6 +2211,7 @@ public enum StateAction: Codable, Sendable {
     case sessionActiveClientRemoved(SessionActiveClientRemovedAction)
     case sessionWorkingDirectorySet(SessionWorkingDirectorySetAction)
     case sessionWorkingDirectoryRemoved(SessionWorkingDirectoryRemovedAction)
+    case sessionWorkingDirectoryReplaced(SessionWorkingDirectoryReplacedAction)
     case chatWorkingDirectorySet(ChatWorkingDirectorySetAction)
     case chatWorkingDirectoryRemoved(ChatWorkingDirectoryRemovedAction)
     case sessionInputNeededSet(SessionInputNeededSetAction)
@@ -2334,6 +2354,8 @@ public enum StateAction: Codable, Sendable {
             self = .sessionWorkingDirectorySet(try SessionWorkingDirectorySetAction(from: decoder))
         case "session/workingDirectoryRemoved":
             self = .sessionWorkingDirectoryRemoved(try SessionWorkingDirectoryRemovedAction(from: decoder))
+        case "session/workingDirectoryReplaced":
+            self = .sessionWorkingDirectoryReplaced(try SessionWorkingDirectoryReplacedAction(from: decoder))
         case "chat/workingDirectorySet":
             self = .chatWorkingDirectorySet(try ChatWorkingDirectorySetAction(from: decoder))
         case "chat/workingDirectoryRemoved":
@@ -2493,6 +2515,7 @@ public enum StateAction: Codable, Sendable {
         case .sessionActiveClientRemoved(let v): try v.encode(to: encoder)
         case .sessionWorkingDirectorySet(let v): try v.encode(to: encoder)
         case .sessionWorkingDirectoryRemoved(let v): try v.encode(to: encoder)
+        case .sessionWorkingDirectoryReplaced(let v): try v.encode(to: encoder)
         case .chatWorkingDirectorySet(let v): try v.encode(to: encoder)
         case .chatWorkingDirectoryRemoved(let v): try v.encode(to: encoder)
         case .sessionInputNeededSet(let v): try v.encode(to: encoder)
