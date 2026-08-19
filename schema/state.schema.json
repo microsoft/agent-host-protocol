@@ -3779,6 +3779,23 @@
         "confirmed"
       ]
     },
+    "ToolCallProgress": {
+      "type": "object",
+      "description": "A point-in-time report that a running tool call is still working.",
+      "properties": {
+        "elapsedMs": {
+          "type": "number",
+          "description": "Milliseconds the tool call has been executing, per the producer's own clock"
+        },
+        "message": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "What the tool is doing right now, when the host knows. Absent for a bare\nliveness report."
+        }
+      },
+      "required": [
+        "elapsedMs"
+      ]
+    },
     "ToolCallRunningState": {
       "type": "object",
       "description": "Tool is actively executing.",
@@ -3833,6 +3850,10 @@
             "$ref": "#/$defs/ToolResultContent"
           },
           "description": "Partial content produced while the tool is still executing.\n\nFor example, a terminal content block lets clients subscribe to live\noutput before the tool completes."
+        },
+        "progress": {
+          "$ref": "#/$defs/ToolCallProgress",
+          "description": "Most recent progress reported while the tool has been executing.\n\nReplaced wholesale by each `chat/toolCallProgress`. Absent until the host\nreports any, and not carried out of `running`: a completed call states\nits own duration, so stale progress would only contradict it."
         }
       },
       "required": [

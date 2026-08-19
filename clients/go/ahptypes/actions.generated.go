@@ -37,6 +37,7 @@ const (
 	ActionTypeChatToolCallComplete              ActionType = "chat/toolCallComplete"
 	ActionTypeChatToolCallResultConfirmed       ActionType = "chat/toolCallResultConfirmed"
 	ActionTypeChatToolCallContentChanged        ActionType = "chat/toolCallContentChanged"
+	ActionTypeChatToolCallProgress              ActionType = "chat/toolCallProgress"
 	ActionTypeChatToolCallAuthRequired          ActionType = "chat/toolCallAuthRequired"
 	ActionTypeChatToolCallAuthResolved          ActionType = "chat/toolCallAuthResolved"
 	ActionTypeChatTurnComplete                  ActionType = "chat/turnComplete"
@@ -486,6 +487,44 @@ type ChatToolCallContentChangedAction struct {
 	Type ActionType                 `json:"type"`
 	// The current partial content for the running tool call
 	Content []ToolResultContent `json:"content"`
+}
+
+// A running tool call is still working.
+//
+// Hosts SHOULD dispatch this periodically while a tool call executes, so a
+// client can tell slow work apart from a stalled session. It carries no
+// result and does not change the tool call status, and a call that reports
+// no progress is not thereby stalled.
+//
+// `elapsedMs` is measured by the producer's own clock and is milliseconds,
+// like every other duration in the protocol. Clients MUST NOT derive it by
+// subtracting timestamps, since cross-client clocks may differ; treat it as
+// opaque, producer-supplied data, exactly as with
+// {@link ChatTurnCompleteAction.duration}.
+//
+// For client-provided tools (whose tool call state carries a client
+// {@link ToolCallContributor} with a `clientId`), the owning client
+// dispatches this while executing, since the server cannot observe that
+// work. The server SHOULD reject this action if the dispatching client does
+// not match the contributor's `clientId`.
+type ChatToolCallProgressAction struct {
+	// Turn identifier
+	TurnId string `json:"turnId"`
+	// Tool call identifier
+	ToolCallId string `json:"toolCallId"`
+	// Additional provider-specific metadata for this tool call.
+	//
+	// Clients MAY look for well-known keys here to provide enhanced UI.
+	// For example, a `ptyTerminal` key with `{ input: string; output: string }`
+	// indicates the tool operated on a terminal (both `input` and `output` may
+	// contain escape sequences).
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	Type ActionType                 `json:"type"`
+	// Milliseconds the tool call has been executing, per the producer's own clock
+	ElapsedMs int64 `json:"elapsedMs"`
+	// What the tool is doing right now, when the host knows. Absent for a bare
+	// liveness report.
+	Message *StringOrMarkdown `json:"message,omitempty"`
 }
 
 // A running tool call is paused pending MCP authentication. Transitions the
@@ -1543,6 +1582,7 @@ func (*ChatToolCallConfirmedAction) isStateAction()             {}
 func (*ChatToolCallCompleteAction) isStateAction()              {}
 func (*ChatToolCallResultConfirmedAction) isStateAction()       {}
 func (*ChatToolCallContentChangedAction) isStateAction()        {}
+func (*ChatToolCallProgressAction) isStateAction()              {}
 func (*ChatToolCallAuthRequiredAction) isStateAction()          {}
 func (*ChatToolCallAuthResolvedAction) isStateAction()          {}
 func (*ChatTurnCompleteAction) isStateAction()                  {}
@@ -1735,6 +1775,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/toolCallContentChanged":
 		var value ChatToolCallContentChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/toolCallProgress":
+		var value ChatToolCallProgressAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

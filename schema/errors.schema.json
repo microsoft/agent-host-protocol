@@ -3868,6 +3868,23 @@
         "confirmed"
       ]
     },
+    "ToolCallProgress": {
+      "type": "object",
+      "description": "A point-in-time report that a running tool call is still working.",
+      "properties": {
+        "elapsedMs": {
+          "type": "number",
+          "description": "Milliseconds the tool call has been executing, per the producer's own clock"
+        },
+        "message": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "What the tool is doing right now, when the host knows. Absent for a bare\nliveness report."
+        }
+      },
+      "required": [
+        "elapsedMs"
+      ]
+    },
     "ToolCallRunningState": {
       "type": "object",
       "description": "Tool is actively executing.",
@@ -3922,6 +3939,10 @@
             "$ref": "#/$defs/ToolResultContent"
           },
           "description": "Partial content produced while the tool is still executing.\n\nFor example, a terminal content block lets clients subscribe to live\noutput before the tool completes."
+        },
+        "progress": {
+          "$ref": "#/$defs/ToolCallProgress",
+          "description": "Most recent progress reported while the tool has been executing.\n\nReplaced wholesale by each `chat/toolCallProgress`. Absent until the host\nreports any, and not carried out of `running`: a completed call states\nits own duration, so stale progress would only contradict it."
         }
       },
       "required": [
@@ -7278,6 +7299,9 @@
           "$ref": "#/$defs/ChatToolCallContentChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatToolCallProgressAction"
+        },
+        {
           "$ref": "#/$defs/ChatToolCallAuthRequiredAction"
         },
         {
@@ -8519,6 +8543,42 @@
         "toolCallId",
         "type",
         "content"
+      ]
+    },
+    "ChatToolCallProgressAction": {
+      "type": "object",
+      "description": "A running tool call is still working.\n\nHosts SHOULD dispatch this periodically while a tool call executes, so a\nclient can tell slow work apart from a stalled session. It carries no\nresult and does not change the tool call status, and a call that reports\nno progress is not thereby stalled.\n\n`elapsedMs` is measured by the producer's own clock and is milliseconds,\nlike every other duration in the protocol. Clients MUST NOT derive it by\nsubtracting timestamps, since cross-client clocks may differ; treat it as\nopaque, producer-supplied data, exactly as with\n{@link ChatTurnCompleteAction.duration}.\n\nFor client-provided tools (whose tool call state carries a client\n{@link ToolCallContributor} with a `clientId`), the owning client\ndispatches this while executing, since the server cannot observe that\nwork. The server SHOULD reject this action if the dispatching client does\nnot match the contributor's `clientId`.",
+      "properties": {
+        "turnId": {
+          "type": "string",
+          "description": "Turn identifier"
+        },
+        "toolCallId": {
+          "type": "string",
+          "description": "Tool call identifier"
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata for this tool call.\n\nClients MAY look for well-known keys here to provide enhanced UI.\nFor example, a `ptyTerminal` key with `{ input: string; output: string }`\nindicates the tool operated on a terminal (both `input` and `output` may\ncontain escape sequences)."
+        },
+        "type": {
+          "const": "chat/toolCallProgress"
+        },
+        "elapsedMs": {
+          "type": "number",
+          "description": "Milliseconds the tool call has been executing, per the producer's own clock"
+        },
+        "message": {
+          "$ref": "#/$defs/StringOrMarkdown",
+          "description": "What the tool is doing right now, when the host knows. Absent for a bare\nliveness report."
+        }
+      },
+      "required": [
+        "turnId",
+        "toolCallId",
+        "type",
+        "elapsedMs"
       ]
     },
     "ChatToolCallAuthRequiredAction": {

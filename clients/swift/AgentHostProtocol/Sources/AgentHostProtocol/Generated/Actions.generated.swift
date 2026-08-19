@@ -24,6 +24,7 @@ public enum ActionType: String, Codable, Sendable {
     case chatToolCallComplete = "chat/toolCallComplete"
     case chatToolCallResultConfirmed = "chat/toolCallResultConfirmed"
     case chatToolCallContentChanged = "chat/toolCallContentChanged"
+    case chatToolCallProgress = "chat/toolCallProgress"
     case chatToolCallAuthRequired = "chat/toolCallAuthRequired"
     case chatToolCallAuthResolved = "chat/toolCallAuthResolved"
     case chatTurnComplete = "chat/turnComplete"
@@ -733,6 +734,51 @@ public struct ChatToolCallContentChangedAction: Codable, Sendable {
         self.meta = meta
         self.type = type
         self.content = content
+    }
+}
+
+public struct ChatToolCallProgressAction: Codable, Sendable {
+    /// Turn identifier
+    public var turnId: String
+    /// Tool call identifier
+    public var toolCallId: String
+    /// Additional provider-specific metadata for this tool call.
+    ///
+    /// Clients MAY look for well-known keys here to provide enhanced UI.
+    /// For example, a `ptyTerminal` key with `{ input: string; output: string }`
+    /// indicates the tool operated on a terminal (both `input` and `output` may
+    /// contain escape sequences).
+    public var meta: [String: AnyCodable]?
+    public var type: ActionType
+    /// Milliseconds the tool call has been executing, per the producer's own clock
+    public var elapsedMs: Int
+    /// What the tool is doing right now, when the host knows. Absent for a bare
+    /// liveness report.
+    public var message: StringOrMarkdown?
+
+    enum CodingKeys: String, CodingKey {
+        case turnId
+        case toolCallId
+        case meta = "_meta"
+        case type
+        case elapsedMs
+        case message
+    }
+
+    public init(
+        turnId: String,
+        toolCallId: String,
+        meta: [String: AnyCodable]? = nil,
+        type: ActionType,
+        elapsedMs: Int,
+        message: StringOrMarkdown? = nil
+    ) {
+        self.turnId = turnId
+        self.toolCallId = toolCallId
+        self.meta = meta
+        self.type = type
+        self.elapsedMs = elapsedMs
+        self.message = message
     }
 }
 
@@ -2054,6 +2100,7 @@ public enum StateAction: Codable, Sendable {
     case chatToolCallComplete(ChatToolCallCompleteAction)
     case chatToolCallResultConfirmed(ChatToolCallResultConfirmedAction)
     case chatToolCallContentChanged(ChatToolCallContentChangedAction)
+    case chatToolCallProgress(ChatToolCallProgressAction)
     case chatToolCallAuthRequired(ChatToolCallAuthRequiredAction)
     case chatToolCallAuthResolved(ChatToolCallAuthResolvedAction)
     case chatTurnComplete(ChatTurnCompleteAction)
@@ -2170,6 +2217,8 @@ public enum StateAction: Codable, Sendable {
             self = .chatToolCallResultConfirmed(try ChatToolCallResultConfirmedAction(from: decoder))
         case "chat/toolCallContentChanged":
             self = .chatToolCallContentChanged(try ChatToolCallContentChangedAction(from: decoder))
+        case "chat/toolCallProgress":
+            self = .chatToolCallProgress(try ChatToolCallProgressAction(from: decoder))
         case "chat/toolCallAuthRequired":
             self = .chatToolCallAuthRequired(try ChatToolCallAuthRequiredAction(from: decoder))
         case "chat/toolCallAuthResolved":
@@ -2331,6 +2380,7 @@ public enum StateAction: Codable, Sendable {
         case .chatToolCallComplete(let v): try v.encode(to: encoder)
         case .chatToolCallResultConfirmed(let v): try v.encode(to: encoder)
         case .chatToolCallContentChanged(let v): try v.encode(to: encoder)
+        case .chatToolCallProgress(let v): try v.encode(to: encoder)
         case .chatToolCallAuthRequired(let v): try v.encode(to: encoder)
         case .chatToolCallAuthResolved(let v): try v.encode(to: encoder)
         case .chatTurnComplete(let v): try v.encode(to: encoder)

@@ -2505,6 +2505,25 @@ pub struct ToolCallRunningState {
     /// output before the tool completes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<Vec<ToolResultContent>>,
+    /// Most recent progress reported while the tool has been executing.
+    ///
+    /// Replaced wholesale by each `chat/toolCallProgress`. Absent until the host
+    /// reports any, and not carried out of `running`: a completed call states
+    /// its own duration, so stale progress would only contradict it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<ToolCallProgress>,
+}
+
+/// A point-in-time report that a running tool call is still working.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolCallProgress {
+    /// Milliseconds the tool call has been executing, per the producer's own clock
+    pub elapsed_ms: i64,
+    /// What the tool is doing right now, when the host knows. Absent for a bare
+    /// liveness report.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<StringOrMarkdown>,
 }
 
 /// A running tool call is paused because the MCP server backing it needs

@@ -1286,6 +1286,21 @@ interface ToolCallPostConfirmationFields {
 }
 
 /**
+ * A point-in-time report that a running tool call is still working.
+ *
+ * @category Tool Call Types
+ */
+export interface ToolCallProgress {
+  /** Milliseconds the tool call has been executing, per the producer's own clock */
+  elapsedMs: number;
+  /**
+   * What the tool is doing right now, when the host knows. Absent for a bare
+   * liveness report.
+   */
+  message?: StringOrMarkdown;
+}
+
+/**
  * Tool is actively executing.
  *
  * @category Tool Call Types
@@ -1299,6 +1314,14 @@ export interface ToolCallRunningState extends ToolCallBase, ToolCallParameterFie
    * output before the tool completes.
    */
   content?: ToolResultContent[];
+  /**
+   * Most recent progress reported while the tool has been executing.
+   *
+   * Replaced wholesale by each `chat/toolCallProgress`. Absent until the host
+   * reports any, and not carried out of `running`: a completed call states
+   * its own duration, so stale progress would only contradict it.
+   */
+  progress?: ToolCallProgress;
 }
 
 /**

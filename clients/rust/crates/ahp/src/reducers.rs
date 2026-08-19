@@ -54,6 +54,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ahp_types::actions::{
     ChatInputAnswerChangedAction, ChatToolCallAuthRequiredAction, ChatToolCallAuthResolvedAction,
     ChatToolCallCompleteAction, ChatToolCallConfirmedAction, ChatToolCallContentChangedAction,
+    ChatToolCallProgressAction,
     ChatToolCallDeltaAction, ChatToolCallReadyAction, ChatToolCallResultConfirmedAction,
     ChatTurnStartedAction, StateAction,
 };
@@ -67,7 +68,8 @@ use ahp_types::state::{
     ToolCallAuthRequiredState, ToolCallCancellationReason, ToolCallCancelledState,
     ToolCallCompletedState, ToolCallConfirmationReason, ToolCallContributor,
     ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState, ToolCallResponsePart,
-    ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState, ToolInput, Turn,
+    ToolCallProgress, ToolCallRunningState, ToolCallState, ToolCallStatus, ToolCallStreamingState,
+    ToolInput, Turn,
     TurnState,
 };
 
@@ -1130,6 +1132,7 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             res
         }
         StateAction::ChatToolCallContentChanged(a) => apply_tool_call_content_changed(state, a),
+        StateAction::ChatToolCallProgress(a) => apply_tool_call_progress(state, a),
         StateAction::ChatToolCallAuthRequired(a) => {
             let res = apply_tool_call_auth_required(state, a);
             if res == ReduceOutcome::Applied {
@@ -1346,6 +1349,9 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
             | ToolCallState::PendingConfirmation(_) => {
                 if let Some(confirmed) = a.confirmed {
                     ToolCallState::Running(ToolCallRunningState {
+                        // A transition into `running` starts a fresh run, so it carries no
+                        // progress until the host reports some.
+                        progress: None,
                         tool_call_id: base.tool_call_id,
                         tool_name: base.tool_name,
                         display_name: base.display_name,
@@ -1427,6 +1433,9 @@ fn apply_tool_call_confirmed(
                 (_, tool_input) => tool_input,
             };
             ToolCallState::Running(ToolCallRunningState {
+                // A transition into `running` starts a fresh run, so it carries no
+                // progress until the host reports some.
+                progress: None,
                 tool_call_id,
                 tool_name,
                 display_name,
@@ -1615,6 +1624,21 @@ fn apply_tool_call_content_changed(
         other => other,
     })
 }
+fn apply_tool_call_progress(state: &mut ChatState, a: &ChatToolCallProgressAction) -> ReduceOutcome {
+    update_tool_call(state, &a.turn_id, &a.tool_call_id, |tc| match tc {
+        ToolCallState::Running(mut s) => {
+            if let Some(meta) = &a.meta {
+                s.meta = Some(meta.clone());
+            }
+            s.progress = Some(ToolCallProgress {
+                elapsed_ms: a.elapsed_ms,
+                message: a.message.clone(),
+            });
+            ToolCallState::Running(s)
+        }
+        other => other,
+    })
+}
 
 fn apply_tool_call_auth_required(
     state: &mut ChatState,
@@ -1658,6 +1682,9 @@ fn apply_tool_call_auth_resolved(
         let meta = a.meta.clone().or(base.meta);
         match tc {
             ToolCallState::AuthRequired(s) => ToolCallState::Running(ToolCallRunningState {
+                // A transition into `running` starts a fresh run, so it carries no
+                // progress until the host reports some.
+                progress: None,
                 tool_call_id: base.tool_call_id,
                 tool_name: base.tool_name,
                 display_name: base.display_name,

@@ -2042,6 +2042,21 @@ type ToolCallRunningState struct {
 	// For example, a terminal content block lets clients subscribe to live
 	// output before the tool completes.
 	Content []ToolResultContent `json:"content,omitempty"`
+	// Most recent progress reported while the tool has been executing.
+	//
+	// Replaced wholesale by each `chat/toolCallProgress`. Absent until the host
+	// reports any, and not carried out of `running`: a completed call states
+	// its own duration, so stale progress would only contradict it.
+	Progress *ToolCallProgress `json:"progress,omitempty"`
+}
+
+// A point-in-time report that a running tool call is still working.
+type ToolCallProgress struct {
+	// Milliseconds the tool call has been executing, per the producer's own clock
+	ElapsedMs int64 `json:"elapsedMs"`
+	// What the tool is doing right now, when the host knows. Absent for a bare
+	// liveness report.
+	Message *StringOrMarkdown `json:"message,omitempty"`
 }
 
 // A running tool call is paused because the MCP server backing it needs

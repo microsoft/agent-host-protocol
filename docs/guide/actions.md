@@ -72,6 +72,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `chat/toolCallComplete` | **Yes**¹ | Tool execution finished |
 | `chat/toolCallResultConfirmed` | **Yes** | Client approves or denies a pending result |
 | `chat/toolCallContentChanged` | **Yes**¹ | Streaming intermediate content while a tool is running |
+| `chat/toolCallProgress` | **Yes**¹ | Running tool is still working; elapsed time and an optional description of the current step |
 | `chat/toolCallAuthRequired` | No | Running MCP-contributed tool call pauses pending authentication |
 | `chat/toolCallAuthResolved` | No | Authentication resolved; tool call resumes to `running` |
 
