@@ -2773,6 +2773,12 @@ public struct ToolCallRunningState: Codable, Sendable {
     /// For example, a terminal content block lets clients subscribe to live
     /// output before the tool completes.
     public var content: [ToolResultContent]?
+    /// Most recent progress reported while the tool has been executing.
+    ///
+    /// Replaced wholesale by each `chat/toolCallProgress`. Absent until the host
+    /// reports any, and not carried out of `running`: a completed call states
+    /// its own duration, so stale progress would only contradict it.
+    public var progress: ToolCallProgress?
 
     enum CodingKeys: String, CodingKey {
         case toolCallId
@@ -2787,6 +2793,7 @@ public struct ToolCallRunningState: Codable, Sendable {
         case selectedOption
         case status
         case content
+        case progress
     }
 
     public init(
@@ -2801,7 +2808,8 @@ public struct ToolCallRunningState: Codable, Sendable {
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
         status: ToolCallStatus,
-        content: [ToolResultContent]? = nil
+        content: [ToolResultContent]? = nil,
+        progress: ToolCallProgress? = nil
     ) {
         self.toolCallId = toolCallId
         self.toolName = toolName
@@ -2815,6 +2823,23 @@ public struct ToolCallRunningState: Codable, Sendable {
         self.selectedOption = selectedOption
         self.status = status
         self.content = content
+        self.progress = progress
+    }
+}
+
+public struct ToolCallProgress: Codable, Sendable {
+    /// Milliseconds the tool call has been executing, per the producer's own clock
+    public var elapsedMs: Int
+    /// What the tool is doing right now, when the host knows. Absent for a bare
+    /// liveness report.
+    public var message: StringOrMarkdown?
+
+    public init(
+        elapsedMs: Int,
+        message: StringOrMarkdown? = nil
+    ) {
+        self.elapsedMs = elapsedMs
+        self.message = message
     }
 }
 

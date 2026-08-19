@@ -643,6 +643,20 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           content: action.content,
         };
       });
+    case ActionType.ChatToolCallProgress:
+      return updateToolCallInParts(state, action.turnId, action.toolCallId, tc => {
+        if (tc.status !== ToolCallStatus.Running) {
+          return tc;
+        }
+        return {
+          ...tc,
+          ...(action._meta !== undefined ? { _meta: action._meta } : {}),
+          progress: {
+            elapsedMs: action.elapsedMs,
+            ...(action.message !== undefined ? { message: action.message } : {}),
+          },
+        };
+      });
 
     case ActionType.ChatToolCallAuthRequired:
       return refreshSummaryStatus(updateToolCallInParts(state, action.turnId, action.toolCallId, tc => {

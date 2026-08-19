@@ -460,6 +460,16 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             return .running(r)
         }
 
+    case .chatToolCallProgress(let a):
+        return updateToolCall(state: state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
+            guard case .running(var r) = tc else { return tc }
+            r.meta = a.meta ?? r.meta
+            // Each report replaces the previous one wholesale, so a report without a
+            // message clears the message the last one carried.
+            r.progress = ToolCallProgress(elapsedMs: a.elapsedMs, message: a.message)
+            return .running(r)
+        }
+
     case .chatToolCallAuthRequired(let a):
         return refreshChatSummaryStatus(updateToolCall(state: state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
             guard case .running(let running) = tc else { return tc }

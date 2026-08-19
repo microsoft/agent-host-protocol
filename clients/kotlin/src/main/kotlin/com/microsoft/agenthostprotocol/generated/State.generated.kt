@@ -2743,7 +2743,28 @@ data class ToolCallRunningState(
      * For example, a terminal content block lets clients subscribe to live
      * output before the tool completes.
      */
-    val content: List<ToolResultContent>? = null
+    val content: List<ToolResultContent>? = null,
+    /**
+     * Most recent progress reported while the tool has been executing.
+     *
+     * Replaced wholesale by each `chat/toolCallProgress`. Absent until the host
+     * reports any, and not carried out of `running`: a completed call states
+     * its own duration, so stale progress would only contradict it.
+     */
+    val progress: ToolCallProgress? = null
+)
+
+@Serializable
+data class ToolCallProgress(
+    /**
+     * Milliseconds the tool call has been executing, per the producer's own clock
+     */
+    val elapsedMs: Long,
+    /**
+     * What the tool is doing right now, when the host knows. Absent for a bare
+     * liveness report.
+     */
+    val message: StringOrMarkdown? = null
 )
 
 @Serializable

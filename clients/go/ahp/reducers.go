@@ -617,6 +617,19 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 			}
 			return tc
 		})
+	case *ahptypes.ChatToolCallProgressAction:
+		return updateToolCall(state, a.TurnId, a.ToolCallId, func(tc ahptypes.ToolCallState) ahptypes.ToolCallState {
+			if r, ok := tc.Value.(*ahptypes.ToolCallRunningState); ok {
+				if a.Meta != nil {
+					r.Meta = a.Meta
+				}
+				r.Progress = &ahptypes.ToolCallProgress{
+					ElapsedMs: a.ElapsedMs,
+					Message:   a.Message,
+				}
+			}
+			return tc
+		})
 	case *ahptypes.ChatToolCallAuthRequiredAction:
 		res := applyToolCallAuthRequired(state, a)
 		if res == ReduceOutcomeApplied {

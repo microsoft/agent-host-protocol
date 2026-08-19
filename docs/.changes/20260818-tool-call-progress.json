@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`chat/toolCallProgress` action and `ToolCallRunningState.progress`, so a host can report that a running tool call is still working: the elapsed time on the producer's own clock plus an optional description of the current step. Progress is replaced wholesale by each report and is dropped when the call leaves `running`, so a replayed snapshot never shows stale elapsed time."
+}

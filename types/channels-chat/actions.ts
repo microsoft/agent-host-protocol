@@ -373,6 +373,41 @@ export interface ChatToolCallContentChangedAction extends ToolCallActionBase {
 }
 
 /**
+ * A running tool call is still working.
+ *
+ * Hosts SHOULD dispatch this periodically while a tool call executes, so a
+ * client can tell slow work apart from a stalled session. It carries no
+ * result and does not change the tool call status, and a call that reports
+ * no progress is not thereby stalled.
+ *
+ * `elapsedMs` is measured by the producer's own clock and is milliseconds,
+ * like every other duration in the protocol. Clients MUST NOT derive it by
+ * subtracting timestamps, since cross-client clocks may differ; treat it as
+ * opaque, producer-supplied data, exactly as with
+ * {@link ChatTurnCompleteAction.duration}.
+ *
+ * For client-provided tools (whose tool call state carries a client
+ * {@link ToolCallContributor} with a `clientId`), the owning client
+ * dispatches this while executing, since the server cannot observe that
+ * work. The server SHOULD reject this action if the dispatching client does
+ * not match the contributor's `clientId`.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ChatToolCallProgressAction extends ToolCallActionBase {
+  type: ActionType.ChatToolCallProgress;
+  /** Milliseconds the tool call has been executing, per the producer's own clock */
+  elapsedMs: number;
+  /**
+   * What the tool is doing right now, when the host knows. Absent for a bare
+   * liveness report.
+   */
+  message?: StringOrMarkdown;
+}
+
+/**
  * A running tool call is paused pending MCP authentication. Transitions the
  * tool call from `running` to `auth-required`.
  *
@@ -816,6 +851,7 @@ export type ChatAction =
   | ChatToolCallCompleteAction
   | ChatToolCallResultConfirmedAction
   | ChatToolCallContentChangedAction
+  | ChatToolCallProgressAction
   | ChatToolCallAuthRequiredAction
   | ChatToolCallAuthResolvedAction
   | ChatTurnCompleteAction

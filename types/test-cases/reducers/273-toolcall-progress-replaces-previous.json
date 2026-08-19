@@ -1,0 +1,89 @@
+{
+  "description": "toolCallProgress replaces the previous report wholesale rather than merging it",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "intention": null,
+            "invocationMessage": "Running command",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
+            "confirmed": "user-action",
+            "progress": {
+              "elapsedMs": 30000,
+              "message": "Reading src/main.ts"
+            }
+          }
+        }
+      ],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/toolCallProgress",
+      "turnId": "turn-1",
+      "toolCallId": "tc-1",
+      "elapsedMs": 60000
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [
+        {
+          "kind": "toolCall",
+          "toolCall": {
+            "status": "running",
+            "toolCallId": "tc-1",
+            "toolName": "bash",
+            "displayName": "Run Command",
+            "intention": null,
+            "invocationMessage": "Running command",
+            "toolInput": {
+              "uri": "file:///tool-inputs/tool-input.json"
+            },
+            "confirmed": "user-action",
+            "progress": {
+              "elapsedMs": 60000
+            }
+          }
+        }
+      ],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

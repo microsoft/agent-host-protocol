@@ -1253,6 +1253,20 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         }
     }
 
+    is StateActionChatToolCallProgress -> {
+        val a = action.value
+        updateToolCallInParts(state, a.turnId, a.toolCallId) { tc ->
+            if (tc !is ToolCallStateRunning) tc else {
+                ToolCallStateRunning(
+                    tc.value.copy(
+                        meta = a.meta ?: tc.value.meta,
+                        progress = ToolCallProgress(elapsedMs = a.elapsedMs, message = a.message),
+                    ),
+                )
+            }
+        }
+    }
+
     is StateActionChatToolCallAuthRequired -> {
         val a = action.value
         refreshChatSummaryStatus(
