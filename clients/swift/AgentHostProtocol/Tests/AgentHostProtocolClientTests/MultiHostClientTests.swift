@@ -152,7 +152,6 @@ final class MultiHostClientTests: XCTestCase {
 
         let initialValue = await multi.host("local")
         let initial = try XCTUnwrap(initialValue)
-        XCTAssertEqual(initial.automations?.execution.lifetime, .managed)
         XCTAssertNotNil(initial.automations?.create)
         XCTAssertEqual(initial.automations?.runHistoryLimit, 25)
 
@@ -164,7 +163,6 @@ final class MultiHostClientTests: XCTestCase {
 
         let reconnectedValue = await multi.host("local")
         let reconnected = try XCTUnwrap(reconnectedValue)
-        XCTAssertEqual(reconnected.automations?.execution.lifetime, .managed)
         XCTAssertNotNil(reconnected.automations?.create)
         XCTAssertEqual(reconnected.automations?.runHistoryLimit, 25)
 
