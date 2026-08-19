@@ -423,7 +423,7 @@ public enum AutomationOperation: String, Codable, Sendable {
     /// Replace editable fields using {@link AutomationUpdateRequestedAction | `automation/updateRequested`}.
     case update = "update"
     /// Permanently remove the automation using {@link AutomationRemovedAction | `automation/removed`}.
-    case dispose = "dispose"
+    case remove = "remove"
     /// Start a manual run using {@link RunAutomationParams | runAutomation}.
     case run = "run"
 }

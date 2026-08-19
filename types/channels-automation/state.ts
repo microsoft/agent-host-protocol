@@ -40,7 +40,7 @@ export const enum AutomationOperation {
   /** Replace editable fields using {@link AutomationUpdateRequestedAction | `automation/updateRequested`}. */
   Update = 'update',
   /** Permanently remove the automation using {@link AutomationRemovedAction | `automation/removed`}. */
-  Dispose = 'dispose',
+  Remove = 'remove',
   /** Start a manual run using {@link RunAutomationParams | runAutomation}. */
   Run = 'run',
 }

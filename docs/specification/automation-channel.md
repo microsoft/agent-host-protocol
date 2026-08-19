@@ -78,8 +78,8 @@ not permitted by the current operations, or is invalid for the current
 definition.
 
 Before dispatching `automation/removed`, a client SHOULD verify that the target
-advertises `AutomationOperation.Dispose`. The host MUST revalidate the operation
-and the client's authorization. If disposal is no longer allowed, the host
+advertises `AutomationOperation.Remove`. The host MUST revalidate the operation
+and the client's authorization. If removal is no longer allowed, the host
 rejects the action with `ActionEnvelope.rejectionReason`; the originating client
 restores its optimistic removal. An accepted action permanently deletes the
 automation before it is echoed to catalogue subscribers. Removing an unknown

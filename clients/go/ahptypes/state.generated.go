@@ -471,7 +471,7 @@ const (
 	// Replace editable fields using {@link AutomationUpdateRequestedAction | `automation/updateRequested`}.
 	AutomationOperationUpdate AutomationOperation = "update"
 	// Permanently remove the automation using {@link AutomationRemovedAction | `automation/removed`}.
-	AutomationOperationDispose AutomationOperation = "dispose"
+	AutomationOperationRemove AutomationOperation = "remove"
 	// Start a manual run using {@link RunAutomationParams | runAutomation}.
 	AutomationOperationRun AutomationOperation = "run"
 )

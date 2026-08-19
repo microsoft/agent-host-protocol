@@ -6419,7 +6419,7 @@
     "AutomationOperation": {
       "enum": [
         "update",
-        "dispose",
+        "remove",
         "run"
       ],
       "type": "string",

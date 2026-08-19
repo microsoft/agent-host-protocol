@@ -90,7 +90,7 @@ The host keeps the catalogue synchronized with full-entry actions:
 | `automation/createRequested` | Ask the host to persist a complete definition at a client-chosen resource. |
 | `automation/updateRequested` | Ask the host to apply a definition patch in action order. |
 | `automation/set` | Add or replace one complete `AutomationState`, keyed by `resource`. |
-| `automation/removed` | Permanently delete the entry identified by `resource`; clients may dispatch this while `dispose` is advertised. |
+| `automation/removed` | Permanently delete the entry identified by `resource`; clients may dispatch this while `remove` is advertised. |
 
 These are ordinary ordered AHP actions. After reconnect, the host either replays
 missed catalogue actions or returns a fresh snapshot; clients do not issue a
@@ -310,7 +310,7 @@ payload clients should replay.
 | --- | --- |
 | `automation/createRequested` | Persist a complete definition at a client-chosen `ahp-automation:/<id>` resource. |
 | `automation/updateRequested` | Replace selected editable fields in action order. |
-| `automation/removed` | Permanently remove a definition when disposal is currently allowed. |
+| `automation/removed` | Permanently remove a definition when removal is currently allowed. |
 
 Create and update requests are side-effect-only. They leave catalogue state
 unchanged until the host validates and persists the mutation, then publishes
@@ -351,7 +351,7 @@ To permanently remove an automation, a client dispatches
 }
 ```
 
-The client checks that the automation advertises `dispose` and may remove it
+The client checks that the automation advertises `remove` and may remove it
 optimistically. The host revalidates permission and current operation
 availability. If the host rejects the action, `ActionEnvelope.rejectionReason`
 causes the originating client to restore its prediction; accepted removals are

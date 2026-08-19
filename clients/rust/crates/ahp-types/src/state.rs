@@ -618,8 +618,8 @@ pub enum AutomationOperation {
     #[serde(rename = "update")]
     Update,
     /// Permanently remove the automation using {@link AutomationRemovedAction | `automation/removed`}.
-    #[serde(rename = "dispose")]
-    Dispose,
+    #[serde(rename = "remove")]
+    Remove,
     /// Start a manual run using {@link RunAutomationParams | runAutomation}.
     #[serde(rename = "run")]
     Run,

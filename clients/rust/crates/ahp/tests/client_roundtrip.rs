@@ -184,7 +184,7 @@ async fn automation_catalogue_actions_fan_out() {
                         "triggers": []
                     },
                     "runs": [],
-                    "operations": ["update", "dispose", "run"],
+                    "operations": ["update", "remove", "run"],
                     "createdAt": "2026-08-01T00:00:00Z",
                     "modifiedAt": "2026-08-05T12:00:00Z"
                 }

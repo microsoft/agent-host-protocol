@@ -119,7 +119,7 @@ export interface AutomationSetAction {
  * Remove one automation from {@link AutomationCatalogState.automations}.
  *
  * Clients may dispatch this action only while the target advertises
- * {@link AutomationOperation.Dispose}. The host revalidates that operation
+ * {@link AutomationOperation.Remove}. The host revalidates that operation
  * before permanently deleting the automation. A rejected action leaves the
  * authoritative catalogue and durable definition unchanged.
  *

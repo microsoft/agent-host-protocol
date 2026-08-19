@@ -45,7 +45,7 @@
         "triggers": []
       },
       "runs": [],
-      "operations": ["update", "dispose", "run"],
+      "operations": ["update", "remove", "run"],
       "createdAt": "2025-01-01T00:00:00Z",
       "modifiedAt": "2025-01-02T00:00:00Z"
     }
@@ -62,7 +62,7 @@
           "triggers": []
         },
         "runs": [],
-        "operations": ["update", "dispose", "run"],
+        "operations": ["update", "remove", "run"],
         "createdAt": "2025-01-01T00:00:00Z",
         "modifiedAt": "2025-01-02T00:00:00Z"
       },

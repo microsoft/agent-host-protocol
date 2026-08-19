@@ -2209,7 +2209,7 @@
     },
     "AutomationRemovedAction": {
       "type": "object",
-      "description": "Remove one automation from {@link AutomationCatalogState.automations}.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Dispose}. The host revalidates that operation\nbefore permanently deleting the automation. A rejected action leaves the\nauthoritative catalogue and durable definition unchanged.\n\nRemoving an unknown resource is a no-op.",
+      "description": "Remove one automation from {@link AutomationCatalogState.automations}.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Remove}. The host revalidates that operation\nbefore permanently deleting the automation. A rejected action leaves the\nauthoritative catalogue and durable definition unchanged.\n\nRemoving an unknown resource is a no-op.",
       "properties": {
         "type": {
           "const": "automation/removed"
@@ -8887,7 +8887,7 @@
     "AutomationOperation": {
       "enum": [
         "update",
-        "dispose",
+        "remove",
         "run"
       ],
       "type": "string",

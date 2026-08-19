@@ -794,8 +794,8 @@ enum class AutomationOperation {
     /**
      * Permanently remove the automation using {@link AutomationRemovedAction | `automation/removed`}.
      */
-    @SerialName("dispose")
-    DISPOSE,
+    @SerialName("remove")
+    REMOVE,
     /**
      * Start a manual run using {@link RunAutomationParams | runAutomation}.
      */
