@@ -2,6 +2,8 @@
  * Changeset State Types — Catalogue and per-changeset state for file-change
  * views exposed on the `ahp-changeset:` channel.
  *
+ * Stability: 1.2 - Release candidate
+ *
  * @module channels-changeset/state
  */
 

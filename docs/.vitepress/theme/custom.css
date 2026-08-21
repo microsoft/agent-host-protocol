@@ -27,3 +27,116 @@
     height: 465px;
   }
 }
+
+.stability-index {
+  --stability-color: #d97706;
+  margin: 1.25rem 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--stability-color) 28%, var(--vp-c-divider));
+  border-left: 4px solid var(--stability-color);
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--stability-color) 12%, transparent),
+      color-mix(in srgb, var(--stability-color) 4%, transparent)
+    );
+}
+
+.stability-index--0 {
+  --stability-color: #b91c1c;
+}
+
+.stability-index--1,
+.stability-index--1-0 {
+  --stability-color: #b93825;
+}
+
+.stability-index--1-1 {
+  --stability-color: #995000;
+}
+
+.stability-index--1-2 {
+  --stability-color: #786000;
+}
+
+.stability-index--2 {
+  --stability-color: #087052;
+}
+
+.stability-index--3 {
+  --stability-color: #526175;
+}
+
+.stability-index__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--vp-c-text-1);
+}
+
+.stability-index__level {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  background: var(--stability-color);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.stability-index p {
+  margin: 0.45rem 0 0.25rem;
+  color: var(--vp-c-text-2);
+}
+
+.stability-index a {
+  color: color-mix(in srgb, var(--stability-color) 78%, var(--vp-c-text-1));
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.stability-index--compact {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.stability-scale {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.dark .stability-index--0 {
+  --stability-color: #f87171;
+}
+
+.dark .stability-index--1,
+.dark .stability-index--1-0 {
+  --stability-color: #fb8068;
+}
+
+.dark .stability-index--1-1 {
+  --stability-color: #f0a43c;
+}
+
+.dark .stability-index--1-2 {
+  --stability-color: #d7ad32;
+}
+
+.dark .stability-index--2 {
+  --stability-color: #45b98a;
+}
+
+.dark .stability-index--3 {
+  --stability-color: #94a3b8;
+}
+
+.dark .stability-index__level {
+  color: #171717;
+}

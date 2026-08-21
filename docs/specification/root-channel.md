@@ -1,5 +1,7 @@
 # Root Channel
 
+<StabilityIndex level="2" />
+
 The root channel is the top-level channel every AHP server exposes. It carries global state — the agents the server provides, the terminals it manages, and host-level configuration — plus the catalogue events for sessions.
 
 ## URI

@@ -2,6 +2,48 @@
 
 AI is an evolving space. Unlike LSP or DAP — which largely guarantee backwards compatibility in perpetuity — the design space for agent hosts is open-ended and moving quickly. Backwards-incompatible changes to AHP are inevitable. Versioning gives clients and hosts a shared vocabulary for negotiating which behaviors are safe to use on a given connection.
 
+## Stability Index
+
+AHP uses a channel-level stability index based on the [Node.js stability index](https://nodejs.org/api/documentation.html#stability-index). It communicates how much change implementors should expect within a channel independently of the protocol version negotiated on a connection.
+
+Until more granular annotations are introduced, a channel's index applies to its complete surface: URI shape, state, actions, commands, notifications, and lifecycle.
+
+<div class="stability-scale">
+  <StabilityIndex level="0" compact />
+  <StabilityIndex level="1" compact />
+  <StabilityIndex level="1.0" compact />
+  <StabilityIndex level="1.1" compact />
+  <StabilityIndex level="1.2" compact />
+  <StabilityIndex level="2" compact />
+  <StabilityIndex level="3" compact />
+</div>
+
+- **0 - Deprecated.** Backward compatibility is not guaranteed, and the channel may be removed.
+- **1 - Experimental.** Backward-incompatible changes or removal may occur in any future release.
+  - **1.0 - Early development.** The channel is unfinished and subject to substantial change.
+  - **1.1 - Active development.** The channel is nearing minimum viability but may still change incompatibly.
+  - **1.2 - Release candidate.** No further breaking changes are anticipated, but user feedback or development of an underlying specification may still require them.
+- **2 - Stable.** Compatibility is a high priority, and normal semantic-versioning guarantees apply.
+- **3 - Legacy.** The channel remains supported under semantic versioning but is no longer actively developed.
+
+### Current channel stability
+
+| Channel | Stability |
+| --- | --- |
+| [Root](/specification/root-channel) | **2 - Stable** |
+| [Session](/specification/session-channel) | **2 - Stable** |
+| [Chat](/specification/chat-channel) | **2 - Stable** |
+| [Terminal](/specification/terminal-channel) | **2 - Stable** |
+| [Changeset](/reference/changeset) | **1.2 - Release candidate** |
+| [Annotations](/reference/annotations) | **1.1 - Active development** |
+| [Telemetry](/specification/telemetry-channel) | **2 - Stable** |
+| [Automation catalogue](/specification/automation-channel) | **1.0 - Early development** |
+| [Automation run](/specification/automation-run-channel) | **1.0 - Early development** |
+| [Resource watch](/specification/resource-watch-channel) | **2 - Stable** |
+| [MCP](/specification/mcp-channel) | **1.2 - Release candidate** |
+
+The stability index does not replace [protocol version negotiation](#negotiation) or capability checks. A stability change is itself a documentation signal; wire compatibility continues to follow the rules below.
+
 ## Version Format
 
 Protocol versions are [SemVer](https://semver.org) `MAJOR.MINOR.PATCH` strings (e.g. `"0.1.0"`). Pre-release and build metadata are not used.

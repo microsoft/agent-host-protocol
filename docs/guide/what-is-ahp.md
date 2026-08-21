@@ -1,9 +1,5 @@
 # What is the Agent Host Protocol?
 
-::: warning UNDER ACTIVE DEVELOPMENT
-This protocol is under active development and is not yet stabilized. Breaking changes to wire types, actions, and state shapes are expected.
-:::
-
 The **Agent Host Protocol (AHP)** defines how a portable, standalone sessions server communicates with its clients. Multiple clients can connect to the server and see a synchronized view of AI agent sessions. Clients send commands that are reflected back as state-changing actions.
 
 AHP stays agent-agnostic: it describes client-facing session state and display-ready metadata without binding clients to a specific agent runtime or backend-specific tool vocabulary.

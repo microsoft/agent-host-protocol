@@ -1,5 +1,7 @@
 # The `mcp://` Channel
 
+<StabilityIndex level="1.2" />
+
 The `mcp://` channel is an optional side-channel that lets an AHP client originate a constrained subset of [MCP](https://modelcontextprotocol.io/) traffic against an MCP server the agent host is already running. It is the wire format AHP uses whenever a client needs to talk MCP — but only as much MCP as the host has explicitly opted into exposing.
 
 The channel itself is generic. The set of methods and notifications it actually serves is determined entirely by capability advertisements on the customization it hangs off. Today the only such advertisement is [`AhpMcpUiHostCapabilities`](/reference/session#ahpmcpuihostcapabilities) (used by [MCP Apps](/guide/mcp#mcp-apps)), but additional domain-specific capability sets MAY be added in the future without changing the channel itself.

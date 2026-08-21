@@ -1,5 +1,7 @@
 # Telemetry Channel
 
+<StabilityIndex level="2" />
+
 The telemetry channel is the way an agent host emits OpenTelemetry (OTel) data — logs, traces, and metrics — to AHP clients. It is a thin pass-through: payloads on the wire are [OTLP/JSON](https://github.com/open-telemetry/opentelemetry-proto) values verbatim. AHP only adds the routing envelope.
 
 This page is normative. The OTel data model itself is defined by [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto); AHP does not redeclare it.

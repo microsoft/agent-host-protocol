@@ -2,6 +2,8 @@
  * Terminal State Types — Per-terminal state and content parts exposed on
  * `ahp-terminal:` channels.
  *
+ * Stability: 2 - Stable
+ *
  * @module channels-terminal/state
  */
 

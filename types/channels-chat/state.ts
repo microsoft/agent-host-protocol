@@ -2,6 +2,8 @@
  * Chat State Types — Per-chat turns, messages, response parts, tool calls,
  * and elicitation/input requests exposed on `ahp-chat:` channels.
  *
+ * Stability: 2 - Stable
+ *
  * @module channels-chat/state
  */
 

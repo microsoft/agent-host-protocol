@@ -1,5 +1,7 @@
 # Chat Channel
 
+<StabilityIndex level="2" />
+
 A chat channel carries the full state of a single conversation thread: turns, streaming responses, tool calls, pending messages, and input requests. A chat always belongs to a [session](./session-channel); a session may contain one or many chats. Chats are independently subscribable so a client can observe a subset of activity without paying the bandwidth cost of every chat in the session.
 
 ## URI

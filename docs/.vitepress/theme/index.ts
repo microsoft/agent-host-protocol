@@ -6,6 +6,7 @@ import { h } from 'vue'
 
 import HomeWalkthrough from './components/HomeWalkthrough.vue'
 import ProtocolHero from './components/ProtocolHero.vue'
+import StabilityIndex from './components/StabilityIndex.vue'
 import './custom.css'
 
 export default {
@@ -15,5 +16,6 @@ export default {
   }),
   enhanceApp({ app }) {
     app.component('HomeWalkthrough', HomeWalkthrough)
+    app.component('StabilityIndex', StabilityIndex)
   },
 } satisfies Theme

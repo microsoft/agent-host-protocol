@@ -1,5 +1,7 @@
 # Automation Run Channel
 
+<StabilityIndex level="1.0" />
+
 The automation-run channel represents one task-level execution of an
 automation. A local run commonly links one session; hosted authorities may link
 multiple attempts or workers.
