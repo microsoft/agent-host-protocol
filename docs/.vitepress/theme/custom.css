@@ -1,3 +1,29 @@
 .VPNavBarMenu .VPNavBarMenuLink.active {
   font-weight: 700;
 }
+
+.VPHomeHero {
+  position: relative;
+  overflow: hidden;
+}
+
+.VPHomeHero::before {
+  position: absolute;
+  inset: 8% -12% auto auto;
+  width: 42rem;
+  height: 42rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--vp-c-brand-1) 10%, transparent),
+    transparent 68%
+  );
+  content: '';
+  pointer-events: none;
+}
+
+@media (max-width: 639px) {
+  .VPHomeHero .image-container {
+    height: 465px;
+  }
+}
