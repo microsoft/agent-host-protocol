@@ -2,12 +2,6 @@
 
 This section contains the formal specification of the Agent Host Protocol (AHP). It defines the normative requirements for compliant implementations.
 
-## Status
-
-::: warning DRAFT
-This specification is a working draft and is under active development. Breaking changes to wire types, actions, and state shapes are expected. Do not rely on backward compatibility until the protocol reaches production status.
-:::
-
 ## Conventions
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this specification are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
@@ -99,6 +93,12 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Chat Channel Reference](/reference/chat)** — `ChatState`, chat actions, and chat commands.
 - **[Terminal Channel Reference](/reference/terminal)** — `TerminalState`, terminal actions, and terminal commands.
 - **[Changeset Channel Reference](/reference/changeset)** — `ChangesetState`, changeset actions, and changeset commands.
+- **[Annotations Channel Reference](/reference/annotations)** — `AnnotationsState` and annotations actions.
+- **[Automation Catalogue Channel Reference](/reference/automation)** — `AutomationCatalogState`, automation actions, and automation commands.
+- **[Automation Run Channel Reference](/reference/automation-run)** — `AutomationRunState` and automation-run actions.
+- **[Resource Watch Channel Reference](/reference/resource-watch)** — `ResourceWatchState`, resource-watch actions, and resource-watch commands.
+- **[Telemetry Channel Reference](/reference/otlp)** — OTLP capability types and notifications.
+- **[MCP Channel Reference](/reference/mcp)** — Upstream MCP wire surface and AHP capability links.
 - **[Messages](/reference/messages)** — Index of every JSON-RPC method with links to the channel page that documents it.
 - **[Error Codes](/reference/error-codes)** — Application-specific error codes.
 

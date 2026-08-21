@@ -1,5 +1,7 @@
 # Session Channel
 
+<StabilityIndex level="2" />
+
 A session channel carries session-level state and acts as the coordination scope for one or more chats. The session tracks lifecycle, customizations, per-session configuration, changesets, and the catalog of chats that belong to the session. The per-conversation state — turns, streaming responses, tool calls, pending messages, and input requests — lives on the [chat channel](./chat-channel).
 
 ## URI

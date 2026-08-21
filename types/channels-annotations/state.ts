@@ -6,6 +6,8 @@
  * derived from the session URI by appending `/annotations` and is also
  * surfaced explicitly on {@link AnnotationsSummary.resource} for badge UI.
  *
+ * Stability: 1.1 - Active development
+ *
  * @module channels-annotations/state
  */
 

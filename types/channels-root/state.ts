@@ -1,6 +1,8 @@
 /**
  * Root State Types — Global state exposed on the `ahp-root://` channel.
  *
+ * Stability: 2 - Stable
+ *
  * @module channels-root/state
  */
 

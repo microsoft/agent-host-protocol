@@ -1,5 +1,7 @@
 # Terminal Channel
 
+<StabilityIndex level="2" />
+
 A terminal channel carries the state of a single pseudo-terminal (pty) process — a shell, dev server, build task, or other long-running command. Terminals live independently of any session that may have created them, and may be claimed by clients or by sessions.
 
 For a hands-on walkthrough of terminal flows, see the [Terminals guide](/guide/terminals).

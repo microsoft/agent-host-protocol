@@ -1,6 +1,8 @@
 /**
  * Automation Catalogue Channel State Types for `ahp-automations://`.
  *
+ * Stability: 1.0 - Early development
+ *
  * @module channels-automation/state
  */
 

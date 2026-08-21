@@ -3,6 +3,8 @@
  * host on the root channel so clients can discover the URIs of any
  * OpenTelemetry signal channels (`ahp-otlp:` scheme) the host emits.
  *
+ * Stability: 2 - Stable
+ *
  * @module channels-otlp/state
  */
 

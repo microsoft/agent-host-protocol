@@ -1,6 +1,8 @@
 /**
  * Session State Types — Per-session coordination state exposed on `ahp-session:` channels.
  *
+ * Stability: 2 - Stable
+ *
  * @module channels-session/state
  */
 

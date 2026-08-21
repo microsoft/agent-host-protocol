@@ -2,6 +2,8 @@
  * Resource-Watch Channel State Types — Per-watch state exposed on
  * `ahp-resource-watch:` channels.
  *
+ * Stability: 2 - Stable
+ *
  * @module channels-resource-watch/state
  */
 

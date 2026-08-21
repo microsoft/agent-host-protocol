@@ -1,6 +1,8 @@
 /**
  * Automation Run Channel State Types for `ahp-automation-run:`.
  *
+ * Stability: 1.0 - Early development
+ *
  * @module channels-automation-run/state
  */
 
