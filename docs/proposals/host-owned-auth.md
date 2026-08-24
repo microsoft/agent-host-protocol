@@ -163,13 +163,13 @@ missing a credential. On the wire they're identical.
 ```
 accounts     accounts the host holds, and what uses each one
 challenges   credentials the host needs and doesn't have   ← flows 1, 2, 3
-pendingAuth  sign-ins happening right now                  ← flows 1–4
+attempts     sign-ins under way, and how each one ended    ← flows 1–4
 ```
 
 A **challenge** is a *need*. An **attempt** is a *try*. One need can outlive
 several tries, so they're separate collections. Flow 1 over time:
 
-| | `challenges` | `pendingAuth` | The user sees |
+| | `challenges` | `attempts` | The user sees |
 | --- | --- | --- | --- |
 | Host starts, no GitHub credential | `[github]` | — | "Sign in to GitHub" |
 | User clicks; device code issued | `[github]` | `[#1 · ABCD-1234]` | "Enter ABCD-1234" |
@@ -205,7 +205,7 @@ sequenceDiagram
     H->>C: action accounts/challengeSet
     C->>U: renders the prompt for that challenge
     U->>C: approves
-    C->>H: authBegin({ target: { challengeId }, flows, redirectUri? })
+    C->>H: authBegin({ target: { challengeId }, flows })
     H-->>C: authorizationUri, or a device code
     C->>U: opens the browser / displays the code
     U->>AS: authenticates and consents
@@ -221,6 +221,19 @@ subscribed to `ahp-accounts://` then has the whole challenge sitting in
 `AccountsState.challenges`, and passes its `id` back at step 5. No lookup, no
 second source — a client only ever echoes a value the host gave it. That's what
 makes it safe for the challenge to carry full `ProtectedResourceMetadata` (§7).
+
+**Nothing here replaces `AuthRequired` (`-32007`).** It stays exactly as it is,
+along with `McpServerAuthRequiredState` and `ToolCallAuthRequiredState`. A
+client that never subscribes to `ahp-accounts://` sees precisely what it sees
+today, in the same places, and keeps brokering tokens with `authenticate` — that
+is the whole point of the feature being additive.
+
+What subscribing buys is the *earlier* and *wider* view: a need visible before
+anything has failed (flow 1), deduplicated across sessions, and the
+`challengeId` that lets the host run the flow instead of the client. A client
+that wants none of that is unaffected, which is why
+`McpAuthRequirement.challengeId` is optional — absent when the host has no
+challenge published for that connection, and simply ignorable when it isn't.
 
 Challenges cover *static* requirements too, not only failures. That's what makes
 flow 1 work: on first run nothing has failed, the host just knows an agent needs
@@ -377,7 +390,7 @@ every flow until one works. Rejected: each failed try can burn a real browser
 window or a live device code, and "until one works" can't tell *flow unsupported*
 from *user cancelled*. Once you can tell those apart, you can work out the overlap
 up front anyway. So the host advertises its flows in
-`InitializeResult.hostAuth`, the client names the ones it will drive in
+`InitializeResult.authentication`, the client names the ones it will drive in
 `authBegin` and is told which got picked, and it can call again with a narrower
 set. The client drives retries; the host never fires blind.
 
@@ -492,81 +505,38 @@ that is what an account-management UI renders; deriving it by walking every
 session's customizations is both expensive and racy. Per-session overrides and
 `usedBy` rollups stay deferred (§10).
 
-### 7.2 The consumer key: a real gap in AHP today
+### 7.2 The consumer key
 
 A binding has to survive a restart, so it needs an id for "this MCP server" that
-means the same thing in every session. **AHP doesn't guarantee one.**
-
-| Candidate | Why it fails |
-| --- | --- |
-| `CustomizationBase.id` | Documented as a *"session-unique opaque identifier… minted by whoever publishes the customization."* Unique **within** a session; carries no promise **across** sessions. |
-| `uri` alone | For inline declarations, `uri` points to the **containing file** — several MCP servers in one `plugins.json` share it. |
-| `range` | Narrows within the file, but shifts the moment anyone edits it. |
-| `name` alone | Human-readable, with no documented uniqueness guarantee. |
-
-The failure is worse than a lost preference. Take a host that mints ids as
-counters in discovery order — allowed by "opaque" — and let discovery order change
-because a server was added, disabled, or enumerated by a racing filesystem walk:
-
-```
-Session 1   [ github-work (c1), github-personal (c2) ]   binding: c1 → work account
-Session 2   [ github-personal (c1), github-work (c2) ]   binding: c1 → work account
-            ⇒ the personal server now authenticates as the work account
-```
-
-A host minting per-session GUIDs gets the harmless version: the binding matches
-nothing and quietly falls back to "last signed-in wins." **Both hosts are
-conformant**, so the protocol currently permits the credential-misbinding one.
-That's the exact boundary multi-account exists to enforce, so it can't be left to
-luck.
+means the same thing in every session. AHP has no such id today:
+`CustomizationBase.id` is documented as *session-unique*, `uri` alone collides
+for servers declared inline in one manifest, `range` shifts on edit, and `name`
+alone has no uniqueness guarantee.
 
 **This proposal keys on `(uri, name)`** — the manifest, plus the declaration's
-name inside it. It survives file edits, tells inline siblings apart, and needs no
-change to any existing type, so it can't stall on someone else's decision.
+name inside it. It needs no change to any existing type, so it can't stall on
+someone else's decision. It does need one rule the spec doesn't state, so this
+proposal adds it: a host **MUST NOT** publish two MCP-server customizations
+sharing a `(uri, name)` in one session. In practice that already holds — an
+`mcpServers` block is a map keyed by name.
 
-It does need one rule the spec doesn't state today, so this proposal adds it: a
-host **MUST NOT** publish two MCP-server customizations sharing a `(uri, name)`
-in one session. In practice this already holds — an `mcpServers` block is a map
-keyed by name — but the key can't rest on a convention that lives outside the
-protocol.
+Mostly this is a host implementation concern, and hosts already have to solve it
+to keep grants across restarts. Two things are worth pinning in the spec rather
+than leaving to each host:
 
-#### Four ways it breaks
+- **URI comparison needs a normalization rule** — trailing slashes,
+  percent-encoding, drive-letter case, symlinks. Without one, two hosts compute
+  different keys for the same server and neither is wrong (§10).
+- **Don't garbage-collect bindings whose consumer is absent.** A workspace that
+  isn't open contributes no customizations, which is not the same as the server
+  being deleted; collecting on absence would wipe bindings for every project a
+  user hasn't opened lately.
 
-1. **Renames and moves lose it.** Renaming the server, moving the manifest,
-   cloning to a different path, opening through a devcontainer, or bumping a
-   versioned plugin URL all change the key. It fails **safe** — no match, host
-   default — but invisibly, and a user who set a preference months ago won't
-   connect the two events.
-
-2. **URI equality is unspecified.** Trailing slashes, percent-encoding, Windows
-   drive-letter case, UNC paths, symlinks. Two implementations can compute
-   different keys for one server and neither is wrong. This needs a normalization
-   rule in the spec.
-
-3. **`name` uniqueness is a rule this proposal adds**, not one it inherits. Worth
-   being honest that the key's soundness rests on it.
-
-4. **Name reuse can still mis-bind.** Delete a `github` server bound to work,
-   later add a *different* `github` server at the same manifest pointing at
-   personal, and the old binding matches — silently using the **work** account.
-   Same class as the counter case above: much rarer, and user-caused rather than
-   host-caused, but not gone.
-
-   The tempting fix — delete bindings whose consumer isn't present — is **wrong**.
-   A workspace that isn't open contributes no customizations, and that isn't the
-   same as the server being deleted; collecting on absence would wipe bindings for
-   every project a user hasn't opened lately. The honest fix is **visibility**:
-   clients SHOULD show the binding ("github → tyler@work"), so a wrong one is
-   something a user can see and correct.
-
-#### Why accept it
-
-Problem 1 fails safe, 2 and 3 close by writing rules down, and 4 is rare,
-user-triggered, and visible in UI. Against that, the pair needs no change to a
-shared type used by every client, so it can't stall. It's also
-**forward-compatible**: if `CustomizationBase` later gains a real `stableId`
-(§10), bindings migrate by matching `(uri, name)` once and rewriting to the new
-key — no flag day, no lost preferences.
+The residual failure is a rename or move losing the binding. That fails **safe**
+— no match, host default — and clients SHOULD render the binding
+("*server* → *account*") so a wrong or missing one is visible rather than
+silent. If `CustomizationBase` later gains a real `stableId` (§10), bindings
+migrate by matching `(uri, name)` once and rewriting to the new key.
 
 ---
 
@@ -580,13 +550,14 @@ behaves exactly as today.
 
 | Symbol | File | Kind |
 | --- | --- | --- |
-| `InitializeResult.hostAuth?` | `common/commands.ts` | added (capability) |
-| `HostAuthCapability` | `common/commands.ts` | added (type) |
+| `InitializeResult.authentication?` | `common/commands.ts` | added (capability) |
+| `AuthenticationCapability` + `AuthFlowSupport` | `common/commands.ts` | added (types) |
 | `AuthFlowKind` | `common/state.ts` | added (enum) |
+| `AuthFlowRequest` | `channels-accounts/commands.ts` | added (union; carries `redirectUri`) |
 | `authBegin` / `authComplete` | `channels-accounts/commands.ts` | added (2 commands) |
-| `AccountsState`, `HostAccount` (identity), `AuthChallenge` (need), `AuthAttempt` (try) | `channels-accounts/state.ts` | added (state) |
-| `AccountConsumer` (agent variant carries `resource?`) + `HostAccount.consumers?` | `channels-accounts/state.ts` | added (multi-account) |
-| `AccountOrigin`, `AuthAttemptStatus` | `channels-accounts/state.ts` | added (enums) |
+| `AccountsState`, `HostAccount` (identity), `AuthChallenge` (need), `AuthAttemptState` (try) | `channels-accounts/state.ts` | added (state) |
+| `AccountConsumer` (agent variant carries `resource`) + `HostAccount.consumers?` | `channels-accounts/state.ts` | added (multi-account) |
+| `AuthAttemptStatus` + 5 `AuthAttempt*State` variants | `channels-accounts/state.ts` | added (lifecycle union) |
 | `DeviceCodePrompt` | `channels-accounts/state.ts` | added (device-code payload) |
 | `McpAuthRequiredReason` | `channels-session/state.ts` | reused (see §10 on the name) |
 | `accounts/set` + `accounts/updated` + `accounts/removed` | `channels-accounts/actions.ts` | added (keyed collection) |
@@ -598,7 +569,7 @@ behaves exactly as today.
 | 7 `ActionType` entries + `ACTION_INTRODUCED_IN` | `common/actions.ts`, `version/registry.ts` | added |
 
 > **On shape.** All three collections here (`accounts`, `challenges`,
-> `pendingAuth`) are keyed, so each uses the `Set` / `Updated` / `Removed`
+> `attempts`) are keyed, so each uses the `Set` / `Updated` / `Removed`
 > convention rather than a single full-replacement action — the
 > `root/terminalsChanged` full-replacement style is a catalogue exception, not
 > the convention. Each action needs a fixture per reducer branch (insert,
@@ -613,11 +584,20 @@ behaves exactly as today.
 interface InitializeResult {
   // …existing…
   /** Present = this host owns credentials and accepts the auth commands. */
-  hostAuth?: HostAuthCapability;
+  authentication?: AuthenticationCapability;
 }
-interface HostAuthCapability {
+interface AuthenticationCapability {
   /** The menu. The client picks from it in `AuthBeginParams.flows`. */
-  flows: AuthFlowKind[];
+  flows: AuthFlowSupport[];
+}
+
+/**
+ * An object rather than a bare `AuthFlowKind`, so a flow can later advertise
+ * facts about itself — supported PKCE methods, a required redirect scheme, a
+ * polling floor — without reshaping the capability.
+ */
+interface AuthFlowSupport {
+  kind: AuthFlowKind;
 }
 
 // ── Flows — common/state.ts ──────────────────────────────────────────────
@@ -637,8 +617,16 @@ interface AccountsState {
   accounts: HostAccount[];
   /** What the host NEEDS. A *need*, and it persists until satisfied (§5.2). */
   challenges?: AuthChallenge[];
-  /** What's in flight. A *try*, and it dies on its own clock (§5.1). */
-  pendingAuth?: AuthAttempt[];
+  /**
+   * Sign-ins, in flight and just-settled. A *try*, and it dies on its own
+   * clock (§5.1).
+   *
+   * Named `attempts` rather than `pendingAuth` because a settled attempt
+   * lands here too, briefly: a client learns the outcome by seeing the entry
+   * reach `Completed` or `Failed` before the host removes it. A collection
+   * called "pending" holding a completed entry would be a lie.
+   */
+  attempts?: AuthAttemptState[];
 }
 
 /**
@@ -688,10 +676,29 @@ interface HostAccount {
   issuer?: string;
   /** Stable subject at that issuer, when known. */
   subject?: string;
-  /** Display only, e.g. "tyler@github.com". What the user picks between. */
-  label?: string;
-  /** How the host came to hold it. Decides revocation behaviour (§8.4). */
-  origin?: AccountOrigin;
+  /**
+   * What the user picks between. **Required**: an account list a client cannot
+   * render is useless, and every other field here is optional or opaque, so
+   * without this there is nothing to put in the UI.
+   *
+   * The host synthesizes one when the provider gives it nothing to work with
+   * (an ambient credential whose subject it cannot resolve), because a
+   * placeholder it chose beats a blank row the client has to invent.
+   */
+  label: string;
+  /**
+   * Whether `accounts/removed` does anything for this account.
+   *
+   * `false` for a credential the host did not mint and cannot forget — an
+   * ambient one it rediscovers from its environment on every start, or one a
+   * client pushed and still owns. Signing those out is not the host's to do,
+   * so a client SHOULD NOT offer the affordance.
+   *
+   * This is deliberately *what a client can do*, not *where the credential
+   * came from*. Provenance is host-internal and drives the host's own
+   * revocation rules (§8.4); the only part of it a client can act on is this.
+   */
+  removable: boolean;
   /**
    * What uses this identity (§7.1). The only field a client may change.
    *
@@ -712,15 +719,21 @@ interface HostAccount {
  */
 type AccountConsumer =
   | {
-      kind: 'agent';
+      /** Matches `AgentInfo.provider`. */
       provider: string;
       /**
-       * Which resource this binding is for. **Required**, not optional: one
-       * Copilot can hold a GitHub account and an Entra account at once, so
-       * `{ agent, copilot }` alone identifies nothing — not in `consumers`,
-       * not in a challenge, not in `authBegin`. An optional field would make
-       * `{ agent, copilot }` and `{ agent, copilot, resource }` both legal
-       * while meaning different things.
+       * Which resource this binding is for. **Required**, not optional: an
+       * agent may declare several `protectedResources`, and hold a different
+       * account for each, so `provider` alone identifies nothing — not in
+       * `consumers`, not in a challenge, not in `authBegin`. An optional field
+       * would make `{ agent, p }` and `{ agent, p, resource }` both legal while
+       * meaning different things.
+       *
+       * **Opaque to clients.** It is the RFC 9728 resource identifier the agent
+       * declared, and a client's only correct use of it is equality — matching
+       * against `AgentInfo.protectedResources[].resource` to group or label
+       * bindings. Clients SHOULD NOT parse it, derive an endpoint from it, or
+       * display it raw; `resource_name` on the metadata is the display string.
        *
        * Always available, because every path by which an agent comes to use a
        * credential already names one, and `ProtectedResourceMetadata.resource`
@@ -754,51 +767,95 @@ type AccountConsumer =
    *  .resources` are both arrays — while `McpAuthRequirement.resource`, shared
    *  by `McpServerAuthRequiredState` and `ToolCallAuthRequiredState.auth`, is a
    *  single object. These variants mirror that, rather than inventing it. */
-  | { kind: 'mcpServer'; uri: URI; name: string };
-
-/** How the host got the credential. Decides whether it may revoke upstream. */
-const enum AccountOrigin {
-  /** A client drove `authBegin`; the host owns this grant. */
-  Interactive = 'interactive',
-  /** Ambient — GITHUB_TOKEN, managed identity. The host didn't mint it and
-   *  other software may depend on it. */
-  Environment = 'environment',
-  /** Arrived via the classic `authenticate` push; belongs to the client. */
-  Pushed = 'pushed',
-}
+  | {
+      kind: 'mcpServer';
+      /**
+       * The manifest that declares the server — **identity only, never
+       * display.** `name` is what a client shows. This is here because `name`
+       * alone is not unique: two workspaces can each declare a `github`
+       * server, and binding one must not bind the other.
+       */
+      uri: URI;
+      /** The declaration's name within that manifest. What a client renders. */
+      name: string;
+    };
 
 /**
- * One in-flight sign-in. Discriminated on `flow`, so device-code facts exist
- * only where they mean something — `{ flow: AuthorizationCode, device: {…} }`
- * can't be said, and neither can a device-code attempt with nothing to show.
+ * One sign-in, at whatever point it has reached. A lifecycle union per the
+ * repo's naming rule: `*State` discriminated by a `*Status` enum.
+ *
+ * Discriminating on `status` is what makes the conditional fields honest —
+ * `accountId` exists exactly when the attempt completed, `error` exactly when
+ * it failed, and neither can be attached to a pending one.
+ *
+ * `flow` sub-discriminates only `Pending`, because that is the only status
+ * where a flow still has anything to say. Once an attempt has settled, what a
+ * device code used to be is no longer actionable.
  */
-type AuthAttempt = AuthorizationCodeAttempt | DeviceCodeAttempt;
+type AuthAttemptState =
+  | AuthAttemptPendingState
+  | AuthAttemptCompletedState
+  | AuthAttemptFailedState
+  | AuthAttemptCancelledState
+  | AuthAttemptExpiredState;
 
 interface AuthAttemptBase {
-  attemptId: string;
+  /** Host-minted. Referenced elsewhere as `attemptId`. */
+  id: string;
+  /**
+   * The RFC 9728 resource identifier being authorized. Typed `string` rather
+   * than `URI` to match the rest of AHP's OAuth surface —
+   * `ProtectedResourceMetadata.resource`, `AuthenticateParams.resource` and
+   * the `auth/required` notification all use `string`.
+   */
   resource: string;
   /** The need this try is answering. Absent for flow 4 (§5.3). */
   challengeId?: string;
-  status: AuthAttemptStatus;
-  /** Set once `status` is `Completed`. */
-  accountId?: string;
-  /** Set once `status` is `Failed`. */
-  error?: ErrorInfo;
 }
 
-interface AuthorizationCodeAttempt extends AuthAttemptBase {
+/** Still running. The only status that carries flow-specific detail. */
+type AuthAttemptPendingState =
+  | AuthorizationCodePendingState
+  | DeviceCodePendingState;
+
+interface AuthorizationCodePendingState extends AuthAttemptBase {
+  status: AuthAttemptStatus.Pending;
   flow: AuthFlowKind.AuthorizationCode;
   // Nothing to broadcast: the browser is already open on the client that
   // called `authBegin`, and the URI is bound to that client's `redirectUri`.
 }
 
-interface DeviceCodeAttempt extends AuthAttemptBase {
+interface DeviceCodePendingState extends AuthAttemptBase {
+  status: AuthAttemptStatus.Pending;
   flow: AuthFlowKind.DeviceCode;
-  /** Required — showing this is the whole reason `pendingAuth` exists. */
+  /** Required — showing this is the whole reason attempts are in state. */
   device: DeviceCodePrompt;
-  /** RFC 8628 `expires_in` as an absolute instant. Required: the code stops
-   *  working, and a client showing it has to be able to say when. */
+  /** RFC 8628 `expires_in` as an ISO 8601 timestamp
+   *  (e.g. `"2025-03-10T18:42:03.123Z"`). Required: the code stops working,
+   *  and a client showing it has to be able to say when. */
   expiresAt: string;
+}
+
+interface AuthAttemptCompletedState extends AuthAttemptBase {
+  status: AuthAttemptStatus.Completed;
+  /** Required here, and expressible nowhere else. */
+  accountId: string;
+}
+
+interface AuthAttemptFailedState extends AuthAttemptBase {
+  status: AuthAttemptStatus.Failed;
+  /** Required here, and expressible nowhere else. */
+  error: ErrorInfo;
+}
+
+/** The user backed out, or a client dispatched `accounts/authAttemptRemoved`. */
+interface AuthAttemptCancelledState extends AuthAttemptBase {
+  status: AuthAttemptStatus.Cancelled;
+}
+
+/** A device code aged out before the user finished with it (§5.1). */
+interface AuthAttemptExpiredState extends AuthAttemptBase {
+  status: AuthAttemptStatus.Expired;
 }
 
 const enum AuthAttemptStatus {
@@ -821,6 +878,14 @@ interface DeviceCodePrompt {
 // ── Accounts actions — channels-accounts/actions.ts ──────────────────────
 // `Set` carries the full entry, `Updated` the key plus changed fields,
 // `Removed` only the key and no-ops when absent. Three collections.
+//
+// Keys are a bare `id`, not `accountId` / `challengeId` / `attemptId`: each
+// action names exactly one entity and the action name already says which, so
+// the prefix would be redundant. Matches `SessionCustomizationRemovedAction`
+// and `ChatPendingMessageRemovedAction`. The prefixed form is for actions that
+// carry several ids at once (as `AnnotationsUpdatedAction` carries
+// `annotationId` alongside `turnId`), and for cross-references from another
+// type — which is why `AuthAttemptBase.challengeId` and `accountId` keep it.
 
 interface AccountSetAction {          // keyed by HostAccount.id
   type: ActionType.AccountSet;        // 'accounts/set'
@@ -828,16 +893,17 @@ interface AccountSetAction {          // keyed by HostAccount.id
 }
 interface AccountUpdatedAction {
   type: ActionType.AccountUpdated;    // 'accounts/updated'
-  accountId: string;
+  id: string;
   /** The only field a client may change, so binding is one action — the host
    *  reconciles by dropping the consumer from whoever held it before. */
   consumers?: AccountConsumer[];
 }
 interface AccountRemovedAction {
   type: ActionType.AccountRemoved;    // 'accounts/removed' — signing out
-  /** Key only. Whether the host also revokes upstream is its own behaviour,
-   *  scoped by `origin`, not a client flag (§8.4). */
-  accountId: string;
+  /** Key only. Whether the host also revokes upstream is host behaviour, not
+   *  a client flag (§8.4). A no-op against an account that is not
+   *  `removable`. */
+  id: string;
 }
 
 interface ChallengeSetAction {        // keyed by AuthChallenge.id
@@ -846,16 +912,16 @@ interface ChallengeSetAction {        // keyed by AuthChallenge.id
 }
 interface ChallengeRemovedAction {
   type: ActionType.ChallengeRemoved;  // 'accounts/challengeRemoved' — satisfied
-  challengeId: string;
+  id: string;
 }
 
-interface AuthAttemptSetAction {      // keyed by AuthAttempt.attemptId
+interface AuthAttemptSetAction {      // keyed by AuthAttemptState.id
   type: ActionType.AuthAttemptSet;    // 'accounts/authAttemptSet'
-  attempt: AuthAttempt;
+  attempt: AuthAttemptState;
 }
 interface AuthAttemptRemovedAction {
   type: ActionType.AuthAttemptRemoved; // 'accounts/authAttemptRemoved'
-  attemptId: string;                   // cancelling a sign-in
+  id: string;                          // cancelling a sign-in
 }
 
 // ── Commands — channels-accounts/commands.ts ─────────────────────────────
@@ -882,11 +948,15 @@ interface AuthBeginParams extends BaseParams {
    * did not publish with `InvalidParams` (`-32602`) — see §8.4.
    */
   target: { challengeId: string } | { consumer: AccountConsumer };
-  /** Flows the client will drive for THIS attempt, most-preferred first. */
-  flows: AuthFlowKind[];
-  /** REQUIRED when `flows` includes `authorizationCode`. Loopback per
-   *  RFC 8252 §7.3 unless host policy says otherwise. */
-  redirectUri?: URI;
+  /**
+   * Flows the client will drive for THIS attempt, most-preferred first.
+   *
+   * Each entry carries what its own flow needs, so there is no field that is
+   * "required when some other field says so" — offering the authorization-code
+   * flow without a `redirectUri` is not expressible, and supplying one without
+   * offering that flow is not either.
+   */
+  flows: AuthFlowRequest[];
   /**
    * Act on an EXISTING account — re-authorizing after expiry, or consenting to
    * more. Absent means "add a new one" (flow 4). An optional id rather than an
@@ -896,13 +966,27 @@ interface AuthBeginParams extends BaseParams {
   accountId?: string;
 }
 
+/**
+ * What a client offers to drive. Mirrors `AuthFlowSupport` but carries the
+ * per-flow inputs the host needs from the caller. `None` is a result, never a
+ * request — a client cannot ask for "no interaction".
+ */
+type AuthFlowRequest =
+  | {
+      kind: AuthFlowKind.AuthorizationCode;
+      /** Where the browser lands. MUST be a loopback URI per RFC 8252 §7.3
+       *  unless host policy says otherwise, and the host validates it (§8.4). */
+      redirectUri: URI;
+    }
+  | { kind: AuthFlowKind.DeviceCode };
+
 type AuthBeginResult =
   | { flow: AuthFlowKind.AuthorizationCode; attemptId: string;
       /** Open in a browser. NOT mirrored into state — single-use and bound to
        *  this client's `redirectUri`. */
       authorizationUri: URI; expiresAt?: string }
   | { flow: AuthFlowKind.DeviceCode; attemptId: string;
-      /** Also mirrored into `pendingAuth`, so late-joining and headless-side
+      /** Also mirrored into `attempts`, so late-joining and headless-side
        *  clients can show it; returned here so the caller needn't race its own
        *  subscription. */
       device: DeviceCodePrompt; expiresAt: string }
@@ -949,9 +1033,9 @@ interface AuthFlowUnsupportedErrorData {
   host-authored (`accounts/set`, both `challenge*` actions, both
   `authAttempt*` actions); `accounts/updated` and `accounts/removed` are
   `@clientDispatchable`. The two commands and the `ahp-accounts://` channel are
-  gated by `InitializeResult.hostAuth` plus the `initialize` version handshake —
+  gated by `InitializeResult.authentication` plus the `initialize` version handshake —
   a one-sided advertisement, with no matching client capability.
-- A host MUST NOT advertise `InitializeResult.hostAuth` to a connection it is
+- A host MUST NOT advertise `InitializeResult.authentication` to a connection it is
   unwilling to let spend its credentials, and MAY reject
   `subscribe('ahp-accounts://')` with `PermissionDenied` (`-32009`) even when it
   does.
@@ -979,10 +1063,10 @@ just here:
    echoes host-published values" a guarantee rather than a convention — without
    it, a caller could name an arbitrary consumer or resource and steer which
    credential the host goes and gets.
-3. **The host MUST validate `redirectUri`** against policy before using it —
-   loopback per RFC 8252 §7.3 (`http://127.0.0.1:<port>/…` or `http://[::1]`) is
-   the recommended default. An unvalidated client-supplied redirect lets a
-   malicious client aim the code at itself.
+3. **The host MUST validate the `redirectUri`** on an `AuthFlowRequest` before
+   using it — loopback per RFC 8252 §7.3 (`http://127.0.0.1:<port>/…` or
+   `http://[::1]`) is the recommended default. An unvalidated client-supplied
+   redirect lets a malicious client aim the code at itself.
 4. **The host MUST validate `state`** on the callback and MUST reject a
    `authComplete` whose `callbackUri` state does not match its attempt.
 5. **`attemptId` is single-use.** The host MUST reject a second `authComplete`
@@ -1005,18 +1089,23 @@ just here:
      → revocation_endpoint                                  (RFC 7009)
    ```
 
-   The rule is scoped by {@link AccountOrigin} because not every credential is
-   the host's to invalidate:
+   The rule is scoped by how the host came to hold the credential, which it
+   knows without publishing it — not every credential is the host's to
+   invalidate:
 
-   - `origin: 'interactive'` — the host ran the flow and owns the grant. It
-     **SHOULD** revoke when the authorization server advertises a
-     `revocation_endpoint`, and MUST forget locally regardless of whether that
-     call succeeds.
-   - `origin: 'environment'` — an ambient credential (e.g. `GITHUB_TOKEN`, a
-     managed identity). The host did not mint it and other software may depend
-     on it, so it **MUST NOT** revoke; it only stops using it.
-   - `origin: 'pushed'` — supplied by a client via `authenticate`. It belongs to
-     that client, so the host **MUST NOT** revoke it.
+   - **The host ran the flow itself** and owns the grant. It **SHOULD** revoke
+     when the authorization server advertises a `revocation_endpoint`, and MUST
+     forget locally regardless of whether that call succeeds. `removable: true`.
+   - **An ambient credential** read from the host's environment. The host did
+     not mint it, other software may depend on it, and it will rediscover it on
+     the next start, so it **MUST NOT** revoke and MUST NOT pretend to have
+     forgotten it. `removable: false`.
+   - **A credential a client pushed** via `authenticate`. It belongs to that
+     client, so the host **MUST NOT** revoke it. `removable: false`.
+
+   Provenance stays host-internal on purpose. A client cannot act on *where* a
+   credential came from — only on whether signing out will do anything, which
+   is exactly what `HostAccount.removable` says.
 
    Revocation failure is invisible to the protocol on purpose: the account is
    removed either way, and the observable state is identical. Clients SHOULD
@@ -1200,8 +1289,38 @@ argument.
   multi-resource agent is disambiguated by `AccountConsumer` itself, not by a
   qualifier on the command (below).
 
+- **Flow descriptors are objects, and each carries what it needs.**
+  `AuthenticationCapability.flows` is `AuthFlowSupport[]` rather than
+  `AuthFlowKind[]`, so a flow can later advertise facts about itself — PKCE
+  methods, a required redirect scheme, a polling floor — without reshaping the
+  capability. On the request side `AuthFlowRequest` carries `redirectUri` inside
+  the authorization-code variant, which removes the last "required when another
+  field says so" from the surface: offering that flow without a redirect URI is
+  not expressible, and supplying one without offering the flow is not either.
+
+- **`AuthAttemptState` is discriminated by status, not by flow.** The conditional
+  fields are status-conditional — `accountId` exists exactly when an attempt
+  completed, `error` exactly when it failed — so status is the axis that makes
+  them honest, and it matches the repo's `*State` / `*Status` lifecycle naming.
+  Flow sub-discriminates only `Pending`, because once an attempt has settled
+  what its device code used to be is no longer actionable. The collection is
+  named `attempts`, not `pendingAuth`, since a settled attempt lands there
+  briefly on its way out.
+
+- **`HostAccount.removable` instead of an `origin` enum.** Rejected publishing
+  how the host came to hold a credential. Provenance is host-internal and a
+  client cannot act on it; the only part it can act on is whether signing out
+  will do anything, which is one boolean. The host still reasons from
+  provenance for its own revocation rules (§8.4) — it just doesn't put it on the
+  wire.
+
+- **`HostAccount.label` is required.** An account list a client cannot render is
+  useless, and every other field is optional or opaque. Where a provider gives
+  the host nothing to work with, a placeholder the host chose beats a blank row
+  the client has to invent.
+
 - **The host advertises flows; the client doesn't declare them** (§7).
-  `InitializeResult.hostAuth.flows` is the menu; the client names what it will
+  `InitializeResult.authentication.flows` is the menu; the client names what it will
   drive per attempt in `AuthBeginParams.flows`, which is where the decision
   actually matters. A `ClientCapabilities` declaration would be the same set
   twice, free to drift. Also rejected: walking every flow until one works, which
@@ -1253,9 +1372,10 @@ argument.
 
 - **The MCP consumer key is `(uri, name)`** (§7.2). `CustomizationBase.id` is
   session-unique and `uri` alone collides for inline declarations, so neither
-  works alone. Four known weaknesses are documented rather than hidden. Accepted
-  because it needs no change to a shared type and migrates cleanly if a
-  `stableId` lands later.
+  works alone. Accepted because it needs no change to a shared type and migrates
+  cleanly if a `stableId` lands later. Mostly a host implementation concern; the
+  two parts that belong in the spec are a URI normalization rule and a
+  don't-collect-on-absence rule.
 
 - **Device code before authorization code** (§7). Device code is the baseline
   every client can manage; authorization code is the local-rich-client
@@ -1264,9 +1384,10 @@ argument.
 - **Upstream revocation is host behaviour, not wire surface** (§8.4). Rejected a
   `revokeRemote` flag — it bends the "remove actions carry only the key" rule and
   asks clients to decide something they have no basis for — and rejected leaving
-  it unspecified. A **SHOULD** scoped by `origin` gives predictable behaviour with
-  zero new fields, since the host can already find `revocation_endpoint` via
-  RFC 9728 → 8414 → 7009. Failure stays invisible: the account is gone either way.
+  it unspecified. A **SHOULD** scoped by how the host got the credential gives
+  predictable behaviour with zero new wire fields, since the host can already
+  find `revocation_endpoint` via RFC 9728 → 8414 → 7009. Failure stays
+  invisible: the account is gone either way.
 
 - **Sign-out and cancel are actions, not commands** (§7). Both change a keyed
   collection and return nothing the caller can't read back from state, so they're
@@ -1275,7 +1396,7 @@ argument.
   state — and for `authComplete` that's a hard security requirement.
 
 - **`Set`/`Updated`/`Removed`, not full replacement.** `accounts`, `challenges`
-  and `pendingAuth` are all keyed collections. The `root/terminalsChanged`
+  and `attempts` are all keyed collections. The `root/terminalsChanged`
   full-replacement style is a catalogue exception, not the convention.
 
 - **Attempts in state, authorization URI not** (§7). Device codes are
@@ -1286,8 +1407,9 @@ argument.
   refusable separately from seeing root state.
 
 - **Pushed tokens MAY appear as accounts.** A host that also accepts
-  `authenticate` MAY show them as `origin: 'pushed'` so a client sees one picture.
-  It MUST NOT expose the token, and `accounts/removed` on one means "forget it."
+  `authenticate` MAY surface them so a client sees one picture. They are
+  `removable: false`, because the credential belongs to the client that pushed
+  it. The host MUST NOT expose the token.
 
 - **Offline access is host policy, not a field** (§5.5). Rejected three times over
   — as an `offlineAccess` request, a `renewable` fact, and a host capability flag.
@@ -1313,7 +1435,7 @@ argument.
   need persists, a device code dies in minutes — and a cancelled attempt leaves
   the need standing. Also many-to-many: one sign-in can clear several challenges,
   and flow 4 is an attempt with no challenge at all. Linked by
-  `AuthAttempt.challengeId`.
+  `AuthAttemptState.challengeId`.
 
 - **Challenges cover static requirements, not just failures** (§5.2). Flow 1
   decides it: on first run nothing has failed. Otherwise the most common flow in
@@ -1341,7 +1463,8 @@ argument.
 
 - **Whether `CustomizationBase` should gain a `stableId`.** Not a blocker — §7.2
   migrates by rewriting keys once. Worth raising anyway, since any cross-session
-  preference will want it and it retires three of §7.2's four weaknesses.
+  preference will want it, and it would retire the rename-and-move failure
+  §7.2 accepts.
 
 - **Whether `McpAuthRequiredReason` should be renamed.** §8.2 reuses it rather
   than minting a twin, but the `Mcp` prefix stops being accurate once agents raise
@@ -1380,7 +1503,7 @@ argument.
   host. It becomes a protocol question once [#259](https://github.com/microsoft/agent-host-protocol/issues/259) /
   [#266](https://github.com/microsoft/agent-host-protocol/issues/266) give clients verifiable identities.
 
-- **Whether `pendingAuth` needs per-attempt subscription.** If attempts get richer
+- **Whether `attempts` needs per-attempt subscription.** If attempts get richer
   (progress, multi-step), a per-attempt channel may beat a state array. Not needed
   for two flows.
 
