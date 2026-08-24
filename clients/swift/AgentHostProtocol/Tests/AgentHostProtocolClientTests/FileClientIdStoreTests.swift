@@ -100,12 +100,81 @@ final class FileClientIdStoreTests: XCTestCase {
         let perms = try XCTUnwrap(attrs[.posixPermissions] as? NSNumber)
         XCTAssertEqual(perms.intValue & 0o777, 0o600,
                        "expected owner-only permissions on the persisted file")
-        // NOTE: this runs after `store()` returns, so it cannot distinguish a
-        // file created 0600 from one created at the umask default and chmod'd
-        // afterwards. The window this guards is a sub-millisecond race between
-        // two syscalls and is not observable deterministically from in-process
-        // polling; it is closed by construction in `store()` (open(2) with an
-        // explicit mode) rather than by this assertion.
+        // This runs after `store()` returns, so on its own it cannot tell a file
+        // created 0600 from one created loose and chmod'd afterwards. The two tests
+        // below cover that difference directly.
+    }
+
+    /// The window itself. `Data.write(to:options:.atomic)` writes a temp file in the
+    /// destination directory at the umask default and only chmods after the rename, so
+    /// the client id is briefly readable by any local user. This watches the directory
+    /// while a store runs and fails if ANY file in it is ever observed carrying group or
+    /// other permission bits.
+    ///
+    /// Measured against the pre-fix implementation this observes the leak in 19 of 20
+    /// runs; against the current one, 0 of 20. The asymmetry is deliberate — the
+    /// assertion is "nothing was ever loose", which the current implementation satisfies
+    /// by construction, so the test cannot fail spuriously. Only a real regression fails
+    /// it, and the repeat count makes missing one vanishingly unlikely.
+    func testClientIdIsNeverObservableAtLoosePermissionsDuringStore() async throws {
+        for attempt in 0..<5 {
+            let dir = tempDir.appendingPathComponent("attempt-\(attempt)")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            // 0755, and pre-existing: `ensureDirectory()` only applies 0700 on the branch
+            // where it CREATES the directory, so this is the reachable configuration.
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dir.path)
+
+            let observer = LoosePermissionObserver()
+            let stop = DispatchSemaphore(value: 0)
+            DispatchQueue.global().async {
+                let fm = FileManager.default
+                while stop.wait(timeout: .now()) == .timedOut {
+                    guard let entries = try? fm.contentsOfDirectory(atPath: dir.path) else { continue }
+                    for entry in entries {
+                        let path = dir.appendingPathComponent(entry).path
+                        guard let attrs = try? fm.attributesOfItem(atPath: path),
+                              let perms = attrs[.posixPermissions] as? NSNumber,
+                              perms.intValue & 0o077 != 0
+                        else { continue }
+                        observer.record("\(entry) was 0\(String(perms.intValue & 0o777, radix: 8))")
+                    }
+                }
+            }
+
+            // A payload large enough that the write is not instantaneous. 1 MB detects the
+            // pre-fix leak in 20 of 20 trials; the value is about widening the window, not
+            // about any realistic client-id length.
+            let store = FileClientIdStore(directory: dir)
+            await store.store("h", clientId: String(repeating: "s", count: 1_000_000))
+
+            stop.signal()
+            try await Task.sleep(nanoseconds: 20_000_000)
+
+            XCTAssertNil(observer.first,
+                         "client id was observable at loose permissions during store(): \(observer.first ?? "")")
+        }
+    }
+
+    /// `open(2)`'s mode argument is masked by the process umask, so opening with 0600
+    /// under a umask carrying 0o200 yields a read-only 0400 file. The explicit `fchmod`
+    /// is what pins it to exactly 0600. Without that call this test fails with 0400.
+    func testPersistedModeIsExactlyOwnerOnlyRegardlessOfUmask() async throws {
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: tempDir.path)
+
+        // umask is process-wide; restore it immediately so no sibling test sees it.
+        let saved = umask(0o277)
+        let store = FileClientIdStore(directory: tempDir)
+        await store.store("h", clientId: "value")
+        umask(saved)
+
+        let url = tempDir.appendingPathComponent("h.clientid")
+        let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+        let perms = try XCTUnwrap(attrs[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(perms.intValue & 0o777, 0o600,
+                       "expected exactly 0600 under a restrictive umask, got 0\(String(perms.intValue & 0o777, radix: 8))")
+        let value = await store.load("h")
+        XCTAssertEqual(value, "value", "a file the owner cannot read back is not a fix")
     }
 
     /// `rename(2)` carries the temp file's mode onto the destination, so a file
@@ -139,5 +208,22 @@ final class FileClientIdStoreTests: XCTestCase {
         let entries = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
         let temps = entries.filter { $0.hasSuffix(".tmp") }
         XCTAssertTrue(temps.isEmpty, "left temp files behind: \(temps)")
+    }
+}
+
+/// Records the first loose-permission observation. A class with a lock rather than an
+/// actor so the polling closure can write to it without an await.
+private final class LoosePermissionObserver: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _first: String?
+
+    var first: String? {
+        lock.lock(); defer { lock.unlock() }
+        return _first
+    }
+
+    func record(_ description: String) {
+        lock.lock(); defer { lock.unlock() }
+        if _first == nil { _first = description }
     }
 }

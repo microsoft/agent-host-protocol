@@ -26,7 +26,8 @@ the tag matches the version pinned in [`VERSION`](VERSION).
   window between the write and the `chmod`. The store's own `0700` on its
   directory did not cover this, because it is only applied on the branch that
   creates the directory. A file left at looser permissions by an earlier version
-  is repaired by the next store.
+  is repaired by the next store. The mode is pinned with `fchmod`, which the umask
+  does not mask, so a umask carrying `0o200` cannot leave the file read-only.
 
 ## [0.8.0] — 2026-08-17
 

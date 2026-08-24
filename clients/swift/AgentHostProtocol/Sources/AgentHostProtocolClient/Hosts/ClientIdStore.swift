@@ -145,6 +145,13 @@ public final class FileClientIdStore: ClientIdStore {
                 #endif
                 return
             }
+            // open(2)'s mode argument is masked by the process umask, so a umask
+            // carrying 0o200 would leave the file read-only (0o400) and a stricter one
+            // could strip owner access entirely. fchmod is not masked, so it pins the
+            // mode to exactly 0o600 — the guarantee the previous chmod-after-write
+            // shape did provide, kept here without reopening the window it left. This
+            // mirrors the netstandard2.0 leg of the .NET fix in #411.
+            _ = fchmod(fd, 0o600)
 
             var written = 0
             data.withUnsafeBytes { buffer in
