@@ -17,6 +17,17 @@ the tag matches the version pinned in [`VERSION`](VERSION).
 
 ## [Unreleased]
 
+### Security
+
+- `FileClientIdStore` creates its temp file with owner-only permissions before
+  writing the client id, then renames it into place, instead of writing at the
+  umask default and restricting permissions afterwards. On the first store for a
+  host id the persisted file was previously readable by other local users for the
+  window between the write and the `chmod`. The store's own `0700` on its
+  directory did not cover this, because it is only applied on the branch that
+  creates the directory. A file left at looser permissions by an earlier version
+  is repaired by the next store.
+
 ## [0.8.0] — 2026-08-17
 
 Implements AHP 0.8.0.

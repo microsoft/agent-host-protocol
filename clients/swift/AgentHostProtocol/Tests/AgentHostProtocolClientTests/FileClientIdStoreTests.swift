@@ -89,18 +89,55 @@ final class FileClientIdStoreTests: XCTestCase {
     }
 
     func testFileIsRestrictedToOwnerWhenPossible() async throws {
-        // Smoke test for the perm-restriction code path on POSIX
-        // platforms. We don't assert on non-POSIX file systems where
-        // this is a no-op.
         let store = FileClientIdStore(directory: tempDir)
         await store.store("h", clientId: "value")
 
         let url = tempDir.appendingPathComponent("h.clientid")
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-           let perms = attrs[.posixPermissions] as? NSNumber {
-            // 0o600 = 384
-            XCTAssertEqual(perms.intValue & 0o777, 0o600,
-                           "expected owner-only permissions on the persisted file")
+        // Assert unconditionally. This used to be wrapped in `if let attrs = try?`
+        // with no `else`, so a failure to read the attributes passed the test
+        // silently rather than failing it.
+        let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+        let perms = try XCTUnwrap(attrs[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(perms.intValue & 0o777, 0o600,
+                       "expected owner-only permissions on the persisted file")
+        // NOTE: this runs after `store()` returns, so it cannot distinguish a
+        // file created 0600 from one created at the umask default and chmod'd
+        // afterwards. The window this guards is a sub-millisecond race between
+        // two syscalls and is not observable deterministically from in-process
+        // polling; it is closed by construction in `store()` (open(2) with an
+        // explicit mode) rather than by this assertion.
+    }
+
+    /// `rename(2)` carries the temp file's mode onto the destination, so a file
+    /// left at loose permissions by an older build is repaired by the next store
+    /// rather than kept.
+    func testStoreRepairsPreExistingLoosePermissions() async throws {
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let url = tempDir.appendingPathComponent("h.clientid")
+        XCTAssertTrue(FileManager.default.createFile(
+            atPath: url.path,
+            contents: Data("stale".utf8),
+            attributes: [.posixPermissions: 0o644]))
+
+        let store = FileClientIdStore(directory: tempDir)
+        await store.store("h", clientId: "fresh")
+
+        let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+        let perms = try XCTUnwrap(attrs[.posixPermissions] as? NSNumber)
+        XCTAssertEqual(perms.intValue & 0o777, 0o600,
+                       "a pre-existing 0644 client-id file should be repaired to 0600")
+        let value = await store.load("h")
+        XCTAssertEqual(value, "fresh")
+    }
+
+    /// A failed or interrupted store must not leave its temp file behind.
+    func testNoTempFilesLeftBehind() async throws {
+        let store = FileClientIdStore(directory: tempDir)
+        for i in 0..<8 {
+            await store.store(HostId("h-\(i)"), clientId: "id-\(i)")
         }
+        let entries = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
+        let temps = entries.filter { $0.hasSuffix(".tmp") }
+        XCTAssertTrue(temps.isEmpty, "left temp files behind: \(temps)")
     }
 }
