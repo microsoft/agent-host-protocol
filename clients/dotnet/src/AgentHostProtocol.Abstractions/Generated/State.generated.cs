@@ -1078,7 +1078,7 @@ public sealed record ConfigPropertySchema
 public sealed record ConfigSchema
 {
     /// <summary>JSON Schema: always `'object'`</summary>
-    public required string Type { get; init; }
+    public string Type { get; init; } = "object";
 
     /// <summary>JSON Schema: property descriptors keyed by property id</summary>
     public required Dictionary<string, ConfigPropertySchema> Properties { get; init; }
@@ -1275,7 +1275,7 @@ public sealed record ChatInputTextQuestion
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
 
-    public ChatInputQuestionKind Kind { get; init; }
+    public ChatInputQuestionKind Kind { get; init; } = ChatInputQuestionKind.Text;
 
     /// <summary>Format hint for text questions, such as `email`, `uri`, `date`, or `date-time`</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1343,7 +1343,7 @@ public sealed record ChatInputBooleanQuestion
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
 
-    public ChatInputQuestionKind Kind { get; init; }
+    public ChatInputQuestionKind Kind { get; init; } = ChatInputQuestionKind.Boolean;
 
     /// <summary>Default boolean value</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1367,7 +1367,7 @@ public sealed record ChatInputSingleSelectQuestion
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
 
-    public ChatInputQuestionKind Kind { get; init; }
+    public ChatInputQuestionKind Kind { get; init; } = ChatInputQuestionKind.SingleSelect;
 
     /// <summary>Options the user may select from</summary>
     public required List<ChatInputOption> Options { get; init; }
@@ -1394,7 +1394,7 @@ public sealed record ChatInputMultiSelectQuestion
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
 
-    public ChatInputQuestionKind Kind { get; init; }
+    public ChatInputQuestionKind Kind { get; init; } = ChatInputQuestionKind.MultiSelect;
 
     /// <summary>Options the user may select from</summary>
     public required List<ChatInputOption> Options { get; init; }
@@ -1442,28 +1442,28 @@ public sealed class ChatInputRequest
 /// <summary>Value captured for one answer.</summary>
 public sealed record ChatInputTextAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.Text;
 
     public required string Value { get; init; }
 }
 
 public sealed record ChatInputNumberAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.Number;
 
     public double Value { get; init; }
 }
 
 public sealed record ChatInputBooleanAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.Boolean;
 
     public bool Value { get; init; }
 }
 
 public sealed record ChatInputSelectedAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.Selected;
 
     public required string Value { get; init; }
 
@@ -1474,7 +1474,7 @@ public sealed record ChatInputSelectedAnswerValue
 
 public sealed record ChatInputSelectedManyAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.SelectedMany;
 
     public required List<string> Value { get; init; }
 
@@ -1495,7 +1495,7 @@ public sealed record ChatInputAnswered
 public sealed record ChatInputSkipped
 {
     /// <summary>Answer state</summary>
-    public ChatInputAnswerState State { get; init; }
+    public ChatInputAnswerState State { get; init; } = ChatInputAnswerState.Skipped;
 
     /// <summary>Free-form reason or value captured while skipping, if any</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1695,7 +1695,7 @@ public sealed record SessionChatInputRequest
     /// chat first.</summary>
     public required string Chat { get; init; }
 
-    public SessionInputRequestKind Kind { get; init; }
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ChatInput;
 
     /// <summary>The mirrored chat input request.</summary>
     public required ChatInputRequest Request { get; init; }
@@ -1723,7 +1723,7 @@ public sealed record SessionToolConfirmationRequest
     /// chat first.</summary>
     public required string Chat { get; init; }
 
-    public SessionInputRequestKind Kind { get; init; }
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ToolConfirmation;
 
     /// <summary>The turn the tool call belongs to.</summary>
     public required string TurnId { get; init; }
@@ -1763,7 +1763,7 @@ public sealed record SessionToolClientExecutionRequest
     /// chat first.</summary>
     public required string Chat { get; init; }
 
-    public SessionInputRequestKind Kind { get; init; }
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ToolClientExecution;
 
     /// <summary>The turn the tool call belongs to.</summary>
     public required string TurnId { get; init; }
@@ -1804,7 +1804,7 @@ public sealed record SessionToolAuthenticationRequest
     /// chat first.</summary>
     public required string Chat { get; init; }
 
-    public SessionInputRequestKind Kind { get; init; }
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ToolAuthentication;
 
     /// <summary>The turn the tool call belongs to.</summary>
     public required string TurnId { get; init; }
@@ -2009,7 +2009,7 @@ public sealed record SessionConfigPropertySchema
 public sealed record SessionConfigSchema
 {
     /// <summary>JSON Schema: always `'object'`</summary>
-    public required string Type { get; init; }
+    public string Type { get; init; } = "object";
 
     /// <summary>JSON Schema: property descriptors keyed by property id</summary>
     public required Dictionary<string, SessionConfigPropertySchema> Properties { get; init; }
@@ -2234,7 +2234,7 @@ public sealed record SimpleMessageAttachment
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Simple;
 
     /// <summary>Representation of the attachment as it should be shown to the model.
     ///
@@ -2285,7 +2285,7 @@ public sealed record MessageEmbeddedResourceAttachment
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.EmbeddedResource;
 
     /// <summary>Base64-encoded binary data</summary>
     public required string Data { get; init; }
@@ -2352,7 +2352,7 @@ public sealed record MessageResourceAttachment
     public string? Nonce { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Resource;
 
     /// <summary>Optional selection within the referenced textual resource.
     ///
@@ -2402,7 +2402,7 @@ public sealed record MessageAnnotationsAttachment
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Annotations;
 
     /// <summary>The annotations channel URI (typically `ahp-session:/&lt;uuid&gt;/annotations`).
     /// Matches {@link AnnotationsSummary.resource}.</summary>
@@ -2469,7 +2469,7 @@ public sealed record MessageChatAttachment
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Chat;
 
     /// <summary>URI of the referenced chat.</summary>
     public required string Resource { get; init; }
@@ -2483,7 +2483,7 @@ public sealed record MessageChatAttachment
 public sealed class MarkdownResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; set; }
+    public ResponsePartKind Kind { get; set; } = ResponsePartKind.Markdown;
 
     /// <summary>Part identifier, used by `chat/delta` to target this part for content appends</summary>
     public required string Id { get; set; }
@@ -2530,7 +2530,7 @@ public sealed record ResourceResponsePart
     public string? Nonce { get; init; }
 
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; init; }
+    public ResponsePartKind Kind { get; init; } = ResponsePartKind.ContentRef;
 }
 
 /// <summary>A tool call represented as a response part.
@@ -2541,7 +2541,7 @@ public sealed record ResourceResponsePart
 public sealed class ToolCallResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; set; }
+    public ResponsePartKind Kind { get; set; } = ResponsePartKind.ToolCall;
 
     /// <summary>Full tool call lifecycle state</summary>
     public required ToolCallState ToolCall { get; set; }
@@ -2551,7 +2551,7 @@ public sealed class ToolCallResponsePart
 public sealed class ReasoningResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; set; }
+    public ResponsePartKind Kind { get; set; } = ResponsePartKind.Reasoning;
 
     /// <summary>Part identifier, used by `chat/reasoning` to target this part for content appends</summary>
     public required string Id { get; set; }
@@ -2569,7 +2569,7 @@ public sealed class ReasoningResponsePart
 public sealed record SystemNotificationResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; init; }
+    public ResponsePartKind Kind { get; init; } = ResponsePartKind.SystemNotification;
 
     /// <summary>The text of the system notification</summary>
     public required StringOrMarkdown Content { get; init; }
@@ -2599,7 +2599,7 @@ public sealed record SystemNotificationResponsePart
 public sealed record InputRequestResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; init; }
+    public ResponsePartKind Kind { get; init; } = ResponsePartKind.InputRequest;
 
     /// <summary>The request, carrying its `id`, `message`, `url`, `questions`, and current
     /// draft or submitted `answers`.</summary>
@@ -2665,7 +2665,7 @@ public sealed record ToolCallRiskAssessmentLoadingState
 {
     public ToolCallRiskAssessmentKind Kind { get; init; }
 
-    public ToolCallRiskAssessmentStatus Status { get; init; }
+    public ToolCallRiskAssessmentStatus Status { get; init; } = ToolCallRiskAssessmentStatus.Loading;
 }
 
 /// <summary>The model judge has completed its evaluation.</summary>
@@ -2673,7 +2673,7 @@ public sealed record ToolCallRiskAssessmentCompleteState
 {
     public ToolCallRiskAssessmentKind Kind { get; init; }
 
-    public ToolCallRiskAssessmentStatus Status { get; init; }
+    public ToolCallRiskAssessmentStatus Status { get; init; } = ToolCallRiskAssessmentStatus.Complete;
 
     public required StringOrMarkdown Reason { get; init; }
 
@@ -2710,7 +2710,7 @@ public sealed class ToolCallStreamingState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
 
-    public ToolCallStatus Status { get; set; }
+    public ToolCallStatus Status { get; set; } = ToolCallStatus.Streaming;
 
     /// <summary>Partial parameters accumulated from tool-call deltas.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2763,7 +2763,7 @@ public sealed record ToolCallPendingConfirmationState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ToolInput? ToolInput { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.PendingConfirmation;
 
     /// <summary>Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2837,7 +2837,7 @@ public sealed class ToolCallRunningState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; set; }
 
-    public ToolCallStatus Status { get; set; }
+    public ToolCallStatus Status { get; set; } = ToolCallStatus.Running;
 
     /// <summary>Partial content produced while the tool is still executing.
     ///
@@ -2920,7 +2920,7 @@ public sealed record ToolCallAuthRequiredState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.AuthRequired;
 
     /// <summary>The authentication challenge blocking this invocation.</summary>
     public required McpAuthRequirement Auth { get; init; }
@@ -3000,7 +3000,7 @@ public sealed record ToolCallPendingResultConfirmationState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.PendingResultConfirmation;
 }
 
 /// <summary>Tool completed successfully or with an error.</summary>
@@ -3073,7 +3073,7 @@ public sealed record ToolCallCompletedState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.Completed;
 }
 
 /// <summary>Tool call was cancelled before execution.</summary>
@@ -3117,7 +3117,7 @@ public sealed record ToolCallCancelledState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ToolInput? ToolInput { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.Cancelled;
 
     /// <summary>Why the tool was cancelled</summary>
     public ToolCallCancellationReason Reason { get; init; }
@@ -3206,7 +3206,7 @@ public sealed record ToolAnnotations
 /// Mirrors MCP `TextContent`.</summary>
 public sealed record ToolResultTextContent
 {
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.Text;
 
     /// <summary>The text content</summary>
     public required string Text { get; init; }
@@ -3217,7 +3217,7 @@ public sealed record ToolResultTextContent
 /// Mirrors MCP `EmbeddedResource` for inline binary data.</summary>
 public sealed record ToolResultEmbeddedResourceContent
 {
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.EmbeddedResource;
 
     /// <summary>Base64-encoded data</summary>
     public required string Data { get; init; }
@@ -3246,7 +3246,7 @@ public sealed record ToolResultResourceContent
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
 
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.Resource;
 }
 
 /// <summary>Describes a file modification performed by a tool.</summary>
@@ -3264,7 +3264,7 @@ public sealed record ToolResultFileEditContent
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? Diff { get; init; }
 
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.FileEdit;
 }
 
 /// <summary>A reference to a terminal whose output is relevant to this tool result.
@@ -3278,7 +3278,7 @@ public sealed record ToolResultFileEditContent
 /// running afterwards.</summary>
 public sealed record ToolResultTerminalContent
 {
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.Terminal;
 
     /// <summary>Terminal URI (subscribable for full terminal state)</summary>
     public required string Resource { get; init; }
@@ -3325,7 +3325,7 @@ public sealed record TerminalCommandResult
 /// whose `toolCallId` identifies the tool call that emitted this content.</summary>
 public sealed record ToolResultSubagentContent
 {
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.Subagent;
 
     /// <summary>Worker chat URI (subscribable for full chat state)</summary>
     public required string Resource { get; init; }
@@ -3345,19 +3345,19 @@ public sealed record ToolResultSubagentContent
 /// <summary>Container is being loaded by the host.</summary>
 public sealed record CustomizationLoadingState
 {
-    public CustomizationLoadStatus Kind { get; init; }
+    public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Loading;
 }
 
 /// <summary>Container loaded successfully.</summary>
 public sealed record CustomizationLoadedState
 {
-    public CustomizationLoadStatus Kind { get; init; }
+    public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Loaded;
 }
 
 /// <summary>Container partially loaded but has warnings.</summary>
 public sealed record CustomizationDegradedState
 {
-    public CustomizationLoadStatus Kind { get; init; }
+    public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Degraded;
 
     /// <summary>Human-readable description of the warning.</summary>
     public required string Message { get; init; }
@@ -3366,7 +3366,7 @@ public sealed record CustomizationDegradedState
 /// <summary>Container failed to load.</summary>
 public sealed record CustomizationErrorState
 {
-    public CustomizationLoadStatus Kind { get; init; }
+    public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Error;
 
     /// <summary>Human-readable error message.</summary>
     public required string Message { get; init; }
@@ -3430,7 +3430,7 @@ public sealed class PluginCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ChildCustomization>? Children { get; set; }
 
-    public CustomizationType Type { get; set; }
+    public CustomizationType Type { get; set; } = CustomizationType.Plugin;
 
     /// <summary>Explicit enablement decisions. See {@link McpServerCustomization.enablement}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3512,7 +3512,7 @@ public sealed record ClientPluginCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ChildCustomization>? Children { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Plugin;
 
     /// <summary>Explicit enablement decisions. See {@link McpServerCustomization.enablement}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3609,7 +3609,7 @@ public sealed class DirectoryCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ChildCustomization>? Children { get; set; }
 
-    public CustomizationType Type { get; set; }
+    public CustomizationType Type { get; set; } = CustomizationType.Directory;
 
     /// <summary>Whether this container is currently enabled.</summary>
     public bool Enabled { get; set; }
@@ -3680,7 +3680,7 @@ public sealed record AgentCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Agent;
 
     /// <summary>Short description of what the agent specializes in and when to
     /// invoke it. Sourced from the agent file's frontmatter `description`.</summary>
@@ -3776,7 +3776,7 @@ public sealed record SkillCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Skill;
 
     /// <summary>Short description used for help text and auto-invocation matching.
     /// Sourced from the skill's frontmatter `description`.</summary>
@@ -3851,7 +3851,7 @@ public sealed record PromptCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Prompt;
 
     /// <summary>Short description of what the prompt does.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3921,7 +3921,7 @@ public sealed record RuleCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Rule;
 
     /// <summary>Description of what the rule enforces.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3994,7 +3994,7 @@ public sealed record HookCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Hook;
 }
 
 /// <summary>An MCP server contributed by a plugin or directory.
@@ -4044,7 +4044,7 @@ public sealed class McpServerCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
 
-    public CustomizationType Type { get; set; }
+    public CustomizationType Type { get; set; } = CustomizationType.McpServer;
 
     /// <summary>Explicit enablement decisions for this customization, one entry per scope
     /// that has one. This is a wire contract: producers MUST publish entries
@@ -4159,13 +4159,13 @@ public sealed record AhpMcpUiHostCapabilities
 /// <summary>Server is registered with the host but has not yet started.</summary>
 public sealed record McpServerStartingState
 {
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.Starting;
 }
 
 /// <summary>Server is running and serving requests.</summary>
 public sealed record McpServerReadyState
 {
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.Ready;
 }
 
 /// <summary>A pre-registered OAuth client that clients use instead of dynamic client
@@ -4276,7 +4276,7 @@ public sealed record McpServerAuthRequiredState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
 
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.AuthRequired;
 }
 
 /// <summary>Server failed to start, crashed, or otherwise transitioned to a
@@ -4284,7 +4284,7 @@ public sealed record McpServerAuthRequiredState
 /// for authentication failures.</summary>
 public sealed record McpServerErrorState
 {
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.Error;
 
     /// <summary>Error details.</summary>
     public required ErrorInfo Error { get; init; }
@@ -4294,12 +4294,12 @@ public sealed record McpServerErrorState
 /// session entirely shortly after this state.</summary>
 public sealed record McpServerStoppedState
 {
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.Stopped;
 }
 
 public sealed record ToolCallClientContributor
 {
-    public ToolCallContributorKind Kind { get; init; }
+    public ToolCallContributorKind Kind { get; init; } = ToolCallContributorKind.Client;
 
     /// <summary>If this tool is provided by a client, the `clientId` of the owning client.
     /// Absent for server-side tools.
@@ -4311,7 +4311,7 @@ public sealed record ToolCallClientContributor
 
 public sealed record ToolCallMcpContributor
 {
-    public ToolCallContributorKind Kind { get; init; }
+    public ToolCallContributorKind Kind { get; init; } = ToolCallContributorKind.MCP;
 
     /// <summary>Customization ID of the corresponding MCP server in {@link SessionState.customizations}.</summary>
     public required string CustomizationId { get; init; }
@@ -4356,7 +4356,7 @@ public sealed record TerminalInfo
 public sealed record TerminalClientClaim
 {
     /// <summary>Discriminant</summary>
-    public TerminalClaimKind Kind { get; init; }
+    public TerminalClaimKind Kind { get; init; } = TerminalClaimKind.Client;
 
     /// <summary>The `clientId` of the claiming client</summary>
     public required string ClientId { get; init; }
@@ -4366,7 +4366,7 @@ public sealed record TerminalClientClaim
 public sealed record TerminalSessionClaim
 {
     /// <summary>Discriminant</summary>
-    public TerminalClaimKind Kind { get; init; }
+    public TerminalClaimKind Kind { get; init; } = TerminalClaimKind.Session;
 
     /// <summary>Session URI that claimed the terminal</summary>
     public required string Session { get; init; }
@@ -4435,7 +4435,7 @@ public sealed class TerminalState
 /// or from terminals that do not support command detection.</summary>
 public sealed class TerminalUnclassifiedPart
 {
-    public required string Type { get; set; }
+    public string Type { get; set; } = "unclassified";
 
     /// <summary>Accumulated VT output. Appended to by `terminal/data` when no command is executing.</summary>
     public required string Value { get; set; }
@@ -4448,7 +4448,7 @@ public sealed class TerminalUnclassifiedPart
 /// is mutated in-place with `isComplete: true` and the completion metadata.</summary>
 public sealed class TerminalCommandPart
 {
-    public required string Type { get; set; }
+    public string Type { get; set; } = "command";
 
     /// <summary>Stable id matching the `commandId` on the corresponding
     /// `terminal/commandExecuted` and `terminal/commandFinished` actions.</summary>
@@ -4942,7 +4942,7 @@ public sealed record AnnotationEntry
 /// for this session's transcript, tools, confirmations, and changes.</summary>
 public sealed record AutomationSessionOrigin
 {
-    public SessionOriginKind Kind { get; init; }
+    public SessionOriginKind Kind { get; init; } = SessionOriginKind.Automation;
 
     /// <summary>Owning {@link AutomationState.resource}.</summary>
     public required string Automation { get; init; }
@@ -4954,13 +4954,13 @@ public sealed record AutomationSessionOrigin
 /// <summary>A terminal process that is still running.</summary>
 public sealed record TerminalRunningLifecycleState
 {
-    public TerminalLifecycleStatus Status { get; init; }
+    public TerminalLifecycleStatus Status { get; init; } = TerminalLifecycleStatus.Running;
 }
 
 /// <summary>A terminal process that has exited.</summary>
 public sealed record TerminalExitedLifecycleState
 {
-    public TerminalLifecycleStatus Status { get; init; }
+    public TerminalLifecycleStatus Status { get; init; } = TerminalLifecycleStatus.Exited;
 
     /// <summary>Process exit code, if the runtime reported one.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -5008,7 +5008,7 @@ public sealed record AutomationScheduleTrigger
     /// run.</summary>
     public required string Id { get; init; }
 
-    public AutomationTriggerKind Kind { get; init; }
+    public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.Schedule;
 
     /// <summary>Recurrence and time zone evaluated by the host.</summary>
     public required AutomationSchedule Schedule { get; init; }
@@ -5033,7 +5033,7 @@ public sealed record AutomationEventTrigger
     /// run.</summary>
     public required string Id { get; init; }
 
-    public AutomationTriggerKind Kind { get; init; }
+    public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.Event;
 
     /// <summary>Matches {@link AutomationTriggerDefinition.type}.</summary>
     public required string Type { get; init; }
@@ -5259,13 +5259,13 @@ public sealed class AutomationCatalogState
 /// <summary>Origin recorded for a client-requested manual run.</summary>
 public sealed record AutomationManualRunOrigin
 {
-    public AutomationRunOriginKind Kind { get; init; }
+    public AutomationRunOriginKind Kind { get; init; } = AutomationRunOriginKind.Manual;
 }
 
 /// <summary>Origin recorded for a run created by one of the automation's triggers.</summary>
 public sealed record AutomationTriggeredRunOrigin
 {
-    public AutomationRunOriginKind Kind { get; init; }
+    public AutomationRunOriginKind Kind { get; init; } = AutomationRunOriginKind.Trigger;
 
     /// <summary>Matches the stable {@link AutomationScheduleTrigger.id} or
     /// {@link AutomationEventTrigger.id} in the definition.</summary>
@@ -5290,7 +5290,7 @@ public sealed record AutomationTriggeredRunOrigin
 /// <summary>A durable run exists but has not begun external execution.</summary>
 public sealed record AutomationPendingRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Pending;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5303,7 +5303,7 @@ public sealed record AutomationPendingRunLifecycle
 /// required.</summary>
 public sealed record AutomationRunningRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Running;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5315,7 +5315,7 @@ public sealed record AutomationRunningRunLifecycle
 /// <summary>Terminal lifecycle for a successfully completed run.</summary>
 public sealed record AutomationCompletedRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Completed;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5337,7 +5337,7 @@ public sealed record AutomationCompletedRunLifecycle
 /// session-template validation or workspace preparation.</summary>
 public sealed record AutomationFailedRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Failed;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5359,7 +5359,7 @@ public sealed record AutomationFailedRunLifecycle
 /// pending.</summary>
 public sealed record AutomationCancelledRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Cancelled;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }

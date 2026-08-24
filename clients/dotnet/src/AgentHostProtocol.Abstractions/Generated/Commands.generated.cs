@@ -351,7 +351,7 @@ public sealed record ReconnectParams
 public sealed record ReconnectReplayResult
 {
     /// <summary>Discriminant</summary>
-    public ReconnectResultType Type { get; init; }
+    public ReconnectResultType Type { get; init; } = ReconnectResultType.Replay;
 
     /// <summary>Missed action envelopes since `lastSeenServerSeq`</summary>
     public required List<ActionEnvelope> Actions { get; init; }
@@ -367,7 +367,7 @@ public sealed record ReconnectReplayResult
 public sealed record ReconnectSnapshotResult
 {
     /// <summary>Discriminant</summary>
-    public ReconnectResultType Type { get; init; }
+    public ReconnectResultType Type { get; init; } = ReconnectResultType.Snapshot;
 
     /// <summary>Fresh snapshots for each subscription</summary>
     public required List<Snapshot> Snapshots { get; init; }
@@ -531,7 +531,7 @@ public sealed record DisposeSessionParams
 public sealed record ForkChatSource
 {
     /// <summary>Discriminant</summary>
-    public ChatSourceKind Kind { get; init; }
+    public ChatSourceKind Kind { get; init; } = ChatSourceKind.Fork;
 
     /// <summary>URI of the existing source chat.</summary>
     public required string Chat { get; init; }
@@ -547,7 +547,7 @@ public sealed record ForkChatSource
 public sealed record SideChatSource
 {
     /// <summary>Discriminant</summary>
-    public ChatSourceKind Kind { get; init; }
+    public ChatSourceKind Kind { get; init; } = ChatSourceKind.SideChat;
 
     /// <summary>URI of the existing source chat.</summary>
     public required string Chat { get; init; }

@@ -237,6 +237,13 @@ interface CsProp {
   doc: string;
   isLiteralDiscriminant: boolean;
   literalValue?: string;
+  /**
+   * The C# expression a literal discriminant initializes to — `ActionType.RootAgentsChanged`
+   * for an enum-member discriminant, `"user"` for a string-literal one. Undefined for a
+   * discriminant whose TS type is a UNION of enum members: those have no single correct
+   * value, so they must stay uninitialized.
+   */
+  literalInit?: string;
 }
 
 function getPropertyType(prop: PropertySignature): string {
@@ -324,6 +331,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
     const stringLiteral = tsType.match(/^'([^']+)'$/);
     let isLiteralDiscriminant = false;
     let literalValue: string | undefined;
+    let literalInit: string | undefined;
 
     const tsPropLower = tsName.toLowerCase();
     if (['type', 'kind', 'status', 'state'].includes(tsPropLower)) {
@@ -336,11 +344,16 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
           if (mem) {
             isLiteralDiscriminant = true;
             literalValue = String(mem.getValue());
+            // The C# enum mirrors the TS enum's NAME (generateStringEnum emits
+            // `mem.getName()`), while literalValue holds the WIRE value. The
+            // initializer needs the former.
+            literalInit = `${enumName}.${memberName}`;
           }
         }
       } else if (stringLiteral) {
         isLiteralDiscriminant = true;
         literalValue = stringLiteral[1];
+        literalInit = JSON.stringify(stringLiteral[1]);
       } else if (/^\w+\.\w+(\s*\|\s*\w+\.\w+)+$/.test(tsType)) {
         isLiteralDiscriminant = true;
       }
@@ -366,6 +379,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
       doc: getPropertyDoc(p),
       isLiteralDiscriminant,
       literalValue,
+      literalInit,
     });
   }
   return result;
@@ -543,8 +557,18 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
       lines.push('    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]');
       csType = `${csType}?`;
     }
-    const def = csPropDefault(p.csType, p.optional);
-    const req = csRequiredModifier(p.csType, p.optional);
+    // A literal discriminant initializes to its own constant. Without this the
+    // property falls back to `default(T)`, and because the C# enums are ordinary
+    // (non-flags) enums whose zero value is a real member, that silently produces a
+    // VALID BUT WRONG discriminant on the wire — e.g. every uninitialised action
+    // serialising as the first ActionType member. Emitting the initializer is also
+    // why `required` is dropped here: requiring callers to set a constant is the
+    // very thing being fixed.
+    const discriminantInit = p.isLiteralDiscriminant && p.literalInit
+      ? ` = ${p.literalInit};`
+      : undefined;
+    const def = discriminantInit ?? csPropDefault(p.csType, p.optional);
+    const req = discriminantInit ? '' : csRequiredModifier(p.csType, p.optional);
     lines.push(`    public ${req}${csType} ${p.csName} { ${accessor} }${def}`);
   });
   lines.push('}');
