@@ -62,3 +62,14 @@ func TestMultiHostStateMirrorDropResourceRemovesAutomationCatalogue(t *testing.T
 		t.Error("automation run for dropped resource was retained")
 	}
 }
+
+func TestMultiHostStateMirrorDropResourceRemovesTunnelCatalogue(t *testing.T) {
+	mirror := NewMultiHostStateMirror()
+	mirror.PutTunnelCatalog("host", ahptypes.TunnelsState{})
+
+	mirror.DropResource("host", "ahp-tunnels://")
+
+	if _, ok := mirror.TunnelCatalog("host"); ok {
+		t.Error("tunnels state for dropped resource was retained")
+	}
+}

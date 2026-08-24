@@ -10,6 +10,7 @@ import com.microsoft.agenthostprotocol.generated.RootState
 import com.microsoft.agenthostprotocol.generated.SessionState
 import com.microsoft.agenthostprotocol.generated.StateAction
 import com.microsoft.agenthostprotocol.generated.TerminalState
+import com.microsoft.agenthostprotocol.generated.TunnelsState
 import java.io.File
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
@@ -196,6 +197,18 @@ class FixtureDrivenReducerTest {
                 run = { state ->
                     var s = state
                     for (action in actions) s = resourceWatchReducer(s, action)
+                    s
+                },
+            )
+
+            "tunnel" -> compareFixture(
+                file = file,
+                initial = initial,
+                expected = expected,
+                serializer = TunnelsState.serializer(),
+                run = { state ->
+                    var s = state
+                    for (action in actions) s = tunnelReducer(s, action)
                     s
                 },
             )

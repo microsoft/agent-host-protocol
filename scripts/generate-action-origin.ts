@@ -17,7 +17,7 @@ const GENERATED_HEADER = `// Generated from types/actions.ts — do not edit
 // Run \`npm run generate\` to regenerate.
 `;
 
-type ActionScope = 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+type ActionScope = 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun' | 'tunnel';
 
 interface ActionInfo {
   /** The interface name (e.g. 'RootAgentsChangedAction') */
@@ -157,6 +157,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
       : category === 'Resource Watch Actions' ? 'resourceWatch'
       : category === 'Automation Actions' ? 'automation'
       : category === 'Automation Run Actions' ? 'automationRun'
+      : category === 'Tunnel Actions' ? 'tunnel'
       : 'session';
     const isClientDispatchable = hasJsDocTag(node as any, 'clientDispatchable');
 
@@ -211,6 +212,7 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const resourceWatchActions = actions.filter(a => a.scope === 'resourceWatch');
   const automationActions = actions.filter(a => a.scope === 'automation');
   const automationRunActions = actions.filter(a => a.scope === 'automationRun');
+  const tunnelActions = actions.filter(a => a.scope === 'tunnel');
   const clientRootActions = rootActions.filter(a => a.isClientDispatchable);
   const serverRootActions = rootActions.filter(a => !a.isClientDispatchable);
   const clientSessionActions = sessionActions.filter(a => a.isClientDispatchable);
@@ -229,6 +231,8 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const serverAutomationActions = automationActions.filter(a => !a.isClientDispatchable);
   const clientAutomationRunActions = automationRunActions.filter(a => a.isClientDispatchable);
   const serverAutomationRunActions = automationRunActions.filter(a => !a.isClientDispatchable);
+  const clientTunnelActions = tunnelActions.filter(a => a.isClientDispatchable);
+  const serverTunnelActions = tunnelActions.filter(a => !a.isClientDispatchable);
 
   const lines: string[] = [GENERATED_HEADER];
 
@@ -516,6 +520,35 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   lines.push(`export type ServerAutomationRunAction =`);
   for (const a of serverAutomationRunActions) {
     lines.push(`  | ${a.name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  // TunnelAction
+  lines.push(`/** Union of all tunnel-catalogue actions. */`);
+  lines.push(`export type TunnelAction =`);
+  for (const a of tunnelActions) {
+    lines.push(`  | ${a.name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  lines.push(`/** Union of tunnel-catalogue actions that clients may dispatch. */`);
+  lines.push(`export type ClientTunnelAction =`);
+  for (const a of clientTunnelActions) {
+    lines.push(`  | ${a.name}`);
+  }
+  lines.push(`;`);
+  lines.push(``);
+
+  lines.push(`/** Union of tunnel-catalogue actions that only the server may produce. */`);
+  lines.push(`export type ServerTunnelAction =`);
+  if (serverTunnelActions.length === 0) {
+    lines.push(`  never`);
+  } else {
+    for (const a of serverTunnelActions) {
+      lines.push(`  | ${a.name}`);
+    }
   }
   lines.push(`;`);
   lines.push(``);

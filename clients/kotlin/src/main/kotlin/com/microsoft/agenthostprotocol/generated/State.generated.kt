@@ -1140,6 +1140,103 @@ enum class AutomationRunOriginKind {
     TRIGGER
 }
 
+/**
+ * Direction of one coordinated port forward.
+ *
+ * `AtoB` means a service reachable from A is exposed through a listening
+ * address on B. It does not describe byte flow, which is bidirectional.
+ */
+@Serializable(with = TunnelPortDirectionKindSerializer::class)
+@JvmInline
+value class TunnelPortDirectionKind(val rawValue: String) {
+    companion object {
+        /**
+         * A host-side service is exposed through one or more client-side listeners.
+         */
+        val HOST_TO_CLIENT: TunnelPortDirectionKind = TunnelPortDirectionKind("hostToClient")
+        /**
+         * A client-side service is exposed through a host-side listener.
+         */
+        val CLIENT_TO_HOST: TunnelPortDirectionKind = TunnelPortDirectionKind("clientToHost")
+    }
+}
+
+internal object TunnelPortDirectionKindSerializer : KSerializer<TunnelPortDirectionKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("TunnelPortDirectionKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: TunnelPortDirectionKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): TunnelPortDirectionKind =
+        TunnelPortDirectionKind(decoder.decodeString())
+}
+
+/**
+ * Lifecycle status of a client-owned forwarding attempt.
+ */
+@Serializable(with = TunnelPortClientStatusSerializer::class)
+@JvmInline
+value class TunnelPortClientStatus(val rawValue: String) {
+    companion object {
+        /**
+         * The client has not yet accepted or declined the forwarding request.
+         */
+        val PENDING: TunnelPortClientStatus = TunnelPortClientStatus("pending")
+        /**
+         * The client accepted the request and is establishing the forward.
+         */
+        val ACCEPTED: TunnelPortClientStatus = TunnelPortClientStatus("accepted")
+        /**
+         * The client reports that the forward is active.
+         */
+        val READY: TunnelPortClientStatus = TunnelPortClientStatus("ready")
+        /**
+         * The client explicitly declined the request.
+         */
+        val DECLINED: TunnelPortClientStatus = TunnelPortClientStatus("declined")
+        /**
+         * The client accepted the request but failed to establish the forward.
+         */
+        val FAILED: TunnelPortClientStatus = TunnelPortClientStatus("failed")
+        /**
+         * The assigned client is disconnected or no longer capable of forwarding.
+         */
+        val UNAVAILABLE: TunnelPortClientStatus = TunnelPortClientStatus("unavailable")
+    }
+}
+
+internal object TunnelPortClientStatusSerializer : KSerializer<TunnelPortClientStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("TunnelPortClientStatus", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: TunnelPortClientStatus) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): TunnelPortClientStatus =
+        TunnelPortClientStatus(decoder.decodeString())
+}
+
+/**
+ * Actor that originally requested a port forward.
+ */
+@Serializable(with = TunnelPortRequesterKindSerializer::class)
+@JvmInline
+value class TunnelPortRequesterKind(val rawValue: String) {
+    companion object {
+        val HOST: TunnelPortRequesterKind = TunnelPortRequesterKind("host")
+        val CLIENT: TunnelPortRequesterKind = TunnelPortRequesterKind("client")
+    }
+}
+
+internal object TunnelPortRequesterKindSerializer : KSerializer<TunnelPortRequesterKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("TunnelPortRequesterKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: TunnelPortRequesterKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): TunnelPortRequesterKind =
+        TunnelPortRequesterKind(decoder.decodeString())
+}
+
 // ─── State Types ────────────────────────────────────────────────────────────
 
 @Serializable
@@ -5591,6 +5688,286 @@ data class AutomationRunState(
     val meta: Map<String, JsonElement>? = null
 )
 
+@Serializable
+data class TunnelingCapabilities(
+    /**
+     * The host-owned tunnels channel.
+     */
+    val channel: String
+)
+
+@Serializable
+data class ClientTunnelingCapabilities(
+    /**
+     * Make a host-side service reachable at a client-side listening address.
+     */
+    val hostToClient: Map<String, JsonElement>? = null,
+    /**
+     * Make a client-side service reachable at a host-side listening address.
+     */
+    val clientToHost: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class TunnelAddress(
+    /**
+     * Host name or numeric IP address meaningful from the side that owns it.
+     */
+    val host: String,
+    /**
+     * TCP port. A requested local address MAY use `0` to ask the forwarding
+     * implementation to allocate an available port; a ready forward MUST report
+     * the effective non-zero port.
+     */
+    val port: Long
+)
+
+@Serializable
+data class TunnelPortPendingState(
+    val status: TunnelPortClientStatus
+)
+
+@Serializable
+data class TunnelPortAcceptedState(
+    val status: TunnelPortClientStatus
+)
+
+@Serializable
+data class TunnelPortReadyState(
+    val status: TunnelPortClientStatus,
+    /**
+     * Effective listening endpoint after the forwarding mechanism is active.
+     */
+    val localAddress: TunnelAddress,
+    /**
+     * Effective target endpoint after the forwarding mechanism is active.
+     */
+    val remoteAddress: TunnelAddress
+)
+
+@Serializable
+data class TunnelPortDeclinedState(
+    val status: TunnelPortClientStatus,
+    /**
+     * Optional human-readable explanation.
+     */
+    val reason: String? = null
+)
+
+@Serializable
+data class TunnelPortFailedState(
+    val status: TunnelPortClientStatus,
+    /**
+     * Failure reported by the client-owned forwarding implementation.
+     */
+    val error: ErrorInfo
+)
+
+@Serializable
+data class TunnelPortUnavailableState(
+    val status: TunnelPortClientStatus,
+    /**
+     * Optional human-readable explanation.
+     */
+    val reason: String? = null
+)
+
+@Serializable
+data class TunnelPortClient(
+    /**
+     * Matches the `clientId` supplied during `initialize`.
+     */
+    val clientId: String,
+    /**
+     * Current client-owned lifecycle.
+     */
+    val state: TunnelPortClientState
+)
+
+@Serializable
+data class TunnelPortHostRequester(
+    val kind: TunnelPortRequesterKind
+)
+
+@Serializable
+data class TunnelPortClientRequester(
+    val kind: TunnelPortRequesterKind,
+    /**
+     * Client that requested the forward.
+     */
+    val clientId: String
+)
+
+@Serializable
+data class TunnelPortBase(
+    /**
+     * Stable `ahp-tunnel:/<id>` resource identifier.
+     *
+     * Entries are not independently subscribable in this version, but the
+     * `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+     * treat the URI as opaque.
+     */
+    val resource: String,
+    /**
+     * Desired listening endpoint of the forward.
+     *
+     * This request is shared by every assigned client. It is not proof that the
+     * address was established; each client's ready state reports its effective
+     * listener independently.
+     */
+    val requestedLocalAddress: TunnelAddress,
+    /**
+     * Desired target service endpoint of the forward.
+     *
+     * This request is shared by every assigned client. The effective target is
+     * reported by each client's ready state.
+     */
+    val requestedRemoteAddress: TunnelAddress,
+    /**
+     * Optional human-readable name, such as `"Development server"`.
+     */
+    val title: String? = null,
+    /**
+     * Optional application protocol hint, such as `"http"`, `"https"`, or
+     * `"postgresql"`. Forwarding remains byte-transparent.
+     */
+    val protocol: String? = null,
+    /**
+     * Actor that originally requested this forward.
+     */
+    val requestedBy: TunnelPortRequester,
+    /**
+     * Creation timestamp in ISO 8601 format.
+     */
+    val createdAt: String,
+    /**
+     * Opaque implementation-defined metadata.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class HostToClientTunnelPort(
+    /**
+     * Stable `ahp-tunnel:/<id>` resource identifier.
+     *
+     * Entries are not independently subscribable in this version, but the
+     * `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+     * treat the URI as opaque.
+     */
+    val resource: String,
+    /**
+     * Desired listening endpoint of the forward.
+     *
+     * This request is shared by every assigned client. It is not proof that the
+     * address was established; each client's ready state reports its effective
+     * listener independently.
+     */
+    val requestedLocalAddress: TunnelAddress,
+    /**
+     * Desired target service endpoint of the forward.
+     *
+     * This request is shared by every assigned client. The effective target is
+     * reported by each client's ready state.
+     */
+    val requestedRemoteAddress: TunnelAddress,
+    /**
+     * Optional human-readable name, such as `"Development server"`.
+     */
+    val title: String? = null,
+    /**
+     * Optional application protocol hint, such as `"http"`, `"https"`, or
+     * `"postgresql"`. Forwarding remains byte-transparent.
+     */
+    val protocol: String? = null,
+    /**
+     * Actor that originally requested this forward.
+     */
+    val requestedBy: TunnelPortRequester,
+    /**
+     * Creation timestamp in ISO 8601 format.
+     */
+    val createdAt: String,
+    /**
+     * Opaque implementation-defined metadata.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    val direction: TunnelPortDirectionKind,
+    /**
+     * Clients invited to establish this forward.
+     */
+    val clients: List<TunnelPortClient>
+)
+
+@Serializable
+data class ClientToHostTunnelPort(
+    /**
+     * Stable `ahp-tunnel:/<id>` resource identifier.
+     *
+     * Entries are not independently subscribable in this version, but the
+     * `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+     * treat the URI as opaque.
+     */
+    val resource: String,
+    /**
+     * Desired listening endpoint of the forward.
+     *
+     * This request is shared by every assigned client. It is not proof that the
+     * address was established; each client's ready state reports its effective
+     * listener independently.
+     */
+    val requestedLocalAddress: TunnelAddress,
+    /**
+     * Desired target service endpoint of the forward.
+     *
+     * This request is shared by every assigned client. The effective target is
+     * reported by each client's ready state.
+     */
+    val requestedRemoteAddress: TunnelAddress,
+    /**
+     * Optional human-readable name, such as `"Development server"`.
+     */
+    val title: String? = null,
+    /**
+     * Optional application protocol hint, such as `"http"`, `"https"`, or
+     * `"postgresql"`. Forwarding remains byte-transparent.
+     */
+    val protocol: String? = null,
+    /**
+     * Actor that originally requested this forward.
+     */
+    val requestedBy: TunnelPortRequester,
+    /**
+     * Creation timestamp in ISO 8601 format.
+     */
+    val createdAt: String,
+    /**
+     * Opaque implementation-defined metadata.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    val direction: TunnelPortDirectionKind,
+    /**
+     * Client responsible for establishing this forward.
+     */
+    val client: TunnelPortClient
+)
+
+@Serializable
+data class TunnelsState(
+    /**
+     * Full port-forward entries keyed by `resource`.
+     */
+    val ports: List<TunnelPort>,
+    /**
+     * Opaque host-defined state metadata.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
 // ─── Customization Enablement Union ─────────────────────────────────────
 
 /**
@@ -6878,6 +7255,194 @@ internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLife
     }
 }
 
+@Serializable(with = TunnelPortClientStateSerializer::class)
+sealed interface TunnelPortClientState
+
+@JvmInline
+value class TunnelPortClientStatePending(val value: TunnelPortPendingState) : TunnelPortClientState
+@JvmInline
+value class TunnelPortClientStateAccepted(val value: TunnelPortAcceptedState) : TunnelPortClientState
+@JvmInline
+value class TunnelPortClientStateReady(val value: TunnelPortReadyState) : TunnelPortClientState
+@JvmInline
+value class TunnelPortClientStateDeclined(val value: TunnelPortDeclinedState) : TunnelPortClientState
+@JvmInline
+value class TunnelPortClientStateFailed(val value: TunnelPortFailedState) : TunnelPortClientState
+@JvmInline
+value class TunnelPortClientStateUnavailable(val value: TunnelPortUnavailableState) : TunnelPortClientState
+/**
+ * Forward-compat catch-all for unknown TunnelPortClientState discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class TunnelPortClientStateUnknown(val raw: JsonObject) : TunnelPortClientState
+
+internal object TunnelPortClientStateSerializer : KSerializer<TunnelPortClientState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("TunnelPortClientState")
+
+    override fun deserialize(decoder: Decoder): TunnelPortClientState {
+        val input = decoder as? JsonDecoder
+            ?: error("TunnelPortClientState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for TunnelPortClientState")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: return TunnelPortClientStateUnknown(obj)
+        return when (discriminant) {
+            "pending" -> TunnelPortClientStatePending(input.json.decodeFromJsonElement(TunnelPortPendingState.serializer(), element))
+            "accepted" -> TunnelPortClientStateAccepted(input.json.decodeFromJsonElement(TunnelPortAcceptedState.serializer(), element))
+            "ready" -> TunnelPortClientStateReady(input.json.decodeFromJsonElement(TunnelPortReadyState.serializer(), element))
+            "declined" -> TunnelPortClientStateDeclined(input.json.decodeFromJsonElement(TunnelPortDeclinedState.serializer(), element))
+            "failed" -> TunnelPortClientStateFailed(input.json.decodeFromJsonElement(TunnelPortFailedState.serializer(), element))
+            "unavailable" -> TunnelPortClientStateUnavailable(input.json.decodeFromJsonElement(TunnelPortUnavailableState.serializer(), element))
+            else -> TunnelPortClientStateUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: TunnelPortClientState) {
+        val output = encoder as? JsonEncoder
+            ?: error("TunnelPortClientState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is TunnelPortClientStatePending -> output.json.encodeToJsonElement(TunnelPortPendingState.serializer(), value.value)
+            is TunnelPortClientStateAccepted -> output.json.encodeToJsonElement(TunnelPortAcceptedState.serializer(), value.value)
+            is TunnelPortClientStateReady -> output.json.encodeToJsonElement(TunnelPortReadyState.serializer(), value.value)
+            is TunnelPortClientStateDeclined -> output.json.encodeToJsonElement(TunnelPortDeclinedState.serializer(), value.value)
+            is TunnelPortClientStateFailed -> output.json.encodeToJsonElement(TunnelPortFailedState.serializer(), value.value)
+            is TunnelPortClientStateUnavailable -> output.json.encodeToJsonElement(TunnelPortUnavailableState.serializer(), value.value)
+            is TunnelPortClientStateUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is TunnelPortClientStatePending -> "pending"
+            is TunnelPortClientStateAccepted -> "accepted"
+            is TunnelPortClientStateReady -> "ready"
+            is TunnelPortClientStateDeclined -> "declined"
+            is TunnelPortClientStateFailed -> "failed"
+            is TunnelPortClientStateUnavailable -> "unavailable"
+            is TunnelPortClientStateUnknown -> null
+        }
+        if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = TunnelPortRequesterSerializer::class)
+sealed interface TunnelPortRequester
+
+@JvmInline
+value class TunnelPortRequesterHost(val value: TunnelPortHostRequester) : TunnelPortRequester
+@JvmInline
+value class TunnelPortRequesterClient(val value: TunnelPortClientRequester) : TunnelPortRequester
+/**
+ * Forward-compat catch-all for unknown TunnelPortRequester discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class TunnelPortRequesterUnknown(val raw: JsonObject) : TunnelPortRequester
+
+internal object TunnelPortRequesterSerializer : KSerializer<TunnelPortRequester> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("TunnelPortRequester")
+
+    override fun deserialize(decoder: Decoder): TunnelPortRequester {
+        val input = decoder as? JsonDecoder
+            ?: error("TunnelPortRequester can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for TunnelPortRequester")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return TunnelPortRequesterUnknown(obj)
+        return when (discriminant) {
+            "host" -> TunnelPortRequesterHost(input.json.decodeFromJsonElement(TunnelPortHostRequester.serializer(), element))
+            "client" -> TunnelPortRequesterClient(input.json.decodeFromJsonElement(TunnelPortClientRequester.serializer(), element))
+            else -> TunnelPortRequesterUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: TunnelPortRequester) {
+        val output = encoder as? JsonEncoder
+            ?: error("TunnelPortRequester can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is TunnelPortRequesterHost -> output.json.encodeToJsonElement(TunnelPortHostRequester.serializer(), value.value)
+            is TunnelPortRequesterClient -> output.json.encodeToJsonElement(TunnelPortClientRequester.serializer(), value.value)
+            is TunnelPortRequesterUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is TunnelPortRequesterHost -> "host"
+            is TunnelPortRequesterClient -> "client"
+            is TunnelPortRequesterUnknown -> null
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = TunnelPortSerializer::class)
+sealed interface TunnelPort
+
+@JvmInline
+value class TunnelPortHostToClient(val value: HostToClientTunnelPort) : TunnelPort
+@JvmInline
+value class TunnelPortClientToHost(val value: ClientToHostTunnelPort) : TunnelPort
+/**
+ * Forward-compat catch-all for unknown TunnelPort discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class TunnelPortUnknown(val raw: JsonObject) : TunnelPort
+
+internal object TunnelPortSerializer : KSerializer<TunnelPort> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("TunnelPort")
+
+    override fun deserialize(decoder: Decoder): TunnelPort {
+        val input = decoder as? JsonDecoder
+            ?: error("TunnelPort can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for TunnelPort")
+        val discriminant = (obj["direction"] as? JsonPrimitive)?.content
+            ?: return TunnelPortUnknown(obj)
+        return when (discriminant) {
+            "hostToClient" -> TunnelPortHostToClient(input.json.decodeFromJsonElement(HostToClientTunnelPort.serializer(), element))
+            "clientToHost" -> TunnelPortClientToHost(input.json.decodeFromJsonElement(ClientToHostTunnelPort.serializer(), element))
+            else -> TunnelPortUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: TunnelPort) {
+        val output = encoder as? JsonEncoder
+            ?: error("TunnelPort can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is TunnelPortHostToClient -> output.json.encodeToJsonElement(HostToClientTunnelPort.serializer(), value.value)
+            is TunnelPortClientToHost -> output.json.encodeToJsonElement(ClientToHostTunnelPort.serializer(), value.value)
+            is TunnelPortUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is TunnelPortHostToClient -> "hostToClient"
+            is TunnelPortClientToHost -> "clientToHost"
+            is TunnelPortUnknown -> null
+        }
+        if (discriminant != null) encodedObject["direction"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
 @Serializable(with = ToolResultContentSerializer::class)
 sealed interface ToolResultContent {
     @JvmInline value class Text(val value: ToolResultTextContent) : ToolResultContent
@@ -6949,6 +7514,7 @@ sealed interface SnapshotState {
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
     @JvmInline value class Automations(val value: AutomationCatalogState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
+    @JvmInline value class Tunnels(val value: TunnelsState) : SnapshotState
 }
 
 internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
@@ -6968,8 +7534,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // required `status` + `files`; ResourceWatchState has required
         // `root` + `recursive`; AnnotationsState has required `annotations`
         // (checked after session, whose optional annotations summary reuses the
-        // key); TerminalState has required `content`; RootState is the
-        // catch-all.
+        // key); TerminalState has required `content`; TunnelsState has
+        // required `ports`; RootState is the catch-all.
         return when {
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
@@ -6985,6 +7551,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
             obj.containsKey("content") ->
                 SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
+            obj.containsKey("ports") ->
+                SnapshotState.Tunnels(input.json.decodeFromJsonElement(TunnelsState.serializer(), element))
             else -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
         }
     }
@@ -7002,6 +7570,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
             is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationCatalogState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
+            is SnapshotState.Tunnels -> output.json.encodeToJsonElement(TunnelsState.serializer(), value.value)
         }
         output.encodeJsonElement(element)
     }

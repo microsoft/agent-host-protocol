@@ -208,6 +208,12 @@ public sealed record InitializeResult
     /// host does not expose an automation catalogue or automation commands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCapabilities? Automations { get; init; }
+
+    /// <summary>Host-owned tunnel coordination support. Presence advertises the
+    /// state-bearing catalogue channel; it does not mean the host establishes
+    /// forwards itself.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TunnelingCapabilities? Tunnels { get; init; }
 }
 
 /// <summary>Identifies a protocol implementation — the software (and build) on one end
@@ -259,6 +265,11 @@ public sealed record ClientCapabilities
     /// App-bearing tool calls as ordinary MCP tool calls.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? McpApps { get; init; }
+
+    /// <summary>Port-forwarding directions this client can establish through facilities
+    /// outside AHP. The host coordinates their state on its tunnels channel.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ClientTunnelingCapabilities? Tunnels { get; init; }
 }
 
 /// <summary>Automation features supported by this host authority.

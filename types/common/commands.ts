@@ -18,6 +18,10 @@ import type {
   AutomationState,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
+import type {
+  ClientTunnelingCapabilities,
+  TunnelingCapabilities,
+} from '../channels-tunnels/state.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -219,6 +223,11 @@ export interface ClientCapabilities {
    * App-bearing tool calls as ordinary MCP tool calls.
    */
   mcpApps?: Record<string, never>;
+  /**
+   * Port-forwarding directions this client can establish through facilities
+   * outside AHP. The host coordinates their state on its tunnels channel.
+   */
+  tunnels?: ClientTunnelingCapabilities;
 }
 
 /**
@@ -284,6 +293,12 @@ export interface InitializeResult {
    * @see {@link /guide/automations | Automations Guide}
    */
   automations?: AutomationCapabilities;
+  /**
+   * Host-owned tunnel coordination support. Presence advertises the
+   * state-bearing catalogue channel; it does not mean the host establishes
+   * forwards itself.
+   */
+  tunnels?: TunnelingCapabilities;
 }
 
 /**

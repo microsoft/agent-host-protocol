@@ -74,6 +74,7 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-otlp': 'otlp',
   'channels-automation': 'automation',
   'channels-automation-run': 'automation-run',
+  'channels-tunnels': 'tunnels',
 };
 
 /**
@@ -1382,6 +1383,26 @@ function generateAutomationRunChannelPage(project: Project): string {
   if (stateSf) {
     lines.push('## State Types\n', emitStateTypesSection([stateSf]));
   }
+
+  if (actionsSf) {
+    lines.push('## Actions\n', schemaLink('actions.schema.json'), emitActionsSection([actionsSf]));
+  }
+  return lines.join('\n');
+}
+
+function generateTunnelsChannelPage(project: Project): string {
+  currentPage = 'tunnels';
+  const stateSf = findChannelSourceFile(project, 'channels-tunnels', 'state.ts');
+  const actionsSf = findChannelSourceFile(project, 'channels-tunnels', 'actions.ts');
+  const lines: string[] = [
+    GENERATED_HEADER,
+    '# Tunnels Channel\n',
+    stabilityIndex(stateSf),
+    schemaLink('state.schema.json'),
+  ];
+  if (stateSf) {
+    lines.push('## State Types\n', emitStateTypesSection([stateSf]));
+  }
   if (actionsSf) {
     lines.push('## Actions\n', schemaLink('actions.schema.json'), emitActionsSection([actionsSf]));
   }
@@ -1420,6 +1441,7 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'otlp.md', generator: generateOtlpChannelPage },
     { filename: 'automation.md', generator: generateAutomationChannelPage },
     { filename: 'automation-run.md', generator: generateAutomationRunChannelPage },
+    { filename: 'tunnels.md', generator: generateTunnelsChannelPage },
     { filename: 'mcp.md', generator: generateMcpChannelPage },
     { filename: 'messages.md', generator: generateMessagesPage },
     { filename: 'error-codes.md', generator: generateErrorCodesPage },

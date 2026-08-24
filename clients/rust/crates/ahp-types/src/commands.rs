@@ -16,9 +16,10 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AutomationTrigger, AutomationTriggerDefinition, ClientTunnelingCapabilities, ContentRef,
+    Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema,
+    SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities,
+    TerminalClaim, TextRange, TunnelingCapabilities, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -284,6 +285,11 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+    /// Host-owned tunnel coordination support. Presence advertises the
+    /// state-bearing catalogue channel; it does not mean the host establishes
+    /// forwards itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tunnels: Option<TunnelingCapabilities>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -307,6 +313,10 @@ pub struct ClientCapabilities {
     /// App-bearing tool calls as ordinary MCP tool calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
+    /// Port-forwarding directions this client can establish through facilities
+    /// outside AHP. The host coordinates their state on its tunnels channel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tunnels: Option<ClientTunnelingCapabilities>,
 }
 
 /// Automation features supported by this host authority.

@@ -1,0 +1,68 @@
+{
+  "description": "tunnel client set appends, replaces, and sets the single client",
+  "reducer": "tunnel",
+  "initial": {
+    "ports": [
+      {
+        "resource": "ahp-tunnel:/preview",
+        "direction": "hostToClient",
+        "requestedLocalAddress": { "host": "127.0.0.1", "port": 0 },
+        "requestedRemoteAddress": { "host": "127.0.0.1", "port": 3000 },
+        "clients": [{ "clientId": "client-1", "state": { "status": "pending" } }],
+        "requestedBy": { "kind": "host" },
+        "createdAt": "2026-08-24T18:00:00Z"
+      },
+      {
+        "resource": "ahp-tunnel:/callback",
+        "direction": "clientToHost",
+        "requestedLocalAddress": { "host": "127.0.0.1", "port": 0 },
+        "requestedRemoteAddress": { "host": "127.0.0.1", "port": 8080 },
+        "client": { "clientId": "client-2", "state": { "status": "pending" } },
+        "requestedBy": { "kind": "client", "clientId": "client-2" },
+        "createdAt": "2026-08-24T18:01:00Z"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "tunnel/portClientSet",
+      "resource": "ahp-tunnel:/preview",
+      "client": { "clientId": "client-3", "state": { "status": "pending" } }
+    },
+    {
+      "type": "tunnel/portClientSet",
+      "resource": "ahp-tunnel:/preview",
+      "client": { "clientId": "client-1", "state": { "status": "declined", "reason": "Not needed" } }
+    },
+    {
+      "type": "tunnel/portClientSet",
+      "resource": "ahp-tunnel:/callback",
+      "client": { "clientId": "client-4", "state": { "status": "accepted" } }
+    }
+  ],
+  "expected": {
+    "ports": [
+      {
+        "resource": "ahp-tunnel:/preview",
+        "direction": "hostToClient",
+        "requestedLocalAddress": { "host": "127.0.0.1", "port": 0 },
+        "requestedRemoteAddress": { "host": "127.0.0.1", "port": 3000 },
+        "clients": [
+          { "clientId": "client-1", "state": { "status": "declined", "reason": "Not needed" } },
+          { "clientId": "client-3", "state": { "status": "pending" } }
+        ],
+        "requestedBy": { "kind": "host" },
+        "createdAt": "2026-08-24T18:00:00Z"
+      },
+      {
+        "resource": "ahp-tunnel:/callback",
+        "direction": "clientToHost",
+        "requestedLocalAddress": { "host": "127.0.0.1", "port": 0 },
+        "requestedRemoteAddress": { "host": "127.0.0.1", "port": 8080 },
+        "client": { "clientId": "client-4", "state": { "status": "accepted" } },
+        "requestedBy": { "kind": "client", "clientId": "client-2" },
+        "createdAt": "2026-08-24T18:01:00Z"
+      }
+    ]
+  }
+}

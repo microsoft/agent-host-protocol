@@ -334,6 +334,10 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationCatalogState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Host-owned tunnel coordination support. Presence advertises the
+    /// state-bearing catalogue channel; it does not mean the host establishes
+    /// forwards itself.
+    public var tunnels: TunnelingCapabilities?
 
     public init(
         protocolVersion: String,
@@ -344,7 +348,8 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        tunnels: TunnelingCapabilities? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -355,6 +360,7 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.tunnels = tunnels
     }
 }
 
@@ -371,11 +377,16 @@ public struct ClientCapabilities: Codable, Sendable {
     /// capability is declared. Clients that omit it MUST treat
     /// App-bearing tool calls as ordinary MCP tool calls.
     public var mcpApps: [String: AnyCodable]?
+    /// Port-forwarding directions this client can establish through facilities
+    /// outside AHP. The host coordinates their state on its tunnels channel.
+    public var tunnels: ClientTunnelingCapabilities?
 
     public init(
-        mcpApps: [String: AnyCodable]? = nil
+        mcpApps: [String: AnyCodable]? = nil,
+        tunnels: ClientTunnelingCapabilities? = nil
     ) {
         self.mcpApps = mcpApps
+        self.tunnels = tunnels
     }
 }
 

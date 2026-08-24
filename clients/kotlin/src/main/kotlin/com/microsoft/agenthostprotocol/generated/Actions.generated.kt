@@ -124,6 +124,11 @@ value class ActionType(val rawValue: String) {
         val AUTOMATION_RUN_SESSION_REMOVED: ActionType = ActionType("automationRun/sessionRemoved")
         val AUTOMATION_RUN_PRIMARY_SESSION_CHANGED: ActionType = ActionType("automationRun/primarySessionChanged")
         val AUTOMATION_RUN_CANCEL_REQUESTED: ActionType = ActionType("automationRun/cancelRequested")
+        val TUNNEL_PORT_SET: ActionType = ActionType("tunnel/portSet")
+        val TUNNEL_PORT_CLIENT_SET: ActionType = ActionType("tunnel/portClientSet")
+        val TUNNEL_PORT_CLIENT_UPDATED: ActionType = ActionType("tunnel/portClientUpdated")
+        val TUNNEL_PORT_CLIENT_REMOVED: ActionType = ActionType("tunnel/portClientRemoved")
+        val TUNNEL_PORT_REMOVED: ActionType = ActionType("tunnel/portRemoved")
     }
 }
 
@@ -1511,6 +1516,67 @@ data class AutomationRunCancelRequestedAction(
     val type: ActionType
 )
 
+@Serializable
+data class TunnelPortSetAction(
+    val type: ActionType,
+    /**
+     * Full new or replacement port-forward state.
+     */
+    val port: TunnelPort
+)
+
+@Serializable
+data class TunnelPortClientSetAction(
+    val type: ActionType,
+    /**
+     * Target {@link TunnelPort.resource}.
+     */
+    val resource: String,
+    /**
+     * Full new or replacement participant state.
+     */
+    val client: TunnelPortClient
+)
+
+@Serializable
+data class TunnelPortClientUpdatedAction(
+    val type: ActionType,
+    /**
+     * Target {@link TunnelPort.resource}.
+     */
+    val resource: String,
+    /**
+     * Client participant being updated.
+     */
+    val clientId: String,
+    /**
+     * New client-owned lifecycle, including confirmed addresses when ready.
+     */
+    val state: TunnelPortClientState
+)
+
+@Serializable
+data class TunnelPortClientRemovedAction(
+    val type: ActionType,
+    /**
+     * Target {@link TunnelPort.resource}.
+     */
+    val resource: String,
+    /**
+     * Participant to remove.
+     */
+    val clientId: String
+)
+
+@Serializable
+data class TunnelPortRemovedAction(
+    val type: ActionType,
+    /**
+     * {@link TunnelPort.resource} to remove.
+     */
+    val resource: String
+)
+
 // ─── Partial Summary Types ──────────────────────────────────────────────────
 
 @Serializable
@@ -1663,6 +1729,11 @@ sealed interface StateAction
 @JvmInline value class StateActionAutomationRunSessionRemoved(val value: AutomationRunSessionRemovedAction) : StateAction
 @JvmInline value class StateActionAutomationRunPrimarySessionChanged(val value: AutomationRunPrimarySessionChangedAction) : StateAction
 @JvmInline value class StateActionAutomationRunCancelRequested(val value: AutomationRunCancelRequestedAction) : StateAction
+@JvmInline value class StateActionTunnelPortSet(val value: TunnelPortSetAction) : StateAction
+@JvmInline value class StateActionTunnelPortClientSet(val value: TunnelPortClientSetAction) : StateAction
+@JvmInline value class StateActionTunnelPortClientUpdated(val value: TunnelPortClientUpdatedAction) : StateAction
+@JvmInline value class StateActionTunnelPortClientRemoved(val value: TunnelPortClientRemovedAction) : StateAction
+@JvmInline value class StateActionTunnelPortRemoved(val value: TunnelPortRemovedAction) : StateAction
 @JvmInline value class StateActionUnknown(val raw: JsonObject) : StateAction
 
 internal object StateActionSerializer : KSerializer<StateAction> {
@@ -1773,6 +1844,11 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "automationRun/sessionRemoved" -> StateActionAutomationRunSessionRemoved(input.json.decodeFromJsonElement(AutomationRunSessionRemovedAction.serializer(), element))
             "automationRun/primarySessionChanged" -> StateActionAutomationRunPrimarySessionChanged(input.json.decodeFromJsonElement(AutomationRunPrimarySessionChangedAction.serializer(), element))
             "automationRun/cancelRequested" -> StateActionAutomationRunCancelRequested(input.json.decodeFromJsonElement(AutomationRunCancelRequestedAction.serializer(), element))
+            "tunnel/portSet" -> StateActionTunnelPortSet(input.json.decodeFromJsonElement(TunnelPortSetAction.serializer(), element))
+            "tunnel/portClientSet" -> StateActionTunnelPortClientSet(input.json.decodeFromJsonElement(TunnelPortClientSetAction.serializer(), element))
+            "tunnel/portClientUpdated" -> StateActionTunnelPortClientUpdated(input.json.decodeFromJsonElement(TunnelPortClientUpdatedAction.serializer(), element))
+            "tunnel/portClientRemoved" -> StateActionTunnelPortClientRemoved(input.json.decodeFromJsonElement(TunnelPortClientRemovedAction.serializer(), element))
+            "tunnel/portRemoved" -> StateActionTunnelPortRemoved(input.json.decodeFromJsonElement(TunnelPortRemovedAction.serializer(), element))
             else -> StateActionUnknown(obj)
         }
     }
@@ -1876,6 +1952,11 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionAutomationRunSessionRemoved -> output.json.encodeToJsonElement(AutomationRunSessionRemovedAction.serializer(), value.value)
             is StateActionAutomationRunPrimarySessionChanged -> output.json.encodeToJsonElement(AutomationRunPrimarySessionChangedAction.serializer(), value.value)
             is StateActionAutomationRunCancelRequested -> output.json.encodeToJsonElement(AutomationRunCancelRequestedAction.serializer(), value.value)
+            is StateActionTunnelPortSet -> output.json.encodeToJsonElement(TunnelPortSetAction.serializer(), value.value)
+            is StateActionTunnelPortClientSet -> output.json.encodeToJsonElement(TunnelPortClientSetAction.serializer(), value.value)
+            is StateActionTunnelPortClientUpdated -> output.json.encodeToJsonElement(TunnelPortClientUpdatedAction.serializer(), value.value)
+            is StateActionTunnelPortClientRemoved -> output.json.encodeToJsonElement(TunnelPortClientRemovedAction.serializer(), value.value)
+            is StateActionTunnelPortRemoved -> output.json.encodeToJsonElement(TunnelPortRemovedAction.serializer(), value.value)
             is StateActionUnknown -> value.raw
         }
         output.encodeJsonElement(element)

@@ -1,0 +1,22 @@
+{
+  "name": "tunnel-capabilities",
+  "group": "A",
+  "description": "The host tunnels-channel advertisement round-trips without implying direction support.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "1.0.0",
+    "serverSeq": 1,
+    "snapshots": [],
+    "tunnels": {
+      "channel": "ahp-tunnels://"
+    }
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "1.0.0",
+    "serverSeq": 1,
+    "snapshots": [],
+    "tunnels": {
+      "channel": "ahp-tunnels://"
+    }
+  }]
+}

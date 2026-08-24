@@ -1,0 +1,22 @@
+{
+  "description": "tunnel port removed deletes a matching catalogue entry",
+  "reducer": "tunnel",
+  "initial": {
+    "ports": [{
+      "resource": "ahp-tunnel:/preview",
+      "direction": "hostToClient",
+      "requestedLocalAddress": { "host": "127.0.0.1", "port": 0 },
+      "requestedRemoteAddress": { "host": "127.0.0.1", "port": 3000 },
+      "clients": [],
+      "requestedBy": { "kind": "host" },
+      "createdAt": "2026-08-24T18:00:00Z"
+    }]
+  },
+  "actions": [{
+    "type": "tunnel/portRemoved",
+    "resource": "ahp-tunnel:/preview"
+  }],
+  "expected": {
+    "ports": []
+  }
+}

@@ -163,7 +163,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState | TunnelsState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -567,6 +567,8 @@ function generateRustEnum(enumDecl: EnumDeclaration): string {
 interface StructOpts {
   /** Omit fields flagged as literal discriminants (for union variants). */
   omitDiscriminants?: boolean;
+  /** Omit named fields when the source discriminant is represented by an enum. */
+  omitFields?: readonly string[];
   /** Force `Default` derive (synthesizes Default impl when all fields optional). */
   deriveDefault?: boolean;
   /** Docstring for the struct itself. */
@@ -575,7 +577,10 @@ interface StructOpts {
 
 function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpts = {}): string {
   const lines: string[] = [];
-  const emittedProps = props.filter(p => !(opts.omitDiscriminants && p.isLiteralDiscriminant));
+  const emittedProps = props.filter(p =>
+    !(opts.omitDiscriminants && p.isLiteralDiscriminant)
+    && !opts.omitFields?.includes(p.wireName),
+  );
   const allOptional = emittedProps.length > 0 && emittedProps.every(p => p.optional);
   const wantsDefault = opts.deriveDefault || allOptional;
 
@@ -762,6 +767,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'TunnelPortDirectionKind', 'TunnelPortClientStatus', 'TunnelPortRequesterKind',
 ];
 
 /**
@@ -785,7 +791,7 @@ function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
  * doesn't require forward declaration. Structs that serve as variants of a
  * discriminated union have `omitDiscriminants: true` set.
  */
-const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
+const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; omitFields?: readonly string[]; rustName?: string }[] = [
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
@@ -937,6 +943,22 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationCancelledRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
+  { name: 'TunnelingCapabilities' },
+  { name: 'ClientTunnelingCapabilities' },
+  { name: 'TunnelAddress' },
+  { name: 'TunnelPortPendingState', omitDiscriminants: true },
+  { name: 'TunnelPortAcceptedState', omitDiscriminants: true },
+  { name: 'TunnelPortReadyState', omitDiscriminants: true },
+  { name: 'TunnelPortDeclinedState', omitDiscriminants: true },
+  { name: 'TunnelPortFailedState', omitDiscriminants: true },
+  { name: 'TunnelPortUnavailableState', omitDiscriminants: true },
+  { name: 'TunnelPortClient' },
+  { name: 'TunnelPortHostRequester', omitDiscriminants: true },
+  { name: 'TunnelPortClientRequester', omitDiscriminants: true },
+  { name: 'TunnelPortBase' },
+  { name: 'HostToClientTunnelPort', omitDiscriminants: true, omitFields: ['direction'] },
+  { name: 'ClientToHostTunnelPort', omitDiscriminants: true, omitFields: ['direction'] },
+  { name: 'TunnelsState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1219,6 +1241,43 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+const TUNNEL_PORT_CLIENT_STATE_UNION: UnionConfig = {
+  name: 'TunnelPortClientState',
+  discriminantField: 'status',
+  doc: 'Lifecycle of one client-owned forwarding attempt.',
+  variants: [
+    { variantName: 'Pending', innerType: 'TunnelPortPendingState', wireValue: 'pending' },
+    { variantName: 'Accepted', innerType: 'TunnelPortAcceptedState', wireValue: 'accepted' },
+    { variantName: 'Ready', innerType: 'TunnelPortReadyState', wireValue: 'ready' },
+    { variantName: 'Declined', innerType: 'TunnelPortDeclinedState', wireValue: 'declined' },
+    { variantName: 'Failed', innerType: 'TunnelPortFailedState', wireValue: 'failed' },
+    { variantName: 'Unavailable', innerType: 'TunnelPortUnavailableState', wireValue: 'unavailable' },
+  ],
+  unknown: true,
+};
+
+const TUNNEL_PORT_REQUESTER_UNION: UnionConfig = {
+  name: 'TunnelPortRequester',
+  discriminantField: 'kind',
+  doc: 'Durable attribution for a port-forwarding request.',
+  variants: [
+    { variantName: 'Host', innerType: 'TunnelPortHostRequester', wireValue: 'host' },
+    { variantName: 'Client', innerType: 'TunnelPortClientRequester', wireValue: 'client' },
+  ],
+  unknown: true,
+};
+
+const TUNNEL_PORT_UNION: UnionConfig = {
+  name: 'TunnelPort',
+  discriminantField: 'direction',
+  doc: 'One authoritative port-forward entry in the tunnels state.',
+  variants: [
+    { variantName: 'HostToClient', innerType: 'HostToClientTunnelPort', wireValue: 'hostToClient' },
+    { variantName: 'ClientToHost', innerType: 'ClientToHostTunnelPort', wireValue: 'clientToHost' },
+  ],
+  unknown: true,
+};
+
 function generateChatOrigin(project: Project): string {
   const originKind = findEnum(project, 'ChatOriginKind');
   if (!originKind) throw new Error('ChatOriginKind enum not found');
@@ -1277,7 +1336,8 @@ function generateSnapshotState(): string {
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
 /// (has required \`root\` and \`recursive\`), then annotations (has required
 /// \`annotations\`), then the automation catalogue (has required
-/// \`automations\`), then root.
+/// \`automations\`), then the tunnels state (has required \`ports\`), then
+/// root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -1289,6 +1349,7 @@ pub enum SnapshotState {
     Annotations(Box<AnnotationsState>),
     Automations(Box<AutomationCatalogState>),
     AutomationRun(Box<AutomationRunState>),
+    Tunnels(Box<TunnelsState>),
     Root(Box<RootState>),
 }`;
 }
@@ -1323,6 +1384,7 @@ function generateStateFile(project: Project): string {
     try {
       lines.push(generateStructFromInterface(project, entry.name, entry.rustName, {
         omitDiscriminants: entry.omitDiscriminants,
+        omitFields: entry.omitFields,
       }));
       if (entry.name === 'SessionToolClientExecutionRequest') {
         lines.push('');
@@ -1392,6 +1454,12 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_CLIENT_STATE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_REQUESTER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_UNION));
   lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
@@ -1504,6 +1572,11 @@ const ACTION_VARIANTS: {
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', variantName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', variantName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'tunnel/portSet', variantName: 'TunnelPortSet', tsInterface: 'TunnelPortSetAction', boxed: true },
+  { type: 'tunnel/portClientSet', variantName: 'TunnelPortClientSet', tsInterface: 'TunnelPortClientSetAction', boxed: true },
+  { type: 'tunnel/portClientUpdated', variantName: 'TunnelPortClientUpdated', tsInterface: 'TunnelPortClientUpdatedAction', boxed: true },
+  { type: 'tunnel/portClientRemoved', variantName: 'TunnelPortClientRemoved', tsInterface: 'TunnelPortClientRemovedAction' },
+  { type: 'tunnel/portRemoved', variantName: 'TunnelPortRemoved', tsInterface: 'TunnelPortRemovedAction' },
 ];
 
 function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Session'): string {
@@ -1542,7 +1615,7 @@ pub struct ${scope}ToolCallConfirmedAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationRunLifecycle, AutomationRunSummary, AutomationState, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationRunLifecycle, AutomationRunSummary, AutomationState, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, TunnelPort, TunnelPortClient, TunnelPortClientState, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1710,7 +1783,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ClientTunnelingCapabilities, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, TunnelingCapabilities, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -2177,6 +2250,10 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTrigger',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',
+    'TunnelPortClientState',
+    'TunnelPortRequester',
+    'TunnelPort',
+    'TunnelActionState',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',

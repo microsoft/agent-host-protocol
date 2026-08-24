@@ -17,3 +17,4 @@ export * from './channels-annotations/actions.js';
 export * from './channels-resource-watch/actions.js';
 export * from './channels-automation/actions.js';
 export * from './channels-automation-run/actions.js';
+export * from './channels-tunnels/actions.js';

@@ -1816,6 +1816,113 @@ func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahpty
 	return ReduceOutcomeOutOfScope
 }
 
+// ApplyActionToTunnel applies an action to tunnels state.
+func ApplyActionToTunnel(state *ahptypes.TunnelsState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.TunnelPortSetAction:
+		resource, ok := tunnelPortResource(a.Port)
+		if !ok {
+			return ReduceOutcomeNoOp
+		}
+		for i := range state.Ports {
+			if existingResource, known := tunnelPortResource(state.Ports[i]); known && existingResource == resource {
+				state.Ports[i] = a.Port
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Ports = append(state.Ports, a.Port)
+		return ReduceOutcomeApplied
+	case *ahptypes.TunnelPortClientUpdatedAction:
+		for i := range state.Ports {
+			resource, known := tunnelPortResource(state.Ports[i])
+			if !known || resource != a.Resource {
+				continue
+			}
+			switch port := state.Ports[i].Value.(type) {
+			case *ahptypes.HostToClientTunnelPort:
+				for clientIndex := range port.Clients {
+					if port.Clients[clientIndex].ClientId == a.ClientId {
+						port.Clients[clientIndex].State = a.State
+						return ReduceOutcomeApplied
+					}
+				}
+			case *ahptypes.ClientToHostTunnelPort:
+				if port.Client.ClientId == a.ClientId {
+					port.Client.State = a.State
+					return ReduceOutcomeApplied
+				}
+			}
+			return ReduceOutcomeNoOp
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.TunnelPortClientSetAction:
+		for i := range state.Ports {
+			resource, known := tunnelPortResource(state.Ports[i])
+			if !known || resource != a.Resource {
+				continue
+			}
+			switch port := state.Ports[i].Value.(type) {
+			case *ahptypes.HostToClientTunnelPort:
+				for clientIndex := range port.Clients {
+					if port.Clients[clientIndex].ClientId == a.Client.ClientId {
+						port.Clients[clientIndex] = a.Client
+						return ReduceOutcomeApplied
+					}
+				}
+				port.Clients = append(port.Clients, a.Client)
+				return ReduceOutcomeApplied
+			case *ahptypes.ClientToHostTunnelPort:
+				port.Client = a.Client
+				return ReduceOutcomeApplied
+			default:
+				return ReduceOutcomeNoOp
+			}
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.TunnelPortClientRemovedAction:
+		for i := range state.Ports {
+			resource, known := tunnelPortResource(state.Ports[i])
+			if !known || resource != a.Resource {
+				continue
+			}
+			port, ok := state.Ports[i].Value.(*ahptypes.HostToClientTunnelPort)
+			if !ok {
+				return ReduceOutcomeNoOp
+			}
+			for clientIndex := range port.Clients {
+				if port.Clients[clientIndex].ClientId == a.ClientId {
+					port.Clients = append(port.Clients[:clientIndex], port.Clients[clientIndex+1:]...)
+					return ReduceOutcomeApplied
+				}
+			}
+			return ReduceOutcomeNoOp
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.TunnelPortRemovedAction:
+		for i := range state.Ports {
+			if resource, known := tunnelPortResource(state.Ports[i]); known && resource == a.Resource {
+				state.Ports = append(state.Ports[:i], state.Ports[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	}
+	return ReduceOutcomeOutOfScope
+}
+
+func tunnelPortResource(port ahptypes.TunnelPort) (ahptypes.URI, bool) {
+	switch value := port.Value.(type) {
+	case *ahptypes.HostToClientTunnelPort:
+		return value.Resource, true
+	case *ahptypes.ClientToHostTunnelPort:
+		return value.Resource, true
+	case *ahptypes.TunnelPortUnknown:
+		return "", false
+	default:
+		return "", false
+	}
+}
+
 // ApplyActionToAutomation applies an action to automation catalogue state.
 func ApplyActionToAutomation(state *ahptypes.AutomationCatalogState, action ahptypes.StateAction) ReduceOutcome {
 	switch a := action.Value.(type) {

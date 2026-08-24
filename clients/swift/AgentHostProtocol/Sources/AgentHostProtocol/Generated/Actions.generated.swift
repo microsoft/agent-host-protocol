@@ -101,6 +101,11 @@ public enum ActionType: Codable, Sendable, Equatable {
     case automationRunSessionRemoved
     case automationRunPrimarySessionChanged
     case automationRunCancelRequested
+    case tunnelPortSet
+    case tunnelPortClientSet
+    case tunnelPortClientUpdated
+    case tunnelPortClientRemoved
+    case tunnelPortRemoved
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -203,6 +208,11 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "automationRun/sessionRemoved": self = .automationRunSessionRemoved
         case "automationRun/primarySessionChanged": self = .automationRunPrimarySessionChanged
         case "automationRun/cancelRequested": self = .automationRunCancelRequested
+        case "tunnel/portSet": self = .tunnelPortSet
+        case "tunnel/portClientSet": self = .tunnelPortClientSet
+        case "tunnel/portClientUpdated": self = .tunnelPortClientUpdated
+        case "tunnel/portClientRemoved": self = .tunnelPortClientRemoved
+        case "tunnel/portRemoved": self = .tunnelPortRemoved
         default: self = .unknown(raw)
         }
     }
@@ -305,6 +315,11 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .automationRunSessionRemoved: try container.encode("automationRun/sessionRemoved")
         case .automationRunPrimarySessionChanged: try container.encode("automationRun/primarySessionChanged")
         case .automationRunCancelRequested: try container.encode("automationRun/cancelRequested")
+        case .tunnelPortSet: try container.encode("tunnel/portSet")
+        case .tunnelPortClientSet: try container.encode("tunnel/portClientSet")
+        case .tunnelPortClientUpdated: try container.encode("tunnel/portClientUpdated")
+        case .tunnelPortClientRemoved: try container.encode("tunnel/portClientRemoved")
+        case .tunnelPortRemoved: try container.encode("tunnel/portRemoved")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -2326,6 +2341,92 @@ public struct AutomationRunCancelRequestedAction: Codable, Sendable {
     }
 }
 
+public struct TunnelPortSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// Full new or replacement port-forward state.
+    public var port: TunnelPort
+
+    public init(
+        type: ActionType,
+        port: TunnelPort
+    ) {
+        self.type = type
+        self.port = port
+    }
+}
+
+public struct TunnelPortClientSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// Target {@link TunnelPort.resource}.
+    public var resource: String
+    /// Full new or replacement participant state.
+    public var client: TunnelPortClient
+
+    public init(
+        type: ActionType,
+        resource: String,
+        client: TunnelPortClient
+    ) {
+        self.type = type
+        self.resource = resource
+        self.client = client
+    }
+}
+
+public struct TunnelPortClientUpdatedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Target {@link TunnelPort.resource}.
+    public var resource: String
+    /// Client participant being updated.
+    public var clientId: String
+    /// New client-owned lifecycle, including confirmed addresses when ready.
+    public var state: TunnelPortClientState
+
+    public init(
+        type: ActionType,
+        resource: String,
+        clientId: String,
+        state: TunnelPortClientState
+    ) {
+        self.type = type
+        self.resource = resource
+        self.clientId = clientId
+        self.state = state
+    }
+}
+
+public struct TunnelPortClientRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Target {@link TunnelPort.resource}.
+    public var resource: String
+    /// Participant to remove.
+    public var clientId: String
+
+    public init(
+        type: ActionType,
+        resource: String,
+        clientId: String
+    ) {
+        self.type = type
+        self.resource = resource
+        self.clientId = clientId
+    }
+}
+
+public struct TunnelPortRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// {@link TunnelPort.resource} to remove.
+    public var resource: String
+
+    public init(
+        type: ActionType,
+        resource: String
+    ) {
+        self.type = type
+        self.resource = resource
+    }
+}
+
 // MARK: - Partial Summary Types
 
 public struct PartialChatSummary: Codable, Sendable {
@@ -2471,6 +2572,11 @@ public enum StateAction: Codable, Sendable {
     case automationRunSessionRemoved(AutomationRunSessionRemovedAction)
     case automationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction)
     case automationRunCancelRequested(AutomationRunCancelRequestedAction)
+    case tunnelPortSet(TunnelPortSetAction)
+    case tunnelPortClientSet(TunnelPortClientSetAction)
+    case tunnelPortClientUpdated(TunnelPortClientUpdatedAction)
+    case tunnelPortClientRemoved(TunnelPortClientRemovedAction)
+    case tunnelPortRemoved(TunnelPortRemovedAction)
     /// Unknown or future action type; reducers treat this as a no-op.
     /// The raw payload (including its `type` discriminant) is preserved
     /// as an `AnyCodable` so a decode→encode round-trip re-emits it
@@ -2673,6 +2779,16 @@ public enum StateAction: Codable, Sendable {
             self = .automationRunPrimarySessionChanged(try AutomationRunPrimarySessionChangedAction(from: decoder))
         case "automationRun/cancelRequested":
             self = .automationRunCancelRequested(try AutomationRunCancelRequestedAction(from: decoder))
+        case "tunnel/portSet":
+            self = .tunnelPortSet(try TunnelPortSetAction(from: decoder))
+        case "tunnel/portClientSet":
+            self = .tunnelPortClientSet(try TunnelPortClientSetAction(from: decoder))
+        case "tunnel/portClientUpdated":
+            self = .tunnelPortClientUpdated(try TunnelPortClientUpdatedAction(from: decoder))
+        case "tunnel/portClientRemoved":
+            self = .tunnelPortClientRemoved(try TunnelPortClientRemovedAction(from: decoder))
+        case "tunnel/portRemoved":
+            self = .tunnelPortRemoved(try TunnelPortRemovedAction(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -2775,6 +2891,11 @@ public enum StateAction: Codable, Sendable {
         case .automationRunSessionRemoved(let v): try v.encode(to: encoder)
         case .automationRunPrimarySessionChanged(let v): try v.encode(to: encoder)
         case .automationRunCancelRequested(let v): try v.encode(to: encoder)
+        case .tunnelPortSet(let v): try v.encode(to: encoder)
+        case .tunnelPortClientSet(let v): try v.encode(to: encoder)
+        case .tunnelPortClientUpdated(let v): try v.encode(to: encoder)
+        case .tunnelPortClientRemoved(let v): try v.encode(to: encoder)
+        case .tunnelPortRemoved(let v): try v.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

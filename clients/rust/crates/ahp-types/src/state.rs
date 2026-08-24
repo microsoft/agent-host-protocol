@@ -1420,6 +1420,137 @@ pub enum AutomationRunOriginKind {
     Trigger,
 }
 
+/// Direction of one coordinated port forward.
+///
+/// `AtoB` means a service reachable from A is exposed through a listening
+/// address on B. It does not describe byte flow, which is bidirectional.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TunnelPortDirectionKind {
+    /// A host-side service is exposed through one or more client-side listeners.
+    HostToClient,
+    /// A client-side service is exposed through a host-side listener.
+    ClientToHost,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for TunnelPortDirectionKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::HostToClient => serializer.serialize_str("hostToClient"),
+            Self::ClientToHost => serializer.serialize_str("clientToHost"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TunnelPortDirectionKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "hostToClient" => Self::HostToClient,
+            "clientToHost" => Self::ClientToHost,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Lifecycle status of a client-owned forwarding attempt.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TunnelPortClientStatus {
+    /// The client has not yet accepted or declined the forwarding request.
+    Pending,
+    /// The client accepted the request and is establishing the forward.
+    Accepted,
+    /// The client reports that the forward is active.
+    Ready,
+    /// The client explicitly declined the request.
+    Declined,
+    /// The client accepted the request but failed to establish the forward.
+    Failed,
+    /// The assigned client is disconnected or no longer capable of forwarding.
+    Unavailable,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for TunnelPortClientStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Pending => serializer.serialize_str("pending"),
+            Self::Accepted => serializer.serialize_str("accepted"),
+            Self::Ready => serializer.serialize_str("ready"),
+            Self::Declined => serializer.serialize_str("declined"),
+            Self::Failed => serializer.serialize_str("failed"),
+            Self::Unavailable => serializer.serialize_str("unavailable"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TunnelPortClientStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "pending" => Self::Pending,
+            "accepted" => Self::Accepted,
+            "ready" => Self::Ready,
+            "declined" => Self::Declined,
+            "failed" => Self::Failed,
+            "unavailable" => Self::Unavailable,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Actor that originally requested a port forward.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum TunnelPortRequesterKind {
+    Host,
+    Client,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for TunnelPortRequesterKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Host => serializer.serialize_str("host"),
+            Self::Client => serializer.serialize_str("client"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for TunnelPortRequesterKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "host" => Self::Host,
+            "client" => Self::Client,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 /// An optionally-sized icon that can be displayed in a user interface.
@@ -5629,6 +5760,246 @@ pub struct AutomationRunState {
     pub meta: Option<JsonObject>,
 }
 
+/// Capabilities advertised by a host that exposes tunnel coordination.
+///
+/// Presence means the host maintains the authoritative state at
+/// {@link TunnelingCapabilities.channel}. It does not imply that the host can
+/// establish a particular kind of forwarding itself.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelingCapabilities {
+    /// The host-owned tunnels channel.
+    pub channel: String,
+}
+
+/// Port-forwarding directions a client can establish.
+///
+/// Each field is a presence capability: an empty object means supported and
+/// absence means unsupported.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientTunnelingCapabilities {
+    /// Make a host-side service reachable at a client-side listening address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_to_client: Option<JsonObject>,
+    /// Make a client-side service reachable at a host-side listening address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_to_host: Option<JsonObject>,
+}
+
+/// One TCP address used by a port forward.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelAddress {
+    /// Host name or numeric IP address meaningful from the side that owns it.
+    pub host: String,
+    /// TCP port. A requested local address MAY use `0` to ask the forwarding
+    /// implementation to allocate an available port; a ready forward MUST report
+    /// the effective non-zero port.
+    pub port: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortPendingState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortAcceptedState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortReadyState {
+    /// Effective listening endpoint after the forwarding mechanism is active.
+    pub local_address: TunnelAddress,
+    /// Effective target endpoint after the forwarding mechanism is active.
+    pub remote_address: TunnelAddress,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortDeclinedState {
+    /// Optional human-readable explanation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortFailedState {
+    /// Failure reported by the client-owned forwarding implementation.
+    pub error: ErrorInfo,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortUnavailableState {
+    /// Optional human-readable explanation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// One client responsible for establishing a port forward.
+///
+/// The requested mapping lives on the parent {@link TunnelPort}; every client
+/// assigned to a `hostToClient` entry attempts the same mapping. Once active,
+/// {@link TunnelPortReadyState} carries this client's confirmed effective
+/// addresses, including any port allocated from a request for port `0`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortClient {
+    /// Matches the `clientId` supplied during `initialize`.
+    pub client_id: String,
+    /// Current client-owned lifecycle.
+    pub state: TunnelPortClientState,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortHostRequester {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortClientRequester {
+    /// Client that requested the forward.
+    pub client_id: String,
+}
+
+/// Common authoritative fields for every port-forward entry.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortBase {
+    /// Stable `ahp-tunnel:/<id>` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.
+    pub resource: Uri,
+    /// Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.
+    pub requested_local_address: TunnelAddress,
+    /// Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.
+    pub requested_remote_address: TunnelAddress,
+    /// Optional human-readable name, such as `"Development server"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+    /// Actor that originally requested this forward.
+    pub requested_by: TunnelPortRequester,
+    /// Creation timestamp in ISO 8601 format.
+    pub created_at: String,
+    /// Opaque implementation-defined metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+/// A host-side service exposed through one or more client-side listeners.
+///
+/// Every client independently accepts and establishes its own mapping, so each
+/// has separate addresses and lifecycle state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostToClientTunnelPort {
+    /// Stable `ahp-tunnel:/<id>` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.
+    pub resource: Uri,
+    /// Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.
+    pub requested_local_address: TunnelAddress,
+    /// Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.
+    pub requested_remote_address: TunnelAddress,
+    /// Optional human-readable name, such as `"Development server"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+    /// Actor that originally requested this forward.
+    pub requested_by: TunnelPortRequester,
+    /// Creation timestamp in ISO 8601 format.
+    pub created_at: String,
+    /// Opaque implementation-defined metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Clients invited to establish this forward.
+    pub clients: Vec<TunnelPortClient>,
+}
+
+/// A client-side service exposed through a host-side listener.
+///
+/// Exactly one client owns the forwarding operation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientToHostTunnelPort {
+    /// Stable `ahp-tunnel:/<id>` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.
+    pub resource: Uri,
+    /// Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.
+    pub requested_local_address: TunnelAddress,
+    /// Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.
+    pub requested_remote_address: TunnelAddress,
+    /// Optional human-readable name, such as `"Development server"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+    /// Actor that originally requested this forward.
+    pub requested_by: TunnelPortRequester,
+    /// Creation timestamp in ISO 8601 format.
+    pub created_at: String,
+    /// Opaque implementation-defined metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Client responsible for establishing this forward.
+    pub client: TunnelPortClient,
+}
+
+/// Authoritative state exposed on the `ahp-tunnels://` channel.
+///
+/// Clients establish the actual forwards through implementation-defined
+/// facilities. The host only sequences, validates, snapshots, and replays this
+/// coordination state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelsState {
+    /// Full port-forward entries keyed by `resource`.
+    pub ports: Vec<TunnelPort>,
+    /// Opaque host-defined state metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
 // ─── Customization Enablement Union ───────────────────────────────────────
 
 /// A single explicit customization enablement decision.
@@ -6054,6 +6425,56 @@ pub enum AutomationRunLifecycle {
     Cancelled(AutomationCancelledRunLifecycle),
 }
 
+/// Lifecycle of one client-owned forwarding attempt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum TunnelPortClientState {
+    #[serde(rename = "pending")]
+    Pending(TunnelPortPendingState),
+    #[serde(rename = "accepted")]
+    Accepted(TunnelPortAcceptedState),
+    #[serde(rename = "ready")]
+    Ready(TunnelPortReadyState),
+    #[serde(rename = "declined")]
+    Declined(TunnelPortDeclinedState),
+    #[serde(rename = "failed")]
+    Failed(TunnelPortFailedState),
+    #[serde(rename = "unavailable")]
+    Unavailable(TunnelPortUnavailableState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// Durable attribution for a port-forwarding request.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum TunnelPortRequester {
+    #[serde(rename = "host")]
+    Host(TunnelPortHostRequester),
+    #[serde(rename = "client")]
+    Client(TunnelPortClientRequester),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// One authoritative port-forward entry in the tunnels state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "direction")]
+pub enum TunnelPort {
+    #[serde(rename = "hostToClient")]
+    HostToClient(HostToClientTunnelPort),
+    #[serde(rename = "clientToHost")]
+    ClientToHost(ClientToHostTunnelPort),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
 /// The state payload of a snapshot.
 ///
 /// Deserialized by trying session first (has required `lifecycle`), then
@@ -6061,7 +6482,8 @@ pub enum AutomationRunLifecycle {
 /// then changeset (has required `status` and `files`), then resource-watch
 /// (has required `root` and `recursive`), then annotations (has required
 /// `annotations`), then the automation catalogue (has required
-/// `automations`), then root.
+/// `automations`), then the tunnels state (has required `ports`), then
+/// root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -6073,5 +6495,6 @@ pub enum SnapshotState {
     Annotations(Box<AnnotationsState>),
     Automations(Box<AutomationCatalogState>),
     AutomationRun(Box<AutomationRunState>),
+    Tunnels(Box<TunnelsState>),
     Root(Box<RootState>),
 }

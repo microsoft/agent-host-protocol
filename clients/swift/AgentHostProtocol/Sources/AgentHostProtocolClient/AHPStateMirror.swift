@@ -18,6 +18,7 @@ public actor AHPStateMirror {
     public private(set) var changesets: [String: ChangesetState] = [:]
     public private(set) var annotations: [String: AnnotationsState] = [:]
     public private(set) var resourceWatches: [String: ResourceWatchState] = [:]
+    public private(set) var tunnelCatalog = TunnelsState(ports: [])
     public private(set) var automationCatalog = AutomationCatalogState(automations: [])
     public private(set) var automations: [String: AutomationState] = [:]
     public private(set) var automationRuns: [String: AutomationRunState] = [:]
@@ -68,6 +69,10 @@ public actor AHPStateMirror {
             // a reducer input. The slot is seeded by `applySnapshot`.
             return
         }
+        if channel == "ahp-tunnels://" {
+            tunnelCatalog = tunnelReducer(state: tunnelCatalog, action: action)
+            return
+        }
         if channel == "ahp-automations://" {
             automationCatalog = automationReducer(state: automationCatalog, action: action)
             rebuildAutomationIndex()
@@ -97,6 +102,8 @@ public actor AHPStateMirror {
             resourceWatches[snapshot.resource] = state
         case .annotations(let state):
             annotations[snapshot.resource] = state
+        case .tunnels(let state):
+            tunnelCatalog = state
         case .automations(let state):
             automationCatalog = state
             rebuildAutomationIndex()
@@ -122,6 +129,7 @@ public actor AHPStateMirror {
         changesets.removeAll()
         annotations.removeAll()
         resourceWatches.removeAll()
+        tunnelCatalog = TunnelsState(ports: [])
         automationCatalog = AutomationCatalogState(automations: [])
         automations.removeAll()
         automationRuns.removeAll()

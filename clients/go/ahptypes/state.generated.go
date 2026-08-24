@@ -539,6 +539,45 @@ const (
 	AutomationRunOriginKindTrigger AutomationRunOriginKind = "trigger"
 )
 
+// Direction of one coordinated port forward.
+//
+// `AtoB` means a service reachable from A is exposed through a listening
+// address on B. It does not describe byte flow, which is bidirectional.
+type TunnelPortDirectionKind string
+
+const (
+	// A host-side service is exposed through one or more client-side listeners.
+	TunnelPortDirectionKindHostToClient TunnelPortDirectionKind = "hostToClient"
+	// A client-side service is exposed through a host-side listener.
+	TunnelPortDirectionKindClientToHost TunnelPortDirectionKind = "clientToHost"
+)
+
+// Lifecycle status of a client-owned forwarding attempt.
+type TunnelPortClientStatus string
+
+const (
+	// The client has not yet accepted or declined the forwarding request.
+	TunnelPortClientStatusPending TunnelPortClientStatus = "pending"
+	// The client accepted the request and is establishing the forward.
+	TunnelPortClientStatusAccepted TunnelPortClientStatus = "accepted"
+	// The client reports that the forward is active.
+	TunnelPortClientStatusReady TunnelPortClientStatus = "ready"
+	// The client explicitly declined the request.
+	TunnelPortClientStatusDeclined TunnelPortClientStatus = "declined"
+	// The client accepted the request but failed to establish the forward.
+	TunnelPortClientStatusFailed TunnelPortClientStatus = "failed"
+	// The assigned client is disconnected or no longer capable of forwarding.
+	TunnelPortClientStatusUnavailable TunnelPortClientStatus = "unavailable"
+)
+
+// Actor that originally requested a port forward.
+type TunnelPortRequesterKind string
+
+const (
+	TunnelPortRequesterKindHost   TunnelPortRequesterKind = "host"
+	TunnelPortRequesterKindClient TunnelPortRequesterKind = "client"
+)
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 // An optionally-sized icon that can be displayed in a user interface.
@@ -4083,6 +4122,213 @@ type AutomationRunState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
+// Capabilities advertised by a host that exposes tunnel coordination.
+//
+// Presence means the host maintains the authoritative state at
+// {@link TunnelingCapabilities.channel}. It does not imply that the host can
+// establish a particular kind of forwarding itself.
+type TunnelingCapabilities struct {
+	// The host-owned tunnels channel.
+	Channel string `json:"channel"`
+}
+
+// Port-forwarding directions a client can establish.
+//
+// Each field is a presence capability: an empty object means supported and
+// absence means unsupported.
+type ClientTunnelingCapabilities struct {
+	// Make a host-side service reachable at a client-side listening address.
+	HostToClient map[string]json.RawMessage `json:"hostToClient,omitempty"`
+	// Make a client-side service reachable at a host-side listening address.
+	ClientToHost map[string]json.RawMessage `json:"clientToHost,omitempty"`
+}
+
+// One TCP address used by a port forward.
+type TunnelAddress struct {
+	// Host name or numeric IP address meaningful from the side that owns it.
+	Host string `json:"host"`
+	// TCP port. A requested local address MAY use `0` to ask the forwarding
+	// implementation to allocate an available port; a ready forward MUST report
+	// the effective non-zero port.
+	Port int64 `json:"port"`
+}
+
+type TunnelPortPendingState struct {
+	Status TunnelPortClientStatus `json:"status"`
+}
+
+type TunnelPortAcceptedState struct {
+	Status TunnelPortClientStatus `json:"status"`
+}
+
+type TunnelPortReadyState struct {
+	Status TunnelPortClientStatus `json:"status"`
+	// Effective listening endpoint after the forwarding mechanism is active.
+	LocalAddress TunnelAddress `json:"localAddress"`
+	// Effective target endpoint after the forwarding mechanism is active.
+	RemoteAddress TunnelAddress `json:"remoteAddress"`
+}
+
+type TunnelPortDeclinedState struct {
+	Status TunnelPortClientStatus `json:"status"`
+	// Optional human-readable explanation.
+	Reason *string `json:"reason,omitempty"`
+}
+
+type TunnelPortFailedState struct {
+	Status TunnelPortClientStatus `json:"status"`
+	// Failure reported by the client-owned forwarding implementation.
+	Error ErrorInfo `json:"error"`
+}
+
+type TunnelPortUnavailableState struct {
+	Status TunnelPortClientStatus `json:"status"`
+	// Optional human-readable explanation.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// One client responsible for establishing a port forward.
+//
+// The requested mapping lives on the parent {@link TunnelPort}; every client
+// assigned to a `hostToClient` entry attempts the same mapping. Once active,
+// {@link TunnelPortReadyState} carries this client's confirmed effective
+// addresses, including any port allocated from a request for port `0`.
+type TunnelPortClient struct {
+	// Matches the `clientId` supplied during `initialize`.
+	ClientId string `json:"clientId"`
+	// Current client-owned lifecycle.
+	State TunnelPortClientState `json:"state"`
+}
+
+type TunnelPortHostRequester struct {
+	Kind TunnelPortRequesterKind `json:"kind"`
+}
+
+type TunnelPortClientRequester struct {
+	Kind TunnelPortRequesterKind `json:"kind"`
+	// Client that requested the forward.
+	ClientId string `json:"clientId"`
+}
+
+// Common authoritative fields for every port-forward entry.
+type TunnelPortBase struct {
+	// Stable `ahp-tunnel:/<id>` resource identifier.
+	//
+	// Entries are not independently subscribable in this version, but the
+	// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+	// treat the URI as opaque.
+	Resource URI `json:"resource"`
+	// Desired listening endpoint of the forward.
+	//
+	// This request is shared by every assigned client. It is not proof that the
+	// address was established; each client's ready state reports its effective
+	// listener independently.
+	RequestedLocalAddress TunnelAddress `json:"requestedLocalAddress"`
+	// Desired target service endpoint of the forward.
+	//
+	// This request is shared by every assigned client. The effective target is
+	// reported by each client's ready state.
+	RequestedRemoteAddress TunnelAddress `json:"requestedRemoteAddress"`
+	// Optional human-readable name, such as `"Development server"`.
+	Title *string `json:"title,omitempty"`
+	// Optional application protocol hint, such as `"http"`, `"https"`, or
+	// `"postgresql"`. Forwarding remains byte-transparent.
+	Protocol *string `json:"protocol,omitempty"`
+	// Actor that originally requested this forward.
+	RequestedBy TunnelPortRequester `json:"requestedBy"`
+	// Creation timestamp in ISO 8601 format.
+	CreatedAt string `json:"createdAt"`
+	// Opaque implementation-defined metadata.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// A host-side service exposed through one or more client-side listeners.
+//
+// Every client independently accepts and establishes its own mapping, so each
+// has separate addresses and lifecycle state.
+type HostToClientTunnelPort struct {
+	// Stable `ahp-tunnel:/<id>` resource identifier.
+	//
+	// Entries are not independently subscribable in this version, but the
+	// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+	// treat the URI as opaque.
+	Resource URI `json:"resource"`
+	// Desired listening endpoint of the forward.
+	//
+	// This request is shared by every assigned client. It is not proof that the
+	// address was established; each client's ready state reports its effective
+	// listener independently.
+	RequestedLocalAddress TunnelAddress `json:"requestedLocalAddress"`
+	// Desired target service endpoint of the forward.
+	//
+	// This request is shared by every assigned client. The effective target is
+	// reported by each client's ready state.
+	RequestedRemoteAddress TunnelAddress `json:"requestedRemoteAddress"`
+	// Optional human-readable name, such as `"Development server"`.
+	Title *string `json:"title,omitempty"`
+	// Optional application protocol hint, such as `"http"`, `"https"`, or
+	// `"postgresql"`. Forwarding remains byte-transparent.
+	Protocol *string `json:"protocol,omitempty"`
+	// Actor that originally requested this forward.
+	RequestedBy TunnelPortRequester `json:"requestedBy"`
+	// Creation timestamp in ISO 8601 format.
+	CreatedAt string `json:"createdAt"`
+	// Opaque implementation-defined metadata.
+	Meta      map[string]json.RawMessage `json:"_meta,omitempty"`
+	Direction TunnelPortDirectionKind    `json:"direction"`
+	// Clients invited to establish this forward.
+	Clients []TunnelPortClient `json:"clients"`
+}
+
+// A client-side service exposed through a host-side listener.
+//
+// Exactly one client owns the forwarding operation.
+type ClientToHostTunnelPort struct {
+	// Stable `ahp-tunnel:/<id>` resource identifier.
+	//
+	// Entries are not independently subscribable in this version, but the
+	// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+	// treat the URI as opaque.
+	Resource URI `json:"resource"`
+	// Desired listening endpoint of the forward.
+	//
+	// This request is shared by every assigned client. It is not proof that the
+	// address was established; each client's ready state reports its effective
+	// listener independently.
+	RequestedLocalAddress TunnelAddress `json:"requestedLocalAddress"`
+	// Desired target service endpoint of the forward.
+	//
+	// This request is shared by every assigned client. The effective target is
+	// reported by each client's ready state.
+	RequestedRemoteAddress TunnelAddress `json:"requestedRemoteAddress"`
+	// Optional human-readable name, such as `"Development server"`.
+	Title *string `json:"title,omitempty"`
+	// Optional application protocol hint, such as `"http"`, `"https"`, or
+	// `"postgresql"`. Forwarding remains byte-transparent.
+	Protocol *string `json:"protocol,omitempty"`
+	// Actor that originally requested this forward.
+	RequestedBy TunnelPortRequester `json:"requestedBy"`
+	// Creation timestamp in ISO 8601 format.
+	CreatedAt string `json:"createdAt"`
+	// Opaque implementation-defined metadata.
+	Meta      map[string]json.RawMessage `json:"_meta,omitempty"`
+	Direction TunnelPortDirectionKind    `json:"direction"`
+	// Client responsible for establishing this forward.
+	Client TunnelPortClient `json:"client"`
+}
+
+// Authoritative state exposed on the `ahp-tunnels://` channel.
+//
+// Clients establish the actual forwards through implementation-defined
+// facilities. The host only sequences, validates, snapshots, and replays this
+// coordination state.
+type TunnelsState struct {
+	// Full port-forward entries keyed by `resource`.
+	Ports []TunnelPort `json:"ports"`
+	// Opaque host-defined state metadata.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
 // ─── Customization Enablement Union ───────────────────────────────────────
 
 // CustomizationEnablement is a single explicit customization enablement decision.
@@ -5744,6 +5990,264 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
+// TunnelPortClientState is the lifecycle of one client-owned forwarding attempt.
+type TunnelPortClientState struct {
+	Value isTunnelPortClientState
+}
+
+// isTunnelPortClientState is the marker interface implemented by every
+// concrete variant of TunnelPortClientState.
+type isTunnelPortClientState interface{ isTunnelPortClientState() }
+
+func (*TunnelPortPendingState) isTunnelPortClientState()     {}
+func (*TunnelPortAcceptedState) isTunnelPortClientState()    {}
+func (*TunnelPortReadyState) isTunnelPortClientState()       {}
+func (*TunnelPortDeclinedState) isTunnelPortClientState()    {}
+func (*TunnelPortFailedState) isTunnelPortClientState()      {}
+func (*TunnelPortUnavailableState) isTunnelPortClientState() {}
+
+// TunnelPortClientStateUnknown carries an unrecognized TunnelPortClientState variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type TunnelPortClientStateUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*TunnelPortClientStateUnknown) isTunnelPortClientState() {}
+
+// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
+func (u *TunnelPortClientState) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "status")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "pending":
+		var value TunnelPortPendingState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "accepted":
+		var value TunnelPortAcceptedState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "ready":
+		var value TunnelPortReadyState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "declined":
+		var value TunnelPortDeclinedState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "failed":
+		var value TunnelPortFailedState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "unavailable":
+		var value TunnelPortUnavailableState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &TunnelPortClientStateUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u TunnelPortClientState) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*TunnelPortClientStateUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *TunnelPortPendingState:
+		object["status"] = json.RawMessage("\"pending\"")
+	case *TunnelPortAcceptedState:
+		object["status"] = json.RawMessage("\"accepted\"")
+	case *TunnelPortReadyState:
+		object["status"] = json.RawMessage("\"ready\"")
+	case *TunnelPortDeclinedState:
+		object["status"] = json.RawMessage("\"declined\"")
+	case *TunnelPortFailedState:
+		object["status"] = json.RawMessage("\"failed\"")
+	case *TunnelPortUnavailableState:
+		object["status"] = json.RawMessage("\"unavailable\"")
+	}
+	return json.Marshal(object)
+}
+
+// TunnelPortRequester is the durable attribution for a port-forwarding request.
+type TunnelPortRequester struct {
+	Value isTunnelPortRequester
+}
+
+// isTunnelPortRequester is the marker interface implemented by every
+// concrete variant of TunnelPortRequester.
+type isTunnelPortRequester interface{ isTunnelPortRequester() }
+
+func (*TunnelPortHostRequester) isTunnelPortRequester()   {}
+func (*TunnelPortClientRequester) isTunnelPortRequester() {}
+
+// TunnelPortRequesterUnknown carries an unrecognized TunnelPortRequester variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type TunnelPortRequesterUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*TunnelPortRequesterUnknown) isTunnelPortRequester() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *TunnelPortRequester) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "host":
+		var value TunnelPortHostRequester
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "client":
+		var value TunnelPortClientRequester
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &TunnelPortRequesterUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u TunnelPortRequester) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*TunnelPortRequesterUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *TunnelPortHostRequester:
+		object["kind"] = json.RawMessage("\"host\"")
+	case *TunnelPortClientRequester:
+		object["kind"] = json.RawMessage("\"client\"")
+	}
+	return json.Marshal(object)
+}
+
+// TunnelPort is one authoritative port-forward entry in the tunnels state.
+type TunnelPort struct {
+	Value isTunnelPort
+}
+
+// isTunnelPort is the marker interface implemented by every
+// concrete variant of TunnelPort.
+type isTunnelPort interface{ isTunnelPort() }
+
+func (*HostToClientTunnelPort) isTunnelPort() {}
+func (*ClientToHostTunnelPort) isTunnelPort() {}
+
+// TunnelPortUnknown carries an unrecognized TunnelPort variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type TunnelPortUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*TunnelPortUnknown) isTunnelPort() {}
+
+// UnmarshalJSON decodes the variant indicated by the "direction" discriminator.
+func (u *TunnelPort) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "direction")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "hostToClient":
+		var value HostToClientTunnelPort
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "clientToHost":
+		var value ClientToHostTunnelPort
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &TunnelPortUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u TunnelPort) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*TunnelPortUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *HostToClientTunnelPort:
+		object["direction"] = json.RawMessage("\"hostToClient\"")
+	case *ClientToHostTunnelPort:
+		object["direction"] = json.RawMessage("\"clientToHost\"")
+	}
+	return json.Marshal(object)
+}
+
 // ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
 	Value isChatOrigin
@@ -5842,11 +6346,11 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 // SnapshotState is the state payload of a snapshot — root, session,
 // chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// automation-run, or tunnel-catalogue state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
 // (automationRun → automations → session → chat → terminal → changeset →
-// resourceWatch → annotations → root).
+// resourceWatch → annotations → tunnels → root).
 type SnapshotState struct {
 	Root          *RootState              `json:"-"`
 	Session       *SessionState           `json:"-"`
@@ -5857,6 +6361,7 @@ type SnapshotState struct {
 	Annotations   *AnnotationsState       `json:"-"`
 	Automations   *AutomationCatalogState `json:"-"`
 	AutomationRun *AutomationRunState     `json:"-"`
+	Tunnels       *TunnelsState           `json:"-"`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
@@ -5878,6 +6383,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 		return json.Marshal(s.ResourceWatch)
 	case s.Annotations != nil:
 		return json.Marshal(s.Annotations)
+	case s.Tunnels != nil:
+		return json.Marshal(s.Tunnels)
 	case s.Root != nil:
 		return json.Marshal(s.Root)
 	default:
@@ -5942,6 +6449,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.Annotations = &v
+	case containsAll(probe, "ports"):
+		var v TunnelsState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Tunnels = &v
 	default:
 		var v RootState
 		if err := json.Unmarshal(data, &v); err != nil {

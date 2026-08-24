@@ -173,6 +173,10 @@ type InitializeResult struct {
 	// `ahp-automations://` for {@link AutomationCatalogState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
+	// Host-owned tunnel coordination support. Presence advertises the
+	// state-bearing catalogue channel; it does not mean the host establishes
+	// forwards itself.
+	Tunnels *TunnelingCapabilities `json:"tunnels,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -193,6 +197,9 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	// Port-forwarding directions this client can establish through facilities
+	// outside AHP. The host coordinates their state on its tunnels channel.
+	Tunnels *ClientTunnelingCapabilities `json:"tunnels,omitempty"`
 }
 
 // Automation features supported by this host authority.

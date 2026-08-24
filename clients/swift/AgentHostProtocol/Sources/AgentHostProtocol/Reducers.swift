@@ -1461,6 +1461,84 @@ public func resourceWatchReducer(state: ResourceWatchState, action: StateAction)
     }
 }
 
+// MARK: - Tunnels Reducer
+
+/// Pure reducer for tunnels state.
+public func tunnelReducer(state: TunnelsState, action: StateAction) -> TunnelsState {
+    var next = state
+    switch action {
+    case .tunnelPortSet(let value):
+        guard let resource = tunnelPortResource(value.port) else { return state }
+        if let index = next.ports.firstIndex(where: { tunnelPortResource($0) == resource }) {
+            next.ports[index] = value.port
+        } else {
+            next.ports.append(value.port)
+        }
+    case .tunnelPortClientUpdated(let value):
+        guard let portIndex = next.ports.firstIndex(where: { tunnelPortResource($0) == value.resource }) else {
+            return state
+        }
+        switch next.ports[portIndex] {
+        case .hostToClient(var port):
+            guard let clientIndex = port.clients.firstIndex(where: { $0.clientId == value.clientId }) else {
+                return state
+            }
+            port.clients[clientIndex].state = value.state
+            next.ports[portIndex] = .hostToClient(port)
+        case .clientToHost(var port):
+            guard port.client.clientId == value.clientId else { return state }
+            port.client.state = value.state
+            next.ports[portIndex] = .clientToHost(port)
+        case .unknown:
+            return state
+        }
+    case .tunnelPortClientSet(let value):
+        guard let portIndex = next.ports.firstIndex(where: { tunnelPortResource($0) == value.resource }) else {
+            return state
+        }
+        switch next.ports[portIndex] {
+        case .hostToClient(var port):
+            if let clientIndex = port.clients.firstIndex(where: { $0.clientId == value.client.clientId }) {
+                port.clients[clientIndex] = value.client
+            } else {
+                port.clients.append(value.client)
+            }
+            next.ports[portIndex] = .hostToClient(port)
+        case .clientToHost(var port):
+            port.client = value.client
+            next.ports[portIndex] = .clientToHost(port)
+        case .unknown:
+            return state
+        }
+    case .tunnelPortClientRemoved(let value):
+        guard let portIndex = next.ports.firstIndex(where: { tunnelPortResource($0) == value.resource }) else {
+            return state
+        }
+        guard case .hostToClient(var port) = next.ports[portIndex],
+              let clientIndex = port.clients.firstIndex(where: { $0.clientId == value.clientId }) else {
+            return state
+        }
+        port.clients.remove(at: clientIndex)
+        next.ports[portIndex] = .hostToClient(port)
+    case .tunnelPortRemoved(let value):
+        guard let index = next.ports.firstIndex(where: { tunnelPortResource($0) == value.resource }) else {
+            return state
+        }
+        next.ports.remove(at: index)
+    default:
+        return state
+    }
+    return next
+}
+
+private func tunnelPortResource(_ port: TunnelPort) -> String? {
+    switch port {
+    case .hostToClient(let port): return port.resource
+    case .clientToHost(let port): return port.resource
+    case .unknown: return nil
+    }
+}
+
 /// Pure reducer for automation catalogue state.
 public func automationReducer(state: AutomationCatalogState, action: StateAction) -> AutomationCatalogState {
     var next = state

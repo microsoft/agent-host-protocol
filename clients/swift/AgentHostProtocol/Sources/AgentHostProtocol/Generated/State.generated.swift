@@ -1098,6 +1098,110 @@ public enum AutomationRunOriginKind: String, Codable, Sendable {
     case trigger = "trigger"
 }
 
+/// Direction of one coordinated port forward.
+///
+/// `AtoB` means a service reachable from A is exposed through a listening
+/// address on B. It does not describe byte flow, which is bidirectional.
+public enum TunnelPortDirectionKind: Codable, Sendable, Equatable {
+    /// A host-side service is exposed through one or more client-side listeners.
+    case hostToClient
+    /// A client-side service is exposed through a host-side listener.
+    case clientToHost
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "hostToClient": self = .hostToClient
+        case "clientToHost": self = .clientToHost
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .hostToClient: try container.encode("hostToClient")
+        case .clientToHost: try container.encode("clientToHost")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Lifecycle status of a client-owned forwarding attempt.
+public enum TunnelPortClientStatus: Codable, Sendable, Equatable {
+    /// The client has not yet accepted or declined the forwarding request.
+    case pending
+    /// The client accepted the request and is establishing the forward.
+    case accepted
+    /// The client reports that the forward is active.
+    case ready
+    /// The client explicitly declined the request.
+    case declined
+    /// The client accepted the request but failed to establish the forward.
+    case failed
+    /// The assigned client is disconnected or no longer capable of forwarding.
+    case unavailable
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "pending": self = .pending
+        case "accepted": self = .accepted
+        case "ready": self = .ready
+        case "declined": self = .declined
+        case "failed": self = .failed
+        case "unavailable": self = .unavailable
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .pending: try container.encode("pending")
+        case .accepted: try container.encode("accepted")
+        case .ready: try container.encode("ready")
+        case .declined: try container.encode("declined")
+        case .failed: try container.encode("failed")
+        case .unavailable: try container.encode("unavailable")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Actor that originally requested a port forward.
+public enum TunnelPortRequesterKind: Codable, Sendable, Equatable {
+    case host
+    case client
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "host": self = .host
+        case "client": self = .client
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .host: try container.encode("host")
+        case .client: try container.encode("client")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 // MARK: - State Types
 
 public struct Icon: Codable, Sendable {
@@ -6609,6 +6713,392 @@ public struct AutomationRunState: Codable, Sendable {
     }
 }
 
+public struct TunnelingCapabilities: Codable, Sendable {
+    /// The host-owned tunnels channel.
+    public var channel: String
+
+    public init(
+        channel: String
+    ) {
+        self.channel = channel
+    }
+}
+
+public struct ClientTunnelingCapabilities: Codable, Sendable {
+    /// Make a host-side service reachable at a client-side listening address.
+    public var hostToClient: [String: AnyCodable]?
+    /// Make a client-side service reachable at a host-side listening address.
+    public var clientToHost: [String: AnyCodable]?
+
+    public init(
+        hostToClient: [String: AnyCodable]? = nil,
+        clientToHost: [String: AnyCodable]? = nil
+    ) {
+        self.hostToClient = hostToClient
+        self.clientToHost = clientToHost
+    }
+}
+
+public struct TunnelAddress: Codable, Sendable {
+    /// Host name or numeric IP address meaningful from the side that owns it.
+    public var host: String
+    /// TCP port. A requested local address MAY use `0` to ask the forwarding
+    /// implementation to allocate an available port; a ready forward MUST report
+    /// the effective non-zero port.
+    public var port: Int
+
+    public init(
+        host: String,
+        port: Int
+    ) {
+        self.host = host
+        self.port = port
+    }
+}
+
+public struct TunnelPortPendingState: Codable, Sendable {
+    public var status: TunnelPortClientStatus
+
+    public init(
+        status: TunnelPortClientStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct TunnelPortAcceptedState: Codable, Sendable {
+    public var status: TunnelPortClientStatus
+
+    public init(
+        status: TunnelPortClientStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct TunnelPortReadyState: Codable, Sendable {
+    public var status: TunnelPortClientStatus
+    /// Effective listening endpoint after the forwarding mechanism is active.
+    public var localAddress: TunnelAddress
+    /// Effective target endpoint after the forwarding mechanism is active.
+    public var remoteAddress: TunnelAddress
+
+    public init(
+        status: TunnelPortClientStatus,
+        localAddress: TunnelAddress,
+        remoteAddress: TunnelAddress
+    ) {
+        self.status = status
+        self.localAddress = localAddress
+        self.remoteAddress = remoteAddress
+    }
+}
+
+public struct TunnelPortDeclinedState: Codable, Sendable {
+    public var status: TunnelPortClientStatus
+    /// Optional human-readable explanation.
+    public var reason: String?
+
+    public init(
+        status: TunnelPortClientStatus,
+        reason: String? = nil
+    ) {
+        self.status = status
+        self.reason = reason
+    }
+}
+
+public struct TunnelPortFailedState: Codable, Sendable {
+    public var status: TunnelPortClientStatus
+    /// Failure reported by the client-owned forwarding implementation.
+    public var error: ErrorInfo
+
+    public init(
+        status: TunnelPortClientStatus,
+        error: ErrorInfo
+    ) {
+        self.status = status
+        self.error = error
+    }
+}
+
+public struct TunnelPortUnavailableState: Codable, Sendable {
+    public var status: TunnelPortClientStatus
+    /// Optional human-readable explanation.
+    public var reason: String?
+
+    public init(
+        status: TunnelPortClientStatus,
+        reason: String? = nil
+    ) {
+        self.status = status
+        self.reason = reason
+    }
+}
+
+public struct TunnelPortClient: Codable, Sendable {
+    /// Matches the `clientId` supplied during `initialize`.
+    public var clientId: String
+    /// Current client-owned lifecycle.
+    public var state: TunnelPortClientState
+
+    public init(
+        clientId: String,
+        state: TunnelPortClientState
+    ) {
+        self.clientId = clientId
+        self.state = state
+    }
+}
+
+public struct TunnelPortHostRequester: Codable, Sendable {
+    public var kind: TunnelPortRequesterKind
+
+    public init(
+        kind: TunnelPortRequesterKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct TunnelPortClientRequester: Codable, Sendable {
+    public var kind: TunnelPortRequesterKind
+    /// Client that requested the forward.
+    public var clientId: String
+
+    public init(
+        kind: TunnelPortRequesterKind,
+        clientId: String
+    ) {
+        self.kind = kind
+        self.clientId = clientId
+    }
+}
+
+public struct TunnelPortBase: Codable, Sendable {
+    /// Stable `ahp-tunnel:/<id>` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.
+    public var resource: String
+    /// Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.
+    public var requestedLocalAddress: TunnelAddress
+    /// Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.
+    public var requestedRemoteAddress: TunnelAddress
+    /// Optional human-readable name, such as `"Development server"`.
+    public var title: String?
+    /// Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.
+    public var `protocol`: String?
+    /// Actor that originally requested this forward.
+    public var requestedBy: TunnelPortRequester
+    /// Creation timestamp in ISO 8601 format.
+    public var createdAt: String
+    /// Opaque implementation-defined metadata.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case requestedLocalAddress
+        case requestedRemoteAddress
+        case title
+        case `protocol` = "protocol"
+        case requestedBy
+        case createdAt
+        case meta = "_meta"
+    }
+
+    public init(
+        resource: String,
+        requestedLocalAddress: TunnelAddress,
+        requestedRemoteAddress: TunnelAddress,
+        title: String? = nil,
+        `protocol`: String? = nil,
+        requestedBy: TunnelPortRequester,
+        createdAt: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.resource = resource
+        self.requestedLocalAddress = requestedLocalAddress
+        self.requestedRemoteAddress = requestedRemoteAddress
+        self.title = title
+        self.`protocol` = `protocol`
+        self.requestedBy = requestedBy
+        self.createdAt = createdAt
+        self.meta = meta
+    }
+}
+
+public struct HostToClientTunnelPort: Codable, Sendable {
+    /// Stable `ahp-tunnel:/<id>` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.
+    public var resource: String
+    /// Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.
+    public var requestedLocalAddress: TunnelAddress
+    /// Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.
+    public var requestedRemoteAddress: TunnelAddress
+    /// Optional human-readable name, such as `"Development server"`.
+    public var title: String?
+    /// Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.
+    public var `protocol`: String?
+    /// Actor that originally requested this forward.
+    public var requestedBy: TunnelPortRequester
+    /// Creation timestamp in ISO 8601 format.
+    public var createdAt: String
+    /// Opaque implementation-defined metadata.
+    public var meta: [String: AnyCodable]?
+    public var direction: TunnelPortDirectionKind
+    /// Clients invited to establish this forward.
+    public var clients: [TunnelPortClient]
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case requestedLocalAddress
+        case requestedRemoteAddress
+        case title
+        case `protocol` = "protocol"
+        case requestedBy
+        case createdAt
+        case meta = "_meta"
+        case direction
+        case clients
+    }
+
+    public init(
+        resource: String,
+        requestedLocalAddress: TunnelAddress,
+        requestedRemoteAddress: TunnelAddress,
+        title: String? = nil,
+        `protocol`: String? = nil,
+        requestedBy: TunnelPortRequester,
+        createdAt: String,
+        meta: [String: AnyCodable]? = nil,
+        direction: TunnelPortDirectionKind,
+        clients: [TunnelPortClient]
+    ) {
+        self.resource = resource
+        self.requestedLocalAddress = requestedLocalAddress
+        self.requestedRemoteAddress = requestedRemoteAddress
+        self.title = title
+        self.`protocol` = `protocol`
+        self.requestedBy = requestedBy
+        self.createdAt = createdAt
+        self.meta = meta
+        self.direction = direction
+        self.clients = clients
+    }
+}
+
+public struct ClientToHostTunnelPort: Codable, Sendable {
+    /// Stable `ahp-tunnel:/<id>` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.
+    public var resource: String
+    /// Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.
+    public var requestedLocalAddress: TunnelAddress
+    /// Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.
+    public var requestedRemoteAddress: TunnelAddress
+    /// Optional human-readable name, such as `"Development server"`.
+    public var title: String?
+    /// Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.
+    public var `protocol`: String?
+    /// Actor that originally requested this forward.
+    public var requestedBy: TunnelPortRequester
+    /// Creation timestamp in ISO 8601 format.
+    public var createdAt: String
+    /// Opaque implementation-defined metadata.
+    public var meta: [String: AnyCodable]?
+    public var direction: TunnelPortDirectionKind
+    /// Client responsible for establishing this forward.
+    public var client: TunnelPortClient
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case requestedLocalAddress
+        case requestedRemoteAddress
+        case title
+        case `protocol` = "protocol"
+        case requestedBy
+        case createdAt
+        case meta = "_meta"
+        case direction
+        case client
+    }
+
+    public init(
+        resource: String,
+        requestedLocalAddress: TunnelAddress,
+        requestedRemoteAddress: TunnelAddress,
+        title: String? = nil,
+        `protocol`: String? = nil,
+        requestedBy: TunnelPortRequester,
+        createdAt: String,
+        meta: [String: AnyCodable]? = nil,
+        direction: TunnelPortDirectionKind,
+        client: TunnelPortClient
+    ) {
+        self.resource = resource
+        self.requestedLocalAddress = requestedLocalAddress
+        self.requestedRemoteAddress = requestedRemoteAddress
+        self.title = title
+        self.`protocol` = `protocol`
+        self.requestedBy = requestedBy
+        self.createdAt = createdAt
+        self.meta = meta
+        self.direction = direction
+        self.client = client
+    }
+}
+
+public struct TunnelsState: Codable, Sendable {
+    /// Full port-forward entries keyed by `resource`.
+    public var ports: [TunnelPort]
+    /// Opaque host-defined state metadata.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case ports
+        case meta = "_meta"
+    }
+
+    public init(
+        ports: [TunnelPort],
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.ports = ports
+        self.meta = meta
+    }
+}
+
 // MARK: - Customization Enablement Union
 
 /// A single explicit customization enablement decision.
@@ -7640,6 +8130,150 @@ public enum AutomationRunLifecycle: Codable, Sendable {
     }
 }
 
+public enum TunnelPortClientState: Codable, Sendable {
+    case pending(TunnelPortPendingState)
+    case accepted(TunnelPortAcceptedState)
+    case ready(TunnelPortReadyState)
+    case declined(TunnelPortDeclinedState)
+    case failed(TunnelPortFailedState)
+    case unavailable(TunnelPortUnavailableState)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "status"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "pending":
+            self = .pending(try TunnelPortPendingState(from: decoder))
+        case "accepted":
+            self = .accepted(try TunnelPortAcceptedState(from: decoder))
+        case "ready":
+            self = .ready(try TunnelPortReadyState(from: decoder))
+        case "declined":
+            self = .declined(try TunnelPortDeclinedState(from: decoder))
+        case "failed":
+            self = .failed(try TunnelPortFailedState(from: decoder))
+        case "unavailable":
+            self = .unavailable(try TunnelPortUnavailableState(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .pending(var value):
+            value.status = .pending
+            try value.encode(to: encoder)
+        case .accepted(var value):
+            value.status = .accepted
+            try value.encode(to: encoder)
+        case .ready(var value):
+            value.status = .ready
+            try value.encode(to: encoder)
+        case .declined(var value):
+            value.status = .declined
+            try value.encode(to: encoder)
+        case .failed(var value):
+            value.status = .failed
+            try value.encode(to: encoder)
+        case .unavailable(var value):
+            value.status = .unavailable
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum TunnelPortRequester: Codable, Sendable {
+    case host(TunnelPortHostRequester)
+    case client(TunnelPortClientRequester)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "host":
+            self = .host(try TunnelPortHostRequester(from: decoder))
+        case "client":
+            self = .client(try TunnelPortClientRequester(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .host(var value):
+            value.kind = .host
+            try value.encode(to: encoder)
+        case .client(var value):
+            value.kind = .client
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum TunnelPort: Codable, Sendable {
+    case hostToClient(HostToClientTunnelPort)
+    case clientToHost(ClientToHostTunnelPort)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "direction"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "hostToClient":
+            self = .hostToClient(try HostToClientTunnelPort(from: decoder))
+        case "clientToHost":
+            self = .clientToHost(try ClientToHostTunnelPort(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .hostToClient(var value):
+            value.direction = .hostToClient
+            try value.encode(to: encoder)
+        case .clientToHost(var value):
+            value.direction = .clientToHost
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
 public enum ToolResultContent: Codable, Sendable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
@@ -7706,13 +8340,19 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
     case automations(AutomationCatalogState)
     case automationRun(AutomationRunState)
+    case tunnels(TunnelsState)
+
+    private enum SnapshotCodingKeys: String, CodingKey { case ports }
 
     public init(from decoder: Decoder) throws {
         // Try the most distinctive shapes first. SessionState has required
         // `lifecycle` / `activeClients` / `chats`; ChatState has required
         // `turns`; the remaining variants follow, with RootState as the
         // catch-all.
-        if let session = try? SessionState(from: decoder) {
+        let shape = try decoder.container(keyedBy: SnapshotCodingKeys.self)
+        if shape.contains(.ports) {
+            self = .tunnels(try TunnelsState(from: decoder))
+        } else if let session = try? SessionState(from: decoder) {
             self = .session(session)
         } else if let chat = try? ChatState(from: decoder) {
             self = .chat(chat)
@@ -7744,6 +8384,7 @@ public enum SnapshotState: Codable, Sendable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .tunnels(let state): try state.encode(to: encoder)
         }
     }
 }

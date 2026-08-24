@@ -380,7 +380,13 @@ data class InitializeResult(
      * `ahp-automations://` for {@link AutomationCatalogState}; absence means the
      * host does not expose an automation catalogue or automation commands.
      */
-    val automations: AutomationCapabilities? = null
+    val automations: AutomationCapabilities? = null,
+    /**
+     * Host-owned tunnel coordination support. Presence advertises the
+     * state-bearing catalogue channel; it does not mean the host establishes
+     * forwards itself.
+     */
+    val tunnels: TunnelingCapabilities? = null
 )
 
 @Serializable
@@ -398,7 +404,12 @@ data class ClientCapabilities(
      * capability is declared. Clients that omit it MUST treat
      * App-bearing tool calls as ordinary MCP tool calls.
      */
-    val mcpApps: Map<String, JsonElement>? = null
+    val mcpApps: Map<String, JsonElement>? = null,
+    /**
+     * Port-forwarding directions this client can establish through facilities
+     * outside AHP. The host coordinates their state on its tunnels channel.
+     */
+    val tunnels: ClientTunnelingCapabilities? = null
 )
 
 @Serializable

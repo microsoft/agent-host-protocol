@@ -41,16 +41,19 @@ use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
     AnnotationsState, AutomationCatalogState, AutomationRunState, AutomationState, ChangesetState,
     ChatState, ResourceWatchState, RootState, SessionState, SnapshotState, TerminalState,
+    TunnelsState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
 use crate::reducers::{
     apply_action_to_automation, apply_action_to_automation_run, apply_action_to_chat,
     apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
+    apply_action_to_tunnel,
 };
 use crate::SubscriptionEvent;
 
 const AUTOMATIONS_RESOURCE_URI: &str = "ahp-automations://";
+const TUNNELS_RESOURCE_URI: &str = "ahp-tunnels://";
 
 /// Compound key tagging a channel URI with the host that produced it.
 ///
@@ -97,6 +100,7 @@ pub struct MultiHostStateMirror {
     changesets: HashMap<HostedResourceKey, ChangesetState>,
     annotations: HashMap<HostedResourceKey, AnnotationsState>,
     resource_watches: HashMap<HostedResourceKey, ResourceWatchState>,
+    tunnel_catalogs: HashMap<HostId, TunnelsState>,
     automation_catalogs: HashMap<HostId, AutomationCatalogState>,
     automations: HashMap<HostedResourceKey, AutomationState>,
     automation_runs: HashMap<HostedResourceKey, AutomationRunState>,
@@ -141,6 +145,11 @@ impl MultiHostStateMirror {
     /// Borrow the resource-watch states map keyed by `(host_id, uri)`.
     pub fn resource_watches(&self) -> &HashMap<HostedResourceKey, ResourceWatchState> {
         &self.resource_watches
+    }
+
+    /// Borrow tunnels states keyed by host.
+    pub fn tunnel_catalogs(&self) -> &HashMap<HostId, TunnelsState> {
+        &self.tunnel_catalogs
     }
 
     /// Borrow automation catalogue states keyed by host.
@@ -198,6 +207,12 @@ impl MultiHostStateMirror {
             }
             return;
         }
+        if envelope.channel == TUNNELS_RESOURCE_URI {
+            if let Some(catalog) = self.tunnel_catalogs.get_mut(host) {
+                apply_action_to_tunnel(catalog, &envelope.action);
+            }
+            return;
+        }
         let key = HostedResourceKey::new(host.clone(), envelope.channel.clone());
         if let Some(session) = self.sessions.get_mut(&key) {
             apply_action_to_session(session, &envelope.action);
@@ -248,6 +263,10 @@ impl MultiHostStateMirror {
             SnapshotState::Annotations(state) => {
                 self.annotations.insert(key, state.as_ref().clone());
             }
+            SnapshotState::Tunnels(state) => {
+                self.tunnel_catalogs
+                    .insert(host.clone(), state.as_ref().clone());
+            }
             SnapshotState::Automations(state) => {
                 let state = state.as_ref().clone();
                 self.replace_automations(host, state.automations.clone());
@@ -270,6 +289,7 @@ impl MultiHostStateMirror {
         self.changesets.retain(|key, _| &key.host_id != host);
         self.annotations.retain(|key, _| &key.host_id != host);
         self.resource_watches.retain(|key, _| &key.host_id != host);
+        self.tunnel_catalogs.remove(host);
         self.automation_catalogs.remove(host);
         self.automations.retain(|key, _| &key.host_id != host);
         self.automation_runs.retain(|key, _| &key.host_id != host);
@@ -284,6 +304,7 @@ impl MultiHostStateMirror {
         self.changesets.clear();
         self.annotations.clear();
         self.resource_watches.clear();
+        self.tunnel_catalogs.clear();
         self.automation_catalogs.clear();
         self.automations.clear();
         self.automation_runs.clear();

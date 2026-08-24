@@ -31,6 +31,7 @@ type MultiHostStateMirror struct {
 	chat          map[HostedResourceKey]ahptypes.ChatState
 	term          map[HostedResourceKey]ahptypes.TerminalState
 	changes       map[HostedResourceKey]ahptypes.ChangesetState
+	tunnelCat     map[string]ahptypes.TunnelsState
 	automationCat map[string]ahptypes.AutomationCatalogState
 	automation    map[HostedResourceKey]ahptypes.AutomationState
 	automationRun map[HostedResourceKey]ahptypes.AutomationRunState
@@ -44,6 +45,7 @@ func NewMultiHostStateMirror() *MultiHostStateMirror {
 		chat:          make(map[HostedResourceKey]ahptypes.ChatState),
 		term:          make(map[HostedResourceKey]ahptypes.TerminalState),
 		changes:       make(map[HostedResourceKey]ahptypes.ChangesetState),
+		tunnelCat:     make(map[string]ahptypes.TunnelsState),
 		automationCat: make(map[string]ahptypes.AutomationCatalogState),
 		automation:    make(map[HostedResourceKey]ahptypes.AutomationState),
 		automationRun: make(map[HostedResourceKey]ahptypes.AutomationRunState),
@@ -130,6 +132,21 @@ func (m *MultiHostStateMirror) Changeset(hostID string, uri ahptypes.URI) (ahpty
 	return v, ok
 }
 
+// PutTunnelCatalog stores a host's tunnels-channel snapshot.
+func (m *MultiHostStateMirror) PutTunnelCatalog(hostID string, catalog ahptypes.TunnelsState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.tunnelCat[hostID] = catalog
+}
+
+// TunnelCatalog returns the tunnels state for hostID.
+func (m *MultiHostStateMirror) TunnelCatalog(hostID string) (ahptypes.TunnelsState, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.tunnelCat[hostID]
+	return v, ok
+}
+
 // PutAutomationCatalog stores a host's automation catalogue snapshot and
 // refreshes the per-automation lookup.
 func (m *MultiHostStateMirror) PutAutomationCatalog(hostID string, catalog ahptypes.AutomationCatalogState) {
@@ -183,6 +200,7 @@ func (m *MultiHostStateMirror) DropHost(hostID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.roots, hostID)
+	delete(m.tunnelCat, hostID)
 	delete(m.automationCat, hostID)
 	for k := range m.session {
 		if k.HostID == hostID {
@@ -229,6 +247,9 @@ func (m *MultiHostStateMirror) DropResource(hostID string, uri ahptypes.URI) {
 				delete(m.automation, key)
 			}
 		}
+	}
+	if uri == "ahp-tunnels://" {
+		delete(m.tunnelCat, hostID)
 	}
 	delete(m.session, k)
 	delete(m.chat, k)

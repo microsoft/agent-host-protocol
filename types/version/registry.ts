@@ -175,6 +175,11 @@ export const ACTION_INTRODUCED_IN: { readonly [K in StateAction['type']]: string
   [ActionType.AutomationRunSessionRemoved]: '0.8.0',
   [ActionType.AutomationRunPrimarySessionChanged]: '0.8.0',
   [ActionType.AutomationRunCancelRequested]: '0.8.0',
+  [ActionType.TunnelPortSet]: '1.0.0',
+  [ActionType.TunnelPortClientSet]: '1.0.0',
+  [ActionType.TunnelPortClientUpdated]: '1.0.0',
+  [ActionType.TunnelPortClientRemoved]: '1.0.0',
+  [ActionType.TunnelPortRemoved]: '1.0.0',
 };
 
 /**

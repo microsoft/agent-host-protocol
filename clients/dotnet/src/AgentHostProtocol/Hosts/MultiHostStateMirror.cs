@@ -23,6 +23,7 @@ public sealed class MultiHostStateMirror
     private readonly ConcurrentDictionary<HostedResourceKey, ChatState> _chats = new();
     private readonly ConcurrentDictionary<HostedResourceKey, TerminalState> _terminals = new();
     private readonly ConcurrentDictionary<HostedResourceKey, ChangesetState> _changesets = new();
+    private readonly ConcurrentDictionary<string, TunnelsState> _tunnelCatalogs = new(StringComparer.Ordinal);
 
     /// <summary>Stores <paramref name="root"/> for <paramref name="hostId"/>.</summary>
     public void PutRoot(string hostId, RootState root)
@@ -88,10 +89,23 @@ public sealed class MultiHostStateMirror
     public (ChangesetState? Value, bool Found) Changeset(string hostId, string uri) =>
         _changesets.TryGetValue(new HostedResourceKey(hostId, uri), out var v) ? (v, true) : (default, false);
 
+    /// <summary>Stores a tunnels-channel snapshot for <paramref name="hostId"/>.</summary>
+    public void PutTunnelCatalog(string hostId, TunnelsState state)
+    {
+        Guard.ThrowIfNull(hostId, nameof(hostId));
+        Guard.ThrowIfNull(state, nameof(state));
+        _tunnelCatalogs[hostId] = state;
+    }
+
+    /// <summary>Returns the tunnels state for <paramref name="hostId"/>, or (default, false) if absent.</summary>
+    public (TunnelsState? Value, bool Found) TunnelCatalog(string hostId) =>
+        _tunnelCatalogs.TryGetValue(hostId, out var v) ? (v, true) : (default, false);
+
     /// <summary>Removes every snapshot belonging to <paramref name="hostId"/>.</summary>
     public void DropHost(string hostId)
     {
         _roots.TryRemove(hostId, out _);
+        _tunnelCatalogs.TryRemove(hostId, out _);
         foreach (var k in _sessions.Keys) if (k.HostId.ToString() == hostId) _sessions.TryRemove(k, out _);
         foreach (var k in _chats.Keys) if (k.HostId.ToString() == hostId) _chats.TryRemove(k, out _);
         foreach (var k in _terminals.Keys) if (k.HostId.ToString() == hostId) _terminals.TryRemove(k, out _);
@@ -102,6 +116,7 @@ public sealed class MultiHostStateMirror
     public void DropResource(string hostId, string uri)
     {
         var key = new HostedResourceKey(hostId, uri);
+        if (uri == "ahp-tunnels://") _tunnelCatalogs.TryRemove(hostId, out _);
         _sessions.TryRemove(key, out _);
         _chats.TryRemove(key, out _);
         _terminals.TryRemove(key, out _);

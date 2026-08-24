@@ -172,7 +172,7 @@ function mapType(tsType: string): string {
 
   // SnapshotState is the discriminated union of all per-channel state types
   // (RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState |
-  // AnnotationsState, with `I`-prefixed interface variants in some positions). Match it
+  // AnnotationsState | TunnelsState, with `I`-prefixed interface variants in some positions). Match it
   // structurally — any union whose members are all `*State` types — so a new state
   // variant added upstream (e.g. ResourceWatchState) maps without a hand-edit here.
   const unionMembers = tsType.split('|').map((m) => m.trim());
@@ -589,6 +589,8 @@ interface UnionConfig {
   doc?: string;
   variants: UnionVariant[];
   unknown?: boolean;
+  /** Replace a known variant's discriminator with the wrapper's wire value. */
+  injectDiscriminantOnWrite?: boolean;
 }
 
 function generateDiscriminatedUnion(cfg: UnionConfig): string {
@@ -624,6 +626,39 @@ function generateDiscriminatedUnion(cfg: UnionConfig): string {
   lines.push(`            allowUnknown: ${cfg.unknown ? 'true' : 'false'})`);
   lines.push('    {');
   lines.push('    }');
+  if (cfg.injectDiscriminantOnWrite) {
+    const runtimeCases = cfg.variants
+      .map((v) => `            ${v.innerType} => ${JSON.stringify(v.wireValue)},`)
+      .join('\n');
+    lines.push('');
+    lines.push(`    public override void Write(Utf8JsonWriter writer, ${cfg.name} value, JsonSerializerOptions options)`);
+    lines.push('    {');
+    lines.push('        object? inner = value?.Value;');
+    lines.push('        if (inner is null)');
+    lines.push('        {');
+    lines.push('            writer.WriteNullValue();');
+    lines.push('            return;');
+    lines.push('        }');
+    lines.push('        if (inner is JsonElement raw)');
+    lines.push('        {');
+    lines.push('            raw.WriteTo(writer);');
+    lines.push('            return;');
+    lines.push('        }');
+    lines.push('        string discriminator = inner switch');
+    lines.push('        {');
+    lines.push(runtimeCases);
+    lines.push(`            _ => throw new JsonException("Unsupported ${cfg.name} variant"),`);
+    lines.push('        };');
+    lines.push('        JsonElement element = JsonSerializer.SerializeToElement(inner, inner.GetType(), options);');
+    lines.push('        writer.WriteStartObject();');
+    lines.push(`        writer.WriteString(${JSON.stringify(cfg.discriminantField)}, discriminator);`);
+    lines.push('        foreach (JsonProperty property in element.EnumerateObject())');
+    lines.push('        {');
+    lines.push(`            if (!property.NameEquals(${JSON.stringify(cfg.discriminantField)})) property.WriteTo(writer);`);
+    lines.push('        }');
+    lines.push('        writer.WriteEndObject();');
+    lines.push('    }');
+  }
   lines.push('}');
   return lines.join('\n');
 }
@@ -646,6 +681,7 @@ const STATE_ENUMS = [
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'TunnelPortDirectionKind', 'TunnelPortClientStatus', 'TunnelPortRequesterKind',
 ];
 
 // `mutable: true` marks the STATE types the reducers mutate in place — these
@@ -802,6 +838,22 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState', mutable: true },
+  { name: 'TunnelingCapabilities' },
+  { name: 'ClientTunnelingCapabilities' },
+  { name: 'TunnelAddress' },
+  { name: 'TunnelPortPendingState' },
+  { name: 'TunnelPortAcceptedState' },
+  { name: 'TunnelPortReadyState' },
+  { name: 'TunnelPortDeclinedState' },
+  { name: 'TunnelPortFailedState' },
+  { name: 'TunnelPortUnavailableState' },
+  { name: 'TunnelPortClient' },
+  { name: 'TunnelPortHostRequester' },
+  { name: 'TunnelPortClientRequester' },
+  { name: 'TunnelPortBase' },
+  { name: 'HostToClientTunnelPort' },
+  { name: 'ClientToHostTunnelPort' },
+  { name: 'TunnelsState', mutable: true },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1191,6 +1243,46 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+const TUNNEL_PORT_CLIENT_STATE_UNION: UnionConfig = {
+  name: 'TunnelPortClientState',
+  discriminantField: 'status',
+  doc: 'TunnelPortClientState is the lifecycle of one client-owned forwarding attempt.',
+  variants: [
+    { variantName: 'Pending', innerType: 'TunnelPortPendingState', wireValue: 'pending' },
+    { variantName: 'Accepted', innerType: 'TunnelPortAcceptedState', wireValue: 'accepted' },
+    { variantName: 'Ready', innerType: 'TunnelPortReadyState', wireValue: 'ready' },
+    { variantName: 'Declined', innerType: 'TunnelPortDeclinedState', wireValue: 'declined' },
+    { variantName: 'Failed', innerType: 'TunnelPortFailedState', wireValue: 'failed' },
+    { variantName: 'Unavailable', innerType: 'TunnelPortUnavailableState', wireValue: 'unavailable' },
+  ],
+  unknown: true,
+  injectDiscriminantOnWrite: true,
+};
+
+const TUNNEL_PORT_REQUESTER_UNION: UnionConfig = {
+  name: 'TunnelPortRequester',
+  discriminantField: 'kind',
+  doc: 'TunnelPortRequester is the durable attribution for a port-forwarding request.',
+  variants: [
+    { variantName: 'Host', innerType: 'TunnelPortHostRequester', wireValue: 'host' },
+    { variantName: 'Client', innerType: 'TunnelPortClientRequester', wireValue: 'client' },
+  ],
+  unknown: true,
+  injectDiscriminantOnWrite: true,
+};
+
+const TUNNEL_PORT_UNION: UnionConfig = {
+  name: 'TunnelPort',
+  discriminantField: 'direction',
+  doc: 'TunnelPort is one authoritative port-forward entry in the tunnels state.',
+  variants: [
+    { variantName: 'HostToClient', innerType: 'HostToClientTunnelPort', wireValue: 'hostToClient' },
+    { variantName: 'ClientToHost', innerType: 'ClientToHostTunnelPort', wireValue: 'clientToHost' },
+  ],
+  unknown: true,
+  injectDiscriminantOnWrite: true,
+};
+
 const CUSTOMIZATION_ENABLEMENT_UNION_CS = `/// <summary>A single explicit customization enablement decision.</summary>
 [JsonConverter(typeof(CustomizationEnablementConverter))]
 public sealed class CustomizationEnablement : AhpUnion
@@ -1238,7 +1330,7 @@ function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+  /// automation-run, or tunnel-catalogue state. Read
 /// probes for distinctive fields in an order where no probe shadows another
 /// (chat → session → terminal → changeset → resource-watch → annotations → root).
 /// </summary>
@@ -1271,6 +1363,9 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>Tunnels state variant, when populated.</summary>
+    public TunnelsState? Tunnels { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -1318,6 +1413,10 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Annotations = root.Deserialize<AnnotationsState>(options);
         }
+        else if (root.TryGetProperty("ports", out _))
+        {
+            result.Tunnels = root.Deserialize<TunnelsState>(options);
+        }
         else
         {
             result.Root = root.Deserialize<RootState>(options);
@@ -1335,6 +1434,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, options); return; }
         if (value.ResourceWatch is not null) { JsonSerializer.Serialize(writer, value.ResourceWatch, options); return; }
         if (value.Annotations is not null) { JsonSerializer.Serialize(writer, value.Annotations, options); return; }
+        if (value.Tunnels is not null) { JsonSerializer.Serialize(writer, value.Tunnels, options); return; }
         if (value.Root is not null) { JsonSerializer.Serialize(writer, value.Root, options); return; }
         writer.WriteNullValue();
     }
@@ -1382,6 +1482,8 @@ function generateStateFile(project: Project): string {
     MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
+    TUNNEL_PORT_CLIENT_STATE_UNION, TUNNEL_PORT_REQUESTER_UNION,
+    TUNNEL_PORT_UNION,
   ]) {
     lines.push(generateDiscriminatedUnion(u));
     lines.push('');
@@ -1517,6 +1619,11 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', variantName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', variantName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'tunnel/portSet', variantName: 'TunnelPortSet', tsInterface: 'TunnelPortSetAction' },
+  { type: 'tunnel/portClientSet', variantName: 'TunnelPortClientSet', tsInterface: 'TunnelPortClientSetAction' },
+  { type: 'tunnel/portClientUpdated', variantName: 'TunnelPortClientUpdated', tsInterface: 'TunnelPortClientUpdatedAction' },
+  { type: 'tunnel/portClientRemoved', variantName: 'TunnelPortClientRemoved', tsInterface: 'TunnelPortClientRemovedAction' },
+  { type: 'tunnel/portRemoved', variantName: 'TunnelPortRemoved', tsInterface: 'TunnelPortRemovedAction' },
 ];
 
 function generateMergedToolCallConfirmedClass(): string {
@@ -2548,6 +2655,8 @@ function checkExhaustiveness(project: Project): void {
     'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
+    'TunnelPortClientState', 'TunnelPortRequester', 'TunnelPort',
+    'TunnelActionState',
     'SessionInputRequest', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',

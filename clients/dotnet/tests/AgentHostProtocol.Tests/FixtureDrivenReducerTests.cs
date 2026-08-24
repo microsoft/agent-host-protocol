@@ -72,6 +72,9 @@ public sealed class FixtureDrivenReducerTests
                 case "resourceWatch":
                     RunFixture<ResourceWatchState>(initial, expected, actions, Reducers.ApplyToResourceWatch);
                     break;
+                case "tunnel":
+                    RunFixture<TunnelsState>(initial, expected, actions, Reducers.ApplyToTunnel);
+                    break;
                 case "annotations":
                     RunFixture<AnnotationsState>(initial, expected, actions, Reducers.ApplyToAnnotations);
                     break;

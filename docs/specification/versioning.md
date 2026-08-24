@@ -39,6 +39,7 @@ Until more granular annotations are introduced, a channel's index applies to its
 | [Telemetry](/specification/telemetry-channel) | **2 - Stable** |
 | [Automation catalogue](/specification/automation-channel) | **1.0 - Early development** |
 | [Automation run](/specification/automation-run-channel) | **1.0 - Early development** |
+| [Tunnels](/specification/tunnels-channel) | **1 - Experimental** |
 | [Resource watch](/specification/resource-watch-channel) | **2 - Stable** |
 | [MCP](/specification/mcp-channel) | **1.2 - Release candidate** |
 

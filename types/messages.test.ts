@@ -35,6 +35,7 @@ function readChannelSources(baseName: string): string {
     'channels-resource-watch',
     'channels-automation',
     'channels-automation-run',
+    'channels-tunnels',
   ];
   return dirs
     .map(dir => {

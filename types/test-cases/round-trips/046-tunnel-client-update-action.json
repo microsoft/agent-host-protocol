@@ -1,0 +1,42 @@
+{
+  "name": "tunnel-client-update-action",
+  "group": "A",
+  "description": "A client-owned tunnel lifecycle update preserves effective addresses and structured failure state.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-tunnels://",
+    "action": {
+      "type": "tunnel/portClientUpdated",
+      "resource": "ahp-tunnel:/callback",
+      "clientId": "client-1",
+      "state": {
+        "status": "ready",
+        "localAddress": { "host": "127.0.0.1", "port": 41781 },
+        "remoteAddress": { "host": "127.0.0.1", "port": 8080 }
+      }
+    },
+    "serverSeq": 8,
+    "origin": {
+      "clientId": "client-1",
+      "clientSeq": 3
+    }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-tunnels://",
+    "action": {
+      "type": "tunnel/portClientUpdated",
+      "resource": "ahp-tunnel:/callback",
+      "clientId": "client-1",
+      "state": {
+        "status": "ready",
+        "localAddress": { "host": "127.0.0.1", "port": 41781 },
+        "remoteAddress": { "host": "127.0.0.1", "port": 8080 }
+      }
+    },
+    "serverSeq": 8,
+    "origin": {
+      "clientId": "client-1",
+      "clientSeq": 3
+    }
+  }]
+}

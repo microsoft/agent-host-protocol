@@ -49,6 +49,7 @@ public actor MultiHostStateMirror {
     public private(set) var changesets: [HostedResourceKey: ChangesetState] = [:]
     public private(set) var annotations: [HostedResourceKey: AnnotationsState] = [:]
     public private(set) var resourceWatches: [HostedResourceKey: ResourceWatchState] = [:]
+    public private(set) var tunnelCatalogs: [HostId: TunnelsState] = [:]
     public private(set) var automationCatalogs: [HostId: AutomationCatalogState] = [:]
     public private(set) var automations: [HostedResourceKey: AutomationState] = [:]
     public private(set) var automationRuns: [HostedResourceKey: AutomationRunState] = [:]
@@ -108,6 +109,11 @@ public actor MultiHostStateMirror {
             // a reducer input. The slot is seeded by `applySnapshot`.
             return
         }
+        if channel == "ahp-tunnels://", var catalog = tunnelCatalogs[host] {
+            catalog = tunnelReducer(state: catalog, action: action)
+            tunnelCatalogs[host] = catalog
+            return
+        }
         if channel == "ahp-automations://", var catalog = automationCatalogs[host] {
             catalog = automationReducer(state: catalog, action: action)
             setAutomationCatalog(host: host, catalog: catalog)
@@ -141,6 +147,8 @@ public actor MultiHostStateMirror {
             resourceWatches[key] = state
         case .annotations(let state):
             annotations[key] = state
+        case .tunnels(let state):
+            tunnelCatalogs[host] = state
         case .automations(let state):
             setAutomationCatalog(host: host, catalog: state)
         case .automationRun(let state):
@@ -157,6 +165,7 @@ public actor MultiHostStateMirror {
         changesets = changesets.filter { $0.key.hostId != host }
         annotations = annotations.filter { $0.key.hostId != host }
         resourceWatches = resourceWatches.filter { $0.key.hostId != host }
+        tunnelCatalogs.removeValue(forKey: host)
         automationCatalogs.removeValue(forKey: host)
         automations = automations.filter { $0.key.hostId != host }
         automationRuns = automationRuns.filter { $0.key.hostId != host }
@@ -171,6 +180,7 @@ public actor MultiHostStateMirror {
         changesets.removeAll()
         annotations.removeAll()
         resourceWatches.removeAll()
+        tunnelCatalogs.removeAll()
         automationCatalogs.removeAll()
         automations.removeAll()
         automationRuns.removeAll()

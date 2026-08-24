@@ -162,6 +162,7 @@ pub use error::{ClientError, TransportError};
 pub use multi_host_state_mirror::{HostedResourceKey, MultiHostStateMirror};
 pub use reducers::{
     apply_action_to_automation, apply_action_to_automation_run, apply_action_to_root,
-    apply_action_to_session, apply_action_to_terminal, ReduceError, ReduceOutcome,
+    apply_action_to_session, apply_action_to_terminal, apply_action_to_tunnel, ReduceError,
+    ReduceOutcome,
 };
 pub use transport::{BoxedTransport, DynTransport, Transport, TransportMessage};

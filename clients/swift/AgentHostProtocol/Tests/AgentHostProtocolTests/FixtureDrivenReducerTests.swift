@@ -196,6 +196,10 @@ final class FixtureDrivenReducerTests: XCTestCase {
             try compareFixture(file: file, fixture: fixture, stateType: AnnotationsState.self) { state in
                 actions.reduce(state) { annotationsReducer(state: $0, action: $1) }
             }
+        case "tunnel":
+            try compareFixture(file: file, fixture: fixture, stateType: TunnelsState.self) { state in
+                actions.reduce(state) { tunnelReducer(state: $0, action: $1) }
+            }
         case "automation":
             try compareFixture(file: file, fixture: fixture, stateType: AutomationCatalogState.self) { state in
                 actions.reduce(state) { automationReducer(state: $0, action: $1) }

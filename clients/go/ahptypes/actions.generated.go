@@ -114,6 +114,11 @@ const (
 	ActionTypeAutomationRunSessionRemoved        ActionType = "automationRun/sessionRemoved"
 	ActionTypeAutomationRunPrimarySessionChanged ActionType = "automationRun/primarySessionChanged"
 	ActionTypeAutomationRunCancelRequested       ActionType = "automationRun/cancelRequested"
+	ActionTypeTunnelPortSet                      ActionType = "tunnel/portSet"
+	ActionTypeTunnelPortClientSet                ActionType = "tunnel/portClientSet"
+	ActionTypeTunnelPortClientUpdated            ActionType = "tunnel/portClientUpdated"
+	ActionTypeTunnelPortClientRemoved            ActionType = "tunnel/portClientRemoved"
+	ActionTypeTunnelPortRemoved                  ActionType = "tunnel/portRemoved"
 )
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -1634,6 +1639,72 @@ type AutomationRunCancelRequestedAction struct {
 	Type ActionType `json:"type"`
 }
 
+// Add or replace one port-forward entry.
+//
+// Existing entries are matched by {@link TunnelPort.resource} and replaced in
+// place. A previously unseen resource is appended. Clients and the host may
+// both dispatch this action; the host validates client assignments, addresses,
+// attribution, and authorization before broadcasting it in server order.
+type TunnelPortSetAction struct {
+	Type ActionType `json:"type"`
+	// Full new or replacement port-forward state.
+	Port TunnelPort `json:"port"`
+}
+
+// Add or replace one participating client on a port forward.
+//
+// For `hostToClient`, clients are matched by `clientId`, appended when absent,
+// and replaced in place when present. For `clientToHost`, this replaces the
+// single responsible client. The target port's requested mapping is unchanged.
+type TunnelPortClientSetAction struct {
+	Type ActionType `json:"type"`
+	// Target {@link TunnelPort.resource}.
+	Resource URI `json:"resource"`
+	// Full new or replacement participant state.
+	Client TunnelPortClient `json:"client"`
+}
+
+// Update the lifecycle of one client-owned forwarding attempt.
+//
+// The reducer locates the client inside the target port and replaces its
+// `state`. The requested addresses remain unchanged. A client dispatching this
+// action may update only its own participant; the host validates
+// `ActionEnvelope.origin.clientId` before broadcasting it in server order.
+type TunnelPortClientUpdatedAction struct {
+	Type ActionType `json:"type"`
+	// Target {@link TunnelPort.resource}.
+	Resource URI `json:"resource"`
+	// Client participant being updated.
+	ClientId string `json:"clientId"`
+	// New client-owned lifecycle, including confirmed addresses when ready.
+	State TunnelPortClientState `json:"state"`
+}
+
+// Remove one participating client from a `hostToClient` port forward.
+//
+// A `clientToHost` port requires exactly one client, so this action is a no-op
+// for that direction; remove the complete port with
+// {@link TunnelPortRemovedAction | `tunnel/portRemoved`} instead. Removing an
+// unknown port or client is a no-op.
+type TunnelPortClientRemovedAction struct {
+	Type ActionType `json:"type"`
+	// Target {@link TunnelPort.resource}.
+	Resource URI `json:"resource"`
+	// Participant to remove.
+	ClientId string `json:"clientId"`
+}
+
+// Remove one port-forward entry from the tunnels state.
+//
+// Clients and the host may dispatch this action. The host validates
+// authorization and coordinates cleanup with every assigned client. Removing
+// an unknown resource is a no-op.
+type TunnelPortRemovedAction struct {
+	Type ActionType `json:"type"`
+	// {@link TunnelPort.resource} to remove.
+	Resource URI `json:"resource"`
+}
+
 // ─── StateAction Union ───────────────────────────────────────────────
 
 // StateAction is the discriminated union of every state action.
@@ -1740,6 +1811,11 @@ func (*AutomationRunSessionSetAction) isStateAction()            {}
 func (*AutomationRunSessionRemovedAction) isStateAction()        {}
 func (*AutomationRunPrimarySessionChangedAction) isStateAction() {}
 func (*AutomationRunCancelRequestedAction) isStateAction()       {}
+func (*TunnelPortSetAction) isStateAction()                      {}
+func (*TunnelPortClientSetAction) isStateAction()                {}
+func (*TunnelPortClientUpdatedAction) isStateAction()            {}
+func (*TunnelPortClientRemovedAction) isStateAction()            {}
+func (*TunnelPortRemovedAction) isStateAction()                  {}
 
 // StateActionUnknown carries an unrecognized StateAction variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type StateActionUnknown struct {
@@ -2321,6 +2397,36 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "automationRun/cancelRequested":
 		var value AutomationRunCancelRequestedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tunnel/portSet":
+		var value TunnelPortSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tunnel/portClientSet":
+		var value TunnelPortClientSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tunnel/portClientUpdated":
+		var value TunnelPortClientUpdatedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tunnel/portClientRemoved":
+		var value TunnelPortClientRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "tunnel/portRemoved":
+		var value TunnelPortRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

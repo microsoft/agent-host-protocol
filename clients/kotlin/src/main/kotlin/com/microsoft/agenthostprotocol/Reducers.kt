@@ -20,10 +20,10 @@ import kotlinx.serialization.json.JsonElement
  *
  * The companion top-level functions ([rootReducer], [sessionReducer], [chatReducer],
  * [terminalReducer], [changesetReducer], [annotationsReducer], [resourceWatchReducer],
- * [automationReducer], and [automationRunReducer]) are the canonical implementations.
+ * [tunnelReducer], [automationReducer], and [automationRunReducer]) are the canonical implementations.
  * The object instances on this interface ([RootReducer], [SessionReducer], [ChatReducer],
  * [TerminalReducer], [ChangesetReducer], [AnnotationsReducer], [ResourceWatchReducer],
- * [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
+ * [TunnelReducer], [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
  * instance is needed.
  */
 public fun interface Reducer<S, A> {
@@ -70,6 +70,12 @@ public object AnnotationsReducer : Reducer<AnnotationsState, StateAction> {
 public object ResourceWatchReducer : Reducer<ResourceWatchState, StateAction> {
     override fun reduce(state: ResourceWatchState, action: StateAction): ResourceWatchState =
         resourceWatchReducer(state, action)
+}
+
+/** Pure tunnels reducer as a [Reducer] instance. Delegates to [tunnelReducer]. */
+public object TunnelReducer : Reducer<TunnelsState, StateAction> {
+    override fun reduce(state: TunnelsState, action: StateAction): TunnelsState =
+        tunnelReducer(state, action)
 }
 
 /** Pure automation reducer as a [Reducer] instance. Delegates to [automationReducer]. */
@@ -1808,6 +1814,110 @@ public fun annotationsReducer(state: AnnotationsState, action: StateAction): Ann
 public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction): ResourceWatchState = when (action) {
     is StateActionResourceWatchChanged -> state
     else -> state
+}
+
+/** Pure reducer for [TunnelsState]. Handles tunnels-channel action variants. */
+public fun tunnelReducer(state: TunnelsState, action: StateAction): TunnelsState {
+    return when (action) {
+        is StateActionTunnelPortSet -> {
+            val port = action.value.port
+            val resource = tunnelPortResource(port) ?: return state
+            val index = state.ports.indexOfFirst { tunnelPortResource(it) == resource }
+            if (index < 0) {
+                state.copy(ports = state.ports + port)
+            } else {
+                val ports = state.ports.toMutableList()
+                ports[index] = port
+                state.copy(ports = ports)
+            }
+        }
+
+        is StateActionTunnelPortClientUpdated -> {
+            val portIndex = state.ports.indexOfFirst { tunnelPortResource(it) == action.value.resource }
+            if (portIndex < 0) {
+                state
+            } else {
+                val updatedPort = when (val port = state.ports[portIndex]) {
+                    is TunnelPortHostToClient -> {
+                        val clientIndex = port.value.clients.indexOfFirst { it.clientId == action.value.clientId }
+                        if (clientIndex < 0) return state
+                        val clients = port.value.clients.toMutableList()
+                        clients[clientIndex] = clients[clientIndex].copy(state = action.value.state)
+                        TunnelPortHostToClient(port.value.copy(clients = clients))
+                    }
+                    is TunnelPortClientToHost -> {
+                        if (port.value.client.clientId != action.value.clientId) return state
+                        TunnelPortClientToHost(
+                            port.value.copy(client = port.value.client.copy(state = action.value.state)),
+                        )
+                    }
+                    is TunnelPortUnknown -> return state
+                }
+                val ports = state.ports.toMutableList()
+                ports[portIndex] = updatedPort
+                state.copy(ports = ports)
+            }
+        }
+
+        is StateActionTunnelPortClientSet -> {
+            val portIndex = state.ports.indexOfFirst { tunnelPortResource(it) == action.value.resource }
+            if (portIndex < 0) {
+                state
+            } else {
+                val updatedPort = when (val port = state.ports[portIndex]) {
+                    is TunnelPortHostToClient -> {
+                        val clients = port.value.clients.toMutableList()
+                        val clientIndex = clients.indexOfFirst { it.clientId == action.value.client.clientId }
+                        if (clientIndex < 0) {
+                            clients.add(action.value.client)
+                        } else {
+                            clients[clientIndex] = action.value.client
+                        }
+                        TunnelPortHostToClient(port.value.copy(clients = clients))
+                    }
+                    is TunnelPortClientToHost ->
+                        TunnelPortClientToHost(port.value.copy(client = action.value.client))
+                    is TunnelPortUnknown -> return state
+                }
+                val ports = state.ports.toMutableList()
+                ports[portIndex] = updatedPort
+                state.copy(ports = ports)
+            }
+        }
+
+        is StateActionTunnelPortClientRemoved -> {
+            val portIndex = state.ports.indexOfFirst { tunnelPortResource(it) == action.value.resource }
+            if (portIndex < 0) {
+                state
+            } else {
+                val port = state.ports[portIndex]
+                if (port !is TunnelPortHostToClient) return state
+                val clientIndex = port.value.clients.indexOfFirst { it.clientId == action.value.clientId }
+                if (clientIndex < 0) return state
+                val clients = port.value.clients.toMutableList().also { it.removeAt(clientIndex) }
+                val ports = state.ports.toMutableList()
+                ports[portIndex] = TunnelPortHostToClient(port.value.copy(clients = clients))
+                state.copy(ports = ports)
+            }
+        }
+
+        is StateActionTunnelPortRemoved -> {
+            val index = state.ports.indexOfFirst { tunnelPortResource(it) == action.value.resource }
+            if (index < 0) {
+                state
+            } else {
+                state.copy(ports = state.ports.toMutableList().also { it.removeAt(index) })
+            }
+        }
+
+        else -> state
+    }
+}
+
+private fun tunnelPortResource(port: TunnelPort): String? = when (port) {
+    is TunnelPortHostToClient -> port.value.resource
+    is TunnelPortClientToHost -> port.value.resource
+    is TunnelPortUnknown -> null
 }
 
 // ─── Automation Reducer ─────────────────────────────────────────────────────

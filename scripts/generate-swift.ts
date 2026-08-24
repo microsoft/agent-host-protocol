@@ -119,7 +119,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState | TunnelsState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -685,6 +685,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'TunnelPortDirectionKind', 'TunnelPortClientStatus', 'TunnelPortRequesterKind',
 ];
 
 const STATE_STRUCTS = [
@@ -752,6 +753,12 @@ const STATE_STRUCTS = [
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
+  'TunnelingCapabilities', 'ClientTunnelingCapabilities', 'TunnelAddress',
+  'TunnelPortPendingState', 'TunnelPortAcceptedState', 'TunnelPortReadyState',
+  'TunnelPortDeclinedState', 'TunnelPortFailedState', 'TunnelPortUnavailableState',
+  'TunnelPortClient',
+  'TunnelPortHostRequester', 'TunnelPortClientRequester', 'TunnelPortBase',
+  'HostToClientTunnelPort', 'ClientToHostTunnelPort', 'TunnelsState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1100,13 +1107,19 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
     case automations(AutomationCatalogState)
     case automationRun(AutomationRunState)
+    case tunnels(TunnelsState)
+
+    private enum SnapshotCodingKeys: String, CodingKey { case ports }
 
     public init(from decoder: Decoder) throws {
         // Try the most distinctive shapes first. SessionState has required
         // \`lifecycle\` / \`activeClients\` / \`chats\`; ChatState has required
         // \`turns\`; the remaining variants follow, with RootState as the
         // catch-all.
-        if let session = try? SessionState(from: decoder) {
+        let shape = try decoder.container(keyedBy: SnapshotCodingKeys.self)
+        if shape.contains(.ports) {
+            self = .tunnels(try TunnelsState(from: decoder))
+        } else if let session = try? SessionState(from: decoder) {
             self = .session(session)
         } else if let chat = try? ChatState(from: decoder) {
             self = .chat(chat)
@@ -1138,6 +1151,7 @@ public enum SnapshotState: Codable, Sendable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .tunnels(let state): try state.encode(to: encoder)
         }
     }
 }`;
@@ -1265,6 +1279,43 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnEncode: true,
 };
 
+const TUNNEL_PORT_CLIENT_STATE_UNION: UnionConfig = {
+  name: 'TunnelPortClientState',
+  discriminantField: 'status',
+  allowUnknown: true,
+  variants: [
+    { caseName: 'pending', structName: 'TunnelPortPendingState', discriminantValue: 'pending' },
+    { caseName: 'accepted', structName: 'TunnelPortAcceptedState', discriminantValue: 'accepted' },
+    { caseName: 'ready', structName: 'TunnelPortReadyState', discriminantValue: 'ready' },
+    { caseName: 'declined', structName: 'TunnelPortDeclinedState', discriminantValue: 'declined' },
+    { caseName: 'failed', structName: 'TunnelPortFailedState', discriminantValue: 'failed' },
+    { caseName: 'unavailable', structName: 'TunnelPortUnavailableState', discriminantValue: 'unavailable' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
+const TUNNEL_PORT_REQUESTER_UNION: UnionConfig = {
+  name: 'TunnelPortRequester',
+  discriminantField: 'kind',
+  allowUnknown: true,
+  variants: [
+    { caseName: 'host', structName: 'TunnelPortHostRequester', discriminantValue: 'host' },
+    { caseName: 'client', structName: 'TunnelPortClientRequester', discriminantValue: 'client' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
+const TUNNEL_PORT_UNION: UnionConfig = {
+  name: 'TunnelPort',
+  discriminantField: 'direction',
+  allowUnknown: true,
+  variants: [
+    { caseName: 'hostToClient', structName: 'HostToClientTunnelPort', discriminantValue: 'hostToClient' },
+    { caseName: 'clientToHost', structName: 'ClientToHostTunnelPort', discriminantValue: 'clientToHost' },
+  ],
+  injectDiscriminantOnEncode: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1347,6 +1398,12 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_CLIENT_STATE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_REQUESTER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -1455,6 +1512,11 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'automationRun/sessionRemoved', caseName: 'automationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', caseName: 'automationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', caseName: 'automationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'tunnel/portSet', caseName: 'tunnelPortSet', tsInterface: 'TunnelPortSetAction' },
+  { type: 'tunnel/portClientSet', caseName: 'tunnelPortClientSet', tsInterface: 'TunnelPortClientSetAction' },
+  { type: 'tunnel/portClientUpdated', caseName: 'tunnelPortClientUpdated', tsInterface: 'TunnelPortClientUpdatedAction' },
+  { type: 'tunnel/portClientRemoved', caseName: 'tunnelPortClientRemoved', tsInterface: 'TunnelPortClientRemovedAction' },
+  { type: 'tunnel/portRemoved', caseName: 'tunnelPortRemoved', tsInterface: 'TunnelPortRemovedAction' },
 ];
 
 /** Merged struct for the approved/denied tool call confirmed action */
@@ -2380,6 +2442,10 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union
+    'TunnelPortClientState',        // TUNNEL_PORT_CLIENT_STATE_UNION discriminated union
+    'TunnelPortRequester',          // TUNNEL_PORT_REQUESTER_UNION discriminated union
+    'TunnelPort',                   // TUNNEL_PORT_UNION discriminated union
+    'TunnelActionState',            // source-only action-family state alias
     'ForkChatSource',               // generateFixedChatSourceBranchSwift()
     'SideChatSource',               // generateFixedChatSourceBranchSwift()
     'ChangesetOperationTarget',     // TS discriminated union; consumers should add a Swift case-iterable enum

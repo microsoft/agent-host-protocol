@@ -98,6 +98,11 @@ import type {
   AutomationRunSessionRemovedAction,
   AutomationRunPrimarySessionChangedAction,
   AutomationRunCancelRequestedAction,
+  TunnelPortSetAction,
+  TunnelPortClientSetAction,
+  TunnelPortClientUpdatedAction,
+  TunnelPortClientRemovedAction,
+  TunnelPortRemovedAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -404,6 +409,29 @@ export type ServerAutomationRunAction =
   | AutomationRunPrimarySessionChangedAction
 ;
 
+/** Union of all tunnel-catalogue actions. */
+export type TunnelAction =
+  | TunnelPortSetAction
+  | TunnelPortClientSetAction
+  | TunnelPortClientUpdatedAction
+  | TunnelPortClientRemovedAction
+  | TunnelPortRemovedAction
+;
+
+/** Union of tunnel-catalogue actions that clients may dispatch. */
+export type ClientTunnelAction =
+  | TunnelPortSetAction
+  | TunnelPortClientSetAction
+  | TunnelPortClientUpdatedAction
+  | TunnelPortClientRemovedAction
+  | TunnelPortRemovedAction
+;
+
+/** Union of tunnel-catalogue actions that only the server may produce. */
+export type ServerTunnelAction =
+  never
+;
+
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
 
 /**
@@ -506,4 +534,9 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.AutomationRunSessionRemoved]: false,
   [ActionType.AutomationRunPrimarySessionChanged]: false,
   [ActionType.AutomationRunCancelRequested]: true,
+  [ActionType.TunnelPortSet]: true,
+  [ActionType.TunnelPortClientSet]: true,
+  [ActionType.TunnelPortClientUpdated]: true,
+  [ActionType.TunnelPortClientRemoved]: true,
+  [ActionType.TunnelPortRemoved]: true,
 };

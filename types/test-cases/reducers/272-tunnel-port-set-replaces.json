@@ -1,0 +1,55 @@
+{
+  "description": "tunnel port set replaces an existing catalogue entry in place",
+  "reducer": "tunnel",
+  "initial": {
+    "ports": [{
+      "resource": "ahp-tunnel:/callback",
+      "direction": "clientToHost",
+      "requestedLocalAddress": { "host": "127.0.0.1", "port": 0 },
+      "requestedRemoteAddress": { "host": "127.0.0.1", "port": 8080 },
+      "client": {
+        "clientId": "client-1",
+        "state": { "status": "pending" }
+      },
+      "requestedBy": { "kind": "client", "clientId": "client-1" },
+      "createdAt": "2026-08-24T18:00:00Z"
+    }]
+  },
+  "actions": [{
+    "type": "tunnel/portSet",
+    "port": {
+      "resource": "ahp-tunnel:/callback",
+      "direction": "clientToHost",
+      "requestedLocalAddress": { "host": "127.0.0.1", "port": 0 },
+      "requestedRemoteAddress": { "host": "127.0.0.1", "port": 8080 },
+      "client": {
+        "clientId": "client-1",
+        "state": {
+          "status": "ready",
+          "localAddress": { "host": "127.0.0.1", "port": 41781 },
+          "remoteAddress": { "host": "127.0.0.1", "port": 8080 }
+        }
+      },
+      "requestedBy": { "kind": "client", "clientId": "client-1" },
+      "createdAt": "2026-08-24T18:00:00Z"
+    }
+  }],
+  "expected": {
+    "ports": [{
+      "resource": "ahp-tunnel:/callback",
+      "direction": "clientToHost",
+      "requestedLocalAddress": { "host": "127.0.0.1", "port": 0 },
+      "requestedRemoteAddress": { "host": "127.0.0.1", "port": 8080 },
+      "client": {
+        "clientId": "client-1",
+        "state": {
+          "status": "ready",
+          "localAddress": { "host": "127.0.0.1", "port": 41781 },
+          "remoteAddress": { "host": "127.0.0.1", "port": 8080 }
+        }
+      },
+      "requestedBy": { "kind": "client", "clientId": "client-1" },
+      "createdAt": "2026-08-24T18:00:00Z"
+    }]
+  }
+}

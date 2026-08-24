@@ -663,6 +663,55 @@ public enum AutomationRunOriginKind
     Trigger,
 }
 
+/// <summary>Direction of one coordinated port forward.
+///
+/// `AtoB` means a service reachable from A is exposed through a listening
+/// address on B. It does not describe byte flow, which is bidirectional.</summary>
+[JsonConverter(typeof(WireEnumConverter<TunnelPortDirectionKind>))]
+public enum TunnelPortDirectionKind
+{
+    /// <summary>A host-side service is exposed through one or more client-side listeners.</summary>
+    [WireValue("hostToClient")]
+    HostToClient,
+    /// <summary>A client-side service is exposed through a host-side listener.</summary>
+    [WireValue("clientToHost")]
+    ClientToHost,
+}
+
+/// <summary>Lifecycle status of a client-owned forwarding attempt.</summary>
+[JsonConverter(typeof(WireEnumConverter<TunnelPortClientStatus>))]
+public enum TunnelPortClientStatus
+{
+    /// <summary>The client has not yet accepted or declined the forwarding request.</summary>
+    [WireValue("pending")]
+    Pending,
+    /// <summary>The client accepted the request and is establishing the forward.</summary>
+    [WireValue("accepted")]
+    Accepted,
+    /// <summary>The client reports that the forward is active.</summary>
+    [WireValue("ready")]
+    Ready,
+    /// <summary>The client explicitly declined the request.</summary>
+    [WireValue("declined")]
+    Declined,
+    /// <summary>The client accepted the request but failed to establish the forward.</summary>
+    [WireValue("failed")]
+    Failed,
+    /// <summary>The assigned client is disconnected or no longer capable of forwarding.</summary>
+    [WireValue("unavailable")]
+    Unavailable,
+}
+
+/// <summary>Actor that originally requested a port forward.</summary>
+[JsonConverter(typeof(WireEnumConverter<TunnelPortRequesterKind>))]
+public enum TunnelPortRequesterKind
+{
+    [WireValue("host")]
+    Host,
+    [WireValue("client")]
+    Client,
+}
+
 // ─── Classes ──────────────────────────────────────────────────────────
 
 /// <summary>An optionally-sized icon that can be displayed in a user interface.</summary>
@@ -5438,6 +5487,282 @@ public sealed class AutomationRunState
     public Dictionary<string, JsonElement>? Meta { get; set; }
 }
 
+/// <summary>Capabilities advertised by a host that exposes tunnel coordination.
+///
+/// Presence means the host maintains the authoritative state at
+/// {@link TunnelingCapabilities.channel}. It does not imply that the host can
+/// establish a particular kind of forwarding itself.</summary>
+public sealed record TunnelingCapabilities
+{
+    /// <summary>The host-owned tunnels channel.</summary>
+    public required string Channel { get; init; }
+}
+
+/// <summary>Port-forwarding directions a client can establish.
+///
+/// Each field is a presence capability: an empty object means supported and
+/// absence means unsupported.</summary>
+public sealed record ClientTunnelingCapabilities
+{
+    /// <summary>Make a host-side service reachable at a client-side listening address.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? HostToClient { get; init; }
+
+    /// <summary>Make a client-side service reachable at a host-side listening address.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? ClientToHost { get; init; }
+}
+
+/// <summary>One TCP address used by a port forward.</summary>
+public sealed record TunnelAddress
+{
+    /// <summary>Host name or numeric IP address meaningful from the side that owns it.</summary>
+    public required string Host { get; init; }
+
+    /// <summary>TCP port. A requested local address MAY use `0` to ask the forwarding
+    /// implementation to allocate an available port; a ready forward MUST report
+    /// the effective non-zero port.</summary>
+    public long Port { get; init; }
+}
+
+public sealed record TunnelPortPendingState
+{
+    public TunnelPortClientStatus Status { get; init; }
+}
+
+public sealed record TunnelPortAcceptedState
+{
+    public TunnelPortClientStatus Status { get; init; }
+}
+
+public sealed record TunnelPortReadyState
+{
+    public TunnelPortClientStatus Status { get; init; }
+
+    /// <summary>Effective listening endpoint after the forwarding mechanism is active.</summary>
+    public required TunnelAddress LocalAddress { get; init; }
+
+    /// <summary>Effective target endpoint after the forwarding mechanism is active.</summary>
+    public required TunnelAddress RemoteAddress { get; init; }
+}
+
+public sealed record TunnelPortDeclinedState
+{
+    public TunnelPortClientStatus Status { get; init; }
+
+    /// <summary>Optional human-readable explanation.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reason { get; init; }
+}
+
+public sealed record TunnelPortFailedState
+{
+    public TunnelPortClientStatus Status { get; init; }
+
+    /// <summary>Failure reported by the client-owned forwarding implementation.</summary>
+    public required ErrorInfo Error { get; init; }
+}
+
+public sealed record TunnelPortUnavailableState
+{
+    public TunnelPortClientStatus Status { get; init; }
+
+    /// <summary>Optional human-readable explanation.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reason { get; init; }
+}
+
+/// <summary>One client responsible for establishing a port forward.
+///
+/// The requested mapping lives on the parent {@link TunnelPort}; every client
+/// assigned to a `hostToClient` entry attempts the same mapping. Once active,
+/// {@link TunnelPortReadyState} carries this client's confirmed effective
+/// addresses, including any port allocated from a request for port `0`.</summary>
+public sealed record TunnelPortClient
+{
+    /// <summary>Matches the `clientId` supplied during `initialize`.</summary>
+    public required string ClientId { get; init; }
+
+    /// <summary>Current client-owned lifecycle.</summary>
+    public required TunnelPortClientState State { get; init; }
+}
+
+public sealed record TunnelPortHostRequester
+{
+    public TunnelPortRequesterKind Kind { get; init; }
+}
+
+public sealed record TunnelPortClientRequester
+{
+    public TunnelPortRequesterKind Kind { get; init; }
+
+    /// <summary>Client that requested the forward.</summary>
+    public required string ClientId { get; init; }
+}
+
+/// <summary>Common authoritative fields for every port-forward entry.</summary>
+public sealed record TunnelPortBase
+{
+    /// <summary>Stable `ahp-tunnel:/&lt;id&gt;` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.</summary>
+    public required TunnelAddress RequestedLocalAddress { get; init; }
+
+    /// <summary>Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.</summary>
+    public required TunnelAddress RequestedRemoteAddress { get; init; }
+
+    /// <summary>Optional human-readable name, such as `"Development server"`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; init; }
+
+    /// <summary>Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Protocol { get; init; }
+
+    /// <summary>Actor that originally requested this forward.</summary>
+    public required TunnelPortRequester RequestedBy { get; init; }
+
+    /// <summary>Creation timestamp in ISO 8601 format.</summary>
+    public required string CreatedAt { get; init; }
+
+    /// <summary>Opaque implementation-defined metadata.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>A host-side service exposed through one or more client-side listeners.
+///
+/// Every client independently accepts and establishes its own mapping, so each
+/// has separate addresses and lifecycle state.</summary>
+public sealed record HostToClientTunnelPort
+{
+    /// <summary>Stable `ahp-tunnel:/&lt;id&gt;` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.</summary>
+    public required TunnelAddress RequestedLocalAddress { get; init; }
+
+    /// <summary>Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.</summary>
+    public required TunnelAddress RequestedRemoteAddress { get; init; }
+
+    /// <summary>Optional human-readable name, such as `"Development server"`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; init; }
+
+    /// <summary>Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Protocol { get; init; }
+
+    /// <summary>Actor that originally requested this forward.</summary>
+    public required TunnelPortRequester RequestedBy { get; init; }
+
+    /// <summary>Creation timestamp in ISO 8601 format.</summary>
+    public required string CreatedAt { get; init; }
+
+    /// <summary>Opaque implementation-defined metadata.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    public TunnelPortDirectionKind Direction { get; init; }
+
+    /// <summary>Clients invited to establish this forward.</summary>
+    public required List<TunnelPortClient> Clients { get; init; }
+}
+
+/// <summary>A client-side service exposed through a host-side listener.
+///
+/// Exactly one client owns the forwarding operation.</summary>
+public sealed record ClientToHostTunnelPort
+{
+    /// <summary>Stable `ahp-tunnel:/&lt;id&gt;` resource identifier.
+    ///
+    /// Entries are not independently subscribable in this version, but the
+    /// `ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST
+    /// treat the URI as opaque.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>Desired listening endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. It is not proof that the
+    /// address was established; each client's ready state reports its effective
+    /// listener independently.</summary>
+    public required TunnelAddress RequestedLocalAddress { get; init; }
+
+    /// <summary>Desired target service endpoint of the forward.
+    ///
+    /// This request is shared by every assigned client. The effective target is
+    /// reported by each client's ready state.</summary>
+    public required TunnelAddress RequestedRemoteAddress { get; init; }
+
+    /// <summary>Optional human-readable name, such as `"Development server"`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; init; }
+
+    /// <summary>Optional application protocol hint, such as `"http"`, `"https"`, or
+    /// `"postgresql"`. Forwarding remains byte-transparent.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Protocol { get; init; }
+
+    /// <summary>Actor that originally requested this forward.</summary>
+    public required TunnelPortRequester RequestedBy { get; init; }
+
+    /// <summary>Creation timestamp in ISO 8601 format.</summary>
+    public required string CreatedAt { get; init; }
+
+    /// <summary>Opaque implementation-defined metadata.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    public TunnelPortDirectionKind Direction { get; init; }
+
+    /// <summary>Client responsible for establishing this forward.</summary>
+    public required TunnelPortClient Client { get; init; }
+}
+
+/// <summary>Authoritative state exposed on the `ahp-tunnels://` channel.
+///
+/// Clients establish the actual forwards through implementation-defined
+/// facilities. The host only sequences, validates, snapshots, and replays this
+/// coordination state.</summary>
+public sealed class TunnelsState
+{
+    /// <summary>Full port-forward entries keyed by `resource`.</summary>
+    public required List<TunnelPort> Ports { get; set; }
+
+    /// <summary>Opaque host-defined state metadata.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; set; }
+}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 /// <summary>A single explicit customization enablement decision.</summary>
@@ -6115,6 +6440,182 @@ internal sealed class AutomationRunLifecycleConverter : UnionConverter<Automatio
     }
 }
 
+/// <summary>TunnelPortClientState is the lifecycle of one client-owned forwarding attempt.</summary>
+[JsonConverter(typeof(TunnelPortClientStateConverter))]
+public sealed class TunnelPortClientState : AhpUnion
+{
+    /// <summary>Creates an empty TunnelPortClientState (no active variant).</summary>
+    public TunnelPortClientState() { }
+
+    /// <summary>Creates a TunnelPortClientState wrapping the given variant value.</summary>
+    public TunnelPortClientState(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the TunnelPortClientState discriminated union.</summary>
+internal sealed class TunnelPortClientStateConverter : UnionConverter<TunnelPortClientState>
+{
+    public TunnelPortClientStateConverter()
+        : base(
+            discriminator: "status",
+            variants: new Dictionary<string, Type>
+            {
+        ["pending"] = typeof(TunnelPortPendingState),
+        ["accepted"] = typeof(TunnelPortAcceptedState),
+        ["ready"] = typeof(TunnelPortReadyState),
+        ["declined"] = typeof(TunnelPortDeclinedState),
+        ["failed"] = typeof(TunnelPortFailedState),
+        ["unavailable"] = typeof(TunnelPortUnavailableState),
+            },
+            allowUnknown: true)
+    {
+    }
+
+    public override void Write(Utf8JsonWriter writer, TunnelPortClientState value, JsonSerializerOptions options)
+    {
+        object? inner = value?.Value;
+        if (inner is null)
+        {
+            writer.WriteNullValue();
+            return;
+        }
+        if (inner is JsonElement raw)
+        {
+            raw.WriteTo(writer);
+            return;
+        }
+        string discriminator = inner switch
+        {
+            TunnelPortPendingState => "pending",
+            TunnelPortAcceptedState => "accepted",
+            TunnelPortReadyState => "ready",
+            TunnelPortDeclinedState => "declined",
+            TunnelPortFailedState => "failed",
+            TunnelPortUnavailableState => "unavailable",
+            _ => throw new JsonException("Unsupported TunnelPortClientState variant"),
+        };
+        JsonElement element = JsonSerializer.SerializeToElement(inner, inner.GetType(), options);
+        writer.WriteStartObject();
+        writer.WriteString("status", discriminator);
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (!property.NameEquals("status")) property.WriteTo(writer);
+        }
+        writer.WriteEndObject();
+    }
+}
+
+/// <summary>TunnelPortRequester is the durable attribution for a port-forwarding request.</summary>
+[JsonConverter(typeof(TunnelPortRequesterConverter))]
+public sealed class TunnelPortRequester : AhpUnion
+{
+    /// <summary>Creates an empty TunnelPortRequester (no active variant).</summary>
+    public TunnelPortRequester() { }
+
+    /// <summary>Creates a TunnelPortRequester wrapping the given variant value.</summary>
+    public TunnelPortRequester(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the TunnelPortRequester discriminated union.</summary>
+internal sealed class TunnelPortRequesterConverter : UnionConverter<TunnelPortRequester>
+{
+    public TunnelPortRequesterConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["host"] = typeof(TunnelPortHostRequester),
+        ["client"] = typeof(TunnelPortClientRequester),
+            },
+            allowUnknown: true)
+    {
+    }
+
+    public override void Write(Utf8JsonWriter writer, TunnelPortRequester value, JsonSerializerOptions options)
+    {
+        object? inner = value?.Value;
+        if (inner is null)
+        {
+            writer.WriteNullValue();
+            return;
+        }
+        if (inner is JsonElement raw)
+        {
+            raw.WriteTo(writer);
+            return;
+        }
+        string discriminator = inner switch
+        {
+            TunnelPortHostRequester => "host",
+            TunnelPortClientRequester => "client",
+            _ => throw new JsonException("Unsupported TunnelPortRequester variant"),
+        };
+        JsonElement element = JsonSerializer.SerializeToElement(inner, inner.GetType(), options);
+        writer.WriteStartObject();
+        writer.WriteString("kind", discriminator);
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (!property.NameEquals("kind")) property.WriteTo(writer);
+        }
+        writer.WriteEndObject();
+    }
+}
+
+/// <summary>TunnelPort is one authoritative port-forward entry in the tunnels state.</summary>
+[JsonConverter(typeof(TunnelPortConverter))]
+public sealed class TunnelPort : AhpUnion
+{
+    /// <summary>Creates an empty TunnelPort (no active variant).</summary>
+    public TunnelPort() { }
+
+    /// <summary>Creates a TunnelPort wrapping the given variant value.</summary>
+    public TunnelPort(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the TunnelPort discriminated union.</summary>
+internal sealed class TunnelPortConverter : UnionConverter<TunnelPort>
+{
+    public TunnelPortConverter()
+        : base(
+            discriminator: "direction",
+            variants: new Dictionary<string, Type>
+            {
+        ["hostToClient"] = typeof(HostToClientTunnelPort),
+        ["clientToHost"] = typeof(ClientToHostTunnelPort),
+            },
+            allowUnknown: true)
+    {
+    }
+
+    public override void Write(Utf8JsonWriter writer, TunnelPort value, JsonSerializerOptions options)
+    {
+        object? inner = value?.Value;
+        if (inner is null)
+        {
+            writer.WriteNullValue();
+            return;
+        }
+        if (inner is JsonElement raw)
+        {
+            raw.WriteTo(writer);
+            return;
+        }
+        string discriminator = inner switch
+        {
+            HostToClientTunnelPort => "hostToClient",
+            ClientToHostTunnelPort => "clientToHost",
+            _ => throw new JsonException("Unsupported TunnelPort variant"),
+        };
+        JsonElement element = JsonSerializer.SerializeToElement(inner, inner.GetType(), options);
+        writer.WriteStartObject();
+        writer.WriteString("direction", discriminator);
+        foreach (JsonProperty property in element.EnumerateObject())
+        {
+            if (!property.NameEquals("direction")) property.WriteTo(writer);
+        }
+        writer.WriteEndObject();
+    }
+}
+
 /// <summary>
 /// ChatOrigin describes how a chat came into existence.
 /// </summary>
@@ -6224,7 +6725,7 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
 /// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
   /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-  /// or automation-run state. Read
+  /// automation-run, or tunnel-catalogue state. Read
 /// probes for distinctive fields in an order where no probe shadows another
 /// (chat → session → terminal → changeset → resource-watch → annotations → root).
 /// </summary>
@@ -6257,6 +6758,9 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>Tunnels state variant, when populated.</summary>
+    public TunnelsState? Tunnels { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -6304,6 +6808,10 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.Annotations = root.Deserialize<AnnotationsState>(options);
         }
+        else if (root.TryGetProperty("ports", out _))
+        {
+            result.Tunnels = root.Deserialize<TunnelsState>(options);
+        }
         else
         {
             result.Root = root.Deserialize<RootState>(options);
@@ -6321,6 +6829,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         if (value.Changeset is not null) { JsonSerializer.Serialize(writer, value.Changeset, options); return; }
         if (value.ResourceWatch is not null) { JsonSerializer.Serialize(writer, value.ResourceWatch, options); return; }
         if (value.Annotations is not null) { JsonSerializer.Serialize(writer, value.Annotations, options); return; }
+        if (value.Tunnels is not null) { JsonSerializer.Serialize(writer, value.Tunnels, options); return; }
         if (value.Root is not null) { JsonSerializer.Serialize(writer, value.Root, options); return; }
         writer.WriteNullValue();
     }

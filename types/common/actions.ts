@@ -127,6 +127,13 @@ import type {
   AutomationRunPrimarySessionChangedAction,
   AutomationRunCancelRequestedAction,
 } from '../channels-automation-run/actions.js';
+import type {
+  TunnelPortSetAction,
+  TunnelPortClientSetAction,
+  TunnelPortClientUpdatedAction,
+  TunnelPortClientRemovedAction,
+  TunnelPortRemovedAction,
+} from '../channels-tunnels/actions.js';
 
 // ─── Action Type Enum ────────────────────────────────────────────────────────
 
@@ -232,6 +239,11 @@ export const enum ActionType {
   AutomationRunSessionRemoved = 'automationRun/sessionRemoved',
   AutomationRunPrimarySessionChanged = 'automationRun/primarySessionChanged',
   AutomationRunCancelRequested = 'automationRun/cancelRequested',
+  TunnelPortSet = 'tunnel/portSet',
+  TunnelPortClientSet = 'tunnel/portClientSet',
+  TunnelPortClientUpdated = 'tunnel/portClientUpdated',
+  TunnelPortClientRemoved = 'tunnel/portClientRemoved',
+  TunnelPortRemoved = 'tunnel/portRemoved',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -362,4 +374,9 @@ export type StateAction =
   | AutomationRunSessionSetAction
   | AutomationRunSessionRemovedAction
   | AutomationRunPrimarySessionChangedAction
-  | AutomationRunCancelRequestedAction;
+  | AutomationRunCancelRequestedAction
+  | TunnelPortSetAction
+  | TunnelPortClientSetAction
+  | TunnelPortClientUpdatedAction
+  | TunnelPortClientRemovedAction
+  | TunnelPortRemovedAction;

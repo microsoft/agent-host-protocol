@@ -4,7 +4,7 @@
 //! [`apply_action_to_root`], [`apply_action_to_session`],
 //! [`apply_action_to_chat`], [`apply_action_to_terminal`],
 //! [`apply_action_to_changeset`], [`apply_action_to_annotations`], and
-//! [`apply_action_to_resource_watch`] to dispatch any [`StateAction`]
+//! [`apply_action_to_resource_watch`], and [`apply_action_to_tunnel`] to dispatch any [`StateAction`]
 //! against the matching scope; unrelated actions short-circuit as
 //! [`ReduceOutcome::OutOfScope`] so a client holding every state tree can
 //! blindly fan each action out.
@@ -68,7 +68,7 @@ use ahp_types::state::{
     ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
     ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
-    ToolCallStreamingState, ToolInput, Turn, TurnState,
+    ToolCallStreamingState, ToolInput, TunnelPort, TunnelsState, Turn, TurnState,
 };
 use jiff::{SignedDuration, Timestamp};
 
@@ -2031,6 +2031,138 @@ pub fn apply_action_to_resource_watch(
     }
 }
 
+/// Apply a [`StateAction`] to a [`TunnelsState`] in place.
+pub fn apply_action_to_tunnel(state: &mut TunnelsState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::TunnelPortSet(a) => {
+            let Some(resource) = tunnel_port_resource(&a.port) else {
+                return ReduceOutcome::NoOp;
+            };
+            if let Some(index) = state
+                .ports
+                .iter()
+                .position(|port| tunnel_port_resource(port) == Some(resource))
+            {
+                state.ports[index] = a.port.clone();
+            } else {
+                state.ports.push(a.port.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::TunnelPortClientUpdated(a) => {
+            let Some(port) = state
+                .ports
+                .iter_mut()
+                .find(|port| tunnel_port_resource(port) == Some(a.resource.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            if update_tunnel_port_client_state(port, &a.client_id, &a.state) {
+                ReduceOutcome::Applied
+            } else {
+                ReduceOutcome::NoOp
+            }
+        }
+        StateAction::TunnelPortClientSet(a) => {
+            let Some(port) = state
+                .ports
+                .iter_mut()
+                .find(|port| tunnel_port_resource(port) == Some(a.resource.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            match port {
+                TunnelPort::HostToClient(port) => {
+                    if let Some(index) = port
+                        .clients
+                        .iter()
+                        .position(|client| client.client_id == a.client.client_id)
+                    {
+                        port.clients[index] = a.client.clone();
+                    } else {
+                        port.clients.push(a.client.clone());
+                    }
+                    ReduceOutcome::Applied
+                }
+                TunnelPort::ClientToHost(port) => {
+                    port.client = a.client.clone();
+                    ReduceOutcome::Applied
+                }
+                TunnelPort::Unknown(_) => ReduceOutcome::NoOp,
+            }
+        }
+        StateAction::TunnelPortClientRemoved(a) => {
+            let Some(port) = state
+                .ports
+                .iter_mut()
+                .find(|port| tunnel_port_resource(port) == Some(a.resource.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            let TunnelPort::HostToClient(port) = port else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(index) = port
+                .clients
+                .iter()
+                .position(|client| client.client_id == a.client_id)
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            port.clients.remove(index);
+            ReduceOutcome::Applied
+        }
+        StateAction::TunnelPortRemoved(a) => {
+            let Some(index) = state
+                .ports
+                .iter()
+                .position(|port| tunnel_port_resource(port) == Some(a.resource.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            state.ports.remove(index);
+            ReduceOutcome::Applied
+        }
+        _ => ReduceOutcome::OutOfScope,
+    }
+}
+
+fn update_tunnel_port_client_state(
+    port: &mut TunnelPort,
+    client_id: &str,
+    state: &ahp_types::state::TunnelPortClientState,
+) -> bool {
+    match port {
+        TunnelPort::HostToClient(port) => {
+            let Some(client) = port
+                .clients
+                .iter_mut()
+                .find(|client| client.client_id == client_id)
+            else {
+                return false;
+            };
+            client.state = state.clone();
+            true
+        }
+        TunnelPort::ClientToHost(port) => {
+            if port.client.client_id != client_id {
+                return false;
+            }
+            port.client.state = state.clone();
+            true
+        }
+        TunnelPort::Unknown(_) => false,
+    }
+}
+
+fn tunnel_port_resource(port: &TunnelPort) -> Option<&str> {
+    match port {
+        TunnelPort::HostToClient(port) => Some(port.resource.as_str()),
+        TunnelPort::ClientToHost(port) => Some(port.resource.as_str()),
+        TunnelPort::Unknown(_) => None,
+    }
+}
+
 /// Apply a [`StateAction`] to an [`AutomationCatalogState`] in place.
 pub fn apply_action_to_automation(
     state: &mut AutomationCatalogState,
@@ -2512,7 +2644,6 @@ mod tests {
                     })
                 })
                 .collect();
-
             /// Deserialize initial state, apply actions, compare result.
             /// Also checks that initial state round-trips through Rust types,
             /// catching any data loss from the generated de/serializers.
@@ -2607,6 +2738,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_resource_watch,
+                    &file_name,
+                    description,
+                ),
+                "tunnel" => run_fixture::<TunnelsState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_tunnel,
                     &file_name,
                     description,
                 ),

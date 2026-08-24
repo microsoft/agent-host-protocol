@@ -21,8 +21,8 @@ use crate::state::{
     McpAuthRequirement, McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart,
     SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo,
     TextRange, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor,
-    ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn,
-    UsageInfo,
+    ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent,
+    TunnelPort, TunnelPortClient, TunnelPortClientState, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -125,6 +125,11 @@ pub enum ActionType {
     AutomationRunSessionRemoved,
     AutomationRunPrimarySessionChanged,
     AutomationRunCancelRequested,
+    TunnelPortSet,
+    TunnelPortClientSet,
+    TunnelPortClientUpdated,
+    TunnelPortClientRemoved,
+    TunnelPortRemoved,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
 }
@@ -290,6 +295,11 @@ impl serde::Serialize for ActionType {
             Self::AutomationRunCancelRequested => {
                 serializer.serialize_str("automationRun/cancelRequested")
             }
+            Self::TunnelPortSet => serializer.serialize_str("tunnel/portSet"),
+            Self::TunnelPortClientSet => serializer.serialize_str("tunnel/portClientSet"),
+            Self::TunnelPortClientUpdated => serializer.serialize_str("tunnel/portClientUpdated"),
+            Self::TunnelPortClientRemoved => serializer.serialize_str("tunnel/portClientRemoved"),
+            Self::TunnelPortRemoved => serializer.serialize_str("tunnel/portRemoved"),
             Self::Unknown(value) => serializer.serialize_str(value),
         }
     }
@@ -397,6 +407,11 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "automationRun/sessionRemoved" => Self::AutomationRunSessionRemoved,
             "automationRun/primarySessionChanged" => Self::AutomationRunPrimarySessionChanged,
             "automationRun/cancelRequested" => Self::AutomationRunCancelRequested,
+            "tunnel/portSet" => Self::TunnelPortSet,
+            "tunnel/portClientSet" => Self::TunnelPortClientSet,
+            "tunnel/portClientUpdated" => Self::TunnelPortClientUpdated,
+            "tunnel/portClientRemoved" => Self::TunnelPortClientRemoved,
+            "tunnel/portRemoved" => Self::TunnelPortRemoved,
             _ => Self::Unknown(raw),
         })
     }
@@ -2091,6 +2106,77 @@ pub struct AutomationRunPrimarySessionChangedAction {
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunCancelRequestedAction {}
 
+/// Add or replace one port-forward entry.
+///
+/// Existing entries are matched by {@link TunnelPort.resource} and replaced in
+/// place. A previously unseen resource is appended. Clients and the host may
+/// both dispatch this action; the host validates client assignments, addresses,
+/// attribution, and authorization before broadcasting it in server order.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortSetAction {
+    /// Full new or replacement port-forward state.
+    pub port: TunnelPort,
+}
+
+/// Add or replace one participating client on a port forward.
+///
+/// For `hostToClient`, clients are matched by `clientId`, appended when absent,
+/// and replaced in place when present. For `clientToHost`, this replaces the
+/// single responsible client. The target port's requested mapping is unchanged.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortClientSetAction {
+    /// Target {@link TunnelPort.resource}.
+    pub resource: Uri,
+    /// Full new or replacement participant state.
+    pub client: TunnelPortClient,
+}
+
+/// Update the lifecycle of one client-owned forwarding attempt.
+///
+/// The reducer locates the client inside the target port and replaces its
+/// `state`. The requested addresses remain unchanged. A client dispatching this
+/// action may update only its own participant; the host validates
+/// `ActionEnvelope.origin.clientId` before broadcasting it in server order.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortClientUpdatedAction {
+    /// Target {@link TunnelPort.resource}.
+    pub resource: Uri,
+    /// Client participant being updated.
+    pub client_id: String,
+    /// New client-owned lifecycle, including confirmed addresses when ready.
+    pub state: TunnelPortClientState,
+}
+
+/// Remove one participating client from a `hostToClient` port forward.
+///
+/// A `clientToHost` port requires exactly one client, so this action is a no-op
+/// for that direction; remove the complete port with
+/// {@link TunnelPortRemovedAction | `tunnel/portRemoved`} instead. Removing an
+/// unknown port or client is a no-op.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortClientRemovedAction {
+    /// Target {@link TunnelPort.resource}.
+    pub resource: Uri,
+    /// Participant to remove.
+    pub client_id: String,
+}
+
+/// Remove one port-forward entry from the tunnels state.
+///
+/// Clients and the host may dispatch this action. The host validates
+/// authorization and coordinates cleanup with every assigned client. Removing
+/// an unknown resource is a no-op.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelPortRemovedAction {
+    /// {@link TunnelPort.resource} to remove.
+    pub resource: Uri,
+}
+
 // ─── Partial Summaries ────────────────────────────────────────────────
 
 /// Partial equivalent of ChatSummary — every field is optional for delta updates.
@@ -2324,6 +2410,16 @@ pub enum StateAction {
     AutomationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction),
     #[serde(rename = "automationRun/cancelRequested")]
     AutomationRunCancelRequested(AutomationRunCancelRequestedAction),
+    #[serde(rename = "tunnel/portSet")]
+    TunnelPortSet(Box<TunnelPortSetAction>),
+    #[serde(rename = "tunnel/portClientSet")]
+    TunnelPortClientSet(Box<TunnelPortClientSetAction>),
+    #[serde(rename = "tunnel/portClientUpdated")]
+    TunnelPortClientUpdated(Box<TunnelPortClientUpdatedAction>),
+    #[serde(rename = "tunnel/portClientRemoved")]
+    TunnelPortClientRemoved(TunnelPortClientRemovedAction),
+    #[serde(rename = "tunnel/portRemoved")]
+    TunnelPortRemoved(TunnelPortRemovedAction),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

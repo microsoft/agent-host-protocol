@@ -128,6 +128,10 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Client can render\n[MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.\nit can host the View sandbox, run the `ui/*` protocol against it,\nand forward `mcp://`-channel traffic on the App's behalf.\n\nHosts SHOULD only populate\n{@link McpServerCustomization.mcpApp | `McpServerCustomization.mcpApp`}\n(and expose the corresponding\n{@link McpServerCustomization.channel | `mcp://` channel}) when this\ncapability is declared. Clients that omit it MUST treat\nApp-bearing tool calls as ordinary MCP tool calls."
+        },
+        "tunnels": {
+          "$ref": "#/$defs/ClientTunnelingCapabilities",
+          "description": "Port-forwarding directions this client can establish through facilities\noutside AHP. The host coordinates their state on its tunnels channel."
         }
       }
     },
@@ -176,6 +180,10 @@
         "automations": {
           "$ref": "#/$defs/AutomationCapabilities",
           "description": "Host-owned automation support. Presence means clients may subscribe to\n`ahp-automations://` for {@link AutomationCatalogState}; absence means the\nhost does not expose an automation catalogue or automation commands."
+        },
+        "tunnels": {
+          "$ref": "#/$defs/TunnelingCapabilities",
+          "description": "Host-owned tunnel coordination support. Presence advertises the\nstate-bearing catalogue channel; it does not mean the host establishes\nforwards itself."
         }
       },
       "required": [
@@ -2074,6 +2082,9 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/TunnelsState"
             }
           ],
           "description": "The current state of the resource"
@@ -7200,6 +7211,370 @@
         "sessions"
       ]
     },
+    "TunnelingCapabilities": {
+      "type": "object",
+      "description": "Capabilities advertised by a host that exposes tunnel coordination.\n\nPresence means the host maintains the authoritative state at\n{@link TunnelingCapabilities.channel}. It does not imply that the host can\nestablish a particular kind of forwarding itself.",
+      "properties": {
+        "channel": {
+          "type": "string",
+          "enum": [
+            "ahp-tunnels://"
+          ],
+          "description": "The host-owned tunnels channel."
+        }
+      },
+      "required": [
+        "channel"
+      ]
+    },
+    "ClientTunnelingCapabilities": {
+      "type": "object",
+      "description": "Port-forwarding directions a client can establish.\n\nEach field is a presence capability: an empty object means supported and\nabsence means unsupported.",
+      "properties": {
+        "hostToClient": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Make a host-side service reachable at a client-side listening address."
+        },
+        "clientToHost": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Make a client-side service reachable at a host-side listening address."
+        }
+      }
+    },
+    "TunnelAddress": {
+      "type": "object",
+      "description": "One TCP address used by a port forward.",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Host name or numeric IP address meaningful from the side that owns it."
+        },
+        "port": {
+          "type": "number",
+          "description": "TCP port. A requested local address MAY use `0` to ask the forwarding\nimplementation to allocate an available port; a ready forward MUST report\nthe effective non-zero port."
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ]
+    },
+    "TunnelPortPendingState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "pending"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "TunnelPortAcceptedState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "accepted"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "TunnelPortReadyState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "ready"
+        },
+        "localAddress": {
+          "$ref": "#/$defs/TunnelAddress",
+          "description": "Effective listening endpoint after the forwarding mechanism is active."
+        },
+        "remoteAddress": {
+          "$ref": "#/$defs/TunnelAddress",
+          "description": "Effective target endpoint after the forwarding mechanism is active."
+        }
+      },
+      "required": [
+        "status",
+        "localAddress",
+        "remoteAddress"
+      ]
+    },
+    "TunnelPortDeclinedState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "declined"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional human-readable explanation."
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "TunnelPortFailedState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "failed"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Failure reported by the client-owned forwarding implementation."
+        }
+      },
+      "required": [
+        "status",
+        "error"
+      ]
+    },
+    "TunnelPortUnavailableState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "unavailable"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional human-readable explanation."
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "TunnelPortClient": {
+      "type": "object",
+      "description": "One client responsible for establishing a port forward.\n\nThe requested mapping lives on the parent {@link TunnelPort}; every client\nassigned to a `hostToClient` entry attempts the same mapping. Once active,\n{@link TunnelPortReadyState} carries this client's confirmed effective\naddresses, including any port allocated from a request for port `0`.",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "description": "Matches the `clientId` supplied during `initialize`."
+        },
+        "state": {
+          "$ref": "#/$defs/TunnelPortClientState",
+          "description": "Current client-owned lifecycle."
+        }
+      },
+      "required": [
+        "clientId",
+        "state"
+      ]
+    },
+    "TunnelPortHostRequester": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "host"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "TunnelPortClientRequester": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "client"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Client that requested the forward."
+        }
+      },
+      "required": [
+        "kind",
+        "clientId"
+      ]
+    },
+    "TunnelPortBase": {
+      "type": "object",
+      "description": "Common authoritative fields for every port-forward entry.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Stable `ahp-tunnel:/<id>` resource identifier.\n\nEntries are not independently subscribable in this version, but the\n`ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST\ntreat the URI as opaque."
+        },
+        "requestedLocalAddress": {
+          "$ref": "#/$defs/TunnelAddress",
+          "description": "Desired listening endpoint of the forward.\n\nThis request is shared by every assigned client. It is not proof that the\naddress was established; each client's ready state reports its effective\nlistener independently."
+        },
+        "requestedRemoteAddress": {
+          "$ref": "#/$defs/TunnelAddress",
+          "description": "Desired target service endpoint of the forward.\n\nThis request is shared by every assigned client. The effective target is\nreported by each client's ready state."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional human-readable name, such as `\"Development server\"`."
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Optional application protocol hint, such as `\"http\"`, `\"https\"`, or\n`\"postgresql\"`. Forwarding remains byte-transparent."
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/TunnelPortRequester",
+          "description": "Actor that originally requested this forward."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp in ISO 8601 format."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Opaque implementation-defined metadata."
+        }
+      },
+      "required": [
+        "resource",
+        "requestedLocalAddress",
+        "requestedRemoteAddress",
+        "requestedBy",
+        "createdAt"
+      ]
+    },
+    "HostToClientTunnelPort": {
+      "type": "object",
+      "description": "A host-side service exposed through one or more client-side listeners.\n\nEvery client independently accepts and establishes its own mapping, so each\nhas separate addresses and lifecycle state.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Stable `ahp-tunnel:/<id>` resource identifier.\n\nEntries are not independently subscribable in this version, but the\n`ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST\ntreat the URI as opaque."
+        },
+        "requestedLocalAddress": {
+          "$ref": "#/$defs/TunnelAddress",
+          "description": "Desired listening endpoint of the forward.\n\nThis request is shared by every assigned client. It is not proof that the\naddress was established; each client's ready state reports its effective\nlistener independently."
+        },
+        "requestedRemoteAddress": {
+          "$ref": "#/$defs/TunnelAddress",
+          "description": "Desired target service endpoint of the forward.\n\nThis request is shared by every assigned client. The effective target is\nreported by each client's ready state."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional human-readable name, such as `\"Development server\"`."
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Optional application protocol hint, such as `\"http\"`, `\"https\"`, or\n`\"postgresql\"`. Forwarding remains byte-transparent."
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/TunnelPortRequester",
+          "description": "Actor that originally requested this forward."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp in ISO 8601 format."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Opaque implementation-defined metadata."
+        },
+        "direction": {
+          "const": "hostToClient"
+        },
+        "clients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TunnelPortClient"
+          },
+          "description": "Clients invited to establish this forward."
+        }
+      },
+      "required": [
+        "resource",
+        "requestedLocalAddress",
+        "requestedRemoteAddress",
+        "requestedBy",
+        "createdAt",
+        "direction",
+        "clients"
+      ]
+    },
+    "ClientToHostTunnelPort": {
+      "type": "object",
+      "description": "A client-side service exposed through a host-side listener.\n\nExactly one client owns the forwarding operation.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Stable `ahp-tunnel:/<id>` resource identifier.\n\nEntries are not independently subscribable in this version, but the\n`ahp-tunnel:` scheme is reserved for future protocol use. Consumers MUST\ntreat the URI as opaque."
+        },
+        "requestedLocalAddress": {
+          "$ref": "#/$defs/TunnelAddress",
+          "description": "Desired listening endpoint of the forward.\n\nThis request is shared by every assigned client. It is not proof that the\naddress was established; each client's ready state reports its effective\nlistener independently."
+        },
+        "requestedRemoteAddress": {
+          "$ref": "#/$defs/TunnelAddress",
+          "description": "Desired target service endpoint of the forward.\n\nThis request is shared by every assigned client. The effective target is\nreported by each client's ready state."
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional human-readable name, such as `\"Development server\"`."
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Optional application protocol hint, such as `\"http\"`, `\"https\"`, or\n`\"postgresql\"`. Forwarding remains byte-transparent."
+        },
+        "requestedBy": {
+          "$ref": "#/$defs/TunnelPortRequester",
+          "description": "Actor that originally requested this forward."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp in ISO 8601 format."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Opaque implementation-defined metadata."
+        },
+        "direction": {
+          "const": "clientToHost"
+        },
+        "client": {
+          "$ref": "#/$defs/TunnelPortClient",
+          "description": "Client responsible for establishing this forward."
+        }
+      },
+      "required": [
+        "resource",
+        "requestedLocalAddress",
+        "requestedRemoteAddress",
+        "requestedBy",
+        "createdAt",
+        "direction",
+        "client"
+      ]
+    },
+    "TunnelsState": {
+      "type": "object",
+      "description": "Authoritative state exposed on the `ahp-tunnels://` channel.\n\nClients establish the actual forwards through implementation-defined\nfacilities. The host only sequences, validates, snapshots, and replays this\ncoordination state.",
+      "properties": {
+        "ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TunnelPort"
+          },
+          "description": "Full port-forward entries keyed by `resource`."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Opaque host-defined state metadata."
+        }
+      },
+      "required": [
+        "ports"
+      ]
+    },
     "ActionOrigin": {
       "type": "object",
       "description": "Identifies the client that originally dispatched an action.",
@@ -9494,6 +9869,111 @@
         "type"
       ]
     },
+    "TunnelPortSetAction": {
+      "type": "object",
+      "description": "Add or replace one port-forward entry.\n\nExisting entries are matched by {@link TunnelPort.resource} and replaced in\nplace. A previously unseen resource is appended. Clients and the host may\nboth dispatch this action; the host validates client assignments, addresses,\nattribution, and authorization before broadcasting it in server order.",
+      "properties": {
+        "type": {
+          "const": "tunnel/portSet"
+        },
+        "port": {
+          "$ref": "#/$defs/TunnelPort",
+          "description": "Full new or replacement port-forward state."
+        }
+      },
+      "required": [
+        "type",
+        "port"
+      ]
+    },
+    "TunnelPortClientSetAction": {
+      "type": "object",
+      "description": "Add or replace one participating client on a port forward.\n\nFor `hostToClient`, clients are matched by `clientId`, appended when absent,\nand replaced in place when present. For `clientToHost`, this replaces the\nsingle responsible client. The target port's requested mapping is unchanged.",
+      "properties": {
+        "type": {
+          "const": "tunnel/portClientSet"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Target {@link TunnelPort.resource}."
+        },
+        "client": {
+          "$ref": "#/$defs/TunnelPortClient",
+          "description": "Full new or replacement participant state."
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "client"
+      ]
+    },
+    "TunnelPortClientUpdatedAction": {
+      "type": "object",
+      "description": "Update the lifecycle of one client-owned forwarding attempt.\n\nThe reducer locates the client inside the target port and replaces its\n`state`. The requested addresses remain unchanged. A client dispatching this\naction may update only its own participant; the host validates\n`ActionEnvelope.origin.clientId` before broadcasting it in server order.",
+      "properties": {
+        "type": {
+          "const": "tunnel/portClientUpdated"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Target {@link TunnelPort.resource}."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Client participant being updated."
+        },
+        "state": {
+          "$ref": "#/$defs/TunnelPortClientState",
+          "description": "New client-owned lifecycle, including confirmed addresses when ready."
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "clientId",
+        "state"
+      ]
+    },
+    "TunnelPortClientRemovedAction": {
+      "type": "object",
+      "description": "Remove one participating client from a `hostToClient` port forward.\n\nA `clientToHost` port requires exactly one client, so this action is a no-op\nfor that direction; remove the complete port with\n{@link TunnelPortRemovedAction | `tunnel/portRemoved`} instead. Removing an\nunknown port or client is a no-op.",
+      "properties": {
+        "type": {
+          "const": "tunnel/portClientRemoved"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Target {@link TunnelPort.resource}."
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Participant to remove."
+        }
+      },
+      "required": [
+        "type",
+        "resource",
+        "clientId"
+      ]
+    },
+    "TunnelPortRemovedAction": {
+      "type": "object",
+      "description": "Remove one port-forward entry from the tunnels state.\n\nClients and the host may dispatch this action. The host validates\nauthorization and coordinates cleanup with every assigned client. Removing\nan unknown resource is a no-op.",
+      "properties": {
+        "type": {
+          "const": "tunnel/portRemoved"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "{@link TunnelPort.resource} to remove."
+        }
+      },
+      "required": [
+        "type",
+        "resource"
+      ]
+    },
     "URI": {
       "type": "string",
       "description": "A URI string (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`)."
@@ -9784,6 +10264,21 @@
         },
         {
           "$ref": "#/$defs/AutomationRunCancelRequestedAction"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortSetAction"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortClientSetAction"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortClientUpdatedAction"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortClientRemovedAction"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortRemovedAction"
         }
       ],
       "description": "Discriminated union of all state actions."
@@ -10590,6 +11085,51 @@
         }
       ],
       "description": "Discriminated lifecycle of an automation run."
+    },
+    "TunnelPortClientState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TunnelPortPendingState"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortAcceptedState"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortReadyState"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortDeclinedState"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortFailedState"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortUnavailableState"
+        }
+      ],
+      "description": "Lifecycle of one client-owned forwarding attempt."
+    },
+    "TunnelPortRequester": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TunnelPortHostRequester"
+        },
+        {
+          "$ref": "#/$defs/TunnelPortClientRequester"
+        }
+      ],
+      "description": "Durable attribution for a port-forwarding request."
+    },
+    "TunnelPort": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/HostToClientTunnelPort"
+        },
+        {
+          "$ref": "#/$defs/ClientToHostTunnelPort"
+        }
+      ],
+      "description": "One authoritative port-forward entry in the tunnels state."
     },
     "PendingMessageKind": {
       "enum": [

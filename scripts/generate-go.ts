@@ -173,7 +173,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState | TunnelsState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -728,6 +728,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'TunnelPortDirectionKind', 'TunnelPortClientStatus', 'TunnelPortRequesterKind',
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
@@ -882,6 +883,22 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
+  { name: 'TunnelingCapabilities' },
+  { name: 'ClientTunnelingCapabilities' },
+  { name: 'TunnelAddress' },
+  { name: 'TunnelPortPendingState' },
+  { name: 'TunnelPortAcceptedState' },
+  { name: 'TunnelPortReadyState' },
+  { name: 'TunnelPortDeclinedState' },
+  { name: 'TunnelPortFailedState' },
+  { name: 'TunnelPortUnavailableState' },
+  { name: 'TunnelPortClient' },
+  { name: 'TunnelPortHostRequester' },
+  { name: 'TunnelPortClientRequester' },
+  { name: 'TunnelPortBase' },
+  { name: 'HostToClientTunnelPort' },
+  { name: 'ClientToHostTunnelPort' },
+  { name: 'TunnelsState' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1163,6 +1180,46 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnMarshal: true,
 };
 
+const TUNNEL_PORT_CLIENT_STATE_UNION: UnionConfig = {
+  name: 'TunnelPortClientState',
+  discriminantField: 'status',
+  doc: 'TunnelPortClientState is the lifecycle of one client-owned forwarding attempt.',
+  variants: [
+    { variantName: 'Pending', innerType: 'TunnelPortPendingState', wireValue: 'pending' },
+    { variantName: 'Accepted', innerType: 'TunnelPortAcceptedState', wireValue: 'accepted' },
+    { variantName: 'Ready', innerType: 'TunnelPortReadyState', wireValue: 'ready' },
+    { variantName: 'Declined', innerType: 'TunnelPortDeclinedState', wireValue: 'declined' },
+    { variantName: 'Failed', innerType: 'TunnelPortFailedState', wireValue: 'failed' },
+    { variantName: 'Unavailable', innerType: 'TunnelPortUnavailableState', wireValue: 'unavailable' },
+  ],
+  unknown: true,
+  injectDiscriminantOnMarshal: true,
+};
+
+const TUNNEL_PORT_REQUESTER_UNION: UnionConfig = {
+  name: 'TunnelPortRequester',
+  discriminantField: 'kind',
+  doc: 'TunnelPortRequester is the durable attribution for a port-forwarding request.',
+  variants: [
+    { variantName: 'Host', innerType: 'TunnelPortHostRequester', wireValue: 'host' },
+    { variantName: 'Client', innerType: 'TunnelPortClientRequester', wireValue: 'client' },
+  ],
+  unknown: true,
+  injectDiscriminantOnMarshal: true,
+};
+
+const TUNNEL_PORT_UNION: UnionConfig = {
+  name: 'TunnelPort',
+  discriminantField: 'direction',
+  doc: 'TunnelPort is one authoritative port-forward entry in the tunnels state.',
+  variants: [
+    { variantName: 'HostToClient', innerType: 'HostToClientTunnelPort', wireValue: 'hostToClient' },
+    { variantName: 'ClientToHost', innerType: 'ClientToHostTunnelPort', wireValue: 'clientToHost' },
+  ],
+  unknown: true,
+  injectDiscriminantOnMarshal: true,
+};
+
 function generateChatOriginGo(): string {
   return `// ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
@@ -1264,11 +1321,11 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
 // chat, terminal, changeset, resource-watch, annotations, automation catalogue,
-// or automation-run state. The active
+// automation-run, or tunnel-catalogue state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
 // (automationRun → automations → session → chat → terminal → changeset →
-// resourceWatch → annotations → root).
+// resourceWatch → annotations → tunnels → root).
 type SnapshotState struct {
 \tRoot          *RootState          \`json:"-"\`
 \tSession       *SessionState       \`json:"-"\`
@@ -1279,6 +1336,7 @@ type SnapshotState struct {
 \tAnnotations   *AnnotationsState   \`json:"-"\`
 \tAutomations   *AutomationCatalogState \`json:"-"\`
 \tAutomationRun *AutomationRunState \`json:"-"\`
+\tTunnels       *TunnelsState       \`json:"-"\`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
@@ -1300,6 +1358,8 @@ func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \t\treturn json.Marshal(s.ResourceWatch)
 \tcase s.Annotations != nil:
 \t\treturn json.Marshal(s.Annotations)
+\tcase s.Tunnels != nil:
+\t\treturn json.Marshal(s.Tunnels)
 \tcase s.Root != nil:
 \t\treturn json.Marshal(s.Root)
 \tdefault:
@@ -1364,6 +1424,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.Annotations = &v
+\tcase containsAll(probe, "ports"):
+\t\tvar v TunnelsState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Tunnels = &v
 \tdefault:
 \t\tvar v RootState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1497,6 +1563,12 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_CLIENT_STATE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_REQUESTER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_UNION));
+  lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1607,6 +1679,11 @@ const ACTION_VARIANTS: {
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', variantName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', variantName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'tunnel/portSet', variantName: 'TunnelPortSet', tsInterface: 'TunnelPortSetAction' },
+  { type: 'tunnel/portClientSet', variantName: 'TunnelPortClientSet', tsInterface: 'TunnelPortClientSetAction' },
+  { type: 'tunnel/portClientUpdated', variantName: 'TunnelPortClientUpdated', tsInterface: 'TunnelPortClientUpdatedAction' },
+  { type: 'tunnel/portClientRemoved', variantName: 'TunnelPortClientRemoved', tsInterface: 'TunnelPortClientRemovedAction' },
+  { type: 'tunnel/portRemoved', variantName: 'TunnelPortRemoved', tsInterface: 'TunnelPortRemovedAction' },
 ];
 
 function generateMergedChatToolCallConfirmedStruct(): string {
@@ -2320,6 +2397,10 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTrigger',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',
+    'TunnelPortClientState',
+    'TunnelPortRequester',
+    'TunnelPort',
+    'TunnelActionState',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',

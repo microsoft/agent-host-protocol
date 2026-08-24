@@ -203,6 +203,16 @@ public enum ActionType
     AutomationRunPrimarySessionChanged,
     [WireValue("automationRun/cancelRequested")]
     AutomationRunCancelRequested,
+    [WireValue("tunnel/portSet")]
+    TunnelPortSet,
+    [WireValue("tunnel/portClientSet")]
+    TunnelPortClientSet,
+    [WireValue("tunnel/portClientUpdated")]
+    TunnelPortClientUpdated,
+    [WireValue("tunnel/portClientRemoved")]
+    TunnelPortClientRemoved,
+    [WireValue("tunnel/portRemoved")]
+    TunnelPortRemoved,
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -2467,6 +2477,86 @@ public sealed record AutomationRunCancelRequestedAction
     public ActionType Type { get; init; }
 }
 
+/// <summary>Add or replace one port-forward entry.
+///
+/// Existing entries are matched by {@link TunnelPort.resource} and replaced in
+/// place. A previously unseen resource is appended. Clients and the host may
+/// both dispatch this action; the host validates client assignments, addresses,
+/// attribution, and authorization before broadcasting it in server order.</summary>
+public sealed record TunnelPortSetAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Full new or replacement port-forward state.</summary>
+    public required TunnelPort Port { get; init; }
+}
+
+/// <summary>Add or replace one participating client on a port forward.
+///
+/// For `hostToClient`, clients are matched by `clientId`, appended when absent,
+/// and replaced in place when present. For `clientToHost`, this replaces the
+/// single responsible client. The target port's requested mapping is unchanged.</summary>
+public sealed record TunnelPortClientSetAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Target {@link TunnelPort.resource}.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>Full new or replacement participant state.</summary>
+    public required TunnelPortClient Client { get; init; }
+}
+
+/// <summary>Update the lifecycle of one client-owned forwarding attempt.
+///
+/// The reducer locates the client inside the target port and replaces its
+/// `state`. The requested addresses remain unchanged. A client dispatching this
+/// action may update only its own participant; the host validates
+/// `ActionEnvelope.origin.clientId` before broadcasting it in server order.</summary>
+public sealed record TunnelPortClientUpdatedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Target {@link TunnelPort.resource}.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>Client participant being updated.</summary>
+    public required string ClientId { get; init; }
+
+    /// <summary>New client-owned lifecycle, including confirmed addresses when ready.</summary>
+    public required TunnelPortClientState State { get; init; }
+}
+
+/// <summary>Remove one participating client from a `hostToClient` port forward.
+///
+/// A `clientToHost` port requires exactly one client, so this action is a no-op
+/// for that direction; remove the complete port with
+/// {@link TunnelPortRemovedAction | `tunnel/portRemoved`} instead. Removing an
+/// unknown port or client is a no-op.</summary>
+public sealed record TunnelPortClientRemovedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Target {@link TunnelPort.resource}.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>Participant to remove.</summary>
+    public required string ClientId { get; init; }
+}
+
+/// <summary>Remove one port-forward entry from the tunnels state.
+///
+/// Clients and the host may dispatch this action. The host validates
+/// authorization and coordinates cleanup with every assigned client. Removing
+/// an unknown resource is a no-op.</summary>
+public sealed record TunnelPortRemovedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>{@link TunnelPort.resource} to remove.</summary>
+    public required string Resource { get; init; }
+}
+
 // ─── Partial Summaries (action-discovered) ───────────────────────────
 
 /// <summary>Partial equivalent of ChatSummary — every field is optional for delta updates.</summary>
@@ -2645,6 +2735,11 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["automationRun/sessionRemoved"] = typeof(AutomationRunSessionRemovedAction),
         ["automationRun/primarySessionChanged"] = typeof(AutomationRunPrimarySessionChangedAction),
         ["automationRun/cancelRequested"] = typeof(AutomationRunCancelRequestedAction),
+        ["tunnel/portSet"] = typeof(TunnelPortSetAction),
+        ["tunnel/portClientSet"] = typeof(TunnelPortClientSetAction),
+        ["tunnel/portClientUpdated"] = typeof(TunnelPortClientUpdatedAction),
+        ["tunnel/portClientRemoved"] = typeof(TunnelPortClientRemovedAction),
+        ["tunnel/portRemoved"] = typeof(TunnelPortRemovedAction),
             },
             allowUnknown: true)
     {

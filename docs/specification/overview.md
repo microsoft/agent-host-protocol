@@ -83,6 +83,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Session Channel](/specification/session-channel)** — `ahp-session:/<uuid>` — per-session state: the `chats` catalog, default chat, active clients, customizations, changesets, and aggregated status.
 - **[Automation Catalogue Channel](/specification/automation-channel)** — `ahp-automations://` — synchronized full states for durable trigger-based session workflows.
 - **[Automation Run Channel](/specification/automation-run-channel)** — `ahp-automation-run:/<id>` — task lifecycle and linked sessions.
+- **[Tunnels Channel](/specification/tunnels-channel)** — `ahp-tunnels://` — coordinated client-established port forwards.
 - **[Chat Channel](/specification/chat-channel)** — `ahp-chat:/<cid>` — per-chat conversation state: turns, streaming, tool calls, pending messages, and input requests.
 - **[Terminal Channel](/specification/terminal-channel)** — per-terminal pty state, data flow, claims, command detection.
 - **[Telemetry Channel](/specification/telemetry-channel)** — `ahp-otlp:` — OpenTelemetry logs, traces, and metrics emitted by the agent host.
@@ -96,6 +97,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Annotations Channel Reference](/reference/annotations)** — `AnnotationsState` and annotations actions.
 - **[Automation Catalogue Channel Reference](/reference/automation)** — `AutomationCatalogState`, automation actions, and automation commands.
 - **[Automation Run Channel Reference](/reference/automation-run)** — `AutomationRunState` and automation-run actions.
+- **[Tunnels Channel Reference](/reference/tunnels)** — `TunnelsState`, client capabilities, and tunnel actions.
 - **[Resource Watch Channel Reference](/reference/resource-watch)** — `ResourceWatchState`, resource-watch actions, and resource-watch commands.
 - **[Telemetry Channel Reference](/reference/otlp)** — OTLP capability types and notifications.
 - **[MCP Channel Reference](/reference/mcp)** — Upstream MCP wire surface and AHP capability links.

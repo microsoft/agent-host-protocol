@@ -153,7 +153,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState | TunnelsState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -844,6 +844,7 @@ sealed interface SnapshotState {
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
     @JvmInline value class Automations(val value: AutomationCatalogState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
+    @JvmInline value class Tunnels(val value: TunnelsState) : SnapshotState
 }
 
 internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
@@ -863,8 +864,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // required \`status\` + \`files\`; ResourceWatchState has required
         // \`root\` + \`recursive\`; AnnotationsState has required \`annotations\`
         // (checked after session, whose optional annotations summary reuses the
-        // key); TerminalState has required \`content\`; RootState is the
-        // catch-all.
+        // key); TerminalState has required \`content\`; TunnelsState has
+        // required \`ports\`; RootState is the catch-all.
         return when {
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
@@ -880,6 +881,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
                 SnapshotState.Annotations(input.json.decodeFromJsonElement(AnnotationsState.serializer(), element))
             obj.containsKey("content") ->
                 SnapshotState.Terminal(input.json.decodeFromJsonElement(TerminalState.serializer(), element))
+            obj.containsKey("ports") ->
+                SnapshotState.Tunnels(input.json.decodeFromJsonElement(TunnelsState.serializer(), element))
             else -> SnapshotState.Root(input.json.decodeFromJsonElement(RootState.serializer(), element))
         }
     }
@@ -897,6 +900,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
             is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationCatalogState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
+            is SnapshotState.Tunnels -> output.json.encodeToJsonElement(TunnelsState.serializer(), value.value)
         }
         output.encodeJsonElement(element)
     }
@@ -980,6 +984,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'TunnelPortDirectionKind', 'TunnelPortClientStatus', 'TunnelPortRequesterKind',
 ];
 
 const STATE_STRUCTS = [
@@ -1047,6 +1052,12 @@ const STATE_STRUCTS = [
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
+  'TunnelingCapabilities', 'ClientTunnelingCapabilities', 'TunnelAddress',
+  'TunnelPortPendingState', 'TunnelPortAcceptedState', 'TunnelPortReadyState',
+  'TunnelPortDeclinedState', 'TunnelPortFailedState', 'TunnelPortUnavailableState',
+  'TunnelPortClient',
+  'TunnelPortHostRequester', 'TunnelPortClientRequester', 'TunnelPortBase',
+  'HostToClientTunnelPort', 'ClientToHostTunnelPort', 'TunnelsState',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1361,6 +1372,43 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnSerialize: true,
 };
 
+const TUNNEL_PORT_CLIENT_STATE_UNION: UnionConfig = {
+  name: 'TunnelPortClientState',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'Pending', structName: 'TunnelPortPendingState', discriminantValue: 'pending' },
+    { caseName: 'Accepted', structName: 'TunnelPortAcceptedState', discriminantValue: 'accepted' },
+    { caseName: 'Ready', structName: 'TunnelPortReadyState', discriminantValue: 'ready' },
+    { caseName: 'Declined', structName: 'TunnelPortDeclinedState', discriminantValue: 'declined' },
+    { caseName: 'Failed', structName: 'TunnelPortFailedState', discriminantValue: 'failed' },
+    { caseName: 'Unavailable', structName: 'TunnelPortUnavailableState', discriminantValue: 'unavailable' },
+  ],
+  unknown: true,
+  injectDiscriminantOnSerialize: true,
+};
+
+const TUNNEL_PORT_REQUESTER_UNION: UnionConfig = {
+  name: 'TunnelPortRequester',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Host', structName: 'TunnelPortHostRequester', discriminantValue: 'host' },
+    { caseName: 'Client', structName: 'TunnelPortClientRequester', discriminantValue: 'client' },
+  ],
+  unknown: true,
+  injectDiscriminantOnSerialize: true,
+};
+
+const TUNNEL_PORT_UNION: UnionConfig = {
+  name: 'TunnelPort',
+  discriminantField: 'direction',
+  variants: [
+    { caseName: 'HostToClient', structName: 'HostToClientTunnelPort', discriminantValue: 'hostToClient' },
+    { caseName: 'ClientToHost', structName: 'ClientToHostTunnelPort', discriminantValue: 'clientToHost' },
+  ],
+  unknown: true,
+  injectDiscriminantOnSerialize: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1451,6 +1499,12 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_CLIENT_STATE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_REQUESTER_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, TUNNEL_PORT_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -1558,6 +1612,11 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'automationRun/sessionRemoved', caseName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', caseName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', caseName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'tunnel/portSet', caseName: 'TunnelPortSet', tsInterface: 'TunnelPortSetAction' },
+  { type: 'tunnel/portClientSet', caseName: 'TunnelPortClientSet', tsInterface: 'TunnelPortClientSetAction' },
+  { type: 'tunnel/portClientUpdated', caseName: 'TunnelPortClientUpdated', tsInterface: 'TunnelPortClientUpdatedAction' },
+  { type: 'tunnel/portClientRemoved', caseName: 'TunnelPortClientRemoved', tsInterface: 'TunnelPortClientRemovedAction' },
+  { type: 'tunnel/portRemoved', caseName: 'TunnelPortRemoved', tsInterface: 'TunnelPortRemovedAction' },
 ];
 
 /** Merged data class for the approved/denied tool call confirmed action. */
@@ -2363,6 +2422,10 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union
+    'TunnelPortClientState',        // TUNNEL_PORT_CLIENT_STATE_UNION discriminated union
+    'TunnelPortRequester',          // TUNNEL_PORT_REQUESTER_UNION discriminated union
+    'TunnelPort',                   // TUNNEL_PORT_UNION discriminated union
+    'TunnelActionState',            // source-only action-family state alias
     'ForkChatSource',               // generateFixedChatSourceBranchKotlin()
     'SideChatSource',               // generateFixedChatSourceBranchKotlin()
     'ChangesetOperationTarget',     // generateChangesetOperationTargetKotlin()

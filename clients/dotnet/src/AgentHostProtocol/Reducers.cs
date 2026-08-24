@@ -2207,6 +2207,133 @@ public static class Reducers
             : ReduceOutcome.OutOfScope;
     }
 
+    // ─── Tunnels Reducer ──────────────────────────────────────────────────
+
+    /// <summary>Applies an action to tunnels state in place.</summary>
+    public static ReduceOutcome ApplyToTunnel(TunnelsState state, StateAction action)
+    {
+        Guard.ThrowIfNull(state, nameof(state));
+        Guard.ThrowIfNull(action, nameof(action));
+        switch (action.Value)
+        {
+            case TunnelPortSetAction a:
+                {
+                    string? resource = TunnelPortResource(a.Port);
+                    if (resource is null)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+                    int index = state.Ports.FindIndex(port => TunnelPortResource(port) == resource);
+                    if (index < 0)
+                    {
+                        state.Ports.Add(a.Port);
+                    }
+                    else
+                    {
+                        state.Ports[index] = a.Port;
+                    }
+                    return ReduceOutcome.Applied;
+                }
+            case TunnelPortClientUpdatedAction a:
+                {
+                    int index = state.Ports.FindIndex(port => TunnelPortResource(port) == a.Resource);
+                    if (index < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+                    switch (state.Ports[index].Value)
+                    {
+                        case HostToClientTunnelPort port:
+                            {
+                                int clientIndex = port.Clients.FindIndex(client => client.ClientId == a.ClientId);
+                                if (clientIndex < 0)
+                                {
+                                    return ReduceOutcome.NoOp;
+                                }
+                                var clients = new List<TunnelPortClient>(port.Clients);
+                                clients[clientIndex] = clients[clientIndex] with { State = a.State };
+                                state.Ports[index] = new TunnelPort(port with { Clients = clients });
+                                return ReduceOutcome.Applied;
+                            }
+                        case ClientToHostTunnelPort port when port.Client.ClientId == a.ClientId:
+                            state.Ports[index] = new TunnelPort(
+                                port with { Client = port.Client with { State = a.State } });
+                            return ReduceOutcome.Applied;
+                        default:
+                            return ReduceOutcome.NoOp;
+                    }
+                }
+            case TunnelPortClientSetAction a:
+                {
+                    int index = state.Ports.FindIndex(port => TunnelPortResource(port) == a.Resource);
+                    if (index < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+                    switch (state.Ports[index].Value)
+                    {
+                        case HostToClientTunnelPort port:
+                            {
+                                var clients = new List<TunnelPortClient>(port.Clients);
+                                int clientIndex = clients.FindIndex(client => client.ClientId == a.Client.ClientId);
+                                if (clientIndex < 0)
+                                {
+                                    clients.Add(a.Client);
+                                }
+                                else
+                                {
+                                    clients[clientIndex] = a.Client;
+                                }
+                                state.Ports[index] = new TunnelPort(port with { Clients = clients });
+                                return ReduceOutcome.Applied;
+                            }
+                        case ClientToHostTunnelPort port:
+                            state.Ports[index] = new TunnelPort(port with { Client = a.Client });
+                            return ReduceOutcome.Applied;
+                        default:
+                            return ReduceOutcome.NoOp;
+                    }
+                }
+            case TunnelPortClientRemovedAction a:
+                {
+                    int index = state.Ports.FindIndex(port => TunnelPortResource(port) == a.Resource);
+                    if (index < 0 || state.Ports[index].Value is not HostToClientTunnelPort port)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+                    var clients = new List<TunnelPortClient>(port.Clients);
+                    int clientIndex = clients.FindIndex(client => client.ClientId == a.ClientId);
+                    if (clientIndex < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+                    clients.RemoveAt(clientIndex);
+                    state.Ports[index] = new TunnelPort(port with { Clients = clients });
+                    return ReduceOutcome.Applied;
+                }
+            case TunnelPortRemovedAction a:
+                {
+                    int index = state.Ports.FindIndex(port => TunnelPortResource(port) == a.Resource);
+                    if (index < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+                    state.Ports.RemoveAt(index);
+                    return ReduceOutcome.Applied;
+                }
+            default:
+                return ReduceOutcome.OutOfScope;
+        }
+    }
+
+    private static string? TunnelPortResource(TunnelPort port) =>
+        port.Value switch
+        {
+            HostToClientTunnelPort value => value.Resource,
+            ClientToHostTunnelPort value => value.Resource,
+            _ => null,
+        };
+
     // ─── Annotations Reducer ───────────────────────────────────────────────
 
     /// <summary>
