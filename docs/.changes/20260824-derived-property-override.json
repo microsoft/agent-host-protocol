@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "The rust, go, kotlin and swift generators now use a derived interface's narrowed property instead of the base declaration, so a field narrowed to one variant of a discriminated union is generated as that payload type and keeps its union discriminant on the wire.",
+  "targets": ["rust", "go", "kotlin", "swift"]
+}

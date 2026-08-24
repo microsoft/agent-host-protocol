@@ -458,7 +458,10 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
     case .chatToolCallAuthRequired(let a):
         return refreshChatSummaryStatus(updateToolCall(state: state, turnId: a.turnId, toolCallId: a.toolCallId) { tc in
             guard case .running(let running) = tc else { return tc }
-            guard let contributor = running.contributor, case .mcp = contributor else { return tc }
+            // Auth is only ever required for an MCP-contributed tool call, which is why
+            // `ToolCallAuthRequiredState` narrows `contributor` to the MCP payload.
+            // Bind that payload here; any other contributor is a no-op.
+            guard let contributor = running.contributor, case .mcp(let mcpContributor) = contributor else { return tc }
 
             let base = tc.baseFields
             let meta = a.meta ?? base.meta
@@ -467,7 +470,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolName: base.toolName,
                 displayName: base.displayName,
                 intention: base.intention,
-                contributor: contributor,
+                contributor: mcpContributor,
                 meta: meta,
                 invocationMessage: running.invocationMessage,
                 toolInput: running.toolInput,

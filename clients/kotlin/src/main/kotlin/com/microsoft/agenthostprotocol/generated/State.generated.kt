@@ -3149,9 +3149,9 @@ data class ToolCallAuthRequiredState(
      */
     val intention: String? = null,
     /**
-     * Reference to the contributor of the tool being called.
+     * The MCP server that contributed this tool call — always MCP, never a client tool.
      */
-    val contributor: ToolCallContributor? = null,
+    val contributor: ToolCallMcpContributor,
     /**
      * Additional provider-specific metadata for this tool call.
      *

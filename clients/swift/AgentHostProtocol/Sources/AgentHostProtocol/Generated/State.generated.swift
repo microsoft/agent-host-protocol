@@ -3527,8 +3527,8 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
     public var displayName: String
     /// Human-readable description of what the tool invocation intends to do
     public var intention: String?
-    /// Reference to the contributor of the tool being called.
-    public var contributor: ToolCallContributor?
+    /// The MCP server that contributed this tool call — always MCP, never a client tool.
+    public var contributor: ToolCallMcpContributor
     /// Additional provider-specific metadata for this tool call.
     ///
     /// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)
@@ -3575,7 +3575,7 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         toolName: String,
         displayName: String,
         intention: String? = nil,
-        contributor: ToolCallContributor? = nil,
+        contributor: ToolCallMcpContributor,
         meta: [String: AnyCodable]? = nil,
         invocationMessage: StringOrMarkdown,
         toolInput: ToolInput? = nil,

@@ -225,6 +225,77 @@ interface RustProp {
   doc: string;
   isLiteralDiscriminant: boolean;
   literalValue?: string;
+  /** Name of a generated serde-`with` module that injects the union discriminant
+   * on serialize, for a field narrowed to a discriminated-union payload. */
+  serdeWith?: string;
+}
+
+// Serde `with` modules generated for union-payload narrowings, keyed by module
+// name (deduped across fields in a file). A field like
+// `contributor: ToolCallMcpContributor` (narrowed from the `ToolCallContributor`
+// tagged union) is typed as the narrowed payload; this module injects
+// `"kind":"mcp"` on serialize so the wire still matches the union tag. Populated
+// during struct generation, drained into the file by `drainSerdeTagModules`.
+// Cleared per file. A field that populates this in a file that never drains it
+// produces a `#[serde(with = ...)]` referencing an undefined module, i.e. a loud
+// compile error, never silent wire corruption.
+const serdeTagModules = new Map<string, string>();
+
+/** Emit + clear every serde-`with` module collected for the current file. */
+function drainSerdeTagModules(): string {
+  if (serdeTagModules.size === 0) return '';
+  const mods = [...serdeTagModules.values()].join('\n\n');
+  serdeTagModules.clear();
+  return '// ─── Serde helpers: inject the union discriminant for narrowed payloads ───\n\n' + mods;
+}
+
+/**
+ * Register (deduped) a serde-`with` module that serializes a narrowed
+ * union-payload field with its discriminant injected, and returns its name.
+ * `discriminant` is the union's tag field (e.g. `kind`); `wireValue` is the
+ * variant's wire tag (e.g. `mcp`); `payloadType` is the narrowed Rust type.
+ */
+function registerSerdeTagModule(payloadType: string, discriminant: string, wireValue: string): string {
+  const modName = `serde_${toSnakeCase(payloadType)}_as_${toSnakeCase(wireValue)}`;
+  if (!serdeTagModules.has(modName)) {
+    const dk = JSON.stringify(discriminant);
+    const dv = JSON.stringify(wireValue);
+    serdeTagModules.set(modName, [
+      `/// Serializes a \`${payloadType}\` with the \`${discriminant}: ${wireValue}\` union`,
+      `/// discriminant injected, matching the tagged-union wire form, and REJECTS a`,
+      `/// foreign discriminant on the way in.`,
+      `///`,
+      `/// The field is narrowed to one variant's payload, so any other \`${discriminant}\` is`,
+      `/// malformed input. Decoding it anyway would silently re-emit it as`,
+      `/// \`${wireValue}\` -- rewriting a tag the peer sent. Mirrors`,
+      `/// \`deserialize_running_tool_call\`, which errors the same way on a wrong`,
+      `/// \`status\`.`,
+      `mod ${modName} {`,
+      `    use super::${payloadType};`,
+      `    use serde::{Deserialize, Deserializer, Serialize, Serializer};`,
+      `    pub fn serialize<S: Serializer>(value: &${payloadType}, serializer: S) -> Result<S::Ok, S::Error> {`,
+      `        let mut v = serde_json::to_value(value).map_err(serde::ser::Error::custom)?;`,
+      `        if let serde_json::Value::Object(ref mut map) = v {`,
+      `            map.insert(${dk}.to_string(), serde_json::Value::String(${dv}.to_string()));`,
+      `        }`,
+      `        v.serialize(serializer)`,
+      `    }`,
+      `    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<${payloadType}, D::Error> {`,
+      `        let raw = serde_json::Value::deserialize(deserializer)?;`,
+      `        match raw.get(${dk}).and_then(serde_json::Value::as_str) {`,
+      `            None | Some(${dv}) => {}`,
+      `            Some(other) => {`,
+      `                return Err(serde::de::Error::custom(format!(`,
+      `                    "expected {} {:?}, got {:?}", ${dk}, ${dv}, other`,
+      `                )));`,
+      `            }`,
+      `        }`,
+      `        serde_json::from_value(raw).map_err(serde::de::Error::custom)`,
+      `    }`,
+      `}`,
+    ].join('\n'));
+  }
+  return modName;
 }
 
 function getPropertyType(prop: PropertySignature): string {
@@ -237,6 +308,56 @@ function getPropertyDoc(prop: PropertySignature): string {
   const jsDocs = prop.getJsDocs();
   if (jsDocs.length === 0) return '';
   return jsDocs[0].getDescription().trim();
+}
+
+/**
+ * Group every declaration of each property name, ordered base → derived.
+ *
+ * `getAllProperties` appends an interface's own properties AFTER the ones it
+ * inherits, so a name declared by both a base and the interface itself lands in
+ * the list twice, with the interface's own (the override) last.
+ *
+ * The dedupe SEMANTICS are `generate-json-schema.ts`'s, not new: its
+ * `getAllInterfaceProperties` already resolves a name to its LAST declaration,
+ * emitted at its FIRST declaration's position (`byName.set(prop.getName(), prop)`
+ * then `[...byName.values()]`). This generator keeps the whole ordered LIST rather
+ * than only that winner, because two things here need the BASE declaration, which
+ * the winner-only shape discards:
+ *
+ *   1. the doc cascade — a narrowing override usually carries no prose of its own,
+ *      so the base's doc must still reach the generated code. (The schema generator
+ *      accepts that loss: `InitializeParams.channel` ships with no `description`.)
+ *   2. `findNarrowedUnionPayload` — when an override narrows to a variant payload of
+ *      an inherited discriminated union, the field is typed as the narrowed payload
+ *      (like every other override), and a serde-`with` module re-injects the union
+ *      discriminant on serialize; identifying that case needs the base declaration.
+ */
+function groupDeclarationsByName(props: PropertySignature[]): Map<string, PropertySignature[]> {
+  const byName = new Map<string, PropertySignature[]>();
+  for (const p of props) {
+    const decls = byName.get(p.getName());
+    if (decls) decls.push(p);
+    else byName.set(p.getName(), [p]);
+  }
+  return byName;
+}
+
+/**
+ * Resolve the doc comment for a property from its declarations (base → derived).
+ *
+ * The type comes from the most-derived declaration, but an override is often
+ * declared purely to narrow the type and carries no prose of its own (e.g.
+ * `InitializeParams.channel: 'ahp-root://'` re-declares `BaseParams.channel`
+ * only to pin the literal). Falling back to the nearest ancestor that documents
+ * the property keeps the base's prose cascading, while an override that *does*
+ * document itself (e.g. `CreateSessionParams.channel`) still wins.
+ */
+function resolvePropertyDoc(decls: PropertySignature[]): string {
+  for (let i = decls.length - 1; i >= 0; i--) {
+    const doc = getPropertyDoc(decls[i]);
+    if (doc) return doc;
+  }
+  return '';
 }
 
 /** Returns true if the property has a `@format float` JSDoc tag. */
@@ -277,10 +398,31 @@ function extractProps(iface: InterfaceDeclaration, project: Project): RustProp[]
   const seen = new Set<string>();
   const result: RustProp[] = [];
 
-  for (const p of allProps) {
-    const tsName = p.getName();
+  // A derived interface may narrow an inherited property (e.g.
+  // `InitializeParams.channel` narrows `BaseParams.channel` from `URI` to the
+  // literal `'ahp-root://'`), and that override is the real contract. Take the
+  // type/optionality from the most-derived declaration, but emit the field at the
+  // position of its first (base) declaration so inherited field order stays
+  // stable. The doc is resolved separately: a narrowing override usually has no
+  // prose of its own, and the base's must still cascade.
+  const declsByName = groupDeclarationsByName(allProps);
+
+  for (const declared of allProps) {
+    const tsName = declared.getName();
     if (seen.has(tsName)) continue;
     seen.add(tsName);
+
+    const decls = declsByName.get(tsName) ?? [declared];
+
+    // A field narrowed to a variant payload of an inherited discriminated union
+    // (e.g. `contributor: ToolCallMcpContributor` from the `ToolCallContributor`
+    // union) is typed as the narrowed payload, same as every other override. The
+    // one Rust-specific wrinkle: the union's discriminant (`#[serde(tag = "kind")]`)
+    // lives on the enum, not the payload struct, so serializing the bare payload
+    // would drop `"kind":"mcp"` from the wire. A generated serde-`with` module
+    // injects it back (registered below); the type stays narrowed like the others.
+    const narrowedUnion = findNarrowedUnionPayload(decls);
+    const p = decls[decls.length - 1];
 
     const tsType = getPropertyType(p);
 
@@ -331,15 +473,34 @@ function extractProps(iface: InterfaceDeclaration, project: Project): RustProp[]
       rustType = `Option<${rustType}>`;
     }
 
+    const doc = resolvePropertyDoc(decls);
+
+    // A narrowed union payload keeps the narrowed type; a serde-`with` module
+    // re-injects the union discriminant on serialize so the wire stays tagged.
+    // (Option-wrapped narrowings would need the module to be Option-aware; none
+    // exist today, so fail loudly rather than emit a wrong shape.)
+    let serdeWith: string | undefined;
+    if (narrowedUnion) {
+      if (optional) {
+        throw new Error(
+          `${iface.getName()}.${tsName} narrows to a union payload AND is optional; ` +
+          `the serde-with tag-injection module is not Option-aware. Extend registerSerdeTagModule.`,
+        );
+      }
+      const { union, variant } = narrowedUnion;
+      serdeWith = registerSerdeTagModule(rustType, union.discriminantField, variant.wireValue);
+    }
+
     result.push({
       rustName,
       wireName,
       rustType,
       optional,
       renamed,
-      doc: getPropertyDoc(p),
+      doc,
       isLiteralDiscriminant,
       literalValue,
+      serdeWith,
     });
   }
   return result;
@@ -595,6 +756,7 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
     }
     const attrs: string[] = [];
     if (p.renamed) attrs.push(`rename = ${JSON.stringify(p.wireName)}`);
+    if (p.serdeWith) attrs.push(`with = ${JSON.stringify(p.serdeWith)}`);
     if (p.optional) {
       attrs.push('default');
       attrs.push('skip_serializing_if = "Option::is_none"');
@@ -691,6 +853,14 @@ interface UnionConfig {
 }
 
 function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string {
+  // Emission IS the definition of "this union exists", so registering here rather than
+  // asserting membership is what actually makes the registry unable to drift: a union
+  // cannot be emitted without becoming findable. A miss fails silently otherwise --
+  // findNarrowedUnionPayload returns undefined, the field narrows, no serde-`with`
+  // module is generated, and the discriminant is dropped on the wire with nothing to
+  // notice. `StateAction` in particular is built from runtime-computed variants and so
+  // can never appear in a static const list.
+  getUnionRegistry().set(cfg.name, cfg);
   const unknown = discriminatedUnionAllowsUnknown(
     project,
     cfg.discriminantField,
@@ -1219,6 +1389,38 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+/**
+ * Every discriminated union emitted into `state.rs`, in emission order.
+ *
+ * Doubles as part of the registry consulted by {@link findNarrowedUnionPayload},
+ * so the set of unions the generator knows about cannot drift from the set it
+ * actually emits.
+ */
+const STATE_UNIONS: UnionConfig[] = [
+  RESPONSE_PART_UNION,
+  TOOL_CALL_STATE_UNION,
+  TOOL_CALL_CONFIRMATION_STATE_UNION,
+  TERMINAL_CLAIM_UNION,
+  TERMINAL_CONTENT_PART_UNION,
+  CHAT_INPUT_QUESTION_UNION,
+  CHAT_INPUT_ANSWER_VALUE_UNION,
+  CHAT_INPUT_ANSWER_UNION,
+  TOOL_RESULT_CONTENT_UNION,
+  MESSAGE_ATTACHMENT_UNION,
+  CUSTOMIZATION_UNION,
+  CHILD_CUSTOMIZATION_UNION,
+  CUSTOMIZATION_LOAD_STATE_UNION,
+  MCP_SERVER_STATUS_UNION,
+  TOOL_CALL_CONTRIBUTOR_UNION,
+  TOOL_CALL_RISK_ASSESSMENT_UNION,
+  TERMINAL_LIFECYCLE_STATE_UNION,
+  SESSION_INPUT_REQUEST_UNION,
+  SESSION_ORIGIN_UNION,
+  AUTOMATION_TRIGGER_UNION,
+  AUTOMATION_RUN_ORIGIN_UNION,
+  AUTOMATION_RUN_LIFECYCLE_UNION,
+];
+
 function generateChatOrigin(project: Project): string {
   const originKind = findEnum(project, 'ChatOriginKind');
   if (!originKind) throw new Error('ChatOriginKind enum not found');
@@ -1304,6 +1506,7 @@ pub enum ToolInput {
 }
 
 function generateStateFile(project: Project): string {
+  serdeTagModules.clear();
   const lines: string[] = [GENERATED_HEADER];
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1349,52 +1552,18 @@ function generateStateFile(project: Project): string {
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
   lines.push(generateChatOrigin(project));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(project, RESPONSE_PART_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, TOOL_CALL_STATE_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, TOOL_CALL_CONFIRMATION_STATE_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, TERMINAL_CLAIM_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, TERMINAL_CONTENT_PART_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, CHAT_INPUT_QUESTION_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, CHAT_INPUT_ANSWER_VALUE_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, CHAT_INPUT_ANSWER_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, TOOL_RESULT_CONTENT_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, MESSAGE_ATTACHMENT_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, CUSTOMIZATION_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, CHILD_CUSTOMIZATION_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, CUSTOMIZATION_LOAD_STATE_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, MCP_SERVER_STATUS_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, TOOL_CALL_CONTRIBUTOR_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, TOOL_CALL_RISK_ASSESSMENT_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, TERMINAL_LIFECYCLE_STATE_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
-  lines.push('');
+  for (const union of STATE_UNIONS) {
+    lines.push(generateDiscriminatedUnion(project, union));
+    lines.push('');
+  }
   lines.push(generateSnapshotState());
   lines.push('');
+
+  const serdeMods = drainSerdeTagModules();
+  if (serdeMods) {
+    lines.push(serdeMods);
+    lines.push('');
+  }
 
   return lines.join('\n');
 }
@@ -1704,6 +1873,87 @@ const CHAT_SOURCE_UNION: UnionConfig = {
     { variantName: 'SideChat', innerType: 'SideChatSource', wireValue: 'sideChat' },
   ],
 };
+
+/**
+ * Every `#[serde(tag = "...")]` enum this generator emits, keyed by Rust name.
+ *
+ * These are exactly the unions whose variant payload structs are emitted with
+ * `omitDiscriminants: true` — the discriminant lives on the enum tag, so the
+ * payload struct itself has no such field. That is what makes narrowing a
+ * property to one of these payloads a wire regression; see
+ * {@link findNarrowedUnionPayload}.
+ *
+ * Seeded lazily from the `UnionConfig` consts declared throughout this file
+ * (`extractProps`, declared above them, only ever runs after module evaluation), then
+ * topped up by `generateDiscriminatedUnion`, which registers whatever it emits. The
+ * const seed is what makes lookups order-independent for the common case; the
+ * registration on emit is what stops an emitted union -- including a runtime-built one
+ * like `StateAction` -- from being absent.
+ */
+let unionRegistry: Map<string, UnionConfig> | undefined;
+function getUnionRegistry(): Map<string, UnionConfig> {
+  if (!unionRegistry) {
+    unionRegistry = new Map(
+      [...STATE_UNIONS, RECONNECT_RESULT_UNION, CHAT_SOURCE_UNION].map(u => [u.name, u]),
+    );
+  }
+  return unionRegistry;
+}
+
+/**
+ * Strip `| undefined` / `| null` and whitespace, returning the bare type name if
+ * what remains is a single identifier (e.g. `ToolCallContributor | undefined` →
+ * `ToolCallContributor`). Returns undefined for anything structural.
+ */
+function bareTypeName(tsType: string): string | undefined {
+  const stripped = tsType
+    .split('|')
+    .map(t => t.trim())
+    .filter(t => t !== 'undefined' && t !== 'null');
+  if (stripped.length !== 1) return undefined;
+  return /^\w+$/.test(stripped[0]) ? stripped[0] : undefined;
+}
+
+/**
+ * Detect a property override that narrows an inherited discriminated union to
+ * one of that union's *variant payload structs* — e.g.
+ * `ToolCallAuthRequiredState.contributor` narrowing `ToolCallContributor` (a
+ * `#[serde(tag = "kind")]` enum) to `ToolCallMcpContributor` (its `Mcp` payload).
+ *
+ * The payload struct is emitted with `omitDiscriminants: true` because its
+ * discriminant becomes the enum's tag, so a field typed as the payload *directly*
+ * — rather than reached through the enum — would serialize without `"kind":"mcp"`
+ * and drop the discriminator from the wire. Every other client is unaffected:
+ * their payload types carry their own `kind` field.
+ *
+ * The field is still typed as the narrowed payload, like every other override;
+ * a generated serde-`with` module (see `registerSerdeTagModule`) injects the
+ * discriminant on serialize so the wire stays tagged. This function's job is to
+ * detect the case and surface the union + variant, so the caller can register
+ * that module. It searches base-ward from the override for the nearest ancestor
+ * declaring the union, so multi-level inheritance chains resolve correctly.
+ *
+ * @returns the ancestor declaration to take the type from, plus the union and
+ * variant involved — or undefined when this is not a union-payload narrowing
+ * (e.g. `InitializeParams.channel`, which narrows a plain `URI` to a string
+ * literal and must still be narrowed).
+ */
+function findNarrowedUnionPayload(
+  decls: PropertySignature[],
+): { baseDecl: PropertySignature; union: UnionConfig; variant: UnionVariant } | undefined {
+  if (decls.length < 2) return undefined;
+  const overrideType = bareTypeName(getPropertyType(decls[decls.length - 1]));
+  if (!overrideType) return undefined;
+
+  for (let i = decls.length - 2; i >= 0; i--) {
+    const baseType = bareTypeName(getPropertyType(decls[i]));
+    if (!baseType || baseType === overrideType) continue;
+    const union = getUnionRegistry().get(baseType);
+    const variant = union?.variants.find(v => v.innerType === overrideType);
+    if (union && variant) return { baseDecl: decls[i], union, variant };
+  }
+  return undefined;
+}
 
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];

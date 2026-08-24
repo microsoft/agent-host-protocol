@@ -191,7 +191,7 @@ pub enum ResourceWriteMode {
 #[serde(rename_all = "camelCase")]
 pub struct InitializeParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -404,7 +404,7 @@ pub struct Implementation {
 #[serde(rename_all = "camelCase")]
 pub struct ReconnectParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -553,7 +553,7 @@ pub struct SubscribeResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionParams {
-    /// Channel URI this command targets.
+    /// Session URI (client-chosen, e.g. `ahp-session:/<uuid>`)
     pub channel: Uri,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -658,7 +658,7 @@ pub struct SideChatSource {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateChatParams {
-    /// Channel URI this command targets.
+    /// Session URI containing the new chat.
     pub channel: Uri,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -725,7 +725,7 @@ pub struct DisposeChatParams {
 #[serde(rename_all = "camelCase")]
 pub struct ListSessionsParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -774,7 +774,7 @@ pub struct ListSessionsResult {
 #[serde(rename_all = "camelCase")]
 pub struct ResourceReadParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -821,7 +821,7 @@ pub struct ResourceReadResult {
 #[serde(rename_all = "camelCase")]
 pub struct ResourceWriteParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -882,7 +882,7 @@ pub struct ResourceWriteResult {}
 #[serde(rename_all = "camelCase")]
 pub struct ResourceListParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -920,7 +920,7 @@ pub struct DirectoryEntry {
 #[serde(rename_all = "camelCase")]
 pub struct ResourceCopyParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -950,7 +950,7 @@ pub struct ResourceCopyResult {}
 #[serde(rename_all = "camelCase")]
 pub struct ResourceDeleteParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -981,7 +981,7 @@ pub struct ResourceDeleteResult {}
 #[serde(rename_all = "camelCase")]
 pub struct ResourceMoveParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1018,7 +1018,7 @@ pub struct ResourceMoveResult {}
 #[serde(rename_all = "camelCase")]
 pub struct ResourceResolveParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1075,7 +1075,7 @@ pub struct ResourceResolveResult {
 #[serde(rename_all = "camelCase")]
 pub struct ResourceMkdirParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1116,7 +1116,7 @@ pub struct ResourceMkdirResult {}
 #[serde(rename_all = "camelCase")]
 pub struct ResourceRequestParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1159,7 +1159,7 @@ pub struct ResourceRequestResult {}
 #[serde(rename_all = "camelCase")]
 pub struct CreateResourceWatchParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1205,7 +1205,7 @@ pub struct CreateResourceWatchResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchTurnsParams {
-    /// Channel URI this command targets.
+    /// Chat URI
     pub channel: Uri,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1268,7 +1268,7 @@ pub struct DispatchActionParams {
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticateParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1307,7 +1307,7 @@ pub struct AuthenticateResult {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTerminalParams {
-    /// Channel URI this command targets.
+    /// Terminal URI (client-chosen).
     pub channel: Uri,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1357,7 +1357,7 @@ pub struct DisposeTerminalParams {
 #[serde(rename_all = "camelCase")]
 pub struct ResolveSessionConfigParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1392,7 +1392,7 @@ pub struct ResolveSessionConfigResult {
 #[serde(rename_all = "camelCase")]
 pub struct SessionConfigCompletionsParams {
     /// Channel URI this command targets.
-    pub channel: Uri,
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1444,7 +1444,7 @@ pub struct SessionConfigValueItem {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionsParams {
-    /// Channel URI this command targets.
+    /// The chat URI the completion is being requested for.
     pub channel: Uri,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1515,7 +1515,7 @@ pub struct CompletionsResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InvokeChangesetOperationParams {
-    /// Channel URI this command targets.
+    /// The expanded changeset URI.
     pub channel: Uri,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1573,8 +1573,8 @@ pub struct ChangesetOperationFollowUp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListAutomationTriggerDefinitionsParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
+    /// Trigger definitions are discovered from the root channel.
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1605,8 +1605,8 @@ pub struct ListAutomationTriggerDefinitionsResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RunAutomationParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
+    /// Manual runs are scoped to the catalogue channel.
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
@@ -1636,8 +1636,8 @@ pub struct RunAutomationResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchAutomationRunsParams {
-    /// Channel URI this command targets.
-    pub channel: Uri,
+    /// Run-history loading is scoped to the catalogue channel.
+    pub channel: String,
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]

@@ -580,7 +580,7 @@ data class SubscribeResult(
 @Serializable
 data class CreateSessionParams(
     /**
-     * Channel URI this command targets.
+     * Session URI (client-chosen, e.g. `ahp-session:/<uuid>`)
      */
     val channel: String,
     /**
@@ -655,7 +655,7 @@ data class DisposeSessionParams(
 @Serializable
 data class CreateChatParams(
     /**
-     * Channel URI this command targets.
+     * Session URI containing the new chat.
      */
     val channel: String,
     /**
@@ -1141,7 +1141,7 @@ data class CreateResourceWatchResult(
 @Serializable
 data class FetchTurnsParams(
     /**
-     * Channel URI this command targets.
+     * Chat URI
      */
     val channel: String,
     /**
@@ -1227,7 +1227,7 @@ class AuthenticateResult
 @Serializable
 data class CreateTerminalParams(
     /**
-     * Channel URI this command targets.
+     * Terminal URI (client-chosen).
      */
     val channel: String,
     /**
@@ -1450,7 +1450,7 @@ data class SessionConfigValueItem(
 @Serializable
 data class CompletionsParams(
     /**
-     * Channel URI this command targets.
+     * The chat URI the completion is being requested for.
      */
     val channel: String,
     /**
@@ -1517,7 +1517,7 @@ data class CompletionsResult(
 @Serializable
 data class InvokeChangesetOperationParams(
     /**
-     * Channel URI this command targets.
+     * The expanded changeset URI.
      */
     val channel: String,
     /**
@@ -1561,7 +1561,7 @@ data class ChangesetOperationFollowUp(
 @Serializable
 data class ListAutomationTriggerDefinitionsParams(
     /**
-     * Channel URI this command targets.
+     * Trigger definitions are discovered from the root channel.
      */
     val channel: String,
     /**
@@ -1595,7 +1595,7 @@ data class ListAutomationTriggerDefinitionsResult(
 @Serializable
 data class RunAutomationParams(
     /**
-     * Channel URI this command targets.
+     * Manual runs are scoped to the catalogue channel.
      */
     val channel: String,
     /**
@@ -1627,7 +1627,7 @@ data class RunAutomationResult(
 @Serializable
 data class FetchAutomationRunsParams(
     /**
-     * Channel URI this command targets.
+     * Run-history loading is scoped to the catalogue channel.
      */
     val channel: String,
     /**

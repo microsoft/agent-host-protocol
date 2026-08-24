@@ -3411,9 +3411,9 @@ pub struct ToolCallAuthRequiredState {
     /// Human-readable description of what the tool invocation intends to do
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intention: Option<String>,
-    /// Reference to the contributor of the tool being called.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub contributor: Option<ToolCallContributor>,
+    /// The MCP server that contributed this tool call — always MCP, never a client tool.
+    #[serde(with = "serde_tool_call_mcp_contributor_as_mcp")]
+    pub contributor: ToolCallMcpContributor,
     /// Additional provider-specific metadata for this tool call.
     ///
     /// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)
@@ -6074,4 +6074,48 @@ pub enum SnapshotState {
     Automations(Box<AutomationCatalogState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
+}
+
+// ─── Serde helpers: inject the union discriminant for narrowed payloads ───
+
+/// Serializes a `ToolCallMcpContributor` with the `kind: mcp` union
+/// discriminant injected, matching the tagged-union wire form, and REJECTS a
+/// foreign discriminant on the way in.
+///
+/// The field is narrowed to one variant's payload, so any other `kind` is
+/// malformed input. Decoding it anyway would silently re-emit it as
+/// `mcp` -- rewriting a tag the peer sent. Mirrors
+/// `deserialize_running_tool_call`, which errors the same way on a wrong
+/// `status`.
+mod serde_tool_call_mcp_contributor_as_mcp {
+    use super::ToolCallMcpContributor;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    pub fn serialize<S: Serializer>(
+        value: &ToolCallMcpContributor,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut v = serde_json::to_value(value).map_err(serde::ser::Error::custom)?;
+        if let serde_json::Value::Object(ref mut map) = v {
+            map.insert(
+                "kind".to_string(),
+                serde_json::Value::String("mcp".to_string()),
+            );
+        }
+        v.serialize(serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<ToolCallMcpContributor, D::Error> {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        match raw.get("kind").and_then(serde_json::Value::as_str) {
+            None | Some("mcp") => {}
+            Some(other) => {
+                return Err(serde::de::Error::custom(format!(
+                    "expected {} {:?}, got {:?}",
+                    "kind", "mcp", other
+                )));
+            }
+        }
+        serde_json::from_value(raw).map_err(serde::de::Error::custom)
+    }
 }

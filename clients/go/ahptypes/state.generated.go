@@ -2172,8 +2172,8 @@ type ToolCallAuthRequiredState struct {
 	DisplayName string `json:"displayName"`
 	// Human-readable description of what the tool invocation intends to do
 	Intention *string `json:"intention,omitempty"`
-	// Reference to the contributor of the tool being called.
-	Contributor *ToolCallContributor `json:"contributor,omitempty"`
+	// The MCP server that contributed this tool call — always MCP, never a client tool.
+	Contributor ToolCallMcpContributor `json:"contributor"`
 	// Additional provider-specific metadata for this tool call.
 	//
 	// This MAY include a `ui` field corresponding to the MCP Apps (SEP-1865)

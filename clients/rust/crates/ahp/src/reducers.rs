@@ -196,7 +196,9 @@ fn tool_call_meta(tc: &ToolCallState) -> ToolCallBase {
             display_name: s.display_name.clone(),
             intention: s.intention.clone(),
             tool_input: s.tool_input.clone(),
-            contributor: s.contributor.clone(),
+            // AuthRequired narrows contributor to the MCP payload; widen it back
+            // to the union for the generic ToolCallBase projection.
+            contributor: Some(ToolCallContributor::Mcp(s.contributor.clone())),
             meta: s.meta.clone(),
         },
         ToolCallState::PendingResultConfirmation(s) => ToolCallBase {
@@ -1635,16 +1637,19 @@ fn apply_tool_call_auth_required(
         let meta = a.meta.clone().or(base.meta);
         match tc {
             ToolCallState::Running(s) => {
-                if !matches!(s.contributor, Some(ToolCallContributor::Mcp(_))) {
+                // Only an MCP-contributed call can pause for auth. That is exactly the
+                // narrowed contributor type ToolCallAuthRequiredState carries, so pull
+                // the MCP payload out of the wide union; any other contributor is a no-op.
+                let Some(ToolCallContributor::Mcp(contributor)) = s.contributor.clone() else {
                     return ToolCallState::Running(s);
-                }
+                };
                 ToolCallState::AuthRequired(Box::new(ToolCallAuthRequiredState {
                     tool_call_id: base.tool_call_id,
                     tool_name: base.tool_name,
                     display_name: base.display_name,
                     intention: base.intention,
                     tool_input: s.tool_input,
-                    contributor: s.contributor,
+                    contributor,
                     meta,
                     invocation_message: s.invocation_message,
                     confirmed: s.confirmed,
@@ -1673,7 +1678,8 @@ fn apply_tool_call_auth_resolved(
                 display_name: base.display_name,
                 intention: base.intention,
                 tool_input: s.tool_input,
-                contributor: s.contributor,
+                // Widen the narrowed MCP payload back to the union for the running state.
+                contributor: Some(ToolCallContributor::Mcp(s.contributor)),
                 meta,
                 invocation_message: s.invocation_message,
                 confirmed: s.confirmed,

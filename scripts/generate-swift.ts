@@ -202,6 +202,50 @@ function getPropertyDoc(prop: PropertySignature): string {
   return jsDocs[0].getDescription().trim();
 }
 
+/**
+ * Group every declaration of each property name, ordered base → derived.
+ *
+ * `getAllProperties` appends an interface's own properties AFTER the ones it
+ * inherits, so a name declared by both a base and the interface itself lands in
+ * the list twice, with the interface's own (the override) last.
+ *
+ * The dedupe SEMANTICS are `generate-json-schema.ts`'s, not new: its
+ * `getAllInterfaceProperties` already resolves a name to its LAST declaration,
+ * emitted at its FIRST declaration's position (`byName.set(prop.getName(), prop)`
+ * then `[...byName.values()]`). This generator keeps the whole ordered LIST rather
+ * than only that winner, because the doc must cascade: a narrowing override usually
+ * carries no prose of its own, so the base's doc has to survive, and the
+ * winner-only shape discards the base. (The schema generator accepts that loss:
+ * `InitializeParams.channel` ships with no `description`.)
+ */
+function groupDeclarationsByName(props: PropertySignature[]): Map<string, PropertySignature[]> {
+  const byName = new Map<string, PropertySignature[]>();
+  for (const p of props) {
+    const decls = byName.get(p.getName());
+    if (decls) decls.push(p);
+    else byName.set(p.getName(), [p]);
+  }
+  return byName;
+}
+
+/**
+ * Resolve the doc comment for a property from its declarations (base → derived).
+ *
+ * The type comes from the most-derived declaration, but an override is often
+ * declared purely to narrow the type and carries no prose of its own (e.g.
+ * `InitializeParams.channel: 'ahp-root://'` re-declares `BaseParams.channel`
+ * only to pin the literal). Falling back to the nearest ancestor that documents
+ * the property keeps the base's prose cascading, while an override that *does*
+ * document itself (e.g. `CreateSessionParams.channel`) still wins.
+ */
+function resolvePropertyDoc(decls: PropertySignature[]): string {
+  for (let i = decls.length - 1; i >= 0; i--) {
+    const doc = getPropertyDoc(decls[i]);
+    if (doc) return doc;
+  }
+  return '';
+}
+
 /** Returns true if the property has a `@format float` JSDoc tag. */
 function hasFormatFloat(prop: PropertySignature): boolean {
   for (const doc of prop.getJsDocs()) {
@@ -255,18 +299,30 @@ function extractProps(iface: InterfaceDeclaration, project: Project): SwiftProp[
   const allProps = getAllProperties(iface, project);
   const seen = new Set<string>();
 
+  // A derived interface may narrow an inherited property (e.g.
+  // `ToolCallAuthRequiredState.contributor` narrows the optional
+  // `ToolCallContributor` on `ToolCallBase` to a required
+  // `ToolCallMcpContributor`), and that override is the real contract. Take the
+  // type/optionality from the most-derived declaration, but emit the property at
+  // the position of its first (base) declaration so inherited property order stays
+  // stable. The doc is resolved separately: a narrowing override usually has no
+  // prose of its own, and the base's must still cascade.
+  const declsByName = groupDeclarationsByName(allProps);
+
   return allProps
     .filter(p => {
-      // Deduplicate (later declaration wins)
+      // Deduplicate, keeping the first (base) declaration's position.
       const name = p.getName();
       if (seen.has(name)) return false;
       seen.add(name);
       return true;
     })
-    .map(p => {
+    .map(declared => {
+      const decls = declsByName.get(declared.getName()) ?? [declared];
+      const p = decls[decls.length - 1];
       const tsName = p.getName();
       const tsType = getPropertyType(p);
-        let swiftT = mapType(tsType, tsName, iface.getName());
+      let swiftT = mapType(tsType, tsName, iface.getName());
       // `@format float` overrides the default Int → Double for number properties.
       if (swiftT === 'Int' && hasFormatFloat(p)) {
         swiftT = 'Double';
@@ -285,7 +341,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): SwiftProp[
         wireName: tsName,
         type: finalType,
         optional: isOptional,
-        doc: getPropertyDoc(p),
+        doc: resolvePropertyDoc(decls),
       };
     });
 }

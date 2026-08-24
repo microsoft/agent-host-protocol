@@ -93,7 +93,7 @@ const (
 // This MUST be the first message sent by the client.
 type InitializeParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -273,7 +273,7 @@ type Implementation struct {
 // provides fresh snapshots.
 type ReconnectParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -369,7 +369,7 @@ type SubscribeResult struct {
 // updates. The server also broadcasts a `root/sessionAdded` notification to all
 // clients.
 type CreateSessionParams struct {
-	// Channel URI this command targets.
+	// Session URI (client-chosen, e.g. `ahp-session:/<uuid>`)
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
@@ -462,7 +462,7 @@ type SideChatSource struct {
 
 // Creates a new chat within a session.
 type CreateChatParams struct {
-	// Channel URI this command targets.
+	// Session URI containing the new chat.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
@@ -520,7 +520,7 @@ type DisposeChatParams struct {
 // fetches.
 type ListSessionsParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -561,7 +561,7 @@ type ListSessionsResult struct {
 // same permission/`resourceRequest` flow regardless of which peer initiated.
 type ResourceReadParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -601,7 +601,7 @@ type ResourceReadResult struct {
 // sent in either direction.
 type ResourceWriteParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -653,7 +653,7 @@ type ResourceWriteResult struct {
 // sent in either direction.
 type ResourceListParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -684,7 +684,7 @@ type DirectoryEntry struct {
 // sent in either direction.
 type ResourceCopyParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -709,7 +709,7 @@ type ResourceCopyResult struct {
 // sent in either direction.
 type ResourceDeleteParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -735,7 +735,7 @@ type ResourceDeleteResult struct {
 // sent in either direction.
 type ResourceMoveParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -767,7 +767,7 @@ type ResourceMoveResult struct {
 // sent in either direction.
 type ResourceResolveParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -813,7 +813,7 @@ type ResourceResolveResult struct {
 // sent in either direction.
 type ResourceMkdirParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -850,7 +850,7 @@ type ResourceMkdirResult struct {
 // neither flag set is treated as `read: true` by receivers.
 type ResourceRequestParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -887,7 +887,7 @@ type ResourceRequestResult struct {
 // the same permission flow as `resourceRead`/`resourceWrite`.
 type CreateResourceWatchParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -925,7 +925,7 @@ type CreateResourceWatchResult struct {
 // loaded window, the host MUST eagerly load enough older turns into state for
 // that operation to reduce against valid state.
 type FetchTurnsParams struct {
-	// Channel URI this command targets.
+	// Chat URI
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
@@ -979,7 +979,7 @@ type DispatchActionParams struct {
 // to the server via this command.
 type AuthenticateParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -1013,7 +1013,7 @@ type AuthenticateResult struct {
 // state updates. The server dispatches `root/terminalsChanged` to update the
 // root terminal list.
 type CreateTerminalParams struct {
-	// Channel URI this command targets.
+	// Terminal URI (client-chosen).
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
@@ -1053,7 +1053,7 @@ type DisposeTerminalParams struct {
 // server-resolved defaults to pass to `createSession`.
 type ResolveSessionConfigParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -1080,7 +1080,7 @@ type ResolveSessionConfigResult struct {
 // values with display metadata.
 type SessionConfigCompletionsParams struct {
 	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -1120,7 +1120,7 @@ type SessionConfigValueItem struct {
 // client SHOULD debounce calls to avoid flooding the server with requests on
 // every keystroke.
 type CompletionsParams struct {
-	// Channel URI this command targets.
+	// The chat URI the completion is being requested for.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
@@ -1182,7 +1182,7 @@ type CompletionsResult struct {
 // SHOULD NOT synthesise local optimistic changes for invocations unless
 // the server explicitly opts in via a future capability.
 type InvokeChangesetOperationParams struct {
-	// Channel URI this command targets.
+	// The expanded changeset URI.
 	Channel URI `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
@@ -1229,8 +1229,8 @@ type ChangesetOperationFollowUp struct {
 // choices. Saved {@link AutomationEventTrigger} values retain their selected
 // event descriptors for display but do not establish current availability.
 type ListAutomationTriggerDefinitionsParams struct {
-	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	// Trigger definitions are discovered from the root channel.
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -1253,8 +1253,8 @@ type ListAutomationTriggerDefinitionsResult struct {
 // Manual execution is independent of {@link AutomationDefinition.enabled}.
 // The host persists the run before beginning session side effects.
 type RunAutomationParams struct {
-	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	// Manual runs are scoped to the catalogue channel.
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
@@ -1279,8 +1279,8 @@ type RunAutomationResult struct {
 // `ahp-automations://` channel, keeping all catalogue subscribers synchronized
 // through the normal action stream.
 type FetchAutomationRunsParams struct {
-	// Channel URI this command targets.
-	Channel URI `json:"channel"`
+	// Run-history loading is scoped to the catalogue channel.
+	Channel string `json:"channel"`
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`

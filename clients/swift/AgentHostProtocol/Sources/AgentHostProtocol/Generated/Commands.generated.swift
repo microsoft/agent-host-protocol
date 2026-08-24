@@ -609,7 +609,7 @@ public struct SubscribeResult: Codable, Sendable {
 }
 
 public struct CreateSessionParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// Session URI (client-chosen, e.g. `ahp-session:/<uuid>`)
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -703,7 +703,7 @@ public struct DisposeSessionParams: Codable, Sendable {
 }
 
 public struct CreateChatParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// Session URI containing the new chat.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1363,7 +1363,7 @@ public struct CreateResourceWatchResult: Codable, Sendable {
 }
 
 public struct FetchTurnsParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// Chat URI
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1483,7 +1483,7 @@ public struct AuthenticateResult: Codable, Sendable {
 }
 
 public struct CreateTerminalParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// Terminal URI (client-chosen).
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1779,7 +1779,7 @@ public struct SessionConfigValueItem: Codable, Sendable {
 }
 
 public struct CompletionsParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// The chat URI the completion is being requested for.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1862,7 +1862,7 @@ public struct CompletionsResult: Codable, Sendable {
 }
 
 public struct InvokeChangesetOperationParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// The expanded changeset URI.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1923,7 +1923,7 @@ public struct ChangesetOperationFollowUp: Codable, Sendable {
 }
 
 public struct ListAutomationTriggerDefinitionsParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// Trigger definitions are discovered from the root channel.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -1970,7 +1970,7 @@ public struct ListAutomationTriggerDefinitionsResult: Codable, Sendable {
 }
 
 public struct RunAutomationParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// Manual runs are scoped to the catalogue channel.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
@@ -2014,7 +2014,7 @@ public struct RunAutomationResult: Codable, Sendable {
 }
 
 public struct FetchAutomationRunsParams: Codable, Sendable {
-    /// Channel URI this command targets.
+    /// Run-history loading is scoped to the catalogue channel.
     public var channel: String
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.

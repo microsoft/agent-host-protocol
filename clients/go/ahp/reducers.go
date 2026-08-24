@@ -99,7 +99,10 @@ func toolCallMeta(tc ahptypes.ToolCallState) toolCallCommon {
 	case *ahptypes.ToolCallRunningState:
 		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallAuthRequiredState:
-		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
+		// ToolCallAuthRequiredState narrows Contributor to the MCP variant; widen it
+		// back to the union toolCallCommon shares with every variant.
+		mcp := v.Contributor
+		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, &ahptypes.ToolCallContributor{Value: &mcp}, v.Meta}
 	case *ahptypes.ToolCallPendingResultConfirmationState:
 		return toolCallCommon{v.ToolCallId, v.ToolName, v.DisplayName, v.Intention, v.ToolInput, v.Contributor, v.Meta}
 	case *ahptypes.ToolCallCompletedState:
@@ -1396,7 +1399,11 @@ func applyToolCallAuthRequired(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 		if s.Contributor == nil {
 			return tc
 		}
-		if _, ok := s.Contributor.Value.(*ahptypes.ToolCallMcpContributor); !ok {
+		// Auth is only ever required for an MCP-contributed tool call, which is why
+		// ToolCallAuthRequiredState narrows Contributor to the MCP variant. Bind that
+		// payload here; any other contributor is a no-op.
+		mcp, ok := s.Contributor.Value.(*ahptypes.ToolCallMcpContributor)
+		if !ok {
 			return tc
 		}
 		meta := s.Meta
@@ -1410,7 +1417,7 @@ func applyToolCallAuthRequired(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 			DisplayName:       s.DisplayName,
 			Intention:         s.Intention,
 			ToolInput:         s.ToolInput,
-			Contributor:       s.Contributor,
+			Contributor:       *mcp,
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
 			Confirmed:         s.Confirmed,
@@ -1431,6 +1438,8 @@ func applyToolCallAuthResolved(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 		if a.Meta != nil {
 			meta = a.Meta
 		}
+		// Widen the narrowed MCP contributor back to the union RunningState holds.
+		mcp := s.Contributor
 		return ahptypes.ToolCallState{Value: &ahptypes.ToolCallRunningState{
 			Status:            ahptypes.ToolCallStatusRunning,
 			ToolCallId:        s.ToolCallId,
@@ -1438,7 +1447,7 @@ func applyToolCallAuthResolved(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 			DisplayName:       s.DisplayName,
 			Intention:         s.Intention,
 			ToolInput:         s.ToolInput,
-			Contributor:       s.Contributor,
+			Contributor:       &ahptypes.ToolCallContributor{Value: &mcp},
 			Meta:              meta,
 			InvocationMessage: s.InvocationMessage,
 			Confirmed:         s.Confirmed,

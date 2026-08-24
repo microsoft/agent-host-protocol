@@ -59,10 +59,12 @@ extension ToolCallState {
                                        toolInput: s.toolInput,
                                        contributor: s.contributor, meta: s.meta)
         case .authRequired(let s):
+            // `ToolCallAuthRequiredState` narrows `contributor` to the MCP payload;
+            // wrap it back into the union these base fields share with every variant.
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,
                                        toolInput: s.toolInput,
-                                       contributor: s.contributor, meta: s.meta)
+                                       contributor: .mcp(s.contributor), meta: s.meta)
         case .pendingResultConfirmation(let s):
             return ToolCallBaseFields(toolCallId: s.toolCallId, toolName: s.toolName,
                                        displayName: s.displayName, intention: s.intention,

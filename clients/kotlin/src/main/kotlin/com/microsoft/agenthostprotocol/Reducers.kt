@@ -217,7 +217,17 @@ private fun toolCallBase(tc: ToolCallState): ToolCallBase = when (tc) {
         ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
     }
     is ToolCallStateAuthRequired -> tc.value.let {
-        ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
+        // ToolCallAuthRequiredState narrows `contributor` to the MCP payload; wrap it
+        // back into the union ToolCallBase shares with every variant.
+        ToolCallBase(
+            it.toolCallId,
+            it.toolName,
+            it.displayName,
+            it.intention,
+            it.toolInput,
+            ToolCallContributorMcp(it.contributor),
+            it.meta,
+        )
     }
     is ToolCallStatePendingResultConfirmation -> tc.value.let {
         ToolCallBase(it.toolCallId, it.toolName, it.displayName, it.intention, it.toolInput, it.contributor, it.meta)
@@ -1277,7 +1287,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
                                 displayName = base.displayName,
                                 intention = base.intention,
                                 toolInput = tc.value.toolInput,
-                                contributor = contributor,
+                                // Auth is only ever required for an MCP-contributed tool
+                                // call; unwrap the union to the MCP payload the narrowed
+                                // `contributor` field requires.
+                                contributor = contributor.value,
                                 meta = base.meta,
                                 invocationMessage = tc.value.invocationMessage,
                                 confirmed = tc.value.confirmed,
