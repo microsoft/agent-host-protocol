@@ -1,0 +1,5 @@
+{
+  "type": "security",
+  "message": "Swift `FileClientIdStore` creates its client-id file with owner-only permissions before writing, instead of writing at the umask default and restricting afterwards, so the persisted id is never briefly readable by other local users.",
+  "targets": ["swift"]
+}
