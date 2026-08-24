@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "Generated .NET records now initialize their literal discriminant instead of falling back to `default(ActionType)`, which is a valid enum member (`root/agentsChanged`) and so silently mis-tagged any action constructed without setting `Type`.",
+  "targets": ["dotnet"]
+}

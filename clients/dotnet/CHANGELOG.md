@@ -11,18 +11,6 @@ this release negotiates.
 
 ## [Unreleased]
 
-### Fixed
-
-- Generated action, state and command records now initialize their literal
-  discriminant (`Type`/`Kind`/`Status`/`State`) to its own constant. Previously
-  the property was emitted with no initializer, so it fell back to
-  `default(ActionType)` — and because these are ordinary enums whose zero value
-  is a real member, an action constructed without explicitly setting `Type`
-  serialized with a valid but wrong discriminant (the first enum member,
-  `root/agentsChanged`). 94 records across `Actions`, `State` and `Commands`
-  were affected. The generator already computed the correct value and discarded
-  it.
-
 ### Added
 
 - **Multiroot working directories** (upstream
