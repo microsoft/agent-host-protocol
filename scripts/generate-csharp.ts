@@ -1590,7 +1590,7 @@ function generateMergedChatToolCallConfirmedClass(): string {
 /// </summary>
 public sealed record ChatToolCallConfirmedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallConfirmed;
 
     public required string TurnId { get; init; }
 
