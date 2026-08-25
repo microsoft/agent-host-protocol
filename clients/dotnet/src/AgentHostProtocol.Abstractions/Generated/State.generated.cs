@@ -1673,6 +1673,29 @@ public sealed class SessionActiveClient
     /// children inside {@link SessionState.customizations}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ClientPluginCustomization>? Customizations { get; set; }
+
+    /// <summary>Additional provider-specific metadata about this active client — for
+    /// example the participant role a host assigns to a connection, or whether
+    /// the host treats it as read-only.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the protocol;
+    /// producers and consumers agree on its contents out-of-band. Keys SHOULD be
+    /// namespaced by their producer (for example
+    /// `"com.example.collaboration": { "role": "viewer" }`) so independent
+    /// producers cannot collide, and consumers MUST ignore namespaces they do not
+    /// recognize and keep working when the field is absent.
+    ///
+    /// A host that assigns participant semantics SHOULD stamp them here
+    /// explicitly rather than leaving consumers to infer them from other fields:
+    /// an empty {@link SessionActiveClient.tools | `tools`} or
+    /// {@link SessionActiveClient.customizations | `customizations`} list means
+    /// only that the client publishes nothing, never that it is read-only.
+    /// Because `session/activeClientSet` upserts the whole entry, a host that
+    /// re-publishes an entry it did not author MUST carry the existing `_meta`
+    /// forward unless it is deliberately restamping it.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; set; }
 }
 
 /// <summary>A user-input elicitation surfaced at the session level, mirroring the request

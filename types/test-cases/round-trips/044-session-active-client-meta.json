@@ -1,0 +1,38 @@
+{
+  "name": "session-active-client-meta-round-trip",
+  "group": "A",
+  "description": "A `session/activeClientSet` StateAction whose SessionActiveClient carries the optional `_meta` side-channel. The nested, namespaced metadata object decodes and re-encodes verbatim under the `_meta` wire key (never a language-mangled name such as `meta`), including non-string values.",
+  "type": "StateAction",
+  "input": {
+    "type": "session/activeClientSet",
+    "activeClient": {
+      "clientId": "vscode-1",
+      "displayName": "VS Code",
+      "tools": [],
+      "_meta": {
+        "com.example.collaboration": {
+          "role": "viewer",
+          "readOnly": true,
+          "seat": 3
+        }
+      }
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "session/activeClientSet",
+      "activeClient": {
+        "clientId": "vscode-1",
+        "displayName": "VS Code",
+        "tools": [],
+        "_meta": {
+          "com.example.collaboration": {
+            "role": "viewer",
+            "readOnly": true,
+            "seat": 3
+          }
+        }
+      }
+    }
+  ]
+}

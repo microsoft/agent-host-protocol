@@ -949,6 +949,11 @@
             "$ref": "#/$defs/ClientPluginCustomization"
           },
           "description": "Plugin customizations this client contributes to the session.\n\nClients publish in [Open Plugins](https://open-plugins.com/) format\n— i.e. always container-shaped plugins. They MAY synthesize virtual\nplugins in memory and rely on the host to expand them into concrete\nchildren inside {@link SessionState.customizations}."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata about this active client — for\nexample the participant role a host assigns to a connection, or whether\nthe host treats it as read-only.\n\nMirrors the MCP `_meta` convention. Optional and opaque to the protocol;\nproducers and consumers agree on its contents out-of-band. Keys SHOULD be\nnamespaced by their producer (for example\n`\"com.example.collaboration\": { \"role\": \"viewer\" }`) so independent\nproducers cannot collide, and consumers MUST ignore namespaces they do not\nrecognize and keep working when the field is absent.\n\nA host that assigns participant semantics SHOULD stamp them here\nexplicitly rather than leaving consumers to infer them from other fields:\nan empty {@link SessionActiveClient.tools | `tools`} or\n{@link SessionActiveClient.customizations | `customizations`} list means\nonly that the client publishes nothing, never that it is read-only.\nBecause `session/activeClientSet` upserts the whole entry, a host that\nre-publishes an entry it did not author MUST carry the existing `_meta`\nforward unless it is deliberately restamping it."
         }
       },
       "required": [
@@ -8685,7 +8690,7 @@
     },
     "SessionActiveClientSetAction": {
       "type": "object",
-      "description": "An active client for this session was added or updated.\n\nUpsert semantics keyed by {@link SessionActiveClient.clientId | `clientId`}:\na client dispatches this action with its own `SessionActiveClient` to join\nthe session's active clients or refresh its entry, replacing any existing\nentry that has the same `clientId`. Multiple clients may be active at once.\nThis is also how a client updates its published tools or customizations —\nre-dispatch with the full, updated entry. Use\n{@link SessionActiveClientRemovedAction | `session/activeClientRemoved`} to\nleave. The server SHOULD automatically dispatch that removal when an active\nclient disconnects.",
+      "description": "An active client for this session was added or updated.\n\nUpsert semantics keyed by {@link SessionActiveClient.clientId | `clientId`}:\na client dispatches this action with its own `SessionActiveClient` to join\nthe session's active clients or refresh its entry, replacing any existing\nentry that has the same `clientId`. Multiple clients may be active at once.\nThis is also how a client updates its published tools or customizations —\nre-dispatch with the full, updated entry. Because the upsert replaces the\nwhole entry, a dispatcher re-publishing an entry it did not author MUST\ncarry that entry's existing {@link SessionActiveClient._meta | `_meta`}\nforward unless it is deliberately restamping it. Use\n{@link SessionActiveClientRemovedAction | `session/activeClientRemoved`} to\nleave. The server SHOULD automatically dispatch that removal when an active\nclient disconnects.",
       "properties": {
         "type": {
           "const": "session/activeClientSet"

@@ -1968,17 +1968,47 @@ public struct SessionActiveClient: Codable, Sendable {
     /// plugins in memory and rely on the host to expand them into concrete
     /// children inside {@link SessionState.customizations}.
     public var customizations: [ClientPluginCustomization]?
+    /// Additional provider-specific metadata about this active client — for
+    /// example the participant role a host assigns to a connection, or whether
+    /// the host treats it as read-only.
+    ///
+    /// Mirrors the MCP `_meta` convention. Optional and opaque to the protocol;
+    /// producers and consumers agree on its contents out-of-band. Keys SHOULD be
+    /// namespaced by their producer (for example
+    /// `"com.example.collaboration": { "role": "viewer" }`) so independent
+    /// producers cannot collide, and consumers MUST ignore namespaces they do not
+    /// recognize and keep working when the field is absent.
+    ///
+    /// A host that assigns participant semantics SHOULD stamp them here
+    /// explicitly rather than leaving consumers to infer them from other fields:
+    /// an empty {@link SessionActiveClient.tools | `tools`} or
+    /// {@link SessionActiveClient.customizations | `customizations`} list means
+    /// only that the client publishes nothing, never that it is read-only.
+    /// Because `session/activeClientSet` upserts the whole entry, a host that
+    /// re-publishes an entry it did not author MUST carry the existing `_meta`
+    /// forward unless it is deliberately restamping it.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case clientId
+        case displayName
+        case tools
+        case customizations
+        case meta = "_meta"
+    }
 
     public init(
         clientId: String,
         displayName: String? = nil,
         tools: [ToolDefinition],
-        customizations: [ClientPluginCustomization]? = nil
+        customizations: [ClientPluginCustomization]? = nil,
+        meta: [String: AnyCodable]? = nil
     ) {
         self.clientId = clientId
         self.displayName = displayName
         self.tools = tools
         self.customizations = customizations
+        self.meta = meta
     }
 }
 

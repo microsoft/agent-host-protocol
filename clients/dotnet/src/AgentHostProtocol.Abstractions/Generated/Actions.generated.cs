@@ -682,7 +682,10 @@ public sealed record SessionServerToolsChangedAction
 /// the session's active clients or refresh its entry, replacing any existing
 /// entry that has the same `clientId`. Multiple clients may be active at once.
 /// This is also how a client updates its published tools or customizations —
-/// re-dispatch with the full, updated entry. Use
+/// re-dispatch with the full, updated entry. Because the upsert replaces the
+/// whole entry, a dispatcher re-publishing an entry it did not author MUST
+/// carry that entry's existing {@link SessionActiveClient._meta | `_meta`}
+/// forward unless it is deliberately restamping it. Use
 /// {@link SessionActiveClientRemovedAction | `session/activeClientRemoved`} to
 /// leave. The server SHOULD automatically dispatch that removal when an active
 /// client disconnects.</summary>
