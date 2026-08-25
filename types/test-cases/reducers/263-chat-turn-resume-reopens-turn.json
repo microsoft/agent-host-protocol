@@ -1,0 +1,79 @@
+{
+  "description": "chat/turnResume reopens the latest turn after a resumable error",
+  "reducer": "chat",
+  "initial": {
+    "turns": [
+      {
+        "id": "turn-1",
+        "startedAt": "1970-01-01T00:00:01.000Z",
+        "duration": 1000,
+        "message": {
+          "text": "Hello",
+          "origin": {
+            "kind": "user"
+          }
+        },
+        "responseParts": [
+          {
+            "kind": "markdown",
+            "id": "markdown-1",
+            "content": "Partial response"
+          },
+          {
+            "kind": "error",
+            "error": {
+              "errorType": "quota",
+              "message": "More tokens are required"
+            },
+            "resumable": true
+          }
+        ],
+        "usage": null,
+        "state": "error"
+      }
+    ],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 2,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnResume",
+      "turnId": "turn-1"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [
+        {
+          "kind": "markdown",
+          "id": "markdown-1",
+          "content": "Partial response"
+        },
+        {
+          "kind": "error",
+          "error": {
+            "errorType": "quota",
+            "message": "More tokens are required"
+          },
+          "resumable": true
+        }
+      ],
+      "usage": null
+    },
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

@@ -26,7 +26,26 @@ struct ResponsePartView: View {
             ContentRefView(ref: ref)
         case .systemNotification(let note):
             SystemNotificationPartView(part: note)
+        case .error(let error):
+            ErrorResponsePartView(part: error)
+        case .inputRequest, .unknown:
+            EmptyView()
         }
+    }
+}
+
+// MARK: - ErrorResponsePartView
+
+struct ErrorResponsePartView: View {
+    let part: ErrorResponsePart
+
+    var body: some View {
+        Label(part.error.message, systemImage: "exclamationmark.triangle.fill")
+            .font(.footnote)
+            .foregroundStyle(.red)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.red.opacity(0.1), in: Capsule())
     }
 }
 

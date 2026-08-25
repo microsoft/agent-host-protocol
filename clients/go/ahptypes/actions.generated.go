@@ -42,6 +42,7 @@ const (
 	ActionTypeChatTurnComplete                   ActionType = "chat/turnComplete"
 	ActionTypeChatTurnCancelled                  ActionType = "chat/turnCancelled"
 	ActionTypeChatError                          ActionType = "chat/error"
+	ActionTypeChatTurnResume                     ActionType = "chat/turnResume"
 	ActionTypeChatActivityChanged                ActionType = "chat/activityChanged"
 	ActionTypeChatWorkingDirectorySet            ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved        ActionType = "chat/workingDirectoryRemoved"
@@ -267,11 +268,14 @@ type ChatDeltaAction struct {
 }
 
 // Structured content appended to the response.
+//
+// An {@link ErrorResponsePart} MUST be appended with {@link ChatErrorAction}
+// instead so adding the part and ending the turn are one atomic transition.
 type ChatResponsePartAction struct {
 	Type ActionType `json:"type"`
 	// Turn identifier
 	TurnId string `json:"turnId"`
-	// Response part (markdown or content ref)
+	// Response part to append; error parts are ignored.
 	Part ResponsePart `json:"part"`
 	// Additional provider-specific metadata for this action.
 	//
@@ -599,8 +603,9 @@ type ChatErrorAction struct {
 	// client clocks may differ — and MUST treat it as opaque, producer-supplied
 	// data.
 	Duration int64 `json:"duration"`
-	// Error details
-	Error ErrorInfo `json:"error"`
+	// Error part to append to the response stream before finalizing the turn.
+	// Its optional `resumable` flag indicates whether the turn can be resumed.
+	Part ErrorResponsePart `json:"part"`
 	// Additional provider-specific metadata for this action.
 	//
 	// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -609,6 +614,18 @@ type ChatErrorAction struct {
 	// (such as a sub-agent acting within the turn). Mirrors the MCP `_meta`
 	// convention.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Resumes the latest errored turn without adding another message.
+//
+// The turn MUST be the latest turn, its state MUST be `error`, and its final
+// response part MUST be a resumable error. The reducer reopens the same turn
+// with its existing message, response parts, and usage intact. The host then
+// resumes the provider's execution for that turn.
+type ChatTurnResumeAction struct {
+	Type ActionType `json:"type"`
+	// Identifier of the errored turn.
+	TurnId string `json:"turnId"`
 }
 
 // The activity description of this chat changed.
@@ -1669,6 +1686,7 @@ func (*ChatToolCallAuthResolvedAction) isStateAction()           {}
 func (*ChatTurnCompleteAction) isStateAction()                   {}
 func (*ChatTurnCancelledAction) isStateAction()                  {}
 func (*ChatErrorAction) isStateAction()                          {}
+func (*ChatTurnResumeAction) isStateAction()                     {}
 func (*ChatActivityChangedAction) isStateAction()                {}
 func (*SessionTitleChangedAction) isStateAction()                {}
 func (*ChatUsageAction) isStateAction()                          {}
@@ -1895,6 +1913,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/error":
 		var value ChatErrorAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/turnResume":
+		var value ChatTurnResumeAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

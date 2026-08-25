@@ -187,9 +187,12 @@ Turn {
   responseParts: ResponsePart[]     // all content in stream order
   usage: UsageInfo | undefined
   state: 'complete' | 'cancelled' | 'error'
-  error?: ErrorInfo
 }
 ```
+
+`state: 'error'` is the convenient top-level signal that processing stopped on
+an error. The detailed error and any recovery interaction live in an
+`ErrorResponsePart`, preserving their position in the response stream.
 
 ### Active Turn
 
@@ -344,6 +347,13 @@ InputRequestResponsePart {
   request: ChatInputRequest   // the resolved request, with its final answers
   response: ChatInputResponseKind  // 'accept' | 'decline' | 'cancel'
 }
+
+// Durable error record
+ErrorResponsePart {
+  kind: 'error'
+  error: ErrorInfo
+  resumable?: boolean
+}
 ```
 
 `SystemNotificationResponsePart._meta` carries provider-specific metadata describing what triggered the notification. A host MAY attach a machine-readable descriptor so clients can categorize, icon, group, filter, or localize the notification without parsing `content`. Clients MAY inspect well-known keys for enhanced UI, and MUST render coherently from `content` alone when `_meta` is absent or unrecognized.
@@ -353,6 +363,11 @@ Text content uses a **create-then-append** pattern: the server first emits a `ch
 Clients fetch `ContentRef` content separately via the `resourceRead(uri)` command. This keeps the state tree small and serializable.
 
 Consumers can derive display text by concatenating all `markdown` parts, find tool calls by filtering for `toolCall` parts, and access reasoning by filtering for `reasoning` parts.
+
+When the latest errored turn ends in an error part with `resumable: true`, a
+client may dispatch `chat/turnResume`. The reducer reopens the same turn without
+adding a user message. If processing fails again, the host appends another
+error part; prior errors remain in stream order.
 
 ## Tool Call Lifecycle
 

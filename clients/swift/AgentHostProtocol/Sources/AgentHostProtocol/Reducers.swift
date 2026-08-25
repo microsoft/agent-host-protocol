@@ -159,6 +159,9 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         guard var activeTurn = state.activeTurn, activeTurn.id == a.turnId else {
             return state
         }
+        if case .error = a.part {
+            return state
+        }
         activeTurn.responseParts.append(a.part)
         var next = state
         next.activeTurn = activeTurn
@@ -171,7 +174,30 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .cancelled)
 
     case .chatError(let a):
-        return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .error, terminalStatus: .error, error: a.error)
+        return endTurn(state: state, turnId: a.turnId, duration: a.duration, turnState: .error, terminalStatus: .error, errorPart: a.part)
+
+    case .chatTurnResume(let a):
+        guard state.activeTurn == nil,
+              let turn = state.turns.last,
+              turn.id == a.turnId,
+              turn.state == .error,
+              case .error(let errorPart) = turn.responseParts.last,
+              errorPart.resumable == true
+        else {
+            return state
+        }
+
+        var next = state
+        next.turns.removeLast()
+        next.activeTurn = ActiveTurn(
+            id: turn.id,
+            startedAt: turn.startedAt ?? state.modifiedAt,
+            message: turn.message,
+            responseParts: turn.responseParts,
+            usage: turn.usage
+        )
+        next.status = withStatusFlag(chatSummaryStatus(next), .isRead, false)
+        return next
 
     case .chatActivityChanged(let a):
         var next = state
@@ -892,6 +918,7 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
 /// Set of action types that clients are allowed to dispatch.
 public let clientDispatchableActions: Set<String> = [
     "chat/turnStarted",
+    "chat/turnResume",
     "chat/toolCallConfirmed",
     "chat/toolCallComplete",
     "chat/toolCallResultConfirmed",
@@ -914,7 +941,8 @@ public let clientDispatchableActions: Set<String> = [
 /// Checks whether an action may be dispatched by a client.
 public func isClientDispatchable(_ action: StateAction) -> Bool {
     switch action {
-    case .chatTurnStarted, .chatToolCallConfirmed, .chatToolCallComplete,
+    case .chatTurnStarted, .chatTurnResume,
+         .chatToolCallConfirmed, .chatToolCallComplete,
          .chatToolCallResultConfirmed, .chatTurnCancelled,
          .sessionActiveClientSet,
          .sessionActiveClientRemoved,
@@ -1063,13 +1091,13 @@ private func endTurn(
     duration: Int,
     turnState: TurnState,
     terminalStatus: SessionStatus? = nil,
-    error: ErrorInfo? = nil
+    errorPart: ErrorResponsePart? = nil
 ) -> ChatState {
     guard let activeTurn = state.activeTurn, activeTurn.id == turnId else {
         return state
     }
 
-    let responseParts: [ResponsePart] = activeTurn.responseParts.map { part in
+    var responseParts: [ResponsePart] = activeTurn.responseParts.map { part in
         guard case .toolCall(let tcPart) = part else { return part }
         let tc = tcPart.toolCall
         switch tc {
@@ -1109,6 +1137,9 @@ private func endTurn(
             ))
         }
     }
+    if let errorPart {
+        responseParts.append(.error(errorPart))
+    }
 
     // Defensive clamp: `duration` is producer-supplied and opaque to this
     // reducer, but a negative value would be nonsensical to display.
@@ -1119,8 +1150,7 @@ private func endTurn(
         message: activeTurn.message,
         responseParts: responseParts,
         usage: activeTurn.usage,
-        state: turnState,
-        error: error
+        state: turnState
     )
 
     var next = state

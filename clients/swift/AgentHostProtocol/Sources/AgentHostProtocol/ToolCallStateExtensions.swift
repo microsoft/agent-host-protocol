@@ -98,6 +98,7 @@ extension ResponsePart {
         case .contentRef: return nil
         case .systemNotification: return nil
         case .inputRequest: return nil
+        case .error: return nil
         case .unknown: return nil
         }
     }

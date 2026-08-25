@@ -1,5 +1,5 @@
 {
-  "description": "session/error finalizes turn with error",
+  "description": "chat/responsePart cannot append an error without the atomic chat/error transition",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -22,9 +22,8 @@
   },
   "actions": [
     {
-      "type": "chat/error",
+      "type": "chat/responsePart",
       "turnId": "turn-1",
-      "duration": 8999,
       "part": {
         "kind": "error",
         "error": {
@@ -35,34 +34,22 @@
     }
   ],
   "expected": {
-    "turns": [
-      {
-        "id": "turn-1",
-        "startedAt": "1970-01-01T00:00:01.000Z",
-        "duration": 8999,
-        "message": {
-          "text": "Hello",
-          "origin": {
-            "kind": "user"
-          }
-        },
-        "responseParts": [
-          {
-            "kind": "error",
-            "error": {
-              "errorType": "runtime",
-              "message": "Something broke"
-            }
-          }
-        ],
-        "usage": null,
-        "state": "error"
-      }
-    ],
-    "activeTurn": null,
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "1970-01-01T00:00:01.000Z",
+      "message": {
+        "text": "Hello",
+        "origin": {
+          "kind": "user"
+        }
+      },
+      "responseParts": [],
+      "usage": null
+    },
     "resource": "copilot:/test-session",
     "title": "Test Session",
-    "status": 2,
-    "modifiedAt": "1970-01-01T00:00:09.999Z"
+    "status": 8,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
   }
 }

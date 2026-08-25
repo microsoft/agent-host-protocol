@@ -287,7 +287,7 @@ public static class Reducers
         TurnState turnState,
         long duration,
         SessionStatus? terminalStatus,
-        ErrorInfo? errInfo)
+        ErrorResponsePart? errorPart)
     {
         if (state.ActiveTurn is null || state.ActiveTurn.Id != turnId)
         {
@@ -333,6 +333,10 @@ public static class Reducers
                 ToolCall = new ToolCallState(cancelled),
             }));
         }
+        if (errorPart is not null)
+        {
+            parts.Add(new ResponsePart(errorPart));
+        }
 
         var turn = new Turn
         {
@@ -345,7 +349,6 @@ public static class Reducers
             ResponseParts = parts,
             Usage = active.Usage,
             State = turnState,
-            Error = errInfo,
         };
 
         state.Turns.Add(turn);
@@ -913,6 +916,10 @@ public static class Reducers
                 {
                     return ReduceOutcome.NoOp;
                 }
+                if (a.Part.Value is ErrorResponsePart)
+                {
+                    return ReduceOutcome.NoOp;
+                }
 
                 state.ActiveTurn.ResponseParts.Add(a.Part);
                 return ReduceOutcome.Applied;
@@ -921,7 +928,33 @@ public static class Reducers
             case ChatTurnCancelledAction a:
                 return EndTurn(state, a.TurnId, TurnState.Cancelled, a.Duration, null, null);
             case ChatErrorAction a:
-                return EndTurn(state, a.TurnId, TurnState.Error, a.Duration, SessionStatus.Error, a.Error);
+                return EndTurn(state, a.TurnId, TurnState.Error, a.Duration, SessionStatus.Error, a.Part);
+            case ChatTurnResumeAction a:
+                if (state.ActiveTurn is not null || state.Turns.Count == 0)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                Turn resumableTurn = state.Turns[state.Turns.Count - 1];
+                if (resumableTurn.Id != a.TurnId
+                    || resumableTurn.State != TurnState.Error
+                    || resumableTurn.ResponseParts.Count == 0
+                    || resumableTurn.ResponseParts[resumableTurn.ResponseParts.Count - 1].Value is not ErrorResponsePart { Resumable: true })
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                state.Turns.RemoveAt(state.Turns.Count - 1);
+                state.ActiveTurn = new ActiveTurn
+                {
+                    Id = resumableTurn.Id,
+                    StartedAt = resumableTurn.StartedAt ?? state.ModifiedAt,
+                    Message = resumableTurn.Message,
+                    ResponseParts = resumableTurn.ResponseParts,
+                    Usage = resumableTurn.Usage,
+                };
+                state.Status = WithStatusFlag(ChatSummaryStatus(state, null), SessionStatus.IsRead, false);
+                return ReduceOutcome.Applied;
             case ChatActivityChangedAction a:
                 state.Activity = a.Activity;
                 return ReduceOutcome.Applied;
@@ -2415,6 +2448,7 @@ public static class Reducers
         "chat/toolCallResultConfirmed",
         "chat/toolCallContentChanged",
         "chat/turnCancelled",
+        "chat/turnResume",
         "chat/pendingMessageSet",
         "chat/pendingMessageRemoved",
         "chat/queuedMessagesReordered",

@@ -18,11 +18,11 @@ use crate::state::{
     Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
     ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
     ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
-    McpAuthRequirement, McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart,
-    SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo,
-    TextRange, ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor,
-    ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn,
-    UsageInfo,
+    ErrorResponsePart, McpAuthRequirement, McpServerState, Message, ModelSelection,
+    PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection,
+    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
+    ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
+    ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ pub enum ActionType {
     ChatTurnComplete,
     ChatTurnCancelled,
     ChatError,
+    ChatTurnResume,
     ChatActivityChanged,
     ChatWorkingDirectorySet,
     ChatWorkingDirectoryRemoved,
@@ -166,6 +167,7 @@ impl serde::Serialize for ActionType {
             Self::ChatTurnComplete => serializer.serialize_str("chat/turnComplete"),
             Self::ChatTurnCancelled => serializer.serialize_str("chat/turnCancelled"),
             Self::ChatError => serializer.serialize_str("chat/error"),
+            Self::ChatTurnResume => serializer.serialize_str("chat/turnResume"),
             Self::ChatActivityChanged => serializer.serialize_str("chat/activityChanged"),
             Self::ChatWorkingDirectorySet => serializer.serialize_str("chat/workingDirectorySet"),
             Self::ChatWorkingDirectoryRemoved => {
@@ -325,6 +327,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/turnComplete" => Self::ChatTurnComplete,
             "chat/turnCancelled" => Self::ChatTurnCancelled,
             "chat/error" => Self::ChatError,
+            "chat/turnResume" => Self::ChatTurnResume,
             "chat/activityChanged" => Self::ChatActivityChanged,
             "chat/workingDirectorySet" => Self::ChatWorkingDirectorySet,
             "chat/workingDirectoryRemoved" => Self::ChatWorkingDirectoryRemoved,
@@ -579,12 +582,15 @@ pub struct ChatDeltaAction {
 }
 
 /// Structured content appended to the response.
+///
+/// An {@link ErrorResponsePart} MUST be appended with {@link ChatErrorAction}
+/// instead so adding the part and ending the turn are one atomic transition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatResponsePartAction {
     /// Turn identifier
     pub turn_id: String,
-    /// Response part (markdown or content ref)
+    /// Response part to append; error parts are ignored.
     pub part: ResponsePart,
     /// Additional provider-specific metadata for this action.
     ///
@@ -953,7 +959,7 @@ pub struct ChatTurnCancelledAction {
 }
 
 /// Error during turn processing.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatErrorAction {
     /// Turn identifier
@@ -963,8 +969,9 @@ pub struct ChatErrorAction {
     /// client clocks may differ — and MUST treat it as opaque, producer-supplied
     /// data.
     pub duration: i64,
-    /// Error details
-    pub error: ErrorInfo,
+    /// Error part to append to the response stream before finalizing the turn.
+    /// Its optional `resumable` flag indicates whether the turn can be resumed.
+    pub part: ErrorResponsePart,
     /// Additional provider-specific metadata for this action.
     ///
     /// Clients MAY look for well-known keys here to provide enhanced UI, and
@@ -974,6 +981,54 @@ pub struct ChatErrorAction {
     /// convention.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChatErrorActionPart<'a> {
+    kind: &'static str,
+    error: &'a ErrorInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resumable: Option<bool>,
+}
+
+impl Serialize for ChatErrorAction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        let mut state = serializer
+            .serialize_struct("ChatErrorAction", if self.meta.is_some() { 4 } else { 3 })?;
+        state.serialize_field("turnId", &self.turn_id)?;
+        state.serialize_field("duration", &self.duration)?;
+        state.serialize_field(
+            "part",
+            &ChatErrorActionPart {
+                kind: "error",
+                error: &self.part.error,
+                resumable: self.part.resumable,
+            },
+        )?;
+        if let Some(meta) = &self.meta {
+            state.serialize_field("_meta", meta)?;
+        }
+        state.end()
+    }
+}
+
+/// Resumes the latest errored turn without adding another message.
+///
+/// The turn MUST be the latest turn, its state MUST be `error`, and its final
+/// response part MUST be a resumable error. The reducer reopens the same turn
+/// with its existing message, response parts, and usage intact. The host then
+/// resumes the provider's execution for that turn.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatTurnResumeAction {
+    /// Identifier of the errored turn.
+    pub turn_id: String,
 }
 
 /// The activity description of this chat changed.
@@ -2182,6 +2237,8 @@ pub enum StateAction {
     ChatTurnCancelled(ChatTurnCancelledAction),
     #[serde(rename = "chat/error")]
     ChatError(ChatErrorAction),
+    #[serde(rename = "chat/turnResume")]
+    ChatTurnResume(ChatTurnResumeAction),
     #[serde(rename = "chat/activityChanged")]
     ChatActivityChanged(ChatActivityChangedAction),
     #[serde(rename = "session/titleChanged")]

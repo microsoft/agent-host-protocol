@@ -1,0 +1,24 @@
+{
+  "description": "chat/turnResume does nothing when the turn is unknown",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/turnResume",
+      "turnId": "turn-1"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "copilot:/test-session",
+    "title": "Test Session",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:02.000Z"
+  }
+}

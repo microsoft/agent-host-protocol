@@ -471,6 +471,7 @@ value class ResponsePartKind(val rawValue: String) {
         val REASONING: ResponsePartKind = ResponsePartKind("reasoning")
         val SYSTEM_NOTIFICATION: ResponsePartKind = ResponsePartKind("systemNotification")
         val INPUT_REQUEST: ResponsePartKind = ResponsePartKind("inputRequest")
+        val ERROR: ResponsePartKind = ResponsePartKind("error")
     }
 }
 
@@ -2147,11 +2148,7 @@ data class Turn(
     /**
      * How the turn ended
      */
-    val state: TurnState,
-    /**
-     * Error details if state is `'error'`
-     */
-    val error: ErrorInfo? = null
+    val state: TurnState
 )
 
 @Serializable
@@ -2926,6 +2923,22 @@ data class InputRequestResponsePart(
      * `decline`, or `cancel` with `chat/inputCompleted`.
      */
     val response: ChatInputResponseKind? = null
+)
+
+@Serializable
+data class ErrorResponsePart(
+    /**
+     * Discriminant
+     */
+    val kind: ResponsePartKind,
+    /**
+     * Error details.
+     */
+    val error: ErrorInfo,
+    /**
+     * Whether the host can resume the turn from this error. Only `true` enables resume.
+     */
+    val resumable: Boolean? = null
 )
 
 @Serializable
@@ -5784,6 +5797,8 @@ value class ResponsePartReasoning(val value: ReasoningResponsePart) : ResponsePa
 value class ResponsePartSystemNotification(val value: SystemNotificationResponsePart) : ResponsePart
 @JvmInline
 value class ResponsePartInputRequest(val value: InputRequestResponsePart) : ResponsePart
+@JvmInline
+value class ResponsePartError(val value: ErrorResponsePart) : ResponsePart
 /**
  * Forward-compat catch-all for unknown ResponsePart discriminators.
  *
@@ -5814,6 +5829,7 @@ internal object ResponsePartSerializer : KSerializer<ResponsePart> {
             "reasoning" -> ResponsePartReasoning(input.json.decodeFromJsonElement(ReasoningResponsePart.serializer(), element))
             "systemNotification" -> ResponsePartSystemNotification(input.json.decodeFromJsonElement(SystemNotificationResponsePart.serializer(), element))
             "inputRequest" -> ResponsePartInputRequest(input.json.decodeFromJsonElement(InputRequestResponsePart.serializer(), element))
+            "error" -> ResponsePartError(input.json.decodeFromJsonElement(ErrorResponsePart.serializer(), element))
             else -> ResponsePartUnknown(obj)
         }
     }
@@ -5828,6 +5844,7 @@ internal object ResponsePartSerializer : KSerializer<ResponsePart> {
             is ResponsePartReasoning -> output.json.encodeToJsonElement(ReasoningResponsePart.serializer(), value.value)
             is ResponsePartSystemNotification -> output.json.encodeToJsonElement(SystemNotificationResponsePart.serializer(), value.value)
             is ResponsePartInputRequest -> output.json.encodeToJsonElement(InputRequestResponsePart.serializer(), value.value)
+            is ResponsePartError -> output.json.encodeToJsonElement(ErrorResponsePart.serializer(), value.value)
             is ResponsePartUnknown -> value.raw
         }
         output.encodeJsonElement(element)

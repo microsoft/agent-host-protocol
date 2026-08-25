@@ -62,6 +62,7 @@ import type {
   ChatTurnCompleteAction,
   ChatTurnCancelledAction,
   ChatErrorAction,
+  ChatTurnResumeAction,
   ChatActivityChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
@@ -160,6 +161,7 @@ export const enum ActionType {
   ChatTurnComplete = 'chat/turnComplete',
   ChatTurnCancelled = 'chat/turnCancelled',
   ChatError = 'chat/error',
+  ChatTurnResume = 'chat/turnResume',
   ChatActivityChanged = 'chat/activityChanged',
   ChatWorkingDirectorySet = 'chat/workingDirectorySet',
   ChatWorkingDirectoryRemoved = 'chat/workingDirectoryRemoved',
@@ -315,6 +317,7 @@ export type StateAction =
   | ChatTurnCompleteAction
   | ChatTurnCancelledAction
   | ChatErrorAction
+  | ChatTurnResumeAction
   | ChatActivityChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction

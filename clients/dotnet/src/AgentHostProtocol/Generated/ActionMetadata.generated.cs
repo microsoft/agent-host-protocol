@@ -151,6 +151,9 @@ internal static class GeneratedActionMetadata
             case ChatTurnCompleteAction value:
                 actionType = value.Type;
                 return true;
+            case ChatTurnResumeAction value:
+                actionType = value.Type;
+                return true;
             case ChatTurnsLoadedAction value:
                 actionType = value.Type;
                 return true;
@@ -410,6 +413,7 @@ internal static class GeneratedActionMetadata
             ActionType.ChatTruncated => "chat/truncated",
             ActionType.ChatTurnCancelled => "chat/turnCancelled",
             ActionType.ChatTurnComplete => "chat/turnComplete",
+            ActionType.ChatTurnResume => "chat/turnResume",
             ActionType.ChatTurnsLoaded => "chat/turnsLoaded",
             ActionType.ChatTurnStarted => "chat/turnStarted",
             ActionType.ChatUsage => "chat/usage",

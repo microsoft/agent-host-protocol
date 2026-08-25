@@ -73,7 +73,8 @@ When a client dispatches an action, the server applies it to the state and also 
 | `chat/usage` | No | Token usage report for the active turn |
 | `chat/turnComplete` | No | Turn finished (assistant idle) |
 | `chat/turnCancelled` | **Yes** | Turn was aborted; server stops processing |
-| `chat/error` | No | Error during turn processing |
+| `chat/error` | No | Error during turn processing; appends an error response part and ends the turn |
+| `chat/turnResume` | **Yes** | Resume the latest resumable errored turn without adding another message |
 | `chat/truncated` | **Yes** | Turn history truncated (with optional `turnId` cutoff) |
 
 ### Tool Calls (chat channel)

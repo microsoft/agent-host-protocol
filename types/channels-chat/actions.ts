@@ -5,7 +5,7 @@
  */
 
 import { ActionType } from '../common/actions.js';
-import type { StringOrMarkdown, ErrorInfo, FileEdit, UsageInfo, URI } from '../common/state.js';
+import type { StringOrMarkdown, FileEdit, UsageInfo, URI } from '../common/state.js';
 import type { McpAuthRequirement } from '../channels-session/state.js';
 import type {
   Message,
@@ -16,6 +16,7 @@ import type {
   ChatInputRequest,
   ChatInputResponseKind,
   ConfirmationOption,
+  ErrorResponsePart,
   ToolCallContributor,
   ToolCallRiskAssessment,
   ToolInput,
@@ -118,6 +119,9 @@ export interface ChatDeltaAction {
 /**
  * Structured content appended to the response.
  *
+ * An {@link ErrorResponsePart} MUST be appended with {@link ChatErrorAction}
+ * instead so adding the part and ending the turn are one atomic transition.
+ *
  * @category Chat Actions
  * @version 1
  */
@@ -125,7 +129,7 @@ export interface ChatResponsePartAction {
   type: ActionType.ChatResponsePart;
   /** Turn identifier */
   turnId: string;
-  /** Response part (markdown or content ref) */
+  /** Response part to append; error parts are ignored. */
   part: ResponsePart;
   /**
    * Additional provider-specific metadata for this action.
@@ -488,8 +492,11 @@ export interface ChatErrorAction {
    * data.
    */
   duration: number;
-  /** Error details */
-  error: ErrorInfo;
+  /**
+   * Error part to append to the response stream before finalizing the turn.
+   * Its optional `resumable` flag indicates whether the turn can be resumed.
+   */
+  part: ErrorResponsePart;
   /**
    * Additional provider-specific metadata for this action.
    *
@@ -500,6 +507,24 @@ export interface ChatErrorAction {
    * convention.
    */
   _meta?: Record<string, unknown>;
+}
+
+/**
+ * Resumes the latest errored turn without adding another message.
+ *
+ * The turn MUST be the latest turn, its state MUST be `error`, and its final
+ * response part MUST be a resumable error. The reducer reopens the same turn
+ * with its existing message, response parts, and usage intact. The host then
+ * resumes the provider's execution for that turn.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ChatTurnResumeAction {
+  type: ActionType.ChatTurnResume;
+  /** Identifier of the errored turn. */
+  turnId: string;
 }
 
 /**
@@ -821,6 +846,7 @@ export type ChatAction =
   | ChatTurnCompleteAction
   | ChatTurnCancelledAction
   | ChatErrorAction
+  | ChatTurnResumeAction
   | ChatActivityChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction

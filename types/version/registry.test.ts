@@ -14,10 +14,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  ACTION_INTRODUCED_IN,
   PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
   compareProtocolVersions,
+  isActionKnownToVersion,
 } from './registry.js';
+import { ActionType } from '../actions.js';
 
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 
@@ -55,6 +58,17 @@ test('SUPPORTED_PROTOCOL_VERSIONS is strictly descending', () => {
 test('SUPPORTED_PROTOCOL_VERSIONS has no duplicates', () => {
   const set = new Set(SUPPORTED_PROTOCOL_VERSIONS);
   assert.equal(set.size, SUPPORTED_PROTOCOL_VERSIONS.length);
+});
+
+test('chat/turnResume is available starting in protocol 1.0.0', () => {
+  const action = {
+    type: ActionType.ChatTurnResume,
+    turnId: 'turn-1',
+  } as const;
+
+  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatTurnResume], '1.0.0');
+  assert.equal(isActionKnownToVersion(action, '0.8.0'), false);
+  assert.equal(isActionKnownToVersion(action, '1.0.0'), true);
 });
 
 test('public package entry re-exports both protocol-version constants', async () => {
