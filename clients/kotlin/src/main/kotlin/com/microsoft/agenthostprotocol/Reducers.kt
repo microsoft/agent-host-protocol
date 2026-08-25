@@ -399,7 +399,7 @@ private fun endTurn(
     duration: Long,
     turnState: TurnState,
     terminalStatus: SessionStatus? = null,
-    error: ErrorInfo? = null,
+    errorPart: ErrorResponsePart? = null,
 ): ChatState {
     val active = state.activeTurn ?: return state
     if (active.id != turnId) return state
@@ -443,6 +443,11 @@ private fun endTurn(
             ),
         )
     }
+    val responseParts = if (errorPart == null) {
+        finalizedParts
+    } else {
+        finalizedParts + ResponsePartError(errorPart)
+    }
 
     // Defensive clamp: `duration` is producer-supplied and opaque to this
     // reducer, but a negative value would be nonsensical to display.
@@ -451,10 +456,9 @@ private fun endTurn(
         startedAt = active.startedAt,
         duration = maxOf(0L, duration),
         message = active.message,
-        responseParts = finalizedParts,
+        responseParts = responseParts,
         usage = active.usage,
         state = turnState,
-        error = error,
     )
 
     val withoutTurn = state.copy(
@@ -906,7 +910,7 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatResponsePart -> {
         val a = action.value
         val activeTurn = state.activeTurn
-        if (activeTurn == null || activeTurn.id != a.turnId) {
+        if (activeTurn == null || activeTurn.id != a.turnId || a.part is ResponsePartError) {
             state
         } else {
             state.copy(
@@ -922,7 +926,39 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
         endTurn(state, action.value.turnId, action.value.duration, TurnState.CANCELLED)
 
     is StateActionChatError ->
-        endTurn(state, action.value.turnId, action.value.duration, TurnState.ERROR, SessionStatus.ERROR, action.value.error)
+        endTurn(state, action.value.turnId, action.value.duration, TurnState.ERROR, SessionStatus.ERROR, action.value.part)
+
+    is StateActionChatTurnResume -> {
+        val a = action.value
+        if (state.activeTurn != null || state.turns.isEmpty()) {
+            state
+        } else {
+            val turnIndex = state.turns.lastIndex
+            val turn = state.turns[turnIndex]
+            if (turn.id != a.turnId || turn.state != TurnState.ERROR) {
+                state
+            } else {
+                val errorPart = turn.responseParts.lastOrNull() as? ResponsePartError
+                if (errorPart?.value?.resumable != true) {
+                    state
+                } else {
+                    val withTurn = state.copy(
+                        turns = state.turns.dropLast(1),
+                        activeTurn = ActiveTurn(
+                            id = turn.id,
+                            startedAt = turn.startedAt ?: state.modifiedAt,
+                            message = turn.message,
+                            responseParts = turn.responseParts,
+                            usage = turn.usage,
+                        ),
+                    )
+                    withTurn.copy(
+                        status = withStatusFlag(chatSummaryStatus(withTurn), SessionStatus.IS_READ, false),
+                    )
+                }
+            }
+        }
+    }
 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)

@@ -270,6 +270,8 @@ public enum ResponsePartKind
     SystemNotification,
     [WireValue("inputRequest")]
     InputRequest,
+    [WireValue("error")]
+    Error,
 }
 
 /// <summary>Status of a tool call in the lifecycle state machine.</summary>
@@ -2075,10 +2077,6 @@ public sealed class Turn
 
     /// <summary>How the turn ended</summary>
     public TurnState State { get; set; }
-
-    /// <summary>Error details if state is `'error'`</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ErrorInfo? Error { get; set; }
 }
 
 /// <summary>An in-progress turn — the assistant is actively streaming.</summary>
@@ -2623,6 +2621,28 @@ public sealed record InputRequestResponsePart
     /// `decline`, or `cancel` with `chat/inputCompleted`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatInputResponseKind? Response { get; init; }
+}
+
+/// <summary>An error encountered while processing a turn.
+///
+/// This is the detailed source of truth for the error. {@link Turn.state}
+/// remains {@link TurnState.Error} while the turn is stopped at this error so
+/// clients can detect the terminal state without inspecting response parts.
+///
+/// When {@link resumable} is `true`, a client may dispatch `chat/turnResume`
+/// while this is the latest turn and its state is {@link TurnState.Error}.
+/// Clients decide whether and how to present that affordance.</summary>
+public sealed record ErrorResponsePart
+{
+    /// <summary>Discriminant</summary>
+    public ResponsePartKind Kind { get; init; }
+
+    /// <summary>Error details.</summary>
+    public required ErrorInfo Error { get; init; }
+
+    /// <summary>Whether the host can resume the turn from this error. Only `true` enables resume.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Resumable { get; init; }
 }
 
 /// <summary>Tool execution result details, available after execution completes.</summary>
@@ -5522,6 +5542,7 @@ internal sealed class ResponsePartConverter : UnionConverter<ResponsePart>
         ["reasoning"] = typeof(ReasoningResponsePart),
         ["systemNotification"] = typeof(SystemNotificationResponsePart),
         ["inputRequest"] = typeof(InputRequestResponsePart),
+        ["error"] = typeof(ErrorResponsePart),
             },
             allowUnknown: true)
     {

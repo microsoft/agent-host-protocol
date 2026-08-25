@@ -521,6 +521,7 @@ pub enum ResponsePartKind {
     Reasoning,
     SystemNotification,
     InputRequest,
+    Error,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
 }
@@ -537,6 +538,7 @@ impl serde::Serialize for ResponsePartKind {
             Self::Reasoning => serializer.serialize_str("reasoning"),
             Self::SystemNotification => serializer.serialize_str("systemNotification"),
             Self::InputRequest => serializer.serialize_str("inputRequest"),
+            Self::Error => serializer.serialize_str("error"),
             Self::Unknown(value) => serializer.serialize_str(value),
         }
     }
@@ -555,6 +557,7 @@ impl<'de> serde::Deserialize<'de> for ResponsePartKind {
             "reasoning" => Self::Reasoning,
             "systemNotification" => Self::SystemNotification,
             "inputRequest" => Self::InputRequest,
+            "error" => Self::Error,
             _ => Self::Unknown(raw),
         })
     }
@@ -2522,9 +2525,6 @@ pub struct Turn {
     pub usage: Option<UsageInfo>,
     /// How the turn ended
     pub state: TurnState,
-    /// Error details if state is `'error'`
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<ErrorInfo>,
 }
 
 /// An in-progress turn — the assistant is actively streaming.
@@ -3190,6 +3190,25 @@ pub struct InputRequestResponsePart {
     /// `decline`, or `cancel` with `chat/inputCompleted`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub response: Option<ChatInputResponseKind>,
+}
+
+/// An error encountered while processing a turn.
+///
+/// This is the detailed source of truth for the error. {@link Turn.state}
+/// remains {@link TurnState.Error} while the turn is stopped at this error so
+/// clients can detect the terminal state without inspecting response parts.
+///
+/// When {@link resumable} is `true`, a client may dispatch `chat/turnResume`
+/// while this is the latest turn and its state is {@link TurnState.Error}.
+/// Clients decide whether and how to present that affordance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorResponsePart {
+    /// Error details.
+    pub error: ErrorInfo,
+    /// Whether the host can resume the turn from this error. Only `true` enables resume.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resumable: Option<bool>,
 }
 
 /// Tool execution result details, available after execution completes.
@@ -5726,6 +5745,8 @@ pub enum ResponsePart {
     SystemNotification(SystemNotificationResponsePart),
     #[serde(rename = "inputRequest")]
     InputRequest(InputRequestResponsePart),
+    #[serde(rename = "error")]
+    Error(ErrorResponsePart),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

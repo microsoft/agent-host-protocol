@@ -1,5 +1,5 @@
 {
-  "description": "session/error finalizes turn with error",
+  "description": "a resumed turn preserves its prior error when it errors again",
   "reducer": "chat",
   "initial": {
     "turns": [],
@@ -24,12 +24,29 @@
     {
       "type": "chat/error",
       "turnId": "turn-1",
-      "duration": 8999,
+      "duration": 1000,
       "part": {
         "kind": "error",
         "error": {
           "errorType": "runtime",
-          "message": "Something broke"
+          "message": "First failure"
+        },
+        "resumable": true
+      }
+    },
+    {
+      "type": "chat/turnResume",
+      "turnId": "turn-1"
+    },
+    {
+      "type": "chat/error",
+      "turnId": "turn-1",
+      "duration": 2000,
+      "part": {
+        "kind": "error",
+        "error": {
+          "errorType": "fatal",
+          "message": "Second failure"
         }
       }
     }
@@ -39,7 +56,7 @@
       {
         "id": "turn-1",
         "startedAt": "1970-01-01T00:00:01.000Z",
-        "duration": 8999,
+        "duration": 2000,
         "message": {
           "text": "Hello",
           "origin": {
@@ -51,7 +68,15 @@
             "kind": "error",
             "error": {
               "errorType": "runtime",
-              "message": "Something broke"
+              "message": "First failure"
+            },
+            "resumable": true
+          },
+          {
+            "kind": "error",
+            "error": {
+              "errorType": "fatal",
+              "message": "Second failure"
             }
           }
         ],
@@ -63,6 +88,6 @@
     "resource": "copilot:/test-session",
     "title": "Test Session",
     "status": 2,
-    "modifiedAt": "1970-01-01T00:00:09.999Z"
+    "modifiedAt": "1970-01-01T00:00:03.000Z"
   }
 }

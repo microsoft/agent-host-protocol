@@ -59,6 +59,8 @@ public enum ActionType
     ChatTurnCancelled,
     [WireValue("chat/error")]
     ChatError,
+    [WireValue("chat/turnResume")]
+    ChatTurnResume,
     [WireValue("chat/activityChanged")]
     ChatActivityChanged,
     [WireValue("chat/workingDirectorySet")]
@@ -1165,7 +1167,10 @@ public sealed record ChatDeltaAction
     public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
-/// <summary>Structured content appended to the response.</summary>
+/// <summary>Structured content appended to the response.
+///
+/// An {@link ErrorResponsePart} MUST be appended with {@link ChatErrorAction}
+/// instead so adding the part and ending the turn are one atomic transition.</summary>
 public sealed record ChatResponsePartAction
 {
     public ActionType Type { get; init; }
@@ -1173,7 +1178,7 @@ public sealed record ChatResponsePartAction
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
 
-    /// <summary>Response part (markdown or content ref)</summary>
+    /// <summary>Response part to append; error parts are ignored.</summary>
     public required ResponsePart Part { get; init; }
 
     /// <summary>Additional provider-specific metadata for this action.
@@ -1625,8 +1630,9 @@ public sealed record ChatErrorAction
     /// data.</summary>
     public long Duration { get; init; }
 
-    /// <summary>Error details</summary>
-    public required ErrorInfo Error { get; init; }
+    /// <summary>Error part to append to the response stream before finalizing the turn.
+    /// Its optional `resumable` flag indicates whether the turn can be resumed.</summary>
+    public required ErrorResponsePart Part { get; init; }
 
     /// <summary>Additional provider-specific metadata for this action.
     ///
@@ -1638,6 +1644,20 @@ public sealed record ChatErrorAction
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>Resumes the latest errored turn without adding another message.
+///
+/// The turn MUST be the latest turn, its state MUST be `error`, and its final
+/// response part MUST be a resumable error. The reducer reopens the same turn
+/// with its existing message, response parts, and usage intact. The host then
+/// resumes the provider's execution for that turn.</summary>
+public sealed record ChatTurnResumeAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Identifier of the errored turn.</summary>
+    public required string TurnId { get; init; }
 }
 
 /// <summary>The activity description of this chat changed.
@@ -2599,6 +2619,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/turnComplete"] = typeof(ChatTurnCompleteAction),
         ["chat/turnCancelled"] = typeof(ChatTurnCancelledAction),
         ["chat/error"] = typeof(ChatErrorAction),
+        ["chat/turnResume"] = typeof(ChatTurnResumeAction),
         ["chat/activityChanged"] = typeof(ChatActivityChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),

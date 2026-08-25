@@ -576,8 +576,6 @@ export interface Turn {
   usage: UsageInfo | undefined;
   /** How the turn ended */
   state: TurnState;
-  /** Error details if state is `'error'` */
-  error?: ErrorInfo;
 }
 
 /**
@@ -878,6 +876,7 @@ export const enum ResponsePartKind {
   Reasoning = 'reasoning',
   SystemNotification = 'systemNotification',
   InputRequest = 'inputRequest',
+  Error = 'error',
 }
 
 /**
@@ -941,7 +940,8 @@ export type ResponsePart =
   | ToolCallResponsePart
   | ReasoningResponsePart
   | SystemNotificationResponsePart
-  | InputRequestResponsePart;
+  | InputRequestResponsePart
+  | ErrorResponsePart;
 
 /**
  * A live or resolved input request (elicitation) in the turn response stream.
@@ -970,6 +970,28 @@ export interface InputRequestResponsePart {
    * `decline`, or `cancel` with `chat/inputCompleted`.
    */
   response?: ChatInputResponseKind;
+}
+
+/**
+ * An error encountered while processing a turn.
+ *
+ * This is the detailed source of truth for the error. {@link Turn.state}
+ * remains {@link TurnState.Error} while the turn is stopped at this error so
+ * clients can detect the terminal state without inspecting response parts.
+ *
+ * When {@link resumable} is `true`, a client may dispatch `chat/turnResume`
+ * while this is the latest turn and its state is {@link TurnState.Error}.
+ * Clients decide whether and how to present that affordance.
+ *
+ * @category Response Parts
+ */
+export interface ErrorResponsePart {
+  /** Discriminant */
+  kind: ResponsePartKind.Error;
+  /** Error details. */
+  error: ErrorInfo;
+  /** Whether the host can resume the turn from this error. Only `true` enables resume. */
+  resumable?: boolean;
 }
 
 /**

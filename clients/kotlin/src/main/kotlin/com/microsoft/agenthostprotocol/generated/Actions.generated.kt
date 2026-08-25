@@ -52,6 +52,7 @@ value class ActionType(val rawValue: String) {
         val CHAT_TURN_COMPLETE: ActionType = ActionType("chat/turnComplete")
         val CHAT_TURN_CANCELLED: ActionType = ActionType("chat/turnCancelled")
         val CHAT_ERROR: ActionType = ActionType("chat/error")
+        val CHAT_TURN_RESUME: ActionType = ActionType("chat/turnResume")
         val CHAT_ACTIVITY_CHANGED: ActionType = ActionType("chat/activityChanged")
         val CHAT_WORKING_DIRECTORY_SET: ActionType = ActionType("chat/workingDirectorySet")
         val CHAT_WORKING_DIRECTORY_REMOVED: ActionType = ActionType("chat/workingDirectoryRemoved")
@@ -302,7 +303,7 @@ data class ChatResponsePartAction(
      */
     val turnId: String,
     /**
-     * Response part (markdown or content ref)
+     * Response part to append; error parts are ignored.
      */
     val part: ResponsePart,
     /**
@@ -690,9 +691,10 @@ data class ChatErrorAction(
      */
     val duration: Long,
     /**
-     * Error details
+     * Error part to append to the response stream before finalizing the turn.
+     * Its optional `resumable` flag indicates whether the turn can be resumed.
      */
-    val error: ErrorInfo,
+    val part: ErrorResponsePart,
     /**
      * Additional provider-specific metadata for this action.
      *
@@ -704,6 +706,15 @@ data class ChatErrorAction(
      */
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class ChatTurnResumeAction(
+    val type: ActionType,
+    /**
+     * Identifier of the errored turn.
+     */
+    val turnId: String
 )
 
 @Serializable
@@ -1591,6 +1602,7 @@ sealed interface StateAction
 @JvmInline value class StateActionChatTurnComplete(val value: ChatTurnCompleteAction) : StateAction
 @JvmInline value class StateActionChatTurnCancelled(val value: ChatTurnCancelledAction) : StateAction
 @JvmInline value class StateActionChatError(val value: ChatErrorAction) : StateAction
+@JvmInline value class StateActionChatTurnResume(val value: ChatTurnResumeAction) : StateAction
 @JvmInline value class StateActionChatActivityChanged(val value: ChatActivityChangedAction) : StateAction
 @JvmInline value class StateActionSessionTitleChanged(val value: SessionTitleChangedAction) : StateAction
 @JvmInline value class StateActionChatUsage(val value: ChatUsageAction) : StateAction
@@ -1701,6 +1713,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/turnComplete" -> StateActionChatTurnComplete(input.json.decodeFromJsonElement(ChatTurnCompleteAction.serializer(), element))
             "chat/turnCancelled" -> StateActionChatTurnCancelled(input.json.decodeFromJsonElement(ChatTurnCancelledAction.serializer(), element))
             "chat/error" -> StateActionChatError(input.json.decodeFromJsonElement(ChatErrorAction.serializer(), element))
+            "chat/turnResume" -> StateActionChatTurnResume(input.json.decodeFromJsonElement(ChatTurnResumeAction.serializer(), element))
             "chat/activityChanged" -> StateActionChatActivityChanged(input.json.decodeFromJsonElement(ChatActivityChangedAction.serializer(), element))
             "session/titleChanged" -> StateActionSessionTitleChanged(input.json.decodeFromJsonElement(SessionTitleChangedAction.serializer(), element))
             "chat/usage" -> StateActionChatUsage(input.json.decodeFromJsonElement(ChatUsageAction.serializer(), element))
@@ -1804,6 +1817,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatTurnComplete -> output.json.encodeToJsonElement(ChatTurnCompleteAction.serializer(), value.value)
             is StateActionChatTurnCancelled -> output.json.encodeToJsonElement(ChatTurnCancelledAction.serializer(), value.value)
             is StateActionChatError -> output.json.encodeToJsonElement(ChatErrorAction.serializer(), value.value)
+            is StateActionChatTurnResume -> output.json.encodeToJsonElement(ChatTurnResumeAction.serializer(), value.value)
             is StateActionChatActivityChanged -> output.json.encodeToJsonElement(ChatActivityChangedAction.serializer(), value.value)
             is StateActionSessionTitleChanged -> output.json.encodeToJsonElement(SessionTitleChangedAction.serializer(), value.value)
             is StateActionChatUsage -> output.json.encodeToJsonElement(ChatUsageAction.serializer(), value.value)

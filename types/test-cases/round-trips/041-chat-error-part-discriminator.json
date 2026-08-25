@@ -1,0 +1,34 @@
+{
+  "name": "chat-error-part-discriminator",
+  "group": "A",
+  "description": "A chat/error action preserves the nested ErrorResponsePart kind discriminator required by the wire schema.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/error",
+    "turnId": "turn-1",
+    "duration": 1000,
+    "part": {
+      "kind": "error",
+      "error": {
+        "errorType": "runtime",
+        "message": "Something broke"
+      },
+      "resumable": true
+    }
+  },
+  "acceptableOutputs": [
+    {
+      "type": "chat/error",
+      "turnId": "turn-1",
+      "duration": 1000,
+      "part": {
+        "kind": "error",
+        "error": {
+          "errorType": "runtime",
+          "message": "Something broke"
+        },
+        "resumable": true
+      }
+    }
+  ]
+}

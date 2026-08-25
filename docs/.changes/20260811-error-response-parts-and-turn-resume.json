@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Turn errors are durable response parts, and resumable errors can reopen the same turn through `chat/turnResume`."
+}

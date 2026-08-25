@@ -393,6 +393,7 @@ public enum ResponsePartKind: Codable, Sendable, Equatable {
     case reasoning
     case systemNotification
     case inputRequest
+    case error
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -406,6 +407,7 @@ public enum ResponsePartKind: Codable, Sendable, Equatable {
         case "reasoning": self = .reasoning
         case "systemNotification": self = .systemNotification
         case "inputRequest": self = .inputRequest
+        case "error": self = .error
         default: self = .unknown(raw)
         }
     }
@@ -419,6 +421,7 @@ public enum ResponsePartKind: Codable, Sendable, Equatable {
         case .reasoning: try container.encode("reasoning")
         case .systemNotification: try container.encode("systemNotification")
         case .inputRequest: try container.encode("inputRequest")
+        case .error: try container.encode("error")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -2293,8 +2296,6 @@ public struct Turn: Codable, Sendable {
     public var usage: UsageInfo?
     /// How the turn ended
     public var state: TurnState
-    /// Error details if state is `'error'`
-    public var error: ErrorInfo?
 
     public init(
         id: String,
@@ -2303,8 +2304,7 @@ public struct Turn: Codable, Sendable {
         message: Message,
         responseParts: [ResponsePart],
         usage: UsageInfo? = nil,
-        state: TurnState,
-        error: ErrorInfo? = nil
+        state: TurnState
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -2313,7 +2313,6 @@ public struct Turn: Codable, Sendable {
         self.responseParts = responseParts
         self.usage = usage
         self.state = state
-        self.error = error
     }
 }
 
@@ -3275,6 +3274,25 @@ public struct InputRequestResponsePart: Codable, Sendable {
         self.kind = kind
         self.request = request
         self.response = response
+    }
+}
+
+public struct ErrorResponsePart: Codable, Sendable {
+    /// Discriminant
+    public var kind: ResponsePartKind
+    /// Error details.
+    public var error: ErrorInfo
+    /// Whether the host can resume the turn from this error. Only `true` enables resume.
+    public var resumable: Bool?
+
+    public init(
+        kind: ResponsePartKind,
+        error: ErrorInfo,
+        resumable: Bool? = nil
+    ) {
+        self.kind = kind
+        self.error = error
+        self.resumable = resumable
     }
 }
 
@@ -6805,6 +6823,7 @@ public enum ResponsePart: Codable, Sendable {
     case reasoning(ReasoningResponsePart)
     case systemNotification(SystemNotificationResponsePart)
     case inputRequest(InputRequestResponsePart)
+    case error(ErrorResponsePart)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
     case unknown(AnyCodable)
@@ -6832,6 +6851,8 @@ public enum ResponsePart: Codable, Sendable {
             self = .systemNotification(try SystemNotificationResponsePart(from: decoder))
         case "inputRequest":
             self = .inputRequest(try InputRequestResponsePart(from: decoder))
+        case "error":
+            self = .error(try ErrorResponsePart(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -6845,6 +6866,7 @@ public enum ResponsePart: Codable, Sendable {
         case .reasoning(let value): try value.encode(to: encoder)
         case .systemNotification(let value): try value.encode(to: encoder)
         case .inputRequest(let value): try value.encode(to: encoder)
+        case .error(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

@@ -170,6 +170,14 @@ func hasOpenInputRequest(state *ahptypes.ChatState) bool {
 	return false
 }
 
+func hasResumableError(turn *ahptypes.Turn) bool {
+	if len(turn.ResponseParts) == 0 {
+		return false
+	}
+	part, ok := turn.ResponseParts[len(turn.ResponseParts)-1].Value.(*ahptypes.ErrorResponsePart)
+	return ok && part.Resumable != nil && *part.Resumable
+}
+
 func summaryStatus(state *ahptypes.ChatState, terminal *ahptypes.SessionStatus) ahptypes.SessionStatus {
 	var activity ahptypes.SessionStatus
 	switch {
@@ -191,7 +199,7 @@ func refreshSummaryStatus(state *ahptypes.ChatState) {
 
 // ─── Active-turn helpers ───────────────────────────────────────────────
 
-func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState ahptypes.TurnState, terminalStatus *ahptypes.SessionStatus, errInfo *ahptypes.ErrorInfo) ReduceOutcome {
+func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState ahptypes.TurnState, terminalStatus *ahptypes.SessionStatus, errorPart *ahptypes.ErrorResponsePart) ReduceOutcome {
 	if state.ActiveTurn == nil || state.ActiveTurn.Id != turnID {
 		return ReduceOutcomeNoOp
 	}
@@ -229,6 +237,9 @@ func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState
 			ToolCall: ahptypes.ToolCallState{Value: cancelled},
 		}})
 	}
+	if errorPart != nil {
+		parts = append(parts, ahptypes.ResponsePart{Value: errorPart})
+	}
 
 	// Defensive clamp: duration is producer-supplied and opaque to this
 	// reducer, but a negative value would be nonsensical to display.
@@ -244,7 +255,6 @@ func endTurn(state *ahptypes.ChatState, turnID string, duration int64, turnState
 		ResponseParts: parts,
 		Usage:         active.Usage,
 		State:         turnState,
-		Error:         errInfo,
 	}
 
 	state.Turns = append(state.Turns, turn)
@@ -436,6 +446,7 @@ func updateResponsePart(state *ahptypes.ChatState, turnID, partID string, update
 	if state.ActiveTurn == nil || state.ActiveTurn.Id != turnID {
 		return ReduceOutcomeNoOp
 	}
+
 	for i := range state.ActiveTurn.ResponseParts {
 		part := &state.ActiveTurn.ResponseParts[i]
 		var id string
@@ -509,6 +520,9 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		if state.ActiveTurn == nil || state.ActiveTurn.Id != a.TurnId {
 			return ReduceOutcomeNoOp
 		}
+		if _, ok := a.Part.Value.(*ahptypes.ErrorResponsePart); ok {
+			return ReduceOutcomeNoOp
+		}
 		state.ActiveTurn.ResponseParts = append(state.ActiveTurn.ResponseParts, a.Part)
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatTurnCompleteAction:
@@ -516,9 +530,32 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatTurnCancelledAction:
 		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateCancelled, nil, nil)
 	case *ahptypes.ChatErrorAction:
-		errCopy := a.Error
 		errStatus := ahptypes.SessionStatusError
-		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateError, &errStatus, &errCopy)
+		return endTurn(state, a.TurnId, a.Duration, ahptypes.TurnStateError, &errStatus, &a.Part)
+	case *ahptypes.ChatTurnResumeAction:
+		if state.ActiveTurn != nil || len(state.Turns) == 0 {
+			return ReduceOutcomeNoOp
+		}
+		turnIndex := len(state.Turns) - 1
+		turn := state.Turns[turnIndex]
+		if turn.Id != a.TurnId || turn.State != ahptypes.TurnStateError || !hasResumableError(&turn) {
+			return ReduceOutcomeNoOp
+		}
+
+		startedAt := state.ModifiedAt
+		if turn.StartedAt != nil {
+			startedAt = *turn.StartedAt
+		}
+		state.Turns = state.Turns[:turnIndex]
+		state.ActiveTurn = &ahptypes.ActiveTurn{
+			Id:            turn.Id,
+			StartedAt:     startedAt,
+			Message:       turn.Message,
+			ResponseParts: turn.ResponseParts,
+			Usage:         turn.Usage,
+		}
+		state.Status = withStatusFlag(summaryStatus(state, nil), ahptypes.SessionStatusIsRead, false)
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied

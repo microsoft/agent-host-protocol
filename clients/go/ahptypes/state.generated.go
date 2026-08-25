@@ -218,6 +218,7 @@ const (
 	ResponsePartKindReasoning          ResponsePartKind = "reasoning"
 	ResponsePartKindSystemNotification ResponsePartKind = "systemNotification"
 	ResponsePartKindInputRequest       ResponsePartKind = "inputRequest"
+	ResponsePartKindError              ResponsePartKind = "error"
 )
 
 // Status of a tool call in the lifecycle state machine.
@@ -1414,8 +1415,6 @@ type Turn struct {
 	Usage *UsageInfo `json:"usage,omitempty"`
 	// How the turn ended
 	State TurnState `json:"state"`
-	// Error details if state is `'error'`
-	Error *ErrorInfo `json:"error,omitempty"`
 }
 
 // An in-progress turn — the assistant is actively streaming.
@@ -1986,6 +1985,24 @@ type InputRequestResponsePart struct {
 	// How the request was resolved. Absent until a client submits `accept`,
 	// `decline`, or `cancel` with `chat/inputCompleted`.
 	Response *ChatInputResponseKind `json:"response,omitempty"`
+}
+
+// An error encountered while processing a turn.
+//
+// This is the detailed source of truth for the error. {@link Turn.state}
+// remains {@link TurnState.Error} while the turn is stopped at this error so
+// clients can detect the terminal state without inspecting response parts.
+//
+// When {@link resumable} is `true`, a client may dispatch `chat/turnResume`
+// while this is the latest turn and its state is {@link TurnState.Error}.
+// Clients decide whether and how to present that affordance.
+type ErrorResponsePart struct {
+	// Discriminant
+	Kind ResponsePartKind `json:"kind"`
+	// Error details.
+	Error ErrorInfo `json:"error"`
+	// Whether the host can resume the turn from this error. Only `true` enables resume.
+	Resumable *bool `json:"resumable,omitempty"`
 }
 
 // Tool execution result details, available after execution completes.
@@ -4210,6 +4227,7 @@ func (*ToolCallResponsePart) isResponsePart()           {}
 func (*ReasoningResponsePart) isResponsePart()          {}
 func (*SystemNotificationResponsePart) isResponsePart() {}
 func (*InputRequestResponsePart) isResponsePart()       {}
+func (*ErrorResponsePart) isResponsePart()              {}
 
 // ResponsePartUnknown carries an unrecognized ResponsePart variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type ResponsePartUnknown struct {
@@ -4257,6 +4275,12 @@ func (u *ResponsePart) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "inputRequest":
 		var value InputRequestResponsePart
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "error":
+		var value ErrorResponsePart
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

@@ -772,16 +772,6 @@ struct TurnView: View {
                 ResponsePartView(part: part)
             }
 
-            // Turn status footer
-            if turn.state == .error, let error = turn.error {
-                Label(error.message, systemImage: "exclamationmark.triangle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.red.opacity(0.1), in: Capsule())
-            }
-
             if turn.state == .cancelled {
                 Label("Cancelled", systemImage: "xmark.circle")
                     .font(.footnote)

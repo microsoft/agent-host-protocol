@@ -4639,10 +4639,6 @@
         "state": {
           "$ref": "#/$defs/TurnState",
           "description": "How the turn ended"
-        },
-        "error": {
-          "$ref": "#/$defs/ErrorInfo",
-          "description": "Error details if state is `'error'`"
         }
       },
       "required": [
@@ -5092,6 +5088,28 @@
       "required": [
         "kind",
         "request"
+      ]
+    },
+    "ErrorResponsePart": {
+      "type": "object",
+      "description": "An error encountered while processing a turn.\n\nThis is the detailed source of truth for the error. {@link Turn.state}\nremains {@link TurnState.Error} while the turn is stopped at this error so\nclients can detect the terminal state without inspecting response parts.\n\nWhen {@link resumable} is `true`, a client may dispatch `chat/turnResume`\nwhile this is the latest turn and its state is {@link TurnState.Error}.\nClients decide whether and how to present that affordance.",
+      "properties": {
+        "kind": {
+          "const": "error",
+          "description": "Discriminant"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Error details."
+        },
+        "resumable": {
+          "type": "boolean",
+          "description": "Whether the host can resume the turn from this error. Only `true` enables resume."
+        }
+      },
+      "required": [
+        "kind",
+        "error"
       ]
     },
     "SystemNotificationResponsePart": {
@@ -7966,7 +7984,7 @@
     },
     "ChatResponsePartAction": {
       "type": "object",
-      "description": "Structured content appended to the response.",
+      "description": "Structured content appended to the response.\n\nAn {@link ErrorResponsePart} MUST be appended with {@link ChatErrorAction}\ninstead so adding the part and ending the turn are one atomic transition.",
       "properties": {
         "type": {
           "const": "chat/responsePart"
@@ -7977,7 +7995,7 @@
         },
         "part": {
           "$ref": "#/$defs/ResponsePart",
-          "description": "Response part (markdown or content ref)"
+          "description": "Response part to append; error parts are ignored."
         },
         "_meta": {
           "type": "object",
@@ -8483,9 +8501,9 @@
           "type": "number",
           "description": "Elapsed turn duration in milliseconds, measured by the producer's own\nclock. Clients MUST NOT derive this by subtracting timestamps — cross-\nclient clocks may differ — and MUST treat it as opaque, producer-supplied\ndata."
         },
-        "error": {
-          "$ref": "#/$defs/ErrorInfo",
-          "description": "Error details"
+        "part": {
+          "$ref": "#/$defs/ErrorResponsePart",
+          "description": "Error part to append to the response stream before finalizing the turn.\nIts optional `resumable` flag indicates whether the turn can be resumed."
         },
         "_meta": {
           "type": "object",
@@ -8497,7 +8515,24 @@
         "type",
         "turnId",
         "duration",
-        "error"
+        "part"
+      ]
+    },
+    "ChatTurnResumeAction": {
+      "type": "object",
+      "description": "Resumes the latest errored turn without adding another message.\n\nThe turn MUST be the latest turn, its state MUST be `error`, and its final\nresponse part MUST be a resumable error. The reducer reopens the same turn\nwith its existing message, response parts, and usage intact. The host then\nresumes the provider's execution for that turn.",
+      "properties": {
+        "type": {
+          "const": "chat/turnResume"
+        },
+        "turnId": {
+          "type": "string",
+          "description": "Identifier of the errored turn."
+        }
+      },
+      "required": [
+        "type",
+        "turnId"
       ]
     },
     "ChatActivityChangedAction": {
@@ -9647,6 +9682,9 @@
           "$ref": "#/$defs/ChatErrorAction"
         },
         {
+          "$ref": "#/$defs/ChatTurnResumeAction"
+        },
+        {
           "$ref": "#/$defs/ChatActivityChangedAction"
         },
         {
@@ -10333,6 +10371,9 @@
         },
         {
           "$ref": "#/$defs/InputRequestResponsePart"
+        },
+        {
+          "$ref": "#/$defs/ErrorResponsePart"
         }
       ]
     },

@@ -12,6 +12,7 @@ import type {
   ResponsePart,
   ToolCallResponsePart,
   InputRequestResponsePart,
+  ErrorResponsePart,
   Turn,
   PendingMessage,
   ConfirmationOption,
@@ -122,6 +123,15 @@ function findOpenInputRequestPart(
   return part.kind === ResponsePartKind.InputRequest ? { index, part } : undefined;
 }
 
+function hasResumableError(turn: Turn): boolean {
+  const part = turn.responseParts[turn.responseParts.length - 1];
+  return part?.kind === ResponsePartKind.Error && part.resumable === true;
+}
+
+function isErrorResponsePart(part: ResponsePart): part is ErrorResponsePart {
+  return part.kind === ResponsePartKind.Error;
+}
+
 /** Bitmask covering the mutually-exclusive activity bits (bits 0–4). */
 const STATUS_ACTIVITY_MASK = (1 << 5) - 1;
 
@@ -171,7 +181,7 @@ function endTurn(
   turnState: TurnState,
   duration: number,
   terminalStatus?: SessionStatus.Error,
-  error?: { errorType: string; message: string; stack?: string },
+  errorPart?: ErrorResponsePart,
 ): ChatState {
   if (!state.activeTurn || state.activeTurn.id !== turnId) {
     return state;
@@ -198,6 +208,9 @@ function endTurn(
       },
     };
   });
+  if (errorPart) {
+    responseParts.push(errorPart);
+  }
 
   const turn: Turn = {
     id: active.id,
@@ -209,7 +222,6 @@ function endTurn(
     responseParts,
     usage: active.usage,
     state: turnState,
-    error,
   };
 
   const next: ChatState = {
@@ -386,6 +398,9 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
       if (!state.activeTurn || state.activeTurn.id !== action.turnId) {
         return state;
       }
+      if (isErrorResponsePart(action.part)) {
+        return state;
+      }
       return {
         ...state,
         activeTurn: {
@@ -401,7 +416,35 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
       return endTurn(state, action.turnId, TurnState.Cancelled, action.duration);
 
     case ActionType.ChatError:
-      return endTurn(state, action.turnId, TurnState.Error, action.duration, SessionStatus.Error, action.error);
+      return endTurn(state, action.turnId, TurnState.Error, action.duration, SessionStatus.Error, action.part);
+
+    case ActionType.ChatTurnResume: {
+      if (state.activeTurn) {
+        return state;
+      }
+      const turnIndex = state.turns.length - 1;
+      const turn = state.turns[turnIndex];
+      if (!turn || turn.id !== action.turnId || turn.state !== TurnState.Error || !hasResumableError(turn)) {
+        return state;
+      }
+      const turns = state.turns.slice();
+      turns.splice(turnIndex, 1);
+      const next: ChatState = {
+        ...state,
+        turns,
+        activeTurn: {
+          id: turn.id,
+          startedAt: turn.startedAt ?? state.modifiedAt,
+          message: turn.message,
+          responseParts: turn.responseParts,
+          usage: turn.usage,
+        },
+      };
+      return {
+        ...next,
+        status: withStatusFlag(summaryStatus(next), SessionStatus.IsRead, false),
+      };
+    }
 
     case ActionType.ChatActivityChanged:
       return { ...state, activity: action.activity };
