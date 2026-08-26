@@ -1,0 +1,54 @@
+{
+  "name": "initialize-result-meta",
+  "group": "A",
+  "description": "InitializeResult preserves opaque, implementation-specific extension capabilities in its optional _meta map.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.5.2",
+    "serverSeq": 7,
+    "_meta": {
+      "com.example.chatTargetStateFile": {
+        "supported": true,
+        "formats": [
+          "json",
+          "jsonc"
+        ]
+      },
+      "com.example.experimentalMode": null
+    },
+    "snapshots": [
+      {
+        "resource": "ahp-root://",
+        "state": {
+          "agents": []
+        },
+        "fromSeq": 7
+      }
+    ]
+  },
+  "acceptableOutputs": [
+    {
+      "protocolVersion": "0.5.2",
+      "serverSeq": 7,
+      "_meta": {
+        "com.example.chatTargetStateFile": {
+          "supported": true,
+          "formats": [
+            "json",
+            "jsonc"
+          ]
+        },
+        "com.example.experimentalMode": null
+      },
+      "snapshots": [
+        {
+          "resource": "ahp-root://",
+          "state": {
+            "agents": []
+          },
+          "fromSeq": 7
+        }
+      ]
+    }
+  ]
+}

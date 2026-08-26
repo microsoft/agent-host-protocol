@@ -8,7 +8,7 @@ The client initiates the connection with an `initialize` **request**. The client
 
 ```
 1. Client → Server:  initialize(protocolVersions[], clientId, clientInfo?, initialSubscriptions?, locale?)
-2. Server → Client:  { protocolVersion, serverSeq, serverInfo?, snapshots[], defaultDirectory? }
+2. Server → Client:  { protocolVersion, serverSeq, serverInfo?, _meta?, snapshots[], defaultDirectory? }
 ```
 
 ### Initialize (Client → Server)
@@ -49,6 +49,9 @@ The client initiates the connection with an `initialize` **request**. The client
     "protocolVersion": "0.3.0",
     "serverSeq": 42,
     "serverInfo": { "name": "acme-agent-host", "version": "1.4.2" },
+    "_meta": {
+      "com.example.chatTargetStateFile": true
+    },
     "defaultDirectory": "file:///home/testuser",
     "snapshots": [
       {
@@ -62,6 +65,8 @@ The client initiates the connection with an `initialize` **request**. The client
 ```
 
 `protocolVersion` is the version the server selected from the client's `protocolVersions` list. Both peers MUST use this version for the rest of the connection.
+
+`_meta` is an optional, opaque map for implementation-specific extension capabilities advertised by the host. Hosts and clients MAY agree on namespaced keys; clients MUST ignore keys they do not understand. Capabilities needed for interoperable behavior should be added as typed `InitializeResult` fields instead.
 
 If present, `defaultDirectory` provides a server-local starting location for remote filesystem browsing.
 

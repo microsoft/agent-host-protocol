@@ -346,6 +346,16 @@ data class InitializeResult(
      */
     val serverInfo: Implementation? = null,
     /**
+     * Optional implementation-specific extension metadata advertised by the host.
+     *
+     * Hosts and clients MAY agree on namespaced keys for capabilities that are not
+     * part of the standardized protocol. Clients MUST ignore keys they do not
+     * understand. Capabilities needed for interoperable behavior SHOULD use typed
+     * fields on {@link InitializeResult} instead.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
      * Snapshots for each `initialSubscriptions` URI
      */
     val snapshots: List<Snapshot>,

@@ -255,6 +255,14 @@ pub struct InitializeResult {
     /// software behind it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub server_info: Option<Implementation>,
+    /// Optional implementation-specific extension metadata advertised by the host.
+    ///
+    /// Hosts and clients MAY agree on namespaced keys for capabilities that are not
+    /// part of the standardized protocol. Clients MUST ignore keys they do not
+    /// understand. Capabilities needed for interoperable behavior SHOULD use typed
+    /// fields on {@link InitializeResult} instead.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
     /// Snapshots for each `initialSubscriptions` URI
     pub snapshots: Vec<Snapshot>,
     /// Suggested default directory for remote filesystem browsing

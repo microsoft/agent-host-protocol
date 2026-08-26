@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`InitializeResult._meta` for hosts to advertise implementation-specific extension capabilities in initialize responses."
+}

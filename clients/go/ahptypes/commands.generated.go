@@ -149,6 +149,13 @@ type InitializeResult struct {
 	// identifies the negotiated protocol, `serverInfo` identifies the host
 	// software behind it.
 	ServerInfo *Implementation `json:"serverInfo,omitempty"`
+	// Optional implementation-specific extension metadata advertised by the host.
+	//
+	// Hosts and clients MAY agree on namespaced keys for capabilities that are not
+	// part of the standardized protocol. Clients MUST ignore keys they do not
+	// understand. Capabilities needed for interoperable behavior SHOULD use typed
+	// fields on {@link InitializeResult} instead.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 	// Snapshots for each `initialSubscriptions` URI
 	Snapshots []Snapshot `json:"snapshots"`
 	// Suggested default directory for remote filesystem browsing

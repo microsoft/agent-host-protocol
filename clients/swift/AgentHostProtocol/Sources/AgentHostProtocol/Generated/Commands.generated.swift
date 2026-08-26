@@ -310,6 +310,13 @@ public struct InitializeResult: Codable, Sendable {
     /// identifies the negotiated protocol, `serverInfo` identifies the host
     /// software behind it.
     public var serverInfo: Implementation?
+    /// Optional implementation-specific extension metadata advertised by the host.
+    ///
+    /// Hosts and clients MAY agree on namespaced keys for capabilities that are not
+    /// part of the standardized protocol. Clients MUST ignore keys they do not
+    /// understand. Capabilities needed for interoperable behavior SHOULD use typed
+    /// fields on {@link InitializeResult} instead.
+    public var meta: [String: AnyCodable]?
     /// Snapshots for each `initialSubscriptions` URI
     public var snapshots: [Snapshot]
     /// Suggested default directory for remote filesystem browsing
@@ -335,10 +342,24 @@ public struct InitializeResult: Codable, Sendable {
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
 
+    enum CodingKeys: String, CodingKey {
+        case protocolVersion
+        case serverSeq
+        case serverInfo
+        case meta = "_meta"
+        case snapshots
+        case defaultDirectory
+        case completionTriggerCharacters
+        case terminalCommandPrefix
+        case telemetry
+        case automations
+    }
+
     public init(
         protocolVersion: String,
         serverSeq: Int,
         serverInfo: Implementation? = nil,
+        meta: [String: AnyCodable]? = nil,
         snapshots: [Snapshot],
         defaultDirectory: String? = nil,
         completionTriggerCharacters: [String]? = nil,
@@ -349,6 +370,7 @@ public struct InitializeResult: Codable, Sendable {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
         self.serverInfo = serverInfo
+        self.meta = meta
         self.snapshots = snapshots
         self.defaultDirectory = defaultDirectory
         self.completionTriggerCharacters = completionTriggerCharacters

@@ -147,6 +147,11 @@
           "$ref": "#/$defs/Implementation",
           "description": "Optional identity of the server implementation (name and version).\nInformational only — see {@link Implementation} for how it may and may not\nbe used. Whereas {@link InitializeResult.protocolVersion | `protocolVersion`}\nidentifies the negotiated protocol, `serverInfo` identifies the host\nsoftware behind it."
         },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional implementation-specific extension metadata advertised by the host.\n\nHosts and clients MAY agree on namespaced keys for capabilities that are not\npart of the standardized protocol. Clients MUST ignore keys they do not\nunderstand. Capabilities needed for interoperable behavior SHOULD use typed\nfields on {@link InitializeResult} instead."
+        },
         "snapshots": {
           "type": "array",
           "items": {
