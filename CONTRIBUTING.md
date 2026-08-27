@@ -26,7 +26,7 @@ against them.
 | `clients/swift/` | Swift package (consumed by SwiftPM at the repo root). |
 | `clients/typescript/` | npm package `@microsoft/agent-host-protocol`. |
 | `clients/go/` | Go module (`ahptypes`, `ahp`, `ahpws`). |
-| `clients/dotnet/` | .NET / NuGet packages (`Microsoft.AgentHostProtocol`, `.Abstractions`, `.WebSockets`). |
+| `clients/dotnet/` | .NET / NuGet packages (`Microsoft.AgentHostProtocol`, `.Abstractions`). |
 | `.github/workflows/` | CI and per-artifact publish pipelines. |
 
 ## Local dev loop

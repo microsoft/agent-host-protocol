@@ -187,7 +187,6 @@ trigger started the run.
 4. Merge to `main`.
 5. Tag: `git tag dotnet/v0.X.Y && git push origin dotnet/v0.X.Y`.
 6. Publish the libraries (`Microsoft.AgentHostProtocol`,
-   `Microsoft.AgentHostProtocol.Abstractions`,
    `Microsoft.AgentHostProtocol.Abstractions`) to NuGet.org. This client does
    not ship its own publish automation — the maintainers wire the
    `dotnet pack` + `dotnet nuget push` step into their own release pipeline,

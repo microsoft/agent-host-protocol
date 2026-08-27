@@ -163,6 +163,13 @@ local NuGet packages, and runs it as a native executable with
 initialization, reconnect replay, subscriptions and reducers, custom generic
 requests and notifications, and typed and raw inbound request handling.
 
+## Authorship
+
+Joshua Mouch contributed the initial first-party .NET client and the
+handwritten C# reducers in [PR #206](https://github.com/microsoft/agent-host-protocol/pull/206).
+The generated wire and model sources described above are separate generated
+artifacts.
+
 ## Releasing
 
 1. Bump [`VERSION`](VERSION).
