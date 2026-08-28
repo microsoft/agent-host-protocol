@@ -119,7 +119,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -747,7 +747,7 @@ const STATE_STRUCTS = [
   'AutomationTriggerEventDefinition', 'AutomationTriggerDefinition',
   'AutomationSessionTemplate', 'AutomationDefinition',
   'AutomationDefinitionPatch',
-  'AutomationState', 'AutomationCatalogState',
+  'AutomationEntry', 'AutomationState',
   'AutomationManualRunOrigin', 'AutomationTriggeredRunOrigin',
   'AutomationPendingRunLifecycle', 'AutomationRunningRunLifecycle',
   'AutomationCompletedRunLifecycle',
@@ -1100,7 +1100,7 @@ public enum SnapshotState: Codable, Sendable {
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
     case annotations(AnnotationsState)
-    case automations(AutomationCatalogState)
+    case automations(AutomationState)
     case automationRun(AutomationRunState)
 
     public init(from decoder: Decoder) throws {
@@ -1120,7 +1120,7 @@ public enum SnapshotState: Codable, Sendable {
             self = .resourceWatch(resourceWatch)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
-        } else if let automations = try? AutomationCatalogState(from: decoder) {
+        } else if let automations = try? AutomationState(from: decoder) {
             self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)

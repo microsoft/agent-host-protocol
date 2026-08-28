@@ -1549,9 +1549,9 @@ type ResourceWatchChangedAction struct {
 // Rejections leave the catalogue unchanged.
 type AutomationCreateRequestedAction struct {
 	Type ActionType `json:"type"`
-	// Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.
+	// Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
 	Resource URI `json:"resource"`
-	// Complete initial {@link AutomationState.definition}.
+	// Complete initial {@link AutomationEntry.definition}.
 	Definition AutomationDefinition `json:"definition"`
 }
 
@@ -1570,24 +1570,24 @@ type AutomationCreateRequestedAction struct {
 // server order wins.
 type AutomationUpdateRequestedAction struct {
 	Type ActionType `json:"type"`
-	// Target {@link AutomationState.resource}.
+	// Target {@link AutomationEntry.resource}.
 	Resource URI `json:"resource"`
 	// Editable {@link AutomationDefinition} fields to replace.
 	Changes AutomationDefinitionPatch `json:"changes"`
 }
 
 // Add or replace one full automation state in
-// {@link AutomationCatalogState.automations}.
+// {@link AutomationState.entries}.
 //
-// Existing entries are matched by {@link AutomationState.resource} and
+// Existing entries are matched by {@link AutomationEntry.resource} and
 // replaced in place. A previously unseen resource is appended.
 type AutomationSetAction struct {
 	Type ActionType `json:"type"`
 	// Full new or replacement automation state.
-	Automation AutomationState `json:"automation"`
+	Automation AutomationEntry `json:"automation"`
 }
 
-// Remove one automation from {@link AutomationCatalogState.automations}.
+// Remove one automation from {@link AutomationState.entries}.
 //
 // Clients may dispatch this action only while the target advertises
 // {@link AutomationOperation.Remove}. The host revalidates that operation
@@ -1597,7 +1597,7 @@ type AutomationSetAction struct {
 // Removing an unknown resource is a no-op.
 type AutomationRemovedAction struct {
 	Type ActionType `json:"type"`
-	// {@link AutomationState.resource} to remove.
+	// {@link AutomationEntry.resource} to remove.
 	Resource URI `json:"resource"`
 }
 

@@ -473,7 +473,7 @@ const (
 
 // Operations the host currently permits for an automation.
 //
-// The list on {@link AutomationState.operations} is authoritative and may
+// The list on {@link AutomationEntry.operations} is authoritative and may
 // change over time. Clients MUST NOT infer permission from capabilities alone:
 // capabilities describe what the host implementation can support, while
 // operations describe what is allowed for this particular automation now.
@@ -3749,7 +3749,7 @@ type ResourceChange struct {
 // for this session's transcript, tools, confirmations, and changes.
 type AutomationSessionOrigin struct {
 	Kind SessionOriginKind `json:"kind"`
-	// Owning {@link AutomationState.resource}.
+	// Owning {@link AutomationEntry.resource}.
 	Automation URI `json:"automation"`
 	// Owning {@link AutomationRunState.resource}.
 	Run URI `json:"run"`
@@ -3886,7 +3886,7 @@ type AutomationSessionTemplate struct {
 // A definition combines the initial automation message, the session template
 // used for each run, and zero or more automatic triggers. Run history,
 // timestamps, and currently allowed operations live on
-// {@link AutomationState} rather than in the definition.
+// {@link AutomationEntry} rather than in the definition.
 type AutomationDefinition struct {
 	// Human-readable automation name.
 	Title string `json:"title"`
@@ -3926,13 +3926,12 @@ type AutomationDefinitionPatch struct {
 	Meta *map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
-// Authoritative state of one automation in the
-// {@link AutomationCatalogState.automations} catalogue.
+// Authoritative state of one automation in {@link AutomationState.entries}.
 //
 // The host owns trigger evaluation, run claims, run retention, and operation
 // availability. Clients render this state and submit actions or commands; they
 // never run a fallback scheduler for a host-owned definition.
-type AutomationState struct {
+type AutomationEntry struct {
 	// Stable `ahp-automation:/<id>` resource identifier.
 	Resource URI `json:"resource"`
 	// Current durable definition.
@@ -3941,7 +3940,7 @@ type AutomationState struct {
 	NextRunAt *string `json:"nextRunAt,omitempty"`
 	// Newest-first retained run summaries. This is a bounded window; use
 	// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
-	// {@link AutomationState.runsNextCursor} is present.
+	// {@link AutomationEntry.runsNextCursor} is present.
 	Runs []AutomationRunSummary `json:"runs"`
 	// Opaque cursor passed as {@link FetchAutomationRunsParams.cursor} for the next older run-history page.
 	RunsNextCursor *string `json:"runsNextCursor,omitempty"`
@@ -3962,9 +3961,9 @@ type AutomationState struct {
 // Subsequent {@link AutomationSetAction | `automation/set`} and
 // {@link AutomationRemovedAction | `automation/removed`} actions keep the
 // catalogue synchronized and participate in normal reconnect replay.
-type AutomationCatalogState struct {
-	// Full automation states keyed by {@link AutomationState.resource}.
-	Automations []AutomationState `json:"automations"`
+type AutomationState struct {
+	// Full automation entries keyed by {@link AutomationEntry.resource}.
+	Entries []AutomationEntry `json:"entries"`
 	// Opaque host-defined catalogue metadata.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
@@ -4084,7 +4083,7 @@ type AutomationRunSummary struct {
 type AutomationRunState struct {
 	// URI of this automation-run channel.
 	Resource URI `json:"resource"`
-	// Owning `ahp-automation:` URI matching {@link AutomationState.resource}.
+	// Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.
 	Automation URI `json:"automation"`
 	// Immutable provenance describing how this run was created.
 	Origin AutomationRunOrigin `json:"origin"`
@@ -5872,15 +5871,15 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 // (automationRun → automations → session → chat → terminal → changeset →
 // resourceWatch → annotations → root).
 type SnapshotState struct {
-	Root          *RootState              `json:"-"`
-	Session       *SessionState           `json:"-"`
-	Chat          *ChatState              `json:"-"`
-	Terminal      *TerminalState          `json:"-"`
-	Changeset     *ChangesetState         `json:"-"`
-	ResourceWatch *ResourceWatchState     `json:"-"`
-	Annotations   *AnnotationsState       `json:"-"`
-	Automations   *AutomationCatalogState `json:"-"`
-	AutomationRun *AutomationRunState     `json:"-"`
+	Root          *RootState          `json:"-"`
+	Session       *SessionState       `json:"-"`
+	Chat          *ChatState          `json:"-"`
+	Terminal      *TerminalState      `json:"-"`
+	Changeset     *ChangesetState     `json:"-"`
+	ResourceWatch *ResourceWatchState `json:"-"`
+	Annotations   *AnnotationsState   `json:"-"`
+	Automations   *AutomationState    `json:"-"`
+	AutomationRun *AutomationRunState `json:"-"`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
@@ -5924,8 +5923,8 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		s.AutomationRun = &v
-	case containsAll(probe, "automations"):
-		var v AutomationCatalogState
+	case containsAll(probe, "entries"):
+		var v AutomationState
 		if err := json.Unmarshal(data, &v); err != nil {
 			return err
 		}

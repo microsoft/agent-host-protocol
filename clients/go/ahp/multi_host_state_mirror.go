@@ -31,8 +31,8 @@ type MultiHostStateMirror struct {
 	chat          map[HostedResourceKey]ahptypes.ChatState
 	term          map[HostedResourceKey]ahptypes.TerminalState
 	changes       map[HostedResourceKey]ahptypes.ChangesetState
-	automationCat map[string]ahptypes.AutomationCatalogState
-	automation    map[HostedResourceKey]ahptypes.AutomationState
+	automationCat map[string]ahptypes.AutomationState
+	automation    map[HostedResourceKey]ahptypes.AutomationEntry
 	automationRun map[HostedResourceKey]ahptypes.AutomationRunState
 }
 
@@ -44,8 +44,8 @@ func NewMultiHostStateMirror() *MultiHostStateMirror {
 		chat:          make(map[HostedResourceKey]ahptypes.ChatState),
 		term:          make(map[HostedResourceKey]ahptypes.TerminalState),
 		changes:       make(map[HostedResourceKey]ahptypes.ChangesetState),
-		automationCat: make(map[string]ahptypes.AutomationCatalogState),
-		automation:    make(map[HostedResourceKey]ahptypes.AutomationState),
+		automationCat: make(map[string]ahptypes.AutomationState),
+		automation:    make(map[HostedResourceKey]ahptypes.AutomationEntry),
 		automationRun: make(map[HostedResourceKey]ahptypes.AutomationRunState),
 	}
 }
@@ -132,7 +132,7 @@ func (m *MultiHostStateMirror) Changeset(hostID string, uri ahptypes.URI) (ahpty
 
 // PutAutomationCatalog stores a host's automation catalogue snapshot and
 // refreshes the per-automation lookup.
-func (m *MultiHostStateMirror) PutAutomationCatalog(hostID string, catalog ahptypes.AutomationCatalogState) {
+func (m *MultiHostStateMirror) PutAutomationCatalog(hostID string, catalog ahptypes.AutomationState) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.automationCat[hostID] = catalog
@@ -141,13 +141,13 @@ func (m *MultiHostStateMirror) PutAutomationCatalog(hostID string, catalog ahpty
 			delete(m.automation, key)
 		}
 	}
-	for _, automation := range catalog.Automations {
+	for _, automation := range catalog.Entries {
 		m.automation[HostedResourceKey{hostID, automation.Resource}] = automation
 	}
 }
 
 // AutomationCatalog returns the automation catalogue for hostID.
-func (m *MultiHostStateMirror) AutomationCatalog(hostID string) (ahptypes.AutomationCatalogState, bool) {
+func (m *MultiHostStateMirror) AutomationCatalog(hostID string) (ahptypes.AutomationState, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	v, ok := m.automationCat[hostID]
@@ -155,7 +155,7 @@ func (m *MultiHostStateMirror) AutomationCatalog(hostID string) (ahptypes.Automa
 }
 
 // Automation returns the automation snapshot at (hostID, uri).
-func (m *MultiHostStateMirror) Automation(hostID string, uri ahptypes.URI) (ahptypes.AutomationState, bool) {
+func (m *MultiHostStateMirror) Automation(hostID string, uri ahptypes.URI) (ahptypes.AutomationEntry, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	v, ok := m.automation[HostedResourceKey{hostID, uri}]

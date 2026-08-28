@@ -1000,7 +1000,7 @@ public enum SessionOriginKind: Codable, Sendable, Equatable {
 
 /// Operations the host currently permits for an automation.
 ///
-/// The list on {@link AutomationState.operations} is authoritative and may
+/// The list on {@link AutomationEntry.operations} is authoritative and may
 /// change over time. Clients MUST NOT infer permission from capabilities alone:
 /// capabilities describe what the host implementation can support, while
 /// operations describe what is allowed for this particular automation now.
@@ -6051,7 +6051,7 @@ public struct ResourceChange: Codable, Sendable {
 
 public struct AutomationSessionOrigin: Codable, Sendable {
     public var kind: SessionOriginKind
-    /// Owning {@link AutomationState.resource}.
+    /// Owning {@link AutomationEntry.resource}.
     public var automation: String
     /// Owning {@link AutomationRunState.resource}.
     public var run: String
@@ -6312,7 +6312,7 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
     }
 }
 
-public struct AutomationState: Codable, Sendable {
+public struct AutomationEntry: Codable, Sendable {
     /// Stable `ahp-automation:/<id>` resource identifier.
     public var resource: String
     /// Current durable definition.
@@ -6321,7 +6321,7 @@ public struct AutomationState: Codable, Sendable {
     public var nextRunAt: String?
     /// Newest-first retained run summaries. This is a bounded window; use
     /// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
-    /// {@link AutomationState.runsNextCursor} is present.
+    /// {@link AutomationEntry.runsNextCursor} is present.
     public var runs: [AutomationRunSummary]
     /// Opaque cursor passed as {@link FetchAutomationRunsParams.cursor} for the next older run-history page.
     public var runsNextCursor: String?
@@ -6369,22 +6369,22 @@ public struct AutomationState: Codable, Sendable {
     }
 }
 
-public struct AutomationCatalogState: Codable, Sendable {
-    /// Full automation states keyed by {@link AutomationState.resource}.
-    public var automations: [AutomationState]
+public struct AutomationState: Codable, Sendable {
+    /// Full automation entries keyed by {@link AutomationEntry.resource}.
+    public var entries: [AutomationEntry]
     /// Opaque host-defined catalogue metadata.
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
-        case automations
+        case entries
         case meta = "_meta"
     }
 
     public init(
-        automations: [AutomationState],
+        entries: [AutomationEntry],
         meta: [String: AnyCodable]? = nil
     ) {
-        self.automations = automations
+        self.entries = entries
         self.meta = meta
     }
 }
@@ -6583,7 +6583,7 @@ public struct AutomationRunSummary: Codable, Sendable {
 public struct AutomationRunState: Codable, Sendable {
     /// URI of this automation-run channel.
     public var resource: String
-    /// Owning `ahp-automation:` URI matching {@link AutomationState.resource}.
+    /// Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.
     public var automation: String
     /// Immutable provenance describing how this run was created.
     public var origin: AutomationRunOrigin
@@ -7726,7 +7726,7 @@ public enum SnapshotState: Codable, Sendable {
     case changeset(ChangesetState)
     case resourceWatch(ResourceWatchState)
     case annotations(AnnotationsState)
-    case automations(AutomationCatalogState)
+    case automations(AutomationState)
     case automationRun(AutomationRunState)
 
     public init(from decoder: Decoder) throws {
@@ -7746,7 +7746,7 @@ public enum SnapshotState: Codable, Sendable {
             self = .resourceWatch(resourceWatch)
         } else if let annotations = try? AnnotationsState(from: decoder) {
             self = .annotations(annotations)
-        } else if let automations = try? AutomationCatalogState(from: decoder) {
+        } else if let automations = try? AutomationState(from: decoder) {
             self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)

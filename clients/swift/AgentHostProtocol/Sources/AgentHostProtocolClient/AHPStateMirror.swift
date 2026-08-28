@@ -18,8 +18,8 @@ public actor AHPStateMirror {
     public private(set) var changesets: [String: ChangesetState] = [:]
     public private(set) var annotations: [String: AnnotationsState] = [:]
     public private(set) var resourceWatches: [String: ResourceWatchState] = [:]
-    public private(set) var automationCatalog = AutomationCatalogState(automations: [])
-    public private(set) var automations: [String: AutomationState] = [:]
+    public private(set) var automationCatalog = AutomationState(entries: [])
+    public private(set) var automations: [String: AutomationEntry] = [:]
     public private(set) var automationRuns: [String: AutomationRunState] = [:]
 
     public init() {}
@@ -106,8 +106,8 @@ public actor AHPStateMirror {
     }
 
     private func rebuildAutomationIndex() {
-        var indexed: [String: AutomationState] = [:]
-        for automation in automationCatalog.automations {
+        var indexed: [String: AutomationEntry] = [:]
+        for automation in automationCatalog.entries {
             indexed[automation.resource] = automation
         }
         automations = indexed
@@ -122,7 +122,7 @@ public actor AHPStateMirror {
         changesets.removeAll()
         annotations.removeAll()
         resourceWatches.removeAll()
-        automationCatalog = AutomationCatalogState(automations: [])
+        automationCatalog = AutomationState(entries: [])
         automations.removeAll()
         automationRuns.removeAll()
     }

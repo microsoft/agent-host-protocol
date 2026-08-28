@@ -1854,23 +1854,23 @@ func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahpty
 }
 
 // ApplyActionToAutomation applies an action to automation catalogue state.
-func ApplyActionToAutomation(state *ahptypes.AutomationCatalogState, action ahptypes.StateAction) ReduceOutcome {
+func ApplyActionToAutomation(state *ahptypes.AutomationState, action ahptypes.StateAction) ReduceOutcome {
 	switch a := action.Value.(type) {
 	case *ahptypes.AutomationCreateRequestedAction, *ahptypes.AutomationUpdateRequestedAction:
 		return ReduceOutcomeNoOp
 	case *ahptypes.AutomationSetAction:
-		for i := range state.Automations {
-			if state.Automations[i].Resource == a.Automation.Resource {
-				state.Automations[i] = a.Automation
+		for i := range state.Entries {
+			if state.Entries[i].Resource == a.Automation.Resource {
+				state.Entries[i] = a.Automation
 				return ReduceOutcomeApplied
 			}
 		}
-		state.Automations = append(state.Automations, a.Automation)
+		state.Entries = append(state.Entries, a.Automation)
 		return ReduceOutcomeApplied
 	case *ahptypes.AutomationRemovedAction:
-		for i := range state.Automations {
-			if state.Automations[i].Resource == a.Resource {
-				state.Automations = append(state.Automations[:i], state.Automations[i+1:]...)
+		for i := range state.Entries {
+			if state.Entries[i].Resource == a.Resource {
+				state.Entries = append(state.Entries[:i], state.Entries[i+1:]...)
 				return ReduceOutcomeApplied
 			}
 		}

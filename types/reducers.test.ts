@@ -31,7 +31,7 @@ import {
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationCatalogState, AutomationRunState } from './state.js';
+import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
 import {
   SessionStatus,
   TurnState,
@@ -73,7 +73,7 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationCatalogState | AutomationRunState;
+type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
 
 interface Fixture {
   description: string;
@@ -128,7 +128,7 @@ describe('reducer fixtures', () => {
         } else if (fixture.reducer === 'resourceWatch') {
           state = resourceWatchReducer(state as ResourceWatchState, action as any);
         } else if (fixture.reducer === 'automation') {
-          state = automationReducer(state as AutomationCatalogState, action as any);
+          state = automationReducer(state as AutomationState, action as any);
         } else if (fixture.reducer === 'automationRun') {
           state = automationRunReducer(state as AutomationRunState, action as any);
         } else {

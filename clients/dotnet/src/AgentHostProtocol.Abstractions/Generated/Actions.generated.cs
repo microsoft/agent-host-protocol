@@ -2367,10 +2367,10 @@ public sealed record AutomationCreateRequestedAction
 {
     public ActionType Type { get; init; }
 
-    /// <summary>Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.</summary>
+    /// <summary>Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.</summary>
     public required string Resource { get; init; }
 
-    /// <summary>Complete initial {@link AutomationState.definition}.</summary>
+    /// <summary>Complete initial {@link AutomationEntry.definition}.</summary>
     public required AutomationDefinition Definition { get; init; }
 }
 
@@ -2391,7 +2391,7 @@ public sealed record AutomationUpdateRequestedAction
 {
     public ActionType Type { get; init; }
 
-    /// <summary>Target {@link AutomationState.resource}.</summary>
+    /// <summary>Target {@link AutomationEntry.resource}.</summary>
     public required string Resource { get; init; }
 
     /// <summary>Editable {@link AutomationDefinition} fields to replace.</summary>
@@ -2399,19 +2399,19 @@ public sealed record AutomationUpdateRequestedAction
 }
 
 /// <summary>Add or replace one full automation state in
-/// {@link AutomationCatalogState.automations}.
+/// {@link AutomationState.entries}.
 ///
-/// Existing entries are matched by {@link AutomationState.resource} and
+/// Existing entries are matched by {@link AutomationEntry.resource} and
 /// replaced in place. A previously unseen resource is appended.</summary>
 public sealed record AutomationSetAction
 {
     public ActionType Type { get; init; }
 
     /// <summary>Full new or replacement automation state.</summary>
-    public required AutomationState Automation { get; init; }
+    public required AutomationEntry Automation { get; init; }
 }
 
-/// <summary>Remove one automation from {@link AutomationCatalogState.automations}.
+/// <summary>Remove one automation from {@link AutomationState.entries}.
 ///
 /// Clients may dispatch this action only while the target advertises
 /// {@link AutomationOperation.Remove}. The host revalidates that operation
@@ -2423,7 +2423,7 @@ public sealed record AutomationRemovedAction
 {
     public ActionType Type { get; init; }
 
-    /// <summary>{@link AutomationState.resource} to remove.</summary>
+    /// <summary>{@link AutomationEntry.resource} to remove.</summary>
     public required string Resource { get; init; }
 }
 

@@ -2350,7 +2350,7 @@ public static class Reducers
 
     /// <summary>Applies an action to the automation catalogue in place.</summary>
     public static ReduceOutcome ApplyToAutomation(
-        AutomationCatalogState state,
+        AutomationState state,
         StateAction action)
     {
         Guard.ThrowIfNull(state, nameof(state));
@@ -2363,29 +2363,29 @@ public static class Reducers
                 return ReduceOutcome.NoOp;
             case AutomationSetAction set:
                 {
-                    int index = state.Automations.FindIndex(
+                    int index = state.Entries.FindIndex(
                         automation => automation.Resource == set.Automation.Resource);
                     if (index < 0)
                     {
-                        state.Automations.Add(set.Automation);
+                        state.Entries.Add(set.Automation);
                     }
                     else
                     {
-                        state.Automations[index] = set.Automation;
+                        state.Entries[index] = set.Automation;
                     }
 
                     return ReduceOutcome.Applied;
                 }
             case AutomationRemovedAction removed:
                 {
-                    int index = state.Automations.FindIndex(
+                    int index = state.Entries.FindIndex(
                         automation => automation.Resource == removed.Resource);
                     if (index < 0)
                     {
                         return ReduceOutcome.NoOp;
                     }
 
-                    state.Automations.RemoveAt(index);
+                    state.Entries.RemoveAt(index);
                     return ReduceOutcome.Applied;
                 }
             default:

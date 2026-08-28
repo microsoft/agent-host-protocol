@@ -23,9 +23,35 @@ changes accumulate. Track in-flight protocol changes via PRs touching
 `NOTIFICATION_INTRODUCED_IN` maps in
 [`types/version/registry.ts`](types/version/registry.ts).
 
-## [1.0.0] — Unreleased
+## [0.9.0] — 2026-08-28
 
-Spec version: `1.0.0`
+Spec version: `0.9.0`
+
+### Added
+
+- Automation catalogue and automation-run channels, including self-contained host-defined event triggers and automation-origin messages, for shared trigger-based agent session workflows.
+- Turn errors are durable response parts, and resumable errors can reopen the same turn through `chat/turnResume`.
+- `InitializeResult._meta` for hosts to advertise implementation-specific extension capabilities in initialize responses.
+
+### Changed
+
+- Annotations now carry an `origin` with a required session URI and optional chat URI and turn ID.
+- Renamed the failed session lifecycle value from `creationFailed` to `failed`.
+- `TerminalSessionClaim` now requires the chat URI that owns the terminal.
+- Terminal state now uses an explicit `running`/`exited` lifecycle that preserves exits without an exit code.
+- Generated clients now preserve unknown values for nonexhaustive protocol enums and their discriminated unions.
+- `SessionToolClientExecutionRequest.toolCall` is narrowed to a running tool-call state.
+- Automation catalogue snapshots now use `AutomationState.entries`, whose items are named `AutomationEntry`.
+
+### Removed
+
+- Removed `error` from `changeset/contentChanged`; changeset failures are represented by `changeset/statusChanged`.
+- Removed session-level forking from `createSession`; use chat forking instead.
+- `ContentNotFound` is no longer an exported AHP error code; `-32006` remains reserved and unassigned.
+
+### Fixed
+
+- Chat reducers now derive `modifiedAt` from turn action data instead of local wall clocks.
 
 ## [0.8.0] — 2026-08-17
 

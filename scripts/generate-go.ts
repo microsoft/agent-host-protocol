@@ -173,7 +173,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationCatalogState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -872,8 +872,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationSessionTemplate' },
   { name: 'AutomationDefinition' },
   { name: 'AutomationDefinitionPatch' },
+  { name: 'AutomationEntry' },
   { name: 'AutomationState' },
-  { name: 'AutomationCatalogState' },
   { name: 'AutomationManualRunOrigin' },
   { name: 'AutomationTriggeredRunOrigin' },
   { name: 'AutomationPendingRunLifecycle' },
@@ -1279,7 +1279,7 @@ type SnapshotState struct {
 \tChangeset     *ChangesetState     \`json:"-"\`
 \tResourceWatch *ResourceWatchState \`json:"-"\`
 \tAnnotations   *AnnotationsState   \`json:"-"\`
-\tAutomations   *AutomationCatalogState \`json:"-"\`
+\tAutomations   *AutomationState       \`json:"-"\`
 \tAutomationRun *AutomationRunState \`json:"-"\`
 }
 
@@ -1324,8 +1324,8 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\t\treturn err
 \t\t}
 \t\ts.AutomationRun = &v
-\tcase containsAll(probe, "automations"):
-\t\tvar v AutomationCatalogState
+\tcase containsAll(probe, "entries"):
+\t\tvar v AutomationState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
 \t\t\treturn err
 \t\t}

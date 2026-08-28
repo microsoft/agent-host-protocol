@@ -1,7 +1,0 @@
-{
-  "type": "changed",
-  "message": "`TerminalSessionClaim` now requires the chat URI that owns the terminal.",
-  "targets": [
-    "spec"
-  ]
-}

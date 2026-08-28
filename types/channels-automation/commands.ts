@@ -12,8 +12,8 @@ import type { AgentInfo } from '../channels-root/state.js';
 import type { AutomationSetAction } from './actions.js';
 import type {
   AutomationDefinition,
+  AutomationEntry,
   AutomationSessionTemplate,
-  AutomationState,
   AutomationTriggerDefinition,
 } from './state.js';
 
@@ -68,7 +68,7 @@ export interface ListAutomationTriggerDefinitionsResult {
 export interface RunAutomationParams extends BaseParams {
   /** Manual runs are scoped to the catalogue channel. */
   channel: 'ahp-automations://';
-  /** Target {@link AutomationState.resource}. */
+  /** Target {@link AutomationEntry.resource}. */
   automation: URI;
   /**
    * Durable client-generated idempotency key. Retrying with the same key and
@@ -105,10 +105,10 @@ export interface RunAutomationResult {
 export interface FetchAutomationRunsParams extends BaseParams {
   /** Run-history loading is scoped to the catalogue channel. */
   channel: 'ahp-automations://';
-  /** Target {@link AutomationState.resource}. */
+  /** Target {@link AutomationEntry.resource}. */
   automation: URI;
   /**
-   * Cursor previously received as {@link AutomationState.runsNextCursor}.
+   * Cursor previously received as {@link AutomationEntry.runsNextCursor}.
    * Omit to request the first page not already included by the snapshot.
    */
   cursor?: string;

@@ -1007,7 +1007,7 @@ internal object SessionOriginKindSerializer : KSerializer<SessionOriginKind> {
 /**
  * Operations the host currently permits for an automation.
  *
- * The list on {@link AutomationState.operations} is authoritative and may
+ * The list on {@link AutomationEntry.operations} is authoritative and may
  * change over time. Clients MUST NOT infer permission from capabilities alone:
  * capabilities describe what the host implementation can support, while
  * operations describe what is allowed for this particular automation now.
@@ -5159,7 +5159,7 @@ data class ResourceChange(
 data class AutomationSessionOrigin(
     val kind: SessionOriginKind,
     /**
-     * Owning {@link AutomationState.resource}.
+     * Owning {@link AutomationEntry.resource}.
      */
     val automation: String,
     /**
@@ -5370,7 +5370,7 @@ data class AutomationDefinitionPatch(
 )
 
 @Serializable
-data class AutomationState(
+data class AutomationEntry(
     /**
      * Stable `ahp-automation:/<id>` resource identifier.
      */
@@ -5386,7 +5386,7 @@ data class AutomationState(
     /**
      * Newest-first retained run summaries. This is a bounded window; use
      * {@link FetchAutomationRunsParams | fetchAutomationRuns} when
-     * {@link AutomationState.runsNextCursor} is present.
+     * {@link AutomationEntry.runsNextCursor} is present.
      */
     val runs: List<AutomationRunSummary>,
     /**
@@ -5413,11 +5413,11 @@ data class AutomationState(
 )
 
 @Serializable
-data class AutomationCatalogState(
+data class AutomationState(
     /**
-     * Full automation states keyed by {@link AutomationState.resource}.
+     * Full automation entries keyed by {@link AutomationEntry.resource}.
      */
-    val automations: List<AutomationState>,
+    val entries: List<AutomationEntry>,
     /**
      * Opaque host-defined catalogue metadata.
      */
@@ -5576,7 +5576,7 @@ data class AutomationRunState(
      */
     val resource: String,
     /**
-     * Owning `ahp-automation:` URI matching {@link AutomationState.resource}.
+     * Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.
      */
     val automation: String,
     /**
@@ -6964,7 +6964,7 @@ sealed interface SnapshotState {
     @JvmInline value class Changeset(val value: ChangesetState) : SnapshotState
     @JvmInline value class ResourceWatch(val value: ResourceWatchState) : SnapshotState
     @JvmInline value class Annotations(val value: AnnotationsState) : SnapshotState
-    @JvmInline value class Automations(val value: AutomationCatalogState) : SnapshotState
+    @JvmInline value class Automations(val value: AutomationState) : SnapshotState
     @JvmInline value class AutomationRun(val value: AutomationRunState) : SnapshotState
 }
 
@@ -6979,8 +6979,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         val obj = element as? JsonObject
             ?: error("Expected JsonObject for SnapshotState")
         // Try the most distinctive shape first. AutomationRunState has required
-        // `automation`, `origin`, and `sessions`; AutomationCatalogState has
-        // required `automations`; SessionState has required
+        // `automation`, `origin`, and `sessions`; AutomationState has
+        // required `entries`; SessionState has required
         // `lifecycle`; ChatState has required `turns`; ChangesetState has
         // required `status` + `files`; ResourceWatchState has required
         // `root` + `recursive`; AnnotationsState has required `annotations`
@@ -6990,8 +6990,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         return when {
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
-            obj.containsKey("automations") ->
-                SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationCatalogState.serializer(), element))
+            obj.containsKey("entries") ->
+                SnapshotState.Automations(input.json.decodeFromJsonElement(AutomationState.serializer(), element))
             obj.containsKey("lifecycle") -> SnapshotState.Session(input.json.decodeFromJsonElement(SessionState.serializer(), element))
             obj.containsKey("turns") -> SnapshotState.Chat(input.json.decodeFromJsonElement(ChatState.serializer(), element))
             obj.containsKey("status") && obj.containsKey("files") ->
@@ -7017,7 +7017,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             is SnapshotState.Changeset -> output.json.encodeToJsonElement(ChangesetState.serializer(), value.value)
             is SnapshotState.ResourceWatch -> output.json.encodeToJsonElement(ResourceWatchState.serializer(), value.value)
             is SnapshotState.Annotations -> output.json.encodeToJsonElement(AnnotationsState.serializer(), value.value)
-            is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationCatalogState.serializer(), value.value)
+            is SnapshotState.Automations -> output.json.encodeToJsonElement(AutomationState.serializer(), value.value)
             is SnapshotState.AutomationRun -> output.json.encodeToJsonElement(AutomationRunState.serializer(), value.value)
         }
         output.encodeJsonElement(element)

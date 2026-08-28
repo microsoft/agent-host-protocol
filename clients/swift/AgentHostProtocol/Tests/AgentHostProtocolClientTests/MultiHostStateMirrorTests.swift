@@ -133,8 +133,8 @@ final class MultiHostStateMirrorTests: XCTestCase {
             host: "alpha",
             snapshot: Snapshot(
                 resource: "ahp-automations://",
-                state: .automations(AutomationCatalogState(automations: [
-                    AutomationState(
+                state: .automations(AutomationState(entries: [
+                    AutomationEntry(
                         resource: automationResource,
                         definition: initialDefinition,
                         nextRunAt: "2026-08-06T12:00:00Z",
@@ -168,7 +168,7 @@ final class MultiHostStateMirrorTests: XCTestCase {
                 channel: "ahp-automations://",
                 action: .automationSet(AutomationSetAction(
                     type: .automationSet,
-                    automation: AutomationState(
+                    automation: AutomationEntry(
                         resource: automationResource,
                         definition: makeAutomationDefinition(title: "New"),
                         runs: [],

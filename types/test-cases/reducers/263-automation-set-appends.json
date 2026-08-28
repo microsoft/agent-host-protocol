@@ -2,7 +2,7 @@
   "description": "automation set appends a new catalogue entry",
   "reducer": "automation",
   "initial": {
-    "automations": []
+    "entries": []
   },
   "actions": [{
     "type": "automation/set",
@@ -22,7 +22,7 @@
     }
   }],
   "expected": {
-    "automations": [{
+    "entries": [{
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "A",

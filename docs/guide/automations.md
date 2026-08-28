@@ -55,7 +55,7 @@ room for future feature-specific options without changing capability detection.
 ```mermaid
 flowchart TD
   R["ahp-root:// capabilities"] --> C["ahp-automations:// catalogue"]
-  C --> A["AutomationState identified by ahp-automation:/&lt;id&gt;"]
+  C --> A["AutomationEntry identified by ahp-automation:/&lt;id&gt;"]
   A --> RS["newest-first run summaries"]
   RS --> AR["ahp-automation-run:/&lt;id&gt;"]
   AR --> S1["ahp-session:/&lt;id&gt;"]
@@ -78,8 +78,8 @@ When `InitializeResult.automations` is present, clients subscribe to
 `ahp-automations://`. The snapshot contains the complete catalogue:
 
 ```typescript
-AutomationCatalogState {
-  automations: AutomationState[]
+AutomationState {
+  entries: AutomationEntry[]
 }
 ```
 
@@ -89,7 +89,7 @@ The host keeps the catalogue synchronized with full-entry actions:
 | --- | --- |
 | `automation/createRequested` | Ask the host to persist a complete definition at a client-chosen resource. |
 | `automation/updateRequested` | Ask the host to apply a definition patch in action order. |
-| `automation/set` | Add or replace one complete `AutomationState`, keyed by `resource`. |
+| `automation/set` | Add or replace one complete `AutomationEntry`, keyed by `resource`. |
 | `automation/removed` | Permanently delete the entry identified by `resource`; clients may dispatch this while `remove` is advertised. |
 
 These are ordinary ordered AHP actions. After reconnect, the host either replays
@@ -437,7 +437,7 @@ become `cancelled`, or it may complete or fail before cancellation takes effect.
 
 ## Run history and retention
 
-`AutomationState.runs` is a newest-first, bounded window of
+`AutomationEntry.runs` is a newest-first, bounded window of
 `AutomationRunSummary` values. If `runsNextCursor` is present, the client calls
 `fetchAutomationRuns`; the host then publishes the updated full state through
 `automation/set` so every catalogue subscriber applies the same reducer update.

@@ -1,7 +1,0 @@
-{
-  "type": "fixed",
-  "message": "Chat reducers now derive `modifiedAt` from turn action data instead of local wall clocks.",
-  "targets": [
-    "spec"
-  ]
-}

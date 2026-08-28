@@ -60,15 +60,15 @@ test('SUPPORTED_PROTOCOL_VERSIONS has no duplicates', () => {
   assert.equal(set.size, SUPPORTED_PROTOCOL_VERSIONS.length);
 });
 
-test('chat/turnResume is available starting in protocol 1.0.0', () => {
+test('chat/turnResume is available starting in protocol 0.9.0', () => {
   const action = {
     type: ActionType.ChatTurnResume,
     turnId: 'turn-1',
   } as const;
 
-  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatTurnResume], '1.0.0');
+  assert.equal(ACTION_INTRODUCED_IN[ActionType.ChatTurnResume], '0.9.0');
   assert.equal(isActionKnownToVersion(action, '0.8.0'), false);
-  assert.equal(isActionKnownToVersion(action, '1.0.0'), true);
+  assert.equal(isActionKnownToVersion(action, '0.9.0'), true);
 });
 
 test('public package entry re-exports both protocol-version constants', async () => {

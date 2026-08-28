@@ -2216,9 +2216,9 @@ public struct ResourceWatchChangedAction: Codable, Sendable {
 
 public struct AutomationCreateRequestedAction: Codable, Sendable {
     public var type: ActionType
-    /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.
+    /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
     public var resource: String
-    /// Complete initial {@link AutomationState.definition}.
+    /// Complete initial {@link AutomationEntry.definition}.
     public var definition: AutomationDefinition
 
     public init(
@@ -2234,7 +2234,7 @@ public struct AutomationCreateRequestedAction: Codable, Sendable {
 
 public struct AutomationUpdateRequestedAction: Codable, Sendable {
     public var type: ActionType
-    /// Target {@link AutomationState.resource}.
+    /// Target {@link AutomationEntry.resource}.
     public var resource: String
     /// Editable {@link AutomationDefinition} fields to replace.
     public var changes: AutomationDefinitionPatch
@@ -2253,11 +2253,11 @@ public struct AutomationUpdateRequestedAction: Codable, Sendable {
 public struct AutomationSetAction: Codable, Sendable {
     public var type: ActionType
     /// Full new or replacement automation state.
-    public var automation: AutomationState
+    public var automation: AutomationEntry
 
     public init(
         type: ActionType,
-        automation: AutomationState
+        automation: AutomationEntry
     ) {
         self.type = type
         self.automation = automation
@@ -2266,7 +2266,7 @@ public struct AutomationSetAction: Codable, Sendable {
 
 public struct AutomationRemovedAction: Codable, Sendable {
     public var type: ActionType
-    /// {@link AutomationState.resource} to remove.
+    /// {@link AutomationEntry.resource} to remove.
     public var resource: String
 
     public init(

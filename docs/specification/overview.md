@@ -94,7 +94,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Terminal Channel Reference](/reference/terminal)** — `TerminalState`, terminal actions, and terminal commands.
 - **[Changeset Channel Reference](/reference/changeset)** — `ChangesetState`, changeset actions, and changeset commands.
 - **[Annotations Channel Reference](/reference/annotations)** — `AnnotationsState` and annotations actions.
-- **[Automation Catalogue Channel Reference](/reference/automation)** — `AutomationCatalogState`, automation actions, and automation commands.
+- **[Automation Catalogue Channel Reference](/reference/automation)** — `AutomationState`, automation actions, and automation commands.
 - **[Automation Run Channel Reference](/reference/automation-run)** — `AutomationRunState` and automation-run actions.
 - **[Resource Watch Channel Reference](/reference/resource-watch)** — `ResourceWatchState`, resource-watch actions, and resource-watch commands.
 - **[Telemetry Channel Reference](/reference/otlp)** — OTLP capability types and notifications.

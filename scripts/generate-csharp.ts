@@ -792,8 +792,8 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationSessionTemplate' },
   { name: 'AutomationDefinition' },
   { name: 'AutomationDefinitionPatch' },
+  { name: 'AutomationEntry', mutable: true },
   { name: 'AutomationState', mutable: true },
-  { name: 'AutomationCatalogState', mutable: true },
   { name: 'AutomationManualRunOrigin' },
   { name: 'AutomationTriggeredRunOrigin' },
   { name: 'AutomationPendingRunLifecycle' },
@@ -1278,7 +1278,7 @@ public sealed class SnapshotState
     public AnnotationsState? Annotations { get; set; }
 
     /// <summary>Automation catalogue state variant, when populated.</summary>
-    public AutomationCatalogState? Automations { get; set; }
+    public AutomationState? Automations { get; set; }
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
@@ -1298,9 +1298,9 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.AutomationRun = root.Deserialize(AhpJsonTypeInfo.Get<AutomationRunState>(options));
         }
-        else if (root.TryGetProperty("automations", out _))
+        else if (root.TryGetProperty("entries", out _))
         {
-            result.Automations = root.Deserialize(AhpJsonTypeInfo.Get<AutomationCatalogState>(options));
+            result.Automations = root.Deserialize(AhpJsonTypeInfo.Get<AutomationState>(options));
         }
         else if (root.TryGetProperty("turns", out _))
         {
@@ -1339,7 +1339,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
-        if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationCatalogState>(options)); return; }
+        if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }

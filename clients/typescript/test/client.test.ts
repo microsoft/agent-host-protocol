@@ -40,7 +40,7 @@ import type {
   UnsubscribeParams,
 } from '../src/types/common/commands.js';
 import { JsonRpcErrorCodes } from '../src/types/common/errors.js';
-import { AutomationOperation, type AutomationState } from '../src/types/channels-automation/state.js';
+import { AutomationOperation, type AutomationEntry } from '../src/types/channels-automation/state.js';
 import { MessageKind } from '../src/types/channels-chat/state.js';
 
 const ROOT = 'ahp-root://' as const;
@@ -158,7 +158,7 @@ test('subscribe attaches before sending the request and fans out an action', asy
 
 test('state mirror applies automation catalogue snapshots and actions', () => {
   const mirror = new AhpStateMirror();
-  const automation: AutomationState = {
+  const automation: AutomationEntry = {
     resource: 'ahp-automation:/a1',
     definition: {
       title: 'Daily triage',
@@ -175,12 +175,12 @@ test('state mirror applies automation catalogue snapshots and actions', () => {
 
   mirror.applySnapshot({
     resource: AUTOMATIONS,
-    state: { automations: [automation] },
+    state: { entries: [automation] },
     fromSeq: 0,
   });
   assert.equal(mirror.getAutomation(automation.resource)?.definition.title, 'Daily triage');
 
-  const updated: AutomationState = {
+  const updated: AutomationEntry = {
     ...automation,
     definition: { ...automation.definition, title: 'Updated triage' },
     modifiedAt: '2026-08-02T00:00:00Z',

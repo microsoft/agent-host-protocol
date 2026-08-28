@@ -25,7 +25,7 @@ The rest of this page details the URI scheme and the lifecycle of a subscription
 | URI | State type | Description |
 |---|---|---|
 | `ahp-root://` | `RootState` | Global state (agents, terminals, host config). Always present. |
-| `ahp-automations://` | `AutomationCatalogState` | Full state for every visible automation. Present when `InitializeResult.automations` is advertised. |
+| `ahp-automations://` | `AutomationState` | Full state for every visible automation. Present when `InitializeResult.automations` is advertised. |
 | `ahp-session:/<uuid>` | `SessionState` | Per-session state (metadata plus the `chats` catalog). The session's provider is carried on `SessionSummary.provider`, not in the URI scheme. |
 | `ahp-chat:/<cid>` | `ChatState` | Per-chat conversation state (turns, streaming, tool calls, pending messages, input requests). A session starts with a default chat; multi-chat hosts add more via `createChat`. See [Chat Channel](/specification/chat-channel). |
 | `ahp-terminal:/<id>` | `TerminalState` | Per-terminal state. Server-defined id. |

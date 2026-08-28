@@ -338,7 +338,7 @@ public struct InitializeResult: Codable, Sendable {
     /// filtering). Clients MAY ignore signals they cannot process.
     public var telemetry: TelemetryCapabilities?
     /// Host-owned automation support. Presence means clients may subscribe to
-    /// `ahp-automations://` for {@link AutomationCatalogState}; absence means the
+    /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
 
@@ -409,7 +409,7 @@ public struct AutomationCapabilities: Codable, Sendable {
     /// Present when clients may request cancellation of `pending` or `running`
     /// automation runs.
     public var runCancellation: AutomationRunCancellationCapability?
-    /// Maximum terminal entries retained in {@link AutomationState.runs}. Active
+    /// Maximum terminal entries retained in {@link AutomationEntry.runs}. Active
     /// runs are not counted toward the limit. Absence means the retention limit is
     /// implementation-defined.
     public var runHistoryLimit: Int?
@@ -1997,7 +1997,7 @@ public struct RunAutomationParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Target {@link AutomationState.resource}.
+    /// Target {@link AutomationEntry.resource}.
     public var automation: String
     /// Durable client-generated idempotency key. Retrying with the same key and
     /// automation MUST return the original run URI rather than create another
@@ -2041,9 +2041,9 @@ public struct FetchAutomationRunsParams: Codable, Sendable {
     /// Optional JSON-serializable metadata associated with this request.
     /// Receivers MUST ignore keys they do not understand.
     public var meta: [String: AnyCodable]?
-    /// Target {@link AutomationState.resource}.
+    /// Target {@link AutomationEntry.resource}.
     public var automation: String
-    /// Cursor previously received as {@link AutomationState.runsNextCursor}.
+    /// Cursor previously received as {@link AutomationEntry.runsNextCursor}.
     /// Omit to request the first page not already included by the snapshot.
     public var cursor: String?
 

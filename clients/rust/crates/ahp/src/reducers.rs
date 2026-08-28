@@ -57,7 +57,7 @@ use ahp_types::actions::{
     ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, AutomationCatalogState, AutomationRunState,
+    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState,
     ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest, ChatState,
     ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
     ErrorResponsePart, InputRequestResponsePart, McpServerStartingState, McpServerState,
@@ -2068,9 +2068,9 @@ pub fn apply_action_to_resource_watch(
     }
 }
 
-/// Apply a [`StateAction`] to an [`AutomationCatalogState`] in place.
+/// Apply a [`StateAction`] to an [`AutomationState`] in place.
 pub fn apply_action_to_automation(
-    state: &mut AutomationCatalogState,
+    state: &mut AutomationState,
     action: &StateAction,
 ) -> ReduceOutcome {
     match action {
@@ -2079,25 +2079,25 @@ pub fn apply_action_to_automation(
         }
         StateAction::AutomationSet(a) => {
             if let Some(index) = state
-                .automations
+                .entries
                 .iter()
                 .position(|automation| automation.resource == a.automation.resource)
             {
-                state.automations[index] = a.automation.clone();
+                state.entries[index] = a.automation.clone();
             } else {
-                state.automations.push(a.automation.clone());
+                state.entries.push(a.automation.clone());
             }
             ReduceOutcome::Applied
         }
         StateAction::AutomationRemoved(a) => {
             let Some(index) = state
-                .automations
+                .entries
                 .iter()
                 .position(|automation| automation.resource == a.resource)
             else {
                 return ReduceOutcome::NoOp;
             };
-            state.automations.remove(index);
+            state.entries.remove(index);
             ReduceOutcome::Applied
         }
         _ => ReduceOutcome::OutOfScope,
@@ -2647,7 +2647,7 @@ mod tests {
                     &file_name,
                     description,
                 ),
-                "automation" => run_fixture::<AutomationCatalogState>(
+                "automation" => run_fixture::<AutomationState>(
                     initial,
                     expected,
                     &parsed_actions,

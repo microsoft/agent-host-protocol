@@ -1,7 +1,0 @@
-{
-  "type": "changed",
-  "message": "Renamed the failed session lifecycle value from `creationFailed` to `failed`.",
-  "targets": [
-    "spec"
-  ]
-}

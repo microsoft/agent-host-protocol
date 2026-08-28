@@ -387,7 +387,7 @@ data class InitializeResult(
     val telemetry: TelemetryCapabilities? = null,
     /**
      * Host-owned automation support. Presence means clients may subscribe to
-     * `ahp-automations://` for {@link AutomationCatalogState}; absence means the
+     * `ahp-automations://` for {@link AutomationState}; absence means the
      * host does not expose an automation catalogue or automation commands.
      */
     val automations: AutomationCapabilities? = null
@@ -427,7 +427,7 @@ data class AutomationCapabilities(
      */
     val runCancellation: AutomationRunCancellationCapability? = null,
     /**
-     * Maximum terminal entries retained in {@link AutomationState.runs}. Active
+     * Maximum terminal entries retained in {@link AutomationEntry.runs}. Active
      * runs are not counted toward the limit. Absence means the retention limit is
      * implementation-defined.
      */
@@ -1615,7 +1615,7 @@ data class RunAutomationParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Target {@link AutomationState.resource}.
+     * Target {@link AutomationEntry.resource}.
      */
     val automation: String,
     /**
@@ -1647,11 +1647,11 @@ data class FetchAutomationRunsParams(
     @SerialName("_meta")
     val meta: Map<String, JsonElement>? = null,
     /**
-     * Target {@link AutomationState.resource}.
+     * Target {@link AutomationEntry.resource}.
      */
     val automation: String,
     /**
-     * Cursor previously received as {@link AutomationState.runsNextCursor}.
+     * Cursor previously received as {@link AutomationEntry.runsNextCursor}.
      * Omit to request the first page not already included by the snapshot.
      */
     val cursor: String? = null

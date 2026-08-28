@@ -584,7 +584,7 @@ public enum ResourceChangeType
 
 /// <summary>Operations the host currently permits for an automation.
 ///
-/// The list on {@link AutomationState.operations} is authoritative and may
+/// The list on {@link AutomationEntry.operations} is authoritative and may
 /// change over time. Clients MUST NOT infer permission from capabilities alone:
 /// capabilities describe what the host implementation can support, while
 /// operations describe what is allowed for this particular automation now.</summary>
@@ -4964,7 +4964,7 @@ public sealed record AutomationSessionOrigin
 {
     public SessionOriginKind Kind { get; init; }
 
-    /// <summary>Owning {@link AutomationState.resource}.</summary>
+    /// <summary>Owning {@link AutomationEntry.resource}.</summary>
     public required string Automation { get; init; }
 
     /// <summary>Owning {@link AutomationRunState.resource}.</summary>
@@ -5155,7 +5155,7 @@ public sealed record AutomationSessionTemplate
 /// A definition combines the initial automation message, the session template
 /// used for each run, and zero or more automatic triggers. Run history,
 /// timestamps, and currently allowed operations live on
-/// {@link AutomationState} rather than in the definition.</summary>
+/// {@link AutomationEntry} rather than in the definition.</summary>
 public sealed record AutomationDefinition
 {
     /// <summary>Human-readable automation name.</summary>
@@ -5216,13 +5216,12 @@ public sealed record AutomationDefinitionPatch
     public Dictionary<string, JsonElement>? Meta { get; init; }
 }
 
-/// <summary>Authoritative state of one automation in the
-/// {@link AutomationCatalogState.automations} catalogue.
+/// <summary>Authoritative state of one automation in {@link AutomationState.entries}.
 ///
 /// The host owns trigger evaluation, run claims, run retention, and operation
 /// availability. Clients render this state and submit actions or commands; they
 /// never run a fallback scheduler for a host-owned definition.</summary>
-public sealed class AutomationState
+public sealed class AutomationEntry
 {
     /// <summary>Stable `ahp-automation:/&lt;id&gt;` resource identifier.</summary>
     public required string Resource { get; set; }
@@ -5236,7 +5235,7 @@ public sealed class AutomationState
 
     /// <summary>Newest-first retained run summaries. This is a bounded window; use
     /// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
-    /// {@link AutomationState.runsNextCursor} is present.</summary>
+    /// {@link AutomationEntry.runsNextCursor} is present.</summary>
     public required List<AutomationRunSummary> Runs { get; set; }
 
     /// <summary>Opaque cursor passed as {@link FetchAutomationRunsParams.cursor} for the next older run-history page.</summary>
@@ -5265,10 +5264,10 @@ public sealed class AutomationState
 /// Subsequent {@link AutomationSetAction | `automation/set`} and
 /// {@link AutomationRemovedAction | `automation/removed`} actions keep the
 /// catalogue synchronized and participate in normal reconnect replay.</summary>
-public sealed class AutomationCatalogState
+public sealed class AutomationState
 {
-    /// <summary>Full automation states keyed by {@link AutomationState.resource}.</summary>
-    public required List<AutomationState> Automations { get; set; }
+    /// <summary>Full automation entries keyed by {@link AutomationEntry.resource}.</summary>
+    public required List<AutomationEntry> Entries { get; set; }
 
     /// <summary>Opaque host-defined catalogue metadata.</summary>
     [JsonPropertyName("_meta")]
@@ -5434,7 +5433,7 @@ public sealed class AutomationRunState
     /// <summary>URI of this automation-run channel.</summary>
     public required string Resource { get; set; }
 
-    /// <summary>Owning `ahp-automation:` URI matching {@link AutomationState.resource}.</summary>
+    /// <summary>Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.</summary>
     public required string Automation { get; set; }
 
     /// <summary>Immutable provenance describing how this run was created.</summary>
@@ -6283,7 +6282,7 @@ public sealed class SnapshotState
     public AnnotationsState? Annotations { get; set; }
 
     /// <summary>Automation catalogue state variant, when populated.</summary>
-    public AutomationCatalogState? Automations { get; set; }
+    public AutomationState? Automations { get; set; }
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
@@ -6303,9 +6302,9 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         {
             result.AutomationRun = root.Deserialize(AhpJsonTypeInfo.Get<AutomationRunState>(options));
         }
-        else if (root.TryGetProperty("automations", out _))
+        else if (root.TryGetProperty("entries", out _))
         {
-            result.Automations = root.Deserialize(AhpJsonTypeInfo.Get<AutomationCatalogState>(options));
+            result.Automations = root.Deserialize(AhpJsonTypeInfo.Get<AutomationState>(options));
         }
         else if (root.TryGetProperty("turns", out _))
         {
@@ -6344,7 +6343,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
-        if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationCatalogState>(options)); return; }
+        if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
         if (value.Session is not null) { JsonSerializer.Serialize(writer, value.Session, AhpJsonTypeInfo.Get<SessionState>(options)); return; }
         if (value.Terminal is not null) { JsonSerializer.Serialize(writer, value.Terminal, AhpJsonTypeInfo.Get<TerminalState>(options)); return; }

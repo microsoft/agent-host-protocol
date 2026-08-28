@@ -2168,11 +2168,11 @@
         },
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}."
+          "description": "Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}."
         },
         "definition": {
           "$ref": "#/$defs/AutomationDefinition",
-          "description": "Complete initial {@link AutomationState.definition}."
+          "description": "Complete initial {@link AutomationEntry.definition}."
         }
       },
       "required": [
@@ -2190,7 +2190,7 @@
         },
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "Target {@link AutomationState.resource}."
+          "description": "Target {@link AutomationEntry.resource}."
         },
         "changes": {
           "$ref": "#/$defs/AutomationDefinitionPatch",
@@ -2205,13 +2205,13 @@
     },
     "AutomationSetAction": {
       "type": "object",
-      "description": "Add or replace one full automation state in\n{@link AutomationCatalogState.automations}.\n\nExisting entries are matched by {@link AutomationState.resource} and\nreplaced in place. A previously unseen resource is appended.",
+      "description": "Add or replace one full automation state in\n{@link AutomationState.entries}.\n\nExisting entries are matched by {@link AutomationEntry.resource} and\nreplaced in place. A previously unseen resource is appended.",
       "properties": {
         "type": {
           "const": "automation/set"
         },
         "automation": {
-          "$ref": "#/$defs/AutomationState",
+          "$ref": "#/$defs/AutomationEntry",
           "description": "Full new or replacement automation state."
         }
       },
@@ -2222,14 +2222,14 @@
     },
     "AutomationRemovedAction": {
       "type": "object",
-      "description": "Remove one automation from {@link AutomationCatalogState.automations}.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Remove}. The host revalidates that operation\nbefore permanently deleting the automation. A rejected action leaves the\nauthoritative catalogue and durable definition unchanged.\n\nRemoving an unknown resource is a no-op.",
+      "description": "Remove one automation from {@link AutomationState.entries}.\n\nClients may dispatch this action only while the target advertises\n{@link AutomationOperation.Remove}. The host revalidates that operation\nbefore permanently deleting the automation. A rejected action leaves the\nauthoritative catalogue and durable definition unchanged.\n\nRemoving an unknown resource is a no-op.",
       "properties": {
         "type": {
           "const": "automation/removed"
         },
         "resource": {
           "$ref": "#/$defs/URI",
-          "description": "{@link AutomationState.resource} to remove."
+          "description": "{@link AutomationEntry.resource} to remove."
         }
       },
       "required": [
@@ -2836,7 +2836,7 @@
               "$ref": "#/$defs/ChatState"
             },
             {
-              "$ref": "#/$defs/AutomationCatalogState"
+              "$ref": "#/$defs/AutomationState"
             },
             {
               "$ref": "#/$defs/AutomationRunState"
@@ -3080,7 +3080,7 @@
         },
         "automation": {
           "$ref": "#/$defs/URI",
-          "description": "Owning {@link AutomationState.resource}."
+          "description": "Owning {@link AutomationEntry.resource}."
         },
         "run": {
           "$ref": "#/$defs/URI",
@@ -7611,7 +7611,7 @@
     },
     "AutomationDefinition": {
       "type": "object",
-      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial automation message, the session template\nused for each run, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationState} rather than in the definition.",
+      "description": "Durable, client-editable definition of an automation.\n\nA definition combines the initial automation message, the session template\nused for each run, and zero or more automatic triggers. Run history,\ntimestamps, and currently allowed operations live on\n{@link AutomationEntry} rather than in the definition.",
       "properties": {
         "title": {
           "type": "string",
@@ -7650,9 +7650,9 @@
         "triggers"
       ]
     },
-    "AutomationState": {
+    "AutomationEntry": {
       "type": "object",
-      "description": "Authoritative state of one automation in the\n{@link AutomationCatalogState.automations} catalogue.\n\nThe host owns trigger evaluation, run claims, run retention, and operation\navailability. Clients render this state and submit actions or commands; they\nnever run a fallback scheduler for a host-owned definition.",
+      "description": "Authoritative state of one automation in {@link AutomationState.entries}.\n\nThe host owns trigger evaluation, run claims, run retention, and operation\navailability. Clients render this state and submit actions or commands; they\nnever run a fallback scheduler for a host-owned definition.",
       "properties": {
         "resource": {
           "$ref": "#/$defs/URI",
@@ -7671,7 +7671,7 @@
           "items": {
             "$ref": "#/$defs/AutomationRunSummary"
           },
-          "description": "Newest-first retained run summaries. This is a bounded window; use\n{@link FetchAutomationRunsParams | fetchAutomationRuns} when\n{@link AutomationState.runsNextCursor} is present."
+          "description": "Newest-first retained run summaries. This is a bounded window; use\n{@link FetchAutomationRunsParams | fetchAutomationRuns} when\n{@link AutomationEntry.runsNextCursor} is present."
         },
         "runsNextCursor": {
           "type": "string",
@@ -7707,16 +7707,16 @@
         "modifiedAt"
       ]
     },
-    "AutomationCatalogState": {
+    "AutomationState": {
       "type": "object",
       "description": "Authoritative automation catalogue exposed on the `ahp-automations://`\nchannel.\n\nA subscription snapshot contains every automation visible to the client.\nSubsequent {@link AutomationSetAction | `automation/set`} and\n{@link AutomationRemovedAction | `automation/removed`} actions keep the\ncatalogue synchronized and participate in normal reconnect replay.",
       "properties": {
-        "automations": {
+        "entries": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/AutomationState"
+            "$ref": "#/$defs/AutomationEntry"
           },
-          "description": "Full automation states keyed by {@link AutomationState.resource}."
+          "description": "Full automation entries keyed by {@link AutomationEntry.resource}."
         },
         "_meta": {
           "type": "object",
@@ -7725,7 +7725,7 @@
         }
       },
       "required": [
-        "automations"
+        "entries"
       ]
     },
     "AutomationManualRunOrigin": {
@@ -7949,7 +7949,7 @@
         },
         "automation": {
           "$ref": "#/$defs/URI",
-          "description": "Owning `ahp-automation:` URI matching {@link AutomationState.resource}."
+          "description": "Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}."
         },
         "origin": {
           "$ref": "#/$defs/AutomationRunOrigin",
@@ -8999,7 +8999,7 @@
         "run"
       ],
       "type": "string",
-      "description": "Operations the host currently permits for an automation.\n\nThe list on {@link AutomationState.operations} is authoritative and may\nchange over time. Clients MUST NOT infer permission from capabilities alone:\ncapabilities describe what the host implementation can support, while\noperations describe what is allowed for this particular automation now."
+      "description": "Operations the host currently permits for an automation.\n\nThe list on {@link AutomationEntry.operations} is authoritative and may\nchange over time. Clients MUST NOT infer permission from capabilities alone:\ncapabilities describe what the host implementation can support, while\noperations describe what is allowed for this particular automation now."
     }
   }
 }

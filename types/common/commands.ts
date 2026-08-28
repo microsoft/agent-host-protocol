@@ -14,7 +14,7 @@ import type { AutomationCreateRequestedAction } from '../channels-automation/act
 import type {
   AutomationSchedule,
   AutomationScheduleTrigger,
-  AutomationCatalogState,
+  AutomationEntry,
   AutomationState,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
@@ -287,7 +287,7 @@ export interface InitializeResult {
   telemetry?: TelemetryCapabilities;
   /**
    * Host-owned automation support. Presence means clients may subscribe to
-   * `ahp-automations://` for {@link AutomationCatalogState}; absence means the
+   * `ahp-automations://` for {@link AutomationState}; absence means the
    * host does not expose an automation catalogue or automation commands.
    *
    * @see {@link /guide/automations | Automations Guide}
@@ -303,7 +303,7 @@ export interface InitializeResult {
  * restrictions.
  *
  * Capabilities describe implementation support.
- * {@link AutomationState.operations} remains authoritative for which
+ * {@link AutomationEntry.operations} remains authoritative for which
  * definition mutations are currently allowed on a particular automation.
  *
  * @category Commands
@@ -319,7 +319,7 @@ export interface AutomationCapabilities {
    */
   runCancellation?: AutomationRunCancellationCapability;
   /**
-   * Maximum terminal entries retained in {@link AutomationState.runs}. Active
+   * Maximum terminal entries retained in {@link AutomationEntry.runs}. Active
    * runs are not counted toward the limit. Absence means the retention limit is
    * implementation-defined.
    */

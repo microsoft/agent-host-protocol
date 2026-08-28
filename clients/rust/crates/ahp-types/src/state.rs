@@ -1292,7 +1292,7 @@ impl<'de> serde::Deserialize<'de> for SessionOriginKind {
 
 /// Operations the host currently permits for an automation.
 ///
-/// The list on {@link AutomationState.operations} is authoritative and may
+/// The list on {@link AutomationEntry.operations} is authoritative and may
 /// change over time. Clients MUST NOT infer permission from capabilities alone:
 /// capabilities describe what the host implementation can support, while
 /// operations describe what is allowed for this particular automation now.
@@ -5237,7 +5237,7 @@ pub struct ResourceChange {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSessionOrigin {
-    /// Owning {@link AutomationState.resource}.
+    /// Owning {@link AutomationEntry.resource}.
     pub automation: Uri,
     /// Owning {@link AutomationRunState.resource}.
     pub run: Uri,
@@ -5395,7 +5395,7 @@ pub struct AutomationSessionTemplate {
 /// A definition combines the initial automation message, the session template
 /// used for each run, and zero or more automatic triggers. Run history,
 /// timestamps, and currently allowed operations live on
-/// {@link AutomationState} rather than in the definition.
+/// {@link AutomationEntry} rather than in the definition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationDefinition {
@@ -5446,15 +5446,14 @@ pub struct AutomationDefinitionPatch {
     pub meta: Option<JsonObject>,
 }
 
-/// Authoritative state of one automation in the
-/// {@link AutomationCatalogState.automations} catalogue.
+/// Authoritative state of one automation in {@link AutomationState.entries}.
 ///
 /// The host owns trigger evaluation, run claims, run retention, and operation
 /// availability. Clients render this state and submit actions or commands; they
 /// never run a fallback scheduler for a host-owned definition.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationState {
+pub struct AutomationEntry {
     /// Stable `ahp-automation:/<id>` resource identifier.
     pub resource: Uri,
     /// Current durable definition.
@@ -5464,7 +5463,7 @@ pub struct AutomationState {
     pub next_run_at: Option<String>,
     /// Newest-first retained run summaries. This is a bounded window; use
     /// {@link FetchAutomationRunsParams | fetchAutomationRuns} when
-    /// {@link AutomationState.runsNextCursor} is present.
+    /// {@link AutomationEntry.runsNextCursor} is present.
     pub runs: Vec<AutomationRunSummary>,
     /// Opaque cursor passed as {@link FetchAutomationRunsParams.cursor} for the next older run-history page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -5489,9 +5488,9 @@ pub struct AutomationState {
 /// catalogue synchronized and participate in normal reconnect replay.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AutomationCatalogState {
-    /// Full automation states keyed by {@link AutomationState.resource}.
-    pub automations: Vec<AutomationState>,
+pub struct AutomationState {
+    /// Full automation entries keyed by {@link AutomationEntry.resource}.
+    pub entries: Vec<AutomationEntry>,
     /// Opaque host-defined catalogue metadata.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
@@ -5630,7 +5629,7 @@ pub struct AutomationRunSummary {
 pub struct AutomationRunState {
     /// URI of this automation-run channel.
     pub resource: Uri,
-    /// Owning `ahp-automation:` URI matching {@link AutomationState.resource}.
+    /// Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}.
     pub automation: Uri,
     /// Immutable provenance describing how this run was created.
     pub origin: AutomationRunOrigin,
@@ -6092,7 +6091,7 @@ pub enum SnapshotState {
     Changeset(Box<ChangesetState>),
     ResourceWatch(Box<ResourceWatchState>),
     Annotations(Box<AnnotationsState>),
-    Automations(Box<AutomationCatalogState>),
+    Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
     Root(Box<RootState>),
 }

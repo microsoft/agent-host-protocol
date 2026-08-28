@@ -477,15 +477,15 @@ this release negotiates.
   receive buffer dropped a frame; the receive loop now grows the buffer after
   copying the previous frame rather than before.
 
-## [0.9.0] — 2026-08-27
+## [0.9.0] — 2026-08-28
 
-Implements AHP 1.0.0.
+Implements AHP 0.9.0.
 
 ### Added
 
 - Automation catalogue and automation-run channels, including self-contained host-defined event triggers and automation-origin messages, for shared trigger-based agent session workflows.
 - Turn errors are durable response parts, and resumable errors can reopen the same turn through `chat/turnResume`.
-- First-party .NET client with generated AHP 1.0 wire types, reducers, JSON-RPC and multi-host clients, and an integrated WebSocket transport targeting `netstandard2.0` and `net8.0`. (#206, #214)
+- First-party .NET client with generated AHP 0.9.0 wire types, reducers, JSON-RPC and multi-host clients, and an integrated WebSocket transport targeting `netstandard2.0` and `net8.0`. (#206, #214)
 - `ClientConfig.TimeProvider` enables deterministic request timeout, keep-alive, reconnect scheduling, and host timestamps.
 - `InitializeResult._meta` for hosts to advertise implementation-specific extension capabilities in initialize responses.
 
@@ -499,6 +499,7 @@ Implements AHP 1.0.0.
 - Generated clients now preserve unknown values for nonexhaustive protocol enums and their discriminated unions.
 - `SessionToolClientExecutionRequest.toolCall` is narrowed to a running tool-call state.
 - The .NET client now ships as the signed `Microsoft.VisualStudioCode.AgentHostProtocol` and `Microsoft.VisualStudioCode.AgentHostProtocol.Abstractions` NuGet packages.
+- Automation catalogue snapshots now use `AutomationState.entries`, whose items are named `AutomationEntry`.
 
 ### Removed
 

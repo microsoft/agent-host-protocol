@@ -1,7 +1,0 @@
-{
-  "type": "changed",
-  "message": "Annotations now carry an `origin` with a required session URI and optional chat URI and turn ID.",
-  "targets": [
-    "spec"
-  ]
-}

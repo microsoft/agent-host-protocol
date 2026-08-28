@@ -1441,11 +1441,11 @@ data class ResourceWatchChangedAction(
 data class AutomationCreateRequestedAction(
     val type: ActionType,
     /**
-     * Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.
+     * Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
      */
     val resource: String,
     /**
-     * Complete initial {@link AutomationState.definition}.
+     * Complete initial {@link AutomationEntry.definition}.
      */
     val definition: AutomationDefinition
 )
@@ -1454,7 +1454,7 @@ data class AutomationCreateRequestedAction(
 data class AutomationUpdateRequestedAction(
     val type: ActionType,
     /**
-     * Target {@link AutomationState.resource}.
+     * Target {@link AutomationEntry.resource}.
      */
     val resource: String,
     /**
@@ -1469,14 +1469,14 @@ data class AutomationSetAction(
     /**
      * Full new or replacement automation state.
      */
-    val automation: AutomationState
+    val automation: AutomationEntry
 )
 
 @Serializable
 data class AutomationRemovedAction(
     val type: ActionType,
     /**
-     * {@link AutomationState.resource} to remove.
+     * {@link AutomationEntry.resource} to remove.
      */
     val resource: String
 )

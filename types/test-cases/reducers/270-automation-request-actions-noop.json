@@ -2,7 +2,7 @@
   "description": "automation create and update requests leave authoritative catalogue state unchanged",
   "reducer": "automation",
   "initial": {
-    "automations": [{
+    "entries": [{
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "A",
@@ -38,7 +38,7 @@
     }
   ],
   "expected": {
-    "automations": [{
+    "entries": [{
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "A",

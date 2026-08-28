@@ -2,7 +2,7 @@
   "description": "automation removed is a no-op for an unknown resource",
   "reducer": "automation",
   "initial": {
-    "automations": [{
+    "entries": [{
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "A",
@@ -22,7 +22,7 @@
     "resource": "ahp-automation:/missing"
   }],
   "expected": {
-    "automations": [{
+    "entries": [{
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "A",

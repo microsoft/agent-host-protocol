@@ -6,7 +6,7 @@
   "input": {
     "resource": "ahp-automations://",
     "state": {
-      "automations": [{
+      "entries": [{
         "resource": "ahp-automation:/a1",
         "definition": {
           "title": "Triage",
@@ -56,7 +56,7 @@
   "acceptableOutputs": [{
     "resource": "ahp-automations://",
     "state": {
-      "automations": [{
+      "entries": [{
         "resource": "ahp-automation:/a1",
         "definition": {
           "title": "Triage",

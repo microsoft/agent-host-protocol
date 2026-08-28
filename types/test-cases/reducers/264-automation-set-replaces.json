@@ -2,7 +2,7 @@
   "description": "automation set replaces an existing catalogue entry in place",
   "reducer": "automation",
   "initial": {
-    "automations": [
+    "entries": [
       {
         "resource": "ahp-automation:/a1",
         "definition": {
@@ -51,7 +51,7 @@
     }
   }],
   "expected": {
-    "automations": [
+    "entries": [
       {
         "resource": "ahp-automation:/a1",
         "definition": {

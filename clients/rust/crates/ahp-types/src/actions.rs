@@ -14,7 +14,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[allow(unused_imports)]
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
-    AutomationDefinitionPatch, AutomationRunLifecycle, AutomationRunSummary, AutomationState,
+    AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
     Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
     ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
     ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
@@ -2036,9 +2036,9 @@ pub struct ResourceWatchChangedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationCreateRequestedAction {
-    /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationState.resource}.
+    /// Client-chosen `ahp-automation:` URI that becomes {@link AutomationEntry.resource}.
     pub resource: Uri,
-    /// Complete initial {@link AutomationState.definition}.
+    /// Complete initial {@link AutomationEntry.definition}.
     pub definition: AutomationDefinition,
 }
 
@@ -2058,25 +2058,25 @@ pub struct AutomationCreateRequestedAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationUpdateRequestedAction {
-    /// Target {@link AutomationState.resource}.
+    /// Target {@link AutomationEntry.resource}.
     pub resource: Uri,
     /// Editable {@link AutomationDefinition} fields to replace.
     pub changes: AutomationDefinitionPatch,
 }
 
 /// Add or replace one full automation state in
-/// {@link AutomationCatalogState.automations}.
+/// {@link AutomationState.entries}.
 ///
-/// Existing entries are matched by {@link AutomationState.resource} and
+/// Existing entries are matched by {@link AutomationEntry.resource} and
 /// replaced in place. A previously unseen resource is appended.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationSetAction {
     /// Full new or replacement automation state.
-    pub automation: AutomationState,
+    pub automation: AutomationEntry,
 }
 
-/// Remove one automation from {@link AutomationCatalogState.automations}.
+/// Remove one automation from {@link AutomationState.entries}.
 ///
 /// Clients may dispatch this action only while the target advertises
 /// {@link AutomationOperation.Remove}. The host revalidates that operation
@@ -2087,7 +2087,7 @@ pub struct AutomationSetAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRemovedAction {
-    /// {@link AutomationState.resource} to remove.
+    /// {@link AutomationEntry.resource} to remove.
     pub resource: Uri,
 }
 

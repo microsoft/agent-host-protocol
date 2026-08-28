@@ -82,7 +82,7 @@ fn automation_snapshot() -> Snapshot {
     serde_json::from_value(serde_json::json!({
         "resource": "ahp-automations://",
         "state": {
-            "automations": [{
+            "entries": [{
                 "resource": "ahp-automation:/a1",
                 "definition": {
                     "title": "Old",

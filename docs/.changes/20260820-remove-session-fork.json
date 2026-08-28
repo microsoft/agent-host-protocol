@@ -1,7 +1,0 @@
-{
-  "type": "removed",
-  "message": "Removed session-level forking from `createSession`; use chat forking instead.",
-  "targets": [
-    "spec"
-  ]
-}

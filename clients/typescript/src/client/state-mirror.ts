@@ -26,7 +26,7 @@ import type { ChangesetState } from '../types/channels-changeset/state.js';
 import type { RootState } from '../types/channels-root/state.js';
 import type { SessionState } from '../types/channels-session/state.js';
 import type { TerminalState } from '../types/channels-terminal/state.js';
-import type { AutomationCatalogState, AutomationState } from '../types/channels-automation/state.js';
+import type { AutomationEntry, AutomationState } from '../types/channels-automation/state.js';
 import type { AutomationRunState } from '../types/channels-automation-run/state.js';
 import { changesetReducer } from '../types/channels-changeset/reducer.js';
 import { rootReducer } from '../types/channels-root/reducer.js';
@@ -39,7 +39,7 @@ const ROOT_URI = 'ahp-root://' as const;
 const AUTOMATIONS_URI = 'ahp-automations://' as const;
 
 const INITIAL_ROOT: RootState = { agents: [] };
-const INITIAL_AUTOMATION_CATALOG: AutomationCatalogState = { automations: [] };
+const INITIAL_AUTOMATION_CATALOG: AutomationState = { entries: [] };
 
 /** Reducer-driven state container synchronised with server events. */
 export class AhpStateMirror {
@@ -47,8 +47,8 @@ export class AhpStateMirror {
   private readonly sessionsMap = new Map<URI, SessionState>();
   private readonly terminalsMap = new Map<URI, TerminalState>();
   private readonly changesetsMap = new Map<URI, ChangesetState>();
-  private automationCatalogState: AutomationCatalogState = INITIAL_AUTOMATION_CATALOG;
-  private readonly automationsMap = new Map<URI, AutomationState>();
+  private automationCatalogState: AutomationState = INITIAL_AUTOMATION_CATALOG;
+  private readonly automationsMap = new Map<URI, AutomationEntry>();
   private readonly automationRunsMap = new Map<URI, AutomationRunState>();
 
   /** Current root state. */
@@ -72,12 +72,12 @@ export class AhpStateMirror {
   }
 
   /** Current automation catalogue state. */
-  get automationCatalog(): AutomationCatalogState {
+  get automationCatalog(): AutomationState {
     return this.automationCatalogState;
   }
 
   /** All catalogued automations keyed by their stable resource URI. */
-  get automations(): ReadonlyMap<URI, AutomationState> {
+  get automations(): ReadonlyMap<URI, AutomationEntry> {
     return this.automationsMap;
   }
 
@@ -97,7 +97,7 @@ export class AhpStateMirror {
   }
 
   /** Look up a catalogued automation by URI. */
-  getAutomation(uri: URI): AutomationState | undefined {
+  getAutomation(uri: URI): AutomationEntry | undefined {
     return this.automationsMap.get(uri);
   }
 
@@ -124,7 +124,7 @@ export class AhpStateMirror {
       return;
     }
     if (resource === AUTOMATIONS_URI) {
-      this.setAutomationCatalog(snapshot.state as AutomationCatalogState);
+      this.setAutomationCatalog(snapshot.state as AutomationState);
       return;
     }
     if (resource.startsWith('ahp-automation-run:')) {
@@ -179,10 +179,10 @@ export class AhpStateMirror {
     }
   }
 
-  private setAutomationCatalog(state: AutomationCatalogState): void {
+  private setAutomationCatalog(state: AutomationState): void {
     this.automationCatalogState = state;
     this.automationsMap.clear();
-    for (const automation of state.automations) {
+    for (const automation of state.entries) {
       this.automationsMap.set(automation.resource, automation);
     }
   }

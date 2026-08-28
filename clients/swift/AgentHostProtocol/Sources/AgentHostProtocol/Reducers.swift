@@ -1492,22 +1492,22 @@ public func resourceWatchReducer(state: ResourceWatchState, action: StateAction)
 }
 
 /// Pure reducer for automation catalogue state.
-public func automationReducer(state: AutomationCatalogState, action: StateAction) -> AutomationCatalogState {
+public func automationReducer(state: AutomationState, action: StateAction) -> AutomationState {
     var next = state
     switch action {
     case .automationCreateRequested, .automationUpdateRequested:
         return state
     case .automationSet(let value):
-        if let index = next.automations.firstIndex(where: { $0.resource == value.automation.resource }) {
-            next.automations[index] = value.automation
+        if let index = next.entries.firstIndex(where: { $0.resource == value.automation.resource }) {
+            next.entries[index] = value.automation
         } else {
-            next.automations.append(value.automation)
+            next.entries.append(value.automation)
         }
     case .automationRemoved(let value):
-        guard let index = next.automations.firstIndex(where: { $0.resource == value.resource }) else {
+        guard let index = next.entries.firstIndex(where: { $0.resource == value.resource }) else {
             return state
         }
-        next.automations.remove(at: index)
+        next.entries.remove(at: index)
     default:
         return state
     }

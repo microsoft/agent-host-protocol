@@ -45,12 +45,12 @@ final class AHPStateMirrorTests: XCTestCase {
     func testAutomationIndexUsesLastDuplicateResourceAcrossSnapshotAndAction() async {
         let mirror = AHPStateMirror()
         let resource = "ahp-automation:/a1"
-        let first = makeAutomationState(resource: resource, title: "First")
-        let latest = makeAutomationState(resource: resource, title: "Latest")
+        let first = makeAutomationEntry(resource: resource, title: "First")
+        let latest = makeAutomationEntry(resource: resource, title: "Latest")
 
         await mirror.applySnapshot(Snapshot(
             resource: "ahp-automations://",
-            state: .automations(AutomationCatalogState(automations: [first, latest])),
+            state: .automations(AutomationState(entries: [first, latest])),
             fromSeq: 0
         ))
 
@@ -58,7 +58,7 @@ final class AHPStateMirrorTests: XCTestCase {
         XCTAssertEqual(automations.count, 1)
         XCTAssertEqual(automations[resource]?.definition.title, "Latest")
 
-        let added = makeAutomationState(resource: "ahp-automation:/a2", title: "Added")
+        let added = makeAutomationEntry(resource: "ahp-automation:/a2", title: "Added")
         await mirror.apply(ActionEnvelope(
             channel: "ahp-automations://",
             action: .automationSet(AutomationSetAction(
@@ -137,8 +137,8 @@ final class AHPStateMirrorTests: XCTestCase {
     }
 }
 
-private func makeAutomationState(resource: String, title: String) -> AutomationState {
-    AutomationState(
+private func makeAutomationEntry(resource: String, title: String) -> AutomationEntry {
+    AutomationEntry(
         resource: resource,
         definition: AutomationDefinition(
             title: title,

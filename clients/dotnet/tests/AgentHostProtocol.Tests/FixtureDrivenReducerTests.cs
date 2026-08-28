@@ -79,7 +79,7 @@ public sealed class FixtureDrivenReducerTests
                     RunFixture<ChatState>(initial, expected, actions, Reducers.ApplyToChat);
                     break;
                 case "automation":
-                    RunFixture<AutomationCatalogState>(
+                    RunFixture<AutomationState>(
                         initial,
                         expected,
                         actions,

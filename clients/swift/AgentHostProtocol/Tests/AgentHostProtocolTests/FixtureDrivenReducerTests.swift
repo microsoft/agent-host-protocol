@@ -197,7 +197,7 @@ final class FixtureDrivenReducerTests: XCTestCase {
                 actions.reduce(state) { annotationsReducer(state: $0, action: $1) }
             }
         case "automation":
-            try compareFixture(file: file, fixture: fixture, stateType: AutomationCatalogState.self) { state in
+            try compareFixture(file: file, fixture: fixture, stateType: AutomationState.self) { state in
                 actions.reduce(state) { automationReducer(state: $0, action: $1) }
             }
         case "automationRun":

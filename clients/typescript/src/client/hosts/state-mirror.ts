@@ -42,7 +42,7 @@ import type { ChangesetState } from '../../types/channels-changeset/state.js';
 import type { RootState } from '../../types/channels-root/state.js';
 import type { SessionState } from '../../types/channels-session/state.js';
 import type { TerminalState } from '../../types/channels-terminal/state.js';
-import type { AutomationCatalogState, AutomationState } from '../../types/channels-automation/state.js';
+import type { AutomationEntry, AutomationState } from '../../types/channels-automation/state.js';
 import type { AutomationRunState } from '../../types/channels-automation-run/state.js';
 import { changesetReducer } from '../../types/channels-changeset/reducer.js';
 import { rootReducer } from '../../types/channels-root/reducer.js';
@@ -105,8 +105,8 @@ export class MultiHostStateMirror {
   private readonly sessionsMap = new Map<string, SessionState>();
   private readonly terminalsMap = new Map<string, TerminalState>();
   private readonly changesetsMap = new Map<string, ChangesetState>();
-  private readonly automationCatalogsMap = new Map<HostId, AutomationCatalogState>();
-  private readonly automationsMap = new Map<string, AutomationState>();
+  private readonly automationCatalogsMap = new Map<HostId, AutomationState>();
+  private readonly automationsMap = new Map<string, AutomationEntry>();
   private readonly automationRunsMap = new Map<string, AutomationRunState>();
 
   /** All known root states keyed by host. */
@@ -130,12 +130,12 @@ export class MultiHostStateMirror {
   }
 
   /** Automation catalogue state keyed by host. */
-  get automationCatalogs(): ReadonlyMap<HostId, AutomationCatalogState> {
+  get automationCatalogs(): ReadonlyMap<HostId, AutomationState> {
     return this.automationCatalogsMap;
   }
 
   /** Catalogued automations keyed by `hostedResourceKey(hostId, resource)`. */
-  get automations(): ReadonlyMap<string, AutomationState> {
+  get automations(): ReadonlyMap<string, AutomationEntry> {
     return this.automationsMap;
   }
 
@@ -165,7 +165,7 @@ export class MultiHostStateMirror {
   }
 
   /** Look up a catalogued automation by `(hostId, uri)`. */
-  getAutomation(hostId: HostId, uri: URI): AutomationState | undefined {
+  getAutomation(hostId: HostId, uri: URI): AutomationEntry | undefined {
     return this.automationsMap.get(hostedResourceKey(hostId, uri));
   }
 
@@ -255,7 +255,7 @@ export class MultiHostStateMirror {
       return;
     }
     if (resource === AUTOMATIONS_URI) {
-      this.setAutomationCatalog(hostId, snapshot.state as AutomationCatalogState);
+      this.setAutomationCatalog(hostId, snapshot.state as AutomationState);
       return;
     }
     if (resource.startsWith('ahp-automation-run:')) {
@@ -297,13 +297,13 @@ export class MultiHostStateMirror {
     this.automationRunsMap.clear();
   }
 
-  private setAutomationCatalog(hostId: HostId, state: AutomationCatalogState): void {
+  private setAutomationCatalog(hostId: HostId, state: AutomationState): void {
     this.automationCatalogsMap.set(hostId, state);
     const prefix = hostedResourceKeyPrefix(hostId);
     for (const key of this.automationsMap.keys()) {
       if (key.startsWith(prefix)) this.automationsMap.delete(key);
     }
-    for (const automation of state.automations) {
+    for (const automation of state.entries) {
       this.automationsMap.set(hostedResourceKey(hostId, automation.resource), automation);
     }
   }

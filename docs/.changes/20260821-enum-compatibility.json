@@ -1,7 +1,0 @@
-{
-  "type": "changed",
-  "message": "Generated clients now preserve unknown values for nonexhaustive protocol enums and their discriminated unions.",
-  "targets": [
-    "spec"
-  ]
-}

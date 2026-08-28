@@ -16,7 +16,7 @@ import type {
   ToolCallAuthRequiredState,
 } from '../channels-chat/state.js';
 import type { AutomationRunState } from '../channels-automation-run/state.js';
-import type { AutomationState } from '../channels-automation/state.js';
+import type { AutomationEntry } from '../channels-automation/state.js';
 import type {
   ConfigPropertySchema,
   ErrorInfo,
@@ -87,7 +87,7 @@ export const enum SessionOriginKind {
  */
 export interface AutomationSessionOrigin {
   kind: SessionOriginKind.Automation;
-  /** Owning {@link AutomationState.resource}. */
+  /** Owning {@link AutomationEntry.resource}. */
   automation: URI;
   /** Owning {@link AutomationRunState.resource}. */
   run: URI;

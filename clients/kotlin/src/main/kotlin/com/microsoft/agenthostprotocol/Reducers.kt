@@ -73,8 +73,8 @@ public object ResourceWatchReducer : Reducer<ResourceWatchState, StateAction> {
 }
 
 /** Pure automation reducer as a [Reducer] instance. Delegates to [automationReducer]. */
-public object AutomationReducer : Reducer<AutomationCatalogState, StateAction> {
-    override fun reduce(state: AutomationCatalogState, action: StateAction): AutomationCatalogState =
+public object AutomationReducer : Reducer<AutomationState, StateAction> {
+    override fun reduce(state: AutomationState, action: StateAction): AutomationState =
         automationReducer(state, action)
 }
 
@@ -1848,32 +1848,32 @@ public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction):
 
 // ─── Automation Reducer ─────────────────────────────────────────────────────
 
-/** Pure reducer for [AutomationCatalogState]. Handles automation-channel action variants. */
-public fun automationReducer(state: AutomationCatalogState, action: StateAction): AutomationCatalogState = when (action) {
+/** Pure reducer for [AutomationState]. Handles automation-channel action variants. */
+public fun automationReducer(state: AutomationState, action: StateAction): AutomationState = when (action) {
     is StateActionAutomationCreateRequested,
     is StateActionAutomationUpdateRequested,
     -> state
 
     is StateActionAutomationSet -> {
         val automation = action.value.automation
-        val index = state.automations.indexOfFirst { it.resource == automation.resource }
+        val index = state.entries.indexOfFirst { it.resource == automation.resource }
         if (index < 0) {
-            state.copy(automations = state.automations + automation)
+            state.copy(entries = state.entries + automation)
         } else {
-            val automations = state.automations.toMutableList()
-            automations[index] = automation
-            state.copy(automations = automations)
+            val entries = state.entries.toMutableList()
+            entries[index] = automation
+            state.copy(entries = entries)
         }
     }
 
     is StateActionAutomationRemoved -> {
-        val index = state.automations.indexOfFirst { it.resource == action.value.resource }
+        val index = state.entries.indexOfFirst { it.resource == action.value.resource }
         if (index < 0) {
             state
         } else {
-            val automations = state.automations.toMutableList()
-            automations.removeAt(index)
-            state.copy(automations = automations)
+            val entries = state.entries.toMutableList()
+            entries.removeAt(index)
+            state.copy(entries = entries)
         }
     }
 

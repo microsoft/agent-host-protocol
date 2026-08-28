@@ -11,12 +11,12 @@ func TestMultiHostStateMirrorDropHostWithoutChangesets(t *testing.T) {
 	automationURI := ahptypes.URI("ahp-automation:/nightly")
 	runURI := ahptypes.URI("ahp-automation-run:/nightly/1")
 
-	mirror.PutAutomationCatalog("removed", ahptypes.AutomationCatalogState{
-		Automations: []ahptypes.AutomationState{{Resource: automationURI}},
+	mirror.PutAutomationCatalog("removed", ahptypes.AutomationState{
+		Entries: []ahptypes.AutomationEntry{{Resource: automationURI}},
 	})
 	mirror.PutAutomationRun("removed", runURI, ahptypes.AutomationRunState{Resource: runURI})
-	mirror.PutAutomationCatalog("retained", ahptypes.AutomationCatalogState{
-		Automations: []ahptypes.AutomationState{{Resource: automationURI}},
+	mirror.PutAutomationCatalog("retained", ahptypes.AutomationState{
+		Entries: []ahptypes.AutomationEntry{{Resource: automationURI}},
 	})
 	mirror.PutAutomationRun("retained", runURI, ahptypes.AutomationRunState{Resource: runURI})
 
@@ -44,8 +44,8 @@ func TestMultiHostStateMirrorDropResourceRemovesAutomationCatalogue(t *testing.T
 	automationURI := ahptypes.URI("ahp-automation:/nightly")
 	runURI := ahptypes.URI("ahp-automation-run:/nightly/1")
 
-	mirror.PutAutomationCatalog("host", ahptypes.AutomationCatalogState{
-		Automations: []ahptypes.AutomationState{{Resource: automationURI}},
+	mirror.PutAutomationCatalog("host", ahptypes.AutomationState{
+		Entries: []ahptypes.AutomationEntry{{Resource: automationURI}},
 	})
 	mirror.PutAutomationRun("host", runURI, ahptypes.AutomationRunState{Resource: runURI})
 

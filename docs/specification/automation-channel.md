@@ -12,7 +12,7 @@ or from host-owned triggers.
 ahp-automations://
 ```
 
-Each `AutomationState.resource` is a stable `ahp-automation:/<id>` identifier
+Each `AutomationEntry.resource` is a stable `ahp-automation:/<id>` identifier
 chosen by `automation/createRequested`. Those identifiers target commands,
 actions, and relationships but are not independently subscribable channels. The
 host owns persistence, action ordering, trigger evaluation, run claims, and run
@@ -20,7 +20,7 @@ history.
 
 ## State
 
-`AutomationCatalogState.automations` contains the full `AutomationState` for
+`AutomationState.entries` contains the full `AutomationEntry` for
 every visible automation, keyed by `resource`. Each entry contains the complete
 definition, host-computed next scheduled run, a newest-first window of
 `AutomationRunSummary` entries, and allowed operations.
@@ -38,7 +38,7 @@ creation. Hosts revalidate all selections when a run starts.
 
 When `InitializeResult.automations` is present, clients subscribe to
 `ahp-automations://`. The subscription returns the complete
-`AutomationCatalogState` snapshot. Later catalogue changes use normal ordered
+`AutomationState` snapshot. Later catalogue changes use normal ordered
 actions and therefore participate in reconnect replay. If replay is unavailable,
 the host returns a fresh catalogue snapshot.
 
@@ -59,7 +59,7 @@ target entry's identifier as `automation`.
   at a client-chosen `resource` (client-dispatchable).
 - `automation/updateRequested` asks the host to apply a definition patch
   in action order (client-dispatchable).
-- `automation/set` adds or replaces one full `AutomationState` by `resource`
+- `automation/set` adds or replaces one full `AutomationEntry` by `resource`
   (server-only).
 - `automation/removed` permanently deletes one entry by `resource`
   (client-dispatchable or server-originated).
@@ -68,7 +68,7 @@ The host sequences all actions on `ahp-automations://`.
 
 Create and update requests are side-effect-only: their reducers leave catalogue
 state unchanged. The host validates and persists the requested mutation, then
-publishes the resulting full `AutomationState` through `automation/set`. A
+publishes the resulting full `AutomationEntry` through `automation/set`. A
 rejected request carries `ActionEnvelope.rejectionReason` and produces no
 catalogue mutation.
 

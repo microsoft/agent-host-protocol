@@ -49,8 +49,8 @@ public actor MultiHostStateMirror {
     public private(set) var changesets: [HostedResourceKey: ChangesetState] = [:]
     public private(set) var annotations: [HostedResourceKey: AnnotationsState] = [:]
     public private(set) var resourceWatches: [HostedResourceKey: ResourceWatchState] = [:]
-    public private(set) var automationCatalogs: [HostId: AutomationCatalogState] = [:]
-    public private(set) var automations: [HostedResourceKey: AutomationState] = [:]
+    public private(set) var automationCatalogs: [HostId: AutomationState] = [:]
+    public private(set) var automations: [HostedResourceKey: AutomationEntry] = [:]
     public private(set) var automationRuns: [HostedResourceKey: AutomationRunState] = [:]
 
     public init() {}
@@ -176,10 +176,10 @@ public actor MultiHostStateMirror {
         automationRuns.removeAll()
     }
 
-    private func setAutomationCatalog(host: HostId, catalog: AutomationCatalogState) {
+    private func setAutomationCatalog(host: HostId, catalog: AutomationState) {
         automationCatalogs[host] = catalog
         automations = automations.filter { $0.key.hostId != host }
-        for automation in catalog.automations {
+        for automation in catalog.entries {
             automations[HostedResourceKey(hostId: host, uri: automation.resource)] = automation
         }
     }

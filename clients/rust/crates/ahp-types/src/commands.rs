@@ -288,7 +288,7 @@ pub struct InitializeResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub telemetry: Option<TelemetryCapabilities>,
     /// Host-owned automation support. Presence means clients may subscribe to
-    /// `ahp-automations://` for {@link AutomationCatalogState}; absence means the
+    /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
@@ -324,7 +324,7 @@ pub struct ClientCapabilities {
 /// restrictions.
 ///
 /// Capabilities describe implementation support.
-/// {@link AutomationState.operations} remains authoritative for which
+/// {@link AutomationEntry.operations} remains authoritative for which
 /// definition mutations are currently allowed on a particular automation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -339,7 +339,7 @@ pub struct AutomationCapabilities {
     /// automation runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_cancellation: Option<AutomationRunCancellationCapability>,
-    /// Maximum terminal entries retained in {@link AutomationState.runs}. Active
+    /// Maximum terminal entries retained in {@link AutomationEntry.runs}. Active
     /// runs are not counted toward the limit. Absence means the retention limit is
     /// implementation-defined.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1619,7 +1619,7 @@ pub struct RunAutomationParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Target {@link AutomationState.resource}.
+    /// Target {@link AutomationEntry.resource}.
     pub automation: Uri,
     /// Durable client-generated idempotency key. Retrying with the same key and
     /// automation MUST return the original run URI rather than create another
@@ -1650,9 +1650,9 @@ pub struct FetchAutomationRunsParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
-    /// Target {@link AutomationState.resource}.
+    /// Target {@link AutomationEntry.resource}.
     pub automation: Uri,
-    /// Cursor previously received as {@link AutomationState.runsNextCursor}.
+    /// Cursor previously received as {@link AutomationEntry.runsNextCursor}.
     /// Omit to request the first page not already included by the snapshot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,

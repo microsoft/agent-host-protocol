@@ -214,7 +214,7 @@ public sealed record InitializeResult
     public TelemetryCapabilities? Telemetry { get; init; }
 
     /// <summary>Host-owned automation support. Presence means clients may subscribe to
-    /// `ahp-automations://` for {@link AutomationCatalogState}; absence means the
+    /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCapabilities? Automations { get; init; }
@@ -278,7 +278,7 @@ public sealed record ClientCapabilities
 /// restrictions.
 ///
 /// Capabilities describe implementation support.
-/// {@link AutomationState.operations} remains authoritative for which
+/// {@link AutomationEntry.operations} remains authoritative for which
 /// definition mutations are currently allowed on a particular automation.</summary>
 public sealed record AutomationCapabilities
 {
@@ -295,7 +295,7 @@ public sealed record AutomationCapabilities
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationRunCancellationCapability? RunCancellation { get; init; }
 
-    /// <summary>Maximum terminal entries retained in {@link AutomationState.runs}. Active
+    /// <summary>Maximum terminal entries retained in {@link AutomationEntry.runs}. Active
     /// runs are not counted toward the limit. Absence means the retention limit is
     /// implementation-defined.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1612,7 +1612,7 @@ public sealed record RunAutomationParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Target {@link AutomationState.resource}.</summary>
+    /// <summary>Target {@link AutomationEntry.resource}.</summary>
     public required string Automation { get; init; }
 
     /// <summary>Durable client-generated idempotency key. Retrying with the same key and
@@ -1645,10 +1645,10 @@ public sealed record FetchAutomationRunsParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    /// <summary>Target {@link AutomationState.resource}.</summary>
+    /// <summary>Target {@link AutomationEntry.resource}.</summary>
     public required string Automation { get; init; }
 
-    /// <summary>Cursor previously received as {@link AutomationState.runsNextCursor}.
+    /// <summary>Cursor previously received as {@link AutomationEntry.runsNextCursor}.
     /// Omit to request the first page not already included by the snapshot.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Cursor { get; init; }

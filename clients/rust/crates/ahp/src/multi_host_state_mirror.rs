@@ -39,7 +39,7 @@ use std::collections::HashMap;
 use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AnnotationsState, AutomationCatalogState, AutomationRunState, AutomationState, ChangesetState,
+    AnnotationsState, AutomationEntry, AutomationRunState, AutomationState, ChangesetState,
     ChatState, ResourceWatchState, RootState, SessionState, SnapshotState, TerminalState,
 };
 
@@ -97,8 +97,8 @@ pub struct MultiHostStateMirror {
     changesets: HashMap<HostedResourceKey, ChangesetState>,
     annotations: HashMap<HostedResourceKey, AnnotationsState>,
     resource_watches: HashMap<HostedResourceKey, ResourceWatchState>,
-    automation_catalogs: HashMap<HostId, AutomationCatalogState>,
-    automations: HashMap<HostedResourceKey, AutomationState>,
+    automation_catalogs: HashMap<HostId, AutomationState>,
+    automations: HashMap<HostedResourceKey, AutomationEntry>,
     automation_runs: HashMap<HostedResourceKey, AutomationRunState>,
 }
 
@@ -144,12 +144,12 @@ impl MultiHostStateMirror {
     }
 
     /// Borrow automation catalogue states keyed by host.
-    pub fn automation_catalogs(&self) -> &HashMap<HostId, AutomationCatalogState> {
+    pub fn automation_catalogs(&self) -> &HashMap<HostId, AutomationState> {
         &self.automation_catalogs
     }
 
     /// Borrow automation states keyed by `(host_id, uri)`.
-    pub fn automations(&self) -> &HashMap<HostedResourceKey, AutomationState> {
+    pub fn automations(&self) -> &HashMap<HostedResourceKey, AutomationEntry> {
         &self.automations
     }
 
@@ -191,7 +191,7 @@ impl MultiHostStateMirror {
         if envelope.channel == AUTOMATIONS_RESOURCE_URI {
             let automations = self.automation_catalogs.get_mut(host).map(|catalog| {
                 apply_action_to_automation(catalog, &envelope.action);
-                catalog.automations.clone()
+                catalog.entries.clone()
             });
             if let Some(automations) = automations {
                 self.replace_automations(host, automations);
@@ -250,7 +250,7 @@ impl MultiHostStateMirror {
             }
             SnapshotState::Automations(state) => {
                 let state = state.as_ref().clone();
-                self.replace_automations(host, state.automations.clone());
+                self.replace_automations(host, state.entries.clone());
                 self.automation_catalogs.insert(host.clone(), state);
             }
             SnapshotState::AutomationRun(state) => {
@@ -289,7 +289,7 @@ impl MultiHostStateMirror {
         self.automation_runs.clear();
     }
 
-    fn replace_automations(&mut self, host: &HostId, automations: Vec<AutomationState>) {
+    fn replace_automations(&mut self, host: &HostId, automations: Vec<AutomationEntry>) {
         self.automations.retain(|key, _| &key.host_id != host);
         for automation in automations {
             self.automations.insert(

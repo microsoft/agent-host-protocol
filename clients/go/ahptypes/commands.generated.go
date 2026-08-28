@@ -177,7 +177,7 @@ type InitializeResult struct {
 	// filtering). Clients MAY ignore signals they cannot process.
 	Telemetry *TelemetryCapabilities `json:"telemetry,omitempty"`
 	// Host-owned automation support. Presence means clients may subscribe to
-	// `ahp-automations://` for {@link AutomationCatalogState}; absence means the
+	// `ahp-automations://` for {@link AutomationState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
 }
@@ -209,7 +209,7 @@ type ClientCapabilities struct {
 // restrictions.
 //
 // Capabilities describe implementation support.
-// {@link AutomationState.operations} remains authoritative for which
+// {@link AutomationEntry.operations} remains authoritative for which
 // definition mutations are currently allowed on a particular automation.
 type AutomationCapabilities struct {
 	// Present when clients may dispatch {@link AutomationCreateRequestedAction}.
@@ -219,7 +219,7 @@ type AutomationCapabilities struct {
 	// Present when clients may request cancellation of `pending` or `running`
 	// automation runs.
 	RunCancellation *AutomationRunCancellationCapability `json:"runCancellation,omitempty"`
-	// Maximum terminal entries retained in {@link AutomationState.runs}. Active
+	// Maximum terminal entries retained in {@link AutomationEntry.runs}. Active
 	// runs are not counted toward the limit. Absence means the retention limit is
 	// implementation-defined.
 	RunHistoryLimit *int64 `json:"runHistoryLimit,omitempty"`
@@ -1265,7 +1265,7 @@ type RunAutomationParams struct {
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Target {@link AutomationState.resource}.
+	// Target {@link AutomationEntry.resource}.
 	Automation URI `json:"automation"`
 	// Durable client-generated idempotency key. Retrying with the same key and
 	// automation MUST return the original run URI rather than create another
@@ -1291,9 +1291,9 @@ type FetchAutomationRunsParams struct {
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
-	// Target {@link AutomationState.resource}.
+	// Target {@link AutomationEntry.resource}.
 	Automation URI `json:"automation"`
-	// Cursor previously received as {@link AutomationState.runsNextCursor}.
+	// Cursor previously received as {@link AutomationEntry.runsNextCursor}.
 	// Omit to request the first page not already included by the snapshot.
 	Cursor *string `json:"cursor,omitempty"`
 }

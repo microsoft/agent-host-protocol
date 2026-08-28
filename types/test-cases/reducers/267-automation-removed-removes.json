@@ -2,7 +2,7 @@
   "description": "automation removed deletes an existing catalogue entry",
   "reducer": "automation",
   "initial": {
-    "automations": [{
+    "entries": [{
       "resource": "ahp-automation:/a1",
       "definition": {
         "title": "A",
@@ -22,6 +22,6 @@
     "resource": "ahp-automation:/a1"
   }],
   "expected": {
-    "automations": []
+    "entries": []
   }
 }

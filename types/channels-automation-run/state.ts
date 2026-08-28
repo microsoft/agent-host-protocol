@@ -11,7 +11,7 @@ import type {
   AutomationEventTrigger,
   AutomationMisfirePolicy,
   AutomationScheduleTrigger,
-  AutomationState,
+  AutomationEntry,
 } from '../channels-automation/state.js';
 import type { RunAutomationParams } from '../channels-automation/commands.js';
 import type { SessionState } from '../channels-session/state.js';
@@ -232,7 +232,7 @@ export interface AutomationRunSummary {
 export interface AutomationRunState {
   /** URI of this automation-run channel. */
   resource: URI;
-  /** Owning `ahp-automation:` URI matching {@link AutomationState.resource}. */
+  /** Owning `ahp-automation:` URI matching {@link AutomationEntry.resource}. */
   automation: URI;
   /** Immutable provenance describing how this run was created. */
   origin: AutomationRunOrigin;

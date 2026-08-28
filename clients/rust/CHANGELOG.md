@@ -15,9 +15,9 @@ matching `## [X.Y.Z]` heading is missing from this file.
 
 ## [Unreleased]
 
-## [0.9.0] — 2026-08-27
+## [0.9.0] — 2026-08-28
 
-Implements AHP 1.0.0.
+Implements AHP 0.9.0.
 
 ### Added
 
@@ -34,6 +34,7 @@ Implements AHP 1.0.0.
 - Terminal state now uses an explicit `running`/`exited` lifecycle that preserves exits without an exit code.
 - Generated clients now preserve unknown values for nonexhaustive protocol enums and their discriminated unions.
 - `SessionToolClientExecutionRequest.toolCall` is narrowed to a running tool-call state.
+- Automation catalogue snapshots now use `AutomationState.entries`, whose items are named `AutomationEntry`.
 
 ### Removed
 
