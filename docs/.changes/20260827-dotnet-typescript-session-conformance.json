@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "A hermetic real-WebSocket conformance lane now verifies .NET session negotiation, initialize snapshot seeding, and streamed reducer convergence against a repository-local TypeScript host.",
+  "targets": ["dotnet"]
+}

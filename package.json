@@ -41,6 +41,7 @@
   "homepage": "https://github.com/microsoft/agent-host-protocol#readme",
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
     "c8": "^11.0.0",
@@ -50,6 +51,7 @@
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitepress": "^1.6.4",
-    "vitepress-plugin-mermaid": "^2.0.17"
+    "vitepress-plugin-mermaid": "^2.0.17",
+    "ws": "^8.21.3"
   }
 }

@@ -68,17 +68,14 @@ against `net8.0`:
    multi-host / host / client fake servers share one declarative loop helper,
    `FakeHost`.
 4. **Cross-implementation convergence** — `CrossImplementationConvergenceTests`
-   replays a session trace captured from an INDEPENDENT host (a separate
-   WebSocket host on the canonical TS `sessionReducer`) and asserts byte-identical
-   convergence (`serverSeq` + host-authoritative `modifiedAt`).
-
-Beyond CI, the **full `AhpClient` has been validated LIVE over a real WebSocket**
-against a spec-faithful AHP host built on the canonical `sessionReducer`: the
-real `initialize` request/response handshake, the snapshot in `InitializeResult`,
-and the live `action` notification stream all converge with the host. (No
-client in any language ships a real-socket integration test — they are all
-mock-transport-based; this validation is run out-of-band rather than committed,
-since it needs a Node host + the published package.)
+   replays a session trace captured from an independent host, while
+   `RealSocketTypeScriptConformanceTests` launches the repository-local
+   TypeScript conformance host over a real WebSocket and proves current-version
+   negotiation, snapshot seeding from `InitializeResult`, and streamed action
+   convergence through the handwritten C# reducers. The host imports the
+   canonical TypeScript `sessionReducer` directly and uses the development-only
+   `ws` package for server framing; it does not use a published package or an
+   external service.
 
 Cross-language parity is verified by the shared fixture corpora the suite
 replays — the 189 reducer fixtures (`types/test-cases/reducers/*.json`) and the

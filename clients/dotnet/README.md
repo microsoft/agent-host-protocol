@@ -164,6 +164,16 @@ local NuGet packages, and runs it as a native executable with
 initialization, reconnect replay, subscriptions and reducers, custom generic
 requests and notifications, and typed and raw inbound request handling.
 
+The .NET test suite also owns a hermetic cross-implementation lane. It starts a
+repository-local TypeScript WebSocket host that imports the canonical
+`sessionReducer`, connects through the real .NET `WebSocketTransport`, and
+verifies current protocol negotiation, `InitializeResult` snapshot seeding,
+and structurally equivalent state after the streamed actions pass through the
+handwritten C# reducers. Run `npm ci` at the repository root before
+`dotnet test` so the checked-in TypeScript host can use the repository's `tsx`
+toolchain and the development-only `ws` server; no published AHP package or
+separately running service is involved.
+
 ## Releasing
 
 1. Bump [`VERSION`](VERSION).

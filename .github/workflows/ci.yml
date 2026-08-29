@@ -281,6 +281,10 @@ jobs:
         working-directory: .
         run: npm ci
 
+      - name: Typecheck .NET interoperability host
+        working-directory: .
+        run: npx tsc -p clients/dotnet/tests/AgentHostProtocol.Tests/interop/tsconfig.json
+
       # Verify the committed C# sources are in sync with the TypeScript
       # protocol definitions. `git status --porcelain` (like the Kotlin / Go
       # jobs) so a newly-emitted file also fails the check.
