@@ -271,7 +271,7 @@ jobs:
       # The .NET 10 SDK builds the netstandard2.0 and net8.0 targets and
       # understands the .slnx solution format; the 8.0.x entry provides the
       # runtime used by the tests.
-      - uses: actions/setup-dotnet@d4c94342e560b34958eacfc5d055d21461ed1c5d # v5.0.0
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: |
             8.0.x
