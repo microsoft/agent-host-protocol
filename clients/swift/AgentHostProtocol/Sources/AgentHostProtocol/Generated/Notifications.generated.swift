@@ -8,7 +8,8 @@ import Foundation
 public enum AuthRequiredReason: Codable, Sendable, Equatable {
     /// The client has not yet authenticated for the resource
     case required
-    /// A previously valid token has expired or been revoked
+    /// A previously valid token has expired or been revoked. The client must
+    /// acquire or renew the credential rather than replaying the challenged token.
     case expired
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)

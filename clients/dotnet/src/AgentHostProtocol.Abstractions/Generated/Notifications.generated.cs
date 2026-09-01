@@ -16,7 +16,8 @@ public enum AuthRequiredReason
     /// <summary>The client has not yet authenticated for the resource</summary>
     [WireValue("required")]
     Required,
-    /// <summary>A previously valid token has expired or been revoked</summary>
+    /// <summary>A previously valid token has expired or been revoked. The client must
+    /// acquire or renew the credential rather than replaying the challenged token.</summary>
     [WireValue("expired")]
     Expired,
 }
@@ -151,8 +152,9 @@ public sealed record ProgressParams
 /// to; the `resource` field carries the complete OAuth protected resource
 /// metadata (per RFC 9728).
 ///
-/// Clients should obtain a fresh token and push it via the `authenticate`
-/// command.</summary>
+/// Clients should obtain or renew the credential and push the resulting token
+/// via the `authenticate` command. When `reason` is `expired`, clients MUST NOT
+/// blindly replay the challenged token.</summary>
 public sealed record AuthRequiredParams
 {
     /// <summary>Channel URI this notification belongs to</summary>

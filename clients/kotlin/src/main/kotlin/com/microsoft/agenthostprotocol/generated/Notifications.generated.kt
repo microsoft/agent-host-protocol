@@ -34,7 +34,8 @@ value class AuthRequiredReason(val rawValue: String) {
          */
         val REQUIRED: AuthRequiredReason = AuthRequiredReason("required")
         /**
-         * A previously valid token has expired or been revoked
+         * A previously valid token has expired or been revoked. The client must
+         * acquire or renew the credential rather than replaying the challenged token.
          */
         val EXPIRED: AuthRequiredReason = AuthRequiredReason("expired")
     }

@@ -1253,6 +1253,20 @@ public sealed record AuthenticateParams
     /// <summary>Bearer token obtained from the resource's authorization server</summary>
     public required string Token { get; init; }
 
+    /// <summary>The access token's remaining lifetime, in seconds, when this
+    /// `authenticate` request is sent. This corresponds to `expires_in` in an
+    /// OAuth 2.0 token response (RFC 6749 section 5.1).
+    ///
+    /// If the client retained the original token response, it MUST subtract the
+    /// elapsed time before forwarding this value. Omit this field when the
+    /// authorization server did not supply an expiry or the expiry is otherwise
+    /// unknown. When supplied, the value MUST be a positive integer.
+    ///
+    /// This field is irrelevant when `token` is empty to revoke authentication
+    /// and SHOULD be omitted in that case.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? ExpiresIn { get; init; }
+
     /// <summary>OAuth scopes the token grants, when known. Lets the server determine
     /// whether a specific challenge — e.g. the `requiredScopes` on a live
     /// `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth` — is
