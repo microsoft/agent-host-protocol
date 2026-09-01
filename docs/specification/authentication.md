@@ -18,7 +18,7 @@ sequenceDiagram
     C->>AS: OAuth token request
     AS-->>C: Token
 
-    C->>S: authenticate({ resource, token })
+    C->>S: authenticate({ resource, token, expiresIn })
     S-->>C: {}
 
     C->>S: createSession / other commands
@@ -99,6 +99,7 @@ Clients push Bearer tokens to the server using the [`authenticate`](/reference/c
     "channel": "ahp-root://",
     "resource": "https://api.github.com",
     "token": "gho_xxxxxxxxxxxx",
+    "expiresIn": 3540,
     "scopes": ["read:user", "user:email"]
   }
 }
@@ -110,6 +111,10 @@ Clients push Bearer tokens to the server using the [`authenticate`](/reference/c
   "result": {}
 }
 ```
+
+`expiresIn` is optional and corresponds to the `expires_in` field in an OAuth 2.0 token response, as defined by [RFC 6749 section 5.1](https://datatracker.ietf.org/doc/html/rfc6749#section-5.1). It is the access token's remaining lifetime in seconds when the client sends the `authenticate` request. When supplied, it MUST be a positive integer.
+
+If the client retained the original token response, it MUST subtract elapsed time from the original `expires_in` value before forwarding it. The client MUST omit `expiresIn` when the authorization server did not supply an expiry or the expiry is otherwise unknown. An empty `token` revokes authentication for the resource; `expiresIn` is irrelevant and SHOULD be omitted in that request.
 
 `scopes` is optional and lets the client tell the server which OAuth scopes the pushed token actually grants — useful when resolving a `requiredScopes` challenge (from a live `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth`) without the server needing to decode an opaque token.
 
@@ -190,7 +195,9 @@ The `resource` field carries the complete [`ProtectedResourceMetadata`](/referen
 | Value | Description |
 |---|---|
 | `required` | The client has not yet authenticated for the resource |
-| `expired` | A previously valid token has expired or been revoked |
+| `expired` | A previously valid token has expired or been revoked; the client must acquire or renew the credential |
+
+When `reason` is `expired`, the client MUST acquire a new credential or renew the existing credential before calling `authenticate` again. It MUST NOT blindly replay the challenged token.
 
 Like all protocol notifications, `auth/required` is ephemeral and is **not** replayed on reconnection. Clients SHOULD re-check authentication requirements after reconnecting.
 
@@ -210,6 +217,10 @@ Using the standard OAuth 2.0 Protected Resource Metadata format means:
 - Clients may authenticate for multiple resources independently
 - Tokens can be refreshed or rotated without re-initializing the connection
 - Not all clients need to authenticate (some agents may not require auth)
+
+### Why `expiresIn` instead of `expiresAt`?
+
+`expiresIn` follows the OAuth token endpoint's existing `expires_in` vocabulary and reports the lifetime relative to the `authenticate` request. A relative lifetime does not require the client and host clocks to be synchronized.
 
 ### Why not store auth status in root state?
 

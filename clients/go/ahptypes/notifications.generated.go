@@ -21,7 +21,8 @@ type AuthRequiredReason string
 const (
 	// The client has not yet authenticated for the resource
 	AuthRequiredReasonRequired AuthRequiredReason = "required"
-	// A previously valid token has expired or been revoked
+	// A previously valid token has expired or been revoked. The client must
+	// acquire or renew the credential rather than replaying the challenged token.
 	AuthRequiredReasonExpired AuthRequiredReason = "expired"
 )
 
@@ -141,8 +142,9 @@ type ProgressParams struct {
 // to; the `resource` field carries the complete OAuth protected resource
 // metadata (per RFC 9728).
 //
-// Clients should obtain a fresh token and push it via the `authenticate`
-// command.
+// Clients should obtain or renew the credential and push the resulting token
+// via the `authenticate` command. When `reason` is `expired`, clients MUST NOT
+// blindly replay the challenged token.
 type AuthRequiredParams struct {
 	// Channel URI this notification belongs to
 	Channel URI `json:"channel"`

@@ -32,6 +32,7 @@ interface JsonSchema {
   items?: JsonSchema;
   enum?: Array<string | number | boolean>;
   const?: string | number | boolean;
+  minimum?: number;
   oneOf?: JsonSchema[];
   allOf?: JsonSchema[];
   anyOf?: JsonSchema[];
@@ -53,6 +54,28 @@ function getPropertyDescription(prop: PropertySignature): string {
   const jsDocs = prop.getJsDocs();
   if (jsDocs.length === 0) return '';
   return normalizeDescription(jsDocs[0].getDescription());
+}
+
+function hasPropertyTag(prop: PropertySignature, tagName: string): boolean {
+  return prop.getJsDocs()
+    .flatMap(doc => doc.getTags())
+    .some(tag => tag.getTagName() === tagName);
+}
+
+function getNumericPropertyTag(prop: PropertySignature, tagName: string): number | undefined {
+  const tag = prop.getJsDocs()
+    .flatMap(doc => doc.getTags())
+    .find(candidate => candidate.getTagName() === tagName);
+  if (!tag) return undefined;
+
+  const text = tag.getCommentText()?.trim();
+  const value = text === undefined ? Number.NaN : Number(text);
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      `${prop.getSourceFile().getFilePath()}: ${prop.getName()} has invalid @${tagName} value ${JSON.stringify(text)}`,
+    );
+  }
+  return value;
 }
 
 function getInterfaceDescription(node: InterfaceDeclaration): string {
@@ -336,6 +359,23 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
     const desc = getPropertyDescription(prop);
     const propSchema = typeTextToSchema(typeText, project);
     if (desc) propSchema.description = desc;
+    if (hasPropertyTag(prop, 'integer')) {
+      if (propSchema.type !== 'number') {
+        throw new Error(
+          `${prop.getSourceFile().getFilePath()}: ${name} uses @integer on ${typeText}`,
+        );
+      }
+      propSchema.type = 'integer';
+    }
+    const minimum = getNumericPropertyTag(prop, 'minimum');
+    if (minimum !== undefined) {
+      if (propSchema.type !== 'number' && propSchema.type !== 'integer') {
+        throw new Error(
+          `${prop.getSourceFile().getFilePath()}: ${name} uses a numeric schema constraint on ${typeText}`,
+        );
+      }
+      propSchema.minimum = minimum;
+    }
     schema.properties![name] = propSchema;
     if (!prop.hasQuestionToken() && !typeAdmitsUndefined(typeText)) {
       if (!schema.required!.includes(name)) {

@@ -183,6 +183,23 @@ describe('generated JSON schemas', () => {
         assert.equal(properties.minIntervalMinutes.type, 'number');
       });
 
+      it('exposes the optional authenticate token lifetime', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const authenticate = defs.AuthenticateParams;
+        const properties = authenticate.properties as Record<string, Record<string, unknown>>;
+        const required = authenticate.required as string[];
+        const expiresIn = properties.expiresIn;
+
+        assert.equal(expiresIn.type, 'integer');
+        assert.equal(expiresIn.minimum, 1);
+        assert.equal(required.includes('expiresIn'), false);
+        assert.match(expiresIn.description as string, /remaining lifetime, in seconds/);
+        assert.match(expiresIn.description as string, /MUST be a positive integer/);
+      });
+
       it('constrains every ChatOrigin branch to a distinct kind', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const chatOrigin = defs.ChatOrigin;
