@@ -33,7 +33,6 @@ interface JsonSchema {
   enum?: Array<string | number | boolean>;
   const?: string | number | boolean;
   minimum?: number;
-  multipleOf?: number;
   oneOf?: JsonSchema[];
   allOf?: JsonSchema[];
   anyOf?: JsonSchema[];
@@ -55,6 +54,12 @@ function getPropertyDescription(prop: PropertySignature): string {
   const jsDocs = prop.getJsDocs();
   if (jsDocs.length === 0) return '';
   return normalizeDescription(jsDocs[0].getDescription());
+}
+
+function hasPropertyTag(prop: PropertySignature, tagName: string): boolean {
+  return prop.getJsDocs()
+    .flatMap(doc => doc.getTags())
+    .some(tag => tag.getTagName() === tagName);
 }
 
 function getNumericPropertyTag(prop: PropertySignature, tagName: string): number | undefined {
@@ -354,23 +359,22 @@ function interfaceToSchema(iface: InterfaceDeclaration, project: Project): JsonS
     const desc = getPropertyDescription(prop);
     const propSchema = typeTextToSchema(typeText, project);
     if (desc) propSchema.description = desc;
-    const minimum = getNumericPropertyTag(prop, 'minimum');
-    const multipleOf = getNumericPropertyTag(prop, 'multipleOf');
-    if (minimum !== undefined || multipleOf !== undefined) {
+    if (hasPropertyTag(prop, 'integer')) {
       if (propSchema.type !== 'number') {
+        throw new Error(
+          `${prop.getSourceFile().getFilePath()}: ${name} uses @integer on ${typeText}`,
+        );
+      }
+      propSchema.type = 'integer';
+    }
+    const minimum = getNumericPropertyTag(prop, 'minimum');
+    if (minimum !== undefined) {
+      if (propSchema.type !== 'number' && propSchema.type !== 'integer') {
         throw new Error(
           `${prop.getSourceFile().getFilePath()}: ${name} uses a numeric schema constraint on ${typeText}`,
         );
       }
-      if (multipleOf !== undefined && multipleOf <= 0) {
-        throw new Error(
-          `${prop.getSourceFile().getFilePath()}: ${name} has non-positive @multipleOf value ${multipleOf}`,
-        );
-      }
       propSchema.minimum = minimum;
-      propSchema.multipleOf = multipleOf;
-      if (minimum === undefined) delete propSchema.minimum;
-      if (multipleOf === undefined) delete propSchema.multipleOf;
     }
     schema.properties![name] = propSchema;
     if (!prop.hasQuestionToken() && !typeAdmitsUndefined(typeText)) {

@@ -193,9 +193,8 @@ describe('generated JSON schemas', () => {
         const required = authenticate.required as string[];
         const expiresIn = properties.expiresIn;
 
-        assert.equal(expiresIn.type, 'number');
+        assert.equal(expiresIn.type, 'integer');
         assert.equal(expiresIn.minimum, 1);
-        assert.equal(expiresIn.multipleOf, 1);
         assert.equal(required.includes('expiresIn'), false);
         assert.match(expiresIn.description as string, /remaining lifetime, in seconds/);
         assert.match(expiresIn.description as string, /MUST be a positive integer/);

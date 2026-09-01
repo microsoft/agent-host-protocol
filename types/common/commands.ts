@@ -1170,8 +1170,8 @@ export interface AuthenticateParams extends BaseParams {
    * This field is irrelevant when `token` is empty to revoke authentication
    * and SHOULD be omitted in that case.
    *
+   * @integer
    * @minimum 1
-   * @multipleOf 1
    */
   expiresIn?: number;
   /**

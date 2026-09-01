@@ -6528,10 +6528,9 @@
           "description": "Bearer token obtained from the resource's authorization server"
         },
         "expiresIn": {
-          "type": "number",
+          "type": "integer",
           "description": "The access token's remaining lifetime, in seconds, when this\n`authenticate` request is sent. This corresponds to `expires_in` in an\nOAuth 2.0 token response (RFC 6749 section 5.1).\n\nIf the client retained the original token response, it MUST subtract the\nelapsed time before forwarding this value. Omit this field when the\nauthorization server did not supply an expiry or the expiry is otherwise\nunknown. When supplied, the value MUST be a positive integer.\n\nThis field is irrelevant when `token` is empty to revoke authentication\nand SHOULD be omitted in that case.",
-          "minimum": 1,
-          "multipleOf": 1
+          "minimum": 1
         },
         "scopes": {
           "type": "array",
