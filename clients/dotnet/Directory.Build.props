@@ -45,6 +45,21 @@
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
+  <!-- Release builds delay-sign with the Microsoft shared-library public key
+       supplied by the vscode-engineering template. ESRP completes and verifies
+       the signature before Authenticode signing and packing. The test assembly
+       uses the same key so InternalsVisibleTo remains valid in release builds. -->
+  <PropertyGroup Condition="
+      '$(StrongNamePublicKeyFile)' != '' And
+      ('$(MSBuildProjectName)' == 'AgentHostProtocol' Or
+       '$(MSBuildProjectName)' == 'AgentHostProtocol.Abstractions' Or
+       '$(MSBuildProjectName)' == 'AgentHostProtocol.Tests')">
+    <DefineConstants>$(DefineConstants);STRONG_NAME_SIGNING</DefineConstants>
+    <SignAssembly>true</SignAssembly>
+    <DelaySign>true</DelaySign>
+    <AssemblyOriginatorKeyFile>$(StrongNamePublicKeyFile)</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <Compile Include="$(MSBuildThisFileDirectory)Compatibility\NetStandardPolyfills.cs"
              Link="Compatibility\NetStandardPolyfills.cs" />

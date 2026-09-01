@@ -30,3 +30,6 @@ clients/kotlin/.gradle/
 clients/kotlin/build/
 clients/kotlin/.kotlin/
 clients/kotlin/local.properties
+
+# Strong-name key material is supplied by the vscode-engineering release template.
+clients/dotnet/*.snk

@@ -477,6 +477,19 @@ this release negotiates.
   receive buffer dropped a frame; the receive loop now grows the buffer after
   copying the previous frame rather than before.
 
+## [0.9.1] — 2026-09-01
+
+Implements AHP 0.9.0.
+
+### Added
+
+- A hermetic real-WebSocket conformance lane now verifies .NET session negotiation, initialize snapshot seeding, and streamed reducer convergence against a repository-local TypeScript host.
+- `AuthenticateParams.expiresIn` carries an OAuth access token's remaining lifetime in seconds.
+
+### Changed
+
+- The .NET assemblies are now strong-name signed with public key token `f300afd708cefcd3`.
+
 ## [0.9.0] — 2026-08-28
 
 Implements AHP 0.9.0.

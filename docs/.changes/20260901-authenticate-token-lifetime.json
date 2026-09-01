@@ -1,4 +1,12 @@
 {
   "type": "added",
-  "message": "`AuthenticateParams.expiresIn` carries an OAuth access token's remaining lifetime in seconds."
+  "message": "`AuthenticateParams.expiresIn` carries an OAuth access token's remaining lifetime in seconds.",
+  "targets": [
+    "spec",
+    "rust",
+    "kotlin",
+    "typescript",
+    "swift",
+    "go"
+  ]
 }

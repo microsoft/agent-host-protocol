@@ -1,6 +1,6 @@
 {
   "client": "dotnet",
-  "packageVersion": "0.9.0",
+  "packageVersion": "0.9.1",
   "supportedProtocolVersions": [
     "0.9.0",
     "0.8.0",

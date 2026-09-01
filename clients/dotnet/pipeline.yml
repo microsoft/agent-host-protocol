@@ -5,8 +5,9 @@ name: $(Date:yyyyMMdd)$(Rev:.r)
 #
 #   1. Push a `dotnet/vX.Y.Z` tag from the repo root.
 #   2. ADO validates the release metadata, builds and tests both libraries,
-#      Authenticode-signs their DLLs, packs them, author-signs the resulting
-#      .nupkg/.snupkg files through ESRP, and publishes them to NuGet.org.
+#      strong-name- and Authenticode-signs their DLLs, packs them, author-signs
+#      the resulting .nupkg/.snupkg files through ESRP, and publishes them to
+#      NuGet.org.
 #
 # Manual runs are signed dry runs by default. Tick `publish` only for a manual
 # hotfix publish; `dotnet/v*` tag-triggered runs publish automatically.
@@ -30,7 +31,7 @@ resources:
     - repository: templates
       type: github
       name: microsoft/vscode-engineering
-      ref: refs/heads/main
+      ref: refs/heads/strong-name-signing
       endpoint: Monaco
 
 extends:
@@ -47,6 +48,11 @@ extends:
     nodeVersion: 22.x
     contentSigningFolder: $(Build.SourcesDirectory)/clients/dotnet/src
     contentSigningPattern: "**/bin/Release/**/Microsoft.AgentHostProtocol*.dll"
+    strongNameSigning:
+      enabled: true
+      folderPath: $(Build.SourcesDirectory)/clients/dotnet/src
+      keyCode: CP-233904-SN
+      pattern: "**/bin/Release/**/Microsoft.AgentHostProtocol*.dll"
 
     buildSteps:
       - script: npm ci
@@ -111,6 +117,8 @@ extends:
           --no-restore
           --configuration Release
           -p:ContinuousIntegrationBuild=true
+          -p:StrongNamePublicKeyFile="$(StrongNamePublicKeyFile)"
+          -p:StrongNamePublicKey="$(StrongNamePublicKey)"
         workingDirectory: clients/dotnet
         displayName: 🛠 Build .NET solution
 
