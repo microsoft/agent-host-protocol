@@ -1058,6 +1058,15 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 }
 
 func applyTurnStarted(state *ahptypes.ChatState, a *ahptypes.ChatTurnStartedAction) ReduceOutcome {
+	// A replayed start must not reset the turn in progress or resurrect a finished one.
+	if state.ActiveTurn != nil && state.ActiveTurn.Id == a.TurnId {
+		return ReduceOutcomeNoOp
+	}
+	for _, turn := range state.Turns {
+		if turn.Id == a.TurnId {
+			return ReduceOutcomeNoOp
+		}
+	}
 	state.ActiveTurn = &ahptypes.ActiveTurn{
 		Id:            a.TurnId,
 		StartedAt:     a.StartedAt,

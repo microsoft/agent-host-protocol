@@ -356,6 +356,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
     // ── Turn Lifecycle ────────────────────────────────────────────────────
 
     case ActionType.ChatTurnStarted: {
+      // A replayed start must not reset the turn in progress or resurrect a finished one.
       const alreadyStarted = state.activeTurn?.id === action.turnId
         || state.turns.some(turn => turn.id === action.turnId);
       if (alreadyStarted) {

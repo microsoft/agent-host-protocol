@@ -1093,6 +1093,13 @@ public static class Reducers
 
     private static ReduceOutcome ApplyChatTurnStarted(ChatState state, ChatTurnStartedAction a)
     {
+        // A replayed start must not reset the turn in progress or resurrect a finished one.
+        if ((state.ActiveTurn is not null && state.ActiveTurn.Id == a.TurnId)
+            || state.Turns.Exists(t => t.Id == a.TurnId))
+        {
+            return ReduceOutcome.NoOp;
+        }
+
         state.ActiveTurn = new ActiveTurn
         {
             Id = a.TurnId,
