@@ -1,0 +1,4 @@
+{
+  "type": "fixed",
+  "message": "`chat/turnStarted` is a no-op when its `turnId` is already the active turn or an already-completed turn, so a replayed start no longer resets a streaming turn."
+}
