@@ -27,8 +27,8 @@ flowchart LR
         AC["SessionActiveClient\n.customizations"]
     end
 
-    AI -- "host resolves & parses\non session create" --> SC
-    AC -- "client publishes ClientPluginCustomization\nvia activeClientSet" --> SC
+    AI -- "host resolves & parses\non session create" --> SC        
+    AC -- "client publishes\nClientPluginCustomization\nvia activeClientSet" --> SC
 ```
 
 Clients publish in Open Plugins shape only. They MAY synthesize a virtual plugin in memory if their real source is on disk; mapping a workspace location to a physical directory is the host's job, not the client's.
