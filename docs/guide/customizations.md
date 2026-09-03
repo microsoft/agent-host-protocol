@@ -27,7 +27,7 @@ flowchart LR
         AC["SessionActiveClient\n.customizations"]
     end
 
-    AI -- "host resolves & parses\non session create" --> SC        
+    AI -- "host resolves & parses\non session create" --> SC
     AC -- "client publishes\nClientPluginCustomization\nvia activeClientSet" --> SC
 ```
 
