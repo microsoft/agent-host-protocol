@@ -1362,10 +1362,17 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatUsage -> {
         val a = action.value
         val activeTurn = state.activeTurn
-        if (activeTurn == null || activeTurn.id != a.turnId) {
-            state
-        } else {
+        if (activeTurn != null && activeTurn.id == a.turnId) {
             state.copy(activeTurn = activeTurn.copy(usage = a.usage))
+        } else {
+            val idx = state.turns.indexOfFirst { it.id == a.turnId }
+            if (idx < 0) {
+                state
+            } else {
+                val turns = state.turns.toMutableList()
+                turns[idx] = turns[idx].copy(usage = a.usage)
+                state.copy(turns = turns)
+            }
         }
     }
 

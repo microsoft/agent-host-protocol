@@ -641,12 +641,19 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		}
 		return res
 	case *ahptypes.ChatUsageAction:
-		if state.ActiveTurn == nil || state.ActiveTurn.Id != a.TurnId {
-			return ReduceOutcomeNoOp
+		if state.ActiveTurn != nil && state.ActiveTurn.Id == a.TurnId {
+			usage := a.Usage
+			state.ActiveTurn.Usage = &usage
+			return ReduceOutcomeApplied
 		}
-		usage := a.Usage
-		state.ActiveTurn.Usage = &usage
-		return ReduceOutcomeApplied
+		for i := range state.Turns {
+			if state.Turns[i].Id == a.TurnId {
+				usage := a.Usage
+				state.Turns[i].Usage = &usage
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
 	case *ahptypes.ChatReasoningAction:
 		return updateResponsePart(state, a.TurnId, a.PartId, func(p *ahptypes.ResponsePart) {
 			if r, ok := p.Value.(*ahptypes.ReasoningResponsePart); ok {

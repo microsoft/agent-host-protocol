@@ -279,6 +279,12 @@ Implements AHP 0.5.0.
   published tools by re-dispatching `SessionActiveClientSetAction` with its
   full, updated entry.
 
+### Fixed
+
+- `ApplyActionToChat` now updates the matching turn in `Turns` when a
+  `ChatUsageAction` targets a completed (non-active) turn, rather than
+  ignoring the action.
+
 ## [0.4.0] — 2026-06-19
 
 Implements AHP 0.4.0.

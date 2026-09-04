@@ -281,6 +281,12 @@ Implements AHP 0.5.0.
   (`StateAction.sessionAgentChanged`, `session/agentChanged`), along with their
   session-reducer handling.
 
+### Fixed
+
+- `chatReducer` now updates the matching turn in `turns` when a
+  `StateAction.chatUsage` targets a completed (non-active) turn, rather than
+  ignoring the action.
+
 ## [0.4.0] — 2026-06-19
 
 Implements AHP 0.4.0.
