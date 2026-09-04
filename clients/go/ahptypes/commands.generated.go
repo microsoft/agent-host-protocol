@@ -1016,6 +1016,10 @@ type AuthenticateParams struct {
 	// Omit when the client doesn't track granted scopes separately from the
 	// token.
 	Scopes []string `json:"scopes,omitempty"`
+	// Exact, case-sensitive MCP server configuration name when the token resolves
+	// a server-owned authentication request. The host MUST apply the token only
+	// to that named server. Omit for provider-level protected resources.
+	ServerName *string `json:"serverName,omitempty"`
 }
 
 // Result of the `authenticate` command.

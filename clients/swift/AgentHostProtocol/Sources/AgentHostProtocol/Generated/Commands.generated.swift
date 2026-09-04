@@ -1484,6 +1484,10 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Omit when the client doesn't track granted scopes separately from the
     /// token.
     public var scopes: [String]?
+    /// Exact, case-sensitive MCP server configuration name when the token resolves
+    /// a server-owned authentication request. The host MUST apply the token only
+    /// to that named server. Omit for provider-level protected resources.
+    public var serverName: String?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1492,6 +1496,7 @@ public struct AuthenticateParams: Codable, Sendable {
         case token
         case expiresIn
         case scopes
+        case serverName
     }
 
     public init(
@@ -1500,7 +1505,8 @@ public struct AuthenticateParams: Codable, Sendable {
         resource: String,
         token: String,
         expiresIn: Int? = nil,
-        scopes: [String]? = nil
+        scopes: [String]? = nil,
+        serverName: String? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1508,6 +1514,7 @@ public struct AuthenticateParams: Codable, Sendable {
         self.token = token
         self.expiresIn = expiresIn
         self.scopes = scopes
+        self.serverName = serverName
     }
 }
 

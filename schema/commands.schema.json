@@ -886,6 +886,10 @@
             "type": "string"
           },
           "description": "OAuth scopes the token grants, when known. Lets the server determine\nwhether a specific challenge — e.g. the `requiredScopes` on a live\n`McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth` — is\nsatisfied without decoding the (opaque, server-specific) token itself.\nOmit when the client doesn't track granted scopes separately from the\ntoken."
+        },
+        "serverName": {
+          "type": "string",
+          "description": "Exact, case-sensitive MCP server configuration name when the token resolves\na server-owned authentication request. The host MUST apply the token only\nto that named server. Omit for provider-level protected resources."
         }
       },
       "required": [
