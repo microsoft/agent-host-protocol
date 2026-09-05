@@ -14,7 +14,7 @@ The package exposes four subpath exports:
 | Import path | What it gives you |
 |---|---|
 | `@microsoft/agent-host-protocol`        | Wire types, actions, commands, reducers, version constants. No I/O. |
-| `@microsoft/agent-host-protocol/client` | `AhpClient`, `Subscription`, `AhpStateMirror`, the `AhpTransport` interface, `InMemoryTransport`, and the error taxonomy. |
+| `@microsoft/agent-host-protocol/client` | `AhpClient`, `Subscription`, `ManagedSubscriptionManager`, `AhpStateMirror`, the `AhpTransport` interface, `InMemoryTransport`, and the error taxonomy. |
 | `@microsoft/agent-host-protocol/hosts`  | `MultiHostClient`, `HostClientHandle`, `ReconnectPolicy`, `ClientIdStore` (with `InMemoryClientIdStore`), `MultiHostStateMirror`, and the `Host*Error` family. Builds on `/client` to manage one or more host connections with reconnect, generation-checked handles, and fan-in events. |
 | `@microsoft/agent-host-protocol/ws`     | `WebSocketTransport` — an `AhpTransport` implementation backed by the global `WebSocket`. |
 
@@ -78,6 +78,45 @@ class MyTransport implements AhpTransport {
 
 `InMemoryTransport.pair()` returns two connected halves that exchange
 text frames — handy for unit tests that don't need a real socket.
+
+## Shared subscription ownership
+
+`ManagedSubscriptionManager` coalesces concurrent consumers of the same URI
+onto one wire-level subscription. Each named lease receives an independent
+event iterator. Disposing the last lease sends `unsubscribe`; failed subscriptions are
+cleaned up so the next acquire makes a fresh request.
+
+```ts
+import type { SessionState } from '@microsoft/agent-host-protocol';
+import {
+  ManagedSubscriptionManager,
+  type SubscriptionEvent,
+} from '@microsoft/agent-host-protocol/client';
+
+const subscriptions = new ManagedSubscriptionManager(client);
+let consume: Promise<void>;
+{
+  using lease = subscriptions.acquire<SessionState, SubscriptionEvent>(
+    sessionUri,
+    'SessionEditor',
+  );
+
+  const { snapshot } = await lease.subscription.ready;
+  if (snapshot) mirror.applySnapshot(snapshot);
+  consume = (async () => {
+    for await (const event of lease.events) {
+      if (event.type === 'action') mirror.apply(event.params);
+    }
+  })();
+
+  // Use the subscription. Leaving this block disposes the lease.
+}
+await consume;
+```
+
+Acquire the lease before awaiting `ready`: its event iterator is attached
+before the `subscribe` request is sent, so actions delivered during the
+snapshot round-trip remain ordered behind that snapshot instead of being lost.
 
 ## Reducers and state mirror
 
