@@ -1675,6 +1675,20 @@ public sealed class SessionActiveClient
     /// children inside {@link SessionState.customizations}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ClientPluginCustomization>? Customizations { get; set; }
+
+    /// <summary>Additional provider-specific metadata about this active client, such as
+    /// the participant role a host assigns to a connection or whether the host
+    /// treats it as read-only. Mirrors the MCP `_meta` convention.
+    ///
+    /// A host SHOULD stamp participant semantics here explicitly rather than
+    /// leaving consumers to infer them: an empty
+    /// {@link SessionActiveClient.tools | `tools`} or
+    /// {@link SessionActiveClient.customizations | `customizations`} list means
+    /// only that the client publishes nothing, never that it is read-only. See
+    /// the customizations guide for the full `_meta` semantics.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; set; }
 }
 
 /// <summary>A user-input elicitation surfaced at the session level, mirroring the request

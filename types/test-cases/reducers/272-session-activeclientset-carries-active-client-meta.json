@@ -1,0 +1,75 @@
+{
+  "description": "session/activeClientSet carries SessionActiveClient._meta into state: a host stamps participant metadata on a joining client (insert branch) and later restamps it on the existing entry (replace branch), while a client that publishes no _meta keeps none",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/activeClientSet",
+      "activeClient": {
+        "clientId": "vscode-1",
+        "displayName": "VS Code",
+        "tools": [],
+        "_meta": {
+          "com.example.collaboration": {
+            "role": "viewer",
+            "readOnly": true
+          }
+        }
+      }
+    },
+    {
+      "type": "session/activeClientSet",
+      "activeClient": {
+        "clientId": "cli-1",
+        "displayName": "CLI",
+        "tools": []
+      }
+    },
+    {
+      "type": "session/activeClientSet",
+      "activeClient": {
+        "clientId": "vscode-1",
+        "displayName": "VS Code",
+        "tools": [],
+        "_meta": {
+          "com.example.collaboration": {
+            "role": "editor",
+            "readOnly": false
+          }
+        }
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [
+      {
+        "clientId": "vscode-1",
+        "displayName": "VS Code",
+        "tools": [],
+        "_meta": {
+          "com.example.collaboration": {
+            "role": "editor",
+            "readOnly": false
+          }
+        }
+      },
+      {
+        "clientId": "cli-1",
+        "displayName": "CLI",
+        "tools": []
+      }
+    ],
+    "chats": []
+  }
+}
