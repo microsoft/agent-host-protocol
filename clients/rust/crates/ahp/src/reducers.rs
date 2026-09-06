@@ -1325,6 +1325,12 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
 }
 
 fn apply_turn_started(state: &mut ChatState, a: &ChatTurnStartedAction) -> ReduceOutcome {
+    // A replayed start must not reset the turn in progress or resurrect a finished one.
+    let already_started = state.active_turn.as_ref().is_some_and(|t| t.id == a.turn_id)
+        || state.turns.iter().any(|t| t.id == a.turn_id);
+    if already_started {
+        return ReduceOutcome::NoOp;
+    }
     state.active_turn = Some(ActiveTurn {
         id: a.turn_id.clone(),
         started_at: a.started_at.clone(),

@@ -867,32 +867,39 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatTurnStarted -> {
         val a = action.value
-        val withTurn = state.copy(
-            activeTurn = ActiveTurn(
-                id = a.turnId,
-                startedAt = a.startedAt,
-                message = a.message,
-                responseParts = emptyList(),
-                usage = null,
-            ),
-        )
-        val withStatus = withTurn.copy(
-            status = withStatusFlag(chatSummaryStatus(withTurn), SessionStatus.IS_READ, false),
-            modifiedAt = a.startedAt,
-        )
-        if (a.queuedMessageId == null) {
-            withStatus
+        // A replayed start must not reset the turn in progress or resurrect a finished one.
+        val alreadyStarted = state.activeTurn?.id == a.turnId ||
+            state.turns.any { it.id == a.turnId }
+        if (alreadyStarted) {
+            state
         } else {
-            var next = withStatus
-            if (next.steeringMessage?.id == a.queuedMessageId) {
-                next = next.copy(steeringMessage = null)
+            val withTurn = state.copy(
+                activeTurn = ActiveTurn(
+                    id = a.turnId,
+                    startedAt = a.startedAt,
+                    message = a.message,
+                    responseParts = emptyList(),
+                    usage = null,
+                ),
+            )
+            val withStatus = withTurn.copy(
+                status = withStatusFlag(chatSummaryStatus(withTurn), SessionStatus.IS_READ, false),
+                modifiedAt = a.startedAt,
+            )
+            if (a.queuedMessageId == null) {
+                withStatus
+            } else {
+                var next = withStatus
+                if (next.steeringMessage?.id == a.queuedMessageId) {
+                    next = next.copy(steeringMessage = null)
+                }
+                val queued = next.queuedMessages
+                if (queued != null) {
+                    val filtered = queued.filter { it.id != a.queuedMessageId }
+                    next = next.copy(queuedMessages = filtered.ifEmpty { null })
+                }
+                next
             }
-            val queued = next.queuedMessages
-            if (queued != null) {
-                val filtered = queued.filter { it.id != a.queuedMessageId }
-                next = next.copy(queuedMessages = filtered.ifEmpty { null })
-            }
-            next
         }
     }
 
