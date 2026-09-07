@@ -1187,13 +1187,16 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             res
         }
         StateAction::ChatUsage(a) => {
-            let Some(active) = state.active_turn.as_mut() else {
+            if let Some(active) = state.active_turn.as_mut() {
+                if active.id == a.turn_id {
+                    active.usage = Some(a.usage.clone());
+                    return ReduceOutcome::Applied;
+                }
+            }
+            let Some(turn) = state.turns.iter_mut().find(|t| t.id == a.turn_id) else {
                 return ReduceOutcome::NoOp;
             };
-            if active.id != a.turn_id {
-                return ReduceOutcome::NoOp;
-            }
-            active.usage = Some(a.usage.clone());
+            turn.usage = Some(a.usage.clone());
             ReduceOutcome::Applied
         }
         StateAction::ChatReasoning(a) => update_response_part(state, &a.turn_id, &a.part_id, |p| {
