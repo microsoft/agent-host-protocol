@@ -126,6 +126,12 @@ pub enum ActionType {
     AutomationRunSessionRemoved,
     AutomationRunPrimarySessionChanged,
     AutomationRunCancelRequested,
+    SessionCanvasSet,
+    SessionCanvasRemoved,
+    CanvasAvailabilityChanged,
+    CanvasTrustChanged,
+    CanvasIncarnationChanged,
+    CanvasTitleChanged,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
 }
@@ -292,6 +298,14 @@ impl serde::Serialize for ActionType {
             Self::AutomationRunCancelRequested => {
                 serializer.serialize_str("automationRun/cancelRequested")
             }
+            Self::SessionCanvasSet => serializer.serialize_str("session/canvasSet"),
+            Self::SessionCanvasRemoved => serializer.serialize_str("session/canvasRemoved"),
+            Self::CanvasAvailabilityChanged => {
+                serializer.serialize_str("canvas/availabilityChanged")
+            }
+            Self::CanvasTrustChanged => serializer.serialize_str("canvas/trustChanged"),
+            Self::CanvasIncarnationChanged => serializer.serialize_str("canvas/incarnationChanged"),
+            Self::CanvasTitleChanged => serializer.serialize_str("canvas/titleChanged"),
             Self::Unknown(value) => serializer.serialize_str(value),
         }
     }
@@ -400,6 +414,12 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "automationRun/sessionRemoved" => Self::AutomationRunSessionRemoved,
             "automationRun/primarySessionChanged" => Self::AutomationRunPrimarySessionChanged,
             "automationRun/cancelRequested" => Self::AutomationRunCancelRequested,
+            "session/canvasSet" => Self::SessionCanvasSet,
+            "session/canvasRemoved" => Self::SessionCanvasRemoved,
+            "canvas/availabilityChanged" => Self::CanvasAvailabilityChanged,
+            "canvas/trustChanged" => Self::CanvasTrustChanged,
+            "canvas/incarnationChanged" => Self::CanvasIncarnationChanged,
+            "canvas/titleChanged" => Self::CanvasTitleChanged,
             _ => Self::Unknown(raw),
         })
     }
@@ -2146,6 +2166,96 @@ pub struct AutomationRunPrimarySessionChangedAction {
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunCancelRequestedAction {}
 
+/// A canvas was admitted (opened) or its catalog entry changed.
+///
+/// Upsert semantics keyed by {@link CanvasEntry.resource | `resource`}: the
+/// server dispatches this with the full entry to record a newly opened
+/// canvas, or to republish it after a trust/availability/incarnation change
+/// so subscribers following only the session channel stay in sync with
+/// {@link CanvasState}. Never client-dispatchable — canvases are admitted
+/// only through the `openCanvas` command. A stale/out-of-order delivery
+/// (`canvas.revision` not strictly greater than the currently-recorded
+/// entry's revision) MUST be rejected (no-op) rather than overwrite a newer
+/// entry with older data.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasSetAction {
+    /// The canvas entry to add or update, matched by `resource`.
+    pub canvas: CanvasEntry,
+}
+
+/// A canvas was logically closed.
+///
+/// Remove semantics keyed by `resource`: an unknown URI is a no-op. This
+/// represents durable membership removal, not a client hiding a local
+/// tab/view — see `closeCanvas`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasRemovedAction {
+    /// Entry in {@link SessionState.canvases} to remove, matching {@link CanvasEntry.resource}.
+    pub resource: Uri,
+}
+
+/// Replaces the canvas's live resolution state.
+///
+/// Dispatched by the host on every availability transition: initial
+/// resolution after `openCanvas`, provider restart, reload, and failure.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasAvailabilityChangedAction {
+    /// New {@link CanvasState.availability}.
+    pub availability: CanvasAvailabilityState,
+    /// The {@link CanvasState.revision} this action results in. The reducer
+    /// MUST reject (no-op) this action if `revision` is not strictly greater
+    /// than the canvas's current `revision` — this is how stale/out-of-order
+    /// deliveries are consistently rejected across every canvas action, not
+    /// just this one.
+    pub revision: i64,
+}
+
+/// Replaces the canvas's trust decision.
+///
+/// Dispatched by the host whenever the execution-trust decision for this
+/// canvas's declared actions changes (e.g. a pending decision resolves, or an
+/// administrator revokes a previously trusted source).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTrustChangedAction {
+    /// New {@link CanvasState.trust}.
+    pub trust: CanvasTrustState,
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    pub revision: i64,
+}
+
+/// Records that the canvas's live endpoint was replaced by a fresh one for
+/// the same logical instance (e.g. the owning provider restarted).
+///
+/// The host MUST dispatch {@link CanvasAvailabilityChangedAction} to
+/// transition through `notLoaded`/`loading` around this change. Receivers
+/// MUST reject in-flight `invokeCanvasAction` replies and stale server-pushed
+/// callbacks addressed to a superseded `incarnation` — because `incarnation`
+/// is opaque (see {@link CanvasIdentity.incarnation}), that rejection is
+/// driven by the accompanying `revision` bump here, not by comparing
+/// `incarnation` values for order.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasIncarnationChangedAction {
+    /// New {@link CanvasIdentity.incarnation}. MUST differ from the previous value and MUST NOT be reused for this logical identity.
+    pub incarnation: String,
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    pub revision: i64,
+}
+
+/// Replaces the canvas's display title.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTitleChangedAction {
+    /// New {@link CanvasState.title}.
+    pub title: String,
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    pub revision: i64,
+}
+
 // ─── Partial Summaries ────────────────────────────────────────────────
 
 /// Partial equivalent of ChatSummary — every field is optional for delta updates.
@@ -2381,6 +2491,18 @@ pub enum StateAction {
     AutomationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction),
     #[serde(rename = "automationRun/cancelRequested")]
     AutomationRunCancelRequested(AutomationRunCancelRequestedAction),
+    #[serde(rename = "session/canvasSet")]
+    SessionCanvasSet(SessionCanvasSetAction),
+    #[serde(rename = "session/canvasRemoved")]
+    SessionCanvasRemoved(SessionCanvasRemovedAction),
+    #[serde(rename = "canvas/availabilityChanged")]
+    CanvasAvailabilityChanged(Box<CanvasAvailabilityChangedAction>),
+    #[serde(rename = "canvas/trustChanged")]
+    CanvasTrustChanged(CanvasTrustChangedAction),
+    #[serde(rename = "canvas/incarnationChanged")]
+    CanvasIncarnationChanged(CanvasIncarnationChangedAction),
+    #[serde(rename = "canvas/titleChanged")]
+    CanvasTitleChanged(CanvasTitleChangedAction),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

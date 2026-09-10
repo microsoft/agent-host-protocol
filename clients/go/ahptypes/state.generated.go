@@ -540,6 +540,62 @@ const (
 	AutomationRunOriginKindTrigger AutomationRunOriginKind = "trigger"
 )
 
+// Discriminant for {@link CanvasSource} — what kind of package originates a
+// canvas type.
+type CanvasSourceKind string
+
+const (
+	// An explicitly installed host extension.
+	CanvasSourceKindExtension CanvasSourceKind = "extension"
+	// An explicitly installed package (not a host extension).
+	CanvasSourceKindPackage CanvasSourceKind = "package"
+)
+
+// Discriminant for {@link CanvasTrustState} — whether the host currently
+// permits this canvas's declared actions to execute.
+//
+// Trust is independent of {@link CanvasAvailabilityStatus | availability}:
+// a canvas may be perfectly capable of rendering while blocked from
+// executing actions, and vice versa. Trust decisions are host/runtime
+// authority, not something this protocol grants.
+type CanvasTrustStatus string
+
+const (
+	// Declared actions may be invoked.
+	CanvasTrustStatusTrusted CanvasTrustStatus = "trusted"
+	// A trust decision has not yet been made (e.g. first use of a new/changed source).
+	CanvasTrustStatusPending CanvasTrustStatus = "pending"
+	// The host has denied execution; declared actions MUST NOT be invoked.
+	CanvasTrustStatusBlocked CanvasTrustStatus = "blocked"
+)
+
+// Discriminant for {@link CanvasAvailabilityState} — the canvas's current
+// live resolution state, independent of its durable
+// {@link CanvasEntry | membership} in a session's catalog.
+//
+// An empty catalog membership list is not itself a close, and a canvas may
+// remain a recorded member while its live availability cycles through these
+// states any number of times (e.g. across provider restarts).
+type CanvasAvailabilityStatus string
+
+const (
+	// The connected client or host does not support this canvas type (e.g.
+	// the client omitted the `canvases` capability, or no local runtime can
+	// render this `canvasType`). Distinct from `blocked` trust, which is a
+	// policy decision rather than a capability gap.
+	CanvasAvailabilityStatusUnsupported CanvasAvailabilityStatus = "unsupported"
+	// Recorded but not yet resolved to a live endpoint since it was opened or the host last restarted.
+	CanvasAvailabilityStatusNotLoaded CanvasAvailabilityStatus = "notLoaded"
+	// Currently resolving or (re)connecting to a live endpoint.
+	CanvasAvailabilityStatusLoading CanvasAvailabilityStatus = "loading"
+	// Live and reachable, but the provider has not yet produced content to render.
+	CanvasAvailabilityStatusEmpty CanvasAvailabilityStatus = "empty"
+	// Live, reachable, and has declared its current actions.
+	CanvasAvailabilityStatusReady CanvasAvailabilityStatus = "ready"
+	// The live endpoint failed to resolve, or resolution otherwise failed.
+	CanvasAvailabilityStatusFailed CanvasAvailabilityStatus = "failed"
+)
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 // An optionally-sized icon that can be displayed in a user interface.
@@ -933,6 +989,13 @@ type SessionState struct {
 	// before subscribing. See {@link Changeset} for the full shape and
 	// {@link /guide/changesets | Changesets} for an overview of the model.
 	Changesets []Changeset `json:"changesets,omitempty"`
+	// Catalog of canvases opened for chats in this session. Presence is
+	// durable logical membership, admitted only via `openCanvas` — never
+	// implied by a chat's existence or a client's earlier focus. Each entry's
+	// {@link CanvasIdentity.chat | `identity.chat`} identifies the exact
+	// backing chat; a canvas never migrates to a different chat. See
+	// {@link CanvasEntry} for the full membership/availability/trust model.
+	Canvases []CanvasEntry `json:"canvases,omitempty"`
 	// Outstanding input the session is blocked on, aggregated across every chat
 	// so a client can discover and answer it from the session channel alone,
 	// without subscribing to individual chats.
@@ -4099,6 +4162,283 @@ type AutomationRunState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
+// A canvas type provided by an installed host extension.
+//
+// `extensionId` is the identity-bearing field for comparison purposes (see
+// {@link CanvasIdentityKey}). `version` is display/informational metadata
+// only — it MUST NOT be treated as identity-bearing (two `CanvasSource`
+// values that differ only in `version` are the same source).
+type CanvasExtensionSource struct {
+	// Stable extension identifier (host-defined format, e.g. `publisher.name`).
+	// MUST NOT exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+	ExtensionId string `json:"extensionId"`
+	// Installed extension version, when known. Metadata only — not identity-bearing.
+	Version *string `json:"version,omitempty"`
+}
+
+// A canvas type provided by an installed package that is not a host
+// extension (e.g. a workspace-declared runtime package).
+//
+// `sourceId` — not `packageName` — is the identity-bearing field: the same
+// declared package name MAY be installed in more than one scope (e.g. a
+// workspace-local copy and a globally-installed copy, or two different
+// registries), and each such installation is a distinct source with its own
+// `sourceId`. `packageName` and `version` are display/informational metadata
+// only and MUST NOT be treated as identity-bearing.
+type CanvasPackageSource struct {
+	// Stable, host- or package-manager-assigned unique identifier for this
+	// specific installed package instance/scope (opaque format). This is the
+	// identity-bearing field — see {@link CanvasIdentityKey}. MUST NOT exceed
+	// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+	SourceId string `json:"sourceId"`
+	// Declared package name, for display only — MUST NOT be used to compare source identity; see `sourceId`.
+	PackageName string `json:"packageName"`
+	// Installed package version, when known. Metadata only — not identity-bearing.
+	Version *string `json:"version,omitempty"`
+}
+
+// The logical identity of a canvas, excluding the host-assigned
+// {@link CanvasIdentity.incarnation | `incarnation`}.
+//
+// Two canvases are the same logical canvas iff `chat`, `canvasType`,
+// `instanceId`, and `source`'s **identity-bearing** fields are all equal:
+// `kind` plus `extensionId` (for {@link CanvasExtensionSource}) or `kind`
+// plus `sourceId` (for {@link CanvasPackageSource}). `source.version` (and
+// `CanvasPackageSource.packageName`) are metadata and MUST NOT factor into
+// this comparison. Clients MUST NOT treat
+// {@link CanvasIdentity.instanceId | `instanceId`} alone as a stable key —
+// it is only unique within the scope of `(chat, source, canvasType)`.
+type CanvasIdentityKey struct {
+	// The exact backing chat this canvas belongs to. A canvas is never
+	// re-associated with a different chat; opening a new one for another chat
+	// creates a distinct canvas.
+	Chat URI `json:"chat"`
+	// The extension or package that declares this canvas's type.
+	Source CanvasSource `json:"source"`
+	// Provider-declared canvas type (host/provider-defined format). MUST NOT
+	// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+	CanvasType string `json:"canvasType"`
+	// Provider-chosen stable identifier for this canvas instance, scoped to
+	// `(chat, source, canvasType)`. Stable across reloads and host/window
+	// restarts for the same logical canvas. MUST NOT exceed
+	// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+	InstanceId string `json:"instanceId"`
+}
+
+// Full identity of a canvas, including the host-assigned
+// {@link CanvasIdentity.incarnation | `incarnation`}.
+type CanvasIdentity struct {
+	// The exact backing chat this canvas belongs to. A canvas is never
+	// re-associated with a different chat; opening a new one for another chat
+	// creates a distinct canvas.
+	Chat URI `json:"chat"`
+	// The extension or package that declares this canvas's type.
+	Source CanvasSource `json:"source"`
+	// Provider-declared canvas type (host/provider-defined format). MUST NOT
+	// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+	CanvasType string `json:"canvasType"`
+	// Provider-chosen stable identifier for this canvas instance, scoped to
+	// `(chat, source, canvasType)`. Stable across reloads and host/window
+	// restarts for the same logical canvas. MUST NOT exceed
+	// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+	InstanceId string `json:"instanceId"`
+	// Opaque, host-generated token identifying the current generation of this
+	// canvas's live endpoint. The host mints a fresh token whenever a provider
+	// restart retires the previous live endpoint and establishes a new one for
+	// the same logical instance (see {@link CanvasIncarnationChangedAction |
+	// `canvas/incarnationChanged`}); it is not changed by a plain page reload
+	// against the same still-live endpoint.
+	//
+	// `incarnation` is **opaque**: clients and hosts MUST compare it only for
+	// equality, never parse it, sort it, or perform arithmetic on it (e.g. it
+	// is not guaranteed to be numeric or monotonically increasing). The host
+	// MUST NOT reuse a token for this logical identity once it has been
+	// superseded, including across a host/process restart — if the host
+	// cannot otherwise guarantee non-reuse, it MUST mint tokens (e.g. random
+	// or timestamp-derived) that make accidental reuse practically
+	// impossible, rather than a small resettable counter.
+	//
+	// Clients and hosts use `incarnation` to reject stale callbacks and
+	// in-flight effects addressed to a superseded endpoint.
+	Incarnation string `json:"incarnation"`
+}
+
+type CanvasTrustedState struct {
+}
+
+type CanvasPendingTrustState struct {
+}
+
+type CanvasBlockedTrustState struct {
+	// Optional human-readable reason surfaced to the user.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// One action a canvas declares it can perform, invoked via
+// `invokeCanvasAction`.
+//
+// Declarations are carried only on the full {@link CanvasState}, loaded when
+// a client subscribes — never duplicated into the lightweight
+// {@link CanvasEntry} catalog entry, keeping session summaries small.
+type CanvasActionDeclaration struct {
+	// Stable identifier, unique within this canvas, matching `invokeCanvasAction`'s `actionId`.
+	Id string `json:"id"`
+	// Human-readable display name.
+	Title *string `json:"title,omitempty"`
+	// Description of what invoking the action does.
+	Description *string `json:"description,omitempty"`
+	// Inline JSON Schema for the expected `input`, when small enough to embed
+	// (see {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH},
+	// checked by {@link isCanvasSchemaWithinLimits}). Optional because some
+	// declared actions take no input. Mutually exclusive with
+	// `inputSchemaRef` — a declaration MUST supply at most one of the two.
+	InputSchema *json.RawMessage `json:"inputSchema,omitempty"`
+	// Bounded out-of-band reference to a larger JSON Schema, used instead of
+	// `inputSchema` when the schema would exceed
+	// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+	// inlined. AHP does not mandate a specific resolution mechanism for this
+	// URI (e.g. a host MAY make it `resourceRead`-able).
+	InputSchemaRef *URI `json:"inputSchemaRef,omitempty"`
+}
+
+type CanvasUnsupportedAvailabilityState struct {
+}
+
+type CanvasNotLoadedAvailabilityState struct {
+}
+
+type CanvasLoadingAvailabilityState struct {
+}
+
+type CanvasEmptyAvailabilityState struct {
+}
+
+type CanvasReadyAvailabilityState struct {
+	// Actions currently declared by the live provider (full replacement each time this state is produced).
+	Actions []CanvasActionDeclaration `json:"actions"`
+}
+
+type CanvasFailedAvailabilityState struct {
+	// Stable machine-readable and human-readable failure information.
+	Error ErrorInfo `json:"error"`
+}
+
+// Lightweight catalog entry for a canvas, carried in
+// {@link SessionState.canvases | `SessionState.canvases`}. Presence
+// represents durable **logical membership** — it is unaffected by the live
+// {@link CanvasEntry.availability | `availability`} cycling through
+// `notLoaded`/`loading`/`empty`/`ready`/`failed` any number of times.
+//
+// The full state, including declared actions, lives in {@link CanvasState},
+// loaded when a client subscribes to {@link CanvasEntry.resource}.
+type CanvasEntry struct {
+	// Subscribable `ahp-canvas:` URI matching {@link CanvasState.resource}.
+	Resource URI `json:"resource"`
+	// Full identity, including current incarnation.
+	Identity CanvasIdentity `json:"identity"`
+	// Human-readable display title.
+	Title string `json:"title"`
+	// Optional display icon.
+	Icon *Icon `json:"icon,omitempty"`
+	// Current trust decision matching {@link CanvasState.trust}.
+	Trust CanvasTrustState `json:"trust"`
+	// Current availability status matching {@link CanvasState.availability}'s discriminant.
+	Availability CanvasAvailabilityStatus `json:"availability"`
+	// Monotonically increasing counter bumped on every change to this
+	// canvas's state (trust, availability, or incarnation). Clients MAY use it
+	// to detect and reject stale reads without a full deep comparison.
+	Revision int64 `json:"revision"`
+	// Opaque host-defined summary metadata.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Full state for a single canvas, loaded when a client subscribes to the
+// canvas's URI.
+//
+// `CanvasState` **denormalizes** every {@link CanvasEntry} field directly
+// onto itself, replacing `availability`'s lightweight status with the full
+// {@link CanvasAvailabilityState} (including declared actions or failure
+// detail). Producers MUST keep the two representations consistent: any
+// change to the inlined fields SHOULD also be announced on the owning
+// session via {@link SessionCanvasSetAction | `session/canvasSet`}.
+type CanvasState struct {
+	// URI of this canvas channel.
+	Resource URI `json:"resource"`
+	// Full identity, including current incarnation.
+	Identity CanvasIdentity `json:"identity"`
+	// Human-readable display title.
+	Title string `json:"title"`
+	// Optional display icon.
+	Icon *Icon `json:"icon,omitempty"`
+	// Current trust decision.
+	Trust CanvasTrustState `json:"trust"`
+	// Current live resolution state.
+	Availability CanvasAvailabilityState `json:"availability"`
+	// Matches {@link CanvasEntry.revision}.
+	Revision int64 `json:"revision"`
+	// Opaque host-defined metadata.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// A canvas type an installed extension or package currently makes available
+// to open for a chat, as returned by `listCanvasTypes`.
+//
+// `CanvasTypeDeclaration` is **discovery-only** metadata about a TYPE — it is
+// unrelated to {@link CanvasEntry}, which represents durable membership of
+// an already-opened INSTANCE in {@link SessionState.canvases}. Browsing the
+// catalogue (via `listCanvasTypes`) never opens, materializes, or restarts
+// anything; only `openCanvas` does.
+type CanvasTypeDeclaration struct {
+	// The extension or package that declares this canvas type.
+	Source CanvasSource `json:"source"`
+	// Provider-declared canvas type (host/provider-defined format), passed as
+	// {@link CanvasIdentityKey.canvasType} to `openCanvas`. MUST NOT exceed
+	// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+	CanvasType string `json:"canvasType"`
+	// Human-readable display name for a canvas-type picker.
+	Title string `json:"title"`
+	// Description of what this canvas type does.
+	Description *string `json:"description,omitempty"`
+	// Optional display icon.
+	Icon *Icon `json:"icon,omitempty"`
+	// Inline JSON Schema describing the `openCanvas` `input` this type
+	// expects, when small enough to embed (see {@link CANVAS_SCHEMA_MAX_PROPERTIES}
+	// / {@link CANVAS_SCHEMA_MAX_DEPTH}). Mutually exclusive with
+	// `openInputSchemaRef`.
+	OpenInputSchema *json.RawMessage `json:"openInputSchema,omitempty"`
+	// Bounded out-of-band reference to a larger open-input JSON Schema, used
+	// instead of `openInputSchema` when it would exceed
+	// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+	// inlined.
+	OpenInputSchemaRef *URI `json:"openInputSchemaRef,omitempty"`
+	// Advisory, statically-known preview of actions this canvas type
+	// typically declares once opened (bounded to
+	// {@link CANVAS_MAX_DECLARED_ACTIONS}). This is **not authoritative** —
+	// the actual invocable actions for an opened instance are always
+	// {@link CanvasReadyAvailabilityState.actions}, which MAY differ (e.g.
+	// depend on live provider configuration) and MUST be used instead of this
+	// preview once the canvas is open.
+	DeclaredActions []CanvasActionDeclaration `json:"declaredActions,omitempty"`
+}
+
+// Transient, renderer-neutral presentation of a canvas's current live
+// endpoint, returned by `resolveCanvasSource`.
+//
+// This is a plain URL, not any renderer- or process-model-specific handle
+// (e.g. not an Electron `WebContentsView`, a browser tab id, or a webview
+// panel reference) — how a client actually presents it (a VS Code Webview,
+// the Integrated Browser, or otherwise) is entirely a client/host
+// implementation detail outside this protocol.
+type CanvasSourcePresentation struct {
+	// Ephemeral URL to the canvas's current live endpoint. Transient — MUST
+	// NOT be persisted, cached beyond the current read, or treated as a
+	// stable/durable identity. A host MAY embed short-lived, single-use
+	// credentials in it; such credentials are never durable authority.
+	Url string `json:"url"`
+	// Advisory expiry hint for `url` (and any embedded credential), if the host bounds their validity.
+	ExpiresAt *string `json:"expiresAt,omitempty"`
+}
+
 // ─── Customization Enablement Union ───────────────────────────────────────
 
 // CustomizationEnablement is a single explicit customization enablement decision.
@@ -5763,6 +6103,273 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 		object["status"] = json.RawMessage("\"failed\"")
 	case *AutomationCancelledRunLifecycle:
 		object["status"] = json.RawMessage("\"cancelled\"")
+	}
+	return json.Marshal(object)
+}
+
+// CanvasSource identifies the explicitly installed extension or package that declares a canvas type.
+type CanvasSource struct {
+	Value isCanvasSource
+}
+
+// isCanvasSource is the marker interface implemented by every
+// concrete variant of CanvasSource.
+type isCanvasSource interface{ isCanvasSource() }
+
+func (*CanvasExtensionSource) isCanvasSource() {}
+func (*CanvasPackageSource) isCanvasSource()   {}
+
+// CanvasSourceUnknown carries an unrecognized CanvasSource variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type CanvasSourceUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*CanvasSourceUnknown) isCanvasSource() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *CanvasSource) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "extension":
+		var value CanvasExtensionSource
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "package":
+		var value CanvasPackageSource
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &CanvasSourceUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u CanvasSource) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*CanvasSourceUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *CanvasExtensionSource:
+		object["kind"] = json.RawMessage("\"extension\"")
+	case *CanvasPackageSource:
+		object["kind"] = json.RawMessage("\"package\"")
+	}
+	return json.Marshal(object)
+}
+
+// CanvasTrustState is the current trust decision governing whether a canvas's declared actions may execute.
+type CanvasTrustState struct {
+	Value isCanvasTrustState
+}
+
+// isCanvasTrustState is the marker interface implemented by every
+// concrete variant of CanvasTrustState.
+type isCanvasTrustState interface{ isCanvasTrustState() }
+
+func (*CanvasTrustedState) isCanvasTrustState()      {}
+func (*CanvasPendingTrustState) isCanvasTrustState() {}
+func (*CanvasBlockedTrustState) isCanvasTrustState() {}
+
+// CanvasTrustStateUnknown carries an unrecognized CanvasTrustState variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type CanvasTrustStateUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*CanvasTrustStateUnknown) isCanvasTrustState() {}
+
+// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
+func (u *CanvasTrustState) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "status")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "trusted":
+		var value CanvasTrustedState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "pending":
+		var value CanvasPendingTrustState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "blocked":
+		var value CanvasBlockedTrustState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &CanvasTrustStateUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u CanvasTrustState) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*CanvasTrustStateUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *CanvasTrustedState:
+		object["status"] = json.RawMessage("\"trusted\"")
+	case *CanvasPendingTrustState:
+		object["status"] = json.RawMessage("\"pending\"")
+	case *CanvasBlockedTrustState:
+		object["status"] = json.RawMessage("\"blocked\"")
+	}
+	return json.Marshal(object)
+}
+
+// CanvasAvailabilityState is the current live resolution state of a canvas.
+type CanvasAvailabilityState struct {
+	Value isCanvasAvailabilityState
+}
+
+// isCanvasAvailabilityState is the marker interface implemented by every
+// concrete variant of CanvasAvailabilityState.
+type isCanvasAvailabilityState interface{ isCanvasAvailabilityState() }
+
+func (*CanvasUnsupportedAvailabilityState) isCanvasAvailabilityState() {}
+func (*CanvasNotLoadedAvailabilityState) isCanvasAvailabilityState()   {}
+func (*CanvasLoadingAvailabilityState) isCanvasAvailabilityState()     {}
+func (*CanvasEmptyAvailabilityState) isCanvasAvailabilityState()       {}
+func (*CanvasReadyAvailabilityState) isCanvasAvailabilityState()       {}
+func (*CanvasFailedAvailabilityState) isCanvasAvailabilityState()      {}
+
+// CanvasAvailabilityStateUnknown carries an unrecognized CanvasAvailabilityState variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type CanvasAvailabilityStateUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*CanvasAvailabilityStateUnknown) isCanvasAvailabilityState() {}
+
+// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
+func (u *CanvasAvailabilityState) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "status")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "unsupported":
+		var value CanvasUnsupportedAvailabilityState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "notLoaded":
+		var value CanvasNotLoadedAvailabilityState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "loading":
+		var value CanvasLoadingAvailabilityState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "empty":
+		var value CanvasEmptyAvailabilityState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "ready":
+		var value CanvasReadyAvailabilityState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "failed":
+		var value CanvasFailedAvailabilityState
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &CanvasAvailabilityStateUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u CanvasAvailabilityState) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*CanvasAvailabilityStateUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *CanvasUnsupportedAvailabilityState:
+		object["status"] = json.RawMessage("\"unsupported\"")
+	case *CanvasNotLoadedAvailabilityState:
+		object["status"] = json.RawMessage("\"notLoaded\"")
+	case *CanvasLoadingAvailabilityState:
+		object["status"] = json.RawMessage("\"loading\"")
+	case *CanvasEmptyAvailabilityState:
+		object["status"] = json.RawMessage("\"empty\"")
+	case *CanvasReadyAvailabilityState:
+		object["status"] = json.RawMessage("\"ready\"")
+	case *CanvasFailedAvailabilityState:
+		object["status"] = json.RawMessage("\"failed\"")
 	}
 	return json.Marshal(object)
 }

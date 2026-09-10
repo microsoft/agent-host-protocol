@@ -292,6 +292,23 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+    /// Host/runtime-owned local-canvas support. Presence means the SERVER
+    /// currently has a working runtime able to serve `openCanvas` /
+    /// `invokeCanvasAction` for at least one qualifying (explicitly installed
+    /// and trust-eligible) extension/package source; absence means the host
+    /// has no available canvas runtime, and clients MUST treat every canvas as
+    /// {@link CanvasAvailabilityStatus.Unsupported} regardless of what
+    /// {@link ClientCapabilities.canvases} declared.
+    ///
+    /// **Protocol version support alone is not a runtime capability**: a host
+    /// speaking protocol `>= 0.10.0` without this field present MUST NOT be
+    /// assumed to have a usable canvas runtime. This field — not the
+    /// negotiated `protocolVersion` — is the authoritative signal, and is
+    /// independent of any individual canvas's live availability
+    /// ({@link CanvasAvailabilityState}) or trust decision
+    /// ({@link CanvasTrustState}).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<CanvasCapabilities>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -315,6 +332,24 @@ pub struct ClientCapabilities {
     /// App-bearing tool calls as ordinary MCP tool calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_apps: Option<JsonObject>,
+    /// Client can render local canvases: `listCanvasTypes`, `openCanvas`,
+    /// subscribe to the resulting `ahp-canvas:` channel, and drive
+    /// `resolveCanvasSource` / `invokeCanvasAction` / `restartCanvasProvider` /
+    /// `closeCanvas`.
+    ///
+    /// Hosts SHOULD NOT offer canvas admission to a client that omits this
+    /// capability; such a client MUST be treated as if every canvas were
+    /// {@link CanvasAvailabilityStatus.Unsupported}. Omission does not imply
+    /// anything about server/runtime execution trust — see
+    /// {@link CanvasTrustStatus}, which is a separate, host-owned decision.
+    ///
+    /// This declares only the CLIENT's rendering capability. Protocol version
+    /// support alone (i.e. speaking >= 0.10.0) is not evidence that the SERVER
+    /// actually has a working canvas runtime — see
+    /// {@link InitializeResult.canvases}, the server-side counterpart, which a
+    /// client MUST also check before treating canvases as usable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<JsonObject>,
 }
 
 /// Automation features supported by this host authority.
@@ -345,6 +380,13 @@ pub struct AutomationCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_history_limit: Option<i64>,
 }
+
+/// Local-canvas runtime features supported by this host authority. The empty
+/// object means "supported" — see {@link InitializeResult.canvases} for what
+/// presence/absence of this field itself means.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasCapabilities {}
 
 /// Presence capability for {@link AutomationCreateRequestedAction |
 /// `automation/createRequested`}.
@@ -1675,6 +1717,295 @@ pub struct FetchAutomationRunsParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FetchAutomationRunsResult {}
+
+/// Discovers canvas TYPES currently available to open for one exact backing
+/// chat.
+///
+/// This is a **pure read/browse** operation: it MUST NOT open, materialize,
+/// or otherwise admit any canvas — see `openCanvas` for that. It is
+/// unrelated to {@link SessionState.canvases}, which reflects durable
+/// membership of already-opened canvas INSTANCES, not the set of canvas
+/// TYPES a host/extension could open; do not confuse the two.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListCanvasTypesParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Maximum number of entries to return in this page. The server SHOULD respect
+    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
+    /// Omit to let the server choose the page size.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<i64>,
+    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+    /// as opaque — do not parse, modify, or persist them across connections. An
+    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+}
+
+/// Available canvas types for the requested chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListCanvasTypesResult {
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+    /// Discovered canvas type declarations.
+    pub types: Vec<CanvasTypeDeclaration>,
+}
+
+/// Explicitly opens (admits) a canvas, associating it with the owning chat
+/// given by `identity.chat` at the moment of the call — never with whichever
+/// chat later happens to have focus.
+///
+/// This is a read-write admission, not a resolve: unlike `subscribe` (which
+/// only reads current state), `openCanvas` is the operation that creates
+/// durable membership. There is no implicit open — a client MUST call this
+/// before a canvas appears in {@link SessionState.canvases}. Once admitted,
+/// clients read and follow live state by `subscribe`-ing to the returned
+/// `canvas.resource`, and resolve the current live endpoint via
+/// `resolveCanvasSource`; neither read itself opens, resumes, or restarts
+/// anything.
+///
+/// **Logical identity is always singular.** The same {@link CanvasIdentityKey}
+/// (`chat`, `source`, `canvasType`, `instanceId`) always resolves to the same
+/// `canvas` resource URI and the same {@link SessionState.canvases} catalog
+/// entry, no matter how many times `openCanvas` is called for it — the server
+/// MUST return that existing entry's `resource` rather than mint a second
+/// one. A client-supplied `canvas` URI is honored only on the call that first
+/// establishes the identity; on a later call for an already-recorded
+/// identity the server MUST ignore the supplied `canvas` value and return the
+/// existing resource instead.
+///
+/// **Idempotency is scoped to `requestId`, not identity.** Retrying with the
+/// exact same `requestId` and byte-for-byte identical params from the same
+/// authenticated connection MUST return the original result without
+/// repeating any side effect, within a bounded live window (the server is
+/// not required to remember it forever). Reusing the same `requestId` with
+/// any different parameter value MUST be rejected with `Conflict`
+/// (`-32011`) — mint a new `requestId` for a new logical call. A genuinely
+/// NEW `requestId` for an already-open identity MAY be effectful (e.g.
+/// updating `title`/`icon`, or causing the provider to re-run its own
+/// open-time initialization with new `input`) — this mirrors the pinned
+/// SDK's own repeated-open behavior and does not create a second logical
+/// identity. There is no exactly-once-across-crash guarantee: a lost reply
+/// is indeterminate, and clients MUST NOT automatically replay `openCanvas`
+/// — reconnect and read `SessionState.canvases` / `resolveCanvasSource`
+/// instead to determine the actual outcome.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCanvasParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Canvas URI (client-chosen, e.g. `ahp-canvas:/<uuid>`); honored only when this call first establishes `identity` — see above.
+    pub canvas: Uri,
+    /// Logical identity to open or re-admit.
+    pub identity: CanvasIdentityKey,
+    /// Initial (or updated, on a later effectful call) display title.
+    pub title: String,
+    /// Initial (or updated) display icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<Icon>,
+    /// Bounded JSON input for this open call (e.g. seed parameters the
+    /// provider uses to initialize the canvas), opaque to the protocol. See
+    /// {@link CanvasTypeDeclaration.openInputSchema} /
+    /// `openInputSchemaRef` for the expected shape. The JSON-serialized value
+    /// MUST NOT exceed `CANVAS_INPUT_MAX_LENGTH`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<AnyValue>,
+    /// Durable client-generated idempotency key bounding retry deduplication
+    /// for this call within a live window; see the idempotency rules above.
+    /// MUST NOT exceed `CANVAS_REQUEST_ID_MAX_LENGTH`.
+    pub request_id: String,
+}
+
+/// Result identifying the existing or newly opened canvas.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCanvasResult {
+    /// The catalog entry for the opened (or already-open) canvas.
+    pub canvas: CanvasEntry,
+}
+
+/// Pure, read-only read of a canvas's current live-resolution state and,
+/// when currently live, a transient endpoint presentation.
+///
+/// This MUST NOT create, resume, reopen, or restart a provider. If the
+/// canvas does not currently have a live endpoint, `source` is absent and
+/// `availability` reflects why (e.g. `notLoaded`, `loading`, `failed`) —
+/// call `restartCanvasProvider` (an explicitly effectful operation) to
+/// attempt recovery instead. A client-local page reload (re-navigating the
+/// client's own rendering surface to the same still-live `source.url`)
+/// needs no dedicated command at all; calling `resolveCanvasSource` again is
+/// also how a client retries resolving a currently-unavailable source
+/// without restarting anything.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolveCanvasSourceParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+/// The canvas's current live-resolution state as of this read.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolveCanvasSourceResult {
+    /// Current {@link CanvasEntry.availability}.
+    pub availability: CanvasAvailabilityStatus,
+    /// Current {@link CanvasIdentity.incarnation}.
+    pub incarnation: String,
+    /// Current {@link CanvasEntry.revision}.
+    pub revision: i64,
+    /// Present only when a live endpoint currently exists (`availability` is `empty` or `ready`); absent otherwise. Transient — see {@link CanvasSourcePresentation}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<CanvasSourcePresentation>,
+}
+
+/// Invokes one of a canvas's currently declared actions exactly once.
+///
+/// The server MUST reject with `PermissionDenied` (`-32009`) if the canvas's
+/// current trust is not `trusted`, and with `NotFound` (`-32008`) if
+/// `actionId` does not match a currently declared action. `incarnation` is
+/// REQUIRED — omitting stale-generation protection on an effectful call is
+/// not allowed. If it does not match the canvas's current
+/// {@link CanvasIdentity.incarnation}, the server MUST reject with `Conflict`
+/// (`-32011`) rather than route the call to a superseded endpoint.
+///
+/// The result is the provider's raw reply and is never persisted into
+/// `CanvasState` — large or provider-specific payloads stay off the durable
+/// state tree; a reply that would exceed `CANVAS_RESULT_MAX_LENGTH` MUST be
+/// represented out of band instead of being returned inline. Any resulting
+/// state changes (e.g. a subsequent availability transition) flow back
+/// separately through the normal `canvas/*` action stream on the canvas's
+/// own channel.
+///
+/// A lost reply (e.g. a dropped connection after the provider already ran
+/// the handler) is **indeterminate**: clients MUST NOT automatically replay
+/// `invokeCanvasAction` on reconnect. Instead, reconnect and read the
+/// canvas's current state (e.g. via `subscribe` / `resolveCanvasSource`) and
+/// decide from observed `revision`/`incarnation` and any provider-visible
+/// side effect whether to surface the ambiguity to the user, rather than
+/// assuming success or failure.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvokeCanvasActionParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Matches a {@link CanvasActionDeclaration.id} from the canvas's current declared actions.
+    pub action_id: String,
+    /// Input conforming to the declared action's `inputSchema`/`inputSchemaRef`,
+    /// if any. The JSON-serialized value MUST NOT exceed
+    /// `CANVAS_INPUT_MAX_LENGTH`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<AnyValue>,
+    /// Expected {@link CanvasIdentity.incarnation}. Required — see above. The
+    /// server MUST reject the call with `Conflict` if the canvas's live
+    /// endpoint has since been superseded, rather than deliver the call to it.
+    pub incarnation: String,
+    /// Durable client-generated idempotency key bounding retry
+    /// deduplication for this invocation within a live window. The server is
+    /// not required to guarantee exactly-once execution across a crash. MUST
+    /// NOT exceed `CANVAS_REQUEST_ID_MAX_LENGTH`.
+    pub request_id: String,
+}
+
+/// Result of invoking a declared canvas action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InvokeCanvasActionResult {
+    /// The provider's raw reply, opaque to the protocol. MUST NOT exceed `CANVAS_RESULT_MAX_LENGTH` once JSON-serialized.
+    pub result: AnyValue,
+}
+
+/// Explicitly restarts the provider/chat-scoped runtime backing this canvas:
+/// retires the current live endpoint and establishes a fresh one for the
+/// same logical instance.
+///
+/// This is the **only** operation that intentionally causes an
+/// {@link CanvasIncarnationChangedAction | incarnation bump}; `resolveCanvasSource`
+/// (read-only source resolution / client-local page reload) MUST NEVER
+/// trigger it. The host dispatches {@link CanvasAvailabilityChangedAction}
+/// (transitioning through `notLoaded`/`loading`) and then
+/// {@link CanvasIncarnationChangedAction} to reflect the outcome. Restart
+/// never replays a prior `invokeCanvasAction`, and MUST NOT steal focus or
+/// restore any prior in-flight effect.
+///
+/// `incarnation` is REQUIRED: the server MUST reject with `Conflict`
+/// (`-32011`) if it does not match the canvas's current
+/// {@link CanvasIdentity.incarnation}, so a caller cannot restart a
+/// generation it never observed (e.g. after racing a concurrent restart). A
+/// lost reply is indeterminate; clients MUST NOT automatically replay this
+/// command — reconnect and compare the canvas's current `incarnation`
+/// instead.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestartCanvasProviderParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Durable client-generated idempotency key, following the same
+    /// requestId-scoped idempotency rules as `openCanvas`. MUST NOT exceed
+    /// `CANVAS_REQUEST_ID_MAX_LENGTH`.
+    pub request_id: String,
+    /// Expected current {@link CanvasIdentity.incarnation}; required — see above.
+    pub incarnation: String,
+}
+
+/// Logically closes a canvas: removes its durable membership from
+/// `SessionState.canvases` and disposes matching views.
+///
+/// This is distinct from a client merely hiding a local tab or view, which is
+/// presentation-only and MUST NOT dispatch this command. There is no
+/// advertised model tool for this operation — it is invoked only by
+/// UI/RPC callers.
+///
+/// `revision` is REQUIRED: the server MUST reject with `Conflict`
+/// (`-32011`) if it does not match the canvas's current
+/// {@link CanvasEntry.revision}, so a caller cannot close membership state it
+/// never actually observed. If no matching entry exists (e.g. already
+/// closed), the server MUST treat this as a successful no-op rather than an
+/// error — the `revision` precondition only applies when an entry still
+/// exists. A lost reply is indeterminate; clients MUST NOT automatically
+/// replay this command — reconnect and check `SessionState.canvases`
+/// instead.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloseCanvasParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Durable client-generated idempotency key, following the same
+    /// requestId-scoped idempotency rules as `openCanvas`. MUST NOT exceed
+    /// `CANVAS_REQUEST_ID_MAX_LENGTH`.
+    pub request_id: String,
+    /// Expected current {@link CanvasEntry.revision}; required when an entry still exists — see above.
+    pub revision: i64,
+}
 
 // ─── ChatSource Union ─────────────────────────────────────────────────
 

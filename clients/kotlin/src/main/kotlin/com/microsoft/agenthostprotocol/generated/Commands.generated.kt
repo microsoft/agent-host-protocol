@@ -390,7 +390,25 @@ data class InitializeResult(
      * `ahp-automations://` for {@link AutomationState}; absence means the
      * host does not expose an automation catalogue or automation commands.
      */
-    val automations: AutomationCapabilities? = null
+    val automations: AutomationCapabilities? = null,
+    /**
+     * Host/runtime-owned local-canvas support. Presence means the SERVER
+     * currently has a working runtime able to serve `openCanvas` /
+     * `invokeCanvasAction` for at least one qualifying (explicitly installed
+     * and trust-eligible) extension/package source; absence means the host
+     * has no available canvas runtime, and clients MUST treat every canvas as
+     * {@link CanvasAvailabilityStatus.Unsupported} regardless of what
+     * {@link ClientCapabilities.canvases} declared.
+     *
+     * **Protocol version support alone is not a runtime capability**: a host
+     * speaking protocol `>= 0.10.0` without this field present MUST NOT be
+     * assumed to have a usable canvas runtime. This field — not the
+     * negotiated `protocolVersion` — is the authoritative signal, and is
+     * independent of any individual canvas's live availability
+     * ({@link CanvasAvailabilityState}) or trust decision
+     * ({@link CanvasTrustState}).
+     */
+    val canvases: CanvasCapabilities? = null
 )
 
 @Serializable
@@ -408,7 +426,26 @@ data class ClientCapabilities(
      * capability is declared. Clients that omit it MUST treat
      * App-bearing tool calls as ordinary MCP tool calls.
      */
-    val mcpApps: Map<String, JsonElement>? = null
+    val mcpApps: Map<String, JsonElement>? = null,
+    /**
+     * Client can render local canvases: `listCanvasTypes`, `openCanvas`,
+     * subscribe to the resulting `ahp-canvas:` channel, and drive
+     * `resolveCanvasSource` / `invokeCanvasAction` / `restartCanvasProvider` /
+     * `closeCanvas`.
+     *
+     * Hosts SHOULD NOT offer canvas admission to a client that omits this
+     * capability; such a client MUST be treated as if every canvas were
+     * {@link CanvasAvailabilityStatus.Unsupported}. Omission does not imply
+     * anything about server/runtime execution trust — see
+     * {@link CanvasTrustStatus}, which is a separate, host-owned decision.
+     *
+     * This declares only the CLIENT's rendering capability. Protocol version
+     * support alone (i.e. speaking >= 0.10.0) is not evidence that the SERVER
+     * actually has a working canvas runtime — see
+     * {@link InitializeResult.canvases}, the server-side counterpart, which a
+     * client MUST also check before treating canvases as usable.
+     */
+    val canvases: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -433,6 +470,9 @@ data class AutomationCapabilities(
      */
     val runHistoryLimit: Long? = null
 )
+
+@Serializable
+class CanvasCapabilities
 
 @Serializable
 class AutomationCreateCapability
@@ -1673,6 +1713,226 @@ data class FetchAutomationRunsParams(
 
 @Serializable
 class FetchAutomationRunsResult
+
+@Serializable
+data class ListCanvasTypesParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Maximum number of entries to return in this page. The server SHOULD respect
+     * this bound but MAY return fewer entries and MAY impose its own upper cap.
+     * Omit to let the server choose the page size.
+     */
+    val limit: Long? = null,
+    /**
+     * Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+     * Omit to fetch the first page. Cursors are server-defined and MUST be treated
+     * as opaque — do not parse, modify, or persist them across connections. An
+     * unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+     */
+    val cursor: String? = null
+)
+
+@Serializable
+data class ListCanvasTypesResult(
+    /**
+     * Opaque cursor for the next page. Present when more entries exist beyond the
+     * returned page; absent signals the end of the collection. Pass it back as
+     * {@link PaginatedParams.cursor} to fetch the following page.
+     */
+    val nextCursor: String? = null,
+    /**
+     * Discovered canvas type declarations.
+     */
+    val types: List<CanvasTypeDeclaration>
+)
+
+@Serializable
+data class OpenCanvasParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Canvas URI (client-chosen, e.g. `ahp-canvas:/<uuid>`); honored only when this call first establishes `identity` — see above.
+     */
+    val canvas: String,
+    /**
+     * Logical identity to open or re-admit.
+     */
+    val identity: CanvasIdentityKey,
+    /**
+     * Initial (or updated, on a later effectful call) display title.
+     */
+    val title: String,
+    /**
+     * Initial (or updated) display icon.
+     */
+    val icon: Icon? = null,
+    /**
+     * Bounded JSON input for this open call (e.g. seed parameters the
+     * provider uses to initialize the canvas), opaque to the protocol. See
+     * {@link CanvasTypeDeclaration.openInputSchema} /
+     * `openInputSchemaRef` for the expected shape. The JSON-serialized value
+     * MUST NOT exceed `CANVAS_INPUT_MAX_LENGTH`.
+     */
+    val input: JsonElement? = null,
+    /**
+     * Durable client-generated idempotency key bounding retry deduplication
+     * for this call within a live window; see the idempotency rules above.
+     * MUST NOT exceed `CANVAS_REQUEST_ID_MAX_LENGTH`.
+     */
+    val requestId: String
+)
+
+@Serializable
+data class OpenCanvasResult(
+    /**
+     * The catalog entry for the opened (or already-open) canvas.
+     */
+    val canvas: CanvasEntry
+)
+
+@Serializable
+data class ResolveCanvasSourceParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class ResolveCanvasSourceResult(
+    /**
+     * Current {@link CanvasEntry.availability}.
+     */
+    val availability: CanvasAvailabilityStatus,
+    /**
+     * Current {@link CanvasIdentity.incarnation}.
+     */
+    val incarnation: String,
+    /**
+     * Current {@link CanvasEntry.revision}.
+     */
+    val revision: Long,
+    /**
+     * Present only when a live endpoint currently exists (`availability` is `empty` or `ready`); absent otherwise. Transient — see {@link CanvasSourcePresentation}.
+     */
+    val source: CanvasSourcePresentation? = null
+)
+
+@Serializable
+data class InvokeCanvasActionParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Matches a {@link CanvasActionDeclaration.id} from the canvas's current declared actions.
+     */
+    val actionId: String,
+    /**
+     * Input conforming to the declared action's `inputSchema`/`inputSchemaRef`,
+     * if any. The JSON-serialized value MUST NOT exceed
+     * `CANVAS_INPUT_MAX_LENGTH`.
+     */
+    val input: JsonElement? = null,
+    /**
+     * Expected {@link CanvasIdentity.incarnation}. Required — see above. The
+     * server MUST reject the call with `Conflict` if the canvas's live
+     * endpoint has since been superseded, rather than deliver the call to it.
+     */
+    val incarnation: String,
+    /**
+     * Durable client-generated idempotency key bounding retry
+     * deduplication for this invocation within a live window. The server is
+     * not required to guarantee exactly-once execution across a crash. MUST
+     * NOT exceed `CANVAS_REQUEST_ID_MAX_LENGTH`.
+     */
+    val requestId: String
+)
+
+@Serializable
+data class InvokeCanvasActionResult(
+    /**
+     * The provider's raw reply, opaque to the protocol. MUST NOT exceed `CANVAS_RESULT_MAX_LENGTH` once JSON-serialized.
+     */
+    val result: JsonElement
+)
+
+@Serializable
+data class RestartCanvasProviderParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Durable client-generated idempotency key, following the same
+     * requestId-scoped idempotency rules as `openCanvas`. MUST NOT exceed
+     * `CANVAS_REQUEST_ID_MAX_LENGTH`.
+     */
+    val requestId: String,
+    /**
+     * Expected current {@link CanvasIdentity.incarnation}; required — see above.
+     */
+    val incarnation: String
+)
+
+@Serializable
+data class CloseCanvasParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Durable client-generated idempotency key, following the same
+     * requestId-scoped idempotency rules as `openCanvas`. MUST NOT exceed
+     * `CANVAS_REQUEST_ID_MAX_LENGTH`.
+     */
+    val requestId: String,
+    /**
+     * Expected current {@link CanvasEntry.revision}; required when an entry still exists — see above.
+     */
+    val revision: Long
+)
 
 // ─── ChatSource Union ───────────────────────────────────────────────────────
 

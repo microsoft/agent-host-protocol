@@ -1423,6 +1423,156 @@ pub enum AutomationRunOriginKind {
     Trigger,
 }
 
+/// Discriminant for {@link CanvasSource} — what kind of package originates a
+/// canvas type.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasSourceKind {
+    /// An explicitly installed host extension.
+    Extension,
+    /// An explicitly installed package (not a host extension).
+    Package,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasSourceKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Extension => serializer.serialize_str("extension"),
+            Self::Package => serializer.serialize_str("package"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasSourceKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "extension" => Self::Extension,
+            "package" => Self::Package,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Discriminant for {@link CanvasTrustState} — whether the host currently
+/// permits this canvas's declared actions to execute.
+///
+/// Trust is independent of {@link CanvasAvailabilityStatus | availability}:
+/// a canvas may be perfectly capable of rendering while blocked from
+/// executing actions, and vice versa. Trust decisions are host/runtime
+/// authority, not something this protocol grants.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasTrustStatus {
+    /// Declared actions may be invoked.
+    Trusted,
+    /// A trust decision has not yet been made (e.g. first use of a new/changed source).
+    Pending,
+    /// The host has denied execution; declared actions MUST NOT be invoked.
+    Blocked,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasTrustStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Trusted => serializer.serialize_str("trusted"),
+            Self::Pending => serializer.serialize_str("pending"),
+            Self::Blocked => serializer.serialize_str("blocked"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasTrustStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "trusted" => Self::Trusted,
+            "pending" => Self::Pending,
+            "blocked" => Self::Blocked,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Discriminant for {@link CanvasAvailabilityState} — the canvas's current
+/// live resolution state, independent of its durable
+/// {@link CanvasEntry | membership} in a session's catalog.
+///
+/// An empty catalog membership list is not itself a close, and a canvas may
+/// remain a recorded member while its live availability cycles through these
+/// states any number of times (e.g. across provider restarts).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasAvailabilityStatus {
+    /// The connected client or host does not support this canvas type (e.g.
+    /// the client omitted the `canvases` capability, or no local runtime can
+    /// render this `canvasType`). Distinct from `blocked` trust, which is a
+    /// policy decision rather than a capability gap.
+    Unsupported,
+    /// Recorded but not yet resolved to a live endpoint since it was opened or the host last restarted.
+    NotLoaded,
+    /// Currently resolving or (re)connecting to a live endpoint.
+    Loading,
+    /// Live and reachable, but the provider has not yet produced content to render.
+    Empty,
+    /// Live, reachable, and has declared its current actions.
+    Ready,
+    /// The live endpoint failed to resolve, or resolution otherwise failed.
+    Failed,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasAvailabilityStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Unsupported => serializer.serialize_str("unsupported"),
+            Self::NotLoaded => serializer.serialize_str("notLoaded"),
+            Self::Loading => serializer.serialize_str("loading"),
+            Self::Empty => serializer.serialize_str("empty"),
+            Self::Ready => serializer.serialize_str("ready"),
+            Self::Failed => serializer.serialize_str("failed"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasAvailabilityStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "unsupported" => Self::Unsupported,
+            "notLoaded" => Self::NotLoaded,
+            "loading" => Self::Loading,
+            "empty" => Self::Empty,
+            "ready" => Self::Ready,
+            "failed" => Self::Failed,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 /// An optionally-sized icon that can be displayed in a user interface.
@@ -2084,6 +2234,14 @@ pub struct SessionState {
     /// {@link /guide/changesets | Changesets} for an overview of the model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changesets: Option<Vec<Changeset>>,
+    /// Catalog of canvases opened for chats in this session. Presence is
+    /// durable logical membership, admitted only via `openCanvas` — never
+    /// implied by a chat's existence or a client's earlier focus. Each entry's
+    /// {@link CanvasIdentity.chat | `identity.chat`} identifies the exact
+    /// backing chat; a canvas never migrates to a different chat. See
+    /// {@link CanvasEntry} for the full membership/availability/trust model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<Vec<CanvasEntry>>,
     /// Outstanding input the session is blocked on, aggregated across every chat
     /// so a client can discover and answer it from the session channel alone,
     /// without subscribing to individual chats.
@@ -5647,6 +5805,330 @@ pub struct AutomationRunState {
     pub meta: Option<JsonObject>,
 }
 
+/// A canvas type provided by an installed host extension.
+///
+/// `extensionId` is the identity-bearing field for comparison purposes (see
+/// {@link CanvasIdentityKey}). `version` is display/informational metadata
+/// only — it MUST NOT be treated as identity-bearing (two `CanvasSource`
+/// values that differ only in `version` are the same source).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasExtensionSource {
+    /// Stable extension identifier (host-defined format, e.g. `publisher.name`).
+    /// MUST NOT exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub extension_id: String,
+    /// Installed extension version, when known. Metadata only — not identity-bearing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
+/// A canvas type provided by an installed package that is not a host
+/// extension (e.g. a workspace-declared runtime package).
+///
+/// `sourceId` — not `packageName` — is the identity-bearing field: the same
+/// declared package name MAY be installed in more than one scope (e.g. a
+/// workspace-local copy and a globally-installed copy, or two different
+/// registries), and each such installation is a distinct source with its own
+/// `sourceId`. `packageName` and `version` are display/informational metadata
+/// only and MUST NOT be treated as identity-bearing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasPackageSource {
+    /// Stable, host- or package-manager-assigned unique identifier for this
+    /// specific installed package instance/scope (opaque format). This is the
+    /// identity-bearing field — see {@link CanvasIdentityKey}. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub source_id: String,
+    /// Declared package name, for display only — MUST NOT be used to compare source identity; see `sourceId`.
+    pub package_name: String,
+    /// Installed package version, when known. Metadata only — not identity-bearing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
+/// The logical identity of a canvas, excluding the host-assigned
+/// {@link CanvasIdentity.incarnation | `incarnation`}.
+///
+/// Two canvases are the same logical canvas iff `chat`, `canvasType`,
+/// `instanceId`, and `source`'s **identity-bearing** fields are all equal:
+/// `kind` plus `extensionId` (for {@link CanvasExtensionSource}) or `kind`
+/// plus `sourceId` (for {@link CanvasPackageSource}). `source.version` (and
+/// `CanvasPackageSource.packageName`) are metadata and MUST NOT factor into
+/// this comparison. Clients MUST NOT treat
+/// {@link CanvasIdentity.instanceId | `instanceId`} alone as a stable key —
+/// it is only unique within the scope of `(chat, source, canvasType)`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasIdentityKey {
+    /// The exact backing chat this canvas belongs to. A canvas is never
+    /// re-associated with a different chat; opening a new one for another chat
+    /// creates a distinct canvas.
+    pub chat: Uri,
+    /// The extension or package that declares this canvas's type.
+    pub source: CanvasSource,
+    /// Provider-declared canvas type (host/provider-defined format). MUST NOT
+    /// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub canvas_type: String,
+    /// Provider-chosen stable identifier for this canvas instance, scoped to
+    /// `(chat, source, canvasType)`. Stable across reloads and host/window
+    /// restarts for the same logical canvas. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub instance_id: String,
+}
+
+/// Full identity of a canvas, including the host-assigned
+/// {@link CanvasIdentity.incarnation | `incarnation`}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasIdentity {
+    /// The exact backing chat this canvas belongs to. A canvas is never
+    /// re-associated with a different chat; opening a new one for another chat
+    /// creates a distinct canvas.
+    pub chat: Uri,
+    /// The extension or package that declares this canvas's type.
+    pub source: CanvasSource,
+    /// Provider-declared canvas type (host/provider-defined format). MUST NOT
+    /// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub canvas_type: String,
+    /// Provider-chosen stable identifier for this canvas instance, scoped to
+    /// `(chat, source, canvasType)`. Stable across reloads and host/window
+    /// restarts for the same logical canvas. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub instance_id: String,
+    /// Opaque, host-generated token identifying the current generation of this
+    /// canvas's live endpoint. The host mints a fresh token whenever a provider
+    /// restart retires the previous live endpoint and establishes a new one for
+    /// the same logical instance (see {@link CanvasIncarnationChangedAction |
+    /// `canvas/incarnationChanged`}); it is not changed by a plain page reload
+    /// against the same still-live endpoint.
+    ///
+    /// `incarnation` is **opaque**: clients and hosts MUST compare it only for
+    /// equality, never parse it, sort it, or perform arithmetic on it (e.g. it
+    /// is not guaranteed to be numeric or monotonically increasing). The host
+    /// MUST NOT reuse a token for this logical identity once it has been
+    /// superseded, including across a host/process restart — if the host
+    /// cannot otherwise guarantee non-reuse, it MUST mint tokens (e.g. random
+    /// or timestamp-derived) that make accidental reuse practically
+    /// impossible, rather than a small resettable counter.
+    ///
+    /// Clients and hosts use `incarnation` to reject stale callbacks and
+    /// in-flight effects addressed to a superseded endpoint.
+    pub incarnation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTrustedState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasPendingTrustState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasBlockedTrustState {
+    /// Optional human-readable reason surfaced to the user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// One action a canvas declares it can perform, invoked via
+/// `invokeCanvasAction`.
+///
+/// Declarations are carried only on the full {@link CanvasState}, loaded when
+/// a client subscribes — never duplicated into the lightweight
+/// {@link CanvasEntry} catalog entry, keeping session summaries small.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasActionDeclaration {
+    /// Stable identifier, unique within this canvas, matching `invokeCanvasAction`'s `actionId`.
+    pub id: String,
+    /// Human-readable display name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Description of what invoking the action does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Inline JSON Schema for the expected `input`, when small enough to embed
+    /// (see {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH},
+    /// checked by {@link isCanvasSchemaWithinLimits}). Optional because some
+    /// declared actions take no input. Mutually exclusive with
+    /// `inputSchemaRef` — a declaration MUST supply at most one of the two.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<AnyValue>,
+    /// Bounded out-of-band reference to a larger JSON Schema, used instead of
+    /// `inputSchema` when the schema would exceed
+    /// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+    /// inlined. AHP does not mandate a specific resolution mechanism for this
+    /// URI (e.g. a host MAY make it `resourceRead`-able).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema_ref: Option<Uri>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasUnsupportedAvailabilityState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasNotLoadedAvailabilityState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasLoadingAvailabilityState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasEmptyAvailabilityState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasReadyAvailabilityState {
+    /// Actions currently declared by the live provider (full replacement each time this state is produced).
+    pub actions: Vec<CanvasActionDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasFailedAvailabilityState {
+    /// Stable machine-readable and human-readable failure information.
+    pub error: ErrorInfo,
+}
+
+/// Lightweight catalog entry for a canvas, carried in
+/// {@link SessionState.canvases | `SessionState.canvases`}. Presence
+/// represents durable **logical membership** — it is unaffected by the live
+/// {@link CanvasEntry.availability | `availability`} cycling through
+/// `notLoaded`/`loading`/`empty`/`ready`/`failed` any number of times.
+///
+/// The full state, including declared actions, lives in {@link CanvasState},
+/// loaded when a client subscribes to {@link CanvasEntry.resource}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasEntry {
+    /// Subscribable `ahp-canvas:` URI matching {@link CanvasState.resource}.
+    pub resource: Uri,
+    /// Full identity, including current incarnation.
+    pub identity: CanvasIdentity,
+    /// Human-readable display title.
+    pub title: String,
+    /// Optional display icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<Icon>,
+    /// Current trust decision matching {@link CanvasState.trust}.
+    pub trust: CanvasTrustState,
+    /// Current availability status matching {@link CanvasState.availability}'s discriminant.
+    pub availability: CanvasAvailabilityStatus,
+    /// Monotonically increasing counter bumped on every change to this
+    /// canvas's state (trust, availability, or incarnation). Clients MAY use it
+    /// to detect and reject stale reads without a full deep comparison.
+    pub revision: i64,
+    /// Opaque host-defined summary metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+/// Full state for a single canvas, loaded when a client subscribes to the
+/// canvas's URI.
+///
+/// `CanvasState` **denormalizes** every {@link CanvasEntry} field directly
+/// onto itself, replacing `availability`'s lightweight status with the full
+/// {@link CanvasAvailabilityState} (including declared actions or failure
+/// detail). Producers MUST keep the two representations consistent: any
+/// change to the inlined fields SHOULD also be announced on the owning
+/// session via {@link SessionCanvasSetAction | `session/canvasSet`}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasState {
+    /// URI of this canvas channel.
+    pub resource: Uri,
+    /// Full identity, including current incarnation.
+    pub identity: CanvasIdentity,
+    /// Human-readable display title.
+    pub title: String,
+    /// Optional display icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<Icon>,
+    /// Current trust decision.
+    pub trust: CanvasTrustState,
+    /// Current live resolution state.
+    pub availability: CanvasAvailabilityState,
+    /// Matches {@link CanvasEntry.revision}.
+    pub revision: i64,
+    /// Opaque host-defined metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+/// A canvas type an installed extension or package currently makes available
+/// to open for a chat, as returned by `listCanvasTypes`.
+///
+/// `CanvasTypeDeclaration` is **discovery-only** metadata about a TYPE — it is
+/// unrelated to {@link CanvasEntry}, which represents durable membership of
+/// an already-opened INSTANCE in {@link SessionState.canvases}. Browsing the
+/// catalogue (via `listCanvasTypes`) never opens, materializes, or restarts
+/// anything; only `openCanvas` does.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTypeDeclaration {
+    /// The extension or package that declares this canvas type.
+    pub source: CanvasSource,
+    /// Provider-declared canvas type (host/provider-defined format), passed as
+    /// {@link CanvasIdentityKey.canvasType} to `openCanvas`. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub canvas_type: String,
+    /// Human-readable display name for a canvas-type picker.
+    pub title: String,
+    /// Description of what this canvas type does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Optional display icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<Icon>,
+    /// Inline JSON Schema describing the `openCanvas` `input` this type
+    /// expects, when small enough to embed (see {@link CANVAS_SCHEMA_MAX_PROPERTIES}
+    /// / {@link CANVAS_SCHEMA_MAX_DEPTH}). Mutually exclusive with
+    /// `openInputSchemaRef`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_input_schema: Option<AnyValue>,
+    /// Bounded out-of-band reference to a larger open-input JSON Schema, used
+    /// instead of `openInputSchema` when it would exceed
+    /// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+    /// inlined.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_input_schema_ref: Option<Uri>,
+    /// Advisory, statically-known preview of actions this canvas type
+    /// typically declares once opened (bounded to
+    /// {@link CANVAS_MAX_DECLARED_ACTIONS}). This is **not authoritative** —
+    /// the actual invocable actions for an opened instance are always
+    /// {@link CanvasReadyAvailabilityState.actions}, which MAY differ (e.g.
+    /// depend on live provider configuration) and MUST be used instead of this
+    /// preview once the canvas is open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_actions: Option<Vec<CanvasActionDeclaration>>,
+}
+
+/// Transient, renderer-neutral presentation of a canvas's current live
+/// endpoint, returned by `resolveCanvasSource`.
+///
+/// This is a plain URL, not any renderer- or process-model-specific handle
+/// (e.g. not an Electron `WebContentsView`, a browser tab id, or a webview
+/// panel reference) — how a client actually presents it (a VS Code Webview,
+/// the Integrated Browser, or otherwise) is entirely a client/host
+/// implementation detail outside this protocol.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasSourcePresentation {
+    /// Ephemeral URL to the canvas's current live endpoint. Transient — MUST
+    /// NOT be persisted, cached beyond the current read, or treated as a
+    /// stable/durable identity. A host MAY embed short-lived, single-use
+    /// credentials in it; such credentials are never durable authority.
+    pub url: String,
+    /// Advisory expiry hint for `url` (and any embedded credential), if the host bounds their validity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+}
+
 // ─── Customization Enablement Union ───────────────────────────────────────
 
 /// A single explicit customization enablement decision.
@@ -6072,6 +6554,58 @@ pub enum AutomationRunLifecycle {
     Failed(AutomationFailedRunLifecycle),
     #[serde(rename = "cancelled")]
     Cancelled(AutomationCancelledRunLifecycle),
+}
+
+/// Identifies the explicitly installed extension or package that declares a canvas type.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum CanvasSource {
+    #[serde(rename = "extension")]
+    Extension(CanvasExtensionSource),
+    #[serde(rename = "package")]
+    Package(CanvasPackageSource),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// Current trust decision governing whether a canvas's declared actions may execute.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum CanvasTrustState {
+    #[serde(rename = "trusted")]
+    Trusted(CanvasTrustedState),
+    #[serde(rename = "pending")]
+    Pending(CanvasPendingTrustState),
+    #[serde(rename = "blocked")]
+    Blocked(CanvasBlockedTrustState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// Current live resolution state of a canvas.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum CanvasAvailabilityState {
+    #[serde(rename = "unsupported")]
+    Unsupported(CanvasUnsupportedAvailabilityState),
+    #[serde(rename = "notLoaded")]
+    NotLoaded(CanvasNotLoadedAvailabilityState),
+    #[serde(rename = "loading")]
+    Loading(CanvasLoadingAvailabilityState),
+    #[serde(rename = "empty")]
+    Empty(CanvasEmptyAvailabilityState),
+    #[serde(rename = "ready")]
+    Ready(CanvasReadyAvailabilityState),
+    #[serde(rename = "failed")]
+    Failed(CanvasFailedAvailabilityState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
 }
 
 /// The state payload of a snapshot.

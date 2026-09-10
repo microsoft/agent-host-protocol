@@ -125,6 +125,12 @@ value class ActionType(val rawValue: String) {
         val AUTOMATION_RUN_SESSION_REMOVED: ActionType = ActionType("automationRun/sessionRemoved")
         val AUTOMATION_RUN_PRIMARY_SESSION_CHANGED: ActionType = ActionType("automationRun/primarySessionChanged")
         val AUTOMATION_RUN_CANCEL_REQUESTED: ActionType = ActionType("automationRun/cancelRequested")
+        val SESSION_CANVAS_SET: ActionType = ActionType("session/canvasSet")
+        val SESSION_CANVAS_REMOVED: ActionType = ActionType("session/canvasRemoved")
+        val CANVAS_AVAILABILITY_CHANGED: ActionType = ActionType("canvas/availabilityChanged")
+        val CANVAS_TRUST_CHANGED: ActionType = ActionType("canvas/trustChanged")
+        val CANVAS_INCARNATION_CHANGED: ActionType = ActionType("canvas/incarnationChanged")
+        val CANVAS_TITLE_CHANGED: ActionType = ActionType("canvas/titleChanged")
     }
 }
 
@@ -1522,6 +1528,80 @@ data class AutomationRunCancelRequestedAction(
     val type: ActionType
 )
 
+@Serializable
+data class SessionCanvasSetAction(
+    val type: ActionType,
+    /**
+     * The canvas entry to add or update, matched by `resource`.
+     */
+    val canvas: CanvasEntry
+)
+
+@Serializable
+data class SessionCanvasRemovedAction(
+    val type: ActionType,
+    /**
+     * Entry in {@link SessionState.canvases} to remove, matching {@link CanvasEntry.resource}.
+     */
+    val resource: String
+)
+
+@Serializable
+data class CanvasAvailabilityChangedAction(
+    val type: ActionType,
+    /**
+     * New {@link CanvasState.availability}.
+     */
+    val availability: CanvasAvailabilityState,
+    /**
+     * The {@link CanvasState.revision} this action results in. The reducer
+     * MUST reject (no-op) this action if `revision` is not strictly greater
+     * than the canvas's current `revision` — this is how stale/out-of-order
+     * deliveries are consistently rejected across every canvas action, not
+     * just this one.
+     */
+    val revision: Long
+)
+
+@Serializable
+data class CanvasTrustChangedAction(
+    val type: ActionType,
+    /**
+     * New {@link CanvasState.trust}.
+     */
+    val trust: CanvasTrustState,
+    /**
+     * The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+     */
+    val revision: Long
+)
+
+@Serializable
+data class CanvasIncarnationChangedAction(
+    val type: ActionType,
+    /**
+     * New {@link CanvasIdentity.incarnation}. MUST differ from the previous value and MUST NOT be reused for this logical identity.
+     */
+    val incarnation: String,
+    /**
+     * The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+     */
+    val revision: Long
+)
+
+@Serializable
+data class CanvasTitleChangedAction(
+    val type: ActionType,
+    /**
+     * New {@link CanvasState.title}.
+     */
+    val title: String,
+    /**
+     * The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+     */
+    val revision: Long
+)
+
 // ─── Partial Summary Types ──────────────────────────────────────────────────
 
 @Serializable
@@ -1675,6 +1755,12 @@ sealed interface StateAction
 @JvmInline value class StateActionAutomationRunSessionRemoved(val value: AutomationRunSessionRemovedAction) : StateAction
 @JvmInline value class StateActionAutomationRunPrimarySessionChanged(val value: AutomationRunPrimarySessionChangedAction) : StateAction
 @JvmInline value class StateActionAutomationRunCancelRequested(val value: AutomationRunCancelRequestedAction) : StateAction
+@JvmInline value class StateActionSessionCanvasSet(val value: SessionCanvasSetAction) : StateAction
+@JvmInline value class StateActionSessionCanvasRemoved(val value: SessionCanvasRemovedAction) : StateAction
+@JvmInline value class StateActionCanvasAvailabilityChanged(val value: CanvasAvailabilityChangedAction) : StateAction
+@JvmInline value class StateActionCanvasTrustChanged(val value: CanvasTrustChangedAction) : StateAction
+@JvmInline value class StateActionCanvasIncarnationChanged(val value: CanvasIncarnationChangedAction) : StateAction
+@JvmInline value class StateActionCanvasTitleChanged(val value: CanvasTitleChangedAction) : StateAction
 @JvmInline value class StateActionUnknown(val raw: JsonObject) : StateAction
 
 internal object StateActionSerializer : KSerializer<StateAction> {
@@ -1786,6 +1872,12 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "automationRun/sessionRemoved" -> StateActionAutomationRunSessionRemoved(input.json.decodeFromJsonElement(AutomationRunSessionRemovedAction.serializer(), element))
             "automationRun/primarySessionChanged" -> StateActionAutomationRunPrimarySessionChanged(input.json.decodeFromJsonElement(AutomationRunPrimarySessionChangedAction.serializer(), element))
             "automationRun/cancelRequested" -> StateActionAutomationRunCancelRequested(input.json.decodeFromJsonElement(AutomationRunCancelRequestedAction.serializer(), element))
+            "session/canvasSet" -> StateActionSessionCanvasSet(input.json.decodeFromJsonElement(SessionCanvasSetAction.serializer(), element))
+            "session/canvasRemoved" -> StateActionSessionCanvasRemoved(input.json.decodeFromJsonElement(SessionCanvasRemovedAction.serializer(), element))
+            "canvas/availabilityChanged" -> StateActionCanvasAvailabilityChanged(input.json.decodeFromJsonElement(CanvasAvailabilityChangedAction.serializer(), element))
+            "canvas/trustChanged" -> StateActionCanvasTrustChanged(input.json.decodeFromJsonElement(CanvasTrustChangedAction.serializer(), element))
+            "canvas/incarnationChanged" -> StateActionCanvasIncarnationChanged(input.json.decodeFromJsonElement(CanvasIncarnationChangedAction.serializer(), element))
+            "canvas/titleChanged" -> StateActionCanvasTitleChanged(input.json.decodeFromJsonElement(CanvasTitleChangedAction.serializer(), element))
             else -> StateActionUnknown(obj)
         }
     }
@@ -1890,6 +1982,12 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionAutomationRunSessionRemoved -> output.json.encodeToJsonElement(AutomationRunSessionRemovedAction.serializer(), value.value)
             is StateActionAutomationRunPrimarySessionChanged -> output.json.encodeToJsonElement(AutomationRunPrimarySessionChangedAction.serializer(), value.value)
             is StateActionAutomationRunCancelRequested -> output.json.encodeToJsonElement(AutomationRunCancelRequestedAction.serializer(), value.value)
+            is StateActionSessionCanvasSet -> output.json.encodeToJsonElement(SessionCanvasSetAction.serializer(), value.value)
+            is StateActionSessionCanvasRemoved -> output.json.encodeToJsonElement(SessionCanvasRemovedAction.serializer(), value.value)
+            is StateActionCanvasAvailabilityChanged -> output.json.encodeToJsonElement(CanvasAvailabilityChangedAction.serializer(), value.value)
+            is StateActionCanvasTrustChanged -> output.json.encodeToJsonElement(CanvasTrustChangedAction.serializer(), value.value)
+            is StateActionCanvasIncarnationChanged -> output.json.encodeToJsonElement(CanvasIncarnationChangedAction.serializer(), value.value)
+            is StateActionCanvasTitleChanged -> output.json.encodeToJsonElement(CanvasTitleChangedAction.serializer(), value.value)
             is StateActionUnknown -> value.raw
         }
         output.encodeJsonElement(element)

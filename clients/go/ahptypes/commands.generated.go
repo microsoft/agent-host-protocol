@@ -180,6 +180,22 @@ type InitializeResult struct {
 	// `ahp-automations://` for {@link AutomationState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
+	// Host/runtime-owned local-canvas support. Presence means the SERVER
+	// currently has a working runtime able to serve `openCanvas` /
+	// `invokeCanvasAction` for at least one qualifying (explicitly installed
+	// and trust-eligible) extension/package source; absence means the host
+	// has no available canvas runtime, and clients MUST treat every canvas as
+	// {@link CanvasAvailabilityStatus.Unsupported} regardless of what
+	// {@link ClientCapabilities.canvases} declared.
+	//
+	// **Protocol version support alone is not a runtime capability**: a host
+	// speaking protocol `>= 0.10.0` without this field present MUST NOT be
+	// assumed to have a usable canvas runtime. This field — not the
+	// negotiated `protocolVersion` — is the authoritative signal, and is
+	// independent of any individual canvas's live availability
+	// ({@link CanvasAvailabilityState}) or trust decision
+	// ({@link CanvasTrustState}).
+	Canvases *CanvasCapabilities `json:"canvases,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -200,6 +216,23 @@ type ClientCapabilities struct {
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
 	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	// Client can render local canvases: `listCanvasTypes`, `openCanvas`,
+	// subscribe to the resulting `ahp-canvas:` channel, and drive
+	// `resolveCanvasSource` / `invokeCanvasAction` / `restartCanvasProvider` /
+	// `closeCanvas`.
+	//
+	// Hosts SHOULD NOT offer canvas admission to a client that omits this
+	// capability; such a client MUST be treated as if every canvas were
+	// {@link CanvasAvailabilityStatus.Unsupported}. Omission does not imply
+	// anything about server/runtime execution trust — see
+	// {@link CanvasTrustStatus}, which is a separate, host-owned decision.
+	//
+	// This declares only the CLIENT's rendering capability. Protocol version
+	// support alone (i.e. speaking >= 0.10.0) is not evidence that the SERVER
+	// actually has a working canvas runtime — see
+	// {@link InitializeResult.canvases}, the server-side counterpart, which a
+	// client MUST also check before treating canvases as usable.
+	Canvases map[string]json.RawMessage `json:"canvases,omitempty"`
 }
 
 // Automation features supported by this host authority.
@@ -223,6 +256,12 @@ type AutomationCapabilities struct {
 	// runs are not counted toward the limit. Absence means the retention limit is
 	// implementation-defined.
 	RunHistoryLimit *int64 `json:"runHistoryLimit,omitempty"`
+}
+
+// Local-canvas runtime features supported by this host authority. The empty
+// object means "supported" — see {@link InitializeResult.canvases} for what
+// presence/absence of this field itself means.
+type CanvasCapabilities struct {
 }
 
 // Presence capability for {@link AutomationCreateRequestedAction |
@@ -1312,6 +1351,262 @@ type FetchAutomationRunsParams struct {
 
 // Empty acknowledgement; the updated automation state is delivered by action.
 type FetchAutomationRunsResult struct {
+}
+
+// Discovers canvas TYPES currently available to open for one exact backing
+// chat.
+//
+// This is a **pure read/browse** operation: it MUST NOT open, materialize,
+// or otherwise admit any canvas — see `openCanvas` for that. It is
+// unrelated to {@link SessionState.canvases}, which reflects durable
+// membership of already-opened canvas INSTANCES, not the set of canvas
+// TYPES a host/extension could open; do not confuse the two.
+type ListCanvasTypesParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Maximum number of entries to return in this page. The server SHOULD respect
+	// this bound but MAY return fewer entries and MAY impose its own upper cap.
+	// Omit to let the server choose the page size.
+	Limit *int64 `json:"limit,omitempty"`
+	// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+	// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+	// as opaque — do not parse, modify, or persist them across connections. An
+	// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+	Cursor *string `json:"cursor,omitempty"`
+}
+
+// Available canvas types for the requested chat.
+type ListCanvasTypesResult struct {
+	// Opaque cursor for the next page. Present when more entries exist beyond the
+	// returned page; absent signals the end of the collection. Pass it back as
+	// {@link PaginatedParams.cursor} to fetch the following page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+	// Discovered canvas type declarations.
+	Types []CanvasTypeDeclaration `json:"types"`
+}
+
+// Explicitly opens (admits) a canvas, associating it with the owning chat
+// given by `identity.chat` at the moment of the call — never with whichever
+// chat later happens to have focus.
+//
+// This is a read-write admission, not a resolve: unlike `subscribe` (which
+// only reads current state), `openCanvas` is the operation that creates
+// durable membership. There is no implicit open — a client MUST call this
+// before a canvas appears in {@link SessionState.canvases}. Once admitted,
+// clients read and follow live state by `subscribe`-ing to the returned
+// `canvas.resource`, and resolve the current live endpoint via
+// `resolveCanvasSource`; neither read itself opens, resumes, or restarts
+// anything.
+//
+// **Logical identity is always singular.** The same {@link CanvasIdentityKey}
+// (`chat`, `source`, `canvasType`, `instanceId`) always resolves to the same
+// `canvas` resource URI and the same {@link SessionState.canvases} catalog
+// entry, no matter how many times `openCanvas` is called for it — the server
+// MUST return that existing entry's `resource` rather than mint a second
+// one. A client-supplied `canvas` URI is honored only on the call that first
+// establishes the identity; on a later call for an already-recorded
+// identity the server MUST ignore the supplied `canvas` value and return the
+// existing resource instead.
+//
+// **Idempotency is scoped to `requestId`, not identity.** Retrying with the
+// exact same `requestId` and byte-for-byte identical params from the same
+// authenticated connection MUST return the original result without
+// repeating any side effect, within a bounded live window (the server is
+// not required to remember it forever). Reusing the same `requestId` with
+// any different parameter value MUST be rejected with `Conflict`
+// (`-32011`) — mint a new `requestId` for a new logical call. A genuinely
+// NEW `requestId` for an already-open identity MAY be effectful (e.g.
+// updating `title`/`icon`, or causing the provider to re-run its own
+// open-time initialization with new `input`) — this mirrors the pinned
+// SDK's own repeated-open behavior and does not create a second logical
+// identity. There is no exactly-once-across-crash guarantee: a lost reply
+// is indeterminate, and clients MUST NOT automatically replay `openCanvas`
+// — reconnect and read `SessionState.canvases` / `resolveCanvasSource`
+// instead to determine the actual outcome.
+type OpenCanvasParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Canvas URI (client-chosen, e.g. `ahp-canvas:/<uuid>`); honored only when this call first establishes `identity` — see above.
+	Canvas URI `json:"canvas"`
+	// Logical identity to open or re-admit.
+	Identity CanvasIdentityKey `json:"identity"`
+	// Initial (or updated, on a later effectful call) display title.
+	Title string `json:"title"`
+	// Initial (or updated) display icon.
+	Icon *Icon `json:"icon,omitempty"`
+	// Bounded JSON input for this open call (e.g. seed parameters the
+	// provider uses to initialize the canvas), opaque to the protocol. See
+	// {@link CanvasTypeDeclaration.openInputSchema} /
+	// `openInputSchemaRef` for the expected shape. The JSON-serialized value
+	// MUST NOT exceed `CANVAS_INPUT_MAX_LENGTH`.
+	Input *json.RawMessage `json:"input,omitempty"`
+	// Durable client-generated idempotency key bounding retry deduplication
+	// for this call within a live window; see the idempotency rules above.
+	// MUST NOT exceed `CANVAS_REQUEST_ID_MAX_LENGTH`.
+	RequestId string `json:"requestId"`
+}
+
+// Result identifying the existing or newly opened canvas.
+type OpenCanvasResult struct {
+	// The catalog entry for the opened (or already-open) canvas.
+	Canvas CanvasEntry `json:"canvas"`
+}
+
+// Pure, read-only read of a canvas's current live-resolution state and,
+// when currently live, a transient endpoint presentation.
+//
+// This MUST NOT create, resume, reopen, or restart a provider. If the
+// canvas does not currently have a live endpoint, `source` is absent and
+// `availability` reflects why (e.g. `notLoaded`, `loading`, `failed`) —
+// call `restartCanvasProvider` (an explicitly effectful operation) to
+// attempt recovery instead. A client-local page reload (re-navigating the
+// client's own rendering surface to the same still-live `source.url`)
+// needs no dedicated command at all; calling `resolveCanvasSource` again is
+// also how a client retries resolving a currently-unavailable source
+// without restarting anything.
+type ResolveCanvasSourceParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// The canvas's current live-resolution state as of this read.
+type ResolveCanvasSourceResult struct {
+	// Current {@link CanvasEntry.availability}.
+	Availability CanvasAvailabilityStatus `json:"availability"`
+	// Current {@link CanvasIdentity.incarnation}.
+	Incarnation string `json:"incarnation"`
+	// Current {@link CanvasEntry.revision}.
+	Revision int64 `json:"revision"`
+	// Present only when a live endpoint currently exists (`availability` is `empty` or `ready`); absent otherwise. Transient — see {@link CanvasSourcePresentation}.
+	Source *CanvasSourcePresentation `json:"source,omitempty"`
+}
+
+// Invokes one of a canvas's currently declared actions exactly once.
+//
+// The server MUST reject with `PermissionDenied` (`-32009`) if the canvas's
+// current trust is not `trusted`, and with `NotFound` (`-32008`) if
+// `actionId` does not match a currently declared action. `incarnation` is
+// REQUIRED — omitting stale-generation protection on an effectful call is
+// not allowed. If it does not match the canvas's current
+// {@link CanvasIdentity.incarnation}, the server MUST reject with `Conflict`
+// (`-32011`) rather than route the call to a superseded endpoint.
+//
+// The result is the provider's raw reply and is never persisted into
+// `CanvasState` — large or provider-specific payloads stay off the durable
+// state tree; a reply that would exceed `CANVAS_RESULT_MAX_LENGTH` MUST be
+// represented out of band instead of being returned inline. Any resulting
+// state changes (e.g. a subsequent availability transition) flow back
+// separately through the normal `canvas/*` action stream on the canvas's
+// own channel.
+//
+// A lost reply (e.g. a dropped connection after the provider already ran
+// the handler) is **indeterminate**: clients MUST NOT automatically replay
+// `invokeCanvasAction` on reconnect. Instead, reconnect and read the
+// canvas's current state (e.g. via `subscribe` / `resolveCanvasSource`) and
+// decide from observed `revision`/`incarnation` and any provider-visible
+// side effect whether to surface the ambiguity to the user, rather than
+// assuming success or failure.
+type InvokeCanvasActionParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Matches a {@link CanvasActionDeclaration.id} from the canvas's current declared actions.
+	ActionId string `json:"actionId"`
+	// Input conforming to the declared action's `inputSchema`/`inputSchemaRef`,
+	// if any. The JSON-serialized value MUST NOT exceed
+	// `CANVAS_INPUT_MAX_LENGTH`.
+	Input *json.RawMessage `json:"input,omitempty"`
+	// Expected {@link CanvasIdentity.incarnation}. Required — see above. The
+	// server MUST reject the call with `Conflict` if the canvas's live
+	// endpoint has since been superseded, rather than deliver the call to it.
+	Incarnation string `json:"incarnation"`
+	// Durable client-generated idempotency key bounding retry
+	// deduplication for this invocation within a live window. The server is
+	// not required to guarantee exactly-once execution across a crash. MUST
+	// NOT exceed `CANVAS_REQUEST_ID_MAX_LENGTH`.
+	RequestId string `json:"requestId"`
+}
+
+// Result of invoking a declared canvas action.
+type InvokeCanvasActionResult struct {
+	// The provider's raw reply, opaque to the protocol. MUST NOT exceed `CANVAS_RESULT_MAX_LENGTH` once JSON-serialized.
+	Result json.RawMessage `json:"result"`
+}
+
+// Explicitly restarts the provider/chat-scoped runtime backing this canvas:
+// retires the current live endpoint and establishes a fresh one for the
+// same logical instance.
+//
+// This is the **only** operation that intentionally causes an
+// {@link CanvasIncarnationChangedAction | incarnation bump}; `resolveCanvasSource`
+// (read-only source resolution / client-local page reload) MUST NEVER
+// trigger it. The host dispatches {@link CanvasAvailabilityChangedAction}
+// (transitioning through `notLoaded`/`loading`) and then
+// {@link CanvasIncarnationChangedAction} to reflect the outcome. Restart
+// never replays a prior `invokeCanvasAction`, and MUST NOT steal focus or
+// restore any prior in-flight effect.
+//
+// `incarnation` is REQUIRED: the server MUST reject with `Conflict`
+// (`-32011`) if it does not match the canvas's current
+// {@link CanvasIdentity.incarnation}, so a caller cannot restart a
+// generation it never observed (e.g. after racing a concurrent restart). A
+// lost reply is indeterminate; clients MUST NOT automatically replay this
+// command — reconnect and compare the canvas's current `incarnation`
+// instead.
+type RestartCanvasProviderParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Durable client-generated idempotency key, following the same
+	// requestId-scoped idempotency rules as `openCanvas`. MUST NOT exceed
+	// `CANVAS_REQUEST_ID_MAX_LENGTH`.
+	RequestId string `json:"requestId"`
+	// Expected current {@link CanvasIdentity.incarnation}; required — see above.
+	Incarnation string `json:"incarnation"`
+}
+
+// Logically closes a canvas: removes its durable membership from
+// `SessionState.canvases` and disposes matching views.
+//
+// This is distinct from a client merely hiding a local tab or view, which is
+// presentation-only and MUST NOT dispatch this command. There is no
+// advertised model tool for this operation — it is invoked only by
+// UI/RPC callers.
+//
+// `revision` is REQUIRED: the server MUST reject with `Conflict`
+// (`-32011`) if it does not match the canvas's current
+// {@link CanvasEntry.revision}, so a caller cannot close membership state it
+// never actually observed. If no matching entry exists (e.g. already
+// closed), the server MUST treat this as a successful no-op rather than an
+// error — the `revision` precondition only applies when an entry still
+// exists. A lost reply is indeterminate; clients MUST NOT automatically
+// replay this command — reconnect and check `SessionState.canvases`
+// instead.
+type CloseCanvasParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Durable client-generated idempotency key, following the same
+	// requestId-scoped idempotency rules as `openCanvas`. MUST NOT exceed
+	// `CANVAS_REQUEST_ID_MAX_LENGTH`.
+	RequestId string `json:"requestId"`
+	// Expected current {@link CanvasEntry.revision}; required when an entry still exists — see above.
+	Revision int64 `json:"revision"`
 }
 
 func (v *ForkChatSource) UnmarshalJSON(data []byte) error {

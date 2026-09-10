@@ -1,0 +1,36 @@
+{
+  "description": "canvas/incarnationChanged replaces the opaque incarnation token and applies the action's asserted revision",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "ready", "actions": [] },
+    "revision": 4
+  },
+  "actions": [
+    { "type": "canvas/incarnationChanged", "incarnation": "gen-2", "revision": 5 }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-2"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "ready", "actions": [] },
+    "revision": 5
+  }
+}
+

@@ -174,6 +174,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | CanvasState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
   ) {
@@ -728,6 +729,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'CanvasSourceKind', 'CanvasTrustStatus', 'CanvasAvailabilityStatus',
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
@@ -883,6 +885,24 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
+  { name: 'CanvasExtensionSource', omitDiscriminants: true },
+  { name: 'CanvasPackageSource', omitDiscriminants: true },
+  { name: 'CanvasIdentityKey' },
+  { name: 'CanvasIdentity' },
+  { name: 'CanvasTrustedState', omitDiscriminants: true },
+  { name: 'CanvasPendingTrustState', omitDiscriminants: true },
+  { name: 'CanvasBlockedTrustState', omitDiscriminants: true },
+  { name: 'CanvasActionDeclaration' },
+  { name: 'CanvasUnsupportedAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasNotLoadedAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasLoadingAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasEmptyAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasReadyAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasFailedAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasEntry' },
+  { name: 'CanvasState' },
+  { name: 'CanvasTypeDeclaration' },
+  { name: 'CanvasSourcePresentation' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1161,6 +1181,44 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
     { variantName: 'Completed', innerType: 'AutomationCompletedRunLifecycle', wireValue: 'completed' },
     { variantName: 'Failed', innerType: 'AutomationFailedRunLifecycle', wireValue: 'failed' },
     { variantName: 'Cancelled', innerType: 'AutomationCancelledRunLifecycle', wireValue: 'cancelled' },
+  ],
+  injectDiscriminantOnMarshal: true,
+};
+
+const CANVAS_SOURCE_UNION: UnionConfig = {
+  name: 'CanvasSource',
+  discriminantField: 'kind',
+  doc: 'CanvasSource identifies the explicitly installed extension or package that declares a canvas type.',
+  variants: [
+    { variantName: 'Extension', innerType: 'CanvasExtensionSource', wireValue: 'extension' },
+    { variantName: 'Package', innerType: 'CanvasPackageSource', wireValue: 'package' },
+  ],
+  injectDiscriminantOnMarshal: true,
+};
+
+const CANVAS_TRUST_STATE_UNION: UnionConfig = {
+  name: 'CanvasTrustState',
+  discriminantField: 'status',
+  doc: 'CanvasTrustState is the current trust decision governing whether a canvas\'s declared actions may execute.',
+  variants: [
+    { variantName: 'Trusted', innerType: 'CanvasTrustedState', wireValue: 'trusted' },
+    { variantName: 'Pending', innerType: 'CanvasPendingTrustState', wireValue: 'pending' },
+    { variantName: 'Blocked', innerType: 'CanvasBlockedTrustState', wireValue: 'blocked' },
+  ],
+  injectDiscriminantOnMarshal: true,
+};
+
+const CANVAS_AVAILABILITY_STATE_UNION: UnionConfig = {
+  name: 'CanvasAvailabilityState',
+  discriminantField: 'status',
+  doc: 'CanvasAvailabilityState is the current live resolution state of a canvas.',
+  variants: [
+    { variantName: 'Unsupported', innerType: 'CanvasUnsupportedAvailabilityState', wireValue: 'unsupported' },
+    { variantName: 'NotLoaded', innerType: 'CanvasNotLoadedAvailabilityState', wireValue: 'notLoaded' },
+    { variantName: 'Loading', innerType: 'CanvasLoadingAvailabilityState', wireValue: 'loading' },
+    { variantName: 'Empty', innerType: 'CanvasEmptyAvailabilityState', wireValue: 'empty' },
+    { variantName: 'Ready', innerType: 'CanvasReadyAvailabilityState', wireValue: 'ready' },
+    { variantName: 'Failed', innerType: 'CanvasFailedAvailabilityState', wireValue: 'failed' },
   ],
   injectDiscriminantOnMarshal: true,
 };
@@ -1499,6 +1557,12 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_SOURCE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_TRUST_STATE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_AVAILABILITY_STATE_UNION));
+  lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1610,6 +1674,12 @@ const ACTION_VARIANTS: {
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', variantName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', variantName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'session/canvasSet', variantName: 'SessionCanvasSet', tsInterface: 'SessionCanvasSetAction' },
+  { type: 'session/canvasRemoved', variantName: 'SessionCanvasRemoved', tsInterface: 'SessionCanvasRemovedAction' },
+  { type: 'canvas/availabilityChanged', variantName: 'CanvasAvailabilityChanged', tsInterface: 'CanvasAvailabilityChangedAction' },
+  { type: 'canvas/trustChanged', variantName: 'CanvasTrustChanged', tsInterface: 'CanvasTrustChangedAction' },
+  { type: 'canvas/incarnationChanged', variantName: 'CanvasIncarnationChanged', tsInterface: 'CanvasIncarnationChangedAction' },
+  { type: 'canvas/titleChanged', variantName: 'CanvasTitleChanged', tsInterface: 'CanvasTitleChangedAction' },
 ];
 
 function generateMergedChatToolCallConfirmedStruct(): string {
@@ -1715,7 +1785,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
-  { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
+  { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' }, { name: 'CanvasCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
@@ -1752,6 +1822,11 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
+  { name: 'ListCanvasTypesParams' }, { name: 'ListCanvasTypesResult' },
+  { name: 'OpenCanvasParams' }, { name: 'OpenCanvasResult' },
+  { name: 'ResolveCanvasSourceParams' }, { name: 'ResolveCanvasSourceResult' },
+  { name: 'InvokeCanvasActionParams' }, { name: 'InvokeCanvasActionResult' },
+  { name: 'RestartCanvasProviderParams' }, { name: 'CloseCanvasParams' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -2323,6 +2398,9 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTrigger',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',
+    'CanvasSource',
+    'CanvasTrustState',
+    'CanvasAvailabilityState',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',

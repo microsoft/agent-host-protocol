@@ -1141,6 +1141,126 @@ enum class AutomationRunOriginKind {
     TRIGGER
 }
 
+/**
+ * Discriminant for {@link CanvasSource} — what kind of package originates a
+ * canvas type.
+ */
+@Serializable(with = CanvasSourceKindSerializer::class)
+@JvmInline
+value class CanvasSourceKind(val rawValue: String) {
+    companion object {
+        /**
+         * An explicitly installed host extension.
+         */
+        val EXTENSION: CanvasSourceKind = CanvasSourceKind("extension")
+        /**
+         * An explicitly installed package (not a host extension).
+         */
+        val PACKAGE: CanvasSourceKind = CanvasSourceKind("package")
+    }
+}
+
+internal object CanvasSourceKindSerializer : KSerializer<CanvasSourceKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("CanvasSourceKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: CanvasSourceKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): CanvasSourceKind =
+        CanvasSourceKind(decoder.decodeString())
+}
+
+/**
+ * Discriminant for {@link CanvasTrustState} — whether the host currently
+ * permits this canvas's declared actions to execute.
+ *
+ * Trust is independent of {@link CanvasAvailabilityStatus | availability}:
+ * a canvas may be perfectly capable of rendering while blocked from
+ * executing actions, and vice versa. Trust decisions are host/runtime
+ * authority, not something this protocol grants.
+ */
+@Serializable(with = CanvasTrustStatusSerializer::class)
+@JvmInline
+value class CanvasTrustStatus(val rawValue: String) {
+    companion object {
+        /**
+         * Declared actions may be invoked.
+         */
+        val TRUSTED: CanvasTrustStatus = CanvasTrustStatus("trusted")
+        /**
+         * A trust decision has not yet been made (e.g. first use of a new/changed source).
+         */
+        val PENDING: CanvasTrustStatus = CanvasTrustStatus("pending")
+        /**
+         * The host has denied execution; declared actions MUST NOT be invoked.
+         */
+        val BLOCKED: CanvasTrustStatus = CanvasTrustStatus("blocked")
+    }
+}
+
+internal object CanvasTrustStatusSerializer : KSerializer<CanvasTrustStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("CanvasTrustStatus", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: CanvasTrustStatus) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): CanvasTrustStatus =
+        CanvasTrustStatus(decoder.decodeString())
+}
+
+/**
+ * Discriminant for {@link CanvasAvailabilityState} — the canvas's current
+ * live resolution state, independent of its durable
+ * {@link CanvasEntry | membership} in a session's catalog.
+ *
+ * An empty catalog membership list is not itself a close, and a canvas may
+ * remain a recorded member while its live availability cycles through these
+ * states any number of times (e.g. across provider restarts).
+ */
+@Serializable(with = CanvasAvailabilityStatusSerializer::class)
+@JvmInline
+value class CanvasAvailabilityStatus(val rawValue: String) {
+    companion object {
+        /**
+         * The connected client or host does not support this canvas type (e.g.
+         * the client omitted the `canvases` capability, or no local runtime can
+         * render this `canvasType`). Distinct from `blocked` trust, which is a
+         * policy decision rather than a capability gap.
+         */
+        val UNSUPPORTED: CanvasAvailabilityStatus = CanvasAvailabilityStatus("unsupported")
+        /**
+         * Recorded but not yet resolved to a live endpoint since it was opened or the host last restarted.
+         */
+        val NOT_LOADED: CanvasAvailabilityStatus = CanvasAvailabilityStatus("notLoaded")
+        /**
+         * Currently resolving or (re)connecting to a live endpoint.
+         */
+        val LOADING: CanvasAvailabilityStatus = CanvasAvailabilityStatus("loading")
+        /**
+         * Live and reachable, but the provider has not yet produced content to render.
+         */
+        val EMPTY: CanvasAvailabilityStatus = CanvasAvailabilityStatus("empty")
+        /**
+         * Live, reachable, and has declared its current actions.
+         */
+        val READY: CanvasAvailabilityStatus = CanvasAvailabilityStatus("ready")
+        /**
+         * The live endpoint failed to resolve, or resolution otherwise failed.
+         */
+        val FAILED: CanvasAvailabilityStatus = CanvasAvailabilityStatus("failed")
+    }
+}
+
+internal object CanvasAvailabilityStatusSerializer : KSerializer<CanvasAvailabilityStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("CanvasAvailabilityStatus", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: CanvasAvailabilityStatus) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): CanvasAvailabilityStatus =
+        CanvasAvailabilityStatus(decoder.decodeString())
+}
+
 // ─── State Types ────────────────────────────────────────────────────────────
 
 @Serializable
@@ -1835,6 +1955,15 @@ data class SessionState(
      * {@link /guide/changesets | Changesets} for an overview of the model.
      */
     val changesets: List<Changeset>? = null,
+    /**
+     * Catalog of canvases opened for chats in this session. Presence is
+     * durable logical membership, admitted only via `openCanvas` — never
+     * implied by a chat's existence or a client's earlier focus. Each entry's
+     * {@link CanvasIdentity.chat | `identity.chat`} identifies the exact
+     * backing chat; a canvas never migrates to a different chat. See
+     * {@link CanvasEntry} for the full membership/availability/trust model.
+     */
+    val canvases: List<CanvasEntry>? = null,
     /**
      * Outstanding input the session is blocked on, aggregated across every chat
      * so a client can discover and answer it from the session channel alone,
@@ -5604,6 +5733,343 @@ data class AutomationRunState(
     val meta: Map<String, JsonElement>? = null
 )
 
+@Serializable
+data class CanvasExtensionSource(
+    val kind: CanvasSourceKind,
+    /**
+     * Stable extension identifier (host-defined format, e.g. `publisher.name`).
+     * MUST NOT exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+     */
+    val extensionId: String,
+    /**
+     * Installed extension version, when known. Metadata only — not identity-bearing.
+     */
+    val version: String? = null
+)
+
+@Serializable
+data class CanvasPackageSource(
+    val kind: CanvasSourceKind,
+    /**
+     * Stable, host- or package-manager-assigned unique identifier for this
+     * specific installed package instance/scope (opaque format). This is the
+     * identity-bearing field — see {@link CanvasIdentityKey}. MUST NOT exceed
+     * {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+     */
+    val sourceId: String,
+    /**
+     * Declared package name, for display only — MUST NOT be used to compare source identity; see `sourceId`.
+     */
+    val packageName: String,
+    /**
+     * Installed package version, when known. Metadata only — not identity-bearing.
+     */
+    val version: String? = null
+)
+
+@Serializable
+data class CanvasIdentityKey(
+    /**
+     * The exact backing chat this canvas belongs to. A canvas is never
+     * re-associated with a different chat; opening a new one for another chat
+     * creates a distinct canvas.
+     */
+    val chat: String,
+    /**
+     * The extension or package that declares this canvas's type.
+     */
+    val source: CanvasSource,
+    /**
+     * Provider-declared canvas type (host/provider-defined format). MUST NOT
+     * exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+     */
+    val canvasType: String,
+    /**
+     * Provider-chosen stable identifier for this canvas instance, scoped to
+     * `(chat, source, canvasType)`. Stable across reloads and host/window
+     * restarts for the same logical canvas. MUST NOT exceed
+     * {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+     */
+    val instanceId: String
+)
+
+@Serializable
+data class CanvasIdentity(
+    /**
+     * The exact backing chat this canvas belongs to. A canvas is never
+     * re-associated with a different chat; opening a new one for another chat
+     * creates a distinct canvas.
+     */
+    val chat: String,
+    /**
+     * The extension or package that declares this canvas's type.
+     */
+    val source: CanvasSource,
+    /**
+     * Provider-declared canvas type (host/provider-defined format). MUST NOT
+     * exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+     */
+    val canvasType: String,
+    /**
+     * Provider-chosen stable identifier for this canvas instance, scoped to
+     * `(chat, source, canvasType)`. Stable across reloads and host/window
+     * restarts for the same logical canvas. MUST NOT exceed
+     * {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+     */
+    val instanceId: String,
+    /**
+     * Opaque, host-generated token identifying the current generation of this
+     * canvas's live endpoint. The host mints a fresh token whenever a provider
+     * restart retires the previous live endpoint and establishes a new one for
+     * the same logical instance (see {@link CanvasIncarnationChangedAction |
+     * `canvas/incarnationChanged`}); it is not changed by a plain page reload
+     * against the same still-live endpoint.
+     *
+     * `incarnation` is **opaque**: clients and hosts MUST compare it only for
+     * equality, never parse it, sort it, or perform arithmetic on it (e.g. it
+     * is not guaranteed to be numeric or monotonically increasing). The host
+     * MUST NOT reuse a token for this logical identity once it has been
+     * superseded, including across a host/process restart — if the host
+     * cannot otherwise guarantee non-reuse, it MUST mint tokens (e.g. random
+     * or timestamp-derived) that make accidental reuse practically
+     * impossible, rather than a small resettable counter.
+     *
+     * Clients and hosts use `incarnation` to reject stale callbacks and
+     * in-flight effects addressed to a superseded endpoint.
+     */
+    val incarnation: String
+)
+
+@Serializable
+data class CanvasTrustedState(
+    val status: CanvasTrustStatus
+)
+
+@Serializable
+data class CanvasPendingTrustState(
+    val status: CanvasTrustStatus
+)
+
+@Serializable
+data class CanvasBlockedTrustState(
+    val status: CanvasTrustStatus,
+    /**
+     * Optional human-readable reason surfaced to the user.
+     */
+    val reason: String? = null
+)
+
+@Serializable
+data class CanvasActionDeclaration(
+    /**
+     * Stable identifier, unique within this canvas, matching `invokeCanvasAction`'s `actionId`.
+     */
+    val id: String,
+    /**
+     * Human-readable display name.
+     */
+    val title: String? = null,
+    /**
+     * Description of what invoking the action does.
+     */
+    val description: String? = null,
+    /**
+     * Inline JSON Schema for the expected `input`, when small enough to embed
+     * (see {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH},
+     * checked by {@link isCanvasSchemaWithinLimits}). Optional because some
+     * declared actions take no input. Mutually exclusive with
+     * `inputSchemaRef` — a declaration MUST supply at most one of the two.
+     */
+    val inputSchema: JsonElement? = null,
+    /**
+     * Bounded out-of-band reference to a larger JSON Schema, used instead of
+     * `inputSchema` when the schema would exceed
+     * {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+     * inlined. AHP does not mandate a specific resolution mechanism for this
+     * URI (e.g. a host MAY make it `resourceRead`-able).
+     */
+    val inputSchemaRef: String? = null
+)
+
+@Serializable
+data class CanvasUnsupportedAvailabilityState(
+    val status: CanvasAvailabilityStatus
+)
+
+@Serializable
+data class CanvasNotLoadedAvailabilityState(
+    val status: CanvasAvailabilityStatus
+)
+
+@Serializable
+data class CanvasLoadingAvailabilityState(
+    val status: CanvasAvailabilityStatus
+)
+
+@Serializable
+data class CanvasEmptyAvailabilityState(
+    val status: CanvasAvailabilityStatus
+)
+
+@Serializable
+data class CanvasReadyAvailabilityState(
+    val status: CanvasAvailabilityStatus,
+    /**
+     * Actions currently declared by the live provider (full replacement each time this state is produced).
+     */
+    val actions: List<CanvasActionDeclaration>
+)
+
+@Serializable
+data class CanvasFailedAvailabilityState(
+    val status: CanvasAvailabilityStatus,
+    /**
+     * Stable machine-readable and human-readable failure information.
+     */
+    val error: ErrorInfo
+)
+
+@Serializable
+data class CanvasEntry(
+    /**
+     * Subscribable `ahp-canvas:` URI matching {@link CanvasState.resource}.
+     */
+    val resource: String,
+    /**
+     * Full identity, including current incarnation.
+     */
+    val identity: CanvasIdentity,
+    /**
+     * Human-readable display title.
+     */
+    val title: String,
+    /**
+     * Optional display icon.
+     */
+    val icon: Icon? = null,
+    /**
+     * Current trust decision matching {@link CanvasState.trust}.
+     */
+    val trust: CanvasTrustState,
+    /**
+     * Current availability status matching {@link CanvasState.availability}'s discriminant.
+     */
+    val availability: CanvasAvailabilityStatus,
+    /**
+     * Monotonically increasing counter bumped on every change to this
+     * canvas's state (trust, availability, or incarnation). Clients MAY use it
+     * to detect and reject stale reads without a full deep comparison.
+     */
+    val revision: Long,
+    /**
+     * Opaque host-defined summary metadata.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class CanvasState(
+    /**
+     * URI of this canvas channel.
+     */
+    val resource: String,
+    /**
+     * Full identity, including current incarnation.
+     */
+    val identity: CanvasIdentity,
+    /**
+     * Human-readable display title.
+     */
+    val title: String,
+    /**
+     * Optional display icon.
+     */
+    val icon: Icon? = null,
+    /**
+     * Current trust decision.
+     */
+    val trust: CanvasTrustState,
+    /**
+     * Current live resolution state.
+     */
+    val availability: CanvasAvailabilityState,
+    /**
+     * Matches {@link CanvasEntry.revision}.
+     */
+    val revision: Long,
+    /**
+     * Opaque host-defined metadata.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class CanvasTypeDeclaration(
+    /**
+     * The extension or package that declares this canvas type.
+     */
+    val source: CanvasSource,
+    /**
+     * Provider-declared canvas type (host/provider-defined format), passed as
+     * {@link CanvasIdentityKey.canvasType} to `openCanvas`. MUST NOT exceed
+     * {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+     */
+    val canvasType: String,
+    /**
+     * Human-readable display name for a canvas-type picker.
+     */
+    val title: String,
+    /**
+     * Description of what this canvas type does.
+     */
+    val description: String? = null,
+    /**
+     * Optional display icon.
+     */
+    val icon: Icon? = null,
+    /**
+     * Inline JSON Schema describing the `openCanvas` `input` this type
+     * expects, when small enough to embed (see {@link CANVAS_SCHEMA_MAX_PROPERTIES}
+     * / {@link CANVAS_SCHEMA_MAX_DEPTH}). Mutually exclusive with
+     * `openInputSchemaRef`.
+     */
+    val openInputSchema: JsonElement? = null,
+    /**
+     * Bounded out-of-band reference to a larger open-input JSON Schema, used
+     * instead of `openInputSchema` when it would exceed
+     * {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+     * inlined.
+     */
+    val openInputSchemaRef: String? = null,
+    /**
+     * Advisory, statically-known preview of actions this canvas type
+     * typically declares once opened (bounded to
+     * {@link CANVAS_MAX_DECLARED_ACTIONS}). This is **not authoritative** —
+     * the actual invocable actions for an opened instance are always
+     * {@link CanvasReadyAvailabilityState.actions}, which MAY differ (e.g.
+     * depend on live provider configuration) and MUST be used instead of this
+     * preview once the canvas is open.
+     */
+    val declaredActions: List<CanvasActionDeclaration>? = null
+)
+
+@Serializable
+data class CanvasSourcePresentation(
+    /**
+     * Ephemeral URL to the canvas's current live endpoint. Transient — MUST
+     * NOT be persisted, cached beyond the current read, or treated as a
+     * stable/durable identity. A host MAY embed short-lived, single-use
+     * credentials in it; such credentials are never durable authority.
+     */
+    val url: String,
+    /**
+     * Advisory expiry hint for `url` (and any embedded credential), if the host bounds their validity.
+     */
+    val expiresAt: String? = null
+)
+
 // ─── Customization Enablement Union ─────────────────────────────────────
 
 /**
@@ -6889,6 +7355,199 @@ internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLife
             is AutomationRunLifecycleCompleted -> "completed"
             is AutomationRunLifecycleFailed -> "failed"
             is AutomationRunLifecycleCancelled -> "cancelled"
+        }
+        if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = CanvasSourceSerializer::class)
+sealed interface CanvasSource
+
+@JvmInline
+value class CanvasSourceExtension(val value: CanvasExtensionSource) : CanvasSource
+@JvmInline
+value class CanvasSourcePackage(val value: CanvasPackageSource) : CanvasSource
+/**
+ * Forward-compat catch-all for unknown CanvasSource discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class CanvasSourceUnknown(val raw: JsonObject) : CanvasSource
+
+internal object CanvasSourceSerializer : KSerializer<CanvasSource> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CanvasSource")
+
+    override fun deserialize(decoder: Decoder): CanvasSource {
+        val input = decoder as? JsonDecoder
+            ?: error("CanvasSource can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CanvasSource")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return CanvasSourceUnknown(obj)
+        return when (discriminant) {
+            "extension" -> CanvasSourceExtension(input.json.decodeFromJsonElement(CanvasExtensionSource.serializer(), element))
+            "package" -> CanvasSourcePackage(input.json.decodeFromJsonElement(CanvasPackageSource.serializer(), element))
+            else -> CanvasSourceUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CanvasSource) {
+        val output = encoder as? JsonEncoder
+            ?: error("CanvasSource can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CanvasSourceExtension -> output.json.encodeToJsonElement(CanvasExtensionSource.serializer(), value.value)
+            is CanvasSourcePackage -> output.json.encodeToJsonElement(CanvasPackageSource.serializer(), value.value)
+            is CanvasSourceUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is CanvasSourceExtension -> "extension"
+            is CanvasSourcePackage -> "package"
+            is CanvasSourceUnknown -> null
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = CanvasTrustStateSerializer::class)
+sealed interface CanvasTrustState
+
+@JvmInline
+value class CanvasTrustStateTrusted(val value: CanvasTrustedState) : CanvasTrustState
+@JvmInline
+value class CanvasTrustStatePending(val value: CanvasPendingTrustState) : CanvasTrustState
+@JvmInline
+value class CanvasTrustStateBlocked(val value: CanvasBlockedTrustState) : CanvasTrustState
+/**
+ * Forward-compat catch-all for unknown CanvasTrustState discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class CanvasTrustStateUnknown(val raw: JsonObject) : CanvasTrustState
+
+internal object CanvasTrustStateSerializer : KSerializer<CanvasTrustState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CanvasTrustState")
+
+    override fun deserialize(decoder: Decoder): CanvasTrustState {
+        val input = decoder as? JsonDecoder
+            ?: error("CanvasTrustState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CanvasTrustState")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: return CanvasTrustStateUnknown(obj)
+        return when (discriminant) {
+            "trusted" -> CanvasTrustStateTrusted(input.json.decodeFromJsonElement(CanvasTrustedState.serializer(), element))
+            "pending" -> CanvasTrustStatePending(input.json.decodeFromJsonElement(CanvasPendingTrustState.serializer(), element))
+            "blocked" -> CanvasTrustStateBlocked(input.json.decodeFromJsonElement(CanvasBlockedTrustState.serializer(), element))
+            else -> CanvasTrustStateUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CanvasTrustState) {
+        val output = encoder as? JsonEncoder
+            ?: error("CanvasTrustState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CanvasTrustStateTrusted -> output.json.encodeToJsonElement(CanvasTrustedState.serializer(), value.value)
+            is CanvasTrustStatePending -> output.json.encodeToJsonElement(CanvasPendingTrustState.serializer(), value.value)
+            is CanvasTrustStateBlocked -> output.json.encodeToJsonElement(CanvasBlockedTrustState.serializer(), value.value)
+            is CanvasTrustStateUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is CanvasTrustStateTrusted -> "trusted"
+            is CanvasTrustStatePending -> "pending"
+            is CanvasTrustStateBlocked -> "blocked"
+            is CanvasTrustStateUnknown -> null
+        }
+        if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = CanvasAvailabilityStateSerializer::class)
+sealed interface CanvasAvailabilityState
+
+@JvmInline
+value class CanvasAvailabilityStateUnsupported(val value: CanvasUnsupportedAvailabilityState) : CanvasAvailabilityState
+@JvmInline
+value class CanvasAvailabilityStateNotLoaded(val value: CanvasNotLoadedAvailabilityState) : CanvasAvailabilityState
+@JvmInline
+value class CanvasAvailabilityStateLoading(val value: CanvasLoadingAvailabilityState) : CanvasAvailabilityState
+@JvmInline
+value class CanvasAvailabilityStateEmpty(val value: CanvasEmptyAvailabilityState) : CanvasAvailabilityState
+@JvmInline
+value class CanvasAvailabilityStateReady(val value: CanvasReadyAvailabilityState) : CanvasAvailabilityState
+@JvmInline
+value class CanvasAvailabilityStateFailed(val value: CanvasFailedAvailabilityState) : CanvasAvailabilityState
+/**
+ * Forward-compat catch-all for unknown CanvasAvailabilityState discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class CanvasAvailabilityStateUnknown(val raw: JsonObject) : CanvasAvailabilityState
+
+internal object CanvasAvailabilityStateSerializer : KSerializer<CanvasAvailabilityState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("CanvasAvailabilityState")
+
+    override fun deserialize(decoder: Decoder): CanvasAvailabilityState {
+        val input = decoder as? JsonDecoder
+            ?: error("CanvasAvailabilityState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for CanvasAvailabilityState")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: return CanvasAvailabilityStateUnknown(obj)
+        return when (discriminant) {
+            "unsupported" -> CanvasAvailabilityStateUnsupported(input.json.decodeFromJsonElement(CanvasUnsupportedAvailabilityState.serializer(), element))
+            "notLoaded" -> CanvasAvailabilityStateNotLoaded(input.json.decodeFromJsonElement(CanvasNotLoadedAvailabilityState.serializer(), element))
+            "loading" -> CanvasAvailabilityStateLoading(input.json.decodeFromJsonElement(CanvasLoadingAvailabilityState.serializer(), element))
+            "empty" -> CanvasAvailabilityStateEmpty(input.json.decodeFromJsonElement(CanvasEmptyAvailabilityState.serializer(), element))
+            "ready" -> CanvasAvailabilityStateReady(input.json.decodeFromJsonElement(CanvasReadyAvailabilityState.serializer(), element))
+            "failed" -> CanvasAvailabilityStateFailed(input.json.decodeFromJsonElement(CanvasFailedAvailabilityState.serializer(), element))
+            else -> CanvasAvailabilityStateUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: CanvasAvailabilityState) {
+        val output = encoder as? JsonEncoder
+            ?: error("CanvasAvailabilityState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is CanvasAvailabilityStateUnsupported -> output.json.encodeToJsonElement(CanvasUnsupportedAvailabilityState.serializer(), value.value)
+            is CanvasAvailabilityStateNotLoaded -> output.json.encodeToJsonElement(CanvasNotLoadedAvailabilityState.serializer(), value.value)
+            is CanvasAvailabilityStateLoading -> output.json.encodeToJsonElement(CanvasLoadingAvailabilityState.serializer(), value.value)
+            is CanvasAvailabilityStateEmpty -> output.json.encodeToJsonElement(CanvasEmptyAvailabilityState.serializer(), value.value)
+            is CanvasAvailabilityStateReady -> output.json.encodeToJsonElement(CanvasReadyAvailabilityState.serializer(), value.value)
+            is CanvasAvailabilityStateFailed -> output.json.encodeToJsonElement(CanvasFailedAvailabilityState.serializer(), value.value)
+            is CanvasAvailabilityStateUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is CanvasAvailabilityStateUnsupported -> "unsupported"
+            is CanvasAvailabilityStateNotLoaded -> "notLoaded"
+            is CanvasAvailabilityStateLoading -> "loading"
+            is CanvasAvailabilityStateEmpty -> "empty"
+            is CanvasAvailabilityStateReady -> "ready"
+            is CanvasAvailabilityStateFailed -> "failed"
+            is CanvasAvailabilityStateUnknown -> null
         }
         if (discriminant != null) encodedObject["status"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))

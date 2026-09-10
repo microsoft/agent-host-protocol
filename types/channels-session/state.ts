@@ -7,6 +7,7 @@
  */
 
 import type { Changeset } from '../channels-changeset/state.js';
+import type { CanvasEntry } from '../channels-canvas/state.js';
 import type { AnnotationsSummary } from '../channels-annotations/state.js';
 import type {
   ChatSummary,
@@ -219,6 +220,15 @@ export interface SessionState extends SessionMetadata {
    * {@link /guide/changesets | Changesets} for an overview of the model.
    */
   changesets?: Changeset[];
+  /**
+   * Catalog of canvases opened for chats in this session. Presence is
+   * durable logical membership, admitted only via `openCanvas` — never
+   * implied by a chat's existence or a client's earlier focus. Each entry's
+   * {@link CanvasIdentity.chat | `identity.chat`} identifies the exact
+   * backing chat; a canvas never migrates to a different chat. See
+   * {@link CanvasEntry} for the full membership/availability/trust model.
+   */
+  canvases?: CanvasEntry[];
   /**
    * Outstanding input the session is blocked on, aggregated across every chat
    * so a client can discover and answer it from the session channel alone,

@@ -1,0 +1,36 @@
+{
+  "description": "canvas/trustChanged replaces trust and applies the action's asserted revision",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "package", "sourceId": "pkg-contoso-widgets-workspace", "packageName": "contoso-widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "trust": { "status": "pending" },
+    "availability": { "status": "notLoaded" },
+    "revision": 1
+  },
+  "actions": [
+    { "type": "canvas/trustChanged", "trust": { "status": "blocked", "reason": "unreviewed package" }, "revision": 2 }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "package", "sourceId": "pkg-contoso-widgets-workspace", "packageName": "contoso-widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "trust": { "status": "blocked", "reason": "unreviewed package" },
+    "availability": { "status": "notLoaded" },
+    "revision": 2
+  }
+}
+

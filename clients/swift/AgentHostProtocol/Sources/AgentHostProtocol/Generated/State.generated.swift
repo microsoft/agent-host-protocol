@@ -1101,6 +1101,129 @@ public enum AutomationRunOriginKind: String, Codable, Sendable {
     case trigger = "trigger"
 }
 
+/// Discriminant for {@link CanvasSource} — what kind of package originates a
+/// canvas type.
+public enum CanvasSourceKind: Codable, Sendable, Equatable {
+    /// An explicitly installed host extension.
+    case `extension`
+    /// An explicitly installed package (not a host extension).
+    case package
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "extension": self = .`extension`
+        case "package": self = .package
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .`extension`: try container.encode("extension")
+        case .package: try container.encode("package")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Discriminant for {@link CanvasTrustState} — whether the host currently
+/// permits this canvas's declared actions to execute.
+///
+/// Trust is independent of {@link CanvasAvailabilityStatus | availability}:
+/// a canvas may be perfectly capable of rendering while blocked from
+/// executing actions, and vice versa. Trust decisions are host/runtime
+/// authority, not something this protocol grants.
+public enum CanvasTrustStatus: Codable, Sendable, Equatable {
+    /// Declared actions may be invoked.
+    case trusted
+    /// A trust decision has not yet been made (e.g. first use of a new/changed source).
+    case pending
+    /// The host has denied execution; declared actions MUST NOT be invoked.
+    case blocked
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "trusted": self = .trusted
+        case "pending": self = .pending
+        case "blocked": self = .blocked
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .trusted: try container.encode("trusted")
+        case .pending: try container.encode("pending")
+        case .blocked: try container.encode("blocked")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Discriminant for {@link CanvasAvailabilityState} — the canvas's current
+/// live resolution state, independent of its durable
+/// {@link CanvasEntry | membership} in a session's catalog.
+///
+/// An empty catalog membership list is not itself a close, and a canvas may
+/// remain a recorded member while its live availability cycles through these
+/// states any number of times (e.g. across provider restarts).
+public enum CanvasAvailabilityStatus: Codable, Sendable, Equatable {
+    /// The connected client or host does not support this canvas type (e.g.
+    /// the client omitted the `canvases` capability, or no local runtime can
+    /// render this `canvasType`). Distinct from `blocked` trust, which is a
+    /// policy decision rather than a capability gap.
+    case unsupported
+    /// Recorded but not yet resolved to a live endpoint since it was opened or the host last restarted.
+    case notLoaded
+    /// Currently resolving or (re)connecting to a live endpoint.
+    case loading
+    /// Live and reachable, but the provider has not yet produced content to render.
+    case empty
+    /// Live, reachable, and has declared its current actions.
+    case ready
+    /// The live endpoint failed to resolve, or resolution otherwise failed.
+    case failed
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "unsupported": self = .unsupported
+        case "notLoaded": self = .notLoaded
+        case "loading": self = .loading
+        case "empty": self = .empty
+        case "ready": self = .ready
+        case "failed": self = .failed
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .unsupported: try container.encode("unsupported")
+        case .notLoaded: try container.encode("notLoaded")
+        case .loading: try container.encode("loading")
+        case .empty: try container.encode("empty")
+        case .ready: try container.encode("ready")
+        case .failed: try container.encode("failed")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 // MARK: - State Types
 
 public struct Icon: Codable, Sendable {
@@ -1867,6 +1990,13 @@ public struct SessionState: Codable, Sendable {
     /// before subscribing. See {@link Changeset} for the full shape and
     /// {@link /guide/changesets | Changesets} for an overview of the model.
     public var changesets: [Changeset]?
+    /// Catalog of canvases opened for chats in this session. Presence is
+    /// durable logical membership, admitted only via `openCanvas` — never
+    /// implied by a chat's existence or a client's earlier focus. Each entry's
+    /// {@link CanvasIdentity.chat | `identity.chat`} identifies the exact
+    /// backing chat; a canvas never migrates to a different chat. See
+    /// {@link CanvasEntry} for the full membership/availability/trust model.
+    public var canvases: [CanvasEntry]?
     /// Outstanding input the session is blocked on, aggregated across every chat
     /// so a client can discover and answer it from the session channel alone,
     /// without subscribing to individual chats.
@@ -1910,6 +2040,7 @@ public struct SessionState: Codable, Sendable {
         case config
         case customizations
         case changesets
+        case canvases
         case inputNeeded
         case meta = "_meta"
     }
@@ -1932,6 +2063,7 @@ public struct SessionState: Codable, Sendable {
         config: SessionConfigState? = nil,
         customizations: [Customization]? = nil,
         changesets: [Changeset]? = nil,
+        canvases: [CanvasEntry]? = nil,
         inputNeeded: [SessionInputRequest]? = nil,
         meta: [String: AnyCodable]? = nil
     ) {
@@ -1952,6 +2084,7 @@ public struct SessionState: Codable, Sendable {
         self.config = config
         self.customizations = customizations
         self.changesets = changesets
+        self.canvases = canvases
         self.inputNeeded = inputNeeded
         self.meta = meta
     }
@@ -6627,6 +6760,439 @@ public struct AutomationRunState: Codable, Sendable {
     }
 }
 
+public struct CanvasExtensionSource: Codable, Sendable {
+    public var kind: CanvasSourceKind
+    /// Stable extension identifier (host-defined format, e.g. `publisher.name`).
+    /// MUST NOT exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    public var extensionId: String
+    /// Installed extension version, when known. Metadata only — not identity-bearing.
+    public var version: String?
+
+    public init(
+        kind: CanvasSourceKind,
+        extensionId: String,
+        version: String? = nil
+    ) {
+        self.kind = kind
+        self.extensionId = extensionId
+        self.version = version
+    }
+}
+
+public struct CanvasPackageSource: Codable, Sendable {
+    public var kind: CanvasSourceKind
+    /// Stable, host- or package-manager-assigned unique identifier for this
+    /// specific installed package instance/scope (opaque format). This is the
+    /// identity-bearing field — see {@link CanvasIdentityKey}. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    public var sourceId: String
+    /// Declared package name, for display only — MUST NOT be used to compare source identity; see `sourceId`.
+    public var packageName: String
+    /// Installed package version, when known. Metadata only — not identity-bearing.
+    public var version: String?
+
+    public init(
+        kind: CanvasSourceKind,
+        sourceId: String,
+        packageName: String,
+        version: String? = nil
+    ) {
+        self.kind = kind
+        self.sourceId = sourceId
+        self.packageName = packageName
+        self.version = version
+    }
+}
+
+public struct CanvasIdentityKey: Codable, Sendable {
+    /// The exact backing chat this canvas belongs to. A canvas is never
+    /// re-associated with a different chat; opening a new one for another chat
+    /// creates a distinct canvas.
+    public var chat: String
+    /// The extension or package that declares this canvas's type.
+    public var source: CanvasSource
+    /// Provider-declared canvas type (host/provider-defined format). MUST NOT
+    /// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    public var canvasType: String
+    /// Provider-chosen stable identifier for this canvas instance, scoped to
+    /// `(chat, source, canvasType)`. Stable across reloads and host/window
+    /// restarts for the same logical canvas. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    public var instanceId: String
+
+    public init(
+        chat: String,
+        source: CanvasSource,
+        canvasType: String,
+        instanceId: String
+    ) {
+        self.chat = chat
+        self.source = source
+        self.canvasType = canvasType
+        self.instanceId = instanceId
+    }
+}
+
+public struct CanvasIdentity: Codable, Sendable {
+    /// The exact backing chat this canvas belongs to. A canvas is never
+    /// re-associated with a different chat; opening a new one for another chat
+    /// creates a distinct canvas.
+    public var chat: String
+    /// The extension or package that declares this canvas's type.
+    public var source: CanvasSource
+    /// Provider-declared canvas type (host/provider-defined format). MUST NOT
+    /// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    public var canvasType: String
+    /// Provider-chosen stable identifier for this canvas instance, scoped to
+    /// `(chat, source, canvasType)`. Stable across reloads and host/window
+    /// restarts for the same logical canvas. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    public var instanceId: String
+    /// Opaque, host-generated token identifying the current generation of this
+    /// canvas's live endpoint. The host mints a fresh token whenever a provider
+    /// restart retires the previous live endpoint and establishes a new one for
+    /// the same logical instance (see {@link CanvasIncarnationChangedAction |
+    /// `canvas/incarnationChanged`}); it is not changed by a plain page reload
+    /// against the same still-live endpoint.
+    ///
+    /// `incarnation` is **opaque**: clients and hosts MUST compare it only for
+    /// equality, never parse it, sort it, or perform arithmetic on it (e.g. it
+    /// is not guaranteed to be numeric or monotonically increasing). The host
+    /// MUST NOT reuse a token for this logical identity once it has been
+    /// superseded, including across a host/process restart — if the host
+    /// cannot otherwise guarantee non-reuse, it MUST mint tokens (e.g. random
+    /// or timestamp-derived) that make accidental reuse practically
+    /// impossible, rather than a small resettable counter.
+    ///
+    /// Clients and hosts use `incarnation` to reject stale callbacks and
+    /// in-flight effects addressed to a superseded endpoint.
+    public var incarnation: String
+
+    public init(
+        chat: String,
+        source: CanvasSource,
+        canvasType: String,
+        instanceId: String,
+        incarnation: String
+    ) {
+        self.chat = chat
+        self.source = source
+        self.canvasType = canvasType
+        self.instanceId = instanceId
+        self.incarnation = incarnation
+    }
+}
+
+public struct CanvasTrustedState: Codable, Sendable {
+    public var status: CanvasTrustStatus
+
+    public init(
+        status: CanvasTrustStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct CanvasPendingTrustState: Codable, Sendable {
+    public var status: CanvasTrustStatus
+
+    public init(
+        status: CanvasTrustStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct CanvasBlockedTrustState: Codable, Sendable {
+    public var status: CanvasTrustStatus
+    /// Optional human-readable reason surfaced to the user.
+    public var reason: String?
+
+    public init(
+        status: CanvasTrustStatus,
+        reason: String? = nil
+    ) {
+        self.status = status
+        self.reason = reason
+    }
+}
+
+public struct CanvasActionDeclaration: Codable, Sendable {
+    /// Stable identifier, unique within this canvas, matching `invokeCanvasAction`'s `actionId`.
+    public var id: String
+    /// Human-readable display name.
+    public var title: String?
+    /// Description of what invoking the action does.
+    public var description: String?
+    /// Inline JSON Schema for the expected `input`, when small enough to embed
+    /// (see {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH},
+    /// checked by {@link isCanvasSchemaWithinLimits}). Optional because some
+    /// declared actions take no input. Mutually exclusive with
+    /// `inputSchemaRef` — a declaration MUST supply at most one of the two.
+    public var inputSchema: AnyCodable?
+    /// Bounded out-of-band reference to a larger JSON Schema, used instead of
+    /// `inputSchema` when the schema would exceed
+    /// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+    /// inlined. AHP does not mandate a specific resolution mechanism for this
+    /// URI (e.g. a host MAY make it `resourceRead`-able).
+    public var inputSchemaRef: String?
+
+    public init(
+        id: String,
+        title: String? = nil,
+        description: String? = nil,
+        inputSchema: AnyCodable? = nil,
+        inputSchemaRef: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.inputSchema = inputSchema
+        self.inputSchemaRef = inputSchemaRef
+    }
+}
+
+public struct CanvasUnsupportedAvailabilityState: Codable, Sendable {
+    public var status: CanvasAvailabilityStatus
+
+    public init(
+        status: CanvasAvailabilityStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct CanvasNotLoadedAvailabilityState: Codable, Sendable {
+    public var status: CanvasAvailabilityStatus
+
+    public init(
+        status: CanvasAvailabilityStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct CanvasLoadingAvailabilityState: Codable, Sendable {
+    public var status: CanvasAvailabilityStatus
+
+    public init(
+        status: CanvasAvailabilityStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct CanvasEmptyAvailabilityState: Codable, Sendable {
+    public var status: CanvasAvailabilityStatus
+
+    public init(
+        status: CanvasAvailabilityStatus
+    ) {
+        self.status = status
+    }
+}
+
+public struct CanvasReadyAvailabilityState: Codable, Sendable {
+    public var status: CanvasAvailabilityStatus
+    /// Actions currently declared by the live provider (full replacement each time this state is produced).
+    public var actions: [CanvasActionDeclaration]
+
+    public init(
+        status: CanvasAvailabilityStatus,
+        actions: [CanvasActionDeclaration]
+    ) {
+        self.status = status
+        self.actions = actions
+    }
+}
+
+public struct CanvasFailedAvailabilityState: Codable, Sendable {
+    public var status: CanvasAvailabilityStatus
+    /// Stable machine-readable and human-readable failure information.
+    public var error: ErrorInfo
+
+    public init(
+        status: CanvasAvailabilityStatus,
+        error: ErrorInfo
+    ) {
+        self.status = status
+        self.error = error
+    }
+}
+
+public struct CanvasEntry: Codable, Sendable {
+    /// Subscribable `ahp-canvas:` URI matching {@link CanvasState.resource}.
+    public var resource: String
+    /// Full identity, including current incarnation.
+    public var identity: CanvasIdentity
+    /// Human-readable display title.
+    public var title: String
+    /// Optional display icon.
+    public var icon: Icon?
+    /// Current trust decision matching {@link CanvasState.trust}.
+    public var trust: CanvasTrustState
+    /// Current availability status matching {@link CanvasState.availability}'s discriminant.
+    public var availability: CanvasAvailabilityStatus
+    /// Monotonically increasing counter bumped on every change to this
+    /// canvas's state (trust, availability, or incarnation). Clients MAY use it
+    /// to detect and reject stale reads without a full deep comparison.
+    public var revision: Int
+    /// Opaque host-defined summary metadata.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case identity
+        case title
+        case icon
+        case trust
+        case availability
+        case revision
+        case meta = "_meta"
+    }
+
+    public init(
+        resource: String,
+        identity: CanvasIdentity,
+        title: String,
+        icon: Icon? = nil,
+        trust: CanvasTrustState,
+        availability: CanvasAvailabilityStatus,
+        revision: Int,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.resource = resource
+        self.identity = identity
+        self.title = title
+        self.icon = icon
+        self.trust = trust
+        self.availability = availability
+        self.revision = revision
+        self.meta = meta
+    }
+}
+
+public struct CanvasState: Codable, Sendable {
+    /// URI of this canvas channel.
+    public var resource: String
+    /// Full identity, including current incarnation.
+    public var identity: CanvasIdentity
+    /// Human-readable display title.
+    public var title: String
+    /// Optional display icon.
+    public var icon: Icon?
+    /// Current trust decision.
+    public var trust: CanvasTrustState
+    /// Current live resolution state.
+    public var availability: CanvasAvailabilityState
+    /// Matches {@link CanvasEntry.revision}.
+    public var revision: Int
+    /// Opaque host-defined metadata.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case resource
+        case identity
+        case title
+        case icon
+        case trust
+        case availability
+        case revision
+        case meta = "_meta"
+    }
+
+    public init(
+        resource: String,
+        identity: CanvasIdentity,
+        title: String,
+        icon: Icon? = nil,
+        trust: CanvasTrustState,
+        availability: CanvasAvailabilityState,
+        revision: Int,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.resource = resource
+        self.identity = identity
+        self.title = title
+        self.icon = icon
+        self.trust = trust
+        self.availability = availability
+        self.revision = revision
+        self.meta = meta
+    }
+}
+
+public struct CanvasTypeDeclaration: Codable, Sendable {
+    /// The extension or package that declares this canvas type.
+    public var source: CanvasSource
+    /// Provider-declared canvas type (host/provider-defined format), passed as
+    /// {@link CanvasIdentityKey.canvasType} to `openCanvas`. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    public var canvasType: String
+    /// Human-readable display name for a canvas-type picker.
+    public var title: String
+    /// Description of what this canvas type does.
+    public var description: String?
+    /// Optional display icon.
+    public var icon: Icon?
+    /// Inline JSON Schema describing the `openCanvas` `input` this type
+    /// expects, when small enough to embed (see {@link CANVAS_SCHEMA_MAX_PROPERTIES}
+    /// / {@link CANVAS_SCHEMA_MAX_DEPTH}). Mutually exclusive with
+    /// `openInputSchemaRef`.
+    public var openInputSchema: AnyCodable?
+    /// Bounded out-of-band reference to a larger open-input JSON Schema, used
+    /// instead of `openInputSchema` when it would exceed
+    /// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+    /// inlined.
+    public var openInputSchemaRef: String?
+    /// Advisory, statically-known preview of actions this canvas type
+    /// typically declares once opened (bounded to
+    /// {@link CANVAS_MAX_DECLARED_ACTIONS}). This is **not authoritative** —
+    /// the actual invocable actions for an opened instance are always
+    /// {@link CanvasReadyAvailabilityState.actions}, which MAY differ (e.g.
+    /// depend on live provider configuration) and MUST be used instead of this
+    /// preview once the canvas is open.
+    public var declaredActions: [CanvasActionDeclaration]?
+
+    public init(
+        source: CanvasSource,
+        canvasType: String,
+        title: String,
+        description: String? = nil,
+        icon: Icon? = nil,
+        openInputSchema: AnyCodable? = nil,
+        openInputSchemaRef: String? = nil,
+        declaredActions: [CanvasActionDeclaration]? = nil
+    ) {
+        self.source = source
+        self.canvasType = canvasType
+        self.title = title
+        self.description = description
+        self.icon = icon
+        self.openInputSchema = openInputSchema
+        self.openInputSchemaRef = openInputSchemaRef
+        self.declaredActions = declaredActions
+    }
+}
+
+public struct CanvasSourcePresentation: Codable, Sendable {
+    /// Ephemeral URL to the canvas's current live endpoint. Transient — MUST
+    /// NOT be persisted, cached beyond the current read, or treated as a
+    /// stable/durable identity. A host MAY embed short-lived, single-use
+    /// credentials in it; such credentials are never durable authority.
+    public var url: String
+    /// Advisory expiry hint for `url` (and any embedded credential), if the host bounds their validity.
+    public var expiresAt: String?
+
+    public init(
+        url: String,
+        expiresAt: String? = nil
+    ) {
+        self.url = url
+        self.expiresAt = expiresAt
+    }
+}
+
 // MARK: - Customization Enablement Union
 
 /// A single explicit customization enablement decision.
@@ -7658,6 +8224,156 @@ public enum AutomationRunLifecycle: Codable, Sendable {
         case .cancelled(var value):
             value.status = .cancelled
             try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum CanvasSource: Codable, Sendable {
+    case extension(CanvasExtensionSource)
+    case package(CanvasPackageSource)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "extension":
+            self = .extension(try CanvasExtensionSource(from: decoder))
+        case "package":
+            self = .package(try CanvasPackageSource(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .extension(var value):
+            value.kind = .extension
+            try value.encode(to: encoder)
+        case .package(var value):
+            value.kind = .package
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum CanvasTrustState: Codable, Sendable {
+    case trusted(CanvasTrustedState)
+    case pending(CanvasPendingTrustState)
+    case blocked(CanvasBlockedTrustState)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "status"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "trusted":
+            self = .trusted(try CanvasTrustedState(from: decoder))
+        case "pending":
+            self = .pending(try CanvasPendingTrustState(from: decoder))
+        case "blocked":
+            self = .blocked(try CanvasBlockedTrustState(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .trusted(var value):
+            value.status = .trusted
+            try value.encode(to: encoder)
+        case .pending(var value):
+            value.status = .pending
+            try value.encode(to: encoder)
+        case .blocked(var value):
+            value.status = .blocked
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum CanvasAvailabilityState: Codable, Sendable {
+    case unsupported(CanvasUnsupportedAvailabilityState)
+    case notLoaded(CanvasNotLoadedAvailabilityState)
+    case loading(CanvasLoadingAvailabilityState)
+    case empty(CanvasEmptyAvailabilityState)
+    case ready(CanvasReadyAvailabilityState)
+    case failed(CanvasFailedAvailabilityState)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "status"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "unsupported":
+            self = .unsupported(try CanvasUnsupportedAvailabilityState(from: decoder))
+        case "notLoaded":
+            self = .notLoaded(try CanvasNotLoadedAvailabilityState(from: decoder))
+        case "loading":
+            self = .loading(try CanvasLoadingAvailabilityState(from: decoder))
+        case "empty":
+            self = .empty(try CanvasEmptyAvailabilityState(from: decoder))
+        case "ready":
+            self = .ready(try CanvasReadyAvailabilityState(from: decoder))
+        case "failed":
+            self = .failed(try CanvasFailedAvailabilityState(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .unsupported(var value):
+            value.status = .unsupported
+            try value.encode(to: encoder)
+        case .notLoaded(var value):
+            value.status = .notLoaded
+            try value.encode(to: encoder)
+        case .loading(var value):
+            value.status = .loading
+            try value.encode(to: encoder)
+        case .empty(var value):
+            value.status = .empty
+            try value.encode(to: encoder)
+        case .ready(var value):
+            value.status = .ready
+            try value.encode(to: encoder)
+        case .failed(var value):
+            value.status = .failed
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
         }
     }
 }

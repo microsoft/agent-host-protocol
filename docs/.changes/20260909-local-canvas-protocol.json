@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`ahp-canvas:` channel for local canvases: stable `CanvasIdentity` (exact backing chat, extension/package source with a dedicated stable `sourceId`, canvas type, instance, and an opaque host-generated `incarnation` token), a `CanvasTrustState`/`CanvasAvailabilityState` lifecycle with consistent stale-revision rejection, `SessionState.canvases` catalogue membership distinct from the new read-only `listCanvasTypes` type-discovery catalogue, and `openCanvas`/`resolveCanvasSource`/`invokeCanvasAction`/`restartCanvasProvider`/`closeCanvas` commands with requestId-scoped idempotency, required incarnation/revision preconditions, and declared size/depth limits (`CANVAS_SCHEMA_MAX_PROPERTIES`, `CANVAS_SCHEMA_MAX_DEPTH`, `CANVAS_INPUT_MAX_LENGTH`, `CANVAS_RESULT_MAX_LENGTH`). Adds a client-side `ClientCapabilities.canvases` rendering capability and a separate server/runtime-side `InitializeResult.canvases` (`CanvasCapabilities`) capability, so protocol version support alone never implies a usable canvas runtime."
+}
+

@@ -55,6 +55,18 @@ internal static class GeneratedActionMetadata
             case AutomationUpdateRequestedAction value:
                 actionType = value.Type;
                 return true;
+            case CanvasAvailabilityChangedAction value:
+                actionType = value.Type;
+                return true;
+            case CanvasIncarnationChangedAction value:
+                actionType = value.Type;
+                return true;
+            case CanvasTitleChangedAction value:
+                actionType = value.Type;
+                return true;
+            case CanvasTrustChangedAction value:
+                actionType = value.Type;
+                return true;
             case ChangesetClearedAction value:
                 actionType = value.Type;
                 return true;
@@ -191,6 +203,12 @@ internal static class GeneratedActionMetadata
                 actionType = value.Type;
                 return true;
             case SessionActivityChangedAction value:
+                actionType = value.Type;
+                return true;
+            case SessionCanvasRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case SessionCanvasSetAction value:
                 actionType = value.Type;
                 return true;
             case SessionChangesetsChangedAction value:
@@ -381,6 +399,10 @@ internal static class GeneratedActionMetadata
             ActionType.AutomationRunSessionSet => "automationRun/sessionSet",
             ActionType.AutomationSet => "automation/set",
             ActionType.AutomationUpdateRequested => "automation/updateRequested",
+            ActionType.CanvasAvailabilityChanged => "canvas/availabilityChanged",
+            ActionType.CanvasIncarnationChanged => "canvas/incarnationChanged",
+            ActionType.CanvasTitleChanged => "canvas/titleChanged",
+            ActionType.CanvasTrustChanged => "canvas/trustChanged",
             ActionType.ChangesetCleared => "changeset/cleared",
             ActionType.ChangesetContentChanged => "changeset/contentChanged",
             ActionType.ChangesetFileRemoved => "changeset/fileRemoved",
@@ -427,6 +449,8 @@ internal static class GeneratedActionMetadata
             ActionType.SessionActiveClientRemoved => "session/activeClientRemoved",
             ActionType.SessionActiveClientSet => "session/activeClientSet",
             ActionType.SessionActivityChanged => "session/activityChanged",
+            ActionType.SessionCanvasRemoved => "session/canvasRemoved",
+            ActionType.SessionCanvasSet => "session/canvasSet",
             ActionType.SessionChangesetsChanged => "session/changesetsChanged",
             ActionType.SessionChatAdded => "session/chatAdded",
             ActionType.SessionChatRemoved => "session/chatRemoved",

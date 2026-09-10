@@ -665,6 +665,73 @@ public enum AutomationRunOriginKind
     Trigger,
 }
 
+/// <summary>Discriminant for {@link CanvasSource} — what kind of package originates a
+/// canvas type.</summary>
+[JsonConverter(typeof(WireEnumConverter<CanvasSourceKind>))]
+public enum CanvasSourceKind
+{
+    /// <summary>An explicitly installed host extension.</summary>
+    [WireValue("extension")]
+    Extension,
+    /// <summary>An explicitly installed package (not a host extension).</summary>
+    [WireValue("package")]
+    Package,
+}
+
+/// <summary>Discriminant for {@link CanvasTrustState} — whether the host currently
+/// permits this canvas's declared actions to execute.
+///
+/// Trust is independent of {@link CanvasAvailabilityStatus | availability}:
+/// a canvas may be perfectly capable of rendering while blocked from
+/// executing actions, and vice versa. Trust decisions are host/runtime
+/// authority, not something this protocol grants.</summary>
+[JsonConverter(typeof(WireEnumConverter<CanvasTrustStatus>))]
+public enum CanvasTrustStatus
+{
+    /// <summary>Declared actions may be invoked.</summary>
+    [WireValue("trusted")]
+    Trusted,
+    /// <summary>A trust decision has not yet been made (e.g. first use of a new/changed source).</summary>
+    [WireValue("pending")]
+    Pending,
+    /// <summary>The host has denied execution; declared actions MUST NOT be invoked.</summary>
+    [WireValue("blocked")]
+    Blocked,
+}
+
+/// <summary>Discriminant for {@link CanvasAvailabilityState} — the canvas's current
+/// live resolution state, independent of its durable
+/// {@link CanvasEntry | membership} in a session's catalog.
+///
+/// An empty catalog membership list is not itself a close, and a canvas may
+/// remain a recorded member while its live availability cycles through these
+/// states any number of times (e.g. across provider restarts).</summary>
+[JsonConverter(typeof(WireEnumConverter<CanvasAvailabilityStatus>))]
+public enum CanvasAvailabilityStatus
+{
+    /// <summary>The connected client or host does not support this canvas type (e.g.
+    /// the client omitted the `canvases` capability, or no local runtime can
+    /// render this `canvasType`). Distinct from `blocked` trust, which is a
+    /// policy decision rather than a capability gap.</summary>
+    [WireValue("unsupported")]
+    Unsupported,
+    /// <summary>Recorded but not yet resolved to a live endpoint since it was opened or the host last restarted.</summary>
+    [WireValue("notLoaded")]
+    NotLoaded,
+    /// <summary>Currently resolving or (re)connecting to a live endpoint.</summary>
+    [WireValue("loading")]
+    Loading,
+    /// <summary>Live and reachable, but the provider has not yet produced content to render.</summary>
+    [WireValue("empty")]
+    Empty,
+    /// <summary>Live, reachable, and has declared its current actions.</summary>
+    [WireValue("ready")]
+    Ready,
+    /// <summary>The live endpoint failed to resolve, or resolution otherwise failed.</summary>
+    [WireValue("failed")]
+    Failed,
+}
+
 // ─── Classes ──────────────────────────────────────────────────────────
 
 /// <summary>An optionally-sized icon that can be displayed in a user interface.</summary>
@@ -1619,6 +1686,15 @@ public sealed class SessionState
     /// {@link /guide/changesets | Changesets} for an overview of the model.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<Changeset>? Changesets { get; set; }
+
+    /// <summary>Catalog of canvases opened for chats in this session. Presence is
+    /// durable logical membership, admitted only via `openCanvas` — never
+    /// implied by a chat's existence or a client's earlier focus. Each entry's
+    /// {@link CanvasIdentity.chat | `identity.chat`} identifies the exact
+    /// backing chat; a canvas never migrates to a different chat. See
+    /// {@link CanvasEntry} for the full membership/availability/trust model.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<CanvasEntry>? Canvases { get; set; }
 
     /// <summary>Outstanding input the session is blocked on, aggregated across every chat
     /// so a client can discover and answer it from the session channel alone,
@@ -5457,6 +5533,356 @@ public sealed class AutomationRunState
     public Dictionary<string, JsonElement>? Meta { get; set; }
 }
 
+/// <summary>A canvas type provided by an installed host extension.
+///
+/// `extensionId` is the identity-bearing field for comparison purposes (see
+/// {@link CanvasIdentityKey}). `version` is display/informational metadata
+/// only — it MUST NOT be treated as identity-bearing (two `CanvasSource`
+/// values that differ only in `version` are the same source).</summary>
+public sealed record CanvasExtensionSource
+{
+    /// <summary>Stable extension identifier (host-defined format, e.g. `publisher.name`).
+    /// MUST NOT exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.</summary>
+    public required string ExtensionId { get; init; }
+
+    /// <summary>Installed extension version, when known. Metadata only — not identity-bearing.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Version { get; init; }
+}
+
+/// <summary>A canvas type provided by an installed package that is not a host
+/// extension (e.g. a workspace-declared runtime package).
+///
+/// `sourceId` — not `packageName` — is the identity-bearing field: the same
+/// declared package name MAY be installed in more than one scope (e.g. a
+/// workspace-local copy and a globally-installed copy, or two different
+/// registries), and each such installation is a distinct source with its own
+/// `sourceId`. `packageName` and `version` are display/informational metadata
+/// only and MUST NOT be treated as identity-bearing.</summary>
+public sealed record CanvasPackageSource
+{
+    /// <summary>Stable, host- or package-manager-assigned unique identifier for this
+    /// specific installed package instance/scope (opaque format). This is the
+    /// identity-bearing field — see {@link CanvasIdentityKey}. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.</summary>
+    public required string SourceId { get; init; }
+
+    /// <summary>Declared package name, for display only — MUST NOT be used to compare source identity; see `sourceId`.</summary>
+    public required string PackageName { get; init; }
+
+    /// <summary>Installed package version, when known. Metadata only — not identity-bearing.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Version { get; init; }
+}
+
+/// <summary>The logical identity of a canvas, excluding the host-assigned
+/// {@link CanvasIdentity.incarnation | `incarnation`}.
+///
+/// Two canvases are the same logical canvas iff `chat`, `canvasType`,
+/// `instanceId`, and `source`'s **identity-bearing** fields are all equal:
+/// `kind` plus `extensionId` (for {@link CanvasExtensionSource}) or `kind`
+/// plus `sourceId` (for {@link CanvasPackageSource}). `source.version` (and
+/// `CanvasPackageSource.packageName`) are metadata and MUST NOT factor into
+/// this comparison. Clients MUST NOT treat
+/// {@link CanvasIdentity.instanceId | `instanceId`} alone as a stable key —
+/// it is only unique within the scope of `(chat, source, canvasType)`.</summary>
+public sealed record CanvasIdentityKey
+{
+    /// <summary>The exact backing chat this canvas belongs to. A canvas is never
+    /// re-associated with a different chat; opening a new one for another chat
+    /// creates a distinct canvas.</summary>
+    public required string Chat { get; init; }
+
+    /// <summary>The extension or package that declares this canvas's type.</summary>
+    public required CanvasSource Source { get; init; }
+
+    /// <summary>Provider-declared canvas type (host/provider-defined format). MUST NOT
+    /// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.</summary>
+    public required string CanvasType { get; init; }
+
+    /// <summary>Provider-chosen stable identifier for this canvas instance, scoped to
+    /// `(chat, source, canvasType)`. Stable across reloads and host/window
+    /// restarts for the same logical canvas. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.</summary>
+    public required string InstanceId { get; init; }
+}
+
+/// <summary>Full identity of a canvas, including the host-assigned
+/// {@link CanvasIdentity.incarnation | `incarnation`}.</summary>
+public sealed record CanvasIdentity
+{
+    /// <summary>The exact backing chat this canvas belongs to. A canvas is never
+    /// re-associated with a different chat; opening a new one for another chat
+    /// creates a distinct canvas.</summary>
+    public required string Chat { get; init; }
+
+    /// <summary>The extension or package that declares this canvas's type.</summary>
+    public required CanvasSource Source { get; init; }
+
+    /// <summary>Provider-declared canvas type (host/provider-defined format). MUST NOT
+    /// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.</summary>
+    public required string CanvasType { get; init; }
+
+    /// <summary>Provider-chosen stable identifier for this canvas instance, scoped to
+    /// `(chat, source, canvasType)`. Stable across reloads and host/window
+    /// restarts for the same logical canvas. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.</summary>
+    public required string InstanceId { get; init; }
+
+    /// <summary>Opaque, host-generated token identifying the current generation of this
+    /// canvas's live endpoint. The host mints a fresh token whenever a provider
+    /// restart retires the previous live endpoint and establishes a new one for
+    /// the same logical instance (see {@link CanvasIncarnationChangedAction |
+    /// `canvas/incarnationChanged`}); it is not changed by a plain page reload
+    /// against the same still-live endpoint.
+    ///
+    /// `incarnation` is **opaque**: clients and hosts MUST compare it only for
+    /// equality, never parse it, sort it, or perform arithmetic on it (e.g. it
+    /// is not guaranteed to be numeric or monotonically increasing). The host
+    /// MUST NOT reuse a token for this logical identity once it has been
+    /// superseded, including across a host/process restart — if the host
+    /// cannot otherwise guarantee non-reuse, it MUST mint tokens (e.g. random
+    /// or timestamp-derived) that make accidental reuse practically
+    /// impossible, rather than a small resettable counter.
+    ///
+    /// Clients and hosts use `incarnation` to reject stale callbacks and
+    /// in-flight effects addressed to a superseded endpoint.</summary>
+    public required string Incarnation { get; init; }
+}
+
+public sealed record CanvasTrustedState
+{
+}
+
+public sealed record CanvasPendingTrustState
+{
+}
+
+public sealed record CanvasBlockedTrustState
+{
+    /// <summary>Optional human-readable reason surfaced to the user.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reason { get; init; }
+}
+
+/// <summary>One action a canvas declares it can perform, invoked via
+/// `invokeCanvasAction`.
+///
+/// Declarations are carried only on the full {@link CanvasState}, loaded when
+/// a client subscribes — never duplicated into the lightweight
+/// {@link CanvasEntry} catalog entry, keeping session summaries small.</summary>
+public sealed record CanvasActionDeclaration
+{
+    /// <summary>Stable identifier, unique within this canvas, matching `invokeCanvasAction`'s `actionId`.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Human-readable display name.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; init; }
+
+    /// <summary>Description of what invoking the action does.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    /// <summary>Inline JSON Schema for the expected `input`, when small enough to embed
+    /// (see {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH},
+    /// checked by {@link isCanvasSchemaWithinLimits}). Optional because some
+    /// declared actions take no input. Mutually exclusive with
+    /// `inputSchemaRef` — a declaration MUST supply at most one of the two.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? InputSchema { get; init; }
+
+    /// <summary>Bounded out-of-band reference to a larger JSON Schema, used instead of
+    /// `inputSchema` when the schema would exceed
+    /// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+    /// inlined. AHP does not mandate a specific resolution mechanism for this
+    /// URI (e.g. a host MAY make it `resourceRead`-able).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? InputSchemaRef { get; init; }
+}
+
+public sealed record CanvasUnsupportedAvailabilityState
+{
+}
+
+public sealed record CanvasNotLoadedAvailabilityState
+{
+}
+
+public sealed record CanvasLoadingAvailabilityState
+{
+}
+
+public sealed record CanvasEmptyAvailabilityState
+{
+}
+
+public sealed record CanvasReadyAvailabilityState
+{
+    /// <summary>Actions currently declared by the live provider (full replacement each time this state is produced).</summary>
+    public required List<CanvasActionDeclaration> Actions { get; init; }
+}
+
+public sealed record CanvasFailedAvailabilityState
+{
+    /// <summary>Stable machine-readable and human-readable failure information.</summary>
+    public required ErrorInfo Error { get; init; }
+}
+
+/// <summary>Lightweight catalog entry for a canvas, carried in
+/// {@link SessionState.canvases | `SessionState.canvases`}. Presence
+/// represents durable **logical membership** — it is unaffected by the live
+/// {@link CanvasEntry.availability | `availability`} cycling through
+/// `notLoaded`/`loading`/`empty`/`ready`/`failed` any number of times.
+///
+/// The full state, including declared actions, lives in {@link CanvasState},
+/// loaded when a client subscribes to {@link CanvasEntry.resource}.</summary>
+public sealed class CanvasEntry
+{
+    /// <summary>Subscribable `ahp-canvas:` URI matching {@link CanvasState.resource}.</summary>
+    public required string Resource { get; set; }
+
+    /// <summary>Full identity, including current incarnation.</summary>
+    public required CanvasIdentity Identity { get; set; }
+
+    /// <summary>Human-readable display title.</summary>
+    public required string Title { get; set; }
+
+    /// <summary>Optional display icon.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Icon? Icon { get; set; }
+
+    /// <summary>Current trust decision matching {@link CanvasState.trust}.</summary>
+    public required CanvasTrustState Trust { get; set; }
+
+    /// <summary>Current availability status matching {@link CanvasState.availability}'s discriminant.</summary>
+    public CanvasAvailabilityStatus Availability { get; set; }
+
+    /// <summary>Monotonically increasing counter bumped on every change to this
+    /// canvas's state (trust, availability, or incarnation). Clients MAY use it
+    /// to detect and reject stale reads without a full deep comparison.</summary>
+    public long Revision { get; set; }
+
+    /// <summary>Opaque host-defined summary metadata.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; set; }
+}
+
+/// <summary>Full state for a single canvas, loaded when a client subscribes to the
+/// canvas's URI.
+///
+/// `CanvasState` **denormalizes** every {@link CanvasEntry} field directly
+/// onto itself, replacing `availability`'s lightweight status with the full
+/// {@link CanvasAvailabilityState} (including declared actions or failure
+/// detail). Producers MUST keep the two representations consistent: any
+/// change to the inlined fields SHOULD also be announced on the owning
+/// session via {@link SessionCanvasSetAction | `session/canvasSet`}.</summary>
+public sealed class CanvasState
+{
+    /// <summary>URI of this canvas channel.</summary>
+    public required string Resource { get; set; }
+
+    /// <summary>Full identity, including current incarnation.</summary>
+    public required CanvasIdentity Identity { get; set; }
+
+    /// <summary>Human-readable display title.</summary>
+    public required string Title { get; set; }
+
+    /// <summary>Optional display icon.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Icon? Icon { get; set; }
+
+    /// <summary>Current trust decision.</summary>
+    public required CanvasTrustState Trust { get; set; }
+
+    /// <summary>Current live resolution state.</summary>
+    public required CanvasAvailabilityState Availability { get; set; }
+
+    /// <summary>Matches {@link CanvasEntry.revision}.</summary>
+    public long Revision { get; set; }
+
+    /// <summary>Opaque host-defined metadata.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; set; }
+}
+
+/// <summary>A canvas type an installed extension or package currently makes available
+/// to open for a chat, as returned by `listCanvasTypes`.
+///
+/// `CanvasTypeDeclaration` is **discovery-only** metadata about a TYPE — it is
+/// unrelated to {@link CanvasEntry}, which represents durable membership of
+/// an already-opened INSTANCE in {@link SessionState.canvases}. Browsing the
+/// catalogue (via `listCanvasTypes`) never opens, materializes, or restarts
+/// anything; only `openCanvas` does.</summary>
+public sealed record CanvasTypeDeclaration
+{
+    /// <summary>The extension or package that declares this canvas type.</summary>
+    public required CanvasSource Source { get; init; }
+
+    /// <summary>Provider-declared canvas type (host/provider-defined format), passed as
+    /// {@link CanvasIdentityKey.canvasType} to `openCanvas`. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.</summary>
+    public required string CanvasType { get; init; }
+
+    /// <summary>Human-readable display name for a canvas-type picker.</summary>
+    public required string Title { get; init; }
+
+    /// <summary>Description of what this canvas type does.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
+    /// <summary>Optional display icon.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Icon? Icon { get; init; }
+
+    /// <summary>Inline JSON Schema describing the `openCanvas` `input` this type
+    /// expects, when small enough to embed (see {@link CANVAS_SCHEMA_MAX_PROPERTIES}
+    /// / {@link CANVAS_SCHEMA_MAX_DEPTH}). Mutually exclusive with
+    /// `openInputSchemaRef`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? OpenInputSchema { get; init; }
+
+    /// <summary>Bounded out-of-band reference to a larger open-input JSON Schema, used
+    /// instead of `openInputSchema` when it would exceed
+    /// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+    /// inlined.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OpenInputSchemaRef { get; init; }
+
+    /// <summary>Advisory, statically-known preview of actions this canvas type
+    /// typically declares once opened (bounded to
+    /// {@link CANVAS_MAX_DECLARED_ACTIONS}). This is **not authoritative** —
+    /// the actual invocable actions for an opened instance are always
+    /// {@link CanvasReadyAvailabilityState.actions}, which MAY differ (e.g.
+    /// depend on live provider configuration) and MUST be used instead of this
+    /// preview once the canvas is open.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<CanvasActionDeclaration>? DeclaredActions { get; init; }
+}
+
+/// <summary>Transient, renderer-neutral presentation of a canvas's current live
+/// endpoint, returned by `resolveCanvasSource`.
+///
+/// This is a plain URL, not any renderer- or process-model-specific handle
+/// (e.g. not an Electron `WebContentsView`, a browser tab id, or a webview
+/// panel reference) — how a client actually presents it (a VS Code Webview,
+/// the Integrated Browser, or otherwise) is entirely a client/host
+/// implementation detail outside this protocol.</summary>
+public sealed record CanvasSourcePresentation
+{
+    /// <summary>Ephemeral URL to the canvas's current live endpoint. Transient — MUST
+    /// NOT be persisted, cached beyond the current read, or treated as a
+    /// stable/durable identity. A host MAY embed short-lived, single-use
+    /// credentials in it; such credentials are never durable authority.</summary>
+    public required string Url { get; init; }
+
+    /// <summary>Advisory expiry hint for `url` (and any embedded credential), if the host bounds their validity.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExpiresAt { get; init; }
+}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 /// <summary>A single explicit customization enablement decision.</summary>
@@ -6129,6 +6555,92 @@ internal sealed class AutomationRunLifecycleConverter : UnionConverter<Automatio
         ["completed"] = typeof(AutomationCompletedRunLifecycle),
         ["failed"] = typeof(AutomationFailedRunLifecycle),
         ["cancelled"] = typeof(AutomationCancelledRunLifecycle),
+            },
+            allowUnknown: false)
+    {
+    }
+}
+
+/// <summary>CanvasSource identifies the explicitly installed extension or package that declares a canvas type.</summary>
+[JsonConverter(typeof(CanvasSourceConverter))]
+public sealed class CanvasSource : AhpUnion
+{
+    /// <summary>Creates an empty CanvasSource (no active variant).</summary>
+    public CanvasSource() { }
+
+    /// <summary>Creates a CanvasSource wrapping the given variant value.</summary>
+    public CanvasSource(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the CanvasSource discriminated union.</summary>
+internal sealed class CanvasSourceConverter : UnionConverter<CanvasSource>
+{
+    public CanvasSourceConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["extension"] = typeof(CanvasExtensionSource),
+        ["package"] = typeof(CanvasPackageSource),
+            },
+            allowUnknown: false)
+    {
+    }
+}
+
+/// <summary>CanvasTrustState is the current trust decision governing whether a canvas's declared actions may execute.</summary>
+[JsonConverter(typeof(CanvasTrustStateConverter))]
+public sealed class CanvasTrustState : AhpUnion
+{
+    /// <summary>Creates an empty CanvasTrustState (no active variant).</summary>
+    public CanvasTrustState() { }
+
+    /// <summary>Creates a CanvasTrustState wrapping the given variant value.</summary>
+    public CanvasTrustState(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the CanvasTrustState discriminated union.</summary>
+internal sealed class CanvasTrustStateConverter : UnionConverter<CanvasTrustState>
+{
+    public CanvasTrustStateConverter()
+        : base(
+            discriminator: "status",
+            variants: new Dictionary<string, Type>
+            {
+        ["trusted"] = typeof(CanvasTrustedState),
+        ["pending"] = typeof(CanvasPendingTrustState),
+        ["blocked"] = typeof(CanvasBlockedTrustState),
+            },
+            allowUnknown: false)
+    {
+    }
+}
+
+/// <summary>CanvasAvailabilityState is the current live resolution state of a canvas.</summary>
+[JsonConverter(typeof(CanvasAvailabilityStateConverter))]
+public sealed class CanvasAvailabilityState : AhpUnion
+{
+    /// <summary>Creates an empty CanvasAvailabilityState (no active variant).</summary>
+    public CanvasAvailabilityState() { }
+
+    /// <summary>Creates a CanvasAvailabilityState wrapping the given variant value.</summary>
+    public CanvasAvailabilityState(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the CanvasAvailabilityState discriminated union.</summary>
+internal sealed class CanvasAvailabilityStateConverter : UnionConverter<CanvasAvailabilityState>
+{
+    public CanvasAvailabilityStateConverter()
+        : base(
+            discriminator: "status",
+            variants: new Dictionary<string, Type>
+            {
+        ["unsupported"] = typeof(CanvasUnsupportedAvailabilityState),
+        ["notLoaded"] = typeof(CanvasNotLoadedAvailabilityState),
+        ["loading"] = typeof(CanvasLoadingAvailabilityState),
+        ["empty"] = typeof(CanvasEmptyAvailabilityState),
+        ["ready"] = typeof(CanvasReadyAvailabilityState),
+        ["failed"] = typeof(CanvasFailedAvailabilityState),
             },
             allowUnknown: false)
     {
