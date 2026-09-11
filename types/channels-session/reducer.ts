@@ -231,7 +231,9 @@ export function sessionReducer(state: SessionState, action: SessionAction, log?:
       }
       // Reject a stale/out-of-order membership update rather than let it
       // overwrite a newer catalog entry with older data.
-      if (action.canvas.revision <= list[idx].revision) return state;
+      if (action.canvas.revision <= list[idx].revision) {
+        return state;
+      }
       const updated = list.slice();
       updated[idx] = action.canvas;
       return { ...state, canvases: updated };

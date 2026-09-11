@@ -255,14 +255,26 @@ export function isCanvasSchemaWithinLimits(
   depth = 1,
 ): boolean {
   const props = schema.properties;
-  if (!props) return true;
-  if (Object.keys(props).length > CANVAS_SCHEMA_MAX_PROPERTIES) return false;
+  if (!props) {
+    return true;
+  }
+  if (Object.keys(props).length > CANVAS_SCHEMA_MAX_PROPERTIES) {
+    return false;
+  }
   for (const value of Object.values(props)) {
-    if (!isRecord(value)) continue;
+    if (!isRecord(value)) {
+      continue;
+    }
     const nestedProperties = value.properties;
-    if (!isRecord(nestedProperties)) continue;
-    if (depth >= CANVAS_SCHEMA_MAX_DEPTH) return false;
-    if (!isCanvasSchemaWithinLimits({ properties: nestedProperties }, depth + 1)) return false;
+    if (!isRecord(nestedProperties)) {
+      continue;
+    }
+    if (depth >= CANVAS_SCHEMA_MAX_DEPTH) {
+      return false;
+    }
+    if (!isCanvasSchemaWithinLimits({ properties: nestedProperties }, depth + 1)) {
+      return false;
+    }
   }
   return true;
 }

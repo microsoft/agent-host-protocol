@@ -24,15 +24,21 @@ import { softAssertNever } from '../common/reducer-helpers.js';
 export function canvasReducer(state: CanvasState, action: CanvasAction, log?: (msg: string) => void): CanvasState {
   switch (action.type) {
     case ActionType.CanvasAvailabilityChanged:
-      if (action.revision <= state.revision) return state;
+      if (action.revision <= state.revision) {
+        return state;
+      }
       return { ...state, availability: action.availability, revision: action.revision };
 
     case ActionType.CanvasTrustChanged:
-      if (action.revision <= state.revision) return state;
+      if (action.revision <= state.revision) {
+        return state;
+      }
       return { ...state, trust: action.trust, revision: action.revision };
 
     case ActionType.CanvasIncarnationChanged:
-      if (action.revision <= state.revision) return state;
+      if (action.revision <= state.revision) {
+        return state;
+      }
       return {
         ...state,
         identity: { ...state.identity, incarnation: action.incarnation },
@@ -40,7 +46,9 @@ export function canvasReducer(state: CanvasState, action: CanvasAction, log?: (m
       };
 
     case ActionType.CanvasTitleChanged:
-      if (action.revision <= state.revision) return state;
+      if (action.revision <= state.revision) {
+        return state;
+      }
       return { ...state, title: action.title, revision: action.revision };
 
     default:
@@ -48,4 +56,3 @@ export function canvasReducer(state: CanvasState, action: CanvasAction, log?: (m
       return state;
   }
 }
-
