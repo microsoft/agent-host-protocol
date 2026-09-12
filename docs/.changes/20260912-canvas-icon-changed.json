@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`canvas/iconChanged` now updates or removes authoritative canvas display icons with revision ordering."
+}

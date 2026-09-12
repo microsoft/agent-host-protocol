@@ -17,6 +17,9 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project } from 'ts-morph';
 import { typeAdmitsUndefined } from './generate-json-schema.js';
+import type { ResolveCanvasSourceResult } from '../types/channels-canvas/commands.js';
+import type { CanvasSourcePresentation } from '../types/channels-canvas/state.js';
+import { CanvasAvailabilityStatus } from '../types/channels-canvas/state.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCHEMA_FILES = [
@@ -296,6 +299,58 @@ describe('generated JSON schemas', () => {
       });
     });
   }
+});
+
+describe('canvas presentation schemas', () => {
+  const commandsSchema = loadSchema('commands.schema.json');
+  const resultSchema = { $ref: '#/$defs/ResolveCanvasSourceResult' };
+
+  it('accepts renewed presentation URLs for the same incarnation and revision with optional expiry', () => {
+    const presentations: CanvasSourcePresentation[] = [
+      { url: 'https://canvas.example/view?credential=first' },
+      { url: 'https://canvas.example/view?credential=second', expiresAt: '2026-09-11T12:00:00Z' },
+    ];
+
+    for (const availability of [CanvasAvailabilityStatus.Empty, CanvasAvailabilityStatus.Ready]) {
+      for (const source of presentations) {
+        const result: ResolveCanvasSourceResult = {
+          availability,
+          incarnation: 'native-endpoint-1',
+          revision: 7,
+          source,
+        };
+        assert.equal(schemaAccepts(commandsSchema, resultSchema, result), true);
+      }
+    }
+  });
+
+  it('still requires revision and incarnation on presentation replies', () => {
+    assert.equal(schemaAccepts(commandsSchema, resultSchema, {
+      availability: CanvasAvailabilityStatus.Ready,
+      incarnation: 'native-endpoint-1',
+      source: { url: 'https://canvas.example/view?credential=second' },
+    }), false);
+    assert.equal(schemaAccepts(commandsSchema, resultSchema, {
+      availability: CanvasAvailabilityStatus.Ready,
+      revision: 7,
+      source: { url: 'https://canvas.example/view?credential=second' },
+    }), false);
+  });
+
+  it('does not declare transient presentation fields in durable canvas state or identity', () => {
+    const stateSchema = loadSchema('state.schema.json');
+    for (const name of ['CanvasIdentityKey', 'CanvasIdentity', 'CanvasEntry', 'CanvasState']) {
+      const definition = dereferenceSchema(stateSchema, { $ref: `#/$defs/${name}` });
+      const properties = definition.properties;
+      assert.ok(properties && typeof properties === 'object' && !Array.isArray(properties));
+      assert.equal(Object.hasOwn(properties, 'url'), false, `${name} must not declare a presentation URL`);
+      assert.equal(Object.hasOwn(properties, 'expiresAt'), false, `${name} must not declare presentation expiry`);
+
+      const targets = new Set<string>();
+      collectRefTargets(definition, targets);
+      assert.equal(targets.has('CanvasSourcePresentation'), false, `${name} must not reference a presentation`);
+    }
+  });
 });
 
 describe('typeAdmitsUndefined', () => {

@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "Clarify host publication of correlated, already-open native canvases without reopening providers, and transient presentation credential renewal through `resolveCanvasSource` without changing incarnation or requiring a state revision."
+}

@@ -1,0 +1,72 @@
+{
+  "description": "session/canvasSet replaces a catalogue entry and removes an icon omitted by the authoritative snapshot",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "canvases": [
+      {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-1"
+        },
+        "title": "Widget",
+        "icon": { "src": "https://example.com/stale.png" },
+        "trust": { "status": "trusted" },
+        "availability": "ready",
+        "revision": 1
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/canvasSet",
+      "canvas": {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-1"
+        },
+        "title": "Widget",
+        "trust": { "status": "trusted" },
+        "availability": "ready",
+        "revision": 2
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "canvases": [
+      {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-1"
+        },
+        "title": "Widget",
+        "trust": { "status": "trusted" },
+        "availability": "ready",
+        "revision": 2
+      }
+    ]
+  }
+}

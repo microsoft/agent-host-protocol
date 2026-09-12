@@ -1,0 +1,89 @@
+{
+  "description": "session/canvasSet records a host-published live entry, ignores its replay, and updates the same resource without duplicating membership or granting trust",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/canvasSet",
+      "canvas": {
+        "resource": "ahp-canvas:/native",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "native-widget",
+          "incarnation": "native-endpoint-1"
+        },
+        "title": "Native Widget",
+        "trust": { "status": "pending" },
+        "availability": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "type": "session/canvasSet",
+      "canvas": {
+        "resource": "ahp-canvas:/native",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "native-widget",
+          "incarnation": "native-endpoint-1"
+        },
+        "title": "Native Widget",
+        "trust": { "status": "pending" },
+        "availability": "ready",
+        "revision": 1
+      }
+    },
+    {
+      "type": "session/canvasSet",
+      "canvas": {
+        "resource": "ahp-canvas:/native",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "native-widget",
+          "incarnation": "native-endpoint-1"
+        },
+        "title": "Updated Native Widget",
+        "trust": { "status": "pending" },
+        "availability": "ready",
+        "revision": 2
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "canvases": [
+      {
+        "resource": "ahp-canvas:/native",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "native-widget",
+          "incarnation": "native-endpoint-1"
+        },
+        "title": "Updated Native Widget",
+        "trust": { "status": "pending" },
+        "availability": "ready",
+        "revision": 2
+      }
+    ]
+  }
+}

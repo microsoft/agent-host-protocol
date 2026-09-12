@@ -35,6 +35,8 @@ import type {
   SessionChangesetsChangedAction,
   SessionConfigChangedAction,
   SessionMetaChangedAction,
+  SessionCanvasSetAction,
+  SessionCanvasRemovedAction,
   ChatTurnStartedAction,
   ChatDeltaAction,
   ChatResponsePartAction,
@@ -99,6 +101,11 @@ import type {
   AutomationRunSessionRemovedAction,
   AutomationRunPrimarySessionChangedAction,
   AutomationRunCancelRequestedAction,
+  CanvasAvailabilityChangedAction,
+  CanvasTrustChangedAction,
+  CanvasIncarnationChangedAction,
+  CanvasTitleChangedAction,
+  CanvasIconChangedAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -155,6 +162,8 @@ export type SessionAction =
   | SessionChangesetsChangedAction
   | SessionConfigChangedAction
   | SessionMetaChangedAction
+  | SessionCanvasSetAction
+  | SessionCanvasRemovedAction
 ;
 
 /** Union of session actions that clients may dispatch. */
@@ -191,6 +200,8 @@ export type ServerSessionAction =
   | SessionActivityChangedAction
   | SessionChangesetsChangedAction
   | SessionMetaChangedAction
+  | SessionCanvasSetAction
+  | SessionCanvasRemovedAction
 ;
 
 /** Union of all chat-scoped actions. */
@@ -407,6 +418,29 @@ export type ServerAutomationRunAction =
   | AutomationRunPrimarySessionChangedAction
 ;
 
+/** Union of all canvas-scoped actions. */
+export type CanvasAction =
+  | CanvasAvailabilityChangedAction
+  | CanvasTrustChangedAction
+  | CanvasIncarnationChangedAction
+  | CanvasTitleChangedAction
+  | CanvasIconChangedAction
+;
+
+/** Union of canvas actions that clients may dispatch. */
+export type ClientCanvasAction =
+  never
+;
+
+/** Union of canvas actions that only the server may produce. */
+export type ServerCanvasAction =
+  | CanvasAvailabilityChangedAction
+  | CanvasTrustChangedAction
+  | CanvasIncarnationChangedAction
+  | CanvasTitleChangedAction
+  | CanvasIconChangedAction
+;
+
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
 
 /**
@@ -446,6 +480,8 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.SessionChangesetsChanged]: false,
   [ActionType.SessionConfigChanged]: true,
   [ActionType.SessionMetaChanged]: false,
+  [ActionType.SessionCanvasSet]: false,
+  [ActionType.SessionCanvasRemoved]: false,
   [ActionType.ChatTurnStarted]: true,
   [ActionType.ChatDelta]: false,
   [ActionType.ChatResponsePart]: false,
@@ -510,4 +546,9 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.AutomationRunSessionRemoved]: false,
   [ActionType.AutomationRunPrimarySessionChanged]: false,
   [ActionType.AutomationRunCancelRequested]: true,
+  [ActionType.CanvasAvailabilityChanged]: false,
+  [ActionType.CanvasTrustChanged]: false,
+  [ActionType.CanvasIncarnationChanged]: false,
+  [ActionType.CanvasTitleChanged]: false,
+  [ActionType.CanvasIconChanged]: false,
 };
