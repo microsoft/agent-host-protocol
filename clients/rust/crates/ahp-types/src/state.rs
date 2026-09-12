@@ -4672,6 +4672,10 @@ pub struct TerminalCommandResult {
     /// Whether `preview` is known to be incomplete or truncated
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub truncated: Option<bool>,
+    /// Reference to the command's full captured output, read with `resourceRead`.
+    /// Availability is host-defined; the content may no longer be available when read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full_output: Option<ContentRef>,
 }
 
 /// Lightweight terminal metadata exposed on the root state.

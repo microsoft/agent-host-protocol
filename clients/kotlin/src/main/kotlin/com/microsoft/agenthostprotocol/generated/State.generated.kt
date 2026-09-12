@@ -4553,7 +4553,12 @@ data class TerminalCommandResult(
     /**
      * Whether `preview` is known to be incomplete or truncated
      */
-    val truncated: Boolean? = null
+    val truncated: Boolean? = null,
+    /**
+     * Reference to the command's full captured output, read with `resourceRead`.
+     * Availability is host-defined; the content may no longer be available when read.
+     */
+    val fullOutput: ContentRef? = null
 )
 
 @Serializable

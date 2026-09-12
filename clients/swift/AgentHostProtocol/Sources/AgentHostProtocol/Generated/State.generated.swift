@@ -5325,15 +5325,20 @@ public struct TerminalCommandResult: Codable, Sendable {
     public var preview: String?
     /// Whether `preview` is known to be incomplete or truncated
     public var truncated: Bool?
+    /// Reference to the command's full captured output, read with `resourceRead`.
+    /// Availability is host-defined; the content may no longer be available when read.
+    public var fullOutput: ContentRef?
 
     public init(
         exitCode: Int? = nil,
         preview: String? = nil,
-        truncated: Bool? = nil
+        truncated: Bool? = nil,
+        fullOutput: ContentRef? = nil
     ) {
         self.exitCode = exitCode
         self.preview = preview
         self.truncated = truncated
+        self.fullOutput = fullOutput
     }
 }
 
