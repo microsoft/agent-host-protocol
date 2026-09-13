@@ -83,6 +83,32 @@ private func sessionInputRequestID(_ r: SessionInputRequest) -> String? {
     }
 }
 
+/// Applies newer canvas revisions without allowing stale state or incarnation changes.
+public func canvasReducer(state: CanvasState, action: StateAction) -> CanvasState {
+    var next = state
+    switch action {
+    case .canvasAvailabilityChanged(let a):
+        guard a.revision > state.revision else { return state }
+        next.availability = a.availability
+        next.revision = a.revision
+    case .canvasTrustChanged(let a):
+        guard a.revision > state.revision else { return state }
+        next.trust = a.trust
+        next.revision = a.revision
+    case .canvasIncarnationChanged(let a):
+        guard a.revision > state.revision else { return state }
+        next.identity.incarnation = a.incarnation
+        next.revision = a.revision
+    case .canvasTitleChanged(let a):
+        guard a.revision > state.revision else { return state }
+        next.title = a.title
+        next.revision = a.revision
+    default:
+        return state
+    }
+    return next
+}
+
 // MARK: - Root Reducer
 
 /// Pure reducer for root state.
@@ -758,6 +784,24 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
     case .sessionChangesetsChanged(let a):
         var next = state
         next.changesets = a.changesets
+        return next
+
+    case .sessionCanvasSet(let a):
+        var canvases = state.canvases ?? []
+        if let idx = canvases.firstIndex(where: { $0.resource == a.canvas.resource }) {
+            guard a.canvas.revision > canvases[idx].revision else { return state }
+            canvases[idx] = a.canvas
+        } else {
+            canvases.append(a.canvas)
+        }
+        var next = state
+        next.canvases = canvases
+        return next
+
+    case .sessionCanvasRemoved(let a):
+        guard let idx = state.canvases?.firstIndex(where: { $0.resource == a.resource }) else { return state }
+        var next = state
+        next.canvases?.remove(at: idx)
         return next
 
     case .sessionConfigChanged(let a):

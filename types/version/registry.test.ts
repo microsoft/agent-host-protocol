@@ -76,3 +76,15 @@ test('public package entry re-exports both protocol-version constants', async ()
   assert.equal(pkg.PROTOCOL_VERSION, PROTOCOL_VERSION);
   assert.deepEqual([...pkg.SUPPORTED_PROTOCOL_VERSIONS], [...SUPPORTED_PROTOCOL_VERSIONS]);
 });
+
+test('capability-gated canvas actions use the current protocol without a release bump', () => {
+  const actions = [
+    ActionType.SessionCanvasSet,
+    ActionType.SessionCanvasRemoved,
+    ActionType.CanvasAvailabilityChanged,
+    ActionType.CanvasTrustChanged,
+    ActionType.CanvasIncarnationChanged,
+    ActionType.CanvasTitleChanged,
+  ];
+  assert.deepEqual(actions.map(type => ACTION_INTRODUCED_IN[type]), actions.map(() => '0.9.0'));
+});

@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "Preserve canvas snapshots and empty catalogues in native clients, apply revision-checked canvas and session catalogue actions, and isolate canvas mirrors by host.",
+  "targets": ["rust", "kotlin", "swift", "go", "dotnet"]
+}

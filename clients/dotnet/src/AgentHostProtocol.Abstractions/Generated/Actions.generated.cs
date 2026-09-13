@@ -205,6 +205,18 @@ public enum ActionType
     AutomationRunPrimarySessionChanged,
     [WireValue("automationRun/cancelRequested")]
     AutomationRunCancelRequested,
+    [WireValue("session/canvasSet")]
+    SessionCanvasSet,
+    [WireValue("session/canvasRemoved")]
+    SessionCanvasRemoved,
+    [WireValue("canvas/availabilityChanged")]
+    CanvasAvailabilityChanged,
+    [WireValue("canvas/trustChanged")]
+    CanvasTrustChanged,
+    [WireValue("canvas/incarnationChanged")]
+    CanvasIncarnationChanged,
+    [WireValue("canvas/titleChanged")]
+    CanvasTitleChanged,
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -2487,6 +2499,106 @@ public sealed record AutomationRunCancelRequestedAction
     public ActionType Type { get; init; }
 }
 
+/// <summary>A canvas was admitted (opened) or its catalog entry changed.
+///
+/// Upsert semantics keyed by {@link CanvasEntry.resource | `resource`}: the
+/// server dispatches this with the full entry to record a newly opened
+/// canvas, or to republish it after a trust/availability/incarnation change
+/// so subscribers following only the session channel stay in sync with
+/// {@link CanvasState}. Never client-dispatchable — canvases are admitted
+/// only through the `openCanvas` command. A stale/out-of-order delivery
+/// (`canvas.revision` not strictly greater than the currently-recorded
+/// entry's revision) MUST be rejected (no-op) rather than overwrite a newer
+/// entry with older data.</summary>
+public sealed record SessionCanvasSetAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>The canvas entry to add or update, matched by `resource`.</summary>
+    public required CanvasEntry Canvas { get; init; }
+}
+
+/// <summary>A canvas was logically closed.
+///
+/// Remove semantics keyed by `resource`: an unknown URI is a no-op. This
+/// represents durable membership removal, not a client hiding a local
+/// tab/view — see `closeCanvas`.</summary>
+public sealed record SessionCanvasRemovedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Entry in {@link SessionState.canvases} to remove, matching {@link CanvasEntry.resource}.</summary>
+    public required string Resource { get; init; }
+}
+
+/// <summary>Replaces the canvas's live resolution state.
+///
+/// Dispatched by the host on every availability transition: initial
+/// resolution after `openCanvas`, provider restart, reload, and failure.</summary>
+public sealed record CanvasAvailabilityChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>New {@link CanvasState.availability}.</summary>
+    public required CanvasAvailabilityState Availability { get; init; }
+
+    /// <summary>The {@link CanvasState.revision} this action results in. The reducer
+    /// MUST reject (no-op) this action if `revision` is not strictly greater
+    /// than the canvas's current `revision` — this is how stale/out-of-order
+    /// deliveries are consistently rejected across every canvas action, not
+    /// just this one.</summary>
+    public long Revision { get; init; }
+}
+
+/// <summary>Replaces the canvas's trust decision.
+///
+/// Dispatched by the host whenever the execution-trust decision for this
+/// canvas's declared actions changes (e.g. a pending decision resolves, or an
+/// administrator revokes a previously trusted source).</summary>
+public sealed record CanvasTrustChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>New {@link CanvasState.trust}.</summary>
+    public required CanvasTrustState Trust { get; init; }
+
+    /// <summary>The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.</summary>
+    public long Revision { get; init; }
+}
+
+/// <summary>Records that the canvas's live endpoint was replaced by a fresh one for
+/// the same logical instance (e.g. the owning provider restarted).
+///
+/// The host MUST dispatch {@link CanvasAvailabilityChangedAction} to
+/// transition through `notLoaded`/`loading` around this change. Receivers
+/// MUST reject in-flight `invokeCanvasAction` replies and stale server-pushed
+/// callbacks addressed to a superseded `incarnation` — because `incarnation`
+/// is opaque (see {@link CanvasIdentity.incarnation}), that rejection is
+/// driven by the accompanying `revision` bump here, not by comparing
+/// `incarnation` values for order.</summary>
+public sealed record CanvasIncarnationChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>New {@link CanvasIdentity.incarnation}. MUST differ from the previous value and MUST NOT be reused for this logical identity.</summary>
+    public required string Incarnation { get; init; }
+
+    /// <summary>The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.</summary>
+    public long Revision { get; init; }
+}
+
+/// <summary>Replaces the canvas's display title.</summary>
+public sealed record CanvasTitleChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>New {@link CanvasState.title}.</summary>
+    public required string Title { get; init; }
+
+    /// <summary>The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.</summary>
+    public long Revision { get; init; }
+}
+
 // ─── Partial Summaries (action-discovered) ───────────────────────────
 
 /// <summary>Partial equivalent of ChatSummary — every field is optional for delta updates.</summary>
@@ -2666,6 +2778,12 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["automationRun/sessionRemoved"] = typeof(AutomationRunSessionRemovedAction),
         ["automationRun/primarySessionChanged"] = typeof(AutomationRunPrimarySessionChangedAction),
         ["automationRun/cancelRequested"] = typeof(AutomationRunCancelRequestedAction),
+        ["session/canvasSet"] = typeof(SessionCanvasSetAction),
+        ["session/canvasRemoved"] = typeof(SessionCanvasRemovedAction),
+        ["canvas/availabilityChanged"] = typeof(CanvasAvailabilityChangedAction),
+        ["canvas/trustChanged"] = typeof(CanvasTrustChangedAction),
+        ["canvas/incarnationChanged"] = typeof(CanvasIncarnationChangedAction),
+        ["canvas/titleChanged"] = typeof(CanvasTitleChangedAction),
             },
             allowUnknown: true)
     {

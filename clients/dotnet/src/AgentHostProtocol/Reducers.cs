@@ -30,6 +30,49 @@ public enum ReduceOutcome
 /// </summary>
 public static class Reducers
 {
+    /// <summary>Applies newer canvas revisions without allowing stale state or incarnation changes.</summary>
+    public static ReduceOutcome ApplyToCanvas(CanvasState state, StateAction action)
+    {
+        switch (action.Value)
+        {
+            case CanvasAvailabilityChangedAction a:
+                if (a.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+                state.Availability = a.Availability;
+                state.Revision = a.Revision;
+                break;
+            case CanvasTrustChangedAction a:
+                if (a.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+                state.Trust = a.Trust;
+                state.Revision = a.Revision;
+                break;
+            case CanvasIncarnationChangedAction a:
+                if (a.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+                state.Identity = state.Identity with { Incarnation = a.Incarnation };
+                state.Revision = a.Revision;
+                break;
+            case CanvasTitleChangedAction a:
+                if (a.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+                state.Title = a.Title;
+                state.Revision = a.Revision;
+                break;
+            default:
+                return ReduceOutcome.OutOfScope;
+        }
+        return ReduceOutcome.Applied;
+    }
+
     // ─── Injectable timestamp ──────────────────────────────────────────────
 
     private static volatile Func<long> s_now = () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -693,6 +736,34 @@ public static class Reducers
             case SessionChangesetsChangedAction a:
                 state.Changesets = CopyList(a.Changesets);
                 return ReduceOutcome.Applied;
+            case SessionCanvasSetAction a:
+                {
+                    state.Canvases ??= new List<CanvasEntry>();
+                    int idx = state.Canvases.FindIndex(c => c.Resource == a.Canvas.Resource);
+                    if (idx < 0)
+                    {
+                        state.Canvases.Add(a.Canvas);
+                    }
+                    else
+                    {
+                        if (a.Canvas.Revision <= state.Canvases[idx].Revision)
+                        {
+                            return ReduceOutcome.NoOp;
+                        }
+                        state.Canvases[idx] = a.Canvas;
+                    }
+                    return ReduceOutcome.Applied;
+                }
+            case SessionCanvasRemovedAction a:
+                {
+                    int idx = state.Canvases?.FindIndex(c => c.Resource == a.Resource) ?? -1;
+                    if (idx < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+                    state.Canvases!.RemoveAt(idx);
+                    return ReduceOutcome.Applied;
+                }
             case SessionConfigChangedAction a:
                 if (state.Config is null)
                 {

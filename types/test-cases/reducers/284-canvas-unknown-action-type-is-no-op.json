@@ -1,0 +1,36 @@
+{
+  "description": "canvas unknown action type is a no-op",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "empty" },
+    "revision": 1
+  },
+  "actions": [
+    { "type": "canvas/unknownAction" }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "empty" },
+    "revision": 1
+  }
+}
+

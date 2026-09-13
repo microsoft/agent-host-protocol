@@ -39,14 +39,15 @@ use std::collections::HashMap;
 use ahp_types::actions::ActionEnvelope;
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
-    AnnotationsState, AutomationEntry, AutomationRunState, AutomationState, ChangesetState,
-    ChatState, ResourceWatchState, RootState, SessionState, SnapshotState, TerminalState,
+    AnnotationsState, AutomationEntry, AutomationRunState, AutomationState, CanvasState,
+    ChangesetState, ChatState, ResourceWatchState, RootState, SessionState, SnapshotState,
+    TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
 use crate::reducers::{
-    apply_action_to_automation, apply_action_to_automation_run, apply_action_to_chat,
-    apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
+    apply_action_to_automation, apply_action_to_automation_run, apply_action_to_canvas,
+    apply_action_to_chat, apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
 };
 use crate::SubscriptionEvent;
 
@@ -100,6 +101,7 @@ pub struct MultiHostStateMirror {
     automation_catalogs: HashMap<HostId, AutomationState>,
     automations: HashMap<HostedResourceKey, AutomationEntry>,
     automation_runs: HashMap<HostedResourceKey, AutomationRunState>,
+    canvases: HashMap<HostedResourceKey, CanvasState>,
 }
 
 impl MultiHostStateMirror {
@@ -158,6 +160,11 @@ impl MultiHostStateMirror {
         &self.automation_runs
     }
 
+    /// Borrow canvas states keyed by `(host_id, uri)`.
+    pub fn canvases(&self) -> &HashMap<HostedResourceKey, CanvasState> {
+        &self.canvases
+    }
+
     /// Convenience: apply a [`HostSubscriptionEvent`] produced by
     /// [`crate::hosts::MultiHostClient::events`]. Action envelopes are
     /// routed through the reducer; non-action events (session-summary
@@ -214,6 +221,9 @@ impl MultiHostStateMirror {
         if let Some(run) = self.automation_runs.get_mut(&key) {
             apply_action_to_automation_run(run, &envelope.action);
         }
+        if let Some(canvas) = self.canvases.get_mut(&key) {
+            apply_action_to_canvas(canvas, &envelope.action);
+        }
         // Changesets are seeded by `apply_snapshot` only — there's no
         // changeset reducer in the SDK today (matching the Swift
         // mirror's behavior). Fall through silently.
@@ -256,6 +266,9 @@ impl MultiHostStateMirror {
             SnapshotState::AutomationRun(state) => {
                 self.automation_runs.insert(key, state.as_ref().clone());
             }
+            SnapshotState::Canvas(state) => {
+                self.canvases.insert(key, state.as_ref().clone());
+            }
         }
     }
 
@@ -273,6 +286,7 @@ impl MultiHostStateMirror {
         self.automation_catalogs.remove(host);
         self.automations.retain(|key, _| &key.host_id != host);
         self.automation_runs.retain(|key, _| &key.host_id != host);
+        self.canvases.retain(|key, _| &key.host_id != host);
     }
 
     /// Drop every host's state.
@@ -287,6 +301,7 @@ impl MultiHostStateMirror {
         self.automation_catalogs.clear();
         self.automations.clear();
         self.automation_runs.clear();
+        self.canvases.clear();
     }
 
     fn replace_automations(&mut self, host: &HostId, automations: Vec<AutomationEntry>) {

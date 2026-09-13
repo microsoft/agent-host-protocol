@@ -92,6 +92,9 @@ public sealed class FixtureDrivenReducerTests
                         actions,
                         Reducers.ApplyToAutomationRun);
                     break;
+                case "canvas":
+                    RunFixture<CanvasState>(initial, expected, actions, Reducers.ApplyToCanvas);
+                    break;
                 default:
                     throw new Xunit.Sdk.XunitException($"unknown reducer kind '{reducer}'");
             }

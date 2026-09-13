@@ -1,0 +1,23 @@
+{
+  "description": "session/canvasRemoved is a no-op when the session has no canvases catalogue at all",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    { "type": "session/canvasRemoved", "resource": "ahp-canvas:/c1" }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  }
+}
