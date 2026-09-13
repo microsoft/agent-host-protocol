@@ -26,6 +26,7 @@ The Rust, Swift, Go, and .NET SDKs ship a `MultiHostClient` for talking to two o
 ## Servers
 
 - **[VS Code agent host](https://github.com/microsoft/vscode)** — The reference AHP server implementation ([`src/vs/platform/agentHost/node/`](https://github.com/microsoft/vscode/tree/main/src/vs/platform/agentHost/node)).
+- **[pi-ahp](https://github.com/Qusic/pi-ahp)** — An open-source AHP host for the [pi coding agent](https://github.com/earendil-works/pi), exposing pi sessions to AHP clients over WebSocket.
 
 ## Versioning and releases
 
