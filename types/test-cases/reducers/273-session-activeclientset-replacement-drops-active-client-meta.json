@@ -1,0 +1,48 @@
+{
+  "description": "session/activeClientSet is a whole-entry replacement, not a merge: re-publishing an entry without `_meta` drops the previously stamped SessionActiveClient._meta, which is why a dispatcher re-publishing someone else's entry must carry the existing `_meta` forward",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [
+      {
+        "clientId": "vscode-1",
+        "displayName": "VS Code",
+        "tools": [],
+        "_meta": {
+          "com.example.collaboration": {
+            "role": "viewer",
+            "readOnly": true
+          }
+        }
+      }
+    ],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/activeClientSet",
+      "activeClient": {
+        "clientId": "vscode-1",
+        "displayName": "VS Code",
+        "tools": []
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [
+      {
+        "clientId": "vscode-1",
+        "displayName": "VS Code",
+        "tools": []
+      }
+    ],
+    "chats": []
+  }
+}

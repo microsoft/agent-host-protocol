@@ -978,6 +978,17 @@ type SessionActiveClient struct {
 	// plugins in memory and rely on the host to expand them into concrete
 	// children inside {@link SessionState.customizations}.
 	Customizations []ClientPluginCustomization `json:"customizations,omitempty"`
+	// Additional provider-specific metadata about this active client, such as
+	// the participant role a host assigns to a connection or whether the host
+	// treats it as read-only. Mirrors the MCP `_meta` convention.
+	//
+	// A host SHOULD stamp participant semantics here explicitly rather than
+	// leaving consumers to infer them: an empty
+	// {@link SessionActiveClient.tools | `tools`} or
+	// {@link SessionActiveClient.customizations | `customizations`} list means
+	// only that the client publishes nothing, never that it is read-only. See
+	// the customizations guide for the full `_meta` semantics.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
 // A user-input elicitation surfaced at the session level, mirroring the request

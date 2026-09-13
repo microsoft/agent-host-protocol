@@ -294,6 +294,60 @@ describe('generated JSON schemas', () => {
           false,
         );
       });
+
+      it('keeps SessionActiveClient._meta optional and backward compatible', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const activeClient = defs.SessionActiveClient;
+        if (!activeClient) {
+          return;
+        }
+
+        const properties = activeClient.properties as Record<string, Record<string, unknown>>;
+        assert.equal(
+          properties._meta?.type,
+          'object',
+          '`SessionActiveClient._meta` must be an open metadata object',
+        );
+
+        const required = (activeClient.required as string[] | undefined) ?? [];
+        assert.equal(
+          required.includes('_meta'),
+          false,
+          '`SessionActiveClient._meta` must stay optional so pre-existing producers remain valid',
+        );
+
+        // A payload from a producer that predates `_meta` still validates.
+        assert.equal(
+          schemaAccepts(schema, activeClient, {
+            clientId: 'vscode-1',
+            displayName: 'VS Code',
+            tools: [],
+          }),
+          true,
+        );
+
+        // A host-stamped, namespaced metadata object validates too.
+        assert.equal(
+          schemaAccepts(schema, activeClient, {
+            clientId: 'vscode-1',
+            tools: [],
+            _meta: {
+              'com.example.collaboration': { role: 'viewer', readOnly: true },
+            },
+          }),
+          true,
+        );
+
+        // `_meta` is an object side-channel, never a scalar.
+        assert.equal(
+          schemaAccepts(schema, activeClient, {
+            clientId: 'vscode-1',
+            tools: [],
+            _meta: 'viewer',
+          }),
+          false,
+        );
+      });
     });
   }
 });
