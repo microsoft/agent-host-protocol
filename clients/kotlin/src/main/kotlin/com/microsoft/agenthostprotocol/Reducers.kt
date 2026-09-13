@@ -84,6 +84,12 @@ public object AutomationRunReducer : Reducer<AutomationRunState, StateAction> {
         automationRunReducer(state, action)
 }
 
+/** Pure canvas reducer as a [Reducer] instance. */
+public object CanvasReducer : Reducer<CanvasState, StateAction> {
+    override fun reduce(state: CanvasState, action: StateAction): CanvasState =
+        canvasReducer(state, action)
+}
+
 private val isoTimestampFormatter = DateTimeFormatterBuilder().appendInstant(3).toFormatter()
 
 private fun addMillisecondsToTimestamp(timestamp: String, duration: Long): String =
@@ -612,6 +618,33 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
     is StateActionSessionActivityChanged -> state.copy(activity = action.value.activity)
 
     is StateActionSessionChangesetsChanged -> state.copy(changesets = action.value.changesets)
+
+    is StateActionSessionCanvasSet -> {
+        val canvas = action.value.canvas
+        val list = state.canvases ?: emptyList()
+        val idx = list.indexOfFirst { it.resource == canvas.resource }
+        if (idx < 0) {
+            state.copy(canvases = list + canvas)
+        } else if (canvas.revision <= list[idx].revision) {
+            state
+        } else {
+            val updated = list.toMutableList()
+            updated[idx] = canvas
+            state.copy(canvases = updated)
+        }
+    }
+
+    is StateActionSessionCanvasRemoved -> {
+        val list = state.canvases
+        val idx = list?.indexOfFirst { it.resource == action.value.resource } ?: -1
+        if (list == null || idx < 0) {
+            state
+        } else {
+            val updated = list.toMutableList()
+            updated.removeAt(idx)
+            state.copy(canvases = updated)
+        }
+    }
 
     is StateActionSessionConfigChanged -> {
         val a = action.value
@@ -1843,6 +1876,23 @@ public fun annotationsReducer(state: AnnotationsState, action: StateAction): Ann
  */
 public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction): ResourceWatchState = when (action) {
     is StateActionResourceWatchChanged -> state
+    else -> state
+}
+
+/** Applies only newer canvas revisions, preserving the opaque incarnation on stale actions. */
+public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState = when (action) {
+    is StateActionCanvasAvailabilityChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(availability = action.value.availability, revision = action.value.revision)
+    is StateActionCanvasTrustChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(trust = action.value.trust, revision = action.value.revision)
+    is StateActionCanvasIncarnationChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(identity = state.identity.copy(incarnation = action.value.incarnation), revision = action.value.revision)
+    is StateActionCanvasTitleChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(title = action.value.title, revision = action.value.revision)
     else -> state
 }
 

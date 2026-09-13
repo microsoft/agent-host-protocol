@@ -401,7 +401,7 @@ data class InitializeResult(
      * {@link ClientCapabilities.canvases} declared.
      *
      * **Protocol version support alone is not a runtime capability**: a host
-     * speaking protocol `>= 0.10.0` without this field present MUST NOT be
+     * speaking a supported protocol version without this field present MUST NOT be
      * assumed to have a usable canvas runtime. This field — not the
      * negotiated `protocolVersion` — is the authoritative signal, and is
      * independent of any individual canvas's live availability
@@ -440,7 +440,7 @@ data class ClientCapabilities(
      * {@link CanvasTrustStatus}, which is a separate, host-owned decision.
      *
      * This declares only the CLIENT's rendering capability. Protocol version
-     * support alone (i.e. speaking >= 0.10.0) is not evidence that the SERVER
+     * support alone is not evidence that the SERVER
      * actually has a working canvas runtime — see
      * {@link InitializeResult.canvases}, the server-side counterpart, which a
      * client MUST also check before treating canvases as usable.

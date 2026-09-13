@@ -6619,6 +6619,7 @@ pub enum CanvasAvailabilityState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Canvas(Box<CanvasState>),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Terminal(Box<TerminalState>),

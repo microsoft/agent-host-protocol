@@ -15,9 +15,10 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
-    Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
-    ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
-    ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
+    CanvasAvailabilityState, CanvasEntry, CanvasTrustState, Changeset, ChangesetFile,
+    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
+    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
+    ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
     ErrorResponsePart, McpAuthRequirement, McpServerState, Message, ModelSelection,
     PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection,
     TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,

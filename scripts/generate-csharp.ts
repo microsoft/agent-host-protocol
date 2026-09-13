@@ -804,20 +804,20 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState', mutable: true },
-  { name: 'CanvasExtensionSource', omitDiscriminants: true },
-  { name: 'CanvasPackageSource', omitDiscriminants: true },
+  { name: 'CanvasExtensionSource' },
+  { name: 'CanvasPackageSource' },
   { name: 'CanvasIdentityKey' },
   { name: 'CanvasIdentity' },
-  { name: 'CanvasTrustedState', omitDiscriminants: true },
-  { name: 'CanvasPendingTrustState', omitDiscriminants: true },
-  { name: 'CanvasBlockedTrustState', omitDiscriminants: true },
+  { name: 'CanvasTrustedState' },
+  { name: 'CanvasPendingTrustState' },
+  { name: 'CanvasBlockedTrustState' },
   { name: 'CanvasActionDeclaration' },
-  { name: 'CanvasUnsupportedAvailabilityState', omitDiscriminants: true },
-  { name: 'CanvasNotLoadedAvailabilityState', omitDiscriminants: true },
-  { name: 'CanvasLoadingAvailabilityState', omitDiscriminants: true },
-  { name: 'CanvasEmptyAvailabilityState', omitDiscriminants: true },
-  { name: 'CanvasReadyAvailabilityState', omitDiscriminants: true },
-  { name: 'CanvasFailedAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasUnsupportedAvailabilityState' },
+  { name: 'CanvasNotLoadedAvailabilityState' },
+  { name: 'CanvasLoadingAvailabilityState' },
+  { name: 'CanvasEmptyAvailabilityState' },
+  { name: 'CanvasReadyAvailabilityState' },
+  { name: 'CanvasFailedAvailabilityState' },
   { name: 'CanvasEntry', mutable: true },
   { name: 'CanvasState', mutable: true },
   { name: 'CanvasTypeDeclaration' },
@@ -1336,6 +1336,9 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>Canvas state variant, when populated.</summary>
+    public CanvasState? Canvas { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -1346,7 +1349,13 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        if (root.TryGetProperty("identity", out _) &&
+            root.TryGetProperty("availability", out _) &&
+            root.TryGetProperty("revision", out _))
+        {
+            result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -1392,6 +1401,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }

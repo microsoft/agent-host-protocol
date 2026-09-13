@@ -510,7 +510,7 @@ function generateDiscriminatedUnion(project: Project, config: UnionConfig): stri
   lines.push(`public enum ${config.name}: Codable, Sendable {`);
 
   for (const v of config.variants) {
-    lines.push(`    case ${v.caseName}(${v.structName})`);
+    lines.push(`    case ${swiftIdentifier(v.caseName)}(${v.structName})`);
   }
   if (allowUnknown) {
     lines.push('    /// Unknown or future discriminant; the raw payload is preserved');
@@ -538,7 +538,7 @@ function generateDiscriminatedUnion(project: Project, config: UnionConfig): stri
   lines.push('        switch discriminant {');
   for (const v of config.variants) {
     lines.push(`        case ${JSON.stringify(v.discriminantValue)}:`);
-    lines.push(`            self = .${v.caseName}(try ${v.structName}(from: decoder))`);
+    lines.push(`            self = .${swiftIdentifier(v.caseName)}(try ${v.structName}(from: decoder))`);
   }
   lines.push('        default:');
   if (allowUnknown) {
@@ -555,11 +555,11 @@ function generateDiscriminatedUnion(project: Project, config: UnionConfig): stri
   lines.push('        switch self {');
   for (const v of config.variants) {
     if (config.injectDiscriminantOnEncode) {
-      lines.push(`        case .${v.caseName}(var value):`);
-      lines.push(`            value.${config.discriminantField} = .${v.caseName}`);
+      lines.push(`        case .${swiftIdentifier(v.caseName)}(var value):`);
+      lines.push(`            value.${swiftIdentifier(config.discriminantField)} = .${swiftIdentifier(v.caseName)}`);
       lines.push('            try value.encode(to: encoder)');
     } else {
-      lines.push(`        case .${v.caseName}(let value): try value.encode(to: encoder)`);
+      lines.push(`        case .${swiftIdentifier(v.caseName)}(let value): try value.encode(to: encoder)`);
     }
   }
   if (allowUnknown) {
@@ -1111,13 +1111,16 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
     case automations(AutomationState)
     case automationRun(AutomationRunState)
+    case canvas(CanvasState)
 
     public init(from decoder: Decoder) throws {
         // Try the most distinctive shapes first. SessionState has required
         // \`lifecycle\` / \`activeClients\` / \`chats\`; ChatState has required
         // \`turns\`; the remaining variants follow, with RootState as the
         // catch-all.
-        if let session = try? SessionState(from: decoder) {
+        if let canvas = try? CanvasState(from: decoder) {
+            self = .canvas(canvas)
+        } else if let session = try? SessionState(from: decoder) {
             self = .session(session)
         } else if let chat = try? ChatState(from: decoder) {
             self = .chat(chat)
@@ -1149,6 +1152,7 @@ public enum SnapshotState: Codable, Sendable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .canvas(let state): try state.encode(to: encoder)
         }
     }
 }`;

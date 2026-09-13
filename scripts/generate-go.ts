@@ -1339,11 +1339,14 @@ type SnapshotState struct {
 \tAnnotations   *AnnotationsState   \`json:"-"\`
 \tAutomations   *AutomationState       \`json:"-"\`
 \tAutomationRun *AutomationRunState \`json:"-"\`
+\tCanvas        *CanvasState        \`json:"-"\`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \tswitch {
+\tcase s.Canvas != nil:
+\t\treturn json.Marshal(s.Canvas)
 \tcase s.AutomationRun != nil:
 \t\treturn json.Marshal(s.AutomationRun)
 \tcase s.Automations != nil:
@@ -1376,6 +1379,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\treturn err
 \t}
 \tswitch {
+\tcase containsAll(probe, "identity", "availability", "revision"):
+\t\tvar v CanvasState
+\t\tif err := json.Unmarshal(data, &v); err != nil {
+\t\t\treturn err
+\t\t}
+\t\ts.Canvas = &v
 \tcase containsAll(probe, "automation", "origin", "sessions"):
 \t\tvar v AutomationRunState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1498,6 +1507,21 @@ function generateStateFile(project: Project): string {
         }),
       );
       lines.push('');
+      if (entry.name === 'SessionState') {
+        lines.push(`// MarshalJSON preserves an explicitly empty canvas catalogue.
+func (s SessionState) MarshalJSON() ([]byte, error) {
+\ttype wire SessionState
+\tvar canvases *[]CanvasEntry
+\tif s.Canvases != nil {
+\t\tcanvases = &s.Canvases
+\t}
+\treturn json.Marshal(struct {
+\t\twire
+\t\tCanvases *[]CanvasEntry \`json:"canvases,omitempty"\`
+\t}{wire(s), canvases})
+}`);
+        lines.push('');
+      }
     } catch (e) {
       lines.push(`// TODO: could not generate ${entry.name}: ${e}`);
       lines.push('');

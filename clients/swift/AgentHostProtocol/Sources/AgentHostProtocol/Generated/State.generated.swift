@@ -8229,7 +8229,7 @@ public enum AutomationRunLifecycle: Codable, Sendable {
 }
 
 public enum CanvasSource: Codable, Sendable {
-    case extension(CanvasExtensionSource)
+    case `extension`(CanvasExtensionSource)
     case package(CanvasPackageSource)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
@@ -8247,7 +8247,7 @@ public enum CanvasSource: Codable, Sendable {
         }
         switch discriminant {
         case "extension":
-            self = .extension(try CanvasExtensionSource(from: decoder))
+            self = .`extension`(try CanvasExtensionSource(from: decoder))
         case "package":
             self = .package(try CanvasPackageSource(from: decoder))
         default:
@@ -8257,8 +8257,8 @@ public enum CanvasSource: Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         switch self {
-        case .extension(var value):
-            value.kind = .extension
+        case .`extension`(var value):
+            value.kind = .`extension`
             try value.encode(to: encoder)
         case .package(var value):
             value.kind = .package
@@ -8444,13 +8444,16 @@ public enum SnapshotState: Codable, Sendable {
     case annotations(AnnotationsState)
     case automations(AutomationState)
     case automationRun(AutomationRunState)
+    case canvas(CanvasState)
 
     public init(from decoder: Decoder) throws {
         // Try the most distinctive shapes first. SessionState has required
         // `lifecycle` / `activeClients` / `chats`; ChatState has required
         // `turns`; the remaining variants follow, with RootState as the
         // catch-all.
-        if let session = try? SessionState(from: decoder) {
+        if let canvas = try? CanvasState(from: decoder) {
+            self = .canvas(canvas)
+        } else if let session = try? SessionState(from: decoder) {
             self = .session(session)
         } else if let chat = try? ChatState(from: decoder) {
             self = .chat(chat)
@@ -8482,6 +8485,7 @@ public enum SnapshotState: Codable, Sendable {
         case .annotations(let state): try state.encode(to: encoder)
         case .automations(let state): try state.encode(to: encoder)
         case .automationRun(let state): try state.encode(to: encoder)
+        case .canvas(let state): try state.encode(to: encoder)
         }
     }
 }

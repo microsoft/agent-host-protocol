@@ -5541,6 +5541,8 @@ public sealed class AutomationRunState
 /// values that differ only in `version` are the same source).</summary>
 public sealed record CanvasExtensionSource
 {
+    public CanvasSourceKind Kind { get; init; }
+
     /// <summary>Stable extension identifier (host-defined format, e.g. `publisher.name`).
     /// MUST NOT exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.</summary>
     public required string ExtensionId { get; init; }
@@ -5561,6 +5563,8 @@ public sealed record CanvasExtensionSource
 /// only and MUST NOT be treated as identity-bearing.</summary>
 public sealed record CanvasPackageSource
 {
+    public CanvasSourceKind Kind { get; init; }
+
     /// <summary>Stable, host- or package-manager-assigned unique identifier for this
     /// specific installed package instance/scope (opaque format). This is the
     /// identity-bearing field — see {@link CanvasIdentityKey}. MUST NOT exceed
@@ -5652,14 +5656,18 @@ public sealed record CanvasIdentity
 
 public sealed record CanvasTrustedState
 {
+    public CanvasTrustStatus Status { get; init; }
 }
 
 public sealed record CanvasPendingTrustState
 {
+    public CanvasTrustStatus Status { get; init; }
 }
 
 public sealed record CanvasBlockedTrustState
 {
+    public CanvasTrustStatus Status { get; init; }
+
     /// <summary>Optional human-readable reason surfaced to the user.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Reason { get; init; }
@@ -5703,28 +5711,36 @@ public sealed record CanvasActionDeclaration
 
 public sealed record CanvasUnsupportedAvailabilityState
 {
+    public CanvasAvailabilityStatus Status { get; init; }
 }
 
 public sealed record CanvasNotLoadedAvailabilityState
 {
+    public CanvasAvailabilityStatus Status { get; init; }
 }
 
 public sealed record CanvasLoadingAvailabilityState
 {
+    public CanvasAvailabilityStatus Status { get; init; }
 }
 
 public sealed record CanvasEmptyAvailabilityState
 {
+    public CanvasAvailabilityStatus Status { get; init; }
 }
 
 public sealed record CanvasReadyAvailabilityState
 {
+    public CanvasAvailabilityStatus Status { get; init; }
+
     /// <summary>Actions currently declared by the live provider (full replacement each time this state is produced).</summary>
     public required List<CanvasActionDeclaration> Actions { get; init; }
 }
 
 public sealed record CanvasFailedAvailabilityState
 {
+    public CanvasAvailabilityStatus Status { get; init; }
+
     /// <summary>Stable machine-readable and human-readable failure information.</summary>
     public required ErrorInfo Error { get; init; }
 }
@@ -6798,6 +6814,9 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>Canvas state variant, when populated.</summary>
+    public CanvasState? Canvas { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -6808,7 +6827,13 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        if (root.TryGetProperty("identity", out _) &&
+            root.TryGetProperty("availability", out _) &&
+            root.TryGetProperty("revision", out _))
+        {
+            result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -6854,6 +6879,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }

@@ -1022,6 +1022,19 @@ type SessionState struct {
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
 }
 
+// MarshalJSON preserves an explicitly empty canvas catalogue.
+func (s SessionState) MarshalJSON() ([]byte, error) {
+	type wire SessionState
+	var canvases *[]CanvasEntry
+	if s.Canvases != nil {
+		canvases = &s.Canvases
+	}
+	return json.Marshal(struct {
+		wire
+		Canvases *[]CanvasEntry `json:"canvases,omitempty"`
+	}{wire(s), canvases})
+}
+
 // A client currently providing tools and interactive capabilities to a session.
 //
 // A session MAY have several active clients at once; entries in
@@ -6487,11 +6500,14 @@ type SnapshotState struct {
 	Annotations   *AnnotationsState   `json:"-"`
 	Automations   *AutomationState    `json:"-"`
 	AutomationRun *AutomationRunState `json:"-"`
+	Canvas        *CanvasState        `json:"-"`
 }
 
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	switch {
+	case s.Canvas != nil:
+		return json.Marshal(s.Canvas)
 	case s.AutomationRun != nil:
 		return json.Marshal(s.AutomationRun)
 	case s.Automations != nil:
@@ -6524,6 +6540,12 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch {
+	case containsAll(probe, "identity", "availability", "revision"):
+		var v CanvasState
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		s.Canvas = &v
 	case containsAll(probe, "automation", "origin", "sessions"):
 		var v AutomationRunState
 		if err := json.Unmarshal(data, &v); err != nil {

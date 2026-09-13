@@ -6,6 +6,28 @@ import AgentHostProtocol
 
 final class MultiHostStateMirrorTests: XCTestCase {
 
+    func testCanvasSnapshotsAndActionsRemainIsolatedPerHost() async throws {
+        let mirror = MultiHostStateMirror()
+        let snapshot = try canvasFixtureSnapshot()
+        await mirror.applySnapshot(host: "alpha", snapshot: snapshot)
+        await mirror.applySnapshot(host: "beta", snapshot: snapshot)
+        await mirror.apply(host: "alpha", envelope: ActionEnvelope(
+            channel: snapshot.resource,
+            action: .canvasTitleChanged(CanvasTitleChangedAction(type: .canvasTitleChanged, title: "Alpha", revision: 5)),
+            serverSeq: 9
+        ))
+        let alpha = HostedResourceKey(hostId: "alpha", uri: snapshot.resource)
+        let beta = HostedResourceKey(hostId: "beta", uri: snapshot.resource)
+        let canvases = await mirror.canvases
+        XCTAssertEqual([canvases[alpha]?.title, canvases[beta]?.title], ["Alpha", "Widget"])
+        await mirror.reset(host: "alpha")
+        let remaining = await mirror.canvases
+        XCTAssertEqual(Array(remaining.keys), [beta])
+        await mirror.reset()
+        let empty = await mirror.canvases
+        XCTAssertTrue(empty.isEmpty)
+    }
+
     // MARK: - root_states_are_isolated_per_host
 
     func testRootStatesAreIsolatedPerHost() async {

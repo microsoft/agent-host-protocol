@@ -16,9 +16,11 @@ use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AutomationTrigger, AutomationTriggerDefinition, CanvasAvailabilityStatus, CanvasEntry,
+    CanvasIdentityKey, CanvasSourcePresentation, CanvasTypeDeclaration, ContentRef, Icon, Message,
+    MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange,
+    Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -301,7 +303,7 @@ pub struct InitializeResult {
     /// {@link ClientCapabilities.canvases} declared.
     ///
     /// **Protocol version support alone is not a runtime capability**: a host
-    /// speaking protocol `>= 0.10.0` without this field present MUST NOT be
+    /// speaking a supported protocol version without this field present MUST NOT be
     /// assumed to have a usable canvas runtime. This field — not the
     /// negotiated `protocolVersion` — is the authoritative signal, and is
     /// independent of any individual canvas's live availability
@@ -344,7 +346,7 @@ pub struct ClientCapabilities {
     /// {@link CanvasTrustStatus}, which is a separate, host-owned decision.
     ///
     /// This declares only the CLIENT's rendering capability. Protocol version
-    /// support alone (i.e. speaking >= 0.10.0) is not evidence that the SERVER
+    /// support alone is not evidence that the SERVER
     /// actually has a working canvas runtime — see
     /// {@link InitializeResult.canvases}, the server-side counterpart, which a
     /// client MUST also check before treating canvases as usable.
