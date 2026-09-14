@@ -25,3 +25,12 @@ export type { TransportErrorKind } from './error.js';
 export { InMemoryTransport } from './transport.js';
 export type { AhpTransport, JsonRpcMessage, TransportFrame } from './transport.js';
 export { AhpStateMirror } from './state-mirror.js';
+export { ManagedSubscriptionManager } from './managed-subscriptions.js';
+export type {
+  ManagedSubscription,
+  ManagedSubscriptionHolder,
+  ManagedSubscriptionInfo,
+  ManagedSubscriptionLease,
+  ManagedSubscriptionStatus,
+  ManagedSubscribeResult,
+} from './managed-subscriptions.js';
