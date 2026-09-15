@@ -207,6 +207,8 @@ ActiveTurn {
 }
 ```
 
+A `chat/turnStarted` whose `turnId` is already the active turn, or names a turn that has already completed, is a no-op. A client that replays its own optimistic turn start over confirmed state therefore never resets a turn in progress.
+
 ### User Messages
 
 ```typescript
