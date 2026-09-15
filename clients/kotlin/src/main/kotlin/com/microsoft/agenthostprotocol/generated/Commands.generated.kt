@@ -1242,7 +1242,13 @@ data class AuthenticateParams(
      * Omit when the client doesn't track granted scopes separately from the
      * token.
      */
-    val scopes: List<String>? = null
+    val scopes: List<String>? = null,
+    /**
+     * Exact, case-sensitive MCP server configuration name when the token resolves
+     * a server-owned authentication request. The host MUST apply the token only
+     * to that named server. Omit for provider-level protected resources.
+     */
+    val serverName: String? = null
 )
 
 @Serializable

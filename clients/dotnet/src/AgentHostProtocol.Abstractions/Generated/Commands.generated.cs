@@ -1275,6 +1275,12 @@ public sealed record AuthenticateParams
     /// token.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Scopes { get; init; }
+
+    /// <summary>Exact, case-sensitive MCP server configuration name when the token resolves
+    /// a server-owned authentication request. The host MUST apply the token only
+    /// to that named server. Omit for provider-level protected resources.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ServerName { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.

@@ -1309,6 +1309,11 @@ pub struct AuthenticateParams {
     /// token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
+    /// Exact, case-sensitive MCP server configuration name when the token resolves
+    /// a server-owned authentication request. The host MUST apply the token only
+    /// to that named server. Omit for provider-level protected resources.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_name: Option<String>,
 }
 
 /// Result of the `authenticate` command.
