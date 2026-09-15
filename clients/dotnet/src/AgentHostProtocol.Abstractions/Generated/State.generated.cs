@@ -2795,7 +2795,7 @@ public sealed record ToolCallPendingConfirmationState
 
     /// <summary>File edits that this tool call will perform, for preview before confirmation</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Edits { get; init; }
+    public FileEditCollection? Edits { get; init; }
 
     /// <summary>Whether the agent host allows the client to edit the tool's input parameters before confirming</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3274,15 +3274,15 @@ public sealed record ToolResultFileEditContent
 {
     /// <summary>The file state before the edit. Absent for file creations or for in-place file edits.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Before { get; init; }
+    public FileEditSide? Before { get; init; }
 
     /// <summary>The file state after the edit. Absent for file deletions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? After { get; init; }
+    public FileEditSide? After { get; init; }
 
     /// <summary>Optional diff display metadata</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Diff { get; init; }
+    public FileEditDiffStats? Diff { get; init; }
 
     public ToolResultContentType Type { get; init; }
 }
@@ -4337,6 +4337,22 @@ public sealed record ToolCallMcpContributor
     public required string CustomizationId { get; init; }
 }
 
+public sealed record FileEditSide
+{
+    public required string Uri { get; init; }
+
+    public required ContentRef Content { get; init; }
+}
+
+public sealed record FileEditDiffStats
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Added { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Removed { get; init; }
+}
+
 /// <summary>Describes a file modification with before/after state and diff metadata.
 ///
 /// Supports creates (only `after`), deletes (only `before`), renames/moves
@@ -4345,15 +4361,20 @@ public sealed record FileEdit
 {
     /// <summary>The file state before the edit. Absent for file creations or for in-place file edits.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Before { get; init; }
+    public FileEditSide? Before { get; init; }
 
     /// <summary>The file state after the edit. Absent for file deletions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? After { get; init; }
+    public FileEditSide? After { get; init; }
 
     /// <summary>Optional diff display metadata</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Diff { get; init; }
+    public FileEditDiffStats? Diff { get; init; }
+}
+
+public sealed record FileEditCollection
+{
+    public required List<FileEdit> Items { get; init; }
 }
 
 /// <summary>Lightweight terminal metadata exposed on the root state.</summary>

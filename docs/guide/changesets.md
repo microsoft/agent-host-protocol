@@ -103,6 +103,44 @@ of the changeset URI:
 | `changeset/operationStatusChanged`  | No                   | A single operation's `status` transitioned (e.g. `idle → running → error`).  |
 | `changeset/cleared`                 | No                   | All files dropped (e.g. branch switched, or the owning session ended).       |
 
+### Typed file-edit models
+
+The client API uses three shared model types:
+
+| Type | Purpose |
+| --- | --- |
+| `FileEditSide` | A file URI and its required `ContentRef`. |
+| `FileEditDiffStats` | Optional added and removed item counts. |
+| `FileEditCollection` | The preview wrapper with required `items`. |
+
+`FileEdit.before` and `after` use the same side type.
+`ToolResultFileEditContent` exposes the same fields.
+The ready action and pending-confirmation state both expose previews through
+`edits.items`.
+
+When migrating from a client with raw-JSON file-edit properties, replace JSON
+lookups and construction with these typed properties and constructors.
+This changes the affected SDK APIs, not the JSON structure. Kotlin consumers
+must also rebuild dependent binaries.
+
+Sides remain optional. In Kotlin, a present side requires its file URI and
+content reference. The existing serializer reports missing required fields
+and incompatible values. A file that causes a serialization error fails the
+containing payload. Callers must handle that error rather than apply a partial
+snapshot.
+
+Each SDK keeps its native validation rules. Go can use zero values for missing
+fields. TypeScript types do not perform runtime validation.
+
+Runtime model decoders accept unknown keys but do not retain them on recognized
+objects. Keep the original raw payload separately if forwarding must be
+lossless. Intentional extension fields and unknown variants keep their existing
+raw-data behavior.
+
+The statistics count items, such as text lines or notebook cells. They are not
+patch data. `ContentRef` retains its existing URI, size hint, content type, and
+nonce. This API change does not add diff computation or a new resource protocol.
+
 ### File Review
 
 **Review is a capability of the changeset.** A changeset advertises support for

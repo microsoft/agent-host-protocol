@@ -440,7 +440,7 @@ data class ChatToolCallReadyAction(
     /**
      * File edits that this tool call will perform, for preview before confirmation
      */
-    val edits: JsonElement? = null,
+    val edits: FileEditCollection? = null,
     /**
      * Whether the agent host allows the client to edit the tool's input parameters before confirming
      */

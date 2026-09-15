@@ -3396,7 +3396,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
     /// Risk assessment that informed the confirmation requirement.
     public var riskAssessment: ToolCallRiskAssessment?
     /// File edits that this tool call will perform, for preview before confirmation
-    public var edits: AnyCodable?
+    public var edits: FileEditCollection?
     /// Whether the agent host allows the client to edit the tool's input parameters before confirming
     public var editable: Bool?
     /// Options the server offers for this confirmation. When present, the client
@@ -3434,7 +3434,7 @@ public struct ToolCallPendingConfirmationState: Codable, Sendable {
         status: ToolCallStatus,
         confirmationTitle: StringOrMarkdown? = nil,
         riskAssessment: ToolCallRiskAssessment? = nil,
-        edits: AnyCodable? = nil,
+        edits: FileEditCollection? = nil,
         editable: Bool? = nil,
         options: [ConfirmationOption]? = nil
     ) {
@@ -4105,17 +4105,17 @@ public struct ToolResultResourceContent: Codable, Sendable {
 
 public struct ToolResultFileEditContent: Codable, Sendable {
     /// The file state before the edit. Absent for file creations or for in-place file edits.
-    public var before: AnyCodable?
+    public var before: FileEditSide?
     /// The file state after the edit. Absent for file deletions.
-    public var after: AnyCodable?
+    public var after: FileEditSide?
     /// Optional diff display metadata
-    public var diff: AnyCodable?
+    public var diff: FileEditDiffStats?
     public var type: ToolResultContentType
 
     public init(
-        before: AnyCodable? = nil,
-        after: AnyCodable? = nil,
-        diff: AnyCodable? = nil,
+        before: FileEditSide? = nil,
+        after: FileEditSide? = nil,
+        diff: FileEditDiffStats? = nil,
         type: ToolResultContentType
     ) {
         self.before = before
@@ -5296,22 +5296,58 @@ public struct ToolCallMcpContributor: Codable, Sendable {
     }
 }
 
-public struct FileEdit: Codable, Sendable {
-    /// The file state before the edit. Absent for file creations or for in-place file edits.
-    public var before: AnyCodable?
-    /// The file state after the edit. Absent for file deletions.
-    public var after: AnyCodable?
-    /// Optional diff display metadata
-    public var diff: AnyCodable?
+public struct FileEditSide: Codable, Sendable {
+    public var uri: String
+    public var content: ContentRef
 
     public init(
-        before: AnyCodable? = nil,
-        after: AnyCodable? = nil,
-        diff: AnyCodable? = nil
+        uri: String,
+        content: ContentRef
+    ) {
+        self.uri = uri
+        self.content = content
+    }
+}
+
+public struct FileEditDiffStats: Codable, Sendable {
+    public var added: Int?
+    public var removed: Int?
+
+    public init(
+        added: Int? = nil,
+        removed: Int? = nil
+    ) {
+        self.added = added
+        self.removed = removed
+    }
+}
+
+public struct FileEdit: Codable, Sendable {
+    /// The file state before the edit. Absent for file creations or for in-place file edits.
+    public var before: FileEditSide?
+    /// The file state after the edit. Absent for file deletions.
+    public var after: FileEditSide?
+    /// Optional diff display metadata
+    public var diff: FileEditDiffStats?
+
+    public init(
+        before: FileEditSide? = nil,
+        after: FileEditSide? = nil,
+        diff: FileEditDiffStats? = nil
     ) {
         self.before = before
         self.after = after
         self.diff = diff
+    }
+}
+
+public struct FileEditCollection: Codable, Sendable {
+    public var items: [FileEdit]
+
+    public init(
+        items: [FileEdit]
+    ) {
+        self.items = items
     }
 }
 

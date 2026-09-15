@@ -1946,55 +1946,63 @@
         "uri"
       ]
     },
+    "FileEditSide": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI"
+        },
+        "content": {
+          "$ref": "#/$defs/ContentRef"
+        }
+      },
+      "required": [
+        "uri",
+        "content"
+      ]
+    },
+    "FileEditDiffStats": {
+      "type": "object",
+      "properties": {
+        "added": {
+          "type": "number"
+        },
+        "removed": {
+          "type": "number"
+        }
+      }
+    },
     "FileEdit": {
       "type": "object",
       "description": "Describes a file modification with before/after state and diff metadata.\n\nSupports creates (only `after`), deletes (only `before`), renames/moves\n(different `uri` in `before` and `after`), and edits (same `uri`, different content).",
       "properties": {
         "before": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "$ref": "#/$defs/URI"
-            },
-            "content": {
-              "$ref": "#/$defs/ContentRef"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
+          "$ref": "#/$defs/FileEditSide",
           "description": "The file state before the edit. Absent for file creations or for in-place file edits."
         },
         "after": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "$ref": "#/$defs/URI"
-            },
-            "content": {
-              "$ref": "#/$defs/ContentRef"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
+          "$ref": "#/$defs/FileEditSide",
           "description": "The file state after the edit. Absent for file deletions."
         },
         "diff": {
-          "type": "object",
-          "properties": {
-            "added": {
-              "type": "number"
-            },
-            "removed": {
-              "type": "number"
-            }
-          },
+          "$ref": "#/$defs/FileEditDiffStats",
           "description": "Optional diff display metadata"
         }
       }
+    },
+    "FileEditCollection": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FileEdit"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
     },
     "UsageInfo": {
       "type": "object",
@@ -5446,18 +5454,7 @@
           "description": "Risk assessment that informed the confirmation requirement."
         },
         "edits": {
-          "type": "object",
-          "properties": {
-            "items": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/FileEdit"
-              }
-            }
-          },
-          "required": [
-            "items"
-          ],
+          "$ref": "#/$defs/FileEditCollection",
           "description": "File edits that this tool call will perform, for preview before confirmation"
         },
         "editable": {
@@ -5962,47 +5959,15 @@
       "description": "Describes a file modification performed by a tool.",
       "properties": {
         "before": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "$ref": "#/$defs/URI"
-            },
-            "content": {
-              "$ref": "#/$defs/ContentRef"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
+          "$ref": "#/$defs/FileEditSide",
           "description": "The file state before the edit. Absent for file creations or for in-place file edits."
         },
         "after": {
-          "type": "object",
-          "properties": {
-            "uri": {
-              "$ref": "#/$defs/URI"
-            },
-            "content": {
-              "$ref": "#/$defs/ContentRef"
-            }
-          },
-          "required": [
-            "uri",
-            "content"
-          ],
+          "$ref": "#/$defs/FileEditSide",
           "description": "The file state after the edit. Absent for file deletions."
         },
         "diff": {
-          "type": "object",
-          "properties": {
-            "added": {
-              "type": "number"
-            },
-            "removed": {
-              "type": "number"
-            }
-          },
+          "$ref": "#/$defs/FileEditDiffStats",
           "description": "Optional diff display metadata"
         },
         "type": {
@@ -8139,18 +8104,7 @@
           "description": "Risk assessment that informed the confirmation requirement."
         },
         "edits": {
-          "type": "object",
-          "properties": {
-            "items": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/FileEdit"
-              }
-            }
-          },
-          "required": [
-            "items"
-          ],
+          "$ref": "#/$defs/FileEditCollection",
           "description": "File edits that this tool call will perform, for preview before confirmation"
         },
         "editable": {
