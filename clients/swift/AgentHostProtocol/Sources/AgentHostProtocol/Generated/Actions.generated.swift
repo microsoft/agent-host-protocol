@@ -715,7 +715,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
     /// Risk assessment that informed the confirmation requirement.
     public var riskAssessment: ToolCallRiskAssessment?
     /// File edits that this tool call will perform, for preview before confirmation
-    public var edits: AnyCodable?
+    public var edits: FileEditCollection?
     /// Whether the agent host allows the client to edit the tool's input parameters before confirming
     public var editable: Bool?
     /// If set, the tool was auto-confirmed and transitions directly to `running`
@@ -754,7 +754,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         toolInput: ToolInput? = nil,
         confirmationTitle: StringOrMarkdown? = nil,
         riskAssessment: ToolCallRiskAssessment? = nil,
-        edits: AnyCodable? = nil,
+        edits: FileEditCollection? = nil,
         editable: Bool? = nil,
         confirmed: ToolCallConfirmationReason? = nil,
         options: [ConfirmationOption]? = nil

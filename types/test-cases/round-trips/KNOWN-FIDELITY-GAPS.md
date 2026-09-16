@@ -18,8 +18,7 @@ entries would cement observed-but-wrong divergence as "acceptable".
   which drops the unknown keys, and assert the dropped form in
   `acceptableOutputs[0]`. TypeScript has no runtime decoder, so `JSON.parse` /
   `JSON.stringify` preserve every key; it asserts the preserved form in
-  `preservedOutput`. TypeScript still asserts — it is never skipped. Fixtures
-  017 and 019 are the Group B cases.
+  `preservedOutput`. TypeScript still asserts. It never skips Group B fixtures.
 
 This is a real type-system capability difference, not a blessed divergence: a
 runtime client that wrongly *preserved* unknown keys would fail its

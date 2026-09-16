@@ -13,6 +13,7 @@ import type {
   ContentRef,
   ErrorInfo,
   FileEdit,
+  FileEditCollection,
   StringOrMarkdown,
   TextRange,
   TextSelection,
@@ -1305,7 +1306,7 @@ export interface ToolCallPendingConfirmationState extends ToolCallBase, ToolCall
   /** Risk assessment that informed the confirmation requirement. */
   riskAssessment?: ToolCallRiskAssessment;
   /** File edits that this tool call will perform, for preview before confirmation */
-  edits?: { items: FileEdit[] };
+  edits?: FileEditCollection;
   /** Whether the agent host allows the client to edit the tool's input parameters before confirming */
   editable?: boolean;
   /**

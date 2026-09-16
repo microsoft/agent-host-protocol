@@ -3333,7 +3333,7 @@ pub struct ToolCallPendingConfirmationState {
     pub risk_assessment: Option<ToolCallRiskAssessment>,
     /// File edits that this tool call will perform, for preview before confirmation
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edits: Option<AnyValue>,
+    pub edits: Option<FileEditCollection>,
     /// Whether the agent host allows the client to edit the tool's input parameters before confirming
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editable: Option<bool>,
@@ -3727,13 +3727,13 @@ pub struct ToolResultResourceContent {
 pub struct ToolResultFileEditContent {
     /// The file state before the edit. Absent for file creations or for in-place file edits.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub before: Option<AnyValue>,
+    pub before: Option<FileEditSide>,
     /// The file state after the edit. Absent for file deletions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub after: Option<AnyValue>,
+    pub after: Option<FileEditSide>,
     /// Optional diff display metadata
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub diff: Option<AnyValue>,
+    pub diff: Option<FileEditDiffStats>,
 }
 
 /// A reference to a terminal whose output is relevant to this tool result.
@@ -4637,6 +4637,22 @@ pub struct ToolCallMcpContributor {
     pub customization_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEditSide {
+    pub uri: Uri,
+    pub content: ContentRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEditDiffStats {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removed: Option<i64>,
+}
+
 /// Describes a file modification with before/after state and diff metadata.
 ///
 /// Supports creates (only `after`), deletes (only `before`), renames/moves
@@ -4646,13 +4662,19 @@ pub struct ToolCallMcpContributor {
 pub struct FileEdit {
     /// The file state before the edit. Absent for file creations or for in-place file edits.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub before: Option<AnyValue>,
+    pub before: Option<FileEditSide>,
     /// The file state after the edit. Absent for file deletions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub after: Option<AnyValue>,
+    pub after: Option<FileEditSide>,
     /// Optional diff display metadata
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub diff: Option<AnyValue>,
+    pub diff: Option<FileEditDiffStats>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEditCollection {
+    pub items: Vec<FileEdit>,
 }
 
 /// Outcome of a command run in a terminal-style tool, filled in on

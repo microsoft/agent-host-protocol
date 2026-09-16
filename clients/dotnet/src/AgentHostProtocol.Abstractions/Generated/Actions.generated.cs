@@ -1323,7 +1323,7 @@ public sealed record ChatToolCallReadyAction
 
     /// <summary>File edits that this tool call will perform, for preview before confirmation</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Edits { get; init; }
+    public FileEditCollection? Edits { get; init; }
 
     /// <summary>Whether the agent host allows the client to edit the tool's input parameters before confirming</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -5,7 +5,7 @@
  */
 
 import { ActionType } from '../common/actions.js';
-import type { StringOrMarkdown, FileEdit, UsageInfo, URI } from '../common/state.js';
+import type { StringOrMarkdown, FileEditCollection, UsageInfo, URI } from '../common/state.js';
 import type { McpAuthRequirement } from '../channels-session/state.js';
 import type {
   Message,
@@ -223,7 +223,7 @@ export interface ChatToolCallReadyAction extends ToolCallActionBase {
   /** Risk assessment that informed the confirmation requirement. */
   riskAssessment?: ToolCallRiskAssessment;
   /** File edits that this tool call will perform, for preview before confirmation */
-  edits?: { items: FileEdit[] };
+  edits?: FileEditCollection;
   /** Whether the agent host allows the client to edit the tool's input parameters before confirming */
   editable?: boolean;
   /** If set, the tool was auto-confirmed and transitions directly to `running` */

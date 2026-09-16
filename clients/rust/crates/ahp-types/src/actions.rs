@@ -18,11 +18,11 @@ use crate::state::{
     Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
     ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
     ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
-    ErrorResponsePart, McpAuthRequirement, McpServerState, Message, ModelSelection,
-    PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection,
-    TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
-    ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
-    ToolResultContent, Turn, UsageInfo,
+    ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
+    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest,
+    SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
+    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment,
+    ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -711,7 +711,7 @@ pub struct ChatToolCallReadyAction {
     pub risk_assessment: Option<ToolCallRiskAssessment>,
     /// File edits that this tool call will perform, for preview before confirmation
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edits: Option<AnyValue>,
+    pub edits: Option<FileEditCollection>,
     /// Whether the agent host allows the client to edit the tool's input parameters before confirming
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editable: Option<bool>,

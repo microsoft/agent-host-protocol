@@ -1,0 +1,20 @@
+{
+  "name": "file-edit-preview",
+  "group": "A",
+  "description": "A ready action preserves its typed preview collection.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/toolCallReady",
+    "turnId": "t1",
+    "toolCallId": "tc1",
+    "invocationMessage": "Review",
+    "edits": {"items":[{"after":{"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/file"}},"diff":{"added":0}}]}
+  },
+  "acceptableOutputs": [{
+    "type": "chat/toolCallReady",
+    "turnId": "t1",
+    "toolCallId": "tc1",
+    "invocationMessage": "Review",
+    "edits": {"items":[{"after":{"uri":"file:///workspace/file.txt","content":{"uri":"ahp-content:/file"}},"diff":{"added":0}}]}
+  }]
+}
