@@ -28,7 +28,7 @@ struct ResponsePartView: View {
             SystemNotificationPartView(part: note)
         case .error(let error):
             ErrorResponsePartView(part: error)
-        case .inputRequest, .unknown:
+        case .attribution, .inputRequest, .unknown:
             EmptyView()
         }
     }

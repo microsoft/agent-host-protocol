@@ -1,0 +1,94 @@
+{
+  "name": "response-attribution-action",
+  "group": "A",
+  "description": "Attribution round-trips through a response-part action with source locations, overlapping spans, and optional metadata.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-chat:/c1",
+    "serverSeq": 12,
+    "action": {
+      "type": "chat/responsePart",
+      "turnId": "turn-1",
+      "part": {
+        "kind": "attribution",
+        "id": "attribution-1",
+        "targetPartId": "answer-1",
+        "sources": [
+          {
+            "id": "file",
+            "title": "History",
+            "uri": "file:///workspace/history.txt",
+            "contentType": "text/plain",
+            "excerpt": "Opened in 1984.",
+            "location": {
+              "kind": "text",
+              "range": { "start": { "line": 2, "character": 0 }, "end": { "line": 2, "character": 15 } }
+            },
+            "_meta": { "example.org/revision": "v1" }
+          },
+          {
+            "id": "document",
+            "title": "Uploaded guide",
+            "contentType": "application/pdf",
+            "location": { "kind": "page", "startPage": 4, "endPage": 5 }
+          }
+        ],
+        "spans": [
+          {
+            "range": { "start": { "line": 0, "character": 3 }, "end": { "line": 1, "character": 15 } },
+            "sourceIds": ["file"]
+          },
+          {
+            "range": { "start": { "line": 1, "character": 10 }, "end": { "line": 1, "character": 14 } },
+            "sourceIds": ["file", "document"]
+          }
+        ],
+        "_meta": { "example.org/attribution": { "version": 1 } }
+      }
+    }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-chat:/c1",
+    "serverSeq": 12,
+    "action": {
+      "type": "chat/responsePart",
+      "turnId": "turn-1",
+      "part": {
+        "kind": "attribution",
+        "id": "attribution-1",
+        "targetPartId": "answer-1",
+        "sources": [
+          {
+            "id": "file",
+            "title": "History",
+            "uri": "file:///workspace/history.txt",
+            "contentType": "text/plain",
+            "excerpt": "Opened in 1984.",
+            "location": {
+              "kind": "text",
+              "range": { "start": { "line": 2, "character": 0 }, "end": { "line": 2, "character": 15 } }
+            },
+            "_meta": { "example.org/revision": "v1" }
+          },
+          {
+            "id": "document",
+            "title": "Uploaded guide",
+            "contentType": "application/pdf",
+            "location": { "kind": "page", "startPage": 4, "endPage": 5 }
+          }
+        ],
+        "spans": [
+          {
+            "range": { "start": { "line": 0, "character": 3 }, "end": { "line": 1, "character": 15 } },
+            "sourceIds": ["file"]
+          },
+          {
+            "range": { "start": { "line": 1, "character": 10 }, "end": { "line": 1, "character": 14 } },
+            "sourceIds": ["file", "document"]
+          }
+        ],
+        "_meta": { "example.org/attribution": { "version": 1 } }
+      }
+    }
+  }]
+}

@@ -372,6 +372,7 @@ private fun updateResponsePart(
                 is ResponsePartToolCall -> toolCallIdOf(part.value.toolCall)
                 is ResponsePartMarkdown -> part.value.id
                 is ResponsePartReasoning -> part.value.id
+                is ResponsePartAttribution -> part.value.id
                 else -> null
             }
             if (id == partId) {

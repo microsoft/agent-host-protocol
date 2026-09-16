@@ -590,6 +590,7 @@ public static class Reducers
                 ToolCallResponsePart v => ToolCallId(v.ToolCall),
                 MarkdownResponsePart v => v.Id,
                 ReasoningResponsePart v => v.Id,
+                AttributionResponsePart v => v.Id,
                 _ => string.Empty,
             };
 

@@ -215,6 +215,19 @@ Ready. Other refinements, such as discovering the MCP customization that owns a
 server-executed tool, are allowed. Reducers ignore contributor changes that
 would violate this invariant.
 
+### Source attribution
+
+The host MAY append an [`AttributionResponsePart`](/reference/chat#attributionresponsepart)
+with `chat/responsePart` to identify sources supporting an earlier markdown or
+reasoning part in the same turn. The target must have finished streaming. The
+host sends attribution before ending the turn; it is retained in `responseParts`
+for snapshots, reconnection, and `fetchTurns`.
+
+Attribution is optional presentation data, not a search command or a permission
+to fetch a resource. Clients can ignore it and still render the answer. See
+[Source Attribution](/guide/attribution) for the required identifier, position,
+and fallback rules.
+
 ### Disposal
 
 A chat is implicitly disposed when its owning session is disposed. The protocol does not currently expose a `disposeChat` command; chats live for the life of their session unless the server prunes them. When a chat is removed (whether explicitly or because its session was torn down), the server MUST update the session's `chats` catalog via `session/chatRemoved` so subscribers can release their per-chat subscriptions.

@@ -1,0 +1,95 @@
+{
+  "description": "loading older turns preserves whole-answer attribution and distinct passages from the same URI",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/c1",
+    "title": "History",
+    "status": 1,
+    "modifiedAt": "2026-09-16T00:00:02.000Z",
+    "turnsNextCursor": "older",
+    "turns": [{
+      "id": "turn-2",
+      "message": { "text": "Thanks", "origin": { "kind": "user" } },
+      "responseParts": [],
+      "usage": null,
+      "state": "complete"
+    }]
+  },
+  "actions": [{
+    "type": "chat/turnsLoaded",
+    "turns": [{
+      "id": "turn-1",
+      "message": { "text": "Summarize the guide", "origin": { "kind": "user" } },
+      "responseParts": [
+        { "kind": "markdown", "id": "answer-1", "content": "The guide describes two buildings." },
+        {
+          "kind": "attribution",
+          "id": "attribution-1",
+          "targetPartId": "answer-1",
+          "sources": [
+            {
+              "id": "first",
+              "uri": "https://example.org/guide.pdf",
+              "excerpt": "The first building",
+              "location": { "kind": "page", "startPage": 1, "endPage": 2 }
+            },
+            {
+              "id": "second",
+              "uri": "https://example.org/guide.pdf",
+              "excerpt": "The second building",
+              "location": { "kind": "page", "startPage": 8, "endPage": 9 }
+            }
+          ],
+          "spans": []
+        }
+      ],
+      "usage": null,
+      "state": "complete"
+    }]
+  }],
+  "expected": {
+    "resource": "ahp-chat:/c1",
+    "title": "History",
+    "status": 1,
+    "modifiedAt": "2026-09-16T00:00:02.000Z",
+    "turnsNextCursor": null,
+    "turns": [
+      {
+        "id": "turn-1",
+        "message": { "text": "Summarize the guide", "origin": { "kind": "user" } },
+        "responseParts": [
+          { "kind": "markdown", "id": "answer-1", "content": "The guide describes two buildings." },
+          {
+            "kind": "attribution",
+            "id": "attribution-1",
+            "targetPartId": "answer-1",
+            "sources": [
+              {
+                "id": "first",
+                "uri": "https://example.org/guide.pdf",
+                "excerpt": "The first building",
+                "location": { "kind": "page", "startPage": 1, "endPage": 2 }
+              },
+              {
+                "id": "second",
+                "uri": "https://example.org/guide.pdf",
+                "excerpt": "The second building",
+                "location": { "kind": "page", "startPage": 8, "endPage": 9 }
+              }
+            ],
+            "spans": []
+          }
+        ],
+        "usage": null,
+        "state": "complete"
+      },
+      {
+        "id": "turn-2",
+        "message": { "text": "Thanks", "origin": { "kind": "user" } },
+        "responseParts": [],
+        "usage": null,
+        "state": "complete"
+      }
+    ]
+  }
+}

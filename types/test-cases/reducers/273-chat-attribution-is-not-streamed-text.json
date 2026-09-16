@@ -1,0 +1,60 @@
+{
+  "description": "text deltas never alter attribution while later answer parts keep streaming",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/c1",
+    "title": "Answer",
+    "status": 8,
+    "modifiedAt": "2026-09-16T00:00:00.000Z",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "2026-09-16T00:00:00.000Z",
+      "message": { "text": "Explain", "origin": { "kind": "user" } },
+      "responseParts": [
+        { "kind": "reasoning", "id": "reasoning-1", "content": "The reference agrees." },
+        {
+          "kind": "attribution",
+          "id": "attribution-1",
+          "targetPartId": "reasoning-1",
+          "sources": [{ "id": "reference", "title": "Uploaded reference" }],
+          "spans": []
+        },
+        { "kind": "markdown", "id": "answer-1", "content": "" }
+      ],
+      "usage": null
+    }
+  },
+  "actions": [
+    { "type": "chat/delta", "turnId": "turn-1", "partId": "attribution-1", "content": "not text" },
+    { "type": "chat/reasoning", "turnId": "turn-1", "partId": "attribution-1", "content": "not reasoning" },
+    { "type": "chat/delta", "turnId": "turn-1", "partId": "answer-1", "content": "Here is the answer." },
+    { "type": "chat/turnCancelled", "turnId": "turn-1", "duration": 1000 }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/c1",
+    "title": "Answer",
+    "status": 1,
+    "modifiedAt": "2026-09-16T00:00:01.000Z",
+    "activeTurn": null,
+    "turns": [{
+      "id": "turn-1",
+      "startedAt": "2026-09-16T00:00:00.000Z",
+      "duration": 1000,
+      "message": { "text": "Explain", "origin": { "kind": "user" } },
+      "responseParts": [
+        { "kind": "reasoning", "id": "reasoning-1", "content": "The reference agrees." },
+        {
+          "kind": "attribution",
+          "id": "attribution-1",
+          "targetPartId": "reasoning-1",
+          "sources": [{ "id": "reference", "title": "Uploaded reference" }],
+          "spans": []
+        },
+        { "kind": "markdown", "id": "answer-1", "content": "Here is the answer." }
+      ],
+      "usage": null,
+      "state": "cancelled"
+    }]
+  }
+}

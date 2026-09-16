@@ -94,6 +94,7 @@ extension ResponsePart {
         switch self {
         case .markdown(let m): return m.id
         case .reasoning(let r): return r.id
+        case .attribution(let a): return a.id
         case .toolCall(let t): return t.toolCall.toolCallId
         case .contentRef: return nil
         case .systemNotification: return nil

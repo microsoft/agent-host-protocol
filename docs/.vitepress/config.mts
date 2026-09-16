@@ -31,6 +31,7 @@ export default withMermaid(defineConfig({
           items: [
             { text: 'State Model', link: '/guide/state-model' },
             { text: 'Actions', link: '/guide/actions' },
+            { text: 'Source Attribution', link: '/guide/attribution' },
             { text: 'Elicitation', link: '/guide/elicitation' },
             { text: 'Terminals', link: '/guide/terminals' },
             { text: 'Customizations', link: '/guide/customizations' },

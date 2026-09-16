@@ -636,6 +636,7 @@ const STATE_ENUMS = [
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind',
   'ChatInputQuestionKind', 'ChatInputResponseKind', 'SessionInputRequestKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
+  'AttributionSourceLocationKind',
   'ToolCallConfirmationReason', 'ToolCallCancellationReason',
   'ToolCallRiskAssessmentKind', 'ToolCallRiskAssessmentStatus',
   'ConfirmationOptionKind',
@@ -714,6 +715,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SystemNotificationResponsePart' },
   { name: 'InputRequestResponsePart' },
   { name: 'ErrorResponsePart' },
+  { name: 'AttributionResponsePart' },
+  { name: 'AttributionSource' },
+  { name: 'AttributionSpan' },
+  { name: 'AttributionTextSourceLocation' },
+  { name: 'AttributionPageSourceLocation' },
   { name: 'ToolCallResult' },
   { name: 'ConfirmationOption' },
   { name: 'ToolCallRiskAssessmentLoadingState' },
@@ -817,6 +823,18 @@ const RESPONSE_PART_UNION: UnionConfig = {
     { variantName: 'SystemNotification', innerType: 'SystemNotificationResponsePart', wireValue: 'systemNotification' },
     { variantName: 'InputRequest', innerType: 'InputRequestResponsePart', wireValue: 'inputRequest' },
     { variantName: 'Error', innerType: 'ErrorResponsePart', wireValue: 'error' },
+    { variantName: 'Attribution', innerType: 'AttributionResponsePart', wireValue: 'attribution' },
+  ],
+  unknown: true,
+};
+
+const ATTRIBUTION_SOURCE_LOCATION_UNION: UnionConfig = {
+  name: 'AttributionSourceLocation',
+  discriminantField: 'kind',
+  doc: 'A location within a source supporting an attributed response.',
+  variants: [
+    { variantName: 'Text', innerType: 'AttributionTextSourceLocation', wireValue: 'text' },
+    { variantName: 'Page', innerType: 'AttributionPageSourceLocation', wireValue: 'page' },
   ],
   unknown: true,
 };
@@ -1384,7 +1402,7 @@ function generateStateFile(project: Project): string {
   lines.push(CUSTOMIZATION_ENABLEMENT_UNION_CS);
   lines.push('');
   for (const u of [
-    RESPONSE_PART_UNION, TOOL_CALL_STATE_UNION, TOOL_CALL_CONFIRMATION_STATE_UNION,
+    RESPONSE_PART_UNION, ATTRIBUTION_SOURCE_LOCATION_UNION, TOOL_CALL_STATE_UNION, TOOL_CALL_CONFIRMATION_STATE_UNION,
     TOOL_CALL_RISK_ASSESSMENT_UNION,
     TERMINAL_CLAIM_UNION, TERMINAL_CONTENT_PART_UNION,
     CHAT_INPUT_QUESTION_UNION, CHAT_INPUT_ANSWER_VALUE_UNION, CHAT_INPUT_ANSWER_UNION,
@@ -2552,7 +2570,7 @@ function checkExhaustiveness(project: Project): void {
 
   const knownSpecial = new Set<string>([
     'URI', 'JsonPrimitive', 'BaseParams', 'StringOrMarkdown', 'ToolCallState', 'StateAction',
-    'ActionEnvelope', 'ActionOrigin', 'ResponsePart', 'ToolResultContent',
+    'ActionEnvelope', 'ActionOrigin', 'ResponsePart', 'AttributionSourceLocation', 'ToolResultContent',
     'SessionToolCallApprovedAction', 'SessionToolCallDeniedAction',
     'SessionToolCallConfirmedAction', 'PingParams', 'TerminalClaim',
     'TerminalContentPart', 'MessageAttachment', 'MessageAttachmentBase',

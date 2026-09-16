@@ -1,0 +1,38 @@
+{
+  "name": "attribution-unknown-source-location",
+  "group": "A",
+  "description": "An unknown source-location kind is preserved without losing the rest of the attribution.",
+  "type": "StateAction",
+  "input": {
+    "type": "chat/responsePart",
+    "turnId": "turn-1",
+    "part": {
+      "kind": "attribution",
+      "id": "attribution-1",
+      "targetPartId": "answer-1",
+      "sources": [{
+        "id": "recording",
+        "title": "Recorded lecture",
+        "uri": "https://example.org/lecture",
+        "location": { "kind": "futureTimeRange", "startSeconds": 10, "endSeconds": 15 }
+      }],
+      "spans": []
+    }
+  },
+  "acceptableOutputs": [{
+    "type": "chat/responsePart",
+    "turnId": "turn-1",
+    "part": {
+      "kind": "attribution",
+      "id": "attribution-1",
+      "targetPartId": "answer-1",
+      "sources": [{
+        "id": "recording",
+        "title": "Recorded lecture",
+        "uri": "https://example.org/lecture",
+        "location": { "kind": "futureTimeRange", "startSeconds": 10, "endSeconds": 15 }
+      }],
+      "spans": []
+    }
+  }]
+}

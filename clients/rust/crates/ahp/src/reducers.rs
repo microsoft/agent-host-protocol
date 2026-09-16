@@ -639,6 +639,7 @@ where
             ResponsePart::ToolCall(tc) => Some(tool_call_id(&tc.tool_call).to_owned()),
             ResponsePart::Markdown(m) => Some(m.id.clone()),
             ResponsePart::Reasoning(r) => Some(r.id.clone()),
+            ResponsePart::Attribution(a) => Some(a.id.clone()),
             ResponsePart::Error(_)
             | ResponsePart::ContentRef(_)
             | ResponsePart::SystemNotification(_)

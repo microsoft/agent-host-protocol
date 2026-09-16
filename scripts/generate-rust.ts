@@ -757,6 +757,7 @@ const STATE_ENUMS = [
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
+  'AttributionSourceLocationKind',
   'ToolCallConfirmationReason', 'ToolCallRiskAssessmentKind',
   'ToolCallRiskAssessmentStatus',
   'ToolCallCancellationReason',
@@ -855,6 +856,11 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'SystemNotificationResponsePart', omitDiscriminants: true },
   { name: 'InputRequestResponsePart', omitDiscriminants: true },
   { name: 'ErrorResponsePart', omitDiscriminants: true },
+  { name: 'AttributionResponsePart', omitDiscriminants: true },
+  { name: 'AttributionSource' },
+  { name: 'AttributionSpan' },
+  { name: 'AttributionTextSourceLocation', omitDiscriminants: true },
+  { name: 'AttributionPageSourceLocation', omitDiscriminants: true },
   { name: 'ToolCallResult' },
   { name: 'ToolCallRiskAssessmentLoadingState', omitDiscriminants: true },
   { name: 'ToolCallRiskAssessmentCompleteState', omitDiscriminants: true },
@@ -958,6 +964,18 @@ const RESPONSE_PART_UNION: UnionConfig = {
     { variantName: 'SystemNotification', innerType: 'SystemNotificationResponsePart', wireValue: 'systemNotification' },
     { variantName: 'InputRequest', innerType: 'InputRequestResponsePart', wireValue: 'inputRequest' },
     { variantName: 'Error', innerType: 'ErrorResponsePart', wireValue: 'error' },
+    { variantName: 'Attribution', innerType: 'AttributionResponsePart', wireValue: 'attribution' },
+  ],
+  unknown: true,
+};
+
+const ATTRIBUTION_SOURCE_LOCATION_UNION: UnionConfig = {
+  name: 'AttributionSourceLocation',
+  discriminantField: 'kind',
+  doc: 'A location within a source supporting an attributed response.',
+  variants: [
+    { variantName: 'Text', innerType: 'AttributionTextSourceLocation', wireValue: 'text' },
+    { variantName: 'Page', innerType: 'AttributionPageSourceLocation', wireValue: 'page' },
   ],
   unknown: true,
 };
@@ -1358,6 +1376,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateChatOrigin(project));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, RESPONSE_PART_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, ATTRIBUTION_SOURCE_LOCATION_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, TOOL_CALL_STATE_UNION));
   lines.push('');
@@ -2196,6 +2216,7 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',
     'ActionOrigin',
     'ResponsePart',
+    'AttributionSourceLocation',
     'ToolResultContent',
     'SessionToolCallApprovedAction',
     'SessionToolCallDeniedAction',

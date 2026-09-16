@@ -219,6 +219,7 @@ const (
 	ResponsePartKindSystemNotification ResponsePartKind = "systemNotification"
 	ResponsePartKindInputRequest       ResponsePartKind = "inputRequest"
 	ResponsePartKindError              ResponsePartKind = "error"
+	ResponsePartKindAttribution        ResponsePartKind = "attribution"
 )
 
 // Status of a tool call in the lifecycle state machine.
@@ -235,6 +236,14 @@ const (
 	ToolCallStatusPendingResultConfirmation ToolCallStatus = "pending-result-confirmation"
 	ToolCallStatusCompleted                 ToolCallStatus = "completed"
 	ToolCallStatusCancelled                 ToolCallStatus = "cancelled"
+)
+
+// The kind of location within an attribution source.
+type AttributionSourceLocationKind string
+
+const (
+	AttributionSourceLocationKindText AttributionSourceLocationKind = "text"
+	AttributionSourceLocationKindPage AttributionSourceLocationKind = "page"
 )
 
 // How a tool call was confirmed for execution.
@@ -1992,6 +2001,82 @@ type ErrorResponsePart struct {
 	Error ErrorInfo `json:"error"`
 	// Whether the host can resume the turn from this error. Only `true` enables resume.
 	Resumable *bool `json:"resumable,omitempty"`
+}
+
+// Sources that support an earlier markdown or reasoning part in the same turn.
+//
+// The host appends this part with `chat/responsePart` after the target's last
+// text delta and before the turn ends. At most one attribution part may target
+// a given part. Neither the target text nor its attribution changes afterward,
+// including when the turn resumes; further output uses new part identifiers.
+//
+// Clients MAY show inline citations or a source list. Clients that do not
+// support attribution can ignore this part and still render the original text.
+type AttributionResponsePart struct {
+	// Discriminant
+	Kind ResponsePartKind `json:"kind"`
+	// Non-empty identifier, unique among response parts in this turn.
+	Id string `json:"id"`
+	// Identifier of the earlier MarkdownResponsePart or ReasoningResponsePart.
+	TargetPartId string `json:"targetPartId"`
+	// Supporting sources. MUST contain at least one entry, with distinct IDs.
+	Sources []AttributionSource `json:"sources"`
+	// Ranges of target text linked to sources. An empty list supplies sources for
+	// the target as a whole without claiming a more precise text-to-source mapping.
+	Spans []AttributionSpan `json:"spans"`
+	// Optional implementation-specific details; not needed to display attribution.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// A source, or a passage within a source, supporting an attributed response.
+//
+// A source need not be a public URL or a local file. Hosts SHOULD provide a
+// title when no URI is available and prefer versioned URIs when possible.
+// Two entries may share a URI when they describe different passages.
+type AttributionSource struct {
+	// Non-empty identifier, unique within the containing attribution part.
+	Id string `json:"id"`
+	// Human-readable source title, rendered as plain text.
+	Title *string `json:"title,omitempty"`
+	// Source URI. Its presence does not authorize opening or fetching the resource.
+	Uri *URI `json:"uri,omitempty"`
+	// MIME type of the source, when known.
+	ContentType *string `json:"contentType,omitempty"`
+	// Optional short quotation from the source, not a generated answer summary.
+	Excerpt *string `json:"excerpt,omitempty"`
+	// Location within the source, not within the generated response.
+	Location *AttributionSourceLocation `json:"location,omitempty"`
+	// Optional implementation-specific details; not needed to display the source.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// A non-empty range of generated text linked to supporting sources.
+//
+// Ranges address the target part's raw `content`, before Markdown rendering:
+// zero-based lines and UTF-16 code-unit character offsets, start inclusive and
+// end exclusive. CRLF, LF, and lone CR each count as one line break. Positions
+// MUST lie within the text and MUST NOT split a surrogate pair.
+type AttributionSpan struct {
+	// Range within the target part, not within any source or the combined turn.
+	Range TextRange `json:"range"`
+	// Non-empty, distinct IDs from the containing AttributionResponsePart.sources.
+	SourceIds []string `json:"sourceIds"`
+}
+
+// A range within a textual source, using the same position rules as AttributionSpan.
+type AttributionTextSourceLocation struct {
+	Kind AttributionSourceLocationKind `json:"kind"`
+	// Non-empty, start-inclusive, end-exclusive range within the source text.
+	Range TextRange `json:"range"`
+}
+
+// An inclusive range of pages within a document.
+type AttributionPageSourceLocation struct {
+	Kind AttributionSourceLocationKind `json:"kind"`
+	// First page, numbered from one.
+	StartPage int64 `json:"startPage"`
+	// Last page, inclusive. MUST be greater than or equal to startPage.
+	EndPage int64 `json:"endPage"`
 }
 
 // Tool execution result details, available after execution completes.
@@ -4216,6 +4301,7 @@ func (*ReasoningResponsePart) isResponsePart()          {}
 func (*SystemNotificationResponsePart) isResponsePart() {}
 func (*InputRequestResponsePart) isResponsePart()       {}
 func (*ErrorResponsePart) isResponsePart()              {}
+func (*AttributionResponsePart) isResponsePart()        {}
 
 // ResponsePartUnknown carries an unrecognized ResponsePart variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type ResponsePartUnknown struct {
@@ -4273,6 +4359,12 @@ func (u *ResponsePart) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		u.Value = &value
+	case "attribution":
+		var value AttributionResponsePart
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
 	default:
 		raw := make(json.RawMessage, len(data))
 		copy(raw, data)
@@ -4284,6 +4376,66 @@ func (u *ResponsePart) UnmarshalJSON(data []byte) error {
 // MarshalJSON encodes the active variant back to JSON.
 func (u ResponsePart) MarshalJSON() ([]byte, error) {
 	if unk, ok := u.Value.(*ResponsePartUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// AttributionSourceLocation identifies a passage within a supporting source.
+type AttributionSourceLocation struct {
+	Value isAttributionSourceLocation
+}
+
+// isAttributionSourceLocation is the marker interface implemented by every
+// concrete variant of AttributionSourceLocation.
+type isAttributionSourceLocation interface{ isAttributionSourceLocation() }
+
+func (*AttributionTextSourceLocation) isAttributionSourceLocation() {}
+func (*AttributionPageSourceLocation) isAttributionSourceLocation() {}
+
+// AttributionSourceLocationUnknown carries an unrecognized AttributionSourceLocation variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type AttributionSourceLocationUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*AttributionSourceLocationUnknown) isAttributionSourceLocation() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *AttributionSourceLocation) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "text":
+		var value AttributionTextSourceLocation
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "page":
+		var value AttributionPageSourceLocation
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &AttributionSourceLocationUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u AttributionSourceLocation) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*AttributionSourceLocationUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}

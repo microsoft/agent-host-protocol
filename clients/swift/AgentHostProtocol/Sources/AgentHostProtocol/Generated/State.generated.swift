@@ -394,6 +394,7 @@ public enum ResponsePartKind: Codable, Sendable, Equatable {
     case systemNotification
     case inputRequest
     case error
+    case attribution
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -408,6 +409,7 @@ public enum ResponsePartKind: Codable, Sendable, Equatable {
         case "systemNotification": self = .systemNotification
         case "inputRequest": self = .inputRequest
         case "error": self = .error
+        case "attribution": self = .attribution
         default: self = .unknown(raw)
         }
     }
@@ -422,6 +424,7 @@ public enum ResponsePartKind: Codable, Sendable, Equatable {
         case .systemNotification: try container.encode("systemNotification")
         case .inputRequest: try container.encode("inputRequest")
         case .error: try container.encode("error")
+        case .attribution: try container.encode("attribution")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -467,6 +470,33 @@ public enum ToolCallStatus: Codable, Sendable, Equatable {
         case .pendingResultConfirmation: try container.encode("pending-result-confirmation")
         case .completed: try container.encode("completed")
         case .cancelled: try container.encode("cancelled")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// The kind of location within an attribution source.
+public enum AttributionSourceLocationKind: Codable, Sendable, Equatable {
+    case text
+    case page
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "text": self = .text
+        case "page": self = .page
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .text: try container.encode("text")
+        case .page: try container.encode("page")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -3272,6 +3302,139 @@ public struct ErrorResponsePart: Codable, Sendable {
         self.kind = kind
         self.error = error
         self.resumable = resumable
+    }
+}
+
+public struct AttributionResponsePart: Codable, Sendable {
+    /// Discriminant
+    public var kind: ResponsePartKind
+    /// Non-empty identifier, unique among response parts in this turn.
+    public var id: String
+    /// Identifier of the earlier MarkdownResponsePart or ReasoningResponsePart.
+    public var targetPartId: String
+    /// Supporting sources. MUST contain at least one entry, with distinct IDs.
+    public var sources: [AttributionSource]
+    /// Ranges of target text linked to sources. An empty list supplies sources for
+    /// the target as a whole without claiming a more precise text-to-source mapping.
+    public var spans: [AttributionSpan]
+    /// Optional implementation-specific details; not needed to display attribution.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case kind
+        case id
+        case targetPartId
+        case sources
+        case spans
+        case meta = "_meta"
+    }
+
+    public init(
+        kind: ResponsePartKind,
+        id: String,
+        targetPartId: String,
+        sources: [AttributionSource],
+        spans: [AttributionSpan],
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.kind = kind
+        self.id = id
+        self.targetPartId = targetPartId
+        self.sources = sources
+        self.spans = spans
+        self.meta = meta
+    }
+}
+
+public struct AttributionSource: Codable, Sendable {
+    /// Non-empty identifier, unique within the containing attribution part.
+    public var id: String
+    /// Human-readable source title, rendered as plain text.
+    public var title: String?
+    /// Source URI. Its presence does not authorize opening or fetching the resource.
+    public var uri: String?
+    /// MIME type of the source, when known.
+    public var contentType: String?
+    /// Optional short quotation from the source, not a generated answer summary.
+    public var excerpt: String?
+    /// Location within the source, not within the generated response.
+    public var location: AttributionSourceLocation?
+    /// Optional implementation-specific details; not needed to display the source.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case uri
+        case contentType
+        case excerpt
+        case location
+        case meta = "_meta"
+    }
+
+    public init(
+        id: String,
+        title: String? = nil,
+        uri: String? = nil,
+        contentType: String? = nil,
+        excerpt: String? = nil,
+        location: AttributionSourceLocation? = nil,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.uri = uri
+        self.contentType = contentType
+        self.excerpt = excerpt
+        self.location = location
+        self.meta = meta
+    }
+}
+
+public struct AttributionSpan: Codable, Sendable {
+    /// Range within the target part, not within any source or the combined turn.
+    public var range: TextRange
+    /// Non-empty, distinct IDs from the containing AttributionResponsePart.sources.
+    public var sourceIds: [String]
+
+    public init(
+        range: TextRange,
+        sourceIds: [String]
+    ) {
+        self.range = range
+        self.sourceIds = sourceIds
+    }
+}
+
+public struct AttributionTextSourceLocation: Codable, Sendable {
+    public var kind: AttributionSourceLocationKind
+    /// Non-empty, start-inclusive, end-exclusive range within the source text.
+    public var range: TextRange
+
+    public init(
+        kind: AttributionSourceLocationKind,
+        range: TextRange
+    ) {
+        self.kind = kind
+        self.range = range
+    }
+}
+
+public struct AttributionPageSourceLocation: Codable, Sendable {
+    public var kind: AttributionSourceLocationKind
+    /// First page, numbered from one.
+    public var startPage: Int
+    /// Last page, inclusive. MUST be greater than or equal to startPage.
+    public var endPage: Int
+
+    public init(
+        kind: AttributionSourceLocationKind,
+        startPage: Int,
+        endPage: Int
+    ) {
+        self.kind = kind
+        self.startPage = startPage
+        self.endPage = endPage
     }
 }
 
@@ -6803,6 +6966,7 @@ public enum ResponsePart: Codable, Sendable {
     case systemNotification(SystemNotificationResponsePart)
     case inputRequest(InputRequestResponsePart)
     case error(ErrorResponsePart)
+    case attribution(AttributionResponsePart)
     /// Unknown or future discriminant; the raw payload is preserved
     /// and re-encoded verbatim for forward-compatibility.
     case unknown(AnyCodable)
@@ -6832,6 +6996,8 @@ public enum ResponsePart: Codable, Sendable {
             self = .inputRequest(try InputRequestResponsePart(from: decoder))
         case "error":
             self = .error(try ErrorResponsePart(from: decoder))
+        case "attribution":
+            self = .attribution(try AttributionResponsePart(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -6846,6 +7012,43 @@ public enum ResponsePart: Codable, Sendable {
         case .systemNotification(let value): try value.encode(to: encoder)
         case .inputRequest(let value): try value.encode(to: encoder)
         case .error(let value): try value.encode(to: encoder)
+        case .attribution(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum AttributionSourceLocation: Codable, Sendable {
+    case text(AttributionTextSourceLocation)
+    case page(AttributionPageSourceLocation)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "text":
+            self = .text(try AttributionTextSourceLocation(from: decoder))
+        case "page":
+            self = .page(try AttributionPageSourceLocation(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .text(let value): try value.encode(to: encoder)
+        case .page(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

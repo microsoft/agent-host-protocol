@@ -969,6 +969,7 @@ const STATE_ENUMS = [
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
+  'AttributionSourceLocationKind',
   'ToolCallConfirmationReason', 'ToolCallRiskAssessmentKind',
   'ToolCallRiskAssessmentStatus',
   'ToolCallCancellationReason', 'ConfirmationOptionKind',
@@ -1009,6 +1010,8 @@ const STATE_STRUCTS = [
   'ResourceResponsePart', 'ToolCallResponsePart', 'ReasoningResponsePart',
   'SystemNotificationResponsePart', 'InputRequestResponsePart',
   'ErrorResponsePart',
+  'AttributionResponsePart', 'AttributionSource', 'AttributionSpan',
+  'AttributionTextSourceLocation', 'AttributionPageSourceLocation',
   'ToolCallResult', 'ToolCallStreamingState',
   'ToolCallPendingConfirmationState', 'ToolCallRunningState', 'ToolCallAuthRequiredState',
   'ToolCallPendingResultConfirmationState', 'ToolCallCompletedState',
@@ -1061,6 +1064,17 @@ const RESPONSE_PART_UNION: UnionConfig = {
     { caseName: 'SystemNotification', structName: 'SystemNotificationResponsePart', discriminantValue: 'systemNotification' },
     { caseName: 'InputRequest', structName: 'InputRequestResponsePart', discriminantValue: 'inputRequest' },
     { caseName: 'Error', structName: 'ErrorResponsePart', discriminantValue: 'error' },
+    { caseName: 'Attribution', structName: 'AttributionResponsePart', discriminantValue: 'attribution' },
+  ],
+  unknown: true,
+};
+
+const ATTRIBUTION_SOURCE_LOCATION_UNION: UnionConfig = {
+  name: 'AttributionSourceLocation',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Text', structName: 'AttributionTextSourceLocation', discriminantValue: 'text' },
+    { caseName: 'Page', structName: 'AttributionPageSourceLocation', discriminantValue: 'page' },
   ],
   unknown: true,
 };
@@ -1413,6 +1427,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateChatOriginKotlin());
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, RESPONSE_PART_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, ATTRIBUTION_SOURCE_LOCATION_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, TOOL_CALL_STATE_UNION));
   lines.push('');
@@ -2325,6 +2341,7 @@ function checkExhaustiveness(project: Project): void {
     'ActionEnvelope',               // generateDataClassFromInterface() call in generateActionsFile()
     'ActionOrigin',                 // generateDataClassFromInterface() call in generateActionsFile()
     'ResponsePart',                 // RESPONSE_PART_UNION discriminated union
+    'AttributionSourceLocation',
     'ToolResultContent',            // generateToolResultContentUnion()
     'SessionToolCallApprovedAction', // merged into SessionToolCallConfirmedAction
     'SessionToolCallDeniedAction',   // merged into SessionToolCallConfirmedAction

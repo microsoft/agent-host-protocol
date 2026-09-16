@@ -1,0 +1,105 @@
+{
+  "description": "attribution survives an error and resume while further output uses a new text part",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/c1",
+    "title": "History",
+    "status": 8,
+    "modifiedAt": "2026-09-16T00:00:00.000Z",
+    "turns": [],
+    "activeTurn": {
+      "id": "turn-1",
+      "startedAt": "2026-09-16T00:00:00.000Z",
+      "message": { "text": "Explain the history", "origin": { "kind": "user" } },
+      "responseParts": [
+        { "kind": "markdown", "id": "answer-1", "content": "The library opened in 1984." }
+      ],
+      "usage": null
+    }
+  },
+  "actions": [
+    {
+      "type": "chat/responsePart",
+      "turnId": "turn-1",
+      "part": {
+        "kind": "attribution",
+        "id": "attribution-1",
+        "targetPartId": "answer-1",
+        "sources": [{ "id": "history", "uri": "https://example.org/history" }],
+        "spans": []
+      }
+    },
+    {
+      "type": "chat/error",
+      "turnId": "turn-1",
+      "duration": 1000,
+      "part": {
+        "kind": "error",
+        "error": { "errorType": "runtime", "message": "Connection interrupted" },
+        "resumable": true
+      }
+    },
+    { "type": "chat/turnResume", "turnId": "turn-1" },
+    {
+      "type": "chat/responsePart",
+      "turnId": "turn-1",
+      "part": { "kind": "markdown", "id": "answer-2", "content": "" }
+    },
+    {
+      "type": "chat/delta",
+      "turnId": "turn-1",
+      "partId": "answer-2",
+      "content": "It expanded in 2001."
+    },
+    {
+      "type": "chat/responsePart",
+      "turnId": "turn-1",
+      "part": {
+        "kind": "attribution",
+        "id": "attribution-2",
+        "targetPartId": "answer-2",
+        "sources": [{ "id": "history", "uri": "https://example.org/expansion" }],
+        "spans": []
+      }
+    },
+    { "type": "chat/turnComplete", "turnId": "turn-1", "duration": 2000 }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/c1",
+    "title": "History",
+    "status": 1,
+    "modifiedAt": "2026-09-16T00:00:02.000Z",
+    "activeTurn": null,
+    "turns": [{
+      "id": "turn-1",
+      "startedAt": "2026-09-16T00:00:00.000Z",
+      "duration": 2000,
+      "message": { "text": "Explain the history", "origin": { "kind": "user" } },
+      "responseParts": [
+        { "kind": "markdown", "id": "answer-1", "content": "The library opened in 1984." },
+        {
+          "kind": "attribution",
+          "id": "attribution-1",
+          "targetPartId": "answer-1",
+          "sources": [{ "id": "history", "uri": "https://example.org/history" }],
+          "spans": []
+        },
+        {
+          "kind": "error",
+          "error": { "errorType": "runtime", "message": "Connection interrupted" },
+          "resumable": true
+        },
+        { "kind": "markdown", "id": "answer-2", "content": "It expanded in 2001." },
+        {
+          "kind": "attribution",
+          "id": "attribution-2",
+          "targetPartId": "answer-2",
+          "sources": [{ "id": "history", "uri": "https://example.org/expansion" }],
+          "spans": []
+        }
+      ],
+      "usage": null,
+      "state": "complete"
+    }]
+  }
+}
