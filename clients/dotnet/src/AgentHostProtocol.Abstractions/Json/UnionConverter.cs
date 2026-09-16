@@ -65,6 +65,7 @@ public abstract class UnionConverter<T> : JsonConverter<T>
         {
             JsonTypeInfo typeInfo = options.GetTypeInfo(variantType);
             result.Value = JsonSerializer.Deserialize(root, typeInfo);
+            result.Discriminator = disc;
         }
         else if (_allowUnknown)
         {
@@ -97,9 +98,60 @@ public abstract class UnionConverter<T> : JsonConverter<T>
             return;
         }
 
-        // Serialize by the runtime type so every property (including the
-        // variant's own discriminator field) is written.
         JsonTypeInfo typeInfo = options.GetTypeInfo(inner.GetType());
-        JsonSerializer.Serialize(writer, inner, typeInfo);
+        JsonElement serialized = JsonSerializer.SerializeToElement(inner, typeInfo);
+        if (serialized.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException(
+                $"{typeof(T).Name} variant '{inner.GetType().Name}' must serialize as an object");
+        }
+
+        string? wireValue = null;
+        if (serialized.TryGetProperty(_discriminator, out JsonElement serializedDiscriminator)
+            && serializedDiscriminator.ValueKind == JsonValueKind.String)
+        {
+            wireValue = serializedDiscriminator.GetString();
+        }
+
+        wireValue ??= value?.Discriminator;
+        if (wireValue is not null
+            && (!_variants.TryGetValue(wireValue, out Type? storedType)
+                || storedType != inner.GetType()))
+        {
+            wireValue = null;
+        }
+
+        foreach (KeyValuePair<string, Type> variant in _variants)
+        {
+            if (wireValue is not null)
+            {
+                break;
+            }
+
+            if (variant.Value == inner.GetType())
+            {
+                wireValue = variant.Key;
+                break;
+            }
+        }
+
+        if (wireValue is null)
+        {
+            throw new JsonException(
+                $"Unknown {typeof(T).Name} variant type '{inner.GetType().Name}'");
+        }
+
+        writer.WriteStartObject();
+        writer.WriteString(_discriminator, wireValue);
+        foreach (JsonProperty property in serialized.EnumerateObject())
+        {
+            if (property.NameEquals(_discriminator))
+            {
+                continue;
+            }
+
+            property.WriteTo(writer);
+        }
+        writer.WriteEndObject();
     }
 }

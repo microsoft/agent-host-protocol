@@ -153,6 +153,8 @@ func TestFixtureDrivenReducerParity(t *testing.T) {
 				runFixture[ahptypes.AnnotationsState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAnnotations)
 			case "resourceWatch":
 				runFixture[ahptypes.ResourceWatchState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToResourceWatch)
+			case "canvas":
+				runFixture[ahptypes.CanvasState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToCanvas)
 			case "automation":
 				runFixture[ahptypes.AutomationState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAutomation)
 			case "automationRun":
@@ -192,7 +194,11 @@ func runFixture[T any](t *testing.T, initial, expected json.RawMessage, actions 
 	}
 
 	actual := stripNulls(reMarshal(t, &state))
-	want := stripNulls(parseJSON(t, expected))
+	var expectedState T
+	if err := json.Unmarshal(expected, &expectedState); err != nil {
+		t.Fatalf("decode expected state: %v", err)
+	}
+	want := stripNulls(reMarshal(t, &expectedState))
 	if !reflect.DeepEqual(actual, want) {
 		t.Fatalf("state mismatch:\nactual:   %s\nexpected: %s",
 			mustPretty(actual), mustPretty(want))

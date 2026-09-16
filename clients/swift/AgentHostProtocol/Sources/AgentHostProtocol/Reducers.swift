@@ -709,6 +709,28 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         }
         return next
 
+    case .sessionCanvasSet(let a):
+        var next = state
+        var canvases = next.canvases ?? []
+        if let idx = canvases.firstIndex(where: { $0.resource == a.canvas.resource }) {
+            guard a.canvas.revision > canvases[idx].revision else { return state }
+            canvases[idx] = a.canvas
+        } else {
+            canvases.append(a.canvas)
+        }
+        next.canvases = canvases
+        return next
+
+    case .sessionCanvasRemoved(let a):
+        guard var canvases = state.canvases,
+              let idx = canvases.firstIndex(where: { $0.resource == a.resource }) else {
+            return state
+        }
+        canvases.remove(at: idx)
+        var next = state
+        next.canvases = canvases
+        return next
+
     case .sessionChatRemoved(let a):
         guard let idx = state.chats.firstIndex(where: { $0.resource == a.chat }) else {
             return state
@@ -1489,6 +1511,36 @@ public func resourceWatchReducer(state: ResourceWatchState, action: StateAction)
     default:
         return state
     }
+}
+
+/// Pure reducer for canvas state. Rejects stale or duplicate revisions.
+public func canvasReducer(state: CanvasState, action: StateAction) -> CanvasState {
+    var next = state
+    switch action {
+    case .canvasAvailabilityChanged(let value):
+        guard value.revision > state.revision else { return state }
+        next.availability = value.availability
+        next.revision = value.revision
+    case .canvasTrustChanged(let value):
+        guard value.revision > state.revision else { return state }
+        next.trust = value.trust
+        next.revision = value.revision
+    case .canvasIncarnationChanged(let value):
+        guard value.revision > state.revision else { return state }
+        next.identity.incarnation = value.incarnation
+        next.revision = value.revision
+    case .canvasTitleChanged(let value):
+        guard value.revision > state.revision else { return state }
+        next.title = value.title
+        next.revision = value.revision
+    case .canvasIconChanged(let value):
+        guard value.revision > state.revision else { return state }
+        next.icon = value.icon
+        next.revision = value.revision
+    default:
+        return state
+    }
+    return next
 }
 
 /// Pure reducer for automation catalogue state.

@@ -1,0 +1,41 @@
+{
+  "description": "canvas/iconChanged rejects an icon replacement whose revision is not strictly greater",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "icon": { "src": "https://example.com/current.png" },
+    "trust": { "status": "trusted" },
+    "availability": { "status": "empty" },
+    "revision": 5
+  },
+  "actions": [
+    {
+      "type": "canvas/iconChanged",
+      "icon": { "src": "https://example.com/stale.png" },
+      "revision": 5
+    }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "icon": { "src": "https://example.com/current.png" },
+    "trust": { "status": "trusted" },
+    "availability": { "status": "empty" },
+    "revision": 5
+  }
+}

@@ -6,6 +6,7 @@ package ahptypes
 
 import (
 	"encoding/json"
+	"errors"
 )
 
 // Reference the encoding/json import to keep gofmt -d from
@@ -115,6 +116,13 @@ const (
 	ActionTypeAutomationRunSessionRemoved        ActionType = "automationRun/sessionRemoved"
 	ActionTypeAutomationRunPrimarySessionChanged ActionType = "automationRun/primarySessionChanged"
 	ActionTypeAutomationRunCancelRequested       ActionType = "automationRun/cancelRequested"
+	ActionTypeSessionCanvasSet                   ActionType = "session/canvasSet"
+	ActionTypeSessionCanvasRemoved               ActionType = "session/canvasRemoved"
+	ActionTypeCanvasAvailabilityChanged          ActionType = "canvas/availabilityChanged"
+	ActionTypeCanvasTrustChanged                 ActionType = "canvas/trustChanged"
+	ActionTypeCanvasIncarnationChanged           ActionType = "canvas/incarnationChanged"
+	ActionTypeCanvasTitleChanged                 ActionType = "canvas/titleChanged"
+	ActionTypeCanvasIconChanged                  ActionType = "canvas/iconChanged"
 )
 
 // ─── Action Envelope ─────────────────────────────────────────────────
@@ -1651,6 +1659,128 @@ type AutomationRunCancelRequestedAction struct {
 	Type ActionType `json:"type"`
 }
 
+// A canvas was admitted (opened) or its catalog entry changed.
+//
+// Upsert semantics keyed by {@link CanvasEntry.resource | `resource`}: the
+// server dispatches this with the full entry to record a newly opened
+// canvas, or to republish it after a trust/availability/incarnation change
+// so subscribers following only the session channel stay in sync with
+// {@link CanvasState}. Never client-dispatchable: admission is through
+// `openCanvas` or host publication of a correlated, already-open native
+// instance under that command's admission rules. Both paths MUST use the
+// same singular identity-to-resource binding; repeated native observations
+// MUST NOT create a second entry. A stale/out-of-order delivery
+// (`canvas.revision` not strictly greater than the currently-recorded entry's
+// revision) MUST be rejected (no-op) rather than overwrite a newer entry with
+// older data.
+type SessionCanvasSetAction struct {
+	Type ActionType `json:"type"`
+	// The canvas entry to add or update, matched by `resource`.
+	Canvas CanvasEntry `json:"canvas"`
+}
+
+// A canvas was logically closed.
+//
+// Remove semantics keyed by `resource`: an unknown URI is a no-op. This
+// represents durable membership removal, not a client hiding a local
+// tab/view — see `closeCanvas`.
+type SessionCanvasRemovedAction struct {
+	Type ActionType `json:"type"`
+	// Entry in {@link SessionState.canvases} to remove, matching {@link CanvasEntry.resource}.
+	Resource URI `json:"resource"`
+}
+
+// Replaces the canvas's live resolution state.
+//
+// Dispatched by the host on every availability transition, including
+// initial resolution after admission by `openCanvas` or a correlated native
+// open, provider restart, and endpoint failure/recovery. A client-local page
+// reload or transient presentation credential renewal alone does not require
+// this action or a revision change.
+type CanvasAvailabilityChangedAction struct {
+	Type ActionType `json:"type"`
+	// New {@link CanvasState.availability}.
+	Availability CanvasAvailabilityState `json:"availability"`
+	// The {@link CanvasState.revision} this action results in. The reducer
+	// MUST reject (no-op) this action if `revision` is not strictly greater
+	// than the canvas's current `revision` — this is how stale/out-of-order
+	// deliveries are consistently rejected across every canvas action, not
+	// just this one.
+	Revision int64 `json:"revision"`
+}
+
+// Replaces the canvas's trust decision.
+//
+// Dispatched by the host whenever the execution-trust decision for this
+// canvas's declared actions changes (e.g. a pending decision resolves, or an
+// administrator revokes a previously trusted source).
+type CanvasTrustChangedAction struct {
+	Type ActionType `json:"type"`
+	// New {@link CanvasState.trust}.
+	Trust CanvasTrustState `json:"trust"`
+	// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+	Revision int64 `json:"revision"`
+}
+
+// Records that the canvas's live endpoint was replaced by a fresh one for
+// the same logical instance (e.g. the owning provider restarted).
+//
+// Renewing transient presentation credentials for the same live endpoint is
+// not endpoint replacement and MUST NOT trigger this action.
+//
+// The host MUST dispatch {@link CanvasAvailabilityChangedAction} to
+// transition through `notLoaded`/`loading` around this change. Receivers
+// MUST reject in-flight `invokeCanvasAction` replies and stale server-pushed
+// callbacks addressed to a superseded `incarnation` — because `incarnation`
+// is opaque (see {@link CanvasIdentity.incarnation}), that rejection is
+// driven by the accompanying `revision` bump here, not by comparing
+// `incarnation` values for order.
+type CanvasIncarnationChangedAction struct {
+	Type ActionType `json:"type"`
+	// New {@link CanvasIdentity.incarnation}. MUST differ from the previous value and MUST NOT be reused for this logical identity.
+	Incarnation string `json:"incarnation"`
+	// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+	Revision int64 `json:"revision"`
+}
+
+// Replaces the canvas's display title.
+type CanvasTitleChangedAction struct {
+	Type ActionType `json:"type"`
+	// New {@link CanvasState.title}.
+	Title string `json:"title"`
+	// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+	Revision int64 `json:"revision"`
+}
+
+// Replaces or removes the canvas's display icon.
+//
+// This is presentation metadata only. It does not replace the live endpoint,
+// change the canvas incarnation, or replay any canvas effect.
+type CanvasIconChangedAction struct {
+	Type ActionType `json:"type"`
+	// New {@link CanvasState.icon}; `null` removes the current icon.
+	Icon *Icon `json:"icon"`
+	// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+	Revision int64 `json:"revision"`
+}
+
+func (v *CanvasIconChangedAction) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if _, ok := fields["icon"]; !ok {
+		return errors.New("CanvasIconChangedAction: missing required field \"icon\"")
+	}
+	if raw, ok := fields["revision"]; !ok {
+		return errors.New("CanvasIconChangedAction: missing required field \"revision\"")
+	} else if string(raw) == "null" {
+		return errors.New("CanvasIconChangedAction: required field \"revision\" cannot be null")
+	}
+	type alias CanvasIconChangedAction
+	return json.Unmarshal(data, (*alias)(v))
+}
+
 // ─── StateAction Union ───────────────────────────────────────────────
 
 // StateAction is the discriminated union of every state action.
@@ -1758,6 +1888,13 @@ func (*AutomationRunSessionSetAction) isStateAction()            {}
 func (*AutomationRunSessionRemovedAction) isStateAction()        {}
 func (*AutomationRunPrimarySessionChangedAction) isStateAction() {}
 func (*AutomationRunCancelRequestedAction) isStateAction()       {}
+func (*SessionCanvasSetAction) isStateAction()                   {}
+func (*SessionCanvasRemovedAction) isStateAction()               {}
+func (*CanvasAvailabilityChangedAction) isStateAction()          {}
+func (*CanvasTrustChangedAction) isStateAction()                 {}
+func (*CanvasIncarnationChangedAction) isStateAction()           {}
+func (*CanvasTitleChangedAction) isStateAction()                 {}
+func (*CanvasIconChangedAction) isStateAction()                  {}
 
 // StateActionUnknown carries an unrecognized StateAction variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
 type StateActionUnknown struct {
@@ -2345,6 +2482,48 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "automationRun/cancelRequested":
 		var value AutomationRunCancelRequestedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/canvasSet":
+		var value SessionCanvasSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "session/canvasRemoved":
+		var value SessionCanvasRemovedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/availabilityChanged":
+		var value CanvasAvailabilityChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/trustChanged":
+		var value CanvasTrustChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/incarnationChanged":
+		var value CanvasIncarnationChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/titleChanged":
+		var value CanvasTitleChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "canvas/iconChanged":
+		var value CanvasIconChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}
