@@ -1,0 +1,36 @@
+{
+  "description": "canvas reducer rejects (no-ops) an action whose asserted revision is not strictly greater than the current revision",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-2"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "ready", "actions": [] },
+    "revision": 5
+  },
+  "actions": [
+    { "type": "canvas/titleChanged", "title": "Stale duplicate title", "revision": 5 },
+    { "type": "canvas/incarnationChanged", "incarnation": "gen-1", "revision": 3 }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-2"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "ready", "actions": [] },
+    "revision": 5
+  }
+}

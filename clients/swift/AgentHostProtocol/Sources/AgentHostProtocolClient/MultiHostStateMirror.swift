@@ -52,6 +52,7 @@ public actor MultiHostStateMirror {
     public private(set) var automationCatalogs: [HostId: AutomationState] = [:]
     public private(set) var automations: [HostedResourceKey: AutomationEntry] = [:]
     public private(set) var automationRuns: [HostedResourceKey: AutomationRunState] = [:]
+    public private(set) var canvases: [HostedResourceKey: CanvasState] = [:]
 
     public init() {}
 
@@ -118,6 +119,10 @@ public actor MultiHostStateMirror {
             automationRuns[key] = run
             return
         }
+        if let canvas = canvases[key] {
+            canvases[key] = canvasReducer(state: canvas, action: action)
+            return
+        }
         // No state for this `(host, channel)` yet — the reducer can't
         // initialise one; only `applySnapshot(host:snapshot:)` can.
     }
@@ -145,6 +150,8 @@ public actor MultiHostStateMirror {
             setAutomationCatalog(host: host, catalog: state)
         case .automationRun(let state):
             automationRuns[key] = state
+        case .canvas(let state):
+            canvases[key] = state
         }
     }
 
@@ -160,6 +167,7 @@ public actor MultiHostStateMirror {
         automationCatalogs.removeValue(forKey: host)
         automations = automations.filter { $0.key.hostId != host }
         automationRuns = automationRuns.filter { $0.key.hostId != host }
+        canvases = canvases.filter { $0.key.hostId != host }
     }
 
     /// Reset every host's state.
@@ -174,6 +182,7 @@ public actor MultiHostStateMirror {
         automationCatalogs.removeAll()
         automations.removeAll()
         automationRuns.removeAll()
+        canvases.removeAll()
     }
 
     private func setAutomationCatalog(host: HostId, catalog: AutomationState) {

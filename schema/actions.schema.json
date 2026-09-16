@@ -351,6 +351,40 @@
         "type"
       ]
     },
+    "SessionCanvasSetAction": {
+      "type": "object",
+      "description": "A canvas was admitted (opened) or its catalog entry changed.\n\nUpsert semantics keyed by {@link CanvasEntry.resource | `resource`}: the\nserver dispatches this with the full entry to record a newly opened\ncanvas, or to republish it after a trust/availability/incarnation change\nso subscribers following only the session channel stay in sync with\n{@link CanvasState}. Never client-dispatchable — canvases are admitted\nonly through the `openCanvas` command. A stale/out-of-order delivery\n(`canvas.revision` not strictly greater than the currently-recorded\nentry's revision) MUST be rejected (no-op) rather than overwrite a newer\nentry with older data.",
+      "properties": {
+        "type": {
+          "const": "session/canvasSet"
+        },
+        "canvas": {
+          "$ref": "#/$defs/CanvasEntry",
+          "description": "The canvas entry to add or update, matched by `resource`."
+        }
+      },
+      "required": [
+        "type",
+        "canvas"
+      ]
+    },
+    "SessionCanvasRemovedAction": {
+      "type": "object",
+      "description": "A canvas was logically closed.\n\nRemove semantics keyed by `resource`: an unknown URI is a no-op. This\nrepresents durable membership removal, not a client hiding a local\ntab/view — see `closeCanvas`.",
+      "properties": {
+        "type": {
+          "const": "session/canvasRemoved"
+        },
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Entry in {@link SessionState.canvases} to remove, matching {@link CanvasEntry.resource}."
+        }
+      },
+      "required": [
+        "type",
+        "resource"
+      ]
+    },
     "SessionServerToolsChangedAction": {
       "type": "object",
       "description": "Server tools for this session have changed.\n\nFull-replacement semantics: the `tools` array replaces the previous `serverTools` entirely.",
@@ -2316,6 +2350,94 @@
         "type"
       ]
     },
+    "CanvasAvailabilityChangedAction": {
+      "type": "object",
+      "description": "Replaces the canvas's live resolution state.\n\nDispatched by the host on every availability transition: initial\nresolution after `openCanvas`, provider restart, reload, and failure.",
+      "properties": {
+        "type": {
+          "const": "canvas/availabilityChanged"
+        },
+        "availability": {
+          "$ref": "#/$defs/CanvasAvailabilityState",
+          "description": "New {@link CanvasState.availability}."
+        },
+        "revision": {
+          "type": "number",
+          "description": "The {@link CanvasState.revision} this action results in. The reducer\nMUST reject (no-op) this action if `revision` is not strictly greater\nthan the canvas's current `revision` — this is how stale/out-of-order\ndeliveries are consistently rejected across every canvas action, not\njust this one."
+        }
+      },
+      "required": [
+        "type",
+        "availability",
+        "revision"
+      ]
+    },
+    "CanvasTrustChangedAction": {
+      "type": "object",
+      "description": "Replaces the canvas's trust decision.\n\nDispatched by the host whenever the execution-trust decision for this\ncanvas's declared actions changes (e.g. a pending decision resolves, or an\nadministrator revokes a previously trusted source).",
+      "properties": {
+        "type": {
+          "const": "canvas/trustChanged"
+        },
+        "trust": {
+          "$ref": "#/$defs/CanvasTrustState",
+          "description": "New {@link CanvasState.trust}."
+        },
+        "revision": {
+          "type": "number",
+          "description": "The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}."
+        }
+      },
+      "required": [
+        "type",
+        "trust",
+        "revision"
+      ]
+    },
+    "CanvasIncarnationChangedAction": {
+      "type": "object",
+      "description": "Records that the canvas's live endpoint was replaced by a fresh one for\nthe same logical instance (e.g. the owning provider restarted).\n\nThe host MUST dispatch {@link CanvasAvailabilityChangedAction} to\ntransition through `notLoaded`/`loading` around this change. Receivers\nMUST reject in-flight `invokeCanvasAction` replies and stale server-pushed\ncallbacks addressed to a superseded `incarnation` — because `incarnation`\nis opaque (see {@link CanvasIdentity.incarnation}), that rejection is\ndriven by the accompanying `revision` bump here, not by comparing\n`incarnation` values for order.",
+      "properties": {
+        "type": {
+          "const": "canvas/incarnationChanged"
+        },
+        "incarnation": {
+          "type": "string",
+          "description": "New {@link CanvasIdentity.incarnation}. MUST differ from the previous value and MUST NOT be reused for this logical identity."
+        },
+        "revision": {
+          "type": "number",
+          "description": "The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}."
+        }
+      },
+      "required": [
+        "type",
+        "incarnation",
+        "revision"
+      ]
+    },
+    "CanvasTitleChangedAction": {
+      "type": "object",
+      "description": "Replaces the canvas's display title.",
+      "properties": {
+        "type": {
+          "const": "canvas/titleChanged"
+        },
+        "title": {
+          "type": "string",
+          "description": "New {@link CanvasState.title}."
+        },
+        "revision": {
+          "type": "number",
+          "description": "The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}."
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "revision"
+      ]
+    },
     "ChatToolCallConfirmedAction": {
       "oneOf": [
         {
@@ -2840,6 +2962,9 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/CanvasState"
             }
           ],
           "description": "The current state of the resource"
@@ -3228,6 +3353,13 @@
             "$ref": "#/$defs/Changeset"
           },
           "description": "Catalogue of changesets the server can produce for this session. Each\nentry advertises a subscribable view of file changes (uncommitted,\nsession-wide, per-turn, etc.) and the URI template the client expands\nbefore subscribing. See {@link Changeset} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model."
+        },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasEntry"
+          },
+          "description": "Catalog of canvases opened for chats in this session. Presence is\ndurable logical membership, admitted only via `openCanvas` — never\nimplied by a chat's existence or a client's earlier focus. Each entry's\n{@link CanvasIdentity.chat | `identity.chat`} identifies the exact\nbacking chat; a canvas never migrates to a different chat. See\n{@link CanvasEntry} for the full membership/availability/trust model."
         },
         "inputNeeded": {
           "type": "array",
@@ -7984,6 +8116,462 @@
         "sessions"
       ]
     },
+    "CanvasExtensionSource": {
+      "type": "object",
+      "description": "A canvas type provided by an installed host extension.\n\n`extensionId` is the identity-bearing field for comparison purposes (see\n{@link CanvasIdentityKey}). `version` is display/informational metadata\nonly — it MUST NOT be treated as identity-bearing (two `CanvasSource`\nvalues that differ only in `version` are the same source).",
+      "properties": {
+        "kind": {
+          "const": "extension"
+        },
+        "extensionId": {
+          "type": "string",
+          "description": "Stable extension identifier (host-defined format, e.g. `publisher.name`).\nMUST NOT exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}."
+        },
+        "version": {
+          "type": "string",
+          "description": "Installed extension version, when known. Metadata only — not identity-bearing."
+        }
+      },
+      "required": [
+        "kind",
+        "extensionId"
+      ]
+    },
+    "CanvasPackageSource": {
+      "type": "object",
+      "description": "A canvas type provided by an installed package that is not a host\nextension (e.g. a workspace-declared runtime package).\n\n`sourceId` — not `packageName` — is the identity-bearing field: the same\ndeclared package name MAY be installed in more than one scope (e.g. a\nworkspace-local copy and a globally-installed copy, or two different\nregistries), and each such installation is a distinct source with its own\n`sourceId`. `packageName` and `version` are display/informational metadata\nonly and MUST NOT be treated as identity-bearing.",
+      "properties": {
+        "kind": {
+          "const": "package"
+        },
+        "sourceId": {
+          "type": "string",
+          "description": "Stable, host- or package-manager-assigned unique identifier for this\nspecific installed package instance/scope (opaque format). This is the\nidentity-bearing field — see {@link CanvasIdentityKey}. MUST NOT exceed\n{@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}."
+        },
+        "packageName": {
+          "type": "string",
+          "description": "Declared package name, for display only — MUST NOT be used to compare source identity; see `sourceId`."
+        },
+        "version": {
+          "type": "string",
+          "description": "Installed package version, when known. Metadata only — not identity-bearing."
+        }
+      },
+      "required": [
+        "kind",
+        "sourceId",
+        "packageName"
+      ]
+    },
+    "CanvasIdentityKey": {
+      "type": "object",
+      "description": "The logical identity of a canvas, excluding the host-assigned\n{@link CanvasIdentity.incarnation | `incarnation`}.\n\nTwo canvases are the same logical canvas iff `chat`, `canvasType`,\n`instanceId`, and `source`'s **identity-bearing** fields are all equal:\n`kind` plus `extensionId` (for {@link CanvasExtensionSource}) or `kind`\nplus `sourceId` (for {@link CanvasPackageSource}). `source.version` (and\n`CanvasPackageSource.packageName`) are metadata and MUST NOT factor into\nthis comparison. Clients MUST NOT treat\n{@link CanvasIdentity.instanceId | `instanceId`} alone as a stable key —\nit is only unique within the scope of `(chat, source, canvasType)`.",
+      "properties": {
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The exact backing chat this canvas belongs to. A canvas is never\nre-associated with a different chat; opening a new one for another chat\ncreates a distinct canvas."
+        },
+        "source": {
+          "$ref": "#/$defs/CanvasSource",
+          "description": "The extension or package that declares this canvas's type."
+        },
+        "canvasType": {
+          "type": "string",
+          "description": "Provider-declared canvas type (host/provider-defined format). MUST NOT\nexceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}."
+        },
+        "instanceId": {
+          "type": "string",
+          "description": "Provider-chosen stable identifier for this canvas instance, scoped to\n`(chat, source, canvasType)`. Stable across reloads and host/window\nrestarts for the same logical canvas. MUST NOT exceed\n{@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}."
+        }
+      },
+      "required": [
+        "chat",
+        "source",
+        "canvasType",
+        "instanceId"
+      ]
+    },
+    "CanvasIdentity": {
+      "type": "object",
+      "description": "Full identity of a canvas, including the host-assigned\n{@link CanvasIdentity.incarnation | `incarnation`}.",
+      "properties": {
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "The exact backing chat this canvas belongs to. A canvas is never\nre-associated with a different chat; opening a new one for another chat\ncreates a distinct canvas."
+        },
+        "source": {
+          "$ref": "#/$defs/CanvasSource",
+          "description": "The extension or package that declares this canvas's type."
+        },
+        "canvasType": {
+          "type": "string",
+          "description": "Provider-declared canvas type (host/provider-defined format). MUST NOT\nexceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}."
+        },
+        "instanceId": {
+          "type": "string",
+          "description": "Provider-chosen stable identifier for this canvas instance, scoped to\n`(chat, source, canvasType)`. Stable across reloads and host/window\nrestarts for the same logical canvas. MUST NOT exceed\n{@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}."
+        },
+        "incarnation": {
+          "type": "string",
+          "description": "Opaque, host-generated token identifying the current generation of this\ncanvas's live endpoint. The host mints a fresh token whenever a provider\nrestart retires the previous live endpoint and establishes a new one for\nthe same logical instance (see {@link CanvasIncarnationChangedAction |\n`canvas/incarnationChanged`}); it is not changed by a plain page reload\nagainst the same still-live endpoint.\n\n`incarnation` is **opaque**: clients and hosts MUST compare it only for\nequality, never parse it, sort it, or perform arithmetic on it (e.g. it\nis not guaranteed to be numeric or monotonically increasing). The host\nMUST NOT reuse a token for this logical identity once it has been\nsuperseded, including across a host/process restart — if the host\ncannot otherwise guarantee non-reuse, it MUST mint tokens (e.g. random\nor timestamp-derived) that make accidental reuse practically\nimpossible, rather than a small resettable counter.\n\nClients and hosts use `incarnation` to reject stale callbacks and\nin-flight effects addressed to a superseded endpoint."
+        }
+      },
+      "required": [
+        "chat",
+        "source",
+        "canvasType",
+        "instanceId",
+        "incarnation"
+      ]
+    },
+    "CanvasTrustedState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "trusted"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "CanvasPendingTrustState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "pending"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "CanvasBlockedTrustState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "blocked"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional human-readable reason surfaced to the user."
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "CanvasActionDeclaration": {
+      "type": "object",
+      "description": "One action a canvas declares it can perform, invoked via\n`invokeCanvasAction`.\n\nDeclarations are carried only on the full {@link CanvasState}, loaded when\na client subscribes — never duplicated into the lightweight\n{@link CanvasEntry} catalog entry, keeping session summaries small.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable identifier, unique within this canvas, matching `invokeCanvasAction`'s `actionId`."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable display name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what invoking the action does."
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "object"
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object"
+              }
+            },
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "Inline JSON Schema for the expected `input`, when small enough to embed\n(see {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH},\nchecked by {@link isCanvasSchemaWithinLimits}). Optional because some\ndeclared actions take no input. Mutually exclusive with\n`inputSchemaRef` — a declaration MUST supply at most one of the two."
+        },
+        "inputSchemaRef": {
+          "$ref": "#/$defs/URI",
+          "description": "Bounded out-of-band reference to a larger JSON Schema, used instead of\n`inputSchema` when the schema would exceed\n{@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if\ninlined. AHP does not mandate a specific resolution mechanism for this\nURI (e.g. a host MAY make it `resourceRead`-able)."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "CanvasTypeDeclaration": {
+      "type": "object",
+      "description": "A canvas type an installed extension or package currently makes available\nto open for a chat, as returned by `listCanvasTypes`.\n\n`CanvasTypeDeclaration` is **discovery-only** metadata about a TYPE — it is\nunrelated to {@link CanvasEntry}, which represents durable membership of\nan already-opened INSTANCE in {@link SessionState.canvases}. Browsing the\ncatalogue (via `listCanvasTypes`) never opens, materializes, or restarts\nanything; only `openCanvas` does.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/CanvasSource",
+          "description": "The extension or package that declares this canvas type."
+        },
+        "canvasType": {
+          "type": "string",
+          "description": "Provider-declared canvas type (host/provider-defined format), passed as\n{@link CanvasIdentityKey.canvasType} to `openCanvas`. MUST NOT exceed\n{@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable display name for a canvas-type picker."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what this canvas type does."
+        },
+        "icon": {
+          "$ref": "#/$defs/Icon",
+          "description": "Optional display icon."
+        },
+        "openInputSchema": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "object"
+              ]
+            },
+            "properties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object"
+              }
+            },
+            "required": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "Inline JSON Schema describing the `openCanvas` `input` this type\nexpects, when small enough to embed (see {@link CANVAS_SCHEMA_MAX_PROPERTIES}\n/ {@link CANVAS_SCHEMA_MAX_DEPTH}). Mutually exclusive with\n`openInputSchemaRef`."
+        },
+        "openInputSchemaRef": {
+          "$ref": "#/$defs/URI",
+          "description": "Bounded out-of-band reference to a larger open-input JSON Schema, used\ninstead of `openInputSchema` when it would exceed\n{@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if\ninlined."
+        },
+        "declaredActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasActionDeclaration"
+          },
+          "description": "Advisory, statically-known preview of actions this canvas type\ntypically declares once opened (bounded to\n{@link CANVAS_MAX_DECLARED_ACTIONS}). This is **not authoritative** —\nthe actual invocable actions for an opened instance are always\n{@link CanvasReadyAvailabilityState.actions}, which MAY differ (e.g.\ndepend on live provider configuration) and MUST be used instead of this\npreview once the canvas is open."
+        }
+      },
+      "required": [
+        "source",
+        "canvasType",
+        "title"
+      ]
+    },
+    "CanvasSourcePresentation": {
+      "type": "object",
+      "description": "Transient, renderer-neutral presentation of a canvas's current live\nendpoint, returned by `resolveCanvasSource`.\n\nThis is a plain URL, not any renderer- or process-model-specific handle\n(e.g. not an Electron `WebContentsView`, a browser tab id, or a webview\npanel reference) — how a client actually presents it (a VS Code Webview,\nthe Integrated Browser, or otherwise) is entirely a client/host\nimplementation detail outside this protocol.",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Ephemeral URL to the canvas's current live endpoint. Transient — MUST\nNOT be persisted, cached beyond the current read, or treated as a\nstable/durable identity. A host MAY embed short-lived, single-use\ncredentials in it; such credentials are never durable authority."
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "Advisory expiry hint for `url` (and any embedded credential), if the host bounds their validity."
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "CanvasUnsupportedAvailabilityState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "unsupported"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "CanvasNotLoadedAvailabilityState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "notLoaded"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "CanvasLoadingAvailabilityState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "loading"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "CanvasEmptyAvailabilityState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "empty"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "CanvasReadyAvailabilityState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "ready"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasActionDeclaration"
+          },
+          "description": "Actions currently declared by the live provider (full replacement each time this state is produced)."
+        }
+      },
+      "required": [
+        "status",
+        "actions"
+      ]
+    },
+    "CanvasFailedAvailabilityState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "const": "failed"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Stable machine-readable and human-readable failure information."
+        }
+      },
+      "required": [
+        "status",
+        "error"
+      ]
+    },
+    "CanvasEntry": {
+      "type": "object",
+      "description": "Lightweight catalog entry for a canvas, carried in\n{@link SessionState.canvases | `SessionState.canvases`}. Presence\nrepresents durable **logical membership** — it is unaffected by the live\n{@link CanvasEntry.availability | `availability`} cycling through\n`notLoaded`/`loading`/`empty`/`ready`/`failed` any number of times.\n\nThe full state, including declared actions, lives in {@link CanvasState},\nloaded when a client subscribes to {@link CanvasEntry.resource}.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Subscribable `ahp-canvas:` URI matching {@link CanvasState.resource}."
+        },
+        "identity": {
+          "$ref": "#/$defs/CanvasIdentity",
+          "description": "Full identity, including current incarnation."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable display title."
+        },
+        "icon": {
+          "$ref": "#/$defs/Icon",
+          "description": "Optional display icon."
+        },
+        "trust": {
+          "$ref": "#/$defs/CanvasTrustState",
+          "description": "Current trust decision matching {@link CanvasState.trust}."
+        },
+        "availability": {
+          "$ref": "#/$defs/CanvasAvailabilityStatus",
+          "description": "Current availability status matching {@link CanvasState.availability}'s discriminant."
+        },
+        "revision": {
+          "type": "number",
+          "description": "Monotonically increasing counter bumped on every change to this\ncanvas's state (trust, availability, or incarnation). Clients MAY use it\nto detect and reject stale reads without a full deep comparison."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Opaque host-defined summary metadata."
+        }
+      },
+      "required": [
+        "resource",
+        "identity",
+        "title",
+        "trust",
+        "availability",
+        "revision"
+      ]
+    },
+    "CanvasState": {
+      "type": "object",
+      "description": "Full state for a single canvas, loaded when a client subscribes to the\ncanvas's URI.\n\n`CanvasState` **denormalizes** every {@link CanvasEntry} field directly\nonto itself, replacing `availability`'s lightweight status with the full\n{@link CanvasAvailabilityState} (including declared actions or failure\ndetail). Producers MUST keep the two representations consistent: any\nchange to the inlined fields SHOULD also be announced on the owning\nsession via {@link SessionCanvasSetAction | `session/canvasSet`}.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "URI of this canvas channel."
+        },
+        "identity": {
+          "$ref": "#/$defs/CanvasIdentity",
+          "description": "Full identity, including current incarnation."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable display title."
+        },
+        "icon": {
+          "$ref": "#/$defs/Icon",
+          "description": "Optional display icon."
+        },
+        "trust": {
+          "$ref": "#/$defs/CanvasTrustState",
+          "description": "Current trust decision."
+        },
+        "availability": {
+          "$ref": "#/$defs/CanvasAvailabilityState",
+          "description": "Current live resolution state."
+        },
+        "revision": {
+          "type": "number",
+          "description": "Matches {@link CanvasEntry.revision}."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Opaque host-defined metadata."
+        }
+      },
+      "required": [
+        "resource",
+        "identity",
+        "title",
+        "trust",
+        "availability",
+        "revision"
+      ]
+    },
     "StringOrMarkdown": {
       "oneOf": [
         {
@@ -8529,6 +9117,54 @@
       ],
       "description": "Discriminated lifecycle of an automation run."
     },
+    "CanvasSource": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CanvasExtensionSource"
+        },
+        {
+          "$ref": "#/$defs/CanvasPackageSource"
+        }
+      ],
+      "description": "Identifies the explicitly installed extension or package that declares a\ncanvas type. This is provenance for admission and display; it is not a\ngrant of execution trust by itself — see {@link CanvasTrustStatus}."
+    },
+    "CanvasTrustState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CanvasTrustedState"
+        },
+        {
+          "$ref": "#/$defs/CanvasPendingTrustState"
+        },
+        {
+          "$ref": "#/$defs/CanvasBlockedTrustState"
+        }
+      ],
+      "description": "Current trust decision governing whether a canvas's declared actions may\nexecute."
+    },
+    "CanvasAvailabilityState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CanvasUnsupportedAvailabilityState"
+        },
+        {
+          "$ref": "#/$defs/CanvasNotLoadedAvailabilityState"
+        },
+        {
+          "$ref": "#/$defs/CanvasLoadingAvailabilityState"
+        },
+        {
+          "$ref": "#/$defs/CanvasEmptyAvailabilityState"
+        },
+        {
+          "$ref": "#/$defs/CanvasReadyAvailabilityState"
+        },
+        {
+          "$ref": "#/$defs/CanvasFailedAvailabilityState"
+        }
+      ],
+      "description": "Current live resolution state of a canvas."
+    },
     "StateAction": {
       "description": "Discriminated union of all state actions.",
       "oneOf": [
@@ -8630,6 +9266,12 @@
         },
         {
           "$ref": "#/$defs/SessionMetaChangedAction"
+        },
+        {
+          "$ref": "#/$defs/SessionCanvasSetAction"
+        },
+        {
+          "$ref": "#/$defs/SessionCanvasRemovedAction"
         },
         {
           "$ref": "#/$defs/ChatTurnStartedAction"
@@ -8822,6 +9464,18 @@
         },
         {
           "$ref": "#/$defs/AutomationRunCancelRequestedAction"
+        },
+        {
+          "$ref": "#/$defs/CanvasAvailabilityChangedAction"
+        },
+        {
+          "$ref": "#/$defs/CanvasTrustChangedAction"
+        },
+        {
+          "$ref": "#/$defs/CanvasIncarnationChangedAction"
+        },
+        {
+          "$ref": "#/$defs/CanvasTitleChangedAction"
         }
       ]
     },
@@ -9000,6 +9654,18 @@
       ],
       "type": "string",
       "description": "Operations the host currently permits for an automation.\n\nThe list on {@link AutomationEntry.operations} is authoritative and may\nchange over time. Clients MUST NOT infer permission from capabilities alone:\ncapabilities describe what the host implementation can support, while\noperations describe what is allowed for this particular automation now."
+    },
+    "CanvasAvailabilityStatus": {
+      "enum": [
+        "unsupported",
+        "notLoaded",
+        "loading",
+        "empty",
+        "ready",
+        "failed"
+      ],
+      "type": "string",
+      "description": "Discriminant for {@link CanvasAvailabilityState} — the canvas's current\nlive resolution state, independent of its durable\n{@link CanvasEntry | membership} in a session's catalog.\n\nAn empty catalog membership list is not itself a close, and a canvas may\nremain a recorded member while its live availability cycles through these\nstates any number of times (e.g. across provider restarts)."
     }
   }
 }

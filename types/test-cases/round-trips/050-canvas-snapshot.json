@@ -1,0 +1,42 @@
+{
+  "name": "canvas-snapshot",
+  "group": "A",
+  "description": "A canvas snapshot preserves its source, opaque incarnation, trust, availability and revision.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-canvas:/c1",
+    "state": {
+      "resource": "ahp-canvas:/c1",
+      "identity": {
+        "chat": "ahp-chat:/s1/c1",
+        "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+        "canvasType": "contoso.widget",
+        "instanceId": "w1",
+        "incarnation": "generation-one"
+      },
+      "title": "Widget",
+      "trust": { "status": "trusted" },
+      "availability": { "status": "ready", "actions": [] },
+      "revision": 4
+    },
+    "fromSeq": 8
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-canvas:/c1",
+    "state": {
+      "resource": "ahp-canvas:/c1",
+      "identity": {
+        "chat": "ahp-chat:/s1/c1",
+        "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+        "canvasType": "contoso.widget",
+        "instanceId": "w1",
+        "incarnation": "generation-one"
+      },
+      "title": "Widget",
+      "trust": { "status": "trusted" },
+      "availability": { "status": "ready", "actions": [] },
+      "revision": 4
+    },
+    "fromSeq": 8
+  }]
+}

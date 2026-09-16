@@ -1,0 +1,71 @@
+{
+  "description": "session/canvasSet rejects (no-ops) a stale/duplicate catalog update whose canvas.revision is not strictly greater than the currently-recorded entry's revision",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "canvases": [
+      {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-2"
+        },
+        "title": "Widget",
+        "trust": { "status": "trusted" },
+        "availability": "ready",
+        "revision": 5
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/canvasSet",
+      "canvas": {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-1"
+        },
+        "title": "Stale Widget Title",
+        "trust": { "status": "trusted" },
+        "availability": "notLoaded",
+        "revision": 3
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "canvases": [
+      {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-2"
+        },
+        "title": "Widget",
+        "trust": { "status": "trusted" },
+        "availability": "ready",
+        "revision": 5
+      }
+    ]
+  }
+}

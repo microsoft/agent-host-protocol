@@ -27,11 +27,12 @@ import {
   resourceWatchReducer,
   automationReducer,
   automationRunReducer,
+  canvasReducer,
   isClientDispatchable,
 } from './reducers.js';
 import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
+import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState, CanvasState } from './state.js';
 import {
   SessionStatus,
   TurnState,
@@ -58,6 +59,7 @@ function readChannelSources(baseName: string): string {
     'channels-resource-watch',
     'channels-automation',
     'channels-automation-run',
+    'channels-canvas',
   ];
   return dirs
     .map(dir => {
@@ -73,11 +75,11 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
+type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState | CanvasState;
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun' | 'canvas';
   initial: FixtureState;
   actions: unknown[];
   expected: FixtureState;
@@ -131,6 +133,8 @@ describe('reducer fixtures', () => {
           state = automationReducer(state as AutomationState, action as any);
         } else if (fixture.reducer === 'automationRun') {
           state = automationRunReducer(state as AutomationRunState, action as any);
+        } else if (fixture.reducer === 'canvas') {
+          state = canvasReducer(state as CanvasState, action as any);
         } else {
           state = sessionReducer(state as SessionState, action as any);
         }
@@ -209,6 +213,22 @@ describe('isClientDispatchable', () => {
   it('returns false for server-only actions', () => {
     const action = { type: ActionType.SessionReady, session: 'x' } as const;
     assert.equal(isClientDispatchable(action), false);
+  });
+
+  // Regression: canvas live-state and session-canvas-membership actions
+  // reflect authoritative host resolution outcomes (identity, trust,
+  // availability, membership), not client-optimistic writes — they MUST
+  // remain server-only. A client attempting to dispatch one of these
+  // directly would be forging state the host alone is authoritative for.
+  it('returns false for every canvas-scoped action (server-only)', () => {
+    assert.equal(isClientDispatchable({ type: ActionType.CanvasAvailabilityChanged, availability: { status: 'notLoaded' }, revision: 1 } as const), false);
+    assert.equal(isClientDispatchable({ type: ActionType.CanvasTrustChanged, trust: { status: 'pending' }, revision: 1 } as const), false);
+    assert.equal(isClientDispatchable({ type: ActionType.CanvasIncarnationChanged, incarnation: 'gen-1', revision: 1 } as const), false);
+    assert.equal(isClientDispatchable({ type: ActionType.CanvasTitleChanged, title: 'x', revision: 1 } as const), false);
+  });
+
+  it('returns false for session canvas-membership actions (server-only)', () => {
+    assert.equal(isClientDispatchable({ type: ActionType.SessionCanvasRemoved, resource: 'ahp-canvas:/c1' } as const), false);
   });
 });
 
