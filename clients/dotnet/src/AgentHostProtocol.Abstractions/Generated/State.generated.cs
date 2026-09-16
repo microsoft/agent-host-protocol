@@ -272,6 +272,8 @@ public enum ResponsePartKind
     InputRequest,
     [WireValue("error")]
     Error,
+    [WireValue("attribution")]
+    Attribution,
 }
 
 /// <summary>Status of a tool call in the lifecycle state machine.</summary>
@@ -295,6 +297,16 @@ public enum ToolCallStatus
     Completed,
     [WireValue("cancelled")]
     Cancelled,
+}
+
+/// <summary>The kind of location within an attribution source.</summary>
+[JsonConverter(typeof(WireEnumConverter<AttributionSourceLocationKind>))]
+public enum AttributionSourceLocationKind
+{
+    [WireValue("text")]
+    Text,
+    [WireValue("page")]
+    Page,
 }
 
 /// <summary>How a tool call was confirmed for execution.
@@ -2629,6 +2641,111 @@ public sealed record ErrorResponsePart
     /// <summary>Whether the host can resume the turn from this error. Only `true` enables resume.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Resumable { get; init; }
+}
+
+/// <summary>Sources that support an earlier markdown or reasoning part in the same turn.
+///
+/// The host appends this part with `chat/responsePart` after the target's last
+/// text delta and before the turn ends. At most one attribution part may target
+/// a given part. Neither the target text nor its attribution changes afterward,
+/// including when the turn resumes; further output uses new part identifiers.
+///
+/// Clients MAY show inline citations or a source list. Clients that do not
+/// support attribution can ignore this part and still render the original text.</summary>
+public sealed record AttributionResponsePart
+{
+    /// <summary>Discriminant</summary>
+    public ResponsePartKind Kind { get; init; }
+
+    /// <summary>Non-empty identifier, unique among response parts in this turn.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Identifier of the earlier MarkdownResponsePart or ReasoningResponsePart.</summary>
+    public required string TargetPartId { get; init; }
+
+    /// <summary>Supporting sources. MUST contain at least one entry, with distinct IDs.</summary>
+    public required List<AttributionSource> Sources { get; init; }
+
+    /// <summary>Ranges of target text linked to sources. An empty list supplies sources for
+    /// the target as a whole without claiming a more precise text-to-source mapping.</summary>
+    public required List<AttributionSpan> Spans { get; init; }
+
+    /// <summary>Optional implementation-specific details; not needed to display attribution.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>A source, or a passage within a source, supporting an attributed response.
+///
+/// A source need not be a public URL or a local file. Hosts SHOULD provide a
+/// title when no URI is available and prefer versioned URIs when possible.
+/// Two entries may share a URI when they describe different passages.</summary>
+public sealed record AttributionSource
+{
+    /// <summary>Non-empty identifier, unique within the containing attribution part.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Human-readable source title, rendered as plain text.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; init; }
+
+    /// <summary>Source URI. Its presence does not authorize opening or fetching the resource.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Uri { get; init; }
+
+    /// <summary>MIME type of the source, when known.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContentType { get; init; }
+
+    /// <summary>Optional short quotation from the source, not a generated answer summary.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Excerpt { get; init; }
+
+    /// <summary>Location within the source, not within the generated response.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AttributionSourceLocation? Location { get; init; }
+
+    /// <summary>Optional implementation-specific details; not needed to display the source.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>A non-empty range of generated text linked to supporting sources.
+///
+/// Ranges address the target part's raw `content`, before Markdown rendering:
+/// zero-based lines and UTF-16 code-unit character offsets, start inclusive and
+/// end exclusive. CRLF, LF, and lone CR each count as one line break. Positions
+/// MUST lie within the text and MUST NOT split a surrogate pair.</summary>
+public sealed record AttributionSpan
+{
+    /// <summary>Range within the target part, not within any source or the combined turn.</summary>
+    public required TextRange Range { get; init; }
+
+    /// <summary>Non-empty, distinct IDs from the containing AttributionResponsePart.sources.</summary>
+    public required List<string> SourceIds { get; init; }
+}
+
+/// <summary>A range within a textual source, using the same position rules as AttributionSpan.</summary>
+public sealed record AttributionTextSourceLocation
+{
+    public AttributionSourceLocationKind Kind { get; init; }
+
+    /// <summary>Non-empty, start-inclusive, end-exclusive range within the source text.</summary>
+    public required TextRange Range { get; init; }
+}
+
+/// <summary>An inclusive range of pages within a document.</summary>
+public sealed record AttributionPageSourceLocation
+{
+    public AttributionSourceLocationKind Kind { get; init; }
+
+    /// <summary>First page, numbered from one.</summary>
+    public long StartPage { get; init; }
+
+    /// <summary>Last page, inclusive. MUST be greater than or equal to startPage.</summary>
+    public long EndPage { get; init; }
 }
 
 /// <summary>Tool execution result details, available after execution completes.</summary>
@@ -5528,6 +5645,34 @@ internal sealed class ResponsePartConverter : UnionConverter<ResponsePart>
         ["systemNotification"] = typeof(SystemNotificationResponsePart),
         ["inputRequest"] = typeof(InputRequestResponsePart),
         ["error"] = typeof(ErrorResponsePart),
+        ["attribution"] = typeof(AttributionResponsePart),
+            },
+            allowUnknown: true)
+    {
+    }
+}
+
+/// <summary>A location within a source supporting an attributed response.</summary>
+[JsonConverter(typeof(AttributionSourceLocationConverter))]
+public sealed class AttributionSourceLocation : AhpUnion
+{
+    /// <summary>Creates an empty AttributionSourceLocation (no active variant).</summary>
+    public AttributionSourceLocation() { }
+
+    /// <summary>Creates a AttributionSourceLocation wrapping the given variant value.</summary>
+    public AttributionSourceLocation(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the AttributionSourceLocation discriminated union.</summary>
+internal sealed class AttributionSourceLocationConverter : UnionConverter<AttributionSourceLocation>
+{
+    public AttributionSourceLocationConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["text"] = typeof(AttributionTextSourceLocation),
+        ["page"] = typeof(AttributionPageSourceLocation),
             },
             allowUnknown: true)
     {

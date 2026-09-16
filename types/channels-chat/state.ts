@@ -877,6 +877,7 @@ export const enum ResponsePartKind {
   SystemNotification = 'systemNotification',
   InputRequest = 'inputRequest',
   Error = 'error',
+  Attribution = 'attribution',
 }
 
 /**
@@ -932,6 +933,133 @@ export interface ReasoningResponsePart {
 }
 
 /**
+ * Sources that support an earlier markdown or reasoning part in the same turn.
+ *
+ * The host appends this part with `chat/responsePart` after the target's last
+ * text delta and before the turn ends. At most one attribution part may target
+ * a given part. Neither the target text nor its attribution changes afterward,
+ * including when the turn resumes; further output uses new part identifiers.
+ *
+ * Clients MAY show inline citations or a source list. Clients that do not
+ * support attribution can ignore this part and still render the original text.
+ *
+ * @category Response Parts
+ */
+export interface AttributionResponsePart {
+  /** Discriminant */
+  kind: ResponsePartKind.Attribution;
+  /** Non-empty identifier, unique among response parts in this turn. */
+  id: string;
+  /** Identifier of the earlier MarkdownResponsePart or ReasoningResponsePart. */
+  targetPartId: string;
+  /** Supporting sources. MUST contain at least one entry, with distinct IDs. */
+  sources: AttributionSource[];
+  /**
+   * Ranges of target text linked to sources. An empty list supplies sources for
+   * the target as a whole without claiming a more precise text-to-source mapping.
+   */
+  spans: AttributionSpan[];
+  /** Optional implementation-specific details; not needed to display attribution. */
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * A source, or a passage within a source, supporting an attributed response.
+ *
+ * A source need not be a public URL or a local file. Hosts SHOULD provide a
+ * title when no URI is available and prefer versioned URIs when possible.
+ * Two entries may share a URI when they describe different passages.
+ *
+ * @category Response Parts
+ */
+export interface AttributionSource {
+  /** Non-empty identifier, unique within the containing attribution part. */
+  id: string;
+  /** Human-readable source title, rendered as plain text. */
+  title?: string;
+  /** Source URI. Its presence does not authorize opening or fetching the resource. */
+  uri?: URI;
+  /** MIME type of the source, when known. */
+  contentType?: string;
+  /** Optional short quotation from the source, not a generated answer summary. */
+  excerpt?: string;
+  /** Location within the source, not within the generated response. */
+  location?: AttributionSourceLocation;
+  /** Optional implementation-specific details; not needed to display the source. */
+  _meta?: Record<string, unknown>;
+}
+
+/**
+ * A non-empty range of generated text linked to supporting sources.
+ *
+ * Ranges address the target part's raw `content`, before Markdown rendering:
+ * zero-based lines and UTF-16 code-unit character offsets, start inclusive and
+ * end exclusive. CRLF, LF, and lone CR each count as one line break. Positions
+ * MUST lie within the text and MUST NOT split a surrogate pair.
+ *
+ * @category Response Parts
+ */
+export interface AttributionSpan {
+  /** Range within the target part, not within any source or the combined turn. */
+  range: TextRange;
+  /** Non-empty, distinct IDs from the containing AttributionResponsePart.sources. */
+  sourceIds: string[];
+}
+
+/**
+ * The kind of location within an attribution source.
+ *
+ * @category Response Parts
+ * @nonexhaustive
+ */
+export const enum AttributionSourceLocationKind {
+  Text = 'text',
+  Page = 'page',
+}
+
+/**
+ * A range within a textual source, using the same position rules as AttributionSpan.
+ *
+ * @category Response Parts
+ */
+export interface AttributionTextSourceLocation {
+  kind: AttributionSourceLocationKind.Text;
+  /** Non-empty, start-inclusive, end-exclusive range within the source text. */
+  range: TextRange;
+}
+
+/**
+ * An inclusive range of pages within a document.
+ *
+ * @category Response Parts
+ */
+export interface AttributionPageSourceLocation {
+  kind: AttributionSourceLocationKind.Page;
+  /**
+   * First page, numbered from one.
+   * @integer
+   * @minimum 1
+   */
+  startPage: number;
+  /**
+   * Last page, inclusive. MUST be greater than or equal to startPage.
+   * @integer
+   * @minimum 1
+   */
+  endPage: number;
+}
+
+/**
+ * Where the supporting passage appears within a source. Clients that do not
+ * recognize a location kind can still display the source's title, URI, or excerpt.
+ *
+ * @category Response Parts
+ */
+export type AttributionSourceLocation =
+  | AttributionTextSourceLocation
+  | AttributionPageSourceLocation;
+
+/**
  * @category Response Parts
  */
 export type ResponsePart =
@@ -941,7 +1069,8 @@ export type ResponsePart =
   | ReasoningResponsePart
   | SystemNotificationResponsePart
   | InputRequestResponsePart
-  | ErrorResponsePart;
+  | ErrorResponsePart
+  | AttributionResponsePart;
 
 /**
  * A live or resolved input request (elicitation) in the turn response stream.

@@ -1,0 +1,133 @@
+{
+  "description": "attribution arrives after streamed Unicode Markdown and survives turn completion unchanged",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/c1",
+    "title": "Library history",
+    "status": 1,
+    "modifiedAt": "2026-09-16T00:00:00.000Z",
+    "turns": []
+  },
+  "actions": [
+    {
+      "type": "chat/turnStarted",
+      "turnId": "turn-1",
+      "startedAt": "2026-09-16T00:00:00.000Z",
+      "message": { "text": "When did the library open?", "origin": { "kind": "user" } }
+    },
+    {
+      "type": "chat/responsePart",
+      "turnId": "turn-1",
+      "part": { "kind": "markdown", "id": "answer-1", "content": "" }
+    },
+    {
+      "type": "chat/delta",
+      "turnId": "turn-1",
+      "partId": "answer-1",
+      "content": "\ud83d\ude00 **The library**\r\n"
+    },
+    {
+      "type": "chat/delta",
+      "turnId": "turn-1",
+      "partId": "answer-1",
+      "content": "opened in 1984."
+    },
+    {
+      "type": "chat/responsePart",
+      "turnId": "turn-1",
+      "part": {
+        "kind": "attribution",
+        "id": "attribution-1",
+        "targetPartId": "answer-1",
+        "sources": [
+          {
+            "id": "history",
+            "title": "Library history",
+            "uri": "https://example.org/library/history",
+            "contentType": "text/html",
+            "excerpt": "The library opened in 1984.",
+            "location": {
+              "kind": "text",
+              "range": { "start": { "line": 3, "character": 0 }, "end": { "line": 3, "character": 27 } }
+            },
+            "_meta": { "example.org/source": "archive-42" }
+          },
+          {
+            "id": "guide",
+            "title": "Uploaded library guide",
+            "contentType": "application/pdf",
+            "excerpt": "Opening year: 1984",
+            "location": { "kind": "page", "startPage": 4, "endPage": 4 }
+          }
+        ],
+        "spans": [
+          {
+            "range": { "start": { "line": 0, "character": 3 }, "end": { "line": 1, "character": 15 } },
+            "sourceIds": ["history"]
+          },
+          {
+            "range": { "start": { "line": 1, "character": 10 }, "end": { "line": 1, "character": 14 } },
+            "sourceIds": ["history", "guide"]
+          }
+        ],
+        "_meta": { "example.org/attribution": { "version": 1 } }
+      }
+    },
+    { "type": "chat/turnComplete", "turnId": "turn-1", "duration": 1500 }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/c1",
+    "title": "Library history",
+    "status": 1,
+    "modifiedAt": "2026-09-16T00:00:01.500Z",
+    "activeTurn": null,
+    "turns": [{
+      "id": "turn-1",
+      "startedAt": "2026-09-16T00:00:00.000Z",
+      "duration": 1500,
+      "message": { "text": "When did the library open?", "origin": { "kind": "user" } },
+      "responseParts": [
+        { "kind": "markdown", "id": "answer-1", "content": "\ud83d\ude00 **The library**\r\nopened in 1984." },
+        {
+          "kind": "attribution",
+          "id": "attribution-1",
+          "targetPartId": "answer-1",
+          "sources": [
+            {
+              "id": "history",
+              "title": "Library history",
+              "uri": "https://example.org/library/history",
+              "contentType": "text/html",
+              "excerpt": "The library opened in 1984.",
+              "location": {
+                "kind": "text",
+                "range": { "start": { "line": 3, "character": 0 }, "end": { "line": 3, "character": 27 } }
+              },
+              "_meta": { "example.org/source": "archive-42" }
+            },
+            {
+              "id": "guide",
+              "title": "Uploaded library guide",
+              "contentType": "application/pdf",
+              "excerpt": "Opening year: 1984",
+              "location": { "kind": "page", "startPage": 4, "endPage": 4 }
+            }
+          ],
+          "spans": [
+            {
+              "range": { "start": { "line": 0, "character": 3 }, "end": { "line": 1, "character": 15 } },
+              "sourceIds": ["history"]
+            },
+            {
+              "range": { "start": { "line": 1, "character": 10 }, "end": { "line": 1, "character": 14 } },
+              "sourceIds": ["history", "guide"]
+            }
+          ],
+          "_meta": { "example.org/attribution": { "version": 1 } }
+        }
+      ],
+      "usage": null,
+      "state": "complete"
+    }]
+  }
+}

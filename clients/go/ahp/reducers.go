@@ -457,6 +457,8 @@ func updateResponsePart(state *ahptypes.ChatState, turnID, partID string, update
 			id = v.Id
 		case *ahptypes.ReasoningResponsePart:
 			id = v.Id
+		case *ahptypes.AttributionResponsePart:
+			id = v.Id
 		}
 		if id != "" && id == partID {
 			updater(part)

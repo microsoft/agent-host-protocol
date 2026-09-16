@@ -5829,6 +5829,150 @@
         "content"
       ]
     },
+    "AttributionResponsePart": {
+      "type": "object",
+      "description": "Sources that support an earlier markdown or reasoning part in the same turn.\n\nThe host appends this part with `chat/responsePart` after the target's last\ntext delta and before the turn ends. At most one attribution part may target\na given part. Neither the target text nor its attribution changes afterward,\nincluding when the turn resumes; further output uses new part identifiers.\n\nClients MAY show inline citations or a source list. Clients that do not\nsupport attribution can ignore this part and still render the original text.",
+      "properties": {
+        "kind": {
+          "const": "attribution",
+          "description": "Discriminant"
+        },
+        "id": {
+          "type": "string",
+          "description": "Non-empty identifier, unique among response parts in this turn."
+        },
+        "targetPartId": {
+          "type": "string",
+          "description": "Identifier of the earlier MarkdownResponsePart or ReasoningResponsePart."
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AttributionSource"
+          },
+          "description": "Supporting sources. MUST contain at least one entry, with distinct IDs."
+        },
+        "spans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AttributionSpan"
+          },
+          "description": "Ranges of target text linked to sources. An empty list supplies sources for\nthe target as a whole without claiming a more precise text-to-source mapping."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional implementation-specific details; not needed to display attribution."
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "targetPartId",
+        "sources",
+        "spans"
+      ]
+    },
+    "AttributionSource": {
+      "type": "object",
+      "description": "A source, or a passage within a source, supporting an attributed response.\n\nA source need not be a public URL or a local file. Hosts SHOULD provide a\ntitle when no URI is available and prefer versioned URIs when possible.\nTwo entries may share a URI when they describe different passages.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Non-empty identifier, unique within the containing attribution part."
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable source title, rendered as plain text."
+        },
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Source URI. Its presence does not authorize opening or fetching the resource."
+        },
+        "contentType": {
+          "type": "string",
+          "description": "MIME type of the source, when known."
+        },
+        "excerpt": {
+          "type": "string",
+          "description": "Optional short quotation from the source, not a generated answer summary."
+        },
+        "location": {
+          "$ref": "#/$defs/AttributionSourceLocation",
+          "description": "Location within the source, not within the generated response."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional implementation-specific details; not needed to display the source."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "AttributionSpan": {
+      "type": "object",
+      "description": "A non-empty range of generated text linked to supporting sources.\n\nRanges address the target part's raw `content`, before Markdown rendering:\nzero-based lines and UTF-16 code-unit character offsets, start inclusive and\nend exclusive. CRLF, LF, and lone CR each count as one line break. Positions\nMUST lie within the text and MUST NOT split a surrogate pair.",
+      "properties": {
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "Range within the target part, not within any source or the combined turn."
+        },
+        "sourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Non-empty, distinct IDs from the containing AttributionResponsePart.sources."
+        }
+      },
+      "required": [
+        "range",
+        "sourceIds"
+      ]
+    },
+    "AttributionTextSourceLocation": {
+      "type": "object",
+      "description": "A range within a textual source, using the same position rules as AttributionSpan.",
+      "properties": {
+        "kind": {
+          "const": "text"
+        },
+        "range": {
+          "$ref": "#/$defs/TextRange",
+          "description": "Non-empty, start-inclusive, end-exclusive range within the source text."
+        }
+      },
+      "required": [
+        "kind",
+        "range"
+      ]
+    },
+    "AttributionPageSourceLocation": {
+      "type": "object",
+      "description": "An inclusive range of pages within a document.",
+      "properties": {
+        "kind": {
+          "const": "page"
+        },
+        "startPage": {
+          "type": "integer",
+          "description": "First page, numbered from one.",
+          "minimum": 1
+        },
+        "endPage": {
+          "type": "integer",
+          "description": "Last page, inclusive. MUST be greater than or equal to startPage.",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "kind",
+        "startPage",
+        "endPage"
+      ]
+    },
     "InputRequestResponsePart": {
       "type": "object",
       "description": "A live or resolved input request (elicitation) in the turn response stream.\n\nThe server inserts the part with `chat/inputRequested`. While\n{@link response} is absent, clients can update answer drafts with\n`chat/inputAnswerChanged` and submit a response with `chat/inputCompleted`.\nCompletion updates this part in place so its stream position is stable and\nthe full interaction remains durable and backfillable via `fetchTurns`.\n\nIf the turn ends without a submitted response, the unresolved part remains\nin the completed turn transcript with {@link response} absent.",
@@ -8338,6 +8482,17 @@
       ],
       "description": "An attachment associated with a {@link Message}."
     },
+    "AttributionSourceLocation": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AttributionTextSourceLocation"
+        },
+        {
+          "$ref": "#/$defs/AttributionPageSourceLocation"
+        }
+      ],
+      "description": "Where the supporting passage appears within a source. Clients that do not\nrecognize a location kind can still display the source's title, URI, or excerpt."
+    },
     "ResponsePart": {
       "oneOf": [
         {
@@ -8360,6 +8515,9 @@
         },
         {
           "$ref": "#/$defs/ErrorResponsePart"
+        },
+        {
+          "$ref": "#/$defs/AttributionResponsePart"
         }
       ]
     },

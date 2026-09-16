@@ -1,0 +1,56 @@
+{
+  "name": "response-attribution-snapshot",
+  "group": "A",
+  "description": "A chat snapshot preserves Unicode answer text, source identities, and an empty span list for whole-answer attribution.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-chat:/c1",
+    "fromSeq": 14,
+    "state": {
+      "resource": "ahp-chat:/c1",
+      "title": "Answer",
+      "status": 1,
+      "modifiedAt": "2026-09-16T00:00:00.000Z",
+      "turns": [{
+        "id": "turn-1",
+        "message": { "text": "Explain the symbol", "origin": { "kind": "user" } },
+        "responseParts": [
+          { "kind": "markdown", "id": "answer-1", "content": "\ud83d\ude00 means happy.\r\n" },
+          {
+            "kind": "attribution",
+            "id": "attribution-1",
+            "targetPartId": "answer-1",
+            "sources": [{ "id": "guide", "title": "Symbol guide" }],
+            "spans": []
+          }
+        ],
+        "state": "complete"
+      }]
+    }
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-chat:/c1",
+    "fromSeq": 14,
+    "state": {
+      "resource": "ahp-chat:/c1",
+      "title": "Answer",
+      "status": 1,
+      "modifiedAt": "2026-09-16T00:00:00.000Z",
+      "turns": [{
+        "id": "turn-1",
+        "message": { "text": "Explain the symbol", "origin": { "kind": "user" } },
+        "responseParts": [
+          { "kind": "markdown", "id": "answer-1", "content": "\ud83d\ude00 means happy.\r\n" },
+          {
+            "kind": "attribution",
+            "id": "attribution-1",
+            "targetPartId": "answer-1",
+            "sources": [{ "id": "guide", "title": "Symbol guide" }],
+            "spans": []
+          }
+        ],
+        "state": "complete"
+      }]
+    }
+  }]
+}

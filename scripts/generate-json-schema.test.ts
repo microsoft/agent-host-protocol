@@ -173,6 +173,48 @@ describe('generated JSON schemas', () => {
         );
       });
 
+      it('represents answer attribution as a typed response part', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const part = defs.AttributionResponsePart;
+        assert.ok(part, `${file} must define AttributionResponsePart`);
+        const properties = part.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.kind.const, 'attribution');
+        assert.deepEqual(part.required, ['kind', 'id', 'targetPartId', 'sources', 'spans']);
+        assert.ok(schemaAccepts(schema, defs.ResponsePart as JsonNode, {
+          kind: 'attribution',
+          id: 'attribution-1',
+          targetPartId: 'answer-1',
+          sources: [{ id: 'source-1', uri: 'https://example.org/history' }],
+          spans: [{
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
+            sourceIds: ['source-1'],
+          }],
+        }));
+        assert.equal(schemaAccepts(schema, part as JsonNode, {
+          kind: 'attribution', id: 'attribution-1', sources: [], spans: [],
+        }), false, 'an attribution must identify the text it describes');
+      });
+
+      it('distinguishes text and page locations in attribution sources', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const location = defs.AttributionSourceLocation;
+        assert.ok(location, `${file} must define AttributionSourceLocation`);
+        assert.ok(schemaAccepts(schema, location as JsonNode, {
+          kind: 'text',
+          range: { start: { line: 2, character: 0 }, end: { line: 3, character: 12 } },
+        }));
+        assert.ok(schemaAccepts(schema, location as JsonNode, {
+          kind: 'page', startPage: 4, endPage: 5,
+        }));
+        assert.equal(schemaAccepts(schema, location as JsonNode, { kind: 'text' }), false);
+        assert.equal(schemaAccepts(schema, location as JsonNode, { kind: 'page', startPage: 4 }), false);
+        const pageProperties = defs.AttributionPageSourceLocation.properties as Record<string, Record<string, unknown>>;
+        for (const name of ['startPage', 'endPage']) {
+          assert.equal(pageProperties[name].type, 'integer');
+          assert.equal(pageProperties[name].minimum, 1);
+        }
+      });
+
       it('preserves automation schedule restrictions', () => {
         if (file !== 'commands.schema.json') {
           return;

@@ -472,6 +472,7 @@ value class ResponsePartKind(val rawValue: String) {
         val SYSTEM_NOTIFICATION: ResponsePartKind = ResponsePartKind("systemNotification")
         val INPUT_REQUEST: ResponsePartKind = ResponsePartKind("inputRequest")
         val ERROR: ResponsePartKind = ResponsePartKind("error")
+        val ATTRIBUTION: ResponsePartKind = ResponsePartKind("attribution")
     }
 }
 
@@ -515,6 +516,28 @@ internal object ToolCallStatusSerializer : KSerializer<ToolCallStatus> {
     }
     override fun deserialize(decoder: Decoder): ToolCallStatus =
         ToolCallStatus(decoder.decodeString())
+}
+
+/**
+ * The kind of location within an attribution source.
+ */
+@Serializable(with = AttributionSourceLocationKindSerializer::class)
+@JvmInline
+value class AttributionSourceLocationKind(val rawValue: String) {
+    companion object {
+        val TEXT: AttributionSourceLocationKind = AttributionSourceLocationKind("text")
+        val PAGE: AttributionSourceLocationKind = AttributionSourceLocationKind("page")
+    }
+}
+
+internal object AttributionSourceLocationKindSerializer : KSerializer<AttributionSourceLocationKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AttributionSourceLocationKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AttributionSourceLocationKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AttributionSourceLocationKind =
+        AttributionSourceLocationKind(decoder.decodeString())
 }
 
 /**
@@ -2939,6 +2962,103 @@ data class ErrorResponsePart(
      * Whether the host can resume the turn from this error. Only `true` enables resume.
      */
     val resumable: Boolean? = null
+)
+
+@Serializable
+data class AttributionResponsePart(
+    /**
+     * Discriminant
+     */
+    val kind: ResponsePartKind,
+    /**
+     * Non-empty identifier, unique among response parts in this turn.
+     */
+    val id: String,
+    /**
+     * Identifier of the earlier MarkdownResponsePart or ReasoningResponsePart.
+     */
+    val targetPartId: String,
+    /**
+     * Supporting sources. MUST contain at least one entry, with distinct IDs.
+     */
+    val sources: List<AttributionSource>,
+    /**
+     * Ranges of target text linked to sources. An empty list supplies sources for
+     * the target as a whole without claiming a more precise text-to-source mapping.
+     */
+    val spans: List<AttributionSpan>,
+    /**
+     * Optional implementation-specific details; not needed to display attribution.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AttributionSource(
+    /**
+     * Non-empty identifier, unique within the containing attribution part.
+     */
+    val id: String,
+    /**
+     * Human-readable source title, rendered as plain text.
+     */
+    val title: String? = null,
+    /**
+     * Source URI. Its presence does not authorize opening or fetching the resource.
+     */
+    val uri: String? = null,
+    /**
+     * MIME type of the source, when known.
+     */
+    val contentType: String? = null,
+    /**
+     * Optional short quotation from the source, not a generated answer summary.
+     */
+    val excerpt: String? = null,
+    /**
+     * Location within the source, not within the generated response.
+     */
+    val location: AttributionSourceLocation? = null,
+    /**
+     * Optional implementation-specific details; not needed to display the source.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null
+)
+
+@Serializable
+data class AttributionSpan(
+    /**
+     * Range within the target part, not within any source or the combined turn.
+     */
+    val range: TextRange,
+    /**
+     * Non-empty, distinct IDs from the containing AttributionResponsePart.sources.
+     */
+    val sourceIds: List<String>
+)
+
+@Serializable
+data class AttributionTextSourceLocation(
+    val kind: AttributionSourceLocationKind,
+    /**
+     * Non-empty, start-inclusive, end-exclusive range within the source text.
+     */
+    val range: TextRange
+)
+
+@Serializable
+data class AttributionPageSourceLocation(
+    val kind: AttributionSourceLocationKind,
+    /**
+     * First page, numbered from one.
+     */
+    val startPage: Long,
+    /**
+     * Last page, inclusive. MUST be greater than or equal to startPage.
+     */
+    val endPage: Long
 )
 
 @Serializable
@@ -5799,6 +5919,8 @@ value class ResponsePartSystemNotification(val value: SystemNotificationResponse
 value class ResponsePartInputRequest(val value: InputRequestResponsePart) : ResponsePart
 @JvmInline
 value class ResponsePartError(val value: ErrorResponsePart) : ResponsePart
+@JvmInline
+value class ResponsePartAttribution(val value: AttributionResponsePart) : ResponsePart
 /**
  * Forward-compat catch-all for unknown ResponsePart discriminators.
  *
@@ -5830,6 +5952,7 @@ internal object ResponsePartSerializer : KSerializer<ResponsePart> {
             "systemNotification" -> ResponsePartSystemNotification(input.json.decodeFromJsonElement(SystemNotificationResponsePart.serializer(), element))
             "inputRequest" -> ResponsePartInputRequest(input.json.decodeFromJsonElement(InputRequestResponsePart.serializer(), element))
             "error" -> ResponsePartError(input.json.decodeFromJsonElement(ErrorResponsePart.serializer(), element))
+            "attribution" -> ResponsePartAttribution(input.json.decodeFromJsonElement(AttributionResponsePart.serializer(), element))
             else -> ResponsePartUnknown(obj)
         }
     }
@@ -5845,7 +5968,57 @@ internal object ResponsePartSerializer : KSerializer<ResponsePart> {
             is ResponsePartSystemNotification -> output.json.encodeToJsonElement(SystemNotificationResponsePart.serializer(), value.value)
             is ResponsePartInputRequest -> output.json.encodeToJsonElement(InputRequestResponsePart.serializer(), value.value)
             is ResponsePartError -> output.json.encodeToJsonElement(ErrorResponsePart.serializer(), value.value)
+            is ResponsePartAttribution -> output.json.encodeToJsonElement(AttributionResponsePart.serializer(), value.value)
             is ResponsePartUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable(with = AttributionSourceLocationSerializer::class)
+sealed interface AttributionSourceLocation
+
+@JvmInline
+value class AttributionSourceLocationText(val value: AttributionTextSourceLocation) : AttributionSourceLocation
+@JvmInline
+value class AttributionSourceLocationPage(val value: AttributionPageSourceLocation) : AttributionSourceLocation
+/**
+ * Forward-compat catch-all for unknown AttributionSourceLocation discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class AttributionSourceLocationUnknown(val raw: JsonObject) : AttributionSourceLocation
+
+internal object AttributionSourceLocationSerializer : KSerializer<AttributionSourceLocation> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AttributionSourceLocation")
+
+    override fun deserialize(decoder: Decoder): AttributionSourceLocation {
+        val input = decoder as? JsonDecoder
+            ?: error("AttributionSourceLocation can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AttributionSourceLocation")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return AttributionSourceLocationUnknown(obj)
+        return when (discriminant) {
+            "text" -> AttributionSourceLocationText(input.json.decodeFromJsonElement(AttributionTextSourceLocation.serializer(), element))
+            "page" -> AttributionSourceLocationPage(input.json.decodeFromJsonElement(AttributionPageSourceLocation.serializer(), element))
+            else -> AttributionSourceLocationUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AttributionSourceLocation) {
+        val output = encoder as? JsonEncoder
+            ?: error("AttributionSourceLocation can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AttributionSourceLocationText -> output.json.encodeToJsonElement(AttributionTextSourceLocation.serializer(), value.value)
+            is AttributionSourceLocationPage -> output.json.encodeToJsonElement(AttributionPageSourceLocation.serializer(), value.value)
+            is AttributionSourceLocationUnknown -> value.raw
         }
         output.encodeJsonElement(element)
     }

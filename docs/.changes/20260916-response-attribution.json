@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "Optional response attribution links answer text to supporting sources and preserves it in chat history across clients.",
+  "issues": [452]
+}

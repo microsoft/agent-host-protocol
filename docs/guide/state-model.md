@@ -302,7 +302,7 @@ Hosts that support the common terminal-command shorthand advertise `InitializeRe
 
 ## Response Parts
 
-All response content — text, tool calls, reasoning, and content references — lives in a single `responseParts` array in stream order. This mirrors how LLM APIs (e.g. OpenAI) represent responses as a unified list of typed items.
+All response content — text, tool calls, reasoning, content references, and source attribution — lives in a single `responseParts` array in stream order.
 
 ```typescript
 // Inline markdown content
@@ -317,6 +317,16 @@ ReasoningResponsePart {
   kind: 'reasoning'
   id: string               // targeted by chat/reasoning for text appends
   content: string
+}
+
+// Sources supporting an earlier markdown or reasoning part
+AttributionResponsePart {
+  kind: 'attribution'
+  id: string
+  targetPartId: string
+  sources: AttributionSource[]
+  spans: AttributionSpan[]
+  _meta?: Record<string, unknown>
 }
 
 // Tool call (see Tool Call Lifecycle below)
@@ -359,6 +369,8 @@ ErrorResponsePart {
 `SystemNotificationResponsePart._meta` carries provider-specific metadata describing what triggered the notification. A host MAY attach a machine-readable descriptor so clients can categorize, icon, group, filter, or localize the notification without parsing `content`. Clients MAY inspect well-known keys for enhanced UI, and MUST render coherently from `content` alone when `_meta` is absent or unrecognized.
 
 Text content uses a **create-then-append** pattern: the server first emits a `chat/responsePart` action to create a new markdown or reasoning part with an `id`. `chat/delta` targets markdown parts only, while `chat/reasoning` targets reasoning parts only. This pattern is extensible to future streaming content types.
+
+An optional `attribution` part links ranges in an earlier text part to supporting sources. It arrives after that part's last text delta, so the answer can stream without waiting for source information. It is retained with the turn rather than modifying the answer text. See [Source Attribution](./attribution) for the lifecycle, range rules, and examples.
 
 Clients fetch `ContentRef` content separately via the `resourceRead(uri)` command. This keeps the state tree small and serializable.
 
