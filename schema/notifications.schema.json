@@ -146,7 +146,7 @@
     },
     "ProgressParams": {
       "type": "object",
-      "description": "Generic progress notification for a long-running operation.\n\nA client opts in to progress for a request by including a `progressToken` in\nthat request (today: the `progressToken` field on `createSession`). If the\nserver does long-running work to service the request — e.g. lazily\ndownloading an agent's native SDK the first time a session of that provider\nis materialized — it emits `progress` notifications carrying the same token.\n\nThe notification is operation-agnostic: it says nothing about *what* is\nprogressing. The client correlates `progressToken` back to the request it\noriginated from (and thus the UI surface awaiting it) and renders its own\nlocalized indicator. The same channel serves any future long-running\noperation without a new method.\n\nSemantics:\n\n- `progress` is monotonically non-decreasing for a given `progressToken`.\n- `total` is present only when the server knows the magnitude up front\n  (e.g. a `Content-Length`); when absent the client SHOULD show an\n  indeterminate indicator.\n- The operation is complete when `progress === total`. The server MUST emit a\n  final frame satisfying `progress === total`; when the total was never\n  known, it sets `total` to the final `progress` on that frame. No further\n  frames reference the token afterwards.\n- The server MAY emit no progress at all (e.g. the work was already done);\n  the client then never shows an indicator.\n- Like all notifications this is ephemeral and is **not** replayed on\n  reconnect. A client that never receives the terminal frame SHOULD expire\n  the indicator after an idle timeout.",
+      "description": "Generic progress notification for a long-running operation.\n\nA client opts in to progress for a request by including a `progressToken` in\nthat request (today: the `progressToken` field on `createSession`). If the\nserver does long-running work to service the request — e.g. lazily\ndownloading an agent's native SDK the first time a session of that provider\nis materialized — it emits `progress` notifications carrying the same token.\n\nThe notification is operation-agnostic: it says nothing about *what* is\nprogressing. The client correlates `progressToken` back to the request it\noriginated from (and thus the UI surface awaiting it) and renders its own\nlocalized indicator. The same channel serves any future long-running\noperation without a new method.\n\nSemantics:\n\n- `progress` is monotonically non-decreasing for a given `progressToken`.\n- `total` is present only when the server knows the magnitude up front\n  (e.g. a `Content-Length`); when absent the client SHOULD show an\n  indeterminate indicator.\n- The operation is complete when `progress === total`. The server MUST emit a\n  final frame satisfying `progress === total`; when the total was never\n  known, it sets `total` to the final `progress` on that frame. No further\n  frames reference the token afterwards.\n- The server MAY emit no progress at all (e.g. the work was already done);\n  the client then never shows an indicator.\n- Like all notifications this is ephemeral and is **not** replayed on\n  reconnect. A client that never receives the terminal frame SHOULD expire\n  the indicator after an idle timeout.\n- Completion of reported work does not establish session readiness.\n  Repository-backed creation uses session state and the existing\n  `session/ready` or `session/creationFailed` actions for its durable outcome.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -1053,7 +1053,7 @@
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
-          "description": "Session configuration schema and current values"
+          "description": "Session configuration schema and current values. For repository-backed\ncreation, this includes the advertised repository descriptor and requested\nintent, so joining and reconnecting clients can recover it from state."
         },
         "customizations": {
           "type": "array",
@@ -1475,6 +1475,23 @@
         "title"
       ]
     },
+    "RepositorySessionConfig": {
+      "type": "object",
+      "description": "Opt-in descriptor for preparing one repository during session creation.\n\nProperty ids are host-chosen and MUST name distinct entries in\n{@link SessionConfigSchema.properties}. Each referenced property MUST have\n`type: 'string'` and MUST NOT have `readOnly: true` or `sessionMutable: true`.\nClients MUST use these ids rather than hardcoding repository field names.\n\nValues travel through `resolveSessionConfig.config` and `createSession.config`,\nnot a separate command or `_meta`. Schema discovery MUST NOT clone or prepare\na repository. The host accepts repository intent only when this descriptor\nis advertised.",
+      "properties": {
+        "urlProperty": {
+          "type": "string",
+          "description": "Property id for a credential-free repository URI."
+        },
+        "revisionProperty": {
+          "type": "string",
+          "description": "Property id for an optional branch, tag, or commit revision.\nA revision value without a repository URI is invalid."
+        }
+      },
+      "required": [
+        "urlProperty"
+      ]
+    },
     "SessionConfigSchema": {
       "type": "object",
       "description": "A JSON Schema object describing available session configuration metadata.",
@@ -1499,6 +1516,10 @@
             "type": "string"
           },
           "description": "JSON Schema: list of required property ids"
+        },
+        "repository": {
+          "$ref": "#/$defs/RepositorySessionConfig",
+          "description": "Opt-in capability for repository-backed creation using existing config\nproperties. The descriptor does not itself require a repository value.\nWithout repository intent, existing directory/default behavior is unchanged."
         }
       },
       "required": [

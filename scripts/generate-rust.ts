@@ -819,6 +819,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'ChangesSummary' },
   { name: 'ProjectInfo' },
   { name: 'SessionConfigPropertySchema' },
+  { name: 'RepositorySessionConfig' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
   { name: 'Turn' },

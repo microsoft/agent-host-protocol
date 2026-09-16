@@ -3213,7 +3213,7 @@
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
-          "description": "Session configuration schema and current values"
+          "description": "Session configuration schema and current values. For repository-backed\ncreation, this includes the advertised repository descriptor and requested\nintent, so joining and reconnecting clients can recover it from state."
         },
         "customizations": {
           "type": "array",
@@ -3635,6 +3635,23 @@
         "title"
       ]
     },
+    "RepositorySessionConfig": {
+      "type": "object",
+      "description": "Opt-in descriptor for preparing one repository during session creation.\n\nProperty ids are host-chosen and MUST name distinct entries in\n{@link SessionConfigSchema.properties}. Each referenced property MUST have\n`type: 'string'` and MUST NOT have `readOnly: true` or `sessionMutable: true`.\nClients MUST use these ids rather than hardcoding repository field names.\n\nValues travel through `resolveSessionConfig.config` and `createSession.config`,\nnot a separate command or `_meta`. Schema discovery MUST NOT clone or prepare\na repository. The host accepts repository intent only when this descriptor\nis advertised.",
+      "properties": {
+        "urlProperty": {
+          "type": "string",
+          "description": "Property id for a credential-free repository URI."
+        },
+        "revisionProperty": {
+          "type": "string",
+          "description": "Property id for an optional branch, tag, or commit revision.\nA revision value without a repository URI is invalid."
+        }
+      },
+      "required": [
+        "urlProperty"
+      ]
+    },
     "SessionConfigSchema": {
       "type": "object",
       "description": "A JSON Schema object describing available session configuration metadata.",
@@ -3659,6 +3676,10 @@
             "type": "string"
           },
           "description": "JSON Schema: list of required property ids"
+        },
+        "repository": {
+          "$ref": "#/$defs/RepositorySessionConfig",
+          "description": "Opt-in capability for repository-backed creation using existing config\nproperties. The descriptor does not itself require a repository value.\nWithout repository intent, existing directory/default behavior is unchanged."
         }
       },
       "required": [
