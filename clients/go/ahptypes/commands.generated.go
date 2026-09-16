@@ -375,6 +375,13 @@ type SubscribeResult struct {
 // After creation, the client should subscribe to the session URI to receive state
 // updates. The server also broadcasts a `root/sessionAdded` notification to all
 // clients.
+//
+// For repository intent advertised by {@link RepositorySessionConfig}, the
+// host MUST authorize the request before repository side effects and prepare
+// the repository before executing turns. It MUST publish the requested intent
+// in {@link SessionState.config} and any resolved `workingDirectories` before
+// `session/ready` or `session/creationFailed`. Clients recover the outcome from
+// session state, not progress notifications.
 type CreateSessionParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -396,9 +403,16 @@ type CreateSessionParams struct {
 	// capability treats only the first entry as the session's working directory
 	// and ignores the rest. Dispatch working-directory actions to change the set
 	// after the session has started.
+	//
+	// A non-empty list and repository intent in `config` are mutually exclusive.
+	// A repository URI is not a working-directory URI.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
 	// Agent-specific configuration values collected via `resolveSessionConfig`.
 	// Keys and values correspond to the schema returned by the server.
+	// Repository intent uses only the properties identified by the advertised
+	// {@link SessionConfigSchema.repository} descriptor. A revision without a
+	// repository URI is invalid. Omitting repository intent preserves existing
+	// directory/default behavior.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 	// Eagerly claim an active client role for the new session.
 	//
@@ -423,6 +437,9 @@ type CreateSessionParams struct {
 // Disposes a session and cleans up server-side resources.
 //
 // The server broadcasts a `root/sessionRemoved` notification to all clients.
+// Disposal MUST NOT erase a shared checkout or uncommitted user changes.
+// Repository cleanup remains host-owned; ending a client's wait or subscription
+// does not grant permission to delete repository data.
 type DisposeSessionParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -1070,6 +1087,10 @@ type DisposeTerminalParams struct {
 // (e.g. picks a working directory, toggles a property). Each response returns
 // the full current property set (not a delta). The returned `values` contain
 // server-resolved defaults to pass to `createSession`.
+//
+// Repository-backed creation is advertised by `schema.repository`. Resolving
+// that schema or its values MUST NOT clone or prepare a repository; preparation
+// belongs to `createSession`.
 type ResolveSessionConfigParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`

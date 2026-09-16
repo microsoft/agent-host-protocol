@@ -185,6 +185,8 @@ The server MAY emit `root/progress` to report incremental progress on a long-run
 
 `progress` is monotonically non-decreasing for a given `progressToken`. `total` is present only when the magnitude is known up front (e.g. a `Content-Length`); when absent, clients SHOULD show an indeterminate indicator. The operation is complete when `progress === total` — the server MUST emit a final frame satisfying this, setting `total` to the final `progress` when the total was never known, after which no further frames reference the token. An optional `message` carries a human-readable description of the work in progress; a client that tracks the token renders its own (localized) label and MAY ignore it, while a generic client MAY display `message` verbatim. The server MAY emit no progress at all (for example when the work was already done), in which case the client simply never shows an indicator. Like the catalogue events, `root/progress` is ephemeral and is **not** replayed on reconnect.
 
+Completing reported work does not establish session readiness. For [repository-backed creation](./session-channel#repository-backed-creation), hosts MAY use this same progress notification, but clients recover the requested intent, resolved directories, and `creating` / `ready` / `failed` outcome from session state. A minimal client can ignore progress entirely.
+
 ## Authentication Events
 
 The server MAY emit [`auth/required`](/specification/authentication#auth-expiry-notification) on the root channel when an agent's protected resource needs (re-)authentication. See [Authentication](/specification/authentication) for the full flow.

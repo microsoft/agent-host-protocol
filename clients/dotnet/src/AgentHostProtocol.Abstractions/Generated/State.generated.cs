@@ -1586,7 +1586,9 @@ public sealed class SessionState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; set; }
 
-    /// <summary>Session configuration schema and current values</summary>
+    /// <summary>Session configuration schema and current values. For repository-backed
+    /// creation, this includes the advertised repository descriptor and requested
+    /// intent, so joining and reconnecting clients can recover it from state.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SessionConfigState? Config { get; set; }
 
@@ -2007,6 +2009,28 @@ public sealed record SessionConfigPropertySchema
     public bool? SessionMutable { get; init; }
 }
 
+/// <summary>Opt-in descriptor for preparing one repository during session creation.
+///
+/// Property ids are host-chosen and MUST name distinct entries in
+/// {@link SessionConfigSchema.properties}. Each referenced property MUST have
+/// `type: 'string'` and MUST NOT have `readOnly: true` or `sessionMutable: true`.
+/// Clients MUST use these ids rather than hardcoding repository field names.
+///
+/// Values travel through `resolveSessionConfig.config` and `createSession.config`,
+/// not a separate command or `_meta`. Schema discovery MUST NOT clone or prepare
+/// a repository. The host accepts repository intent only when this descriptor
+/// is advertised.</summary>
+public sealed record RepositorySessionConfig
+{
+    /// <summary>Property id for a credential-free repository URI.</summary>
+    public required string UrlProperty { get; init; }
+
+    /// <summary>Property id for an optional branch, tag, or commit revision.
+    /// A revision value without a repository URI is invalid.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RevisionProperty { get; init; }
+}
+
 /// <summary>A JSON Schema object describing available session configuration metadata.</summary>
 public sealed record SessionConfigSchema
 {
@@ -2019,6 +2043,12 @@ public sealed record SessionConfigSchema
     /// <summary>JSON Schema: list of required property ids</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Required { get; init; }
+
+    /// <summary>Opt-in capability for repository-backed creation using existing config
+    /// properties. The descriptor does not itself require a repository value.
+    /// Without repository intent, existing directory/default behavior is unchanged.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RepositorySessionConfig? Repository { get; init; }
 }
 
 /// <summary>Live session configuration metadata.

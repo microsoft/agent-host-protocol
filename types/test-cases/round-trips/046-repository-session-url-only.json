@@ -1,0 +1,52 @@
+{
+  "name": "repository-session-url-only",
+  "group": "A",
+  "description": "A ready session preserves a repository descriptor without a revision field, requested URI, and resolved directory.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "workingDirectories": ["file:///work/project"],
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "source": { "type": "string", "title": "Repository" }
+          },
+          "repository": { "urlProperty": "source" }
+        },
+        "values": { "source": "https://example.org/team/project.git" }
+      }
+    },
+    "fromSeq": 2
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "workingDirectories": ["file:///work/project"],
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "source": { "type": "string", "title": "Repository" }
+          },
+          "repository": { "urlProperty": "source" }
+        },
+        "values": { "source": "https://example.org/team/project.git" }
+      }
+    },
+    "fromSeq": 2
+  }]
+}

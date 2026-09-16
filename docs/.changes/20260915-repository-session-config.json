@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Optional `SessionConfigSchema.repository` descriptor for host-owned, repository-backed session creation through existing configuration and lifecycle messages."
+}

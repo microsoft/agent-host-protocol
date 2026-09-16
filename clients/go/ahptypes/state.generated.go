@@ -905,7 +905,9 @@ type SessionState struct {
 	// marker — chats remain equal peers at the protocol level. Hosts MAY change
 	// this over the session's lifetime.
 	DefaultChat *URI `json:"defaultChat,omitempty"`
-	// Session configuration schema and current values
+	// Session configuration schema and current values. For repository-backed
+	// creation, this includes the advertised repository descriptor and requested
+	// intent, so joining and reconnecting clients can recover it from state.
 	Config *SessionConfigState `json:"config,omitempty"`
 	// Top-level customizations active in this session.
 	//
@@ -1364,6 +1366,25 @@ type SessionConfigPropertySchema struct {
 	SessionMutable *bool `json:"sessionMutable,omitempty"`
 }
 
+// Opt-in descriptor for preparing one repository during session creation.
+//
+// Property ids are host-chosen and MUST name distinct entries in
+// {@link SessionConfigSchema.properties}. Each referenced property MUST have
+// `type: 'string'` and MUST NOT have `readOnly: true` or `sessionMutable: true`.
+// Clients MUST use these ids rather than hardcoding repository field names.
+//
+// Values travel through `resolveSessionConfig.config` and `createSession.config`,
+// not a separate command or `_meta`. Schema discovery MUST NOT clone or prepare
+// a repository. The host accepts repository intent only when this descriptor
+// is advertised.
+type RepositorySessionConfig struct {
+	// Property id for a credential-free repository URI.
+	UrlProperty string `json:"urlProperty"`
+	// Property id for an optional branch, tag, or commit revision.
+	// A revision value without a repository URI is invalid.
+	RevisionProperty *string `json:"revisionProperty,omitempty"`
+}
+
 // A JSON Schema object describing available session configuration metadata.
 type SessionConfigSchema struct {
 	// JSON Schema: always `'object'`
@@ -1372,6 +1393,10 @@ type SessionConfigSchema struct {
 	Properties map[string]SessionConfigPropertySchema `json:"properties"`
 	// JSON Schema: list of required property ids
 	Required []string `json:"required,omitempty"`
+	// Opt-in capability for repository-backed creation using existing config
+	// properties. The descriptor does not itself require a repository value.
+	// Without repository intent, existing directory/default behavior is unchanged.
+	Repository *RepositorySessionConfig `json:"repository,omitempty"`
 }
 
 // Live session configuration metadata.

@@ -1802,7 +1802,9 @@ data class SessionState(
      */
     val defaultChat: String? = null,
     /**
-     * Session configuration schema and current values
+     * Session configuration schema and current values. For repository-backed
+     * creation, this includes the advertised repository descriptor and requested
+     * intent, so joining and reconnecting clients can recover it from state.
      */
     val config: SessionConfigState? = null,
     /**

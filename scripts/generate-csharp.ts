@@ -691,6 +691,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'ChangesSummary' },
   { name: 'ProjectInfo' },
   { name: 'SessionConfigPropertySchema' },
+  { name: 'RepositorySessionConfig' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState', mutable: true },
   { name: 'Turn', mutable: true },

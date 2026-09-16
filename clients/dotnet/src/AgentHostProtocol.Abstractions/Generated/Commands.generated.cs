@@ -462,7 +462,14 @@ public sealed record SubscribeResult
 ///
 /// After creation, the client should subscribe to the session URI to receive state
 /// updates. The server also broadcasts a `root/sessionAdded` notification to all
-/// clients.</summary>
+/// clients.
+///
+/// For repository intent advertised by {@link RepositorySessionConfig}, the
+/// host MUST authorize the request before repository side effects and prepare
+/// the repository before executing turns. It MUST publish the requested intent
+/// in {@link SessionState.config} and any resolved `workingDirectories` before
+/// `session/ready` or `session/creationFailed`. Clients recover the outcome from
+/// session state, not progress notifications.</summary>
 public sealed record CreateSessionParams
 {
     /// <summary>Session URI (client-chosen, e.g. `ahp-session:/&lt;uuid&gt;`)</summary>
@@ -490,12 +497,19 @@ public sealed record CreateSessionParams
     /// {@link AgentCapabilities.multipleWorkingDirectories}; a server without that
     /// capability treats only the first entry as the session's working directory
     /// and ignores the rest. Dispatch working-directory actions to change the set
-    /// after the session has started.</summary>
+    /// after the session has started.
+    ///
+    /// A non-empty list and repository intent in `config` are mutually exclusive.
+    /// A repository URI is not a working-directory URI.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
 
     /// <summary>Agent-specific configuration values collected via `resolveSessionConfig`.
-    /// Keys and values correspond to the schema returned by the server.</summary>
+    /// Keys and values correspond to the schema returned by the server.
+    /// Repository intent uses only the properties identified by the advertised
+    /// {@link SessionConfigSchema.repository} descriptor. A revision without a
+    /// repository URI is invalid. Omitting repository intent preserves existing
+    /// directory/default behavior.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
 
@@ -524,7 +538,10 @@ public sealed record CreateSessionParams
 
 /// <summary>Disposes a session and cleans up server-side resources.
 ///
-/// The server broadcasts a `root/sessionRemoved` notification to all clients.</summary>
+/// The server broadcasts a `root/sessionRemoved` notification to all clients.
+/// Disposal MUST NOT erase a shared checkout or uncommitted user changes.
+/// Repository cleanup remains host-owned; ending a client's wait or subscription
+/// does not grant permission to delete repository data.</summary>
 public sealed record DisposeSessionParams
 {
     /// <summary>Channel URI this command targets.</summary>
@@ -1346,7 +1363,11 @@ public sealed record DisposeTerminalParams
 /// The client calls this command whenever the user changes a significant input
 /// (e.g. picks a working directory, toggles a property). Each response returns
 /// the full current property set (not a delta). The returned `values` contain
-/// server-resolved defaults to pass to `createSession`.</summary>
+/// server-resolved defaults to pass to `createSession`.
+///
+/// Repository-backed creation is advertised by `schema.repository`. Resolving
+/// that schema or its values MUST NOT clone or prepare a repository; preparation
+/// belongs to `createSession`.</summary>
 public sealed record ResolveSessionConfigParams
 {
     public required string Channel { get; init; }

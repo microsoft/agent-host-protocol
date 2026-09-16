@@ -651,9 +651,16 @@ public struct CreateSessionParams: Codable, Sendable {
     /// capability treats only the first entry as the session's working directory
     /// and ignores the rest. Dispatch working-directory actions to change the set
     /// after the session has started.
+    ///
+    /// A non-empty list and repository intent in `config` are mutually exclusive.
+    /// A repository URI is not a working-directory URI.
     public var workingDirectories: [String]?
     /// Agent-specific configuration values collected via `resolveSessionConfig`.
     /// Keys and values correspond to the schema returned by the server.
+    /// Repository intent uses only the properties identified by the advertised
+    /// {@link SessionConfigSchema.repository} descriptor. A revision without a
+    /// repository URI is invalid. Omitting repository intent preserves existing
+    /// directory/default behavior.
     public var config: [String: AnyCodable]?
     /// Eagerly claim an active client role for the new session.
     ///
@@ -1720,6 +1727,22 @@ public struct SessionConfigPropertySchema: Codable, Sendable {
     }
 }
 
+public struct RepositorySessionConfig: Codable, Sendable {
+    /// Property id for a credential-free repository URI.
+    public var urlProperty: String
+    /// Property id for an optional branch, tag, or commit revision.
+    /// A revision value without a repository URI is invalid.
+    public var revisionProperty: String?
+
+    public init(
+        urlProperty: String,
+        revisionProperty: String? = nil
+    ) {
+        self.urlProperty = urlProperty
+        self.revisionProperty = revisionProperty
+    }
+}
+
 public struct SessionConfigSchema: Codable, Sendable {
     /// JSON Schema: always `'object'`
     public var type: String
@@ -1727,15 +1750,21 @@ public struct SessionConfigSchema: Codable, Sendable {
     public var properties: [String: SessionConfigPropertySchema]
     /// JSON Schema: list of required property ids
     public var required: [String]?
+    /// Opt-in capability for repository-backed creation using existing config
+    /// properties. The descriptor does not itself require a repository value.
+    /// Without repository intent, existing directory/default behavior is unchanged.
+    public var repository: RepositorySessionConfig?
 
     public init(
         type: String,
         properties: [String: SessionConfigPropertySchema],
-        required: [String]? = nil
+        required: [String]? = nil,
+        repository: RepositorySessionConfig? = nil
     ) {
         self.type = type
         self.properties = properties
         self.required = required
+        self.repository = repository
     }
 }
 

@@ -2053,7 +2053,9 @@ pub struct SessionState {
     /// this over the session's lifetime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
-    /// Session configuration schema and current values
+    /// Session configuration schema and current values. For repository-backed
+    /// creation, this includes the advertised repository descriptor and requested
+    /// intent, so joining and reconnecting clients can recover it from state.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<SessionConfigState>,
     /// Top-level customizations active in this session.
@@ -2463,6 +2465,28 @@ pub struct SessionConfigPropertySchema {
     pub session_mutable: Option<bool>,
 }
 
+/// Opt-in descriptor for preparing one repository during session creation.
+///
+/// Property ids are host-chosen and MUST name distinct entries in
+/// {@link SessionConfigSchema.properties}. Each referenced property MUST have
+/// `type: 'string'` and MUST NOT have `readOnly: true` or `sessionMutable: true`.
+/// Clients MUST use these ids rather than hardcoding repository field names.
+///
+/// Values travel through `resolveSessionConfig.config` and `createSession.config`,
+/// not a separate command or `_meta`. Schema discovery MUST NOT clone or prepare
+/// a repository. The host accepts repository intent only when this descriptor
+/// is advertised.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositorySessionConfig {
+    /// Property id for a credential-free repository URI.
+    pub url_property: String,
+    /// Property id for an optional branch, tag, or commit revision.
+    /// A revision value without a repository URI is invalid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision_property: Option<String>,
+}
+
 /// A JSON Schema object describing available session configuration metadata.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2474,6 +2498,11 @@ pub struct SessionConfigSchema {
     /// JSON Schema: list of required property ids
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub required: Option<Vec<String>>,
+    /// Opt-in capability for repository-backed creation using existing config
+    /// properties. The descriptor does not itself require a repository value.
+    /// Without repository intent, existing directory/default behavior is unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository: Option<RepositorySessionConfig>,
 }
 
 /// Live session configuration metadata.

@@ -617,11 +617,18 @@ data class CreateSessionParams(
      * capability treats only the first entry as the session's working directory
      * and ignores the rest. Dispatch working-directory actions to change the set
      * after the session has started.
+     *
+     * A non-empty list and repository intent in `config` are mutually exclusive.
+     * A repository URI is not a working-directory URI.
      */
     val workingDirectories: List<String>? = null,
     /**
      * Agent-specific configuration values collected via `resolveSessionConfig`.
      * Keys and values correspond to the schema returned by the server.
+     * Repository intent uses only the properties identified by the advertised
+     * {@link SessionConfigSchema.repository} descriptor. A revision without a
+     * repository URI is invalid. Omitting repository intent preserves existing
+     * directory/default behavior.
      */
     val config: Map<String, JsonElement>? = null,
     /**
@@ -1398,6 +1405,19 @@ data class SessionConfigPropertySchema(
 )
 
 @Serializable
+data class RepositorySessionConfig(
+    /**
+     * Property id for a credential-free repository URI.
+     */
+    val urlProperty: String,
+    /**
+     * Property id for an optional branch, tag, or commit revision.
+     * A revision value without a repository URI is invalid.
+     */
+    val revisionProperty: String? = null
+)
+
+@Serializable
 data class SessionConfigSchema(
     /**
      * JSON Schema: always `'object'`
@@ -1410,7 +1430,13 @@ data class SessionConfigSchema(
     /**
      * JSON Schema: list of required property ids
      */
-    val required: List<String>? = null
+    val required: List<String>? = null,
+    /**
+     * Opt-in capability for repository-backed creation using existing config
+     * properties. The descriptor does not itself require a repository value.
+     * Without repository intent, existing directory/default behavior is unchanged.
+     */
+    val repository: RepositorySessionConfig? = null
 )
 
 @Serializable

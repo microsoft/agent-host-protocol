@@ -200,6 +200,79 @@ describe('generated JSON schemas', () => {
         assert.match(expiresIn.description as string, /MUST be a positive integer/);
       });
 
+      it('keeps repository session descriptors optional and validates their wire shape', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const configSchema = defs.SessionConfigSchema;
+        const properties = configSchema.properties as Record<string, Record<string, unknown>>;
+        const repository = defs.RepositorySessionConfig;
+        const repositoryProperties = repository.properties as Record<string, Record<string, unknown>>;
+
+        assert.deepEqual(configSchema.required, ['type', 'properties']);
+        assert.equal(properties.repository.$ref, '#/$defs/RepositorySessionConfig');
+        assert.deepEqual(repository.required, ['urlProperty']);
+        assert.deepEqual(Object.keys(repositoryProperties).sort(), ['revisionProperty', 'urlProperty']);
+        assert.equal(repositoryProperties.urlProperty.type, 'string');
+        assert.equal(repositoryProperties.revisionProperty.type, 'string');
+
+        const legacy = {
+          type: 'object',
+          properties: { mode: { type: 'string', title: 'Mode' } },
+          required: ['mode'],
+        };
+        assert.equal(schemaAccepts(schema, configSchema, legacy), true);
+
+        const repositorySchema = {
+          type: 'object',
+          properties: {
+            host_source: { type: 'string', title: 'Repository', readOnly: false, sessionMutable: false },
+            host_revision: { type: 'string', title: 'Revision', readOnly: false, sessionMutable: false },
+          },
+        };
+        for (const descriptor of [
+          { urlProperty: 'host_source' },
+          { urlProperty: 'host_source', revisionProperty: 'host_revision' },
+        ]) {
+          assert.equal(
+            schemaAccepts(schema, configSchema, { ...repositorySchema, repository: descriptor }),
+            true,
+          );
+        }
+        for (const descriptor of [
+          {},
+          { revisionProperty: 'host_revision' },
+          { urlProperty: 42 },
+          { urlProperty: 'host_source', revisionProperty: false },
+          null,
+          [],
+        ]) {
+          assert.equal(
+            schemaAccepts(schema, configSchema, { ...repositorySchema, repository: descriptor }),
+            false,
+          );
+        }
+      });
+
+      it('retains generic config inputs for repository-backed creation', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const config = {
+          host_source: 'https://example.org/team/project.git',
+          host_revision: 'refs/tags/v1.2.3',
+          mode: 'review',
+        };
+        for (const [definition, channel] of [
+          ['ResolveSessionConfigParams', 'ahp-root://'],
+          ['CreateSessionParams', 'ahp-session:/repository-test'],
+        ]) {
+          const properties = defs[definition].properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.config.type, 'object');
+          assert.equal(properties.repository, undefined);
+          assert.equal(schemaAccepts(schema, defs[definition], { channel, config }), true);
+        }
+      });
+
       it('constrains every ChatOrigin branch to a distinct kind', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const chatOrigin = defs.ChatOrigin;

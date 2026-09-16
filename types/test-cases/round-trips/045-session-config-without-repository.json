@@ -1,0 +1,50 @@
+{
+  "name": "session-config-without-repository",
+  "group": "A",
+  "description": "An existing directory-backed session config remains valid without a repository descriptor.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/directory-session",
+    "state": {
+      "provider": "example",
+      "title": "Directory session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "workingDirectories": ["file:///work/existing"],
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "title": "Mode", "sessionMutable": true }
+          }
+        },
+        "values": { "mode": "review" }
+      }
+    },
+    "fromSeq": 1
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/directory-session",
+    "state": {
+      "provider": "example",
+      "title": "Directory session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "workingDirectories": ["file:///work/existing"],
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "title": "Mode", "sessionMutable": true }
+          }
+        },
+        "values": { "mode": "review" }
+      }
+    },
+    "fromSeq": 1
+  }]
+}

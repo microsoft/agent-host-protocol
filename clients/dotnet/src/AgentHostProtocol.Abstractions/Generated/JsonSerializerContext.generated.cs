@@ -264,6 +264,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(ReconnectResult))]
 [JsonSerializable(typeof(ReconnectResultType))]
 [JsonSerializable(typeof(ReconnectSnapshotResult))]
+[JsonSerializable(typeof(RepositorySessionConfig))]
 [JsonSerializable(typeof(ResolveSessionConfigParams))]
 [JsonSerializable(typeof(ResolveSessionConfigResult))]
 [JsonSerializable(typeof(ResourceChange))]
