@@ -19,3 +19,4 @@ for install snippets and per-language entry points.
 ## Servers
 
 - **[VS Code agent host](https://github.com/microsoft/vscode)** — The reference AHP server implementation. Start in [`src/vs/platform/agentHost/node/`](https://github.com/microsoft/vscode/tree/main/src/vs/platform/agentHost/node) when browsing the repository.
+- **[pi-ahp](https://github.com/Qusic/pi-ahp)** — An open-source AHP host for the [pi coding agent](https://github.com/earendil-works/pi), exposing pi sessions to AHP clients over WebSocket.
