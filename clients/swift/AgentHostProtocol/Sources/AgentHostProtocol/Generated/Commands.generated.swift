@@ -657,15 +657,7 @@ public struct CreateSessionParams: Codable, Sendable {
     /// source may produce multiple directories.
     public var workingDirectories: [String]?
     /// Session configuration values collected via `resolveSessionConfig`.
-    /// Keys and values correspond to the schema returned by the server.
-    /// Repository intent uses the standard `repositorySource` and optional
-    /// `repositoryRevision` keys only when advertised by
-    /// {@link SessionConfigSchema.properties}. Values MUST be non-empty strings;
-    /// the source MUST be a credential-free repository URI. A revision without a
-    /// source, unsupported input, or conflicting directories MUST produce
-    /// `InvalidParams` (`-32602`), not silently fall back. Omitting repository
-    /// intent preserves existing directory/default behavior. Other keys remain
-    /// host-defined.
+    /// Keys and values follow the advertised {@link SessionConfigSchema}.
     public var config: [String: AnyCodable]?
     /// Eagerly claim an active client role for the new session.
     ///
@@ -1608,11 +1600,7 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
-    /// Current user-filled configuration values. Repository intent uses
-    /// `repositorySource` and optional `repositoryRevision` only when advertised
-    /// by the session config schema. Invalid or unsupported repository input MUST
-    /// produce `InvalidParams` (`-32602`), not silently select directory/default
-    /// behavior.
+    /// Current user-filled configuration values; see {@link SessionConfigSchema}.
     public var config: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {

@@ -949,7 +949,7 @@
     },
     "ResolveSessionConfigParams": {
       "type": "object",
-      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). The returned `values` contain\nserver-resolved defaults to pass to `createSession`.\n\nRepository-backed creation is advertised by a valid\n`schema.properties.repositorySource`, with optional\n`schema.properties.repositoryRevision`; see {@link SessionConfigSchema}.\nValues use those fixed keys in `config`. Resolving the schema or its values,\nincluding discovery without a working directory, MUST NOT clone or prepare\na repository; preparation belongs to `createSession`.",
+      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). The returned `values` contain\nserver-resolved defaults to pass to `createSession`.\n\nThis command MUST NOT clone or prepare a repository. Standard repository\ninputs and their advertisement requirements are defined by {@link SessionConfigSchema}.",
       "properties": {
         "channel": {
           "type": "string",
@@ -973,7 +973,7 @@
         "config": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Current user-filled configuration values. Repository intent uses\n`repositorySource` and optional `repositoryRevision` only when advertised\nby the session config schema. Invalid or unsupported repository input MUST\nproduce `InvalidParams` (`-32602`), not silently select directory/default\nbehavior."
+          "description": "Current user-filled configuration values; see {@link SessionConfigSchema}."
         }
       },
       "required": [
@@ -1081,7 +1081,7 @@
     },
     "CreateSessionParams": {
       "type": "object",
-      "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `root/sessionAdded` notification to all\nclients.\n\nFor repository intent advertised by {@link SessionConfigSchema.properties},\nthe host MUST authorize the request before repository side effects and\nprepare the repository before executing turns. It MUST publish the requested\n`repositorySource` and optional `repositoryRevision` in\n{@link SessionState.config} from the initial `creating` snapshot and retain\nthem through `ready` or `failed`. Any resolved `workingDirectories` MUST be\npublished before `session/ready` or `session/creationFailed`. Clients recover\nthe outcome from session state, not progress notifications.",
+      "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `root/sessionAdded` notification to all\nclients.\n\nRepository preparation MUST finish before `session/ready` or executing turns.\nClients recover the outcome from session state, not progress notifications.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -1106,7 +1106,7 @@
         "config": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Session configuration values collected via `resolveSessionConfig`.\nKeys and values correspond to the schema returned by the server.\nRepository intent uses the standard `repositorySource` and optional\n`repositoryRevision` keys only when advertised by\n{@link SessionConfigSchema.properties}. Values MUST be non-empty strings;\nthe source MUST be a credential-free repository URI. A revision without a\nsource, unsupported input, or conflicting directories MUST produce\n`InvalidParams` (`-32602`), not silently fall back. Omitting repository\nintent preserves existing directory/default behavior. Other keys remain\nhost-defined."
+          "description": "Session configuration values collected via `resolveSessionConfig`.\nKeys and values follow the advertised {@link SessionConfigSchema}."
         },
         "activeClient": {
           "$ref": "#/$defs/SessionActiveClient",

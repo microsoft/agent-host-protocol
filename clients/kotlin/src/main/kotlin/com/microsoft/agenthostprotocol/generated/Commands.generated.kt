@@ -625,15 +625,7 @@ data class CreateSessionParams(
     val workingDirectories: List<String>? = null,
     /**
      * Session configuration values collected via `resolveSessionConfig`.
-     * Keys and values correspond to the schema returned by the server.
-     * Repository intent uses the standard `repositorySource` and optional
-     * `repositoryRevision` keys only when advertised by
-     * {@link SessionConfigSchema.properties}. Values MUST be non-empty strings;
-     * the source MUST be a credential-free repository URI. A revision without a
-     * source, unsupported input, or conflicting directories MUST produce
-     * `InvalidParams` (`-32602`), not silently fall back. Omitting repository
-     * intent preserves existing directory/default behavior. Other keys remain
-     * host-defined.
+     * Keys and values follow the advertised {@link SessionConfigSchema}.
      */
     val config: Map<String, JsonElement>? = null,
     /**
@@ -1329,11 +1321,7 @@ data class ResolveSessionConfigParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Current user-filled configuration values. Repository intent uses
-     * `repositorySource` and optional `repositoryRevision` only when advertised
-     * by the session config schema. Invalid or unsupported repository input MUST
-     * produce `InvalidParams` (`-32602`), not silently select directory/default
-     * behavior.
+     * Current user-filled configuration values; see {@link SessionConfigSchema}.
      */
     val config: Map<String, JsonElement>? = null
 )

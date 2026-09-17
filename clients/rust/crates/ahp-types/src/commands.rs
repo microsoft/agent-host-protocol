@@ -559,14 +559,8 @@ pub struct SubscribeResult {
 /// updates. The server also broadcasts a `root/sessionAdded` notification to all
 /// clients.
 ///
-/// For repository intent advertised by {@link SessionConfigSchema.properties},
-/// the host MUST authorize the request before repository side effects and
-/// prepare the repository before executing turns. It MUST publish the requested
-/// `repositorySource` and optional `repositoryRevision` in
-/// {@link SessionState.config} from the initial `creating` snapshot and retain
-/// them through `ready` or `failed`. Any resolved `workingDirectories` MUST be
-/// published before `session/ready` or `session/creationFailed`. Clients recover
-/// the outcome from session state, not progress notifications.
+/// Repository preparation MUST finish before `session/ready` or executing turns.
+/// Clients recover the outcome from session state, not progress notifications.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionParams {
@@ -599,15 +593,7 @@ pub struct CreateSessionParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
     /// Session configuration values collected via `resolveSessionConfig`.
-    /// Keys and values correspond to the schema returned by the server.
-    /// Repository intent uses the standard `repositorySource` and optional
-    /// `repositoryRevision` keys only when advertised by
-    /// {@link SessionConfigSchema.properties}. Values MUST be non-empty strings;
-    /// the source MUST be a credential-free repository URI. A revision without a
-    /// source, unsupported input, or conflicting directories MUST produce
-    /// `InvalidParams` (`-32602`), not silently fall back. Omitting repository
-    /// intent preserves existing directory/default behavior. Other keys remain
-    /// host-defined.
+    /// Keys and values follow the advertised {@link SessionConfigSchema}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
     /// Eagerly claim an active client role for the new session.
@@ -1399,12 +1385,8 @@ pub struct DisposeTerminalParams {
 /// the full current property set (not a delta). The returned `values` contain
 /// server-resolved defaults to pass to `createSession`.
 ///
-/// Repository-backed creation is advertised by a valid
-/// `schema.properties.repositorySource`, with optional
-/// `schema.properties.repositoryRevision`; see {@link SessionConfigSchema}.
-/// Values use those fixed keys in `config`. Resolving the schema or its values,
-/// including discovery without a working directory, MUST NOT clone or prepare
-/// a repository; preparation belongs to `createSession`.
+/// This command MUST NOT clone or prepare a repository. Standard repository
+/// inputs and their advertisement requirements are defined by {@link SessionConfigSchema}.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolveSessionConfigParams {
@@ -1420,11 +1402,7 @@ pub struct ResolveSessionConfigParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Current user-filled configuration values. Repository intent uses
-    /// `repositorySource` and optional `repositoryRevision` only when advertised
-    /// by the session config schema. Invalid or unsupported repository input MUST
-    /// produce `InvalidParams` (`-32602`), not silently select directory/default
-    /// behavior.
+    /// Current user-filled configuration values; see {@link SessionConfigSchema}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
 }
