@@ -751,6 +751,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'SessionToolClientExecutionRequest' },
   { name: 'SessionToolAuthenticationRequest' },
   { name: 'SessionSummary' },
+  { name: 'SessionChatSummary' },
   { name: 'ChangesSummary' },
   { name: 'ChatState' },
   { name: 'ChatSummary' },

@@ -300,4 +300,16 @@ public sealed record PartialSessionSummary
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Lightweight ordered chat catalog for session-list presentation.
+    ///
+    /// This intentionally omits volatile chat state such as status, activity,
+    /// and interactivity. Clients subscribe to the session channel when they
+    /// need those details.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<SessionChatSummary>? Chats { get; init; }
+
+    /// <summary>Chat that receives input when no specific chat is selected.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DefaultChat { get; init; }
 }

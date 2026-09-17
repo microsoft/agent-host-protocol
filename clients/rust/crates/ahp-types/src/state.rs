@@ -2381,6 +2381,30 @@ pub struct SessionSummary {
     /// and session notifications.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Lightweight ordered chat catalog for session-list presentation.
+    ///
+    /// This intentionally omits volatile chat state such as status, activity,
+    /// and interactivity. Clients subscribe to the session channel when they
+    /// need those details.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chats: Option<Vec<SessionChatSummary>>,
+    /// Chat that receives input when no specific chat is selected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_chat: Option<Uri>,
+}
+
+/// Lightweight chat information suitable for listing a session without
+/// subscribing to its session channel.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChatSummary {
+    /// Canonical chat URI
+    pub resource: Uri,
+    /// Human-readable chat title
+    pub title: String,
+    /// How this chat was created, when known
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<ChatOrigin>,
 }
 
 /// Aggregate counts describing the file changes associated with a session.

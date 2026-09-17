@@ -1912,6 +1912,33 @@ public sealed class SessionSummary
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
+
+    /// <summary>Lightweight ordered chat catalog for session-list presentation.
+    ///
+    /// This intentionally omits volatile chat state such as status, activity,
+    /// and interactivity. Clients subscribe to the session channel when they
+    /// need those details.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<SessionChatSummary>? Chats { get; set; }
+
+    /// <summary>Chat that receives input when no specific chat is selected.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DefaultChat { get; set; }
+}
+
+/// <summary>Lightweight chat information suitable for listing a session without
+/// subscribing to its session channel.</summary>
+public sealed record SessionChatSummary
+{
+    /// <summary>Canonical chat URI</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>Human-readable chat title</summary>
+    public required string Title { get; init; }
+
+    /// <summary>How this chat was created, when known</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ChatOrigin? Origin { get; init; }
 }
 
 /// <summary>Aggregate counts describing the file changes associated with a session.

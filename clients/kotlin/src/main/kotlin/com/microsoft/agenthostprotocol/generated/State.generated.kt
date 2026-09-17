@@ -2073,7 +2073,35 @@ data class SessionSummary(
      * and session notifications.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Lightweight ordered chat catalog for session-list presentation.
+     *
+     * This intentionally omits volatile chat state such as status, activity,
+     * and interactivity. Clients subscribe to the session channel when they
+     * need those details.
+     */
+    val chats: List<SessionChatSummary>? = null,
+    /**
+     * Chat that receives input when no specific chat is selected.
+     */
+    val defaultChat: String? = null
+)
+
+@Serializable
+data class SessionChatSummary(
+    /**
+     * Canonical chat URI
+     */
+    val resource: String,
+    /**
+     * Human-readable chat title
+     */
+    val title: String,
+    /**
+     * How this chat was created, when known
+     */
+    val origin: ChatOrigin? = null
 )
 
 @Serializable

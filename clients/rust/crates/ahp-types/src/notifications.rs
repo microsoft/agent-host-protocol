@@ -319,4 +319,14 @@ pub struct PartialSessionSummary {
     /// and session notifications.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Lightweight ordered chat catalog for session-list presentation.
+    ///
+    /// This intentionally omits volatile chat state such as status, activity,
+    /// and interactivity. Clients subscribe to the session channel when they
+    /// need those details.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chats: Option<Vec<SessionChatSummary>>,
+    /// Chat that receives input when no specific chat is selected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_chat: Option<Uri>,
 }

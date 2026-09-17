@@ -816,6 +816,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'SessionToolClientExecutionRequest', omitDiscriminants: true },
   { name: 'SessionToolAuthenticationRequest', omitDiscriminants: true },
   { name: 'SessionSummary' },
+  { name: 'SessionChatSummary' },
   { name: 'ChangesSummary' },
   { name: 'ProjectInfo' },
   { name: 'SessionConfigPropertySchema' },
