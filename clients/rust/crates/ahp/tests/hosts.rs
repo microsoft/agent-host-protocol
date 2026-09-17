@@ -1099,6 +1099,8 @@ fn make_summary(uri: &str, title: &str, modified_at: i64) -> ahp_types::state::S
         changes: None,
         annotations: None,
         meta: None,
+        chats: None,
+        default_chat: None,
     }
 }
 
