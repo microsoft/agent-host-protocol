@@ -118,11 +118,25 @@ If the client retained the original token response, it MUST subtract elapsed tim
 
 `scopes` is optional and lets the client tell the server which OAuth scopes the pushed token actually grants — useful when resolving a `requiredScopes` challenge (from a live `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth`) without the server needing to decode an opaque token.
 
+`serverName` is optional for provider-level resources and required when the
+token resolves an authentication challenge from a particular MCP server. Its
+value is the exact, case-sensitive MCP server configuration name advertised by
+the corresponding MCP customization or tool-call state. When present, the host
+MUST apply the token only to that named server, even when other MCP servers
+advertise the same `resource` and scopes.
+
 If the token is invalid or the resource is unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams` `-32602`).
 
-### Why keyed by `resource`?
+### Why keyed by `resource` and optional `serverName`?
 
 The RFC 9728 `resource` field is already a unique identifier for the protected resource. Using it directly as the correlation key between discovery and token delivery avoids inventing a parallel ID scheme. Clients match tokens to resources using standard OAuth 2.0 semantics.
+
+Different MCP server configurations can intentionally share one protected
+resource while using distinct OAuth clients or accounts. For those
+server-owned challenges, `serverName` adds the configuration identity needed
+to prevent one server's token from satisfying a sibling server's pending
+request. Provider-level authentication continues to omit `serverName` and
+remains keyed by `resource` and scopes.
 
 ## Error Handling
 
