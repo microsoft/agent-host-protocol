@@ -14,7 +14,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
-    ProjectInfo, ProtectedResourceMetadata, SessionOrigin, SessionStatus, SessionSummary,
+    ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus,
+    SessionSummary,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
