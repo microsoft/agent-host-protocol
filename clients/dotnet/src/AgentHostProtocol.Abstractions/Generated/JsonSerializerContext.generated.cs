@@ -311,6 +311,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(SessionChatAddedAction))]
 [JsonSerializable(typeof(SessionChatInputRequest))]
 [JsonSerializable(typeof(SessionChatRemovedAction))]
+[JsonSerializable(typeof(SessionChatSummary))]
 [JsonSerializable(typeof(SessionChatUpdatedAction))]
 [JsonSerializable(typeof(SessionConfigChangedAction))]
 [JsonSerializable(typeof(SessionConfigCompletionsParams))]

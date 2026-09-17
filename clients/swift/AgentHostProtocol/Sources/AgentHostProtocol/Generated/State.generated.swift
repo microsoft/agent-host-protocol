@@ -2160,6 +2160,14 @@ public struct SessionSummary: Codable, Sendable {
     /// SHOULD keep the payload small because summaries appear in session lists
     /// and session notifications.
     public var meta: [String: AnyCodable]?
+    /// Lightweight ordered chat catalog for session-list presentation.
+    ///
+    /// This intentionally omits volatile chat state such as status, activity,
+    /// and interactivity. Clients subscribe to the session channel when they
+    /// need those details.
+    public var chats: [SessionChatSummary]?
+    /// Chat that receives input when no specific chat is selected.
+    public var defaultChat: String?
 
     enum CodingKeys: String, CodingKey {
         case provider
@@ -2175,6 +2183,8 @@ public struct SessionSummary: Codable, Sendable {
         case modifiedAt
         case changes
         case meta = "_meta"
+        case chats
+        case defaultChat
     }
 
     public init(
@@ -2190,7 +2200,9 @@ public struct SessionSummary: Codable, Sendable {
         createdAt: String,
         modifiedAt: String,
         changes: ChangesSummary? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        chats: [SessionChatSummary]? = nil,
+        defaultChat: String? = nil
     ) {
         self.provider = provider
         self.title = title
@@ -2205,6 +2217,27 @@ public struct SessionSummary: Codable, Sendable {
         self.modifiedAt = modifiedAt
         self.changes = changes
         self.meta = meta
+        self.chats = chats
+        self.defaultChat = defaultChat
+    }
+}
+
+public struct SessionChatSummary: Codable, Sendable {
+    /// Canonical chat URI
+    public var resource: String
+    /// Human-readable chat title
+    public var title: String
+    /// How this chat was created, when known
+    public var origin: ChatOrigin?
+
+    public init(
+        resource: String,
+        title: String,
+        origin: ChatOrigin? = nil
+    ) {
+        self.resource = resource
+        self.title = title
+        self.origin = origin
     }
 }
 
