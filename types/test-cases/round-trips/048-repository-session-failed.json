@@ -1,0 +1,52 @@
+{
+  "name": "repository-session-failed",
+  "group": "A",
+  "description": "A failed session retains the requested repository source and revision without claiming a directory was resolved.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "failed",
+      "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
+      "activeClients": [],
+      "chats": [],
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "repositorySource": { "type": "string", "title": "Repository" },
+            "repositoryRevision": { "type": "string", "title": "Revision" }
+          }
+        },
+        "values": { "repositorySource": "https://example.org/team/project.git", "repositoryRevision": "main" }
+      }
+    },
+    "fromSeq": 1
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "failed",
+      "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
+      "activeClients": [],
+      "chats": [],
+      "config": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "repositorySource": { "type": "string", "title": "Repository" },
+            "repositoryRevision": { "type": "string", "title": "Revision" }
+          }
+        },
+        "values": { "repositorySource": "https://example.org/team/project.git", "repositoryRevision": "main" }
+      }
+    },
+    "fromSeq": 1
+  }]
+}

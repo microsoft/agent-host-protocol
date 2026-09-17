@@ -758,7 +758,6 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'PendingMessage' },
   { name: 'ProjectInfo' },
   { name: 'SessionConfigPropertySchema' },
-  { name: 'RepositorySessionConfig' },
   { name: 'SessionConfigSchema' },
   { name: 'SessionConfigState' },
   { name: 'Turn' },

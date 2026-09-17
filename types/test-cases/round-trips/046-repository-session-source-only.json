@@ -1,7 +1,7 @@
 {
-  "name": "repository-session-url-only",
+  "name": "repository-session-source-only",
   "group": "A",
-  "description": "A ready session preserves a repository descriptor without a revision field, requested URI, and resolved directory.",
+  "description": "A ready session preserves the standard repositorySource property and requested URI, omits the optional revision, and resolves one source to multiple directories.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-session:/repository-session",
@@ -12,16 +12,15 @@
       "lifecycle": "ready",
       "activeClients": [],
       "chats": [],
-      "workingDirectories": ["file:///work/project"],
+      "workingDirectories": ["file:///work/project", "file:///work/project-worktree"],
       "config": {
         "schema": {
           "type": "object",
           "properties": {
-            "source": { "type": "string", "title": "Repository" }
-          },
-          "repository": { "urlProperty": "source" }
+            "repositorySource": { "type": "string", "title": "Repository" }
+          }
         },
-        "values": { "source": "https://example.org/team/project.git" }
+        "values": { "repositorySource": "https://example.org/team/project.git" }
       }
     },
     "fromSeq": 2
@@ -35,16 +34,15 @@
       "lifecycle": "ready",
       "activeClients": [],
       "chats": [],
-      "workingDirectories": ["file:///work/project"],
+      "workingDirectories": ["file:///work/project", "file:///work/project-worktree"],
       "config": {
         "schema": {
           "type": "object",
           "properties": {
-            "source": { "type": "string", "title": "Repository" }
-          },
-          "repository": { "urlProperty": "source" }
+            "repositorySource": { "type": "string", "title": "Repository" }
+          }
         },
-        "values": { "source": "https://example.org/team/project.git" }
+        "values": { "repositorySource": "https://example.org/team/project.git" }
       }
     },
     "fromSeq": 2

@@ -1652,7 +1652,7 @@ const COMMAND_STRUCTS = [
   'AuthenticateParams', 'AuthenticateResult',
   'CreateTerminalParams', 'DisposeTerminalParams',
   'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
-  'SessionConfigPropertySchema', 'RepositorySessionConfig', 'SessionConfigSchema',
+  'SessionConfigPropertySchema', 'SessionConfigSchema',
   'SessionConfigCompletionsParams', 'SessionConfigCompletionsResult',
   'SessionConfigValueItem',
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',

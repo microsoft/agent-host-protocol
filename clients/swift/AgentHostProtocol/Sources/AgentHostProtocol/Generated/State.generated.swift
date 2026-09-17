@@ -1840,8 +1840,9 @@ public struct SessionState: Codable, Sendable {
     /// this over the session's lifetime.
     public var defaultChat: String?
     /// Session configuration schema and current values. For repository-backed
-    /// creation, this includes the advertised repository descriptor and requested
-    /// intent, so joining and reconnecting clients can recover it from state.
+    /// creation, this includes the advertised standard properties and requested
+    /// `repositorySource` and optional `repositoryRevision` values throughout
+    /// `creating`, `ready`, and `failed`, so clients can recover intent from state.
     public var config: SessionConfigState?
     /// Top-level customizations active in this session.
     ///

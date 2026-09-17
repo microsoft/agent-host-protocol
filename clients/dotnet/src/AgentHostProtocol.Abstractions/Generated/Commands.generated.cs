@@ -464,12 +464,14 @@ public sealed record SubscribeResult
 /// updates. The server also broadcasts a `root/sessionAdded` notification to all
 /// clients.
 ///
-/// For repository intent advertised by {@link RepositorySessionConfig}, the
-/// host MUST authorize the request before repository side effects and prepare
-/// the repository before executing turns. It MUST publish the requested intent
-/// in {@link SessionState.config} and any resolved `workingDirectories` before
-/// `session/ready` or `session/creationFailed`. Clients recover the outcome from
-/// session state, not progress notifications.</summary>
+/// For repository intent advertised by {@link SessionConfigSchema.properties},
+/// the host MUST authorize the request before repository side effects and
+/// prepare the repository before executing turns. It MUST publish the requested
+/// `repositorySource` and optional `repositoryRevision` in
+/// {@link SessionState.config} from the initial `creating` snapshot and retain
+/// them through `ready` or `failed`. Any resolved `workingDirectories` MUST be
+/// published before `session/ready` or `session/creationFailed`. Clients recover
+/// the outcome from session state, not progress notifications.</summary>
 public sealed record CreateSessionParams
 {
     /// <summary>Session URI (client-chosen, e.g. `ahp-session:/&lt;uuid&gt;`)</summary>
@@ -500,16 +502,21 @@ public sealed record CreateSessionParams
     /// after the session has started.
     ///
     /// A non-empty list and repository intent in `config` are mutually exclusive.
-    /// A repository URI is not a working-directory URI.</summary>
+    /// A repository URI identifies the source, not a working-directory URI; one
+    /// source may produce multiple directories.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
 
-    /// <summary>Agent-specific configuration values collected via `resolveSessionConfig`.
+    /// <summary>Session configuration values collected via `resolveSessionConfig`.
     /// Keys and values correspond to the schema returned by the server.
-    /// Repository intent uses only the properties identified by the advertised
-    /// {@link SessionConfigSchema.repository} descriptor. A revision without a
-    /// repository URI is invalid. Omitting repository intent preserves existing
-    /// directory/default behavior.</summary>
+    /// Repository intent uses the standard `repositorySource` and optional
+    /// `repositoryRevision` keys only when advertised by
+    /// {@link SessionConfigSchema.properties}. Values MUST be non-empty strings;
+    /// the source MUST be a credential-free repository URI. A revision without a
+    /// source, unsupported input, or conflicting directories MUST produce
+    /// `InvalidParams` (`-32602`), not silently fall back. Omitting repository
+    /// intent preserves existing directory/default behavior. Other keys remain
+    /// host-defined.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
 
@@ -1365,9 +1372,12 @@ public sealed record DisposeTerminalParams
 /// the full current property set (not a delta). The returned `values` contain
 /// server-resolved defaults to pass to `createSession`.
 ///
-/// Repository-backed creation is advertised by `schema.repository`. Resolving
-/// that schema or its values MUST NOT clone or prepare a repository; preparation
-/// belongs to `createSession`.</summary>
+/// Repository-backed creation is advertised by a valid
+/// `schema.properties.repositorySource`, with optional
+/// `schema.properties.repositoryRevision`; see {@link SessionConfigSchema}.
+/// Values use those fixed keys in `config`. Resolving the schema or its values,
+/// including discovery without a working directory, MUST NOT clone or prepare
+/// a repository; preparation belongs to `createSession`.</summary>
 public sealed record ResolveSessionConfigParams
 {
     public required string Channel { get; init; }
@@ -1386,7 +1396,11 @@ public sealed record ResolveSessionConfigParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
 
-    /// <summary>Current user-filled configuration values</summary>
+    /// <summary>Current user-filled configuration values. Repository intent uses
+    /// `repositorySource` and optional `repositoryRevision` only when advertised
+    /// by the session config schema. Invalid or unsupported repository input MUST
+    /// produce `InvalidParams` (`-32602`), not silently select directory/default
+    /// behavior.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Config { get; init; }
 }

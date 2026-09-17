@@ -1,7 +1,7 @@
 {
   "name": "session-config-without-repository",
   "group": "A",
-  "description": "An existing directory-backed session config remains valid without a repository descriptor.",
+  "description": "An existing directory-backed session config remains valid without repository properties or values.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-session:/directory-session",

@@ -906,8 +906,9 @@ type SessionState struct {
 	// this over the session's lifetime.
 	DefaultChat *URI `json:"defaultChat,omitempty"`
 	// Session configuration schema and current values. For repository-backed
-	// creation, this includes the advertised repository descriptor and requested
-	// intent, so joining and reconnecting clients can recover it from state.
+	// creation, this includes the advertised standard properties and requested
+	// `repositorySource` and optional `repositoryRevision` values throughout
+	// `creating`, `ready`, and `failed`, so clients can recover intent from state.
 	Config *SessionConfigState `json:"config,omitempty"`
 	// Top-level customizations active in this session.
 	//
@@ -1366,26 +1367,20 @@ type SessionConfigPropertySchema struct {
 	SessionMutable *bool `json:"sessionMutable,omitempty"`
 }
 
-// Opt-in descriptor for preparing one repository during session creation.
-//
-// Property ids are host-chosen and MUST name distinct entries in
-// {@link SessionConfigSchema.properties}. Each referenced property MUST have
-// `type: 'string'` and MUST NOT have `readOnly: true` or `sessionMutable: true`.
-// Clients MUST use these ids rather than hardcoding repository field names.
-//
-// Values travel through `resolveSessionConfig.config` and `createSession.config`,
-// not a separate command or `_meta`. Schema discovery MUST NOT clone or prepare
-// a repository. The host accepts repository intent only when this descriptor
-// is advertised.
-type RepositorySessionConfig struct {
-	// Property id for a credential-free repository URI.
-	UrlProperty string `json:"urlProperty"`
-	// Property id for an optional branch, tag, or commit revision.
-	// A revision value without a repository URI is invalid.
-	RevisionProperty *string `json:"revisionProperty,omitempty"`
-}
-
 // A JSON Schema object describing available session configuration metadata.
+//
+// Repository-backed creation uses the standard optional config keys
+// `repositorySource` (a credential-free repository URI) and
+// `repositoryRevision` (a branch, tag, or commit). Support is advertised by
+// `properties.repositorySource`; `properties.repositoryRevision` MUST NOT be
+// advertised without it. Each advertised property MUST have `type: 'string'`
+// and MUST NOT have `readOnly: true` or `sessionMutable: true`.
+//
+// The host MUST NOT accept repository inputs unless their corresponding
+// properties are advertised. Values travel through `resolveSessionConfig.config`
+// and `createSession.config`; schema discovery MUST NOT prepare a repository.
+// Neither key is globally required. Without repository intent, existing
+// directory/default behavior is unchanged. Other property ids remain host-defined.
 type SessionConfigSchema struct {
 	// JSON Schema: always `'object'`
 	Type string `json:"type"`
@@ -1393,10 +1388,6 @@ type SessionConfigSchema struct {
 	Properties map[string]SessionConfigPropertySchema `json:"properties"`
 	// JSON Schema: list of required property ids
 	Required []string `json:"required,omitempty"`
-	// Opt-in capability for repository-backed creation using existing config
-	// properties. The descriptor does not itself require a repository value.
-	// Without repository intent, existing directory/default behavior is unchanged.
-	Repository *RepositorySessionConfig `json:"repository,omitempty"`
 }
 
 // Live session configuration metadata.

@@ -949,7 +949,7 @@
     },
     "ResolveSessionConfigParams": {
       "type": "object",
-      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). The returned `values` contain\nserver-resolved defaults to pass to `createSession`.\n\nRepository-backed creation is advertised by `schema.repository`. Resolving\nthat schema or its values MUST NOT clone or prepare a repository; preparation\nbelongs to `createSession`.",
+      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). The returned `values` contain\nserver-resolved defaults to pass to `createSession`.\n\nRepository-backed creation is advertised by a valid\n`schema.properties.repositorySource`, with optional\n`schema.properties.repositoryRevision`; see {@link SessionConfigSchema}.\nValues use those fixed keys in `config`. Resolving the schema or its values,\nincluding discovery without a working directory, MUST NOT clone or prepare\na repository; preparation belongs to `createSession`.",
       "properties": {
         "channel": {
           "type": "string",
@@ -973,7 +973,7 @@
         "config": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Current user-filled configuration values"
+          "description": "Current user-filled configuration values. Repository intent uses\n`repositorySource` and optional `repositoryRevision` only when advertised\nby the session config schema. Invalid or unsupported repository input MUST\nproduce `InvalidParams` (`-32602`), not silently select directory/default\nbehavior."
         }
       },
       "required": [
@@ -1081,7 +1081,7 @@
     },
     "CreateSessionParams": {
       "type": "object",
-      "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `root/sessionAdded` notification to all\nclients.\n\nFor repository intent advertised by {@link RepositorySessionConfig}, the\nhost MUST authorize the request before repository side effects and prepare\nthe repository before executing turns. It MUST publish the requested intent\nin {@link SessionState.config} and any resolved `workingDirectories` before\n`session/ready` or `session/creationFailed`. Clients recover the outcome from\nsession state, not progress notifications.",
+      "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `root/sessionAdded` notification to all\nclients.\n\nFor repository intent advertised by {@link SessionConfigSchema.properties},\nthe host MUST authorize the request before repository side effects and\nprepare the repository before executing turns. It MUST publish the requested\n`repositorySource` and optional `repositoryRevision` in\n{@link SessionState.config} from the initial `creating` snapshot and retain\nthem through `ready` or `failed`. Any resolved `workingDirectories` MUST be\npublished before `session/ready` or `session/creationFailed`. Clients recover\nthe outcome from session state, not progress notifications.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -1101,12 +1101,12 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "The working directories the session's agent is granted tool access to.\nA session may span multiple directories; they are equal peers except when\nthe agent advertises a protected-primary capability. An\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary | immutable\nprimary} is fixed, while a\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement | replaceable\nprimary} is changed only with `session/workingDirectoryReplaced`.\n\nA client MUST NOT supply more than one entry unless the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}; a server without that\ncapability treats only the first entry as the session's working directory\nand ignores the rest. Dispatch working-directory actions to change the set\nafter the session has started.\n\nA non-empty list and repository intent in `config` are mutually exclusive.\nA repository URI is not a working-directory URI."
+          "description": "The working directories the session's agent is granted tool access to.\nA session may span multiple directories; they are equal peers except when\nthe agent advertises a protected-primary capability. An\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary | immutable\nprimary} is fixed, while a\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement | replaceable\nprimary} is changed only with `session/workingDirectoryReplaced`.\n\nA client MUST NOT supply more than one entry unless the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}; a server without that\ncapability treats only the first entry as the session's working directory\nand ignores the rest. Dispatch working-directory actions to change the set\nafter the session has started.\n\nA non-empty list and repository intent in `config` are mutually exclusive.\nA repository URI identifies the source, not a working-directory URI; one\nsource may produce multiple directories."
         },
         "config": {
           "type": "object",
           "additionalProperties": {},
-          "description": "Agent-specific configuration values collected via `resolveSessionConfig`.\nKeys and values correspond to the schema returned by the server.\nRepository intent uses only the properties identified by the advertised\n{@link SessionConfigSchema.repository} descriptor. A revision without a\nrepository URI is invalid. Omitting repository intent preserves existing\ndirectory/default behavior."
+          "description": "Session configuration values collected via `resolveSessionConfig`.\nKeys and values correspond to the schema returned by the server.\nRepository intent uses the standard `repositorySource` and optional\n`repositoryRevision` keys only when advertised by\n{@link SessionConfigSchema.properties}. Values MUST be non-empty strings;\nthe source MUST be a credential-free repository URI. A revision without a\nsource, unsupported input, or conflicting directories MUST produce\n`InvalidParams` (`-32602`), not silently fall back. Omitting repository\nintent preserves existing directory/default behavior. Other keys remain\nhost-defined."
         },
         "activeClient": {
           "$ref": "#/$defs/SessionActiveClient",
@@ -2457,7 +2457,7 @@
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
-          "description": "Session configuration schema and current values. For repository-backed\ncreation, this includes the advertised repository descriptor and requested\nintent, so joining and reconnecting clients can recover it from state."
+          "description": "Session configuration schema and current values. For repository-backed\ncreation, this includes the advertised standard properties and requested\n`repositorySource` and optional `repositoryRevision` values throughout\n`creating`, `ready`, and `failed`, so clients can recover intent from state."
         },
         "customizations": {
           "type": "array",
@@ -2879,26 +2879,9 @@
         "title"
       ]
     },
-    "RepositorySessionConfig": {
-      "type": "object",
-      "description": "Opt-in descriptor for preparing one repository during session creation.\n\nProperty ids are host-chosen and MUST name distinct entries in\n{@link SessionConfigSchema.properties}. Each referenced property MUST have\n`type: 'string'` and MUST NOT have `readOnly: true` or `sessionMutable: true`.\nClients MUST use these ids rather than hardcoding repository field names.\n\nValues travel through `resolveSessionConfig.config` and `createSession.config`,\nnot a separate command or `_meta`. Schema discovery MUST NOT clone or prepare\na repository. The host accepts repository intent only when this descriptor\nis advertised.",
-      "properties": {
-        "urlProperty": {
-          "type": "string",
-          "description": "Property id for a credential-free repository URI."
-        },
-        "revisionProperty": {
-          "type": "string",
-          "description": "Property id for an optional branch, tag, or commit revision.\nA revision value without a repository URI is invalid."
-        }
-      },
-      "required": [
-        "urlProperty"
-      ]
-    },
     "SessionConfigSchema": {
       "type": "object",
-      "description": "A JSON Schema object describing available session configuration metadata.",
+      "description": "A JSON Schema object describing available session configuration metadata.\n\nRepository-backed creation uses the standard optional config keys\n`repositorySource` (a credential-free repository URI) and\n`repositoryRevision` (a branch, tag, or commit). Support is advertised by\n`properties.repositorySource`; `properties.repositoryRevision` MUST NOT be\nadvertised without it. Each advertised property MUST have `type: 'string'`\nand MUST NOT have `readOnly: true` or `sessionMutable: true`.\n\nThe host MUST NOT accept repository inputs unless their corresponding\nproperties are advertised. Values travel through `resolveSessionConfig.config`\nand `createSession.config`; schema discovery MUST NOT prepare a repository.\nNeither key is globally required. Without repository intent, existing\ndirectory/default behavior is unchanged. Other property ids remain host-defined.",
       "properties": {
         "type": {
           "type": "string",
@@ -2920,10 +2903,6 @@
             "type": "string"
           },
           "description": "JSON Schema: list of required property ids"
-        },
-        "repository": {
-          "$ref": "#/$defs/RepositorySessionConfig",
-          "description": "Opt-in capability for repository-backed creation using existing config\nproperties. The descriptor does not itself require a repository value.\nWithout repository intent, existing directory/default behavior is unchanged."
         }
       },
       "required": [

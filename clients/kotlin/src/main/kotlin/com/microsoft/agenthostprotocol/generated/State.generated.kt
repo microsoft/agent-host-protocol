@@ -1803,8 +1803,9 @@ data class SessionState(
     val defaultChat: String? = null,
     /**
      * Session configuration schema and current values. For repository-backed
-     * creation, this includes the advertised repository descriptor and requested
-     * intent, so joining and reconnecting clients can recover it from state.
+     * creation, this includes the advertised standard properties and requested
+     * `repositorySource` and optional `repositoryRevision` values throughout
+     * `creating`, `ready`, and `failed`, so clients can recover intent from state.
      */
     val config: SessionConfigState? = null,
     /**

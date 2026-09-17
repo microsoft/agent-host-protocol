@@ -41,52 +41,39 @@ A host can offer to prepare **one repository for a new session** through the exi
 
 ##### Capability and field constraints
 
-The host opts in by returning the optional [`SessionConfigSchema.repository`](/reference/session#sessionconfigschema) descriptor from [`resolveSessionConfig`](/reference/root#resolvesessionconfig):
+The host opts in by returning a valid `schema.properties.repositorySource` from [`resolveSessionConfig`](/reference/root#resolvesessionconfig). [`SessionConfigSchema`](/reference/session#sessionconfigschema) remains a generic configuration schema: repository support uses standard property names, not separate repository metadata or a host-selected key mapping.
 
-```ts
-export interface RepositorySessionConfig {
-  urlProperty: string;
-  revisionProperty?: string;
-}
-```
-
-The descriptor identifies existing entries in `schema.properties`; it does not carry the repository values.
-
-| Field | Meaning |
+| Configuration key | Meaning |
 |---|---|
-| `urlProperty` | Host-chosen property id for a credential-free repository URI. |
-| `revisionProperty` | Optional host-chosen property id for a branch, tag, or commit revision. |
+| `repositorySource` | Credential-free repository URI string identifying the requested source. |
+| `repositoryRevision` | Optional branch, tag, or commit string. |
 
-Every referenced property MUST exist in `schema.properties`, have `type: "string"`, and be writable at creation (`readOnly` MUST NOT be `true`). Neither property may have `sessionMutable: true`: these values describe creation intent, not a request to switch repositories or revisions in an existing session. When `revisionProperty` is present, it MUST differ from `urlProperty`. These relationships are host validation rules; validating the descriptor's JSON shape alone does not check its references to other properties.
+Each advertised property MUST have `type: "string"` and be writable at creation (`readOnly` MUST NOT be `true`). Neither property may have `sessionMutable: true`: these values describe creation intent, not a request to switch repositories or revisions in an existing session. `schema.properties.repositoryRevision` is optional and MUST NOT be advertised without a valid `schema.properties.repositorySource`.
 
-Clients MUST use the advertised property ids, not hardcoded names. The descriptor itself is the opt-in capability; clients MUST NOT infer repository support from a provider name, protocol version, `_meta`, or a property whose name happens to resemble a repository field. A host MUST NOT accept repository intent unless it advertises this descriptor.
+Clients MUST use these exact keys after checking the advertised properties. They MUST NOT infer repository support from a provider name, protocol version, `_meta`, or another property whose name resembles a repository field. A host MUST NOT accept `repositorySource` unless it advertises a valid source property, and MUST NOT accept `repositoryRevision` unless it advertises a valid revision property. There are no alternate standard keys or aliases. Other configuration keys remain host-defined.
 
-The descriptor does not itself make either value required. The existing `required` list still describes form requirements; AHP adds no globally required repository property. A host without the descriptor, or a request without repository intent, retains its existing directory/default behavior.
+Advertising support does not itself make either value required. The existing `required` list still describes form requirements; AHP adds no globally required repository property. A host without repository support, or a request without repository intent, retains its existing directory/default behavior. The generated schema describes the generic configuration shape; the host remains responsible for enforcing these semantic rules.
 
 ##### Values and validation
 
 Values travel in `resolveSessionConfig.config`, then in `createSession.config`. Discovery and iterative configuration resolution MUST NOT clone or prepare a repository. The host MAY advertise supported URI schemes and revision choices through the existing property descriptions, enums, and completions.
 
-For example, a host may choose `source_uri` and `source_ref`:
+For example, directory-free discovery can return:
 
 ```json
 {
   "schema": {
     "type": "object",
     "properties": {
-      "source_uri": { "type": "string", "title": "Repository" },
-      "source_ref": { "type": "string", "title": "Revision" }
-    },
-    "repository": {
-      "urlProperty": "source_uri",
-      "revisionProperty": "source_ref"
+      "repositorySource": { "type": "string", "title": "Repository" },
+      "repositoryRevision": { "type": "string", "title": "Revision" }
     }
   },
   "values": {}
 }
 ```
 
-The client can submit `{"source_uri":"https://example.org/team/project.git","source_ref":"main"}` as `resolveSessionConfig.config`, without a `workingDirectory`, and pass the returned values to creation:
+The client can submit `{"repositorySource":"https://example.org/team/project.git","repositoryRevision":"main"}` as `resolveSessionConfig.config`, without a `workingDirectory`, and pass the returned values to creation:
 
 ```json
 {
@@ -96,14 +83,16 @@ The client can submit `{"source_uri":"https://example.org/team/project.git","sou
   "params": {
     "channel": "ahp-session:/new-session",
     "config": {
-      "source_uri": "https://example.org/team/project.git",
-      "source_ref": "main"
+      "repositorySource": "https://example.org/team/project.git",
+      "repositoryRevision": "main"
     }
   }
 }
 ```
 
-The repository URI identifies the source, not a host filesystem directory. Repository intent and a non-empty `createSession.workingDirectories` list are mutually exclusive. A revision value without a repository URI is invalid. Omit an unused repository or revision value rather than supplying an empty string. The host MUST reject invalid intent, including conflicting directories or a revision without a repository, with `InvalidParams` (`-32602`), rather than silently selecting a default directory. A repository-aware client MUST surface an invalid or unsupported descriptor instead of silently dropping the user's repository intent.
+The repository URI identifies the source, not a checkout or host filesystem directory. One source can produce multiple directories, including separate checkouts or worktrees; clients MUST NOT use the source URI as a directory identity. Repository intent and a non-empty `createSession.workingDirectories` list are mutually exclusive.
+
+When supplied, each value MUST be a non-empty string. A revision without a source is invalid. Omit an unused source or revision instead of supplying an empty string. For both configuration resolution and creation, the host MUST reject invalid or unsupported intent with `InvalidParams` (`-32602`), including an unadvertised source or revision, a malformed or credential-bearing source URI, an unsupported revision, or conflicting creation directories. It MUST NOT silently drop explicit input, select a default directory, or replace an unsupported revision with its default. A repository-aware client MUST surface invalid capability declarations or unsupported input instead of silently dropping the user's intent.
 
 Repository URIs and configuration values MUST NOT contain credentials such as passwords or access tokens. Authentication uses the existing [authentication contract](./authentication); the host MUST authorize the requesting client before repository side effects and use only credentials permitted for that request. Credentials MUST NOT appear in session state, progress messages, or logs.
 
@@ -111,7 +100,7 @@ Repository URIs and configuration values MUST NOT contain credentials such as pa
 
 Repository preparation is part of the existing `creating` lifecycle. The host MUST finish preparation before executing turns or publishing `session/ready`. No additional lifecycle state is introduced.
 
-The host MUST publish the accepted, requested repository URI and optional revision under the advertised ids in `SessionState.config.values`, together with the descriptor in `SessionState.config.schema`. Make this intent available in the initial `creating` snapshot so another client joining during preparation can understand the session. Preserve requested intent even if the host resolves a branch or tag to a commit; the resolved working location is a separate fact.
+The host MUST publish the accepted, requested source and optional revision as `SessionState.config.values.repositorySource` and `SessionState.config.values.repositoryRevision`, together with their advertised properties in `SessionState.config.schema`. Make this intent available in the initial `creating` snapshot so another client joining during preparation can understand the session. Preserve requested intent even if the host resolves a branch or tag to a commit; the resolved working location is a separate fact.
 
 Before dispatching `session/ready` or `session/creationFailed`, the host MUST publish the actual resolved `workingDirectories` in session state, using the existing snapshot and working-directory actions. While no directory has been resolved, `workingDirectories` MAY be absent or empty; do not claim a checkout was prepared when preparation failed. On failure, the existing `session/creationFailed` action records `lifecycle: "failed"` and `creationError`. Both outcomes retain the requested intent and any resolved directories so clients can recover them from a snapshot or replay.
 
@@ -119,13 +108,13 @@ The host MAY report preparation through the existing `createSession.progressToke
 
 ##### Reattachment, retry, and cleanup
 
-`createSession` is not an idempotent preparation command. A duplicate URI still returns `SessionAlreadyExists` (`-32003`), including while preparation is running or after creation has failed; it MUST NOT start another preparation for that session. After a lost response, the client should reattach to the same session URI through subscription or [reconnection](./lifecycle#reconnection) and inspect its state. It MUST NOT treat a duplicate creation as successful recovery. After a failure is addressed, a user can explicitly retry with a new session URI rather than overwrite the failed session.
+`createSession` is not an idempotent preparation command. A duplicate URI still returns `SessionAlreadyExists` (`-32003`), including while preparation is running or after creation has failed; it MUST NOT start another preparation for that session. After a lost response, the client should reattach to the same session URI through subscription or [reconnection](./lifecycle#reconnection) and inspect its state. Before treating the recovered session as the requested creation, it MUST verify that `config.values.repositorySource` and `config.values.repositoryRevision` match the requested intent and inspect the lifecycle. A mismatch is a conflict, not successful recovery. It MUST NOT treat a duplicate creation error as successful recovery. After a failure is addressed, a user can explicitly retry with a new session URI rather than overwrite the failed session.
 
 Cancelling a local wait, disconnecting, or unsubscribing does not grant permission to delete repository data. When the user intends to dispose the session, use the existing `disposeSession` command; this capability adds no cancellation RPC. The host MUST NOT erase a shared checkout or uncommitted user changes during cancellation or disposal. Cleanup of exclusively owned temporary preparation resources remains a host responsibility.
 
 ##### Minimal-client behavior
 
-A minimal client can ignore the descriptor, render the ordinary advertised configuration fields, pass resolved values through `config`, and render the existing session lifecycle and `workingDirectories`. It needs neither Git support nor a repository-specific form, clone RPC, or progress implementation. It can also omit this optional creation capability entirely and continue using directory/default creation. A joining or reconnecting client renders the authoritative state without repeating repository preparation.
+A minimal client can render the ordinary advertised configuration fields, pass resolved values through `config`, and render the existing session lifecycle and `workingDirectories`. It needs neither Git support nor a repository-specific form, clone RPC, or progress implementation. It can also omit this optional creation capability entirely and continue using directory/default creation. A joining or reconnecting client renders the authoritative state without repeating repository preparation.
 
 ### Active session
 

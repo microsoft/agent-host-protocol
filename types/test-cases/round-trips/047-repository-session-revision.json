@@ -1,7 +1,7 @@
 {
   "name": "repository-session-revision",
   "group": "A",
-  "description": "A creating session preserves host-chosen repository and revision field ids and requested values before a directory is resolved.",
+  "description": "A creating session preserves the standard repositorySource and repositoryRevision properties and requested values before a directory is resolved.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-session:/repository-session",
@@ -16,12 +16,11 @@
         "schema": {
           "type": "object",
           "properties": {
-            "source_uri": { "type": "string", "title": "Repository", "readOnly": false, "sessionMutable": false },
-            "source_ref": { "type": "string", "title": "Revision", "readOnly": false, "sessionMutable": false }
-          },
-          "repository": { "urlProperty": "source_uri", "revisionProperty": "source_ref" }
+            "repositorySource": { "type": "string", "title": "Repository", "readOnly": false, "sessionMutable": false },
+            "repositoryRevision": { "type": "string", "title": "Revision", "readOnly": false, "sessionMutable": false }
+          }
         },
-        "values": { "source_uri": "https://example.org/team/project.git", "source_ref": "refs/tags/v1.2.3" }
+        "values": { "repositorySource": "https://example.org/team/project.git", "repositoryRevision": "refs/tags/v1.2.3" }
       }
     },
     "fromSeq": 0
@@ -39,12 +38,11 @@
         "schema": {
           "type": "object",
           "properties": {
-            "source_uri": { "type": "string", "title": "Repository", "readOnly": false, "sessionMutable": false },
-            "source_ref": { "type": "string", "title": "Revision", "readOnly": false, "sessionMutable": false }
-          },
-          "repository": { "urlProperty": "source_uri", "revisionProperty": "source_ref" }
+            "repositorySource": { "type": "string", "title": "Repository", "readOnly": false, "sessionMutable": false },
+            "repositoryRevision": { "type": "string", "title": "Revision", "readOnly": false, "sessionMutable": false }
+          }
         },
-        "values": { "source_uri": "https://example.org/team/project.git", "source_ref": "refs/tags/v1.2.3" }
+        "values": { "repositorySource": "https://example.org/team/project.git", "repositoryRevision": "refs/tags/v1.2.3" }
       }
     },
     "fromSeq": 0

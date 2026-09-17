@@ -200,19 +200,21 @@ describe('generated JSON schemas', () => {
         assert.match(expiresIn.description as string, /MUST be a positive integer/);
       });
 
-      it('keeps repository session descriptors optional and validates their wire shape', () => {
+      it('keeps session config schema generic without repository metadata', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const configSchema = defs.SessionConfigSchema;
         const properties = configSchema.properties as Record<string, Record<string, unknown>>;
-        const repository = defs.RepositorySessionConfig;
-        const repositoryProperties = repository.properties as Record<string, Record<string, unknown>>;
-
-        assert.deepEqual(configSchema.required, ['type', 'properties']);
-        assert.equal(properties.repository.$ref, '#/$defs/RepositorySessionConfig');
-        assert.deepEqual(repository.required, ['urlProperty']);
-        assert.deepEqual(Object.keys(repositoryProperties).sort(), ['revisionProperty', 'urlProperty']);
-        assert.equal(repositoryProperties.urlProperty.type, 'string');
-        assert.equal(repositoryProperties.revisionProperty.type, 'string');
+        assert.deepEqual({
+          fields: Object.keys(properties).sort(),
+          required: configSchema.required,
+          propertySchema: properties.properties.additionalProperties,
+          repositoryType: defs.RepositorySessionConfig,
+        }, {
+          fields: ['properties', 'required', 'type'],
+          required: ['type', 'properties'],
+          propertySchema: { $ref: '#/$defs/SessionConfigPropertySchema' },
+          repositoryType: undefined,
+        });
 
         const legacy = {
           type: 'object',
@@ -221,33 +223,21 @@ describe('generated JSON schemas', () => {
         };
         assert.equal(schemaAccepts(schema, configSchema, legacy), true);
 
-        const repositorySchema = {
-          type: 'object',
-          properties: {
-            host_source: { type: 'string', title: 'Repository', readOnly: false, sessionMutable: false },
-            host_revision: { type: 'string', title: 'Revision', readOnly: false, sessionMutable: false },
-          },
-        };
-        for (const descriptor of [
-          { urlProperty: 'host_source' },
-          { urlProperty: 'host_source', revisionProperty: 'host_revision' },
-        ]) {
+        for (const withRevision of [false, true]) {
+          const repositorySchema = {
+            type: 'object',
+            properties: {
+              repositorySource: { type: 'string', title: 'Repository', readOnly: false, sessionMutable: false },
+              ...(withRevision ? {
+                repositoryRevision: { type: 'string', title: 'Revision', readOnly: false, sessionMutable: false },
+              } : {}),
+              mode: { type: 'string', title: 'Mode' },
+            },
+            required: ['mode'],
+          };
           assert.equal(
-            schemaAccepts(schema, configSchema, { ...repositorySchema, repository: descriptor }),
+            schemaAccepts(schema, configSchema, repositorySchema),
             true,
-          );
-        }
-        for (const descriptor of [
-          {},
-          { revisionProperty: 'host_revision' },
-          { urlProperty: 42 },
-          { urlProperty: 'host_source', revisionProperty: false },
-          null,
-          [],
-        ]) {
-          assert.equal(
-            schemaAccepts(schema, configSchema, { ...repositorySchema, repository: descriptor }),
-            false,
           );
         }
       });
@@ -257,19 +247,28 @@ describe('generated JSON schemas', () => {
           return;
         }
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
-        const config = {
-          host_source: 'https://example.org/team/project.git',
-          host_revision: 'refs/tags/v1.2.3',
-          mode: 'review',
-        };
         for (const [definition, channel] of [
           ['ResolveSessionConfigParams', 'ahp-root://'],
           ['CreateSessionParams', 'ahp-session:/repository-test'],
         ]) {
           const properties = defs[definition].properties as Record<string, Record<string, unknown>>;
           assert.equal(properties.config.type, 'object');
-          assert.equal(properties.repository, undefined);
-          assert.equal(schemaAccepts(schema, defs[definition], { channel, config }), true);
+          assert.deepEqual(
+            Object.keys(properties).filter(name => ['repository', 'repositorySource', 'repositoryRevision'].includes(name)),
+            [],
+          );
+          assert.equal(schemaAccepts(schema, defs[definition], { channel }), true);
+          for (const config of [
+            { mode: 'review' },
+            { mode: 'review', repositorySource: 'https://example.org/team/project.git' },
+            {
+              mode: 'review',
+              repositorySource: 'https://example.org/team/project.git',
+              repositoryRevision: 'refs/tags/v1.2.3',
+            },
+          ]) {
+            assert.equal(schemaAccepts(schema, defs[definition], { channel, config }), true);
+          }
         }
       });
 

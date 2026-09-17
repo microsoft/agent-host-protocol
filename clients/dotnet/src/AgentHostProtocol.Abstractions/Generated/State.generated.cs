@@ -1587,8 +1587,9 @@ public sealed class SessionState
     public string? DefaultChat { get; set; }
 
     /// <summary>Session configuration schema and current values. For repository-backed
-    /// creation, this includes the advertised repository descriptor and requested
-    /// intent, so joining and reconnecting clients can recover it from state.</summary>
+    /// creation, this includes the advertised standard properties and requested
+    /// `repositorySource` and optional `repositoryRevision` values throughout
+    /// `creating`, `ready`, and `failed`, so clients can recover intent from state.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SessionConfigState? Config { get; set; }
 
@@ -2009,29 +2010,20 @@ public sealed record SessionConfigPropertySchema
     public bool? SessionMutable { get; init; }
 }
 
-/// <summary>Opt-in descriptor for preparing one repository during session creation.
+/// <summary>A JSON Schema object describing available session configuration metadata.
 ///
-/// Property ids are host-chosen and MUST name distinct entries in
-/// {@link SessionConfigSchema.properties}. Each referenced property MUST have
-/// `type: 'string'` and MUST NOT have `readOnly: true` or `sessionMutable: true`.
-/// Clients MUST use these ids rather than hardcoding repository field names.
+/// Repository-backed creation uses the standard optional config keys
+/// `repositorySource` (a credential-free repository URI) and
+/// `repositoryRevision` (a branch, tag, or commit). Support is advertised by
+/// `properties.repositorySource`; `properties.repositoryRevision` MUST NOT be
+/// advertised without it. Each advertised property MUST have `type: 'string'`
+/// and MUST NOT have `readOnly: true` or `sessionMutable: true`.
 ///
-/// Values travel through `resolveSessionConfig.config` and `createSession.config`,
-/// not a separate command or `_meta`. Schema discovery MUST NOT clone or prepare
-/// a repository. The host accepts repository intent only when this descriptor
-/// is advertised.</summary>
-public sealed record RepositorySessionConfig
-{
-    /// <summary>Property id for a credential-free repository URI.</summary>
-    public required string UrlProperty { get; init; }
-
-    /// <summary>Property id for an optional branch, tag, or commit revision.
-    /// A revision value without a repository URI is invalid.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? RevisionProperty { get; init; }
-}
-
-/// <summary>A JSON Schema object describing available session configuration metadata.</summary>
+/// The host MUST NOT accept repository inputs unless their corresponding
+/// properties are advertised. Values travel through `resolveSessionConfig.config`
+/// and `createSession.config`; schema discovery MUST NOT prepare a repository.
+/// Neither key is globally required. Without repository intent, existing
+/// directory/default behavior is unchanged. Other property ids remain host-defined.</summary>
 public sealed record SessionConfigSchema
 {
     /// <summary>JSON Schema: always `'object'`</summary>
@@ -2043,12 +2035,6 @@ public sealed record SessionConfigSchema
     /// <summary>JSON Schema: list of required property ids</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Required { get; init; }
-
-    /// <summary>Opt-in capability for repository-backed creation using existing config
-    /// properties. The descriptor does not itself require a repository value.
-    /// Without repository intent, existing directory/default behavior is unchanged.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public RepositorySessionConfig? Repository { get; init; }
 }
 
 /// <summary>Live session configuration metadata.
