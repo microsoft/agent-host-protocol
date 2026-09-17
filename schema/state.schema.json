@@ -4398,6 +4398,10 @@
         "truncated": {
           "type": "boolean",
           "description": "Whether `preview` is known to be incomplete or truncated"
+        },
+        "fullOutput": {
+          "$ref": "#/$defs/ContentRef",
+          "description": "Reference to the command's full captured output, read with `resourceRead`.\nAvailability is host-defined; the content may no longer be available when read."
         }
       }
     },

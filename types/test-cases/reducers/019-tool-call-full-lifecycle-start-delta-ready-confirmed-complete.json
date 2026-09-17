@@ -57,7 +57,26 @@
       "toolCallId": "tc-1",
       "result": {
         "success": true,
-        "pastTenseMessage": "Ran command"
+        "pastTenseMessage": "Ran command",
+        "content": [
+          {
+            "type": "terminal",
+            "resource": "agenthost:/terminal/1",
+            "title": "bash",
+            "isPty": false,
+            "result": {
+              "exitCode": 0,
+              "preview": "preview\n",
+              "truncated": true,
+              "fullOutput": {
+                "uri": "shell-output:/tc-1",
+                "sizeHint": 8192,
+                "contentType": "text/plain",
+                "nonce": "output-1"
+              }
+            }
+          }
+        ]
       }
     }
   ],
@@ -89,7 +108,26 @@
             },
             "confirmed": "user-action",
             "success": true,
-            "pastTenseMessage": "Ran command"
+            "pastTenseMessage": "Ran command",
+            "content": [
+              {
+                "type": "terminal",
+                "resource": "agenthost:/terminal/1",
+                "title": "bash",
+                "isPty": false,
+                "result": {
+                  "exitCode": 0,
+                  "preview": "preview\n",
+                  "truncated": true,
+                  "fullOutput": {
+                    "uri": "shell-output:/tc-1",
+                    "sizeHint": 8192,
+                    "contentType": "text/plain",
+                    "nonce": "output-1"
+                  }
+                }
+              }
+            ]
           }
         }
       ],

@@ -45,7 +45,16 @@
         {
           "type": "terminal",
           "resource": "agenthost:/terminal/1",
-          "title": "bash"
+          "title": "bash",
+          "result": {
+            "preview": "preview\n",
+            "truncated": true,
+            "fullOutput": {
+              "uri": "shell-output:/tc-1",
+              "contentType": "text/plain",
+              "nonce": "output-1"
+            }
+          }
         }
       ]
     }
@@ -79,7 +88,16 @@
               {
                 "type": "terminal",
                 "resource": "agenthost:/terminal/1",
-                "title": "bash"
+                "title": "bash",
+                "result": {
+                  "preview": "preview\n",
+                  "truncated": true,
+                  "fullOutput": {
+                    "uri": "shell-output:/tc-1",
+                    "contentType": "text/plain",
+                    "nonce": "output-1"
+                  }
+                }
               }
             ]
           }

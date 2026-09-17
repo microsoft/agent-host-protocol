@@ -3335,6 +3335,11 @@ public sealed record TerminalCommandResult
     /// <summary>Whether `preview` is known to be incomplete or truncated</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Truncated { get; init; }
+
+    /// <summary>Reference to the command's full captured output, read with `resourceRead`.
+    /// Availability is host-defined; the content may no longer be available when read.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ContentRef? FullOutput { get; init; }
 }
 
 /// <summary>A reference, embedded in a tool result, to a worker chat spawned by the tool

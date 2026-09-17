@@ -1,0 +1,72 @@
+{
+  "name": "terminal-content-full-output",
+  "group": "A",
+  "description": "Terminal completion retains a full-output content reference, including opaque URI, size hint, MIME type, and nonce, alongside its truncated preview.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-chat:/s1/c1",
+    "action": {
+      "type": "chat/toolCallComplete",
+      "turnId": "turn-1",
+      "toolCallId": "tool-1",
+      "result": {
+        "success": false,
+        "pastTenseMessage": "Ran npm test",
+        "content": [
+          {
+            "type": "terminal",
+            "resource": "ahp-terminal:/s1/t1",
+            "title": "npm test",
+            "isPty": false,
+            "result": {
+              "exitCode": 1,
+              "preview": "preview\n",
+              "truncated": true,
+              "fullOutput": {
+                "uri": "shell-output:/tool-1?version=1#output",
+                "sizeHint": 8192,
+                "contentType": "text/plain",
+                "nonce": "output-1"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "serverSeq": 12
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-chat:/s1/c1",
+      "action": {
+        "type": "chat/toolCallComplete",
+        "turnId": "turn-1",
+        "toolCallId": "tool-1",
+        "result": {
+          "success": false,
+          "pastTenseMessage": "Ran npm test",
+          "content": [
+            {
+              "type": "terminal",
+              "resource": "ahp-terminal:/s1/t1",
+              "title": "npm test",
+              "isPty": false,
+              "result": {
+                "exitCode": 1,
+                "preview": "preview\n",
+                "truncated": true,
+                "fullOutput": {
+                  "uri": "shell-output:/tool-1?version=1#output",
+                  "sizeHint": 8192,
+                  "contentType": "text/plain",
+                  "nonce": "output-1"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "serverSeq": 12
+    }
+  ]
+}

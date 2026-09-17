@@ -1,0 +1,50 @@
+{
+  "name": "terminal-content-full-output-without-preview",
+  "group": "A",
+  "description": "A terminal result can retain full output without a preview, truncation flag, or optional content-reference metadata.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-chat:/s1/c1",
+    "action": {
+      "type": "chat/toolCallContentChanged",
+      "turnId": "turn-1",
+      "toolCallId": "tool-1",
+      "content": [
+        {
+          "type": "terminal",
+          "resource": "ahp-terminal:/s1/t1",
+          "title": "npm test",
+          "result": {
+            "fullOutput": {
+              "uri": "file:///tmp/full%20output.txt"
+            }
+          }
+        }
+      ]
+    },
+    "serverSeq": 13
+  },
+  "acceptableOutputs": [
+    {
+      "channel": "ahp-chat:/s1/c1",
+      "action": {
+        "type": "chat/toolCallContentChanged",
+        "turnId": "turn-1",
+        "toolCallId": "tool-1",
+        "content": [
+          {
+            "type": "terminal",
+            "resource": "ahp-terminal:/s1/t1",
+            "title": "npm test",
+            "result": {
+              "fullOutput": {
+                "uri": "file:///tmp/full%20output.txt"
+              }
+            }
+          }
+        ]
+      },
+      "serverSeq": 13
+    }
+  ]
+}

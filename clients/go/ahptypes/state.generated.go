@@ -3263,6 +3263,9 @@ type TerminalCommandResult struct {
 	Preview *string `json:"preview,omitempty"`
 	// Whether `preview` is known to be incomplete or truncated
 	Truncated *bool `json:"truncated,omitempty"`
+	// Reference to the command's full captured output, read with `resourceRead`.
+	// Availability is host-defined; the content may no longer be available when read.
+	FullOutput *ContentRef `json:"fullOutput,omitempty"`
 }
 
 // Lightweight terminal metadata exposed on the root state.
