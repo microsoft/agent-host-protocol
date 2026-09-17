@@ -1116,6 +1116,11 @@
             "$ref": "#/$defs/ClientPluginCustomization"
           },
           "description": "Plugin customizations this client contributes to the session.\n\nClients publish in [Open Plugins](https://open-plugins.com/) format\n— i.e. always container-shaped plugins. They MAY synthesize virtual\nplugins in memory and rely on the host to expand them into concrete\nchildren inside {@link SessionState.customizations}."
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Additional provider-specific metadata about this active client, such as\nthe participant role a host assigns to a connection or whether the host\ntreats it as read-only. Mirrors the MCP `_meta` convention.\n\nA host SHOULD stamp participant semantics here explicitly rather than\nleaving consumers to infer them: an empty\n{@link SessionActiveClient.tools | `tools`} or\n{@link SessionActiveClient.customizations | `customizations`} list means\nonly that the client publishes nothing, never that it is read-only. See\nthe customizations guide for the full `_meta` semantics."
         }
       },
       "required": [

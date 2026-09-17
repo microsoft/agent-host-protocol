@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Optional `_meta` metadata side-channel on `SessionActiveClient`, so hosts can stamp explicit per-connection facts (such as a participant role or read-only status) instead of leaving clients to infer them from empty `tools` / `customizations` lists."
+}
