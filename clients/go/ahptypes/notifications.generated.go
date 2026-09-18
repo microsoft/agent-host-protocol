@@ -115,6 +115,8 @@ type SessionSummaryChangedParams struct {
 //   - Like all notifications this is ephemeral and is **not** replayed on
 //     reconnect. A client that never receives the terminal frame SHOULD expire
 //     the indicator after an idle timeout.
+//   - Completion of reported work does not establish session readiness.
+//     Observe session lifecycle state for the durable outcome.
 type ProgressParams struct {
 	// Channel URI this notification belongs to (the root channel).
 	Channel URI `json:"channel"`
@@ -232,6 +234,10 @@ type PartialSessionSummary struct {
 	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Immutable requested source, separate from the host-resolved working directories.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Immutable requested revision, not the checkout's current HEAD.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session

@@ -1336,6 +1336,10 @@ data class AgentInfo(
 @Serializable
 data class AgentCapabilities(
     /**
+     * The host accepts typed repository inputs for session creation and configuration queries.
+     */
+    val repositorySource: RepositorySourceCapability? = null,
+    /**
      * The agent can host more than one concurrent chat per session. When absent,
      * clients MUST NOT call `createChat` to open chats beyond the default one the
      * session starts with. An empty object `{}` advertises multi-chat without
@@ -1413,6 +1417,14 @@ data class MultipleWorkingDirectoriesCapability(
      * allow a targeted replacement even when `immutablePrimary` is also `true`.
      */
     val primaryReplacement: Boolean? = null
+)
+
+@Serializable
+data class RepositorySourceCapability(
+    /**
+     * When true, clients may supply an explicit repositoryRevision.
+     */
+    val revision: Boolean? = null
 )
 
 @Serializable
@@ -1760,6 +1772,14 @@ data class SessionState(
      */
     val workingDirectories: List<String>? = null,
     /**
+     * Immutable requested source, separate from the host-resolved working directories.
+     */
+    val repositorySource: String? = null,
+    /**
+     * Immutable requested revision, not the checkout's current HEAD.
+     */
+    val repositoryRevision: String? = null,
+    /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
      * annotation / entry counts without subscribing. Absent when the session
@@ -1802,7 +1822,7 @@ data class SessionState(
      */
     val defaultChat: String? = null,
     /**
-     * Session configuration schema and current values
+     * Provider-specific session configuration schema and current values.
      */
     val config: SessionConfigState? = null,
     /**
@@ -2040,6 +2060,14 @@ data class SessionSummary(
      * chat that sets none operates against this full set.
      */
     val workingDirectories: List<String>? = null,
+    /**
+     * Immutable requested source, separate from the host-resolved working directories.
+     */
+    val repositorySource: String? = null,
+    /**
+     * Immutable requested revision, not the checkout's current HEAD.
+     */
+    val repositoryRevision: String? = null,
     /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render

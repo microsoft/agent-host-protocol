@@ -1,0 +1,34 @@
+{
+  "name": "repository-session-revision",
+  "group": "A",
+  "description": "A creating session preserves typed source and revision metadata before a directory is resolved.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "creating",
+      "activeClients": [],
+      "chats": [],
+      "repositorySource": "https://example.org/team/project.git",
+      "repositoryRevision": "refs/tags/v1.2.3"
+    },
+    "fromSeq": 0
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "creating",
+      "activeClients": [],
+      "chats": [],
+      "repositorySource": "https://example.org/team/project.git",
+      "repositoryRevision": "refs/tags/v1.2.3"
+    },
+    "fromSeq": 0
+  }]
+}

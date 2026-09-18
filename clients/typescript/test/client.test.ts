@@ -42,6 +42,12 @@ import type {
 import { JsonRpcErrorCodes } from '../src/types/common/errors.js';
 import { AutomationOperation, type AutomationEntry } from '../src/types/channels-automation/state.js';
 import { MessageKind } from '../src/types/channels-chat/state.js';
+import {
+  SessionLifecycle,
+  SessionStatus,
+  type SessionConfigSchema,
+  type SessionState,
+} from '../src/types/index.js';
 
 const ROOT = 'ahp-root://' as const;
 const AUTOMATIONS = 'ahp-automations://' as const;
@@ -107,6 +113,150 @@ test('initialize round-trip', async () => {
 
   await client.shutdown();
 });
+
+for (const withRevision of [false, true]) {
+  test(`typed requests round-trip repository intent ${withRevision ? 'with' : 'without'} a revision outside config`, async t => {
+    const [c, s] = InMemoryTransport.pair();
+    const client = new AhpClient(c);
+    t.after(() => client.shutdown());
+    client.connect();
+
+    const schema: SessionConfigSchema = {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', title: 'Mode', default: 'review' },
+      },
+    };
+    const discovery = client.request('resolveSessionConfig', { channel: ROOT });
+    const discoveryRequest = await readRequest(s);
+    assert.equal(discoveryRequest.method, 'resolveSessionConfig');
+    assert.deepEqual(discoveryRequest.params, { channel: ROOT });
+    reply(s, discoveryRequest.id, { schema, values: { mode: 'review' } });
+
+    const discovered = await discovery;
+    assert.deepEqual(discovered.schema, schema);
+    const repository = {
+      repositorySource: 'https://example.org/team/project.git',
+      ...(withRevision ? { repositoryRevision: 'refs/tags/v1.2.3' } : {}),
+    };
+    const config = discovered.values;
+    const resolution = client.request('resolveSessionConfig', { channel: ROOT, ...repository, config });
+    const resolveRequest = await readRequest(s);
+    assert.equal(resolveRequest.method, 'resolveSessionConfig');
+    assert.deepEqual(resolveRequest.params, { channel: ROOT, ...repository, config });
+    reply(s, resolveRequest.id, { schema, values: config });
+    const resolved = await resolution;
+    assert.deepEqual(resolved.values, config);
+
+    const completions = client.request('sessionConfigCompletions', { channel: ROOT, ...repository, config: resolved.values, property: 'mode' });
+    const completionRequest = await readRequest(s);
+    assert.deepEqual(completionRequest.params, { channel: ROOT, ...repository, config: resolved.values, property: 'mode' });
+    reply(s, completionRequest.id, { items: [] });
+    await completions;
+
+    const params = { channel: 'ahp-session:/repository-test', ...repository, config: resolved.values };
+    const creation = client.request('createSession', params);
+    const createRequest = await readRequest(s);
+    assert.equal(createRequest.method, 'createSession');
+    assert.deepEqual(createRequest.params, params);
+    reply(s, createRequest.id, null);
+    assert.equal(await creation, null);
+  });
+}
+
+for (const method of ['resolveSessionConfig', 'sessionConfigCompletions', 'createSession'] as const) {
+  test(`${method} surfaces host rejection of repository intent`, async t => {
+    const [c, s] = InMemoryTransport.pair();
+    const client = new AhpClient(c);
+    t.after(() => client.shutdown());
+    client.connect();
+
+    const channel = method === 'createSession' ? 'ahp-session:/repository-test' : ROOT;
+    const params = {
+      channel,
+      repositorySource: 'https://example.org/team/project.git',
+      repositoryRevision: 'unsupported',
+      ...(method === 'sessionConfigCompletions' ? { property: 'mode' } : {}),
+    };
+    const request = method === 'sessionConfigCompletions'
+      ? client.request(method, { ...params, property: 'mode' })
+      : client.request(method, params);
+    const rejected = assert.rejects(request, new RpcError(JsonRpcErrorCodes.InvalidParams, 'Unsupported repository revision'));
+    const sent = await readRequest(s);
+    assert.deepEqual({ method: sent.method, params: sent.params }, { method, params });
+    replyError(s, sent.id, JsonRpcErrorCodes.InvalidParams, 'Unsupported repository revision');
+    await rejected;
+  });
+}
+
+for (const failed of [false, true]) {
+  test(`session state recovers repository intent and directories after creation ${failed ? 'fails' : 'succeeds'}`, () => {
+    const resource = 'ahp-session:/repository-test';
+    const initial: SessionState = {
+      provider: 'example',
+      title: 'Repository session',
+      status: SessionStatus.Idle,
+      lifecycle: SessionLifecycle.Creating,
+      activeClients: [],
+      chats: [],
+      workingDirectories: [],
+      repositorySource: 'https://example.org/team/project.git',
+      repositoryRevision: 'main',
+      config: {
+        schema: { type: 'object', properties: { mode: { type: 'string', title: 'Mode' } } },
+        values: { mode: 'review' },
+      },
+    };
+    const mirror = new AhpStateMirror();
+    mirror.applySnapshot({ resource, state: initial, fromSeq: 0 });
+    mirror.apply({
+      channel: resource,
+      serverSeq: 1,
+      origin: undefined,
+      action: { type: ActionType.SessionWorkingDirectorySet, directory: 'file:///work/project' },
+    });
+    mirror.apply({
+      channel: resource,
+      serverSeq: 2,
+      origin: undefined,
+      action: { type: ActionType.SessionWorkingDirectorySet, directory: 'file:///work/project-worktree' },
+    });
+    const preparing = mirror.getSession(resource);
+    assert.ok(preparing);
+    assert.equal(preparing.lifecycle, SessionLifecycle.Creating);
+    assert.deepEqual(preparing.config, initial.config);
+    assert.deepEqual([preparing.repositorySource, preparing.repositoryRevision], [initial.repositorySource, initial.repositoryRevision]);
+
+    const joining = new AhpStateMirror();
+    joining.applySnapshot({ resource, state: preparing, fromSeq: 2 });
+    assert.deepEqual(joining.getSession(resource), preparing);
+
+    const completion: ActionEnvelope = {
+      channel: resource,
+      serverSeq: 3,
+      origin: undefined,
+      action: failed
+        ? { type: ActionType.SessionCreationFailed, error: { errorType: 'preparationFailed', message: 'Preparation failed' } }
+        : { type: ActionType.SessionReady },
+    };
+    mirror.apply(completion);
+    joining.apply(completion);
+    const completed = mirror.getSession(resource);
+    assert.ok(completed);
+    assert.equal(completed.lifecycle, failed ? SessionLifecycle.Failed : SessionLifecycle.Ready);
+    assert.deepEqual(completed.config, initial.config);
+    assert.deepEqual([completed.repositorySource, completed.repositoryRevision], [initial.repositorySource, initial.repositoryRevision]);
+    assert.deepEqual(completed.workingDirectories, ['file:///work/project', 'file:///work/project-worktree']);
+    assert.deepEqual(joining.getSession(resource), completed);
+    if (failed) {
+      assert.deepEqual(completed.creationError, { errorType: 'preparationFailed', message: 'Preparation failed' });
+    }
+
+    const reconnected = new AhpStateMirror();
+    reconnected.applySnapshot({ resource, state: completed, fromSeq: 3 });
+    assert.deepEqual(reconnected.getSession(resource), completed);
+  });
+}
 
 test('subscribe attaches before sending the request and fans out an action', async () => {
   const [c, s] = InMemoryTransport.pair();

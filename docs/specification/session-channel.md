@@ -35,6 +35,81 @@ Subscribers receive a [`SessionState`](/reference/session#sessionstate) snapshot
 
 [`createSession`](/reference/session#createsession) is a JSON-RPC request. The client picks the URI; the server allocates session state and begins backend initialisation. If the URI is already in use the server returns `SessionAlreadyExists` (`-32003`).
 
+#### Repository-backed creation
+
+A host can offer to prepare **one repository for a new session** through typed session-creation inputs. The client collects repository intent; the host owns authorization, credentials, preparation, and cleanup. This capability does not define reusable projects, a repository catalogue, or a general-purpose clone command.
+
+##### Capability and field constraints
+
+The agent opts in through [`AgentCapabilities.repositorySource`](/reference/root#agentcapabilities). As with other agent capabilities, absence means unsupported and `{}` advertises source-based creation. `{ "revision": true }` additionally supports an explicit revision.
+
+| Request field | Meaning |
+|---|---|
+| `repositorySource` | Credential-free repository URI string identifying the requested source. |
+| `repositoryRevision` | Optional branch, tag, or commit string. |
+
+Both fields are optional typed properties of [`CreateSessionParams`](/reference/session#createsessionparams), [`ResolveSessionConfigParams`](/reference/root#resolvesessionconfigparams), and [`SessionConfigCompletionsParams`](/reference/root#sessionconfigcompletionsparams). The query fields provide context for provider-specific configuration; they are not entries in `config`.
+
+Clients MUST check the capability rather than infer support from a provider name, protocol version, `_meta`, or configuration property. A host MUST NOT accept source input without the capability, or an explicit revision unless `revision` is `true`. Supplying either input in `config` is invalid; hosts MUST reject it rather than silently choose directory/default behavior. There are no alternative standard keys or field-name descriptors.
+
+Advertising support does not make either value required. A request without repository intent retains its existing directory/default behavior. The generated request types and schemas declare the fields and their types; the host enforces capability, authorization, and cross-field constraints. Provider-specific `config` and its schema remain independent.
+
+##### Values and validation
+
+The client supplies the same typed source and optional revision when resolving configuration, requesting configuration completions, and creating the session. Discovery and iterative configuration queries MUST NOT clone or prepare a repository.
+
+For example, the root's agent entry can advertise:
+
+```json
+{
+  "capabilities": {
+    "repositorySource": { "revision": true }
+  }
+}
+```
+
+The client can resolve configuration with `repositorySource` and `repositoryRevision` beside `config`, without a `workingDirectory`, then pass the returned provider configuration to creation:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "createSession",
+  "params": {
+    "channel": "ahp-session:/new-session",
+    "repositorySource": "https://example.org/team/project.git",
+    "repositoryRevision": "main",
+    "config": { "mode": "interactive" }
+  }
+}
+```
+
+The repository URI identifies the source, not a checkout or host filesystem directory. One source can produce multiple directories, including separate checkouts or worktrees; clients MUST NOT use the source URI as a directory identity. `createSession.repositorySource` and a non-empty `createSession.workingDirectories` list are mutually exclusive. Configuration queries may also include an existing `workingDirectory` as context; they do not perform preparation.
+
+When supplied, each value MUST be a non-empty string. A revision without a source is invalid. Omit an unused source or revision instead of supplying an empty string. For creation and configuration queries, the host MUST reject invalid or unsupported intent with `InvalidParams` (`-32602`), including an unsupported source or revision, a malformed or credential-bearing source URI, or conflicting creation directories. It MUST NOT silently drop explicit input, select a default directory, or replace an unsupported revision with its default. A repository-aware client MUST surface invalid capability declarations or unsupported input instead of silently dropping the user's intent.
+
+Repository URIs and configuration values MUST NOT contain credentials such as passwords or access tokens. Authentication uses the existing [authentication contract](./authentication); the host MUST authorize the requesting client before repository side effects and use only credentials permitted for that request. Credentials MUST NOT appear in session state, progress messages, or logs.
+
+##### Preparation and recoverable state
+
+Repository preparation is part of the existing `creating` lifecycle. The host MUST finish preparation before executing turns or publishing `session/ready`. No additional lifecycle state is introduced.
+
+The host MUST publish the accepted, requested source and optional revision as `SessionState.repositorySource` and `SessionState.repositoryRevision` from the initial `creating` snapshot and preserve them through `ready` or `failed`. These immutable fields belong to [`SessionMetadata`](/reference/session#sessionmetadata), so summaries carry the same intent. Preserve requested intent even if the host resolves a branch or tag to a commit; the resolved working location is a separate fact. No configuration action changes these fields.
+
+Before dispatching `session/ready` or `session/creationFailed`, the host MUST publish the actual resolved `workingDirectories` in session state, using the existing snapshot and working-directory actions. While no directory has been resolved, `workingDirectories` MAY be absent or empty; do not claim a checkout was prepared when preparation failed. On failure, the existing `session/creationFailed` action records `lifecycle: "failed"` and `creationError`. Both outcomes retain the requested intent and any resolved directories so clients can recover them from a snapshot or replay.
+
+The host MAY report preparation through the existing `createSession.progressToken` and [`root/progress`](./root-channel#progress). Progress is optional, ephemeral, and not replayed. Neither a completed progress indicator nor a successful command response is a replacement for session readiness or failure state.
+
+##### Reattachment, retry, and cleanup
+
+`createSession` is not an idempotent preparation command. A duplicate URI still returns `SessionAlreadyExists` (`-32003`), including while preparation is running or after creation has failed; it MUST NOT start another preparation for that session. After a lost response, the client should reattach to the same session URI through subscription or [reconnection](./lifecycle#reconnection) and inspect its state. Before treating the recovered session as the requested creation, it MUST verify that its typed `repositorySource` and `repositoryRevision` match the requested intent and inspect the lifecycle. A mismatch is a conflict, not successful recovery. It MUST NOT treat a duplicate creation error as successful recovery. After a failure is addressed, a user can explicitly retry with a new session URI rather than overwrite the failed session.
+
+Cancelling a local wait, disconnecting, or unsubscribing does not grant permission to delete repository data. When the user intends to dispose the session, use the existing `disposeSession` command; this capability adds no cancellation RPC. The host MUST NOT erase a shared checkout or uncommitted user changes during cancellation or disposal. Cleanup of exclusively owned temporary preparation resources remains a host responsibility.
+
+##### Minimal-client behavior
+
+A client supporting this capability collects the source and optional revision separately from provider configuration and sends them as typed request fields. It needs no Git implementation, clone RPC, or progress implementation. Minimal clients can omit the optional capability and continue using directory/default creation. Joining or reconnecting clients read the source, revision, lifecycle and working directories from authoritative session state without repeating preparation.
+
 ### Active session
 
 Once a session reaches `lifecycle: 'ready'`, clients may create chats on it with [`createChat`](/reference/chat#createchat). Each chat is independently subscribable at its own `ahp-chat:/<cid>` URI; see the [Chat Channel specification](./chat-channel) for the per-chat lifecycle, turn flow, tool calls, and input request handling.

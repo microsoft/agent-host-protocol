@@ -375,6 +375,9 @@ type SubscribeResult struct {
 // After creation, the client should subscribe to the session URI to receive state
 // updates. The server also broadcasts a `root/sessionAdded` notification to all
 // clients.
+//
+// Repository preparation MUST finish before `session/ready` or executing turns.
+// Clients recover the outcome from session state, not progress notifications.
 type CreateSessionParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -396,9 +399,17 @@ type CreateSessionParams struct {
 	// capability treats only the first entry as the session's working directory
 	// and ignores the rest. Dispatch working-directory actions to change the set
 	// after the session has started.
+	//
+	// A non-empty list and `repositorySource` are mutually exclusive.
+	// A repository URI identifies the source, not a working-directory URI; one
+	// source may produce multiple directories.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
-	// Agent-specific configuration values collected via `resolveSessionConfig`.
-	// Keys and values correspond to the schema returned by the server.
+	// Credential-free source to prepare; requires the agent's repositorySource capability.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Requested branch, tag, or commit; requires a source and the capability's revision option.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
+	// Session configuration values collected via `resolveSessionConfig`.
+	// Keys and values follow the advertised {@link SessionConfigSchema}.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 	// Eagerly claim an active client role for the new session.
 	//
@@ -423,6 +434,9 @@ type CreateSessionParams struct {
 // Disposes a session and cleans up server-side resources.
 //
 // The server broadcasts a `root/sessionRemoved` notification to all clients.
+// Disposal MUST NOT erase a shared checkout or uncommitted user changes.
+// Repository cleanup remains host-owned; ending a client's wait or subscription
+// does not grant permission to delete repository data.
 type DisposeSessionParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -1070,6 +1084,9 @@ type DisposeTerminalParams struct {
 // (e.g. picks a working directory, toggles a property). Each response returns
 // the full current property set (not a delta). The returned `values` contain
 // server-resolved defaults to pass to `createSession`.
+//
+// This command MUST NOT clone or prepare a repository. Repository context
+// requires the agent's `repositorySource` capability.
 type ResolveSessionConfigParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -1080,7 +1097,11 @@ type ResolveSessionConfigParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
-	// Current user-filled configuration values
+	// Credential-free source context; not a working-directory URI.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Requested revision; requires a source and the capability's revision option.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
+	// Current user-filled configuration values; see {@link SessionConfigSchema}.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 }
 
@@ -1107,6 +1128,10 @@ type SessionConfigCompletionsParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+	// Repository context for configuration completions; this MUST NOT prepare a checkout.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Requested revision; requires a source and the capability's revision option.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
 	// Current user-filled configuration values (provides context for the query)
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 	// Property id from the schema to query values for

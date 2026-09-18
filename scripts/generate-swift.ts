@@ -692,6 +692,7 @@ const STATE_STRUCTS = [
   'AgentCapabilities',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
+  'RepositorySourceCapability',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',

@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Typed optional `repositorySource` and `repositoryRevision` request and session metadata fields, with an explicit agent capability for host-owned repository preparation."
+}

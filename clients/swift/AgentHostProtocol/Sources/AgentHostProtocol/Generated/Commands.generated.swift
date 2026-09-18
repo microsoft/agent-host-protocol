@@ -651,9 +651,17 @@ public struct CreateSessionParams: Codable, Sendable {
     /// capability treats only the first entry as the session's working directory
     /// and ignores the rest. Dispatch working-directory actions to change the set
     /// after the session has started.
+    ///
+    /// A non-empty list and `repositorySource` are mutually exclusive.
+    /// A repository URI identifies the source, not a working-directory URI; one
+    /// source may produce multiple directories.
     public var workingDirectories: [String]?
-    /// Agent-specific configuration values collected via `resolveSessionConfig`.
-    /// Keys and values correspond to the schema returned by the server.
+    /// Credential-free source to prepare; requires the agent's repositorySource capability.
+    public var repositorySource: String?
+    /// Requested branch, tag, or commit; requires a source and the capability's revision option.
+    public var repositoryRevision: String?
+    /// Session configuration values collected via `resolveSessionConfig`.
+    /// Keys and values follow the advertised {@link SessionConfigSchema}.
     public var config: [String: AnyCodable]?
     /// Eagerly claim an active client role for the new session.
     ///
@@ -679,6 +687,8 @@ public struct CreateSessionParams: Codable, Sendable {
         case meta = "_meta"
         case provider
         case workingDirectories
+        case repositorySource
+        case repositoryRevision
         case config
         case activeClient
         case progressToken
@@ -689,6 +699,8 @@ public struct CreateSessionParams: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectories: [String]? = nil,
+        repositorySource: String? = nil,
+        repositoryRevision: String? = nil,
         config: [String: AnyCodable]? = nil,
         activeClient: SessionActiveClient? = nil,
         progressToken: String? = nil
@@ -697,6 +709,8 @@ public struct CreateSessionParams: Codable, Sendable {
         self.meta = meta
         self.provider = provider
         self.workingDirectories = workingDirectories
+        self.repositorySource = repositorySource
+        self.repositoryRevision = repositoryRevision
         self.config = config
         self.activeClient = activeClient
         self.progressToken = progressToken
@@ -1596,7 +1610,11 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
-    /// Current user-filled configuration values
+    /// Credential-free source context; not a working-directory URI.
+    public var repositorySource: String?
+    /// Requested revision; requires a source and the capability's revision option.
+    public var repositoryRevision: String?
+    /// Current user-filled configuration values; see {@link SessionConfigSchema}.
     public var config: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
@@ -1604,6 +1622,8 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
         case meta = "_meta"
         case provider
         case workingDirectory
+        case repositorySource
+        case repositoryRevision
         case config
     }
 
@@ -1612,12 +1632,16 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectory: String? = nil,
+        repositorySource: String? = nil,
+        repositoryRevision: String? = nil,
         config: [String: AnyCodable]? = nil
     ) {
         self.channel = channel
         self.meta = meta
         self.provider = provider
         self.workingDirectory = workingDirectory
+        self.repositorySource = repositorySource
+        self.repositoryRevision = repositoryRevision
         self.config = config
     }
 }
@@ -1749,6 +1773,10 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
+    /// Repository context for configuration completions; this MUST NOT prepare a checkout.
+    public var repositorySource: String?
+    /// Requested revision; requires a source and the capability's revision option.
+    public var repositoryRevision: String?
     /// Current user-filled configuration values (provides context for the query)
     public var config: [String: AnyCodable]?
     /// Property id from the schema to query values for
@@ -1761,6 +1789,8 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
         case meta = "_meta"
         case provider
         case workingDirectory
+        case repositorySource
+        case repositoryRevision
         case config
         case property
         case query
@@ -1771,6 +1801,8 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         provider: String? = nil,
         workingDirectory: String? = nil,
+        repositorySource: String? = nil,
+        repositoryRevision: String? = nil,
         config: [String: AnyCodable]? = nil,
         property: String,
         query: String? = nil
@@ -1779,6 +1811,8 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
         self.meta = meta
         self.provider = provider
         self.workingDirectory = workingDirectory
+        self.repositorySource = repositorySource
+        self.repositoryRevision = repositoryRevision
         self.config = config
         self.property = property
         self.query = query

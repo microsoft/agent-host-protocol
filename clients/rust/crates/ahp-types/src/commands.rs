@@ -558,6 +558,9 @@ pub struct SubscribeResult {
 /// After creation, the client should subscribe to the session URI to receive state
 /// updates. The server also broadcasts a `root/sessionAdded` notification to all
 /// clients.
+///
+/// Repository preparation MUST finish before `session/ready` or executing turns.
+/// Clients recover the outcome from session state, not progress notifications.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionParams {
@@ -583,10 +586,20 @@ pub struct CreateSessionParams {
     /// capability treats only the first entry as the session's working directory
     /// and ignores the rest. Dispatch working-directory actions to change the set
     /// after the session has started.
+    ///
+    /// A non-empty list and `repositorySource` are mutually exclusive.
+    /// A repository URI identifies the source, not a working-directory URI; one
+    /// source may produce multiple directories.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
-    /// Agent-specific configuration values collected via `resolveSessionConfig`.
-    /// Keys and values correspond to the schema returned by the server.
+    /// Credential-free source to prepare; requires the agent's repositorySource capability.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_source: Option<Uri>,
+    /// Requested branch, tag, or commit; requires a source and the capability's revision option.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_revision: Option<String>,
+    /// Session configuration values collected via `resolveSessionConfig`.
+    /// Keys and values follow the advertised {@link SessionConfigSchema}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
     /// Eagerly claim an active client role for the new session.
@@ -614,6 +627,9 @@ pub struct CreateSessionParams {
 /// Disposes a session and cleans up server-side resources.
 ///
 /// The server broadcasts a `root/sessionRemoved` notification to all clients.
+/// Disposal MUST NOT erase a shared checkout or uncommitted user changes.
+/// Repository cleanup remains host-owned; ending a client's wait or subscription
+/// does not grant permission to delete repository data.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisposeSessionParams {
@@ -1374,6 +1390,9 @@ pub struct DisposeTerminalParams {
 /// (e.g. picks a working directory, toggles a property). Each response returns
 /// the full current property set (not a delta). The returned `values` contain
 /// server-resolved defaults to pass to `createSession`.
+///
+/// This command MUST NOT clone or prepare a repository. Repository context
+/// requires the agent's `repositorySource` capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolveSessionConfigParams {
@@ -1389,7 +1408,13 @@ pub struct ResolveSessionConfigParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Current user-filled configuration values
+    /// Credential-free source context; not a working-directory URI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_source: Option<Uri>,
+    /// Requested revision; requires a source and the capability's revision option.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_revision: Option<String>,
+    /// Current user-filled configuration values; see {@link SessionConfigSchema}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
 }
@@ -1424,6 +1449,12 @@ pub struct SessionConfigCompletionsParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
+    /// Repository context for configuration completions; this MUST NOT prepare a checkout.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_source: Option<Uri>,
+    /// Requested revision; requires a source and the capability's revision option.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_revision: Option<String>,
     /// Current user-filled configuration values (provides context for the query)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
