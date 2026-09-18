@@ -1,7 +1,7 @@
 {
   "name": "repository-session-revision",
   "group": "A",
-  "description": "A creating session preserves the standard repositorySource and repositoryRevision properties and requested values before a directory is resolved.",
+  "description": "A creating session preserves typed source and revision metadata before a directory is resolved.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-session:/repository-session",
@@ -12,16 +12,8 @@
       "lifecycle": "creating",
       "activeClients": [],
       "chats": [],
-      "config": {
-        "schema": {
-          "type": "object",
-          "properties": {
-            "repositorySource": { "type": "string", "title": "Repository", "readOnly": false, "sessionMutable": false },
-            "repositoryRevision": { "type": "string", "title": "Revision", "readOnly": false, "sessionMutable": false }
-          }
-        },
-        "values": { "repositorySource": "https://example.org/team/project.git", "repositoryRevision": "refs/tags/v1.2.3" }
-      }
+      "repositorySource": "https://example.org/team/project.git",
+      "repositoryRevision": "refs/tags/v1.2.3"
     },
     "fromSeq": 0
   },
@@ -34,16 +26,8 @@
       "lifecycle": "creating",
       "activeClients": [],
       "chats": [],
-      "config": {
-        "schema": {
-          "type": "object",
-          "properties": {
-            "repositorySource": { "type": "string", "title": "Repository", "readOnly": false, "sessionMutable": false },
-            "repositoryRevision": { "type": "string", "title": "Revision", "readOnly": false, "sessionMutable": false }
-          }
-        },
-        "values": { "repositorySource": "https://example.org/team/project.git", "repositoryRevision": "refs/tags/v1.2.3" }
-      }
+      "repositorySource": "https://example.org/team/project.git",
+      "repositoryRevision": "refs/tags/v1.2.3"
     },
     "fromSeq": 0
   }]

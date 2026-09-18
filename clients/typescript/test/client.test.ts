@@ -115,7 +115,7 @@ test('initialize round-trip', async () => {
 });
 
 for (const withRevision of [false, true]) {
-  test(`generic session config round-trips repository intent ${withRevision ? 'with' : 'without'} a revision`, async t => {
+  test(`typed requests round-trip repository intent ${withRevision ? 'with' : 'without'} a revision outside config`, async t => {
     const [c, s] = InMemoryTransport.pair();
     const client = new AhpClient(c);
     t.after(() => client.shutdown());
@@ -124,14 +124,9 @@ for (const withRevision of [false, true]) {
     const schema: SessionConfigSchema = {
       type: 'object',
       properties: {
-        repositorySource: { type: 'string', title: 'Repository' },
         mode: { type: 'string', title: 'Mode', default: 'review' },
       },
     };
-    if (withRevision) {
-      schema.properties.repositoryRevision = { type: 'string', title: 'Revision' };
-    }
-
     const discovery = client.request('resolveSessionConfig', { channel: ROOT });
     const discoveryRequest = await readRequest(s);
     assert.equal(discoveryRequest.method, 'resolveSessionConfig');
@@ -140,20 +135,26 @@ for (const withRevision of [false, true]) {
 
     const discovered = await discovery;
     assert.deepEqual(discovered.schema, schema);
-    const config = {
-      ...discovered.values,
+    const repository = {
       repositorySource: 'https://example.org/team/project.git',
       ...(withRevision ? { repositoryRevision: 'refs/tags/v1.2.3' } : {}),
     };
-    const resolution = client.request('resolveSessionConfig', { channel: ROOT, config });
+    const config = discovered.values;
+    const resolution = client.request('resolveSessionConfig', { channel: ROOT, ...repository, config });
     const resolveRequest = await readRequest(s);
     assert.equal(resolveRequest.method, 'resolveSessionConfig');
-    assert.deepEqual(resolveRequest.params, { channel: ROOT, config });
+    assert.deepEqual(resolveRequest.params, { channel: ROOT, ...repository, config });
     reply(s, resolveRequest.id, { schema, values: config });
     const resolved = await resolution;
     assert.deepEqual(resolved.values, config);
 
-    const params = { channel: 'ahp-session:/repository-test', config: resolved.values };
+    const completions = client.request('sessionConfigCompletions', { channel: ROOT, ...repository, config: resolved.values, property: 'mode' });
+    const completionRequest = await readRequest(s);
+    assert.deepEqual(completionRequest.params, { channel: ROOT, ...repository, config: resolved.values, property: 'mode' });
+    reply(s, completionRequest.id, { items: [] });
+    await completions;
+
+    const params = { channel: 'ahp-session:/repository-test', ...repository, config: resolved.values };
     const creation = client.request('createSession', params);
     const createRequest = await readRequest(s);
     assert.equal(createRequest.method, 'createSession');
@@ -163,22 +164,26 @@ for (const withRevision of [false, true]) {
   });
 }
 
-for (const method of ['resolveSessionConfig', 'createSession'] as const) {
+for (const method of ['resolveSessionConfig', 'sessionConfigCompletions', 'createSession'] as const) {
   test(`${method} surfaces host rejection of repository intent`, async t => {
     const [c, s] = InMemoryTransport.pair();
     const client = new AhpClient(c);
     t.after(() => client.shutdown());
     client.connect();
 
-    const channel = method === 'resolveSessionConfig' ? ROOT : 'ahp-session:/repository-test';
-    const config = {
+    const channel = method === 'createSession' ? 'ahp-session:/repository-test' : ROOT;
+    const params = {
+      channel,
       repositorySource: 'https://example.org/team/project.git',
       repositoryRevision: 'unsupported',
+      ...(method === 'sessionConfigCompletions' ? { property: 'mode' } : {}),
     };
-    const request = client.request(method, { channel, config });
+    const request = method === 'sessionConfigCompletions'
+      ? client.request(method, { ...params, property: 'mode' })
+      : client.request(method, params);
     const rejected = assert.rejects(request, new RpcError(JsonRpcErrorCodes.InvalidParams, 'Unsupported repository revision'));
     const sent = await readRequest(s);
-    assert.deepEqual({ method: sent.method, params: sent.params }, { method, params: { channel, config } });
+    assert.deepEqual({ method: sent.method, params: sent.params }, { method, params });
     replyError(s, sent.id, JsonRpcErrorCodes.InvalidParams, 'Unsupported repository revision');
     await rejected;
   });
@@ -195,15 +200,11 @@ for (const failed of [false, true]) {
       activeClients: [],
       chats: [],
       workingDirectories: [],
+      repositorySource: 'https://example.org/team/project.git',
+      repositoryRevision: 'main',
       config: {
-        schema: {
-          type: 'object',
-          properties: {
-            repositorySource: { type: 'string', title: 'Repository' },
-            repositoryRevision: { type: 'string', title: 'Revision' },
-          },
-        },
-        values: { repositorySource: 'https://example.org/team/project.git', repositoryRevision: 'main' },
+        schema: { type: 'object', properties: { mode: { type: 'string', title: 'Mode' } } },
+        values: { mode: 'review' },
       },
     };
     const mirror = new AhpStateMirror();
@@ -224,6 +225,7 @@ for (const failed of [false, true]) {
     assert.ok(preparing);
     assert.equal(preparing.lifecycle, SessionLifecycle.Creating);
     assert.deepEqual(preparing.config, initial.config);
+    assert.deepEqual([preparing.repositorySource, preparing.repositoryRevision], [initial.repositorySource, initial.repositoryRevision]);
 
     const joining = new AhpStateMirror();
     joining.applySnapshot({ resource, state: preparing, fromSeq: 2 });
@@ -243,6 +245,7 @@ for (const failed of [false, true]) {
     assert.ok(completed);
     assert.equal(completed.lifecycle, failed ? SessionLifecycle.Failed : SessionLifecycle.Ready);
     assert.deepEqual(completed.config, initial.config);
+    assert.deepEqual([completed.repositorySource, completed.repositoryRevision], [initial.repositorySource, initial.repositoryRevision]);
     assert.deepEqual(completed.workingDirectories, ['file:///work/project', 'file:///work/project-worktree']);
     assert.deepEqual(joining.getSession(resource), completed);
     if (failed) {

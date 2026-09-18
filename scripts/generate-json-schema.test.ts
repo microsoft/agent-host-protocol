@@ -222,54 +222,55 @@ describe('generated JSON schemas', () => {
           required: ['mode'],
         };
         assert.equal(schemaAccepts(schema, configSchema, legacy), true);
-
-        for (const withRevision of [false, true]) {
-          const repositorySchema = {
-            type: 'object',
-            properties: {
-              repositorySource: { type: 'string', title: 'Repository', readOnly: false, sessionMutable: false },
-              ...(withRevision ? {
-                repositoryRevision: { type: 'string', title: 'Revision', readOnly: false, sessionMutable: false },
-              } : {}),
-              mode: { type: 'string', title: 'Mode' },
-            },
-            required: ['mode'],
-          };
-          assert.equal(
-            schemaAccepts(schema, configSchema, repositorySchema),
-            true,
-          );
-        }
       });
 
-      it('retains generic config inputs for repository-backed creation', () => {
+      it('declares optional typed repository inputs beside generic config', () => {
         if (file !== 'commands.schema.json') {
           return;
         }
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         for (const [definition, channel] of [
           ['ResolveSessionConfigParams', 'ahp-root://'],
+          ['SessionConfigCompletionsParams', 'ahp-root://'],
           ['CreateSessionParams', 'ahp-session:/repository-test'],
         ]) {
           const properties = defs[definition].properties as Record<string, Record<string, unknown>>;
           assert.equal(properties.config.type, 'object');
           assert.deepEqual(
             Object.keys(properties).filter(name => ['repository', 'repositorySource', 'repositoryRevision'].includes(name)),
-            [],
+            ['repositorySource', 'repositoryRevision'],
           );
-          assert.equal(schemaAccepts(schema, defs[definition], { channel }), true);
-          for (const config of [
-            { mode: 'review' },
-            { mode: 'review', repositorySource: 'https://example.org/team/project.git' },
+          const base = { channel, ...(definition === 'SessionConfigCompletionsParams' ? { property: 'mode' } : {}) };
+          assert.equal(schemaAccepts(schema, defs[definition], base), true);
+          for (const source of [
+            {},
+            { repositorySource: 'https://example.org/team/project.git' },
             {
-              mode: 'review',
               repositorySource: 'https://example.org/team/project.git',
               repositoryRevision: 'refs/tags/v1.2.3',
             },
           ]) {
-            assert.equal(schemaAccepts(schema, defs[definition], { channel, config }), true);
+            assert.equal(schemaAccepts(schema, defs[definition], { ...base, ...source, config: { mode: 'review' } }), true);
+          }
+          for (const invalid of [{ repositorySource: 42 }, { repositorySource: null }, { repositoryRevision: 42 }]) {
+            assert.equal(schemaAccepts(schema, defs[definition], { ...base, ...invalid }), false);
           }
         }
+      });
+
+      it('declares immutable source metadata and an opt-in repository capability', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const name of ['SessionState', 'SessionSummary']) {
+          const properties = defs[name].properties as Record<string, Record<string, unknown>>;
+          assert.equal(dereferenceSchema(schema, properties.repositorySource).type, 'string');
+          assert.equal(dereferenceSchema(schema, properties.repositoryRevision).type, 'string');
+        }
+        const capabilities = defs.AgentCapabilities.properties as Record<string, Record<string, unknown>>;
+        assert.deepEqual(capabilities.repositorySource.$ref, '#/$defs/RepositorySourceCapability');
+        for (const value of [{}, { repositorySource: {} }, { repositorySource: { revision: true } }]) {
+          assert.equal(schemaAccepts(schema, defs.AgentCapabilities, value), true);
+        }
+        assert.equal(schemaAccepts(schema, defs.AgentCapabilities, { repositorySource: true }), false);
       });
 
       it('constrains every ChatOrigin branch to a distinct kind', () => {

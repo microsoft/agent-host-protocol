@@ -1,7 +1,7 @@
 {
   "name": "repository-session-source-only",
   "group": "A",
-  "description": "A ready session preserves the standard repositorySource property and requested URI, omits the optional revision, and resolves one source to multiple directories.",
+  "description": "A ready session preserves typed source metadata, omits the optional revision, and resolves one source to multiple directories.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-session:/repository-session",
@@ -12,16 +12,8 @@
       "lifecycle": "ready",
       "activeClients": [],
       "chats": [],
-      "workingDirectories": ["file:///work/project", "file:///work/project-worktree"],
-      "config": {
-        "schema": {
-          "type": "object",
-          "properties": {
-            "repositorySource": { "type": "string", "title": "Repository" }
-          }
-        },
-        "values": { "repositorySource": "https://example.org/team/project.git" }
-      }
+      "repositorySource": "https://example.org/team/project.git",
+      "workingDirectories": ["file:///work/project", "file:///work/project-worktree"]
     },
     "fromSeq": 2
   },
@@ -34,16 +26,8 @@
       "lifecycle": "ready",
       "activeClients": [],
       "chats": [],
-      "workingDirectories": ["file:///work/project", "file:///work/project-worktree"],
-      "config": {
-        "schema": {
-          "type": "object",
-          "properties": {
-            "repositorySource": { "type": "string", "title": "Repository" }
-          }
-        },
-        "values": { "repositorySource": "https://example.org/team/project.git" }
-      }
+      "repositorySource": "https://example.org/team/project.git",
+      "workingDirectories": ["file:///work/project", "file:///work/project-worktree"]
     },
     "fromSeq": 2
   }]

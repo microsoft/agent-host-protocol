@@ -861,6 +861,10 @@ public sealed record AgentInfo
 /// per-capability options.</summary>
 public sealed record AgentCapabilities
 {
+    /// <summary>The host accepts typed repository inputs for session creation and configuration queries.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RepositorySourceCapability? RepositorySource { get; init; }
+
     /// <summary>The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -938,6 +942,14 @@ public sealed record MultipleWorkingDirectoriesCapability
     /// allow a targeted replacement even when `immutablePrimary` is also `true`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? PrimaryReplacement { get; init; }
+}
+
+/// <summary>Options for repository-backed session creation.</summary>
+public sealed record RepositorySourceCapability
+{
+    /// <summary>When true, clients may supply an explicit repositoryRevision.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Revision { get; init; }
 }
 
 public sealed record SessionModelInfo
@@ -1547,6 +1559,14 @@ public sealed class SessionState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; set; }
 
+    /// <summary>Immutable requested source, separate from the host-resolved working directories.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositorySource { get; set; }
+
+    /// <summary>Immutable requested revision, not the checkout's current HEAD.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositoryRevision { get; set; }
+
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -1586,10 +1606,7 @@ public sealed class SessionState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; set; }
 
-    /// <summary>Session configuration schema and current values. For repository-backed
-    /// creation, this includes the advertised standard properties and requested
-    /// `repositorySource` and optional `repositoryRevision` values throughout
-    /// `creating`, `ready`, and `failed`, so clients can recover intent from state.</summary>
+    /// <summary>Provider-specific session configuration schema and current values.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SessionConfigState? Config { get; set; }
 
@@ -1885,6 +1902,14 @@ public sealed class SessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; set; }
 
+    /// <summary>Immutable requested source, separate from the host-resolved working directories.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositorySource { get; set; }
+
+    /// <summary>Immutable requested revision, not the checkout's current HEAD.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositoryRevision { get; set; }
+
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -2010,20 +2035,7 @@ public sealed record SessionConfigPropertySchema
     public bool? SessionMutable { get; init; }
 }
 
-/// <summary>A JSON Schema object describing available session configuration metadata.
-///
-/// Repository-backed creation uses the standard optional config keys
-/// `repositorySource` (a credential-free repository URI) and
-/// `repositoryRevision` (a branch, tag, or commit). Support is advertised by
-/// `properties.repositorySource`; `properties.repositoryRevision` MUST NOT be
-/// advertised without it. Each advertised property MUST have `type: 'string'`
-/// and MUST NOT have `readOnly: true` or `sessionMutable: true`.
-///
-/// The host MUST NOT accept repository inputs unless their corresponding
-/// properties are advertised. Values travel through `resolveSessionConfig.config`
-/// and `createSession.config`; schema discovery MUST NOT prepare a repository.
-/// Neither key is globally required. Without repository intent, existing
-/// directory/default behavior is unchanged. Other property ids remain host-defined.</summary>
+/// <summary>A JSON Schema object describing available session configuration metadata.</summary>
 public sealed record SessionConfigSchema
 {
     /// <summary>JSON Schema: always `'object'`</summary>

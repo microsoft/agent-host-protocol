@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Standard optional `repositorySource` and `repositoryRevision` configuration keys for schema-advertised, host-owned repository-backed session creation through existing configuration and lifecycle messages."
+  "message": "Typed optional `repositorySource` and `repositoryRevision` request and session metadata fields, with an explicit agent capability for host-owned repository preparation."
 }

@@ -1623,6 +1623,9 @@ pub struct AgentInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
+    /// The host accepts typed repository inputs for session creation and configuration queries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_source: Option<RepositorySourceCapability>,
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1699,6 +1702,15 @@ pub struct MultipleWorkingDirectoriesCapability {
     /// allow a targeted replacement even when `immutablePrimary` is also `true`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary_replacement: Option<bool>,
+}
+
+/// Options for repository-backed session creation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositorySourceCapability {
+    /// When true, clients may supply an explicit repositoryRevision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2021,6 +2033,12 @@ pub struct SessionState {
     /// chat that sets none operates against this full set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+    /// Immutable requested source, separate from the host-resolved working directories.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_source: Option<Uri>,
+    /// Immutable requested revision, not the checkout's current HEAD.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_revision: Option<String>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -2053,10 +2071,7 @@ pub struct SessionState {
     /// this over the session's lifetime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
-    /// Session configuration schema and current values. For repository-backed
-    /// creation, this includes the advertised standard properties and requested
-    /// `repositorySource` and optional `repositoryRevision` values throughout
-    /// `creating`, `ready`, and `failed`, so clients can recover intent from state.
+    /// Provider-specific session configuration schema and current values.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<SessionConfigState>,
     /// Top-level customizations active in this session.
@@ -2360,6 +2375,12 @@ pub struct SessionSummary {
     /// chat that sets none operates against this full set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+    /// Immutable requested source, separate from the host-resolved working directories.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_source: Option<Uri>,
+    /// Immutable requested revision, not the checkout's current HEAD.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_revision: Option<String>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -2467,19 +2488,6 @@ pub struct SessionConfigPropertySchema {
 }
 
 /// A JSON Schema object describing available session configuration metadata.
-///
-/// Repository-backed creation uses the standard optional config keys
-/// `repositorySource` (a credential-free repository URI) and
-/// `repositoryRevision` (a branch, tag, or commit). Support is advertised by
-/// `properties.repositorySource`; `properties.repositoryRevision` MUST NOT be
-/// advertised without it. Each advertised property MUST have `type: 'string'`
-/// and MUST NOT have `readOnly: true` or `sessionMutable: true`.
-///
-/// The host MUST NOT accept repository inputs unless their corresponding
-/// properties are advertised. Values travel through `resolveSessionConfig.config`
-/// and `createSession.config`; schema discovery MUST NOT prepare a repository.
-/// Neither key is globally required. Without repository intent, existing
-/// directory/default behavior is unchanged. Other property ids remain host-defined.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionConfigSchema {

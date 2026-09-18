@@ -79,8 +79,8 @@ export interface ListSessionsResult extends PaginatedResult {
  * the full current property set (not a delta). The returned `values` contain
  * server-resolved defaults to pass to `createSession`.
  *
- * This command MUST NOT clone or prepare a repository. Standard repository
- * inputs and their advertisement requirements are defined by {@link SessionConfigSchema}.
+ * This command MUST NOT clone or prepare a repository. Repository context
+ * requires the agent's `repositorySource` capability.
  *
  * @category Commands
  * @method resolveSessionConfig
@@ -133,6 +133,10 @@ export interface ResolveSessionConfigParams extends BaseParams {
   provider?: string;
   /** Working directory for the session */
   workingDirectory?: URI;
+  /** Credential-free source context; not a working-directory URI. */
+  repositorySource?: URI;
+  /** Requested revision; requires a source and the capability's revision option. */
+  repositoryRevision?: string;
   /** Current user-filled configuration values; see {@link SessionConfigSchema}. */
   config?: Record<string, unknown>;
 }
@@ -198,6 +202,10 @@ export interface SessionConfigCompletionsParams extends BaseParams {
   provider?: string;
   /** Working directory for the session */
   workingDirectory?: URI;
+  /** Repository context for configuration completions; this MUST NOT prepare a checkout. */
+  repositorySource?: URI;
+  /** Requested revision; requires a source and the capability's revision option. */
+  repositoryRevision?: string;
   /** Current user-filled configuration values (provides context for the query) */
   config?: Record<string, unknown>;
   /** Property id from the schema to query values for */

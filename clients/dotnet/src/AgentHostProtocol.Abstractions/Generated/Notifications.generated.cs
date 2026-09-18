@@ -269,6 +269,14 @@ public sealed record PartialSessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
 
+    /// <summary>Immutable requested source, separate from the host-resolved working directories.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositorySource { get; init; }
+
+    /// <summary>Immutable requested revision, not the checkout's current HEAD.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositoryRevision { get; init; }
+
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session

@@ -676,6 +676,8 @@ type AgentInfo struct {
 // corresponding client commands MUST NOT be used. Sub-fields carry
 // per-capability options.
 type AgentCapabilities struct {
+	// The host accepts typed repository inputs for session creation and configuration queries.
+	RepositorySource *RepositorySourceCapability `json:"repositorySource,omitempty"`
 	// The agent can host more than one concurrent chat per session. When absent,
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
 	// session starts with. An empty object `{}` advertises multi-chat without
@@ -742,6 +744,12 @@ type MultipleWorkingDirectoriesCapability struct {
 	// recognize this capability. Clients that recognize this capability MUST
 	// allow a targeted replacement even when `immutablePrimary` is also `true`.
 	PrimaryReplacement *bool `json:"primaryReplacement,omitempty"`
+}
+
+// Options for repository-backed session creation.
+type RepositorySourceCapability struct {
+	// When true, clients may supply an explicit repositoryRevision.
+	Revision *bool `json:"revision,omitempty"`
 }
 
 type SessionModelInfo struct {
@@ -877,6 +885,10 @@ type SessionState struct {
 	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Immutable requested source, separate from the host-resolved working directories.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Immutable requested revision, not the checkout's current HEAD.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
@@ -905,10 +917,7 @@ type SessionState struct {
 	// marker — chats remain equal peers at the protocol level. Hosts MAY change
 	// this over the session's lifetime.
 	DefaultChat *URI `json:"defaultChat,omitempty"`
-	// Session configuration schema and current values. For repository-backed
-	// creation, this includes the advertised standard properties and requested
-	// `repositorySource` and optional `repositoryRevision` values throughout
-	// `creating`, `ready`, and `failed`, so clients can recover intent from state.
+	// Provider-specific session configuration schema and current values.
 	Config *SessionConfigState `json:"config,omitempty"`
 	// Top-level customizations active in this session.
 	//
@@ -1156,6 +1165,10 @@ type SessionSummary struct {
 	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Immutable requested source, separate from the host-resolved working directories.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Immutable requested revision, not the checkout's current HEAD.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
@@ -1368,19 +1381,6 @@ type SessionConfigPropertySchema struct {
 }
 
 // A JSON Schema object describing available session configuration metadata.
-//
-// Repository-backed creation uses the standard optional config keys
-// `repositorySource` (a credential-free repository URI) and
-// `repositoryRevision` (a branch, tag, or commit). Support is advertised by
-// `properties.repositorySource`; `properties.repositoryRevision` MUST NOT be
-// advertised without it. Each advertised property MUST have `type: 'string'`
-// and MUST NOT have `readOnly: true` or `sessionMutable: true`.
-//
-// The host MUST NOT accept repository inputs unless their corresponding
-// properties are advertised. Values travel through `resolveSessionConfig.config`
-// and `createSession.config`; schema discovery MUST NOT prepare a repository.
-// Neither key is globally required. Without repository intent, existing
-// directory/default behavior is unchanged. Other property ids remain host-defined.
 type SessionConfigSchema struct {
 	// JSON Schema: always `'object'`
 	Type string `json:"type"`

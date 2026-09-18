@@ -400,10 +400,14 @@ type CreateSessionParams struct {
 	// and ignores the rest. Dispatch working-directory actions to change the set
 	// after the session has started.
 	//
-	// A non-empty list and repository intent in `config` are mutually exclusive.
+	// A non-empty list and `repositorySource` are mutually exclusive.
 	// A repository URI identifies the source, not a working-directory URI; one
 	// source may produce multiple directories.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Credential-free source to prepare; requires the agent's repositorySource capability.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Requested branch, tag, or commit; requires a source and the capability's revision option.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
 	// Session configuration values collected via `resolveSessionConfig`.
 	// Keys and values follow the advertised {@link SessionConfigSchema}.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
@@ -1081,8 +1085,8 @@ type DisposeTerminalParams struct {
 // the full current property set (not a delta). The returned `values` contain
 // server-resolved defaults to pass to `createSession`.
 //
-// This command MUST NOT clone or prepare a repository. Standard repository
-// inputs and their advertisement requirements are defined by {@link SessionConfigSchema}.
+// This command MUST NOT clone or prepare a repository. Repository context
+// requires the agent's `repositorySource` capability.
 type ResolveSessionConfigParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -1093,6 +1097,10 @@ type ResolveSessionConfigParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+	// Credential-free source context; not a working-directory URI.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Requested revision; requires a source and the capability's revision option.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
 	// Current user-filled configuration values; see {@link SessionConfigSchema}.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 }
@@ -1120,6 +1128,10 @@ type SessionConfigCompletionsParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+	// Repository context for configuration completions; this MUST NOT prepare a checkout.
+	RepositorySource *URI `json:"repositorySource,omitempty"`
+	// Requested revision; requires a source and the capability's revision option.
+	RepositoryRevision *string `json:"repositoryRevision,omitempty"`
 	// Current user-filled configuration values (provides context for the query)
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 	// Property id from the schema to query values for

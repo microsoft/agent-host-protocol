@@ -294,6 +294,12 @@ pub struct PartialSessionSummary {
     /// chat that sets none operates against this full set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+    /// Immutable requested source, separate from the host-resolved working directories.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_source: Option<Uri>,
+    /// Immutable requested revision, not the checkout's current HEAD.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_revision: Option<String>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session

@@ -495,11 +495,19 @@ public sealed record CreateSessionParams
     /// and ignores the rest. Dispatch working-directory actions to change the set
     /// after the session has started.
     ///
-    /// A non-empty list and repository intent in `config` are mutually exclusive.
+    /// A non-empty list and `repositorySource` are mutually exclusive.
     /// A repository URI identifies the source, not a working-directory URI; one
     /// source may produce multiple directories.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
+
+    /// <summary>Credential-free source to prepare; requires the agent's repositorySource capability.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositorySource { get; init; }
+
+    /// <summary>Requested branch, tag, or commit; requires a source and the capability's revision option.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositoryRevision { get; init; }
 
     /// <summary>Session configuration values collected via `resolveSessionConfig`.
     /// Keys and values follow the advertised {@link SessionConfigSchema}.</summary>
@@ -1358,8 +1366,8 @@ public sealed record DisposeTerminalParams
 /// the full current property set (not a delta). The returned `values` contain
 /// server-resolved defaults to pass to `createSession`.
 ///
-/// This command MUST NOT clone or prepare a repository. Standard repository
-/// inputs and their advertisement requirements are defined by {@link SessionConfigSchema}.</summary>
+/// This command MUST NOT clone or prepare a repository. Repository context
+/// requires the agent's `repositorySource` capability.</summary>
 public sealed record ResolveSessionConfigParams
 {
     public required string Channel { get; init; }
@@ -1377,6 +1385,14 @@ public sealed record ResolveSessionConfigParams
     /// <summary>Working directory for the session</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
+
+    /// <summary>Credential-free source context; not a working-directory URI.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositorySource { get; init; }
+
+    /// <summary>Requested revision; requires a source and the capability's revision option.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositoryRevision { get; init; }
 
     /// <summary>Current user-filled configuration values; see {@link SessionConfigSchema}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1415,6 +1431,14 @@ public sealed record SessionConfigCompletionsParams
     /// <summary>Working directory for the session</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
+
+    /// <summary>Repository context for configuration completions; this MUST NOT prepare a checkout.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositorySource { get; init; }
+
+    /// <summary>Requested revision; requires a source and the capability's revision option.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RepositoryRevision { get; init; }
 
     /// <summary>Current user-filled configuration values (provides context for the query)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

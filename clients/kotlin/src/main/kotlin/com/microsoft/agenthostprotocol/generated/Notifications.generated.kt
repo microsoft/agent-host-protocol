@@ -226,6 +226,14 @@ data class PartialSessionSummary(
      */
     val workingDirectories: List<String>? = null,
     /**
+     * Immutable requested source, separate from the host-resolved working directories.
+     */
+    val repositorySource: String? = null,
+    /**
+     * Immutable requested revision, not the checkout's current HEAD.
+     */
+    val repositoryRevision: String? = null,
+    /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
      * annotation / entry counts without subscribing. Absent when the session

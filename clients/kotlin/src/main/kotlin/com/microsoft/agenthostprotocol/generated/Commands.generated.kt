@@ -618,11 +618,19 @@ data class CreateSessionParams(
      * and ignores the rest. Dispatch working-directory actions to change the set
      * after the session has started.
      *
-     * A non-empty list and repository intent in `config` are mutually exclusive.
+     * A non-empty list and `repositorySource` are mutually exclusive.
      * A repository URI identifies the source, not a working-directory URI; one
      * source may produce multiple directories.
      */
     val workingDirectories: List<String>? = null,
+    /**
+     * Credential-free source to prepare; requires the agent's repositorySource capability.
+     */
+    val repositorySource: String? = null,
+    /**
+     * Requested branch, tag, or commit; requires a source and the capability's revision option.
+     */
+    val repositoryRevision: String? = null,
     /**
      * Session configuration values collected via `resolveSessionConfig`.
      * Keys and values follow the advertised {@link SessionConfigSchema}.
@@ -1321,6 +1329,14 @@ data class ResolveSessionConfigParams(
      */
     val workingDirectory: String? = null,
     /**
+     * Credential-free source context; not a working-directory URI.
+     */
+    val repositorySource: String? = null,
+    /**
+     * Requested revision; requires a source and the capability's revision option.
+     */
+    val repositoryRevision: String? = null,
+    /**
      * Current user-filled configuration values; see {@link SessionConfigSchema}.
      */
     val config: Map<String, JsonElement>? = null
@@ -1437,6 +1453,14 @@ data class SessionConfigCompletionsParams(
      * Working directory for the session
      */
     val workingDirectory: String? = null,
+    /**
+     * Repository context for configuration completions; this MUST NOT prepare a checkout.
+     */
+    val repositorySource: String? = null,
+    /**
+     * Requested revision; requires a source and the capability's revision option.
+     */
+    val repositoryRevision: String? = null,
     /**
      * Current user-filled configuration values (provides context for the query)
      */

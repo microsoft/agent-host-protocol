@@ -13,16 +13,8 @@
       "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
       "activeClients": [],
       "chats": [],
-      "config": {
-        "schema": {
-          "type": "object",
-          "properties": {
-            "repositorySource": { "type": "string", "title": "Repository" },
-            "repositoryRevision": { "type": "string", "title": "Revision" }
-          }
-        },
-        "values": { "repositorySource": "https://example.org/team/project.git", "repositoryRevision": "main" }
-      }
+      "repositorySource": "https://example.org/team/project.git",
+      "repositoryRevision": "main"
     },
     "fromSeq": 1
   },
@@ -36,16 +28,8 @@
       "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
       "activeClients": [],
       "chats": [],
-      "config": {
-        "schema": {
-          "type": "object",
-          "properties": {
-            "repositorySource": { "type": "string", "title": "Repository" },
-            "repositoryRevision": { "type": "string", "title": "Revision" }
-          }
-        },
-        "values": { "repositorySource": "https://example.org/team/project.git", "repositoryRevision": "main" }
-      }
+      "repositorySource": "https://example.org/team/project.git",
+      "repositoryRevision": "main"
     },
     "fromSeq": 1
   }]
