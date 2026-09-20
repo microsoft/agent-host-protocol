@@ -676,6 +676,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.draft = a.draft
         return next
 
+    case .chatIsArchivedChanged(let a):
+        var next = state
+        next.status = withStatusFlag(next.status, .isArchived, a.isArchived)
+        return next
+
     default:
         return state
     }
@@ -928,6 +933,7 @@ public let clientDispatchableActions: Set<String> = [
     "chat/pendingMessageSet",
     "chat/pendingMessageRemoved",
     "chat/queuedMessagesReordered",
+    "chat/isArchivedChanged",
     "chat/inputAnswerChanged",
     "chat/inputCompleted",
     "session/customizationToggled",
@@ -948,6 +954,7 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .sessionActiveClientRemoved,
          .chatPendingMessageSet,
          .chatPendingMessageRemoved, .chatQueuedMessagesReordered,
+         .chatIsArchivedChanged,
          .chatInputAnswerChanged, .chatInputCompleted,
          .sessionCustomizationToggled,
          .sessionMcpServerStartRequested, .sessionMcpServerStopRequested,

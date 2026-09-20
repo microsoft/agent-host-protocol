@@ -2456,6 +2456,7 @@ public static class Reducers
         "chat/pendingMessageRemoved",
         "chat/queuedMessagesReordered",
         "chat/draftChanged",
+        "chat/isArchivedChanged",
         "chat/inputAnswerChanged",
         "chat/inputCompleted",
         "chat/truncated",
