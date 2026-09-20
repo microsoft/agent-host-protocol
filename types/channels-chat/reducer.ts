@@ -918,6 +918,9 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
     case ActionType.ChatDraftChanged:
       return { ...state, draft: action.draft };
 
+    case ActionType.ChatIsArchivedChanged:
+      return { ...state, status: withStatusFlag(state.status, SessionStatus.IsArchived, action.isArchived) };
+
     default:
       softAssertNever(action, log);
       return state;

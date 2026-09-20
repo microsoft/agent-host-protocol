@@ -771,6 +771,23 @@ export interface ChatDraftChangedAction {
   draft?: Message;
 }
 
+/**
+ * The archived state of the chat changed.
+ *
+ * Dispatched by a client to archive a chat independently of its owning
+ * session or to restore it. Archiving the session's default chat is equivalent
+ * to archiving the session and SHOULD use `session/isArchivedChanged` instead.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ChatIsArchivedChangedAction {
+  type: ActionType.ChatIsArchivedChanged;
+  /** Whether the chat is archived */
+  isArchived: boolean;
+}
+
 // ─── Session Input Actions ──────────────────────────────────────────────────
 
 /**
@@ -858,6 +875,7 @@ export type ChatAction =
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
+  | ChatIsArchivedChangedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction

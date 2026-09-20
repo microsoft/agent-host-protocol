@@ -97,6 +97,8 @@ public enum ActionType
     ChatQueuedMessagesReordered,
     [WireValue("chat/draftChanged")]
     ChatDraftChanged,
+    [WireValue("chat/isArchivedChanged")]
+    ChatIsArchivedChanged,
     [WireValue("chat/inputRequested")]
     ChatInputRequested,
     [WireValue("chat/inputAnswerChanged")]
@@ -1867,6 +1869,19 @@ public sealed record ChatDraftChangedAction
     public Message? Draft { get; init; }
 }
 
+/// <summary>The archived state of the chat changed.
+///
+/// Dispatched by a client to archive a chat independently of its owning
+/// session or to restore it. Archiving the session's default chat is equivalent
+/// to archiving the session and SHOULD use `session/isArchivedChanged` instead.</summary>
+public sealed record ChatIsArchivedChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Whether the chat is archived</summary>
+    public bool IsArchived { get; init; }
+}
+
 /// <summary>A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -2628,6 +2643,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/pendingMessageRemoved"] = typeof(ChatPendingMessageRemovedAction),
         ["chat/queuedMessagesReordered"] = typeof(ChatQueuedMessagesReorderedAction),
         ["chat/draftChanged"] = typeof(ChatDraftChangedAction),
+        ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),

@@ -72,6 +72,7 @@ pub enum ActionType {
     ChatPendingMessageRemoved,
     ChatQueuedMessagesReordered,
     ChatDraftChanged,
+    ChatIsArchivedChanged,
     ChatInputRequested,
     ChatInputAnswerChanged,
     ChatInputCompleted,
@@ -204,6 +205,7 @@ impl serde::Serialize for ActionType {
                 serializer.serialize_str("chat/queuedMessagesReordered")
             }
             Self::ChatDraftChanged => serializer.serialize_str("chat/draftChanged"),
+            Self::ChatIsArchivedChanged => serializer.serialize_str("chat/isArchivedChanged"),
             Self::ChatInputRequested => serializer.serialize_str("chat/inputRequested"),
             Self::ChatInputAnswerChanged => serializer.serialize_str("chat/inputAnswerChanged"),
             Self::ChatInputCompleted => serializer.serialize_str("chat/inputCompleted"),
@@ -346,6 +348,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/pendingMessageRemoved" => Self::ChatPendingMessageRemoved,
             "chat/queuedMessagesReordered" => Self::ChatQueuedMessagesReordered,
             "chat/draftChanged" => Self::ChatDraftChanged,
+            "chat/isArchivedChanged" => Self::ChatIsArchivedChanged,
             "chat/inputRequested" => Self::ChatInputRequested,
             "chat/inputAnswerChanged" => Self::ChatInputAnswerChanged,
             "chat/inputCompleted" => Self::ChatInputCompleted,
@@ -1389,6 +1392,18 @@ pub struct ChatDraftChangedAction {
     pub draft: Option<Message>,
 }
 
+/// The archived state of the chat changed.
+///
+/// Dispatched by a client to archive a chat independently of its owning
+/// session or to restore it. Archiving the session's default chat is equivalent
+/// to archiving the session and SHOULD use `session/isArchivedChanged` instead.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatIsArchivedChangedAction {
+    /// Whether the chat is archived
+    pub is_archived: bool,
+}
+
 /// A session requested input from the user.
 ///
 /// Creates an unresolved {@link InputRequestResponsePart} in the active turn,
@@ -2283,6 +2298,8 @@ pub enum StateAction {
     ChatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction),
     #[serde(rename = "chat/draftChanged")]
     ChatDraftChanged(ChatDraftChangedAction),
+    #[serde(rename = "chat/isArchivedChanged")]
+    ChatIsArchivedChanged(ChatIsArchivedChangedAction),
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested(ChatInputRequestedAction),
     #[serde(rename = "chat/inputAnswerChanged")]

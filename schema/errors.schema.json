@@ -8231,6 +8231,9 @@
           "$ref": "#/$defs/ChatDraftChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatIsArchivedChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatInputRequestedAction"
         },
         {
@@ -9813,6 +9816,23 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "ChatIsArchivedChangedAction": {
+      "type": "object",
+      "description": "The archived state of the chat changed.\n\nDispatched by a client to archive a chat independently of its owning\nsession or to restore it. Archiving the session's default chat is equivalent\nto archiving the session and SHOULD use `session/isArchivedChanged` instead.",
+      "properties": {
+        "type": {
+          "const": "chat/isArchivedChanged"
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "Whether the chat is archived"
+        }
+      },
+      "required": [
+        "type",
+        "isArchived"
       ]
     },
     "ChatInputRequestedAction": {

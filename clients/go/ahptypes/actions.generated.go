@@ -61,6 +61,7 @@ const (
 	ActionTypeChatPendingMessageRemoved          ActionType = "chat/pendingMessageRemoved"
 	ActionTypeChatQueuedMessagesReordered        ActionType = "chat/queuedMessagesReordered"
 	ActionTypeChatDraftChanged                   ActionType = "chat/draftChanged"
+	ActionTypeChatIsArchivedChanged              ActionType = "chat/isArchivedChanged"
 	ActionTypeChatInputRequested                 ActionType = "chat/inputRequested"
 	ActionTypeChatInputAnswerChanged             ActionType = "chat/inputAnswerChanged"
 	ActionTypeChatInputCompleted                 ActionType = "chat/inputCompleted"
@@ -748,6 +749,17 @@ type ChatDraftChangedAction struct {
 	Type ActionType `json:"type"`
 	// New draft message, or `undefined` to clear it
 	Draft *Message `json:"draft,omitempty"`
+}
+
+// The archived state of the chat changed.
+//
+// Dispatched by a client to archive a chat independently of its owning
+// session or to restore it. Archiving the session's default chat is equivalent
+// to archiving the session and SHOULD use `session/isArchivedChanged` instead.
+type ChatIsArchivedChangedAction struct {
+	Type ActionType `json:"type"`
+	// Whether the chat is archived
+	IsArchived bool `json:"isArchived"`
 }
 
 // A session requested input from the user.
@@ -1695,6 +1707,7 @@ func (*ChatPendingMessageSetAction) isStateAction()              {}
 func (*ChatPendingMessageRemovedAction) isStateAction()          {}
 func (*ChatQueuedMessagesReorderedAction) isStateAction()        {}
 func (*ChatDraftChangedAction) isStateAction()                   {}
+func (*ChatIsArchivedChangedAction) isStateAction()              {}
 func (*ChatInputRequestedAction) isStateAction()                 {}
 func (*ChatInputAnswerChangedAction) isStateAction()             {}
 func (*ChatInputCompletedAction) isStateAction()                 {}
@@ -1967,6 +1980,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/draftChanged":
 		var value ChatDraftChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/isArchivedChanged":
+		var value ChatIsArchivedChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

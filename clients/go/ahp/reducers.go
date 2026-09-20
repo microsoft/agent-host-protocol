@@ -791,6 +791,9 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatDraftChangedAction:
 		state.Draft = a.Draft
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatIsArchivedChangedAction:
+		state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsArchived, a.IsArchived)
+		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope
 }

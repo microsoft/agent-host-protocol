@@ -1320,6 +1320,11 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.draft = a.draft.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatIsArchivedChanged(a) => {
+            state.status =
+                with_status_flag(state.status, SessionStatus::IsArchived, a.is_archived);
+            ReduceOutcome::Applied
+        }
         _ => ReduceOutcome::OutOfScope,
     }
 }

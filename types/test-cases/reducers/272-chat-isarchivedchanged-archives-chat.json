@@ -1,0 +1,24 @@
+{
+  "description": "chat/isArchivedChanged marks chat as archived",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "ahp-chat://session/peer",
+    "title": "Peer Chat",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  },
+  "actions": [
+    {
+      "type": "chat/isArchivedChanged",
+      "isArchived": true
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "ahp-chat://session/peer",
+    "title": "Peer Chat",
+    "status": 65,
+    "modifiedAt": "1970-01-01T00:00:01.000Z"
+  }
+}

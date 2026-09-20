@@ -71,6 +71,7 @@ value class ActionType(val rawValue: String) {
         val CHAT_PENDING_MESSAGE_REMOVED: ActionType = ActionType("chat/pendingMessageRemoved")
         val CHAT_QUEUED_MESSAGES_REORDERED: ActionType = ActionType("chat/queuedMessagesReordered")
         val CHAT_DRAFT_CHANGED: ActionType = ActionType("chat/draftChanged")
+        val CHAT_IS_ARCHIVED_CHANGED: ActionType = ActionType("chat/isArchivedChanged")
         val CHAT_INPUT_REQUESTED: ActionType = ActionType("chat/inputRequested")
         val CHAT_INPUT_ANSWER_CHANGED: ActionType = ActionType("chat/inputAnswerChanged")
         val CHAT_INPUT_COMPLETED: ActionType = ActionType("chat/inputCompleted")
@@ -966,6 +967,15 @@ data class ChatDraftChangedAction(
 )
 
 @Serializable
+data class ChatIsArchivedChangedAction(
+    val type: ActionType,
+    /**
+     * Whether the chat is archived
+     */
+    val isArchived: Boolean
+)
+
+@Serializable
 data class ChatInputRequestedAction(
     val type: ActionType,
     /**
@@ -1625,6 +1635,7 @@ sealed interface StateAction
 @JvmInline value class StateActionChatPendingMessageRemoved(val value: ChatPendingMessageRemovedAction) : StateAction
 @JvmInline value class StateActionChatQueuedMessagesReordered(val value: ChatQueuedMessagesReorderedAction) : StateAction
 @JvmInline value class StateActionChatDraftChanged(val value: ChatDraftChangedAction) : StateAction
+@JvmInline value class StateActionChatIsArchivedChanged(val value: ChatIsArchivedChangedAction) : StateAction
 @JvmInline value class StateActionChatInputRequested(val value: ChatInputRequestedAction) : StateAction
 @JvmInline value class StateActionChatInputAnswerChanged(val value: ChatInputAnswerChangedAction) : StateAction
 @JvmInline value class StateActionChatInputCompleted(val value: ChatInputCompletedAction) : StateAction
@@ -1736,6 +1747,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/pendingMessageRemoved" -> StateActionChatPendingMessageRemoved(input.json.decodeFromJsonElement(ChatPendingMessageRemovedAction.serializer(), element))
             "chat/queuedMessagesReordered" -> StateActionChatQueuedMessagesReordered(input.json.decodeFromJsonElement(ChatQueuedMessagesReorderedAction.serializer(), element))
             "chat/draftChanged" -> StateActionChatDraftChanged(input.json.decodeFromJsonElement(ChatDraftChangedAction.serializer(), element))
+            "chat/isArchivedChanged" -> StateActionChatIsArchivedChanged(input.json.decodeFromJsonElement(ChatIsArchivedChangedAction.serializer(), element))
             "chat/inputRequested" -> StateActionChatInputRequested(input.json.decodeFromJsonElement(ChatInputRequestedAction.serializer(), element))
             "chat/inputAnswerChanged" -> StateActionChatInputAnswerChanged(input.json.decodeFromJsonElement(ChatInputAnswerChangedAction.serializer(), element))
             "chat/inputCompleted" -> StateActionChatInputCompleted(input.json.decodeFromJsonElement(ChatInputCompletedAction.serializer(), element))
@@ -1840,6 +1852,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatPendingMessageRemoved -> output.json.encodeToJsonElement(ChatPendingMessageRemovedAction.serializer(), value.value)
             is StateActionChatQueuedMessagesReordered -> output.json.encodeToJsonElement(ChatQueuedMessagesReorderedAction.serializer(), value.value)
             is StateActionChatDraftChanged -> output.json.encodeToJsonElement(ChatDraftChangedAction.serializer(), value.value)
+            is StateActionChatIsArchivedChanged -> output.json.encodeToJsonElement(ChatIsArchivedChangedAction.serializer(), value.value)
             is StateActionChatInputRequested -> output.json.encodeToJsonElement(ChatInputRequestedAction.serializer(), value.value)
             is StateActionChatInputAnswerChanged -> output.json.encodeToJsonElement(ChatInputAnswerChangedAction.serializer(), value.value)
             is StateActionChatInputCompleted -> output.json.encodeToJsonElement(ChatInputCompletedAction.serializer(), value.value)

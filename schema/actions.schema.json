@@ -1551,6 +1551,23 @@
         "type"
       ]
     },
+    "ChatIsArchivedChangedAction": {
+      "type": "object",
+      "description": "The archived state of the chat changed.\n\nDispatched by a client to archive a chat independently of its owning\nsession or to restore it. Archiving the session's default chat is equivalent\nto archiving the session and SHOULD use `session/isArchivedChanged` instead.",
+      "properties": {
+        "type": {
+          "const": "chat/isArchivedChanged"
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "Whether the chat is archived"
+        }
+      },
+      "required": [
+        "type",
+        "isArchived"
+      ]
+    },
     "ChatInputRequestedAction": {
       "type": "object",
       "description": "A session requested input from the user.\n\nCreates an unresolved {@link InputRequestResponsePart} in the active turn,\nor replaces the unresolved part with the same request `id`. Answer drafts\nare preserved unless `request.answers` is provided.",
@@ -2409,6 +2426,9 @@
         },
         {
           "$ref": "#/$defs/ChatDraftChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatIsArchivedChangedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"
@@ -8705,6 +8725,9 @@
         },
         {
           "$ref": "#/$defs/ChatDraftChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatIsArchivedChangedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"
