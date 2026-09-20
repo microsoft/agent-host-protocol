@@ -303,9 +303,9 @@ public sealed record PartialSessionSummary
 
     /// <summary>Lightweight ordered chat catalog for session-list presentation.
     ///
-    /// This intentionally omits volatile chat state such as status, activity,
-    /// and interactivity. Clients subscribe to the session channel when they
-    /// need those details.</summary>
+    /// This intentionally omits volatile chat state such as status and activity,
+    /// while retaining interactivity so generic clients can hide chats or present
+    /// them as read-only without subscribing to the session channel.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SessionChatSummary>? Chats { get; init; }
 

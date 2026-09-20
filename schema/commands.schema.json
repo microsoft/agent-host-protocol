@@ -2756,7 +2756,7 @@
           "items": {
             "$ref": "#/$defs/SessionChatSummary"
           },
-          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status, activity,\nand interactivity. Clients subscribe to the session channel when they\nneed those details."
+          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status and activity,\nwhile retaining interactivity so generic clients can hide chats or present\nthem as read-only without subscribing to the session channel."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
@@ -2787,6 +2787,10 @@
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat was created, when known"
+        },
+        "interactivity": {
+          "$ref": "#/$defs/ChatInteractivity",
+          "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
         }
       },
       "required": [
@@ -10185,6 +10189,15 @@
       ],
       "description": "How a chat came into existence. Clients MAY use it to render\ncontextual UI (parent indicators, fork markers, \"spawned by tool\" badges).\n\nFork and side-chat origins both carry a stable top-level `turnId` alongside\ntheir discriminated `kind` value instead of snapshotting whether that turn\nwas active or historical at creation time. Consumers resolve the identifier\nagainst the\nsource chat's current `activeTurn` or retained `turns` as needed.\n\nWhen a host accepts side-chat creation from the source chat's current active\nturn, it snapshots the retained history plus that turn's current user\nmessage and any partial assistant response already available. Later\nsource-turn deltas do not retroactively change the created side chat's\nstarting context, and once the source turn completes it is still referenced\nby the same `turnId`. Side-chat origins MAY also retain an immutable\n{@link SideChatSelection | selected-text snapshot} captured at acceptance\ntime; any `responsePartId` there is provenance only, not a range.\n\nThe `tool` variant records a tool-spawned worker from the worker's side: its\n`chat`/`toolCallId` identify the spawning tool call in the parent chat. This\nis the canonical record of the spawn relationship. The same edge is surfaced\nfrom the parent's side by {@link ToolResultSubagentContent}, whose `resource`\nis this chat's URI; hosts MUST keep the two consistent."
     },
+    "ChatInteractivity": {
+      "enum": [
+        "full",
+        "read-only",
+        "hidden"
+      ],
+      "type": "string",
+      "description": "How a user can interact with a chat.\n\n- `Full` — user can send messages and watch (default when absent)\n- `ReadOnly` — user can watch but not send messages (e.g. agent team workers)\n- `Hidden` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
+    },
     "CustomizationLoadState": {
       "oneOf": [
         {
@@ -10330,15 +10343,6 @@
       ],
       "type": "string",
       "description": "Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}\nstate. Mirrors the three failure modes defined by the\n[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md)."
-    },
-    "ChatInteractivity": {
-      "enum": [
-        "full",
-        "read-only",
-        "hidden"
-      ],
-      "type": "string",
-      "description": "How a user can interact with a chat.\n\n- `Full` — user can send messages and watch (default when absent)\n- `ReadOnly` — user can watch but not send messages (e.g. agent team workers)\n- `Hidden` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
     },
     "ChatInputQuestion": {
       "oneOf": [

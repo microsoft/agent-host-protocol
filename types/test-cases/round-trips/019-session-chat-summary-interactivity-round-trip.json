@@ -1,0 +1,50 @@
+{
+  "name": "session-chat-summary-interactivity-round-trip",
+  "group": "A",
+  "description": "SessionSummary chat catalog entries preserve optional hidden and read-only interactivity so generic clients can filter or disable chat input without subscribing to the session channel.",
+  "type": "SessionSummary",
+  "input": {
+    "resource": "ahp-session:/s1",
+    "provider": "demo",
+    "title": "Agent team",
+    "status": 1,
+    "createdAt": "2024-01-01T00:00:00.001Z",
+    "modifiedAt": "2024-01-01T00:00:00.002Z",
+    "chats": [
+      {
+        "resource": "ahp-chat:/lead",
+        "title": "Lead",
+        "interactivity": "read-only"
+      },
+      {
+        "resource": "ahp-chat:/worker",
+        "title": "Worker",
+        "interactivity": "hidden"
+      }
+    ],
+    "defaultChat": "ahp-chat:/lead"
+  },
+  "acceptableOutputs": [
+    {
+      "resource": "ahp-session:/s1",
+      "provider": "demo",
+      "title": "Agent team",
+      "status": 1,
+      "createdAt": "2024-01-01T00:00:00.001Z",
+      "modifiedAt": "2024-01-01T00:00:00.002Z",
+      "chats": [
+        {
+          "resource": "ahp-chat:/lead",
+          "title": "Lead",
+          "interactivity": "read-only"
+        },
+        {
+          "resource": "ahp-chat:/worker",
+          "title": "Worker",
+          "interactivity": "hidden"
+        }
+      ],
+      "defaultChat": "ahp-chat:/lead"
+    }
+  ]
+}

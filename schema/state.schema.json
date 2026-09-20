@@ -1096,7 +1096,7 @@
           "items": {
             "$ref": "#/$defs/SessionChatSummary"
           },
-          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status, activity,\nand interactivity. Clients subscribe to the session channel when they\nneed those details."
+          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status and activity,\nwhile retaining interactivity so generic clients can hide chats or present\nthem as read-only without subscribing to the session channel."
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
@@ -1127,6 +1127,10 @@
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat was created, when known"
+        },
+        "interactivity": {
+          "$ref": "#/$defs/ChatInteractivity",
+          "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
         }
       },
       "required": [
@@ -6180,15 +6184,6 @@
       "type": "string",
       "description": "Session initialization state."
     },
-    "McpAuthRequiredReason": {
-      "enum": [
-        "required",
-        "expired",
-        "insufficientScope"
-      ],
-      "type": "string",
-      "description": "Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}\nstate. Mirrors the three failure modes defined by the\n[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md)."
-    },
     "ChatInteractivity": {
       "enum": [
         "full",
@@ -6197,6 +6192,15 @@
       ],
       "type": "string",
       "description": "How a user can interact with a chat.\n\n- `Full` — user can send messages and watch (default when absent)\n- `ReadOnly` — user can watch but not send messages (e.g. agent team workers)\n- `Hidden` — internal worker not shown in UI at all\n\nSupports the agent-team pattern where a lead chat is fully interactive and\nworker chats are read-only (visible for observability) or hidden (internal\nimplementation detail). The harness sets this based on the chat's role;\nthe UI uses it to show appropriate controls."
+    },
+    "McpAuthRequiredReason": {
+      "enum": [
+        "required",
+        "expired",
+        "insufficientScope"
+      ],
+      "type": "string",
+      "description": "Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}\nstate. Mirrors the three failure modes defined by the\n[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md)."
     },
     "TurnState": {
       "enum": [

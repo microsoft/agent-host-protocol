@@ -240,9 +240,9 @@ public struct PartialSessionSummary: Codable, Sendable {
     public var meta: [String: AnyCodable]?
     /// Lightweight ordered chat catalog for session-list presentation.
     ///
-    /// This intentionally omits volatile chat state such as status, activity,
-    /// and interactivity. Clients subscribe to the session channel when they
-    /// need those details.
+    /// This intentionally omits volatile chat state such as status and activity,
+    /// while retaining interactivity so generic clients can hide chats or present
+    /// them as read-only without subscribing to the session channel.
     public var chats: [SessionChatSummary]?
     /// Chat that receives input when no specific chat is selected.
     public var defaultChat: String?

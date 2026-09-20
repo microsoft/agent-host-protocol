@@ -2077,9 +2077,9 @@ data class SessionSummary(
     /**
      * Lightweight ordered chat catalog for session-list presentation.
      *
-     * This intentionally omits volatile chat state such as status, activity,
-     * and interactivity. Clients subscribe to the session channel when they
-     * need those details.
+     * This intentionally omits volatile chat state such as status and activity,
+     * while retaining interactivity so generic clients can hide chats or present
+     * them as read-only without subscribing to the session channel.
      */
     val chats: List<SessionChatSummary>? = null,
     /**
@@ -2101,7 +2101,15 @@ data class SessionChatSummary(
     /**
      * How this chat was created, when known
      */
-    val origin: ChatOrigin? = null
+    val origin: ChatOrigin? = null,
+    /**
+     * How the user can interact with this chat.
+     *
+     * Generic clients use this to omit hidden chats and disable input for
+     * read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
+     * backward compatibility.
+     */
+    val interactivity: ChatInteractivity? = null
 )
 
 @Serializable
