@@ -1623,9 +1623,6 @@ pub struct AgentInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
-    /// The host accepts typed repository inputs for session creation and configuration queries.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_source: Option<RepositorySourceCapability>,
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1704,13 +1701,17 @@ pub struct MultipleWorkingDirectoriesCapability {
     pub primary_replacement: Option<bool>,
 }
 
-/// Options for repository-backed session creation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+/// Requested repository intent, independent of any host-resolved checkout.
+/// The same source may appear more than once with different revisions; a source
+/// URI is not a checkout identity.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RepositorySourceCapability {
-    /// When true, clients may supply an explicit repositoryRevision.
+pub struct RepositorySource {
+    /// Credential-free repository source URI.
+    pub source: Uri,
+    /// Requested branch, tag, or commit. Omit to use the host's default revision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub revision: Option<bool>,
+    pub revision: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2033,12 +2034,12 @@ pub struct SessionState {
     /// chat that sets none operates against this full set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
-    /// Immutable requested source, separate from the host-resolved working directories.
+    /// Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_source: Option<Uri>,
-    /// Immutable requested revision, not the checkout's current HEAD.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_revision: Option<String>,
+    pub repositories: Option<Vec<RepositorySource>>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -2071,7 +2072,7 @@ pub struct SessionState {
     /// this over the session's lifetime.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_chat: Option<Uri>,
-    /// Provider-specific session configuration schema and current values.
+    /// Session configuration schema and current values
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<SessionConfigState>,
     /// Top-level customizations active in this session.
@@ -2375,12 +2376,12 @@ pub struct SessionSummary {
     /// chat that sets none operates against this full set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
-    /// Immutable requested source, separate from the host-resolved working directories.
+    /// Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_source: Option<Uri>,
-    /// Immutable requested revision, not the checkout's current HEAD.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_revision: Option<String>,
+    pub repositories: Option<Vec<RepositorySource>>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session

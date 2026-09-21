@@ -1,0 +1,34 @@
+{
+  "description": "Failed preparation retains the exact repository list without claiming any checkout was prepared",
+  "reducer": "session",
+  "initial": {
+    "provider": "example",
+    "title": "Repository session",
+    "status": 1,
+    "lifecycle": "creating",
+    "activeClients": [],
+    "chats": [],
+    "repositories": [
+      { "source": "https://example.org/team/project.git", "revision": "main" },
+      { "source": "https://example.org/team/project.git", "revision": "feature" },
+      { "source": "https://example.org/team/other.git" }
+    ]
+  },
+  "actions": [
+    { "type": "session/creationFailed", "error": { "errorType": "preparationFailed", "message": "Preparation failed" } }
+  ],
+  "expected": {
+    "provider": "example",
+    "title": "Repository session",
+    "status": 1,
+    "lifecycle": "failed",
+    "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
+    "activeClients": [],
+    "chats": [],
+    "repositories": [
+      { "source": "https://example.org/team/project.git", "revision": "main" },
+      { "source": "https://example.org/team/project.git", "revision": "feature" },
+      { "source": "https://example.org/team/other.git" }
+    ]
+  }
+}

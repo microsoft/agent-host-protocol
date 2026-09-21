@@ -28,7 +28,10 @@
 
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
-    commands::{ChangesetOperationTarget, ChatSource, Implementation, InitializeResult},
+    commands::{
+        ChangesetOperationTarget, ChatSource, CreateSessionParams, Implementation,
+        InitializeResult, ResolveSessionConfigParams, SessionConfigCompletionsParams,
+    },
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
     notifications::{PartialSessionSummary, SessionAddedParams},
@@ -223,6 +226,9 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "PartialSessionSummary" => round_trip!(PartialSessionSummary),
         "Implementation" => round_trip!(Implementation),
         "InitializeResult" => round_trip!(InitializeResult),
+        "CreateSessionParams" => round_trip!(CreateSessionParams),
+        "ResolveSessionConfigParams" => round_trip!(ResolveSessionConfigParams),
+        "SessionConfigCompletionsParams" => round_trip!(SessionConfigCompletionsParams),
         "ChatSource" => round_trip!(ChatSource),
         "Snapshot" => round_trip!(Snapshot),
         other => Err(format!(

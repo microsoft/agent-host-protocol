@@ -142,7 +142,9 @@ function schemaAccepts(
     case 'null':
       return value === null;
     case 'array':
-      return Array.isArray(value);
+      return Array.isArray(value)
+        && (typeof schema.minItems !== 'number' || value.length >= schema.minItems)
+        && value.every(item => schemaAccepts(root, schema.items as JsonNode, item));
   }
 
   return true;
@@ -224,7 +226,7 @@ describe('generated JSON schemas', () => {
         assert.equal(schemaAccepts(schema, configSchema, legacy), true);
       });
 
-      it('declares optional typed repository inputs beside generic config', () => {
+      it('declares optional non-empty repository lists beside generic config', () => {
         if (file !== 'commands.schema.json') {
           return;
         }
@@ -237,40 +239,81 @@ describe('generated JSON schemas', () => {
           const properties = defs[definition].properties as Record<string, Record<string, unknown>>;
           assert.equal(properties.config.type, 'object');
           assert.deepEqual(
-            Object.keys(properties).filter(name => ['repository', 'repositorySource', 'repositoryRevision'].includes(name)),
-            ['repositorySource', 'repositoryRevision'],
+            Object.keys(properties).filter(name => name.startsWith('repositor')),
+            ['repositories'],
           );
+          assert.equal(properties.repositories.minItems, 1);
           const base = { channel, ...(definition === 'SessionConfigCompletionsParams' ? { property: 'mode' } : {}) };
           assert.equal(schemaAccepts(schema, defs[definition], base), true);
-          for (const source of [
-            {},
-            { repositorySource: 'https://example.org/team/project.git' },
-            {
-              repositorySource: 'https://example.org/team/project.git',
-              repositoryRevision: 'refs/tags/v1.2.3',
-            },
+          const source = 'https://example.org/team/project.git';
+          for (const repositories of [
+            [{ source }],
+            [{ source, revision: 'refs/tags/v1.2.3' }],
+            [{ source, revision: 'main' }, { source, revision: 'feature' }],
           ]) {
-            assert.equal(schemaAccepts(schema, defs[definition], { ...base, ...source, config: { mode: 'review' } }), true);
+            assert.equal(schemaAccepts(schema, defs[definition], { ...base, repositories, config: { mode: 'review' } }), true);
           }
-          for (const invalid of [{ repositorySource: 42 }, { repositorySource: null }, { repositoryRevision: 42 }]) {
-            assert.equal(schemaAccepts(schema, defs[definition], { ...base, ...invalid }), false);
+          for (const repositories of [
+            [], null, {}, source, [null], [source], [{}],
+            [{ revision: 'main' }], [{ source: 42 }], [{ source: null }],
+            [{ source, revision: 42 }],
+          ]) {
+            assert.equal(schemaAccepts(schema, defs[definition], { ...base, repositories }), false);
           }
         }
       });
 
-      it('declares immutable source metadata and an opt-in repository capability', () => {
+      it('declares immutable repository lists with a required source per entry', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
-        for (const name of ['SessionState', 'SessionSummary']) {
+        for (const name of ['SessionMetadata', 'SessionState', 'SessionSummary']) {
           const properties = defs[name].properties as Record<string, Record<string, unknown>>;
-          assert.equal(dereferenceSchema(schema, properties.repositorySource).type, 'string');
-          assert.equal(dereferenceSchema(schema, properties.repositoryRevision).type, 'string');
+          const { type, items, minItems } = properties.repositories;
+          assert.deepEqual({ type, items, minItems }, {
+            type: 'array', items: { $ref: '#/$defs/RepositorySource' }, minItems: 1,
+          });
+          assert.equal((defs[name].required as string[]).includes('repositories'), false);
         }
+        const source = defs.RepositorySource;
+        const properties = source.properties as Record<string, Record<string, unknown>>;
+        assert.deepEqual({
+          fields: Object.keys(properties),
+          required: source.required,
+          sourceType: dereferenceSchema(schema, properties.source).type,
+          revisionType: properties.revision.type,
+        }, {
+          fields: ['source', 'revision'], required: ['source'], sourceType: 'string', revisionType: 'string',
+        });
+      });
+
+      it('advertises repository preparation on the host, not the agent', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
         const capabilities = defs.AgentCapabilities.properties as Record<string, Record<string, unknown>>;
-        assert.deepEqual(capabilities.repositorySource.$ref, '#/$defs/RepositorySourceCapability');
-        for (const value of [{}, { repositorySource: {} }, { repositorySource: { revision: true } }]) {
-          assert.equal(schemaAccepts(schema, defs.AgentCapabilities, value), true);
+        assert.deepEqual({
+          agentSource: capabilities.repositorySource,
+          agentPreparation: capabilities.repositoryPreparation,
+          oldCapability: defs.RepositorySourceCapability,
+        }, {
+          agentSource: undefined, agentPreparation: undefined, oldCapability: undefined,
+        });
+        if (file !== 'commands.schema.json') {
+          return;
         }
-        assert.equal(schemaAccepts(schema, defs.AgentCapabilities, { repositorySource: true }), false);
+        const properties = defs.InitializeResult.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.repositoryPreparation.$ref, '#/$defs/RepositoryPreparationCapabilities');
+        const hostCapabilities = defs.RepositoryPreparationCapabilities;
+        assert.equal(hostCapabilities.required, undefined);
+        const base = { protocolVersion: '0.9.0', serverSeq: 0, snapshots: [] };
+        assert.equal(schemaAccepts(schema, defs.InitializeResult, base), true);
+        for (const repositoryPreparation of [
+          {}, { revision: true }, { revision: false },
+          { multipleRepositories: false }, { multipleRepositories: true },
+          { revision: true, multipleRepositories: true },
+        ]) {
+          assert.equal(schemaAccepts(schema, defs.InitializeResult, { ...base, repositoryPreparation }), true);
+        }
+        for (const repositoryPreparation of [true, null, [], { revision: 'true' }, { multipleRepositories: 2 }]) {
+          assert.equal(schemaAccepts(schema, defs.InitializeResult, { ...base, repositoryPreparation }), false);
+        }
       });
 
       it('constrains every ChatOrigin branch to a distinct kind', () => {

@@ -109,13 +109,13 @@
               },
               "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
             },
-            "repositorySource": {
-              "$ref": "#/$defs/URI",
-              "description": "Immutable requested source, separate from the host-resolved working directories."
-            },
-            "repositoryRevision": {
-              "type": "string",
-              "description": "Immutable requested revision, not the checkout's current HEAD."
+            "repositories": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RepositorySource"
+              },
+              "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+              "minItems": 1
             },
             "annotations": {
               "$ref": "#/$defs/AnnotationsSummary",
@@ -165,7 +165,7 @@
     },
     "ProgressParams": {
       "type": "object",
-      "description": "Generic progress notification for a long-running operation.\n\nA client opts in to progress for a request by including a `progressToken` in\nthat request (today: the `progressToken` field on `createSession`). If the\nserver does long-running work to service the request — e.g. lazily\ndownloading an agent's native SDK the first time a session of that provider\nis materialized — it emits `progress` notifications carrying the same token.\n\nThe notification is operation-agnostic: it says nothing about *what* is\nprogressing. The client correlates `progressToken` back to the request it\noriginated from (and thus the UI surface awaiting it) and renders its own\nlocalized indicator. The same channel serves any future long-running\noperation without a new method.\n\nSemantics:\n\n- `progress` is monotonically non-decreasing for a given `progressToken`.\n- `total` is present only when the server knows the magnitude up front\n  (e.g. a `Content-Length`); when absent the client SHOULD show an\n  indeterminate indicator.\n- The operation is complete when `progress === total`. The server MUST emit a\n  final frame satisfying `progress === total`; when the total was never\n  known, it sets `total` to the final `progress` on that frame. No further\n  frames reference the token afterwards.\n- The server MAY emit no progress at all (e.g. the work was already done);\n  the client then never shows an indicator.\n- Like all notifications this is ephemeral and is **not** replayed on\n  reconnect. A client that never receives the terminal frame SHOULD expire\n  the indicator after an idle timeout.\n- Completion of reported work does not establish session readiness.\n  Observe session lifecycle state for the durable outcome.",
+      "description": "Generic progress notification for a long-running operation.\n\nA client opts in to progress for a request by including a `progressToken` in\nthat request (today: the `progressToken` field on `createSession`). If the\nserver does long-running work to service the request — e.g. lazily\ndownloading an agent's native SDK the first time a session of that provider\nis materialized — it emits `progress` notifications carrying the same token.\n\nThe notification is operation-agnostic: it says nothing about *what* is\nprogressing. The client correlates `progressToken` back to the request it\noriginated from (and thus the UI surface awaiting it) and renders its own\nlocalized indicator. The same channel serves any future long-running\noperation without a new method.\n\nSemantics:\n\n- `progress` is monotonically non-decreasing for a given `progressToken`.\n- `total` is present only when the server knows the magnitude up front\n  (e.g. a `Content-Length`); when absent the client SHOULD show an\n  indeterminate indicator.\n- The operation is complete when `progress === total`. The server MUST emit a\n  final frame satisfying `progress === total`; when the total was never\n  known, it sets `total` to the final `progress` on that frame. No further\n  frames reference the token afterwards.\n- The server MAY emit no progress at all (e.g. the work was already done);\n  the client then never shows an indicator.\n- Like all notifications this is ephemeral and is **not** replayed on\n  reconnect. A client that never receives the terminal frame SHOULD expire\n  the indicator after an idle timeout.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -802,10 +802,6 @@
       "type": "object",
       "description": "Static capabilities an {@link AgentInfo} advertises. Modelled after MCP\ncapabilities: each field is opt-in and its presence (an empty object `{}`)\nsignals support, while absence means the feature is unsupported and the\ncorresponding client commands MUST NOT be used. Sub-fields carry\nper-capability options.",
       "properties": {
-        "repositorySource": {
-          "$ref": "#/$defs/RepositorySourceCapability",
-          "description": "The host accepts typed repository inputs for session creation and configuration queries."
-        },
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
           "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding mode."
@@ -813,16 +809,6 @@
         "multipleWorkingDirectories": {
           "$ref": "#/$defs/MultipleWorkingDirectoriesCapability",
           "description": "The session's agent can be granted tool access to more than one working\ndirectory. The directories are treated as equal peers except where the\nagent advertises a protected primary-slot option (some backends pin or\nreplace their first directory as a process root).\n\nWhen absent, clients MUST NOT mutate a session's or chat's working-directory\nset and MUST NOT set more than one entry in\n{@link CreateSessionParams.workingDirectories}."
-        }
-      }
-    },
-    "RepositorySourceCapability": {
-      "type": "object",
-      "description": "Options for repository-backed session creation.",
-      "properties": {
-        "revision": {
-          "type": "boolean",
-          "description": "When true, clients may supply an explicit repositoryRevision."
         }
       }
     },
@@ -966,6 +952,23 @@
         "run"
       ]
     },
+    "RepositorySource": {
+      "type": "object",
+      "description": "Requested repository intent, independent of any host-resolved checkout.\nThe same source may appear more than once with different revisions; a source\nURI is not a checkout identity.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/URI",
+          "description": "Credential-free repository source URI."
+        },
+        "revision": {
+          "type": "string",
+          "description": "Requested branch, tag, or commit. Omit to use the host's default revision."
+        }
+      },
+      "required": [
+        "source"
+      ]
+    },
     "SessionMetadata": {
       "type": "object",
       "description": "Metadata shared between the full {@link SessionState} (delivered when a\nclient subscribes to a session's URI) and the lightweight\n{@link SessionSummary} (carried in the root-channel session catalog).\n\nThese fields describe the session at a glance and appear in both places.\n`SessionState` owns the authoritative values for a subscribed session;\n`SessionSummary` mirrors them into the catalog so clients that only render a\nsession list don't have to subscribe to every session URI. The host keeps\nthe catalog in sync via `root/sessionSummaryChanged`.",
@@ -1001,13 +1004,13 @@
           },
           "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
         },
-        "repositorySource": {
-          "$ref": "#/$defs/URI",
-          "description": "Immutable requested source, separate from the host-resolved working directories."
-        },
-        "repositoryRevision": {
-          "type": "string",
-          "description": "Immutable requested revision, not the checkout's current HEAD."
+        "repositories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepositorySource"
+          },
+          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "minItems": 1
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -1055,13 +1058,13 @@
           },
           "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
         },
-        "repositorySource": {
-          "$ref": "#/$defs/URI",
-          "description": "Immutable requested source, separate from the host-resolved working directories."
-        },
-        "repositoryRevision": {
-          "type": "string",
-          "description": "Immutable requested revision, not the checkout's current HEAD."
+        "repositories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepositorySource"
+          },
+          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "minItems": 1
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -1102,7 +1105,7 @@
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
-          "description": "Provider-specific session configuration schema and current values."
+          "description": "Session configuration schema and current values"
         },
         "customizations": {
           "type": "array",
@@ -1371,13 +1374,13 @@
           },
           "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
         },
-        "repositorySource": {
-          "$ref": "#/$defs/URI",
-          "description": "Immutable requested source, separate from the host-resolved working directories."
-        },
-        "repositoryRevision": {
-          "type": "string",
-          "description": "Immutable requested revision, not the checkout's current HEAD."
+        "repositories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepositorySource"
+          },
+          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "minItems": 1
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",

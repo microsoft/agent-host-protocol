@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Typed optional `repositorySource` and `repositoryRevision` request and session metadata fields, with an explicit agent capability for host-owned repository preparation."
+  "message": "Typed optional `repositories` lists on session creation, configuration queries, and immutable session metadata, with host-level `repositoryPreparation` discovery."
 }

@@ -861,10 +861,6 @@ public sealed record AgentInfo
 /// per-capability options.</summary>
 public sealed record AgentCapabilities
 {
-    /// <summary>The host accepts typed repository inputs for session creation and configuration queries.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public RepositorySourceCapability? RepositorySource { get; init; }
-
     /// <summary>The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -944,12 +940,17 @@ public sealed record MultipleWorkingDirectoriesCapability
     public bool? PrimaryReplacement { get; init; }
 }
 
-/// <summary>Options for repository-backed session creation.</summary>
-public sealed record RepositorySourceCapability
+/// <summary>Requested repository intent, independent of any host-resolved checkout.
+/// The same source may appear more than once with different revisions; a source
+/// URI is not a checkout identity.</summary>
+public sealed record RepositorySource
 {
-    /// <summary>When true, clients may supply an explicit repositoryRevision.</summary>
+    /// <summary>Credential-free repository source URI.</summary>
+    public required string Source { get; init; }
+
+    /// <summary>Requested branch, tag, or commit. Omit to use the host's default revision.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? Revision { get; init; }
+    public string? Revision { get; init; }
 }
 
 public sealed record SessionModelInfo
@@ -1559,13 +1560,12 @@ public sealed class SessionState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; set; }
 
-    /// <summary>Immutable requested source, separate from the host-resolved working directories.</summary>
+    /// <summary>Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? RepositorySource { get; set; }
-
-    /// <summary>Immutable requested revision, not the checkout's current HEAD.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? RepositoryRevision { get; set; }
+    public List<RepositorySource>? Repositories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render
@@ -1606,7 +1606,7 @@ public sealed class SessionState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; set; }
 
-    /// <summary>Provider-specific session configuration schema and current values.</summary>
+    /// <summary>Session configuration schema and current values</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SessionConfigState? Config { get; set; }
 
@@ -1902,13 +1902,12 @@ public sealed class SessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; set; }
 
-    /// <summary>Immutable requested source, separate from the host-resolved working directories.</summary>
+    /// <summary>Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? RepositorySource { get; set; }
-
-    /// <summary>Immutable requested revision, not the checkout's current HEAD.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? RepositoryRevision { get; set; }
+    public List<RepositorySource>? Repositories { get; set; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render

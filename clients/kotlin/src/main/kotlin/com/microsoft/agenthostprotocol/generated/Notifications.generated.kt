@@ -226,13 +226,12 @@ data class PartialSessionSummary(
      */
     val workingDirectories: List<String>? = null,
     /**
-     * Immutable requested source, separate from the host-resolved working directories.
+     * Immutable repository intent accepted at creation. When present, this list
+     * is non-empty and retained exactly, including order and omitted revisions,
+     * from `creating` through `ready` or `failed` and in session summaries.
+     * Entries have no one-to-one or positional mapping to `workingDirectories`.
      */
-    val repositorySource: String? = null,
-    /**
-     * Immutable requested revision, not the checkout's current HEAD.
-     */
-    val repositoryRevision: String? = null,
+    val repositories: List<RepositorySource>? = null,
     /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render

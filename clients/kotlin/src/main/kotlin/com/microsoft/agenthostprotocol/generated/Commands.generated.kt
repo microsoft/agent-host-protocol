@@ -364,6 +364,12 @@ data class InitializeResult(
      */
     val defaultDirectory: String? = null,
     /**
+     * Host-owned repository preparation for session creation and repository
+     * context in configuration queries. Absence means unsupported; an empty
+     * object supports one repository at its default revision.
+     */
+    val repositoryPreparation: RepositoryPreparationCapabilities? = null,
+    /**
      * Characters that, when typed in a {@link Message} input, SHOULD cause
      * the client to issue a `completions` request with
      * {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -391,6 +397,20 @@ data class InitializeResult(
      * host does not expose an automation catalogue or automation commands.
      */
     val automations: AutomationCapabilities? = null
+)
+
+@Serializable
+data class RepositoryPreparationCapabilities(
+    /**
+     * When true, clients may supply {@link RepositorySource.revision}.
+     */
+    val revision: Boolean? = null,
+    /**
+     * When true, clients may supply more than one repository. When absent or
+     * false, the host MUST reject lists with more than one entry with
+     * `InvalidParams` before preparation.
+     */
+    val multipleRepositories: Boolean? = null
 )
 
 @Serializable
@@ -618,22 +638,19 @@ data class CreateSessionParams(
      * and ignores the rest. Dispatch working-directory actions to change the set
      * after the session has started.
      *
-     * A non-empty list and `repositorySource` are mutually exclusive.
-     * A repository URI identifies the source, not a working-directory URI; one
-     * source may produce multiple directories.
+     * A non-empty list and `repositories` are mutually exclusive.
      */
     val workingDirectories: List<String>? = null,
     /**
-     * Credential-free source to prepare; requires the agent's repositorySource capability.
+     * Non-empty repository list to prepare, supported only when the host
+     * advertises {@link InitializeResult.repositoryPreparation}. Omit to retain
+     * directory/default creation. The resulting working directories MUST fit
+     * the selected agent's existing directory capabilities.
      */
-    val repositorySource: String? = null,
+    val repositories: List<RepositorySource>? = null,
     /**
-     * Requested branch, tag, or commit; requires a source and the capability's revision option.
-     */
-    val repositoryRevision: String? = null,
-    /**
-     * Session configuration values collected via `resolveSessionConfig`.
-     * Keys and values follow the advertised {@link SessionConfigSchema}.
+     * Agent-specific configuration values collected via `resolveSessionConfig`.
+     * Keys and values correspond to the schema returned by the server.
      */
     val config: Map<String, JsonElement>? = null,
     /**
@@ -1329,15 +1346,12 @@ data class ResolveSessionConfigParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Credential-free source context; not a working-directory URI.
+     * Non-empty repository context, subject to
+     * {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
      */
-    val repositorySource: String? = null,
+    val repositories: List<RepositorySource>? = null,
     /**
-     * Requested revision; requires a source and the capability's revision option.
-     */
-    val repositoryRevision: String? = null,
-    /**
-     * Current user-filled configuration values; see {@link SessionConfigSchema}.
+     * Current user-filled configuration values
      */
     val config: Map<String, JsonElement>? = null
 )
@@ -1454,13 +1468,10 @@ data class SessionConfigCompletionsParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Repository context for configuration completions; this MUST NOT prepare a checkout.
+     * Non-empty repository context, subject to
+     * {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
      */
-    val repositorySource: String? = null,
-    /**
-     * Requested revision; requires a source and the capability's revision option.
-     */
-    val repositoryRevision: String? = null,
+    val repositories: List<RepositorySource>? = null,
     /**
      * Current user-filled configuration values (provides context for the query)
      */

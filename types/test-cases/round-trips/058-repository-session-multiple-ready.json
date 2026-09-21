@@ -1,0 +1,40 @@
+{
+  "name": "repository-session-multiple-ready",
+  "group": "A",
+  "description": "Ready state preserves repeated sources at different revisions without a positional directory mapping.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "repositories": [
+        { "source": "https://example.org/team/project.git", "revision": "feature" },
+        { "source": "https://example.org/team/project.git", "revision": "main" }
+      ],
+      "workingDirectories": ["file:///work/session-workspace"]
+    },
+    "fromSeq": 2
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "repositories": [
+        { "source": "https://example.org/team/project.git", "revision": "feature" },
+        { "source": "https://example.org/team/project.git", "revision": "main" }
+      ],
+      "workingDirectories": ["file:///work/session-workspace"]
+    },
+    "fromSeq": 2
+  }]
+}

@@ -14,8 +14,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
-    ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus,
-    SessionSummary,
+    ProjectInfo, ProtectedResourceMetadata, RepositorySource, SessionChatSummary, SessionOrigin,
+    SessionStatus, SessionSummary,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -154,8 +154,6 @@ pub struct SessionSummaryChangedParams {
 /// - Like all notifications this is ephemeral and is **not** replayed on
 ///   reconnect. A client that never receives the terminal frame SHOULD expire
 ///   the indicator after an idle timeout.
-/// - Completion of reported work does not establish session readiness.
-///   Observe session lifecycle state for the durable outcome.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgressParams {
@@ -295,12 +293,12 @@ pub struct PartialSessionSummary {
     /// chat that sets none operates against this full set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
-    /// Immutable requested source, separate from the host-resolved working directories.
+    /// Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_source: Option<Uri>,
-    /// Immutable requested revision, not the checkout's current HEAD.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_revision: Option<String>,
+    pub repositories: Option<Vec<RepositorySource>>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session

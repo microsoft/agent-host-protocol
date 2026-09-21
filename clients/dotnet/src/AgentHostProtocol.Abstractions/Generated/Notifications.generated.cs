@@ -117,9 +117,7 @@ public sealed record SessionSummaryChangedParams
 ///   the client then never shows an indicator.
 /// - Like all notifications this is ephemeral and is **not** replayed on
 ///   reconnect. A client that never receives the terminal frame SHOULD expire
-///   the indicator after an idle timeout.
-/// - Completion of reported work does not establish session readiness.
-///   Observe session lifecycle state for the durable outcome.</summary>
+///   the indicator after an idle timeout.</summary>
 public sealed record ProgressParams
 {
     /// <summary>Channel URI this notification belongs to (the root channel).</summary>
@@ -269,13 +267,12 @@ public sealed record PartialSessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
 
-    /// <summary>Immutable requested source, separate from the host-resolved working directories.</summary>
+    /// <summary>Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? RepositorySource { get; init; }
-
-    /// <summary>Immutable requested revision, not the checkout's current HEAD.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? RepositoryRevision { get; init; }
+    public List<RepositorySource>? Repositories { get; init; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render

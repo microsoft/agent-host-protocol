@@ -17,8 +17,9 @@ use crate::actions::{ActionEnvelope, StateAction};
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
     AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    ModelSelection, RepositorySource, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange,
+    Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -268,6 +269,11 @@ pub struct InitializeResult {
     /// Suggested default directory for remote filesystem browsing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_directory: Option<Uri>,
+    /// Host-owned repository preparation for session creation and repository
+    /// context in configuration queries. Absence means unsupported; an empty
+    /// object supports one repository at its default revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_preparation: Option<RepositoryPreparationCapabilities>,
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
     /// the client to issue a `completions` request with
     /// {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -292,6 +298,22 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+}
+
+/// Repository preparation supported by this host, independent of the selected
+/// agent. Resulting working directories must still fit that agent's existing
+/// directory capabilities.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositoryPreparationCapabilities {
+    /// When true, clients may supply {@link RepositorySource.revision}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<bool>,
+    /// When true, clients may supply more than one repository. When absent or
+    /// false, the host MUST reject lists with more than one entry with
+    /// `InvalidParams` before preparation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multiple_repositories: Option<bool>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -587,19 +609,17 @@ pub struct CreateSessionParams {
     /// and ignores the rest. Dispatch working-directory actions to change the set
     /// after the session has started.
     ///
-    /// A non-empty list and `repositorySource` are mutually exclusive.
-    /// A repository URI identifies the source, not a working-directory URI; one
-    /// source may produce multiple directories.
+    /// A non-empty list and `repositories` are mutually exclusive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
-    /// Credential-free source to prepare; requires the agent's repositorySource capability.
+    /// Non-empty repository list to prepare, supported only when the host
+    /// advertises {@link InitializeResult.repositoryPreparation}. Omit to retain
+    /// directory/default creation. The resulting working directories MUST fit
+    /// the selected agent's existing directory capabilities.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_source: Option<Uri>,
-    /// Requested branch, tag, or commit; requires a source and the capability's revision option.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_revision: Option<String>,
-    /// Session configuration values collected via `resolveSessionConfig`.
-    /// Keys and values follow the advertised {@link SessionConfigSchema}.
+    pub repositories: Option<Vec<RepositorySource>>,
+    /// Agent-specific configuration values collected via `resolveSessionConfig`.
+    /// Keys and values correspond to the schema returned by the server.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
     /// Eagerly claim an active client role for the new session.
@@ -627,9 +647,6 @@ pub struct CreateSessionParams {
 /// Disposes a session and cleans up server-side resources.
 ///
 /// The server broadcasts a `root/sessionRemoved` notification to all clients.
-/// Disposal MUST NOT erase a shared checkout or uncommitted user changes.
-/// Repository cleanup remains host-owned; ending a client's wait or subscription
-/// does not grant permission to delete repository data.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisposeSessionParams {
@@ -1391,8 +1408,8 @@ pub struct DisposeTerminalParams {
 /// the full current property set (not a delta). The returned `values` contain
 /// server-resolved defaults to pass to `createSession`.
 ///
-/// This command MUST NOT clone or prepare a repository. Repository context
-/// requires the agent's `repositorySource` capability.
+/// `resolveSessionConfig` and `sessionConfigCompletions` MUST NOT clone or
+/// prepare repositories: editing a draft should not create checkouts.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolveSessionConfigParams {
@@ -1408,13 +1425,11 @@ pub struct ResolveSessionConfigParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Credential-free source context; not a working-directory URI.
+    /// Non-empty repository context, subject to
+    /// {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_source: Option<Uri>,
-    /// Requested revision; requires a source and the capability's revision option.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_revision: Option<String>,
-    /// Current user-filled configuration values; see {@link SessionConfigSchema}.
+    pub repositories: Option<Vec<RepositorySource>>,
+    /// Current user-filled configuration values
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
 }
@@ -1449,12 +1464,10 @@ pub struct SessionConfigCompletionsParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Repository context for configuration completions; this MUST NOT prepare a checkout.
+    /// Non-empty repository context, subject to
+    /// {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_source: Option<Uri>,
-    /// Requested revision; requires a source and the capability's revision option.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repository_revision: Option<String>,
+    pub repositories: Option<Vec<RepositorySource>>,
     /// Current user-filled configuration values (provides context for the query)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,

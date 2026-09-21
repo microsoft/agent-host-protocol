@@ -1321,8 +1321,6 @@ public struct AgentInfo: Codable, Sendable {
 }
 
 public struct AgentCapabilities: Codable, Sendable {
-    /// The host accepts typed repository inputs for session creation and configuration queries.
-    public var repositorySource: RepositorySourceCapability?
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1340,11 +1338,9 @@ public struct AgentCapabilities: Codable, Sendable {
     public var multipleWorkingDirectories: MultipleWorkingDirectoriesCapability?
 
     public init(
-        repositorySource: RepositorySourceCapability? = nil,
         multipleChats: MultipleChatsCapability? = nil,
         multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = nil
     ) {
-        self.repositorySource = repositorySource
         self.multipleChats = multipleChats
         self.multipleWorkingDirectories = multipleWorkingDirectories
     }
@@ -1415,13 +1411,17 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable {
     }
 }
 
-public struct RepositorySourceCapability: Codable, Sendable {
-    /// When true, clients may supply an explicit repositoryRevision.
-    public var revision: Bool?
+public struct RepositorySource: Codable, Sendable {
+    /// Credential-free repository source URI.
+    public var source: String
+    /// Requested branch, tag, or commit. Omit to use the host's default revision.
+    public var revision: String?
 
     public init(
-        revision: Bool? = nil
+        source: String,
+        revision: String? = nil
     ) {
+        self.source = source
         self.revision = revision
     }
 }
@@ -1826,10 +1826,11 @@ public struct SessionState: Codable, Sendable {
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
-    /// Immutable requested source, separate from the host-resolved working directories.
-    public var repositorySource: String?
-    /// Immutable requested revision, not the checkout's current HEAD.
-    public var repositoryRevision: String?
+    /// Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.
+    public var repositories: [RepositorySource]?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -1858,7 +1859,7 @@ public struct SessionState: Codable, Sendable {
     /// marker — chats remain equal peers at the protocol level. Hosts MAY change
     /// this over the session's lifetime.
     public var defaultChat: String?
-    /// Provider-specific session configuration schema and current values.
+    /// Session configuration schema and current values
     public var config: SessionConfigState?
     /// Top-level customizations active in this session.
     ///
@@ -1919,8 +1920,7 @@ public struct SessionState: Codable, Sendable {
         case origin
         case project
         case workingDirectories
-        case repositorySource
-        case repositoryRevision
+        case repositories
         case annotations
         case lifecycle
         case creationError
@@ -1943,8 +1943,7 @@ public struct SessionState: Codable, Sendable {
         origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
         workingDirectories: [String]? = nil,
-        repositorySource: String? = nil,
-        repositoryRevision: String? = nil,
+        repositories: [RepositorySource]? = nil,
         annotations: AnnotationsSummary? = nil,
         lifecycle: SessionLifecycle,
         creationError: ErrorInfo? = nil,
@@ -1965,8 +1964,7 @@ public struct SessionState: Codable, Sendable {
         self.origin = origin
         self.project = project
         self.workingDirectories = workingDirectories
-        self.repositorySource = repositorySource
-        self.repositoryRevision = repositoryRevision
+        self.repositories = repositories
         self.annotations = annotations
         self.lifecycle = lifecycle
         self.creationError = creationError
@@ -2164,10 +2162,11 @@ public struct SessionSummary: Codable, Sendable {
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
-    /// Immutable requested source, separate from the host-resolved working directories.
-    public var repositorySource: String?
-    /// Immutable requested revision, not the checkout's current HEAD.
-    public var repositoryRevision: String?
+    /// Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.
+    public var repositories: [RepositorySource]?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -2206,8 +2205,7 @@ public struct SessionSummary: Codable, Sendable {
         case origin
         case project
         case workingDirectories
-        case repositorySource
-        case repositoryRevision
+        case repositories
         case annotations
         case resource
         case createdAt
@@ -2226,8 +2224,7 @@ public struct SessionSummary: Codable, Sendable {
         origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
         workingDirectories: [String]? = nil,
-        repositorySource: String? = nil,
-        repositoryRevision: String? = nil,
+        repositories: [RepositorySource]? = nil,
         annotations: AnnotationsSummary? = nil,
         resource: String,
         createdAt: String,
@@ -2244,8 +2241,7 @@ public struct SessionSummary: Codable, Sendable {
         self.origin = origin
         self.project = project
         self.workingDirectories = workingDirectories
-        self.repositorySource = repositorySource
-        self.repositoryRevision = repositoryRevision
+        self.repositories = repositories
         self.annotations = annotations
         self.resource = resource
         self.createdAt = createdAt

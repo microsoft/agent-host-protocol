@@ -217,10 +217,11 @@ public struct PartialSessionSummary: Codable, Sendable {
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
-    /// Immutable requested source, separate from the host-resolved working directories.
-    public var repositorySource: String?
-    /// Immutable requested revision, not the checkout's current HEAD.
-    public var repositoryRevision: String?
+    /// Immutable repository intent accepted at creation. When present, this list
+    /// is non-empty and retained exactly, including order and omitted revisions,
+    /// from `creating` through `ready` or `failed` and in session summaries.
+    /// Entries have no one-to-one or positional mapping to `workingDirectories`.
+    public var repositories: [RepositorySource]?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -259,8 +260,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         case origin
         case project
         case workingDirectories
-        case repositorySource
-        case repositoryRevision
+        case repositories
         case annotations
         case resource
         case createdAt
@@ -279,8 +279,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
         workingDirectories: [String]? = nil,
-        repositorySource: String? = nil,
-        repositoryRevision: String? = nil,
+        repositories: [RepositorySource]? = nil,
         annotations: AnnotationsSummary? = nil,
         resource: String? = nil,
         createdAt: String? = nil,
@@ -297,8 +296,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         self.origin = origin
         self.project = project
         self.workingDirectories = workingDirectories
-        self.repositorySource = repositorySource
-        self.repositoryRevision = repositoryRevision
+        self.repositories = repositories
         self.annotations = annotations
         self.resource = resource
         self.createdAt = createdAt

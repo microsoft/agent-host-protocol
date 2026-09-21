@@ -1,0 +1,20 @@
+{
+  "name": "repository-session-request-multiple",
+  "group": "A",
+  "description": "A future multi-repository request preserves two revisions of the same source in their requested order.",
+  "type": "CreateSessionParams",
+  "input": {
+    "channel": "ahp-session:/repository-session",
+    "repositories": [
+      { "source": "https://example.org/team/project.git", "revision": "feature" },
+      { "source": "https://example.org/team/project.git", "revision": "main" }
+    ]
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-session:/repository-session",
+    "repositories": [
+      { "source": "https://example.org/team/project.git", "revision": "feature" },
+      { "source": "https://example.org/team/project.git", "revision": "main" }
+    ]
+  }]
+}

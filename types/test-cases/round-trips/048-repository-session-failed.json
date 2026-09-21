@@ -13,8 +13,7 @@
       "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
       "activeClients": [],
       "chats": [],
-      "repositorySource": "https://example.org/team/project.git",
-      "repositoryRevision": "main"
+      "repositories": [{ "source": "https://example.org/team/project.git", "revision": "main" }]
     },
     "fromSeq": 1
   },
@@ -28,8 +27,7 @@
       "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
       "activeClients": [],
       "chats": [],
-      "repositorySource": "https://example.org/team/project.git",
-      "repositoryRevision": "main"
+      "repositories": [{ "source": "https://example.org/team/project.git", "revision": "main" }]
     },
     "fromSeq": 1
   }]
