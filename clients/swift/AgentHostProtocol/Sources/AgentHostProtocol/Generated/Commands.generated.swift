@@ -321,9 +321,7 @@ public struct InitializeResult: Codable, Sendable {
     public var snapshots: [Snapshot]
     /// Suggested default directory for remote filesystem browsing
     public var defaultDirectory: String?
-    /// Host-owned repository preparation for session creation and repository
-    /// context in configuration queries. Absence means unsupported; an empty
-    /// object supports one repository at its default revision.
+    /// Host repository preparation support; absent when unsupported.
     public var repositoryPreparation: RepositoryPreparationCapabilities?
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
     /// the client to issue a `completions` request with
@@ -437,9 +435,7 @@ public struct AutomationCapabilities: Codable, Sendable {
 public struct RepositoryPreparationCapabilities: Codable, Sendable {
     /// When true, clients may supply {@link RepositorySource.revision}.
     public var revision: Bool?
-    /// When true, clients may supply more than one repository. When absent or
-    /// false, the host MUST reject lists with more than one entry with
-    /// `InvalidParams` before preparation.
+    /// When true, clients may supply more than one repository.
     public var multipleRepositories: Bool?
 
     public init(
@@ -675,13 +671,8 @@ public struct CreateSessionParams: Codable, Sendable {
     /// capability treats only the first entry as the session's working directory
     /// and ignores the rest. Dispatch working-directory actions to change the set
     /// after the session has started.
-    ///
-    /// A non-empty list and `repositories` are mutually exclusive.
     public var workingDirectories: [String]?
-    /// Non-empty repository list to prepare, supported only when the host
-    /// advertises {@link InitializeResult.repositoryPreparation}. Omit to retain
-    /// directory/default creation. The resulting working directories MUST fit
-    /// the selected agent's existing directory capabilities.
+    /// Repositories to prepare instead of an explicit `workingDirectories` list.
     public var repositories: [RepositorySource]?
     /// Agent-specific configuration values collected via `resolveSessionConfig`.
     /// Keys and values correspond to the schema returned by the server.
@@ -1630,8 +1621,7 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
-    /// Non-empty repository context, subject to
-    /// {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
+    /// Repository context only; no checkout is prepared.
     public var repositories: [RepositorySource]?
     /// Current user-filled configuration values
     public var config: [String: AnyCodable]?
@@ -1789,8 +1779,7 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
-    /// Non-empty repository context, subject to
-    /// {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
+    /// Repository context only; no checkout is prepared.
     public var repositories: [RepositorySource]?
     /// Current user-filled configuration values (provides context for the query)
     public var config: [String: AnyCodable]?

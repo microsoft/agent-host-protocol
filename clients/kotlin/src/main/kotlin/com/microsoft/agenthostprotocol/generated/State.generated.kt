@@ -1772,10 +1772,7 @@ data class SessionState(
      */
     val workingDirectories: List<String>? = null,
     /**
-     * Immutable repository intent accepted at creation. When present, this list
-     * is non-empty and retained exactly, including order and omitted revisions,
-     * from `creating` through `ready` or `failed` and in session summaries.
-     * Entries have no one-to-one or positional mapping to `workingDirectories`.
+     * Immutable repository inputs accepted at creation.
      */
     val repositories: List<RepositorySource>? = null,
     /**
@@ -2060,10 +2057,7 @@ data class SessionSummary(
      */
     val workingDirectories: List<String>? = null,
     /**
-     * Immutable repository intent accepted at creation. When present, this list
-     * is non-empty and retained exactly, including order and omitted revisions,
-     * from `creating` through `ready` or `failed` and in session summaries.
-     * Entries have no one-to-one or positional mapping to `workingDirectories`.
+     * Immutable repository inputs accepted at creation.
      */
     val repositories: List<RepositorySource>? = null,
     /**

@@ -744,9 +744,7 @@ type MultipleWorkingDirectoriesCapability struct {
 	PrimaryReplacement *bool `json:"primaryReplacement,omitempty"`
 }
 
-// Requested repository intent, independent of any host-resolved checkout.
-// The same source may appear more than once with different revisions; a source
-// URI is not a checkout identity.
+// Requested repository source, not a resolved checkout.
 type RepositorySource struct {
 	// Credential-free repository source URI.
 	Source URI `json:"source"`
@@ -887,10 +885,7 @@ type SessionState struct {
 	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
-	// Immutable repository intent accepted at creation. When present, this list
-	// is non-empty and retained exactly, including order and omitted revisions,
-	// from `creating` through `ready` or `failed` and in session summaries.
-	// Entries have no one-to-one or positional mapping to `workingDirectories`.
+	// Immutable repository inputs accepted at creation.
 	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
@@ -1168,10 +1163,7 @@ type SessionSummary struct {
 	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
 	// chat that sets none operates against this full set.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
-	// Immutable repository intent accepted at creation. When present, this list
-	// is non-empty and retained exactly, including order and omitted revisions,
-	// from `creating` through `ready` or `failed` and in session summaries.
-	// Entries have no one-to-one or positional mapping to `workingDirectories`.
+	// Immutable repository inputs accepted at creation.
 	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render

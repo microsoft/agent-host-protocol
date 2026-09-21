@@ -768,7 +768,7 @@
     },
     "RepositorySource": {
       "type": "object",
-      "description": "Requested repository intent, independent of any host-resolved checkout.\nThe same source may appear more than once with different revisions; a source\nURI is not a checkout identity.",
+      "description": "Requested repository source, not a resolved checkout.",
       "properties": {
         "source": {
           "$ref": "#/$defs/URI",
@@ -823,7 +823,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "description": "Immutable repository inputs accepted at creation.",
           "minItems": 1
         },
         "annotations": {
@@ -877,7 +877,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "description": "Immutable repository inputs accepted at creation.",
           "minItems": 1
         },
         "annotations": {
@@ -1193,7 +1193,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "description": "Immutable repository inputs accepted at creation.",
           "minItems": 1
         },
         "annotations": {
@@ -5895,7 +5895,7 @@
         },
         "repositoryPreparation": {
           "$ref": "#/$defs/RepositoryPreparationCapabilities",
-          "description": "Host-owned repository preparation for session creation and repository\ncontext in configuration queries. Absence means unsupported; an empty\nobject supports one repository at its default revision."
+          "description": "Host repository preparation support; absent when unsupported."
         },
         "completionTriggerCharacters": {
           "type": "array",
@@ -5925,7 +5925,7 @@
     },
     "RepositoryPreparationCapabilities": {
       "type": "object",
-      "description": "Repository preparation supported by this host, independent of the selected\nagent. Resulting working directories must still fit that agent's existing\ndirectory capabilities.",
+      "description": "An empty object supports one repository at its default revision.",
       "properties": {
         "revision": {
           "type": "boolean",
@@ -5933,7 +5933,7 @@
         },
         "multipleRepositories": {
           "type": "boolean",
-          "description": "When true, clients may supply more than one repository. When absent or\nfalse, the host MUST reject lists with more than one entry with\n`InvalidParams` before preparation."
+          "description": "When true, clients may supply more than one repository."
         }
       }
     },
@@ -6697,7 +6697,7 @@
     },
     "ResolveSessionConfigParams": {
       "type": "object",
-      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). The returned `values` contain\nserver-resolved defaults to pass to `createSession`.\n\n`resolveSessionConfig` and `sessionConfigCompletions` MUST NOT clone or\nprepare repositories: editing a draft should not create checkouts.",
+      "description": "Iteratively resolves the session configuration schema. The client sends the\ncurrent partial session config and any user-filled metadata values. The server\nreturns a property schema describing what additional metadata is needed,\ncontextual to the current selections.\n\nThe client calls this command whenever the user changes a significant input\n(e.g. picks a working directory, toggles a property). Each response returns\nthe full current property set (not a delta). The returned `values` contain\nserver-resolved defaults to pass to `createSession`.",
       "properties": {
         "channel": {
           "type": "string",
@@ -6723,7 +6723,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Non-empty repository context, subject to\n{@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.",
+          "description": "Repository context only; no checkout is prepared.",
           "minItems": 1
         },
         "config": {
@@ -6805,7 +6805,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Non-empty repository context, subject to\n{@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.",
+          "description": "Repository context only; no checkout is prepared.",
           "minItems": 1
         },
         "config": {
@@ -6845,7 +6845,7 @@
     },
     "CreateSessionParams": {
       "type": "object",
-      "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `root/sessionAdded` notification to all\nclients.\n\nRepository preparation MUST finish before `session/ready` or executing turns.\nClients recover the outcome from session state, not progress notifications.",
+      "description": "Creates a new session with the specified agent provider.\n\nIf the session URI already exists, the server MUST return an error with code\n`-32003` (`SessionAlreadyExists`).\n\nAfter creation, the client should subscribe to the session URI to receive state\nupdates. The server also broadcasts a `root/sessionAdded` notification to all\nclients.",
       "properties": {
         "channel": {
           "$ref": "#/$defs/URI",
@@ -6865,14 +6865,14 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "The working directories the session's agent is granted tool access to.\nA session may span multiple directories; they are equal peers except when\nthe agent advertises a protected-primary capability. An\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary | immutable\nprimary} is fixed, while a\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement | replaceable\nprimary} is changed only with `session/workingDirectoryReplaced`.\n\nA client MUST NOT supply more than one entry unless the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}; a server without that\ncapability treats only the first entry as the session's working directory\nand ignores the rest. Dispatch working-directory actions to change the set\nafter the session has started.\n\nA non-empty list and `repositories` are mutually exclusive."
+          "description": "The working directories the session's agent is granted tool access to.\nA session may span multiple directories; they are equal peers except when\nthe agent advertises a protected-primary capability. An\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary | immutable\nprimary} is fixed, while a\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement | replaceable\nprimary} is changed only with `session/workingDirectoryReplaced`.\n\nA client MUST NOT supply more than one entry unless the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}; a server without that\ncapability treats only the first entry as the session's working directory\nand ignores the rest. Dispatch working-directory actions to change the set\nafter the session has started."
         },
         "repositories": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Non-empty repository list to prepare, supported only when the host\nadvertises {@link InitializeResult.repositoryPreparation}. Omit to retain\ndirectory/default creation. The resulting working directories MUST fit\nthe selected agent's existing directory capabilities.",
+          "description": "Repositories to prepare instead of an explicit `workingDirectories` list.",
           "minItems": 1
         },
         "config": {

@@ -364,9 +364,7 @@ data class InitializeResult(
      */
     val defaultDirectory: String? = null,
     /**
-     * Host-owned repository preparation for session creation and repository
-     * context in configuration queries. Absence means unsupported; an empty
-     * object supports one repository at its default revision.
+     * Host repository preparation support; absent when unsupported.
      */
     val repositoryPreparation: RepositoryPreparationCapabilities? = null,
     /**
@@ -406,9 +404,7 @@ data class RepositoryPreparationCapabilities(
      */
     val revision: Boolean? = null,
     /**
-     * When true, clients may supply more than one repository. When absent or
-     * false, the host MUST reject lists with more than one entry with
-     * `InvalidParams` before preparation.
+     * When true, clients may supply more than one repository.
      */
     val multipleRepositories: Boolean? = null
 )
@@ -637,15 +633,10 @@ data class CreateSessionParams(
      * capability treats only the first entry as the session's working directory
      * and ignores the rest. Dispatch working-directory actions to change the set
      * after the session has started.
-     *
-     * A non-empty list and `repositories` are mutually exclusive.
      */
     val workingDirectories: List<String>? = null,
     /**
-     * Non-empty repository list to prepare, supported only when the host
-     * advertises {@link InitializeResult.repositoryPreparation}. Omit to retain
-     * directory/default creation. The resulting working directories MUST fit
-     * the selected agent's existing directory capabilities.
+     * Repositories to prepare instead of an explicit `workingDirectories` list.
      */
     val repositories: List<RepositorySource>? = null,
     /**
@@ -1346,8 +1337,7 @@ data class ResolveSessionConfigParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Non-empty repository context, subject to
-     * {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
+     * Repository context only; no checkout is prepared.
      */
     val repositories: List<RepositorySource>? = null,
     /**
@@ -1468,8 +1458,7 @@ data class SessionConfigCompletionsParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Non-empty repository context, subject to
-     * {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
+     * Repository context only; no checkout is prepared.
      */
     val repositories: List<RepositorySource>? = null,
     /**

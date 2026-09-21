@@ -160,9 +160,7 @@ type InitializeResult struct {
 	Snapshots []Snapshot `json:"snapshots"`
 	// Suggested default directory for remote filesystem browsing
 	DefaultDirectory *URI `json:"defaultDirectory,omitempty"`
-	// Host-owned repository preparation for session creation and repository
-	// context in configuration queries. Absence means unsupported; an empty
-	// object supports one repository at its default revision.
+	// Host repository preparation support; absent when unsupported.
 	RepositoryPreparation *RepositoryPreparationCapabilities `json:"repositoryPreparation,omitempty"`
 	// Characters that, when typed in a {@link Message} input, SHOULD cause
 	// the client to issue a `completions` request with
@@ -186,15 +184,11 @@ type InitializeResult struct {
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
 }
 
-// Repository preparation supported by this host, independent of the selected
-// agent. Resulting working directories must still fit that agent's existing
-// directory capabilities.
+// An empty object supports one repository at its default revision.
 type RepositoryPreparationCapabilities struct {
 	// When true, clients may supply {@link RepositorySource.revision}.
 	Revision *bool `json:"revision,omitempty"`
-	// When true, clients may supply more than one repository. When absent or
-	// false, the host MUST reject lists with more than one entry with
-	// `InvalidParams` before preparation.
+	// When true, clients may supply more than one repository.
 	MultipleRepositories *bool `json:"multipleRepositories,omitempty"`
 }
 
@@ -391,9 +385,6 @@ type SubscribeResult struct {
 // After creation, the client should subscribe to the session URI to receive state
 // updates. The server also broadcasts a `root/sessionAdded` notification to all
 // clients.
-//
-// Repository preparation MUST finish before `session/ready` or executing turns.
-// Clients recover the outcome from session state, not progress notifications.
 type CreateSessionParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -415,13 +406,8 @@ type CreateSessionParams struct {
 	// capability treats only the first entry as the session's working directory
 	// and ignores the rest. Dispatch working-directory actions to change the set
 	// after the session has started.
-	//
-	// A non-empty list and `repositories` are mutually exclusive.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
-	// Non-empty repository list to prepare, supported only when the host
-	// advertises {@link InitializeResult.repositoryPreparation}. Omit to retain
-	// directory/default creation. The resulting working directories MUST fit
-	// the selected agent's existing directory capabilities.
+	// Repositories to prepare instead of an explicit `workingDirectories` list.
 	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Agent-specific configuration values collected via `resolveSessionConfig`.
 	// Keys and values correspond to the schema returned by the server.
@@ -1096,9 +1082,6 @@ type DisposeTerminalParams struct {
 // (e.g. picks a working directory, toggles a property). Each response returns
 // the full current property set (not a delta). The returned `values` contain
 // server-resolved defaults to pass to `createSession`.
-//
-// `resolveSessionConfig` and `sessionConfigCompletions` MUST NOT clone or
-// prepare repositories: editing a draft should not create checkouts.
 type ResolveSessionConfigParams struct {
 	// Channel URI this command targets.
 	Channel URI `json:"channel"`
@@ -1109,8 +1092,7 @@ type ResolveSessionConfigParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
-	// Non-empty repository context, subject to
-	// {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
+	// Repository context only; no checkout is prepared.
 	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Current user-filled configuration values
 	Config map[string]json.RawMessage `json:"config,omitempty"`
@@ -1139,8 +1121,7 @@ type SessionConfigCompletionsParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
-	// Non-empty repository context, subject to
-	// {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.
+	// Repository context only; no checkout is prepared.
 	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Current user-filled configuration values (provides context for the query)
 	Config map[string]json.RawMessage `json:"config,omitempty"`

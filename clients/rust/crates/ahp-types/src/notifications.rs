@@ -293,10 +293,7 @@ pub struct PartialSessionSummary {
     /// chat that sets none operates against this full set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
-    /// Immutable repository intent accepted at creation. When present, this list
-    /// is non-empty and retained exactly, including order and omitted revisions,
-    /// from `creating` through `ready` or `failed` and in session summaries.
-    /// Entries have no one-to-one or positional mapping to `workingDirectories`.
+    /// Immutable repository inputs accepted at creation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repositories: Option<Vec<RepositorySource>>,
     /// Lightweight summary of this session's inline annotations channel

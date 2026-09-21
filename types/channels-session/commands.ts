@@ -27,9 +27,6 @@ import type {
  * updates. The server also broadcasts a `root/sessionAdded` notification to all
  * clients.
  *
- * Repository preparation MUST finish before `session/ready` or executing turns.
- * Clients recover the outcome from session state, not progress notifications.
- *
  * @category Commands
  * @method createSession
  * @direction Client → Server
@@ -71,14 +68,10 @@ export interface CreateSessionParams extends BaseParams {
    * and ignores the rest. Dispatch working-directory actions to change the set
    * after the session has started.
    *
-   * A non-empty list and `repositories` are mutually exclusive.
    */
   workingDirectories?: URI[];
   /**
-   * Non-empty repository list to prepare, supported only when the host
-   * advertises {@link InitializeResult.repositoryPreparation}. Omit to retain
-   * directory/default creation. The resulting working directories MUST fit
-   * the selected agent's existing directory capabilities.
+   * Repositories to prepare instead of an explicit `workingDirectories` list.
    *
    * @minItems 1
    */

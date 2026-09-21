@@ -679,7 +679,7 @@
     },
     "RepositorySource": {
       "type": "object",
-      "description": "Requested repository intent, independent of any host-resolved checkout.\nThe same source may appear more than once with different revisions; a source\nURI is not a checkout identity.",
+      "description": "Requested repository source, not a resolved checkout.",
       "properties": {
         "source": {
           "$ref": "#/$defs/URI",
@@ -734,7 +734,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "description": "Immutable repository inputs accepted at creation.",
           "minItems": 1
         },
         "annotations": {
@@ -788,7 +788,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "description": "Immutable repository inputs accepted at creation.",
           "minItems": 1
         },
         "annotations": {
@@ -1104,7 +1104,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Immutable repository intent accepted at creation. When present, this list\nis non-empty and retained exactly, including order and omitted revisions,\nfrom `creating` through `ready` or `failed` and in session summaries.\nEntries have no one-to-one or positional mapping to `workingDirectories`.",
+          "description": "Immutable repository inputs accepted at creation.",
           "minItems": 1
         },
         "annotations": {

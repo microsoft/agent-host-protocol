@@ -261,11 +261,7 @@ export interface InitializeResult {
   snapshots: Snapshot[];
   /** Suggested default directory for remote filesystem browsing */
   defaultDirectory?: URI;
-  /**
-   * Host-owned repository preparation for session creation and repository
-   * context in configuration queries. Absence means unsupported; an empty
-   * object supports one repository at its default revision.
-   */
+  /** Host repository preparation support; absent when unsupported. */
   repositoryPreparation?: RepositoryPreparationCapabilities;
   /**
    * Characters that, when typed in a {@link Message} input, SHOULD cause
@@ -302,20 +298,14 @@ export interface InitializeResult {
 }
 
 /**
- * Repository preparation supported by this host, independent of the selected
- * agent. Resulting working directories must still fit that agent's existing
- * directory capabilities.
+ * An empty object supports one repository at its default revision.
  *
  * @category Commands
  */
 export interface RepositoryPreparationCapabilities {
   /** When true, clients may supply {@link RepositorySource.revision}. */
   revision?: boolean;
-  /**
-   * When true, clients may supply more than one repository. When absent or
-   * false, the host MUST reject lists with more than one entry with
-   * `InvalidParams` before preparation.
-   */
+  /** When true, clients may supply more than one repository. */
   multipleRepositories?: boolean;
 }
 

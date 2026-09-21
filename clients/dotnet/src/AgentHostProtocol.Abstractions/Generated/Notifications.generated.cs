@@ -267,10 +267,7 @@ public sealed record PartialSessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
 
-    /// <summary>Immutable repository intent accepted at creation. When present, this list
-    /// is non-empty and retained exactly, including order and omitted revisions,
-    /// from `creating` through `ready` or `failed` and in session summaries.
-    /// Entries have no one-to-one or positional mapping to `workingDirectories`.</summary>
+    /// <summary>Immutable repository inputs accepted at creation.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 

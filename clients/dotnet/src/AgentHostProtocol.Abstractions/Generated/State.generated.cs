@@ -940,9 +940,7 @@ public sealed record MultipleWorkingDirectoriesCapability
     public bool? PrimaryReplacement { get; init; }
 }
 
-/// <summary>Requested repository intent, independent of any host-resolved checkout.
-/// The same source may appear more than once with different revisions; a source
-/// URI is not a checkout identity.</summary>
+/// <summary>Requested repository source, not a resolved checkout.</summary>
 public sealed record RepositorySource
 {
     /// <summary>Credential-free repository source URI.</summary>
@@ -1560,10 +1558,7 @@ public sealed class SessionState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; set; }
 
-    /// <summary>Immutable repository intent accepted at creation. When present, this list
-    /// is non-empty and retained exactly, including order and omitted revisions,
-    /// from `creating` through `ready` or `failed` and in session summaries.
-    /// Entries have no one-to-one or positional mapping to `workingDirectories`.</summary>
+    /// <summary>Immutable repository inputs accepted at creation.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; set; }
 
@@ -1902,10 +1897,7 @@ public sealed class SessionSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; set; }
 
-    /// <summary>Immutable repository intent accepted at creation. When present, this list
-    /// is non-empty and retained exactly, including order and omitted revisions,
-    /// from `creating` through `ready` or `failed` and in session summaries.
-    /// Entries have no one-to-one or positional mapping to `workingDirectories`.</summary>
+    /// <summary>Immutable repository inputs accepted at creation.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; set; }
 

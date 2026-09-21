@@ -217,10 +217,7 @@ public struct PartialSessionSummary: Codable, Sendable {
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
     public var workingDirectories: [String]?
-    /// Immutable repository intent accepted at creation. When present, this list
-    /// is non-empty and retained exactly, including order and omitted revisions,
-    /// from `creating` through `ready` or `failed` and in session summaries.
-    /// Entries have no one-to-one or positional mapping to `workingDirectories`.
+    /// Immutable repository inputs accepted at creation.
     public var repositories: [RepositorySource]?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render

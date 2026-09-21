@@ -191,9 +191,7 @@ public sealed record InitializeResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultDirectory { get; init; }
 
-    /// <summary>Host-owned repository preparation for session creation and repository
-    /// context in configuration queries. Absence means unsupported; an empty
-    /// object supports one repository at its default revision.</summary>
+    /// <summary>Host repository preparation support; absent when unsupported.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RepositoryPreparationCapabilities? RepositoryPreparation { get; init; }
 
@@ -277,18 +275,14 @@ public sealed record ClientCapabilities
     public Dictionary<string, JsonElement>? McpApps { get; init; }
 }
 
-/// <summary>Repository preparation supported by this host, independent of the selected
-/// agent. Resulting working directories must still fit that agent's existing
-/// directory capabilities.</summary>
+/// <summary>An empty object supports one repository at its default revision.</summary>
 public sealed record RepositoryPreparationCapabilities
 {
     /// <summary>When true, clients may supply {@link RepositorySource.revision}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Revision { get; init; }
 
-    /// <summary>When true, clients may supply more than one repository. When absent or
-    /// false, the host MUST reject lists with more than one entry with
-    /// `InvalidParams` before preparation.</summary>
+    /// <summary>When true, clients may supply more than one repository.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? MultipleRepositories { get; init; }
 }
@@ -484,10 +478,7 @@ public sealed record SubscribeResult
 ///
 /// After creation, the client should subscribe to the session URI to receive state
 /// updates. The server also broadcasts a `root/sessionAdded` notification to all
-/// clients.
-///
-/// Repository preparation MUST finish before `session/ready` or executing turns.
-/// Clients recover the outcome from session state, not progress notifications.</summary>
+/// clients.</summary>
 public sealed record CreateSessionParams
 {
     /// <summary>Session URI (client-chosen, e.g. `ahp-session:/&lt;uuid&gt;`)</summary>
@@ -515,16 +506,11 @@ public sealed record CreateSessionParams
     /// {@link AgentCapabilities.multipleWorkingDirectories}; a server without that
     /// capability treats only the first entry as the session's working directory
     /// and ignores the rest. Dispatch working-directory actions to change the set
-    /// after the session has started.
-    ///
-    /// A non-empty list and `repositories` are mutually exclusive.</summary>
+    /// after the session has started.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; init; }
 
-    /// <summary>Non-empty repository list to prepare, supported only when the host
-    /// advertises {@link InitializeResult.repositoryPreparation}. Omit to retain
-    /// directory/default creation. The resulting working directories MUST fit
-    /// the selected agent's existing directory capabilities.</summary>
+    /// <summary>Repositories to prepare instead of an explicit `workingDirectories` list.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 
@@ -1380,10 +1366,7 @@ public sealed record DisposeTerminalParams
 /// The client calls this command whenever the user changes a significant input
 /// (e.g. picks a working directory, toggles a property). Each response returns
 /// the full current property set (not a delta). The returned `values` contain
-/// server-resolved defaults to pass to `createSession`.
-///
-/// `resolveSessionConfig` and `sessionConfigCompletions` MUST NOT clone or
-/// prepare repositories: editing a draft should not create checkouts.</summary>
+/// server-resolved defaults to pass to `createSession`.</summary>
 public sealed record ResolveSessionConfigParams
 {
     public required string Channel { get; init; }
@@ -1402,8 +1385,7 @@ public sealed record ResolveSessionConfigParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
 
-    /// <summary>Non-empty repository context, subject to
-    /// {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.</summary>
+    /// <summary>Repository context only; no checkout is prepared.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 
@@ -1445,8 +1427,7 @@ public sealed record SessionConfigCompletionsParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
 
-    /// <summary>Non-empty repository context, subject to
-    /// {@link InitializeResult.repositoryPreparation}. May accompany `workingDirectory`.</summary>
+    /// <summary>Repository context only; no checkout is prepared.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 
