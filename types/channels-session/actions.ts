@@ -275,6 +275,10 @@ export interface SessionWorkingDirectorySetAction {
   type: ActionType.SessionWorkingDirectorySet;
   /** The working directory to grant the session's agent tool access to. */
   directory: URI;
+  /**
+   * Clients can only dispatch this action with a local origin.
+   */
+  origin?: WorkingDirectoryOrigin;
 }
 
 /**
@@ -330,6 +334,10 @@ export interface SessionWorkingDirectoryReplacedAction {
   directory: URI;
   /** URI to place in the replaced entry's position. */
   replacement: URI;
+    /**
+   * Clients can only dispatch this action with a local origin.
+   */
+  origin?: WorkingDirectoryOrigin;
 }
 
 // ─── Input Needed Actions ────────────────────────────────────────────────────

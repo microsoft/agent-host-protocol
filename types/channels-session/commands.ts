@@ -69,7 +69,7 @@ export interface CreateSessionParams extends BaseParams {
    * after the session has started.
    *
    */
-  workingDirectories?: URI[];
+  workingDirectories?: URI[]; // /Users/roblou/code/vscode
   /**
    * Repositories to prepare instead of an explicit `workingDirectories` list.
    *

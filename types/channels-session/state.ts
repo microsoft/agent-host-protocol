@@ -104,6 +104,8 @@ export type SessionOrigin = AutomationSessionOrigin;
 
 /**
  * Requested repository source, not a resolved checkout.
+ * 
+ * move to commands
  *
  * @category Session State
  */
@@ -151,14 +153,11 @@ export interface SessionMetadata {
    * MAY restrict to a subset via
    * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
    * chat that sets none operates against this full set.
+   * 
+   * Add client capability to tell host which to use: supportsDirInfo
    */
-  workingDirectories?: URI[];
-  /**
-   * Immutable repository inputs accepted at creation.
-   *
-   * @minItems 1
-   */
-  repositories?: RepositorySource[];
+  workingDirectories?: (URI | WorkingDirectory)[];
+
   /**
    * Lightweight summary of this session's inline annotations channel
    * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
@@ -167,6 +166,32 @@ export interface SessionMetadata {
    */
   annotations?: AnnotationsSummary;
 }
+
+/**
+ * Must be unique per URI
+ * uri is the key for WorkingDirectory, document that
+ * TODO name
+ */
+interface WorkingDirectory {
+  // worktree URI // /Users/roblou/code/vscode.worktrees/my-branch
+  uri: URI;
+  // repo URI github.com/microsoft/vscode
+  repo?: URI;
+  // // project dir
+  // projectDir?: URI; // /Users/roblou/code/vscode
+
+  /**
+   * repo: user specified a repo
+   * local: user specified a local directory
+   * worktree: host created a worktree
+   */
+  origin?: WorkingDirectoryOrigin;
+}
+
+// Clean it up according to rules instructions
+type WorkingDirectoryOrigin = { kind: 'repo'} | 
+  { kind: 'local' } | 
+  { kind: 'worktree', mainWorktree: URI }; // eg /Users/roblou/code/vscode
 
 /**
  * Full state for a single session, loaded when a client subscribes to the session's URI.
