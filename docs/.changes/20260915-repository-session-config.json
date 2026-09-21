@@ -1,4 +1,4 @@
 {
   "type": "added",
-  "message": "Typed optional `repositories` lists on session creation, configuration queries, and immutable session metadata, with host-level `repositoryPreparation` discovery."
+  "message": "Typed repository preparation inputs with subdirectory selection, host capability discovery, and opt-in URI-keyed working-directory provenance across session state and actions."
 }

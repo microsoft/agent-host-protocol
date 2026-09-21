@@ -1,7 +1,7 @@
 {
   "name": "repository-session-failed",
   "group": "A",
-  "description": "A failed session retains the requested repository source and revision without claiming a directory was resolved.",
+  "description": "A failed session carries its creation error without claiming a directory was resolved.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-session:/repository-session",
@@ -12,8 +12,7 @@
       "lifecycle": "failed",
       "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
       "activeClients": [],
-      "chats": [],
-      "repositories": [{ "source": "https://example.org/team/project.git", "revision": "main" }]
+      "chats": []
     },
     "fromSeq": 1
   },
@@ -26,8 +25,7 @@
       "lifecycle": "failed",
       "creationError": { "errorType": "preparationFailed", "message": "Preparation failed" },
       "activeClients": [],
-      "chats": [],
-      "repositories": [{ "source": "https://example.org/team/project.git", "revision": "main" }]
+      "chats": []
     },
     "fromSeq": 1
   }]

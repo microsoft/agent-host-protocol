@@ -1,7 +1,7 @@
 {
-  "name": "repository-session-revision",
+  "name": "repository-session-creating",
   "group": "A",
-  "description": "A creating session preserves typed source and revision metadata before a directory is resolved.",
+  "description": "A creating session does not claim unresolved directories or echo the original repository request.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-session:/repository-session",
@@ -11,8 +11,7 @@
       "status": 1,
       "lifecycle": "creating",
       "activeClients": [],
-      "chats": [],
-      "repositories": [{ "source": "https://example.org/team/project.git", "revision": "refs/tags/v1.2.3" }]
+      "chats": []
     },
     "fromSeq": 0
   },
@@ -24,8 +23,7 @@
       "status": 1,
       "lifecycle": "creating",
       "activeClients": [],
-      "chats": [],
-      "repositories": [{ "source": "https://example.org/team/project.git", "revision": "refs/tags/v1.2.3" }]
+      "chats": []
     },
     "fromSeq": 0
   }]

@@ -1,7 +1,7 @@
 {
   "name": "repository-session-multiple-ready",
   "group": "A",
-  "description": "Ready state preserves repeated sources at different revisions without a positional directory mapping.",
+  "description": "Ready state can associate different directories with the same source without deduplication.",
   "type": "Snapshot",
   "input": {
     "resource": "ahp-session:/repository-session",
@@ -12,11 +12,10 @@
       "lifecycle": "ready",
       "activeClients": [],
       "chats": [],
-      "repositories": [
-        { "source": "https://example.org/team/project.git", "revision": "feature" },
-        { "source": "https://example.org/team/project.git", "revision": "main" }
-      ],
-      "workingDirectories": ["file:///work/session-workspace"]
+      "workingDirectories": [
+        { "uri": "file:///work/session-feature", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } },
+        { "uri": "file:///work/session-main", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } }
+      ]
     },
     "fromSeq": 2
   },
@@ -29,11 +28,10 @@
       "lifecycle": "ready",
       "activeClients": [],
       "chats": [],
-      "repositories": [
-        { "source": "https://example.org/team/project.git", "revision": "feature" },
-        { "source": "https://example.org/team/project.git", "revision": "main" }
-      ],
-      "workingDirectories": ["file:///work/session-workspace"]
+      "workingDirectories": [
+        { "uri": "file:///work/session-feature", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } },
+        { "uri": "file:///work/session-main", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } }
+      ]
     },
     "fromSeq": 2
   }]

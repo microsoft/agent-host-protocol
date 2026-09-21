@@ -8,7 +8,8 @@
 
 import type { URI } from '../common/state.js';
 import type { BaseParams, PaginatedParams, PaginatedResult } from '../common/commands.js';
-import type { RepositorySource, SessionSummary, SessionConfigSchema } from '../channels-session/state.js';
+import type { SessionSummary, SessionConfigSchema } from '../channels-session/state.js';
+import type { RepositorySource } from '../channels-session/commands.js';
 
 // Re-export schema types so the legacy `commands.ts` aggregator continues to
 // expose them from the same import path.
@@ -131,7 +132,7 @@ export interface ResolveSessionConfigParams extends BaseParams {
   /** Working directory for the session */
   workingDirectory?: URI;
   /**
-   * Repository context only; no checkout is prepared.
+   * Repositories used as configuration context.
    *
    * @minItems 1
    */
@@ -202,7 +203,7 @@ export interface SessionConfigCompletionsParams extends BaseParams {
   /** Working directory for the session */
   workingDirectory?: URI;
   /**
-   * Repository context only; no checkout is prepared.
+   * Repositories used as configuration context.
    *
    * @minItems 1
    */

@@ -249,6 +249,7 @@ describe('generated JSON schemas', () => {
           for (const repositories of [
             [{ source }],
             [{ source, revision: 'refs/tags/v1.2.3' }],
+            [{ source, subdirectory: 'packages/api' }],
             [{ source, revision: 'main' }, { source, revision: 'feature' }],
           ]) {
             assert.equal(schemaAccepts(schema, defs[definition], { ...base, repositories, config: { mode: 'review' } }), true);
@@ -257,21 +258,40 @@ describe('generated JSON schemas', () => {
             [], null, {}, source, [null], [source], [{}],
             [{ revision: 'main' }], [{ source: 42 }], [{ source: null }],
             [{ source, revision: 42 }],
+            [{ source, subdirectory: 42 }],
           ]) {
             assert.equal(schemaAccepts(schema, defs[definition], { ...base, repositories }), false);
           }
         }
       });
 
-      it('declares immutable repository lists with a required source per entry', () => {
+      it('declares URI-keyed directory records instead of repository input metadata', () => {
         const defs = schema.$defs as Record<string, Record<string, unknown>>;
         for (const name of ['SessionMetadata', 'SessionState', 'SessionSummary']) {
           const properties = defs[name].properties as Record<string, Record<string, unknown>>;
-          const { type, items, minItems } = properties.repositories;
-          assert.deepEqual({ type, items, minItems }, {
-            type: 'array', items: { $ref: '#/$defs/RepositorySource' }, minItems: 1,
-          });
-          assert.equal((defs[name].required as string[]).includes('repositories'), false);
+          assert.equal(properties.repositories, undefined);
+          assert.equal(properties.workingDirectories.type, 'array');
+          const item = properties.workingDirectories.items as JsonNode;
+          const uri = 'file:///work/project/packages/api';
+          for (const directory of [
+            uri, { uri }, { uri, repo: 'https://example.org/team/project.git' },
+            { uri, origin: { kind: 'local' } },
+            { uri, origin: { kind: 'repo' } },
+            { uri, origin: { kind: 'worktree', mainWorktree: 'file:///work/project' } },
+          ]) {
+            assert.equal(schemaAccepts(schema, item, directory), true);
+          }
+          for (const directory of [
+            42, null, {}, { repo: 'https://example.org/team/project.git' },
+            { uri: 42 }, { uri, repo: 42 },
+            { uri, origin: { kind: 'worktree' } },
+            { uri, origin: { kind: 'worktree', mainWorktree: 42 } },
+          ]) {
+            assert.equal(schemaAccepts(schema, item, directory), false);
+          }
+        }
+        if (file !== 'commands.schema.json') {
+          return;
         }
         const source = defs.RepositorySource;
         const properties = source.properties as Record<string, Record<string, unknown>>;
@@ -280,9 +300,47 @@ describe('generated JSON schemas', () => {
           required: source.required,
           sourceType: dereferenceSchema(schema, properties.source).type,
           revisionType: properties.revision.type,
+          subdirectoryType: properties.subdirectory.type,
         }, {
-          fields: ['source', 'revision'], required: ['source'], sourceType: 'string', revisionType: 'string',
+          fields: ['source', 'revision', 'subdirectory'], required: ['source'],
+          sourceType: 'string', revisionType: 'string', subdirectoryType: 'string',
         });
+      });
+
+      it('gates rich directories with a presence-only client capability', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const capabilities = defs.ClientCapabilities;
+        for (const value of [{}, { workingDirectoryInfo: {} }, { mcpApps: {}, workingDirectoryInfo: {} }]) {
+          assert.equal(schemaAccepts(schema, capabilities, value), true);
+        }
+        for (const value of [true, null, []]) {
+          assert.equal(schemaAccepts(schema, capabilities, { workingDirectoryInfo: value }), false);
+        }
+      });
+
+      it('carries complete keyed metadata in set and replace actions', () => {
+        if (file !== 'actions.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const directory = { uri: 'file:///work/tree', origin: { kind: 'worktree', mainWorktree: 'file:///work/main' } };
+        for (const [name, action] of [
+          ['SessionWorkingDirectorySetAction', { type: 'session/workingDirectorySet', directory }],
+          ['SessionWorkingDirectoryReplacedAction', { type: 'session/workingDirectoryReplaced', directory: 'file:///work/old', replacement: directory }],
+        ] as const) {
+          assert.equal(schemaAccepts(schema, defs[name], action), true);
+          const properties = defs[name].properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.origin, undefined);
+        }
+        assert.equal(schemaAccepts(schema, defs.SessionWorkingDirectoryRemovedAction, {
+          type: 'session/workingDirectoryRemoved', directory,
+        }), false);
+        assert.equal(schemaAccepts(schema, defs.SessionWorkingDirectoryReplacedAction, {
+          type: 'session/workingDirectoryReplaced', directory, replacement: 'file:///work/new',
+        }), false);
       });
 
       it('advertises repository preparation on the host, not the agent', () => {

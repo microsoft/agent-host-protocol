@@ -8,7 +8,6 @@
 import type { URI } from '../common/state.js';
 import type { BaseParams } from '../common/commands.js';
 import type {
-  RepositorySource,
   SessionActiveClient,
 } from './state.js';
 import type {
@@ -16,6 +15,20 @@ import type {
 } from '../channels-chat/state.js';
 
 // ─── createSession ───────────────────────────────────────────────────────────
+
+/**
+ * Requested repository source, not a resolved working directory.
+ *
+ * @category Commands
+ */
+export interface RepositorySource {
+  /** Credential-free repository source URI. */
+  source: URI;
+  /** Requested branch, tag, or commit. Omit to use the host's default revision. */
+  revision?: string;
+  /** Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths. */
+  subdirectory?: string;
+}
 
 /**
  * Creates a new session with the specified agent provider.
@@ -67,9 +80,8 @@ export interface CreateSessionParams extends BaseParams {
    * capability treats only the first entry as the session's working directory
    * and ignores the rest. Dispatch working-directory actions to change the set
    * after the session has started.
-   *
    */
-  workingDirectories?: URI[]; // /Users/roblou/code/vscode
+  workingDirectories?: URI[];
   /**
    * Repositories to prepare instead of an explicit `workingDirectories` list.
    *

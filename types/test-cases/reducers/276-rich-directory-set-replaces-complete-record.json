@@ -1,0 +1,18 @@
+{
+  "description": "Rich same-URI set replaces the whole record rather than merging stale metadata",
+  "reducer": "session",
+  "initial": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": [{
+      "uri": "file:///a", "repo": "https://example.org/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+    }, "file:///b"]
+  },
+  "actions": [{ "type": "session/workingDirectorySet", "directory": { "uri": "file:///a" } }],
+  "expected": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": [{ "uri": "file:///a" }, "file:///b"]
+  }
+}

@@ -6,14 +6,14 @@
   "input": {
     "channel": "ahp-session:/repository-session",
     "repositories": [
-      { "source": "https://example.org/team/project.git", "revision": "feature" },
+      { "source": "https://example.org/team/project.git", "revision": "feature", "subdirectory": "packages/api" },
       { "source": "https://example.org/team/project.git", "revision": "main" }
     ]
   },
   "acceptableOutputs": [{
     "channel": "ahp-session:/repository-session",
     "repositories": [
-      { "source": "https://example.org/team/project.git", "revision": "feature" },
+      { "source": "https://example.org/team/project.git", "revision": "feature", "subdirectory": "packages/api" },
       { "source": "https://example.org/team/project.git", "revision": "main" }
     ]
   }]

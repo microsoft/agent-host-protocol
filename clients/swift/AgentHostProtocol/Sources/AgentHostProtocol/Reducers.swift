@@ -803,31 +803,43 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
         return next
 
     case .sessionWorkingDirectorySet(let a):
-        if (state.workingDirectories ?? []).contains(a.directory) { return state }
         var next = state
-        next.workingDirectories = (next.workingDirectories ?? []) + [a.directory]
+        var directories = state.workingDirectories ?? []
+        if let idx = directories.firstIndex(where: { $0.uri == a.directory.uri }) {
+            guard case .directory = a.directory else { return state }
+            directories[idx] = a.directory
+        } else {
+            directories.append(a.directory)
+        }
+        next.workingDirectories = directories
         return next
 
     case .sessionWorkingDirectoryRemoved(let a):
-        guard let idx = state.workingDirectories?.firstIndex(of: a.directory) else { return state }
+        guard let idx = state.workingDirectories?.firstIndex(where: { $0.uri == a.directory }) else { return state }
         var next = state
         next.workingDirectories?.remove(at: idx)
         return next
 
     case .sessionWorkingDirectoryReplaced(let a):
         guard let directories = state.workingDirectories,
-              let idx = directories.firstIndex(of: a.directory) else { return state }
+              let idx = directories.firstIndex(where: { $0.uri == a.directory }) else { return state }
         var next = state
-        if let replacementIdx = directories.firstIndex(of: a.replacement), replacementIdx < idx {
-            next.workingDirectories = directories.enumerated().compactMap { index, directory in
-                index == idx ? nil : directory
-            }
+        let replacementIdx = directories.firstIndex(where: { $0.uri == a.replacement.uri })
+        var replacement = a.replacement
+        if case .uri = replacement, let replacementIdx {
+            replacement = directories[replacementIdx]
+        }
+        var updated = directories
+        if let replacementIdx, replacementIdx < idx {
+            updated[replacementIdx] = replacement
+            updated.remove(at: idx)
         } else {
-            next.workingDirectories = directories.enumerated().compactMap { index, directory in
-                if index == idx { return a.replacement }
-                return directory == a.replacement ? nil : directory
+            updated[idx] = replacement
+            if let replacementIdx, replacementIdx > idx {
+                updated.remove(at: replacementIdx)
             }
         }
+        next.workingDirectories = updated
         return next
 
     case .sessionInputNeededSet(let a):

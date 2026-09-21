@@ -271,6 +271,22 @@ internal object SideChatSourceSerializer : KSerializer<SideChatSource> {
 }
 
 @Serializable
+data class RepositorySource(
+    /**
+     * Credential-free repository source URI.
+     */
+    val source: String,
+    /**
+     * Requested branch, tag, or commit. Omit to use the host's default revision.
+     */
+    val revision: String? = null,
+    /**
+     * Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.
+     */
+    val subdirectory: String? = null
+)
+
+@Serializable
 data class InitializeParams(
     /**
      * Channel URI this command targets.
@@ -411,6 +427,11 @@ data class RepositoryPreparationCapabilities(
 
 @Serializable
 data class ClientCapabilities(
+    /**
+     * Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+     * Hosts project records to URIs when absent and retain this choice on reconnect.
+     */
+    val workingDirectoryInfo: Map<String, JsonElement>? = null,
     /**
      * Client can render
      * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
@@ -720,9 +741,9 @@ data class CreateChatParams(
      */
     val source: ChatSource? = null,
     /**
-     * Initial working-directory subset for this chat. Every entry MUST be
-     * present in the owning session's `workingDirectories`; the server MUST
-     * reject any entry that is not. When absent, the chat inherits the full
+     * Initial working-directory URI subset for this chat. Every URI MUST match
+     * a URI string or record's `uri` in the owning session's `workingDirectories`;
+     * the server MUST reject any entry that does not. When absent, the chat inherits the full
      * session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
      * the source chat's `workingDirectories`; this field is ignored for forks.
      *
@@ -1337,7 +1358,7 @@ data class ResolveSessionConfigParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Repository context only; no checkout is prepared.
+     * Repositories used as configuration context.
      */
     val repositories: List<RepositorySource>? = null,
     /**
@@ -1458,7 +1479,7 @@ data class SessionConfigCompletionsParams(
      */
     val workingDirectory: String? = null,
     /**
-     * Repository context only; no checkout is prepared.
+     * Repositories used as configuration context.
      */
     val repositories: List<RepositorySource>? = null,
     /**

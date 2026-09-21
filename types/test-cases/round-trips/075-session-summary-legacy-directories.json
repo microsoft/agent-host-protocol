@@ -1,0 +1,14 @@
+{
+  "name": "session-summary-legacy-directories",
+  "group": "A",
+  "description": "Legacy summary deltas replace directories using only URI strings.",
+  "type": "SessionSummaryChangedParams",
+  "input": {
+    "channel": "ahp-root://", "session": "ahp-session:/directories",
+    "changes": { "workingDirectories": ["file:///legacy", "file:///tree/packages/api"] }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://", "session": "ahp-session:/directories",
+    "changes": { "workingDirectories": ["file:///legacy", "file:///tree/packages/api"] }
+  }]
+}

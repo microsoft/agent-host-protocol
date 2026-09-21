@@ -73,7 +73,7 @@ SessionState {
   status: number        // SessionStatus bitset
   activity?: string
   project?: ProjectInfo
-  workingDirectories?: URI[]   // equal-peer working directories
+  workingDirectories?: (URI | WorkingDirectory)[] // URI-keyed working directories
   annotations?: AnnotationsSummary
 
   lifecycle: 'creating' | 'ready' | 'failed'
@@ -107,7 +107,7 @@ SessionSummary {
   createdAt: string   // ISO 8601, e.g. "2025-03-10T18:42:03.123Z"
   modifiedAt: string  // ISO 8601
   project?: ProjectInfo
-  workingDirectories?: URI[]   // equal-peer working directories
+  workingDirectories?: (URI | WorkingDirectory)[] // URI-keyed working directories
   annotations?: AnnotationsSummary
   changes?: ChangesSummary
 }
@@ -631,9 +631,14 @@ directories of the source session.
 The directory set is state (`SessionState.workingDirectories`), so clients
 mutate it by **dispatching actions**, not by calling commands:
 
+Entries are keyed by URI, whether represented as URI strings or rich
+`WorkingDirectory` records. Rich records require the client's
+`workingDirectoryInfo` capability; see [repository-backed creation and
+compatibility](/specification/session-channel#repository-backed-creation).
+
 | Action | Effect |
 | --- | --- |
-| `session/workingDirectorySet` | Adds `directory` to the set (creating it if absent). A no-op when the directory is already present. |
+| `session/workingDirectorySet` | Upserts `directory` by URI, appending when absent and replacing a rich same-URI entry in place. A URI-only duplicate preserves known metadata. |
 | `session/workingDirectoryRemoved` | Removes `directory` from the set. A no-op when it is not present. There is no atomic backend "remove one" primitive — the host reconfigures its agent to the reduced set. A host MAY decline to apply the removal (e.g. the immutable primary at index 0), leaving the set unchanged. |
 | `session/workingDirectoryReplaced` | Targeted compare-and-swap replacement of any entry that deduplicates `replacement`, preserving every other directory's relative order. An existing replacement after the target moves to the target's position (`[A, B, C]`, `B -> C` becomes `[A, C]`); an earlier replacement stays in place and the target is removed (`[A, B, C]`, `C -> A` becomes `[A, B]`). A no-op when `directory` is absent. Replacing index `0` additionally requires `primaryReplacement`. |
 

@@ -1,5 +1,5 @@
 {
-  "description": "Repository intent survives readiness, config changes, and directory changes without deduplication or revision resolution",
+  "description": "Resolved directory provenance survives readiness and config changes without echoing creation inputs",
   "reducer": "session",
   "initial": {
     "provider": "example",
@@ -8,21 +8,24 @@
     "lifecycle": "creating",
     "activeClients": [],
     "chats": [],
-    "repositories": [
-      { "source": "https://example.org/team/project.git" },
-      { "source": "https://example.org/team/project.git", "revision": "feature" },
-      { "source": "https://example.org/team/project.git", "revision": "main" }
-    ],
     "config": {
       "schema": { "type": "object", "properties": { "mode": { "type": "string", "title": "Mode" } } },
       "values": { "mode": "review" }
     }
   },
   "actions": [
-    { "type": "session/workingDirectorySet", "directory": "file:///work/project" },
+    { "type": "session/workingDirectorySet", "directory": {
+      "uri": "file:///work/project",
+      "repo": "https://example.org/team/project.git",
+      "origin": { "kind": "repo" }
+    } },
     { "type": "session/ready" },
     { "type": "session/configChanged", "config": { "mode": "interactive" }, "replace": true },
-    { "type": "session/workingDirectorySet", "directory": "file:///work/project-worktree" },
+    { "type": "session/workingDirectorySet", "directory": {
+      "uri": "file:///work/project-worktree/packages/api",
+      "repo": "https://example.org/team/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///work/project" }
+    } },
     { "type": "session/workingDirectoryRemoved", "directory": "file:///work/project" }
   ],
   "expected": {
@@ -32,12 +35,11 @@
     "lifecycle": "ready",
     "activeClients": [],
     "chats": [],
-    "repositories": [
-      { "source": "https://example.org/team/project.git" },
-      { "source": "https://example.org/team/project.git", "revision": "feature" },
-      { "source": "https://example.org/team/project.git", "revision": "main" }
-    ],
-    "workingDirectories": ["file:///work/project-worktree"],
+    "workingDirectories": [{
+      "uri": "file:///work/project-worktree/packages/api",
+      "repo": "https://example.org/team/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///work/project" }
+    }],
     "config": {
       "schema": { "type": "object", "properties": { "mode": { "type": "string", "title": "Mode" } } },
       "values": { "mode": "interactive" }

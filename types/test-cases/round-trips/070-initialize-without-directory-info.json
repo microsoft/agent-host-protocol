@@ -1,0 +1,8 @@
+{
+  "name": "initialize-without-directory-info",
+  "group": "A",
+  "description": "Older clients can omit the rich-directory capability.",
+  "type": "InitializeParams",
+  "input": { "channel": "ahp-root://", "clientId": "legacy-client", "protocolVersions": ["0.9.0"] },
+  "acceptableOutputs": [{ "channel": "ahp-root://", "clientId": "legacy-client", "protocolVersions": ["0.9.0"] }]
+}

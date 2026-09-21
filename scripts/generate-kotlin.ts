@@ -142,6 +142,7 @@ function mapType(tsType: string): string {
   if (tsType === 'URI') return 'String';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
   if (tsType === 'ToolInput') return 'ToolInput';
+  if (tsType === 'URI | WorkingDirectory') return 'WorkingDirectoryEntry';
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
 
@@ -788,6 +789,52 @@ internal object StringOrMarkdownSerializer : KSerializer<StringOrMarkdown> {
 }`;
 }
 
+function generateWorkingDirectoryEntry(): string {
+  return `/** A legacy URI or a complete working-directory record. */
+@Serializable(with = WorkingDirectoryEntrySerializer::class)
+sealed interface WorkingDirectoryEntry {
+    val uri: String
+
+    data class Uri(val value: String) : WorkingDirectoryEntry {
+        override val uri: String get() = value
+    }
+    data class Directory(val value: WorkingDirectory) : WorkingDirectoryEntry {
+        override val uri: String get() = value.uri
+    }
+}
+
+internal object WorkingDirectoryEntrySerializer : KSerializer<WorkingDirectoryEntry> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("WorkingDirectoryEntry")
+
+    override fun deserialize(decoder: Decoder): WorkingDirectoryEntry {
+        val input = decoder as? JsonDecoder
+            ?: error("WorkingDirectoryEntry requires JSON")
+        return when (val element = input.decodeJsonElement()) {
+            is JsonPrimitive -> {
+                require(element.isString) { "WorkingDirectoryEntry URI must be a string" }
+                WorkingDirectoryEntry.Uri(element.content)
+            }
+            is JsonObject -> WorkingDirectoryEntry.Directory(
+                input.json.decodeFromJsonElement(WorkingDirectory.serializer(), element),
+            )
+            else -> error("WorkingDirectoryEntry requires a URI or directory")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: WorkingDirectoryEntry) {
+        val output = encoder as? JsonEncoder
+            ?: error("WorkingDirectoryEntry requires JSON")
+        val element = when (value) {
+            is WorkingDirectoryEntry.Uri -> JsonPrimitive(value.value)
+            is WorkingDirectoryEntry.Directory ->
+                output.json.encodeToJsonElement(WorkingDirectory.serializer(), value.value)
+        }
+        output.encodeJsonElement(element)
+    }
+}`;
+}
+
 function generateToolInput(): string {
   return `/**
  * Raw tool input represented inline or by content reference.
@@ -977,7 +1024,7 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
-  'SessionOriginKind',
+  'SessionOriginKind', 'WorkingDirectoryOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
@@ -987,7 +1034,7 @@ const STATE_STRUCTS = [
   'AgentCapabilities',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
-  'RepositorySource',
+  'WorkingDirectory', 'LocalWorkingDirectoryOrigin', 'RepoWorkingDirectoryOrigin', 'WorktreeWorkingDirectoryOrigin',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
@@ -1322,6 +1369,18 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const WORKING_DIRECTORY_ORIGIN_UNION: UnionConfig = {
+  name: 'WorkingDirectoryOrigin',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Local', structName: 'LocalWorkingDirectoryOrigin', discriminantValue: 'local' },
+    { caseName: 'Repo', structName: 'RepoWorkingDirectoryOrigin', discriminantValue: 'repo' },
+    { caseName: 'Worktree', structName: 'WorktreeWorkingDirectoryOrigin', discriminantValue: 'worktree' },
+  ],
+  unknown: true,
+  injectDiscriminantOnSerialize: true,
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1408,6 +1467,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateToolInput());
   lines.push('');
+  lines.push(generateWorkingDirectoryEntry());
+  lines.push('');
 
   lines.push('// ─── Discriminated Unions ───────────────────────────────────────────────────');
   lines.push('');
@@ -1448,6 +1509,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, WORKING_DIRECTORY_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
@@ -1723,6 +1786,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
+  'RepositorySource',
   'InitializeParams', 'InitializeResult',
   'RepositoryPreparationCapabilities',
   'ClientCapabilities', 'AutomationCapabilities',
@@ -2367,6 +2431,7 @@ function checkExhaustiveness(project: Project): void {
     'JsonRpcErrorCode',             // type-level alias over JsonRpcErrorCodes const enum
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
     'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
+    'WorkingDirectoryOrigin',
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union

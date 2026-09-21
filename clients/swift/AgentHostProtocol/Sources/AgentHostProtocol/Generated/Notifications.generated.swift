@@ -216,9 +216,9 @@ public struct PartialSessionSummary: Codable, Sendable {
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
-    public var workingDirectories: [String]?
-    /// Immutable repository inputs accepted at creation.
-    public var repositories: [RepositorySource]?
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
+    public var workingDirectories: [WorkingDirectoryEntry]?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -257,7 +257,6 @@ public struct PartialSessionSummary: Codable, Sendable {
         case origin
         case project
         case workingDirectories
-        case repositories
         case annotations
         case resource
         case createdAt
@@ -275,8 +274,7 @@ public struct PartialSessionSummary: Codable, Sendable {
         activity: String? = nil,
         origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
-        workingDirectories: [String]? = nil,
-        repositories: [RepositorySource]? = nil,
+        workingDirectories: [WorkingDirectoryEntry]? = nil,
         annotations: AnnotationsSummary? = nil,
         resource: String? = nil,
         createdAt: String? = nil,
@@ -293,7 +291,6 @@ public struct PartialSessionSummary: Codable, Sendable {
         self.origin = origin
         self.project = project
         self.workingDirectories = workingDirectories
-        self.repositories = repositories
         self.annotations = annotations
         self.resource = resource
         self.createdAt = createdAt

@@ -45,8 +45,10 @@ import { MessageKind } from '../src/types/channels-chat/state.js';
 import {
   SessionLifecycle,
   SessionStatus,
+  WorkingDirectoryOriginKind,
   type SessionConfigSchema,
   type SessionState,
+  type WorkingDirectory,
 } from '../src/types/index.js';
 
 const ROOT = 'ahp-root://' as const;
@@ -215,8 +217,16 @@ for (const method of ['resolveSessionConfig', 'sessionConfigCompletions', 'creat
 }
 
 for (const failed of [false, true]) {
-  test(`session state recovers repository intent and directories after creation ${failed ? 'fails' : 'succeeds'}`, () => {
+  test(`session state retains resolved directory metadata after creation ${failed ? 'fails' : 'succeeds'}`, () => {
     const resource = 'ahp-session:/repository-test';
+    const workingDirectories: WorkingDirectory[] = [
+      { uri: 'file:///work/project', repo: repositorySource, origin: { kind: WorkingDirectoryOriginKind.Repo } },
+      {
+        uri: 'file:///work/project-worktree/packages/api',
+        repo: repositorySource,
+        origin: { kind: WorkingDirectoryOriginKind.Worktree, mainWorktree: 'file:///work/project' },
+      },
+    ];
     const initial: SessionState = {
       provider: 'example',
       title: 'Repository session',
@@ -225,11 +235,6 @@ for (const failed of [false, true]) {
       activeClients: [],
       chats: [],
       workingDirectories: [],
-      repositories: [
-        { source: repositorySource },
-        { source: repositorySource, revision: 'main' },
-        { source: repositorySource, revision: 'feature' },
-      ],
       config: {
         schema: { type: 'object', properties: { mode: { type: 'string', title: 'Mode' } } },
         values: { mode: 'review' },
@@ -241,19 +246,19 @@ for (const failed of [false, true]) {
       channel: resource,
       serverSeq: 1,
       origin: undefined,
-      action: { type: ActionType.SessionWorkingDirectorySet, directory: 'file:///work/project' },
+      action: { type: ActionType.SessionWorkingDirectorySet, directory: workingDirectories[0] },
     });
     mirror.apply({
       channel: resource,
       serverSeq: 2,
       origin: undefined,
-      action: { type: ActionType.SessionWorkingDirectorySet, directory: 'file:///work/project-worktree' },
+      action: { type: ActionType.SessionWorkingDirectorySet, directory: workingDirectories[1] },
     });
     const preparing = mirror.getSession(resource);
     assert.ok(preparing);
     assert.equal(preparing.lifecycle, SessionLifecycle.Creating);
     assert.deepEqual(preparing.config, initial.config);
-    assert.deepEqual(preparing.repositories, initial.repositories);
+    assert.deepEqual(preparing.workingDirectories, workingDirectories);
 
     const joining = new AhpStateMirror();
     joining.applySnapshot({ resource, state: preparing, fromSeq: 2 });
@@ -273,8 +278,7 @@ for (const failed of [false, true]) {
     assert.ok(completed);
     assert.equal(completed.lifecycle, failed ? SessionLifecycle.Failed : SessionLifecycle.Ready);
     assert.deepEqual(completed.config, initial.config);
-    assert.deepEqual(completed.repositories, initial.repositories);
-    assert.deepEqual(completed.workingDirectories, ['file:///work/project', 'file:///work/project-worktree']);
+    assert.deepEqual(completed.workingDirectories, workingDirectories);
     assert.deepEqual(joining.getSession(resource), completed);
     if (failed) {
       assert.deepEqual(completed.creationError, { errorType: 'preparationFailed', message: 'Preparation failed' });

@@ -103,17 +103,56 @@ export interface AutomationSessionOrigin {
 export type SessionOrigin = AutomationSessionOrigin;
 
 /**
- * Requested repository source, not a resolved checkout.
- * 
- * move to commands
+ * How a working directory was prepared.
+ *
+ * @category Session State
+ * @nonexhaustive
+ */
+export const enum WorkingDirectoryOriginKind {
+  Local = 'local',
+  Repo = 'repo',
+  Worktree = 'worktree',
+}
+
+/** @category Session State */
+export interface LocalWorkingDirectoryOrigin {
+  kind: WorkingDirectoryOriginKind.Local;
+}
+
+/** @category Session State */
+export interface RepoWorkingDirectoryOrigin {
+  kind: WorkingDirectoryOriginKind.Repo;
+}
+
+/** @category Session State */
+export interface WorktreeWorkingDirectoryOrigin {
+  kind: WorkingDirectoryOriginKind.Worktree;
+  /** Main worktree associated with the host-prepared worktree. */
+  mainWorktree: URI;
+}
+
+/**
+ * Host-reported preparation result, independent of the creation input.
  *
  * @category Session State
  */
-export interface RepositorySource {
-  /** Credential-free repository source URI. */
-  source: URI;
-  /** Requested branch, tag, or commit. Omit to use the host's default revision. */
-  revision?: string;
+export type WorkingDirectoryOrigin =
+  | LocalWorkingDirectoryOrigin
+  | RepoWorkingDirectoryOrigin
+  | WorktreeWorkingDirectoryOrigin;
+
+/**
+ * An actual working directory, uniquely keyed by `uri` within the session.
+ *
+ * @category Session State
+ */
+export interface WorkingDirectory {
+  /** Actual selected directory, which may be a repository subdirectory. */
+  uri: URI;
+  /** Credential-free repository source association, not a checkout identity. */
+  repo?: URI;
+  /** Host-reported provenance; omission means unspecified. */
+  origin?: WorkingDirectoryOrigin;
 }
 
 /**
@@ -153,8 +192,8 @@ export interface SessionMetadata {
    * MAY restrict to a subset via
    * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
    * chat that sets none operates against this full set.
-   * 
-   * Add client capability to tell host which to use: supportsDirInfo
+   * Entries are uniquely keyed by URI. Rich records require
+   * {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
    */
   workingDirectories?: (URI | WorkingDirectory)[];
 
@@ -166,32 +205,6 @@ export interface SessionMetadata {
    */
   annotations?: AnnotationsSummary;
 }
-
-/**
- * Must be unique per URI
- * uri is the key for WorkingDirectory, document that
- * TODO name
- */
-interface WorkingDirectory {
-  // worktree URI // /Users/roblou/code/vscode.worktrees/my-branch
-  uri: URI;
-  // repo URI github.com/microsoft/vscode
-  repo?: URI;
-  // // project dir
-  // projectDir?: URI; // /Users/roblou/code/vscode
-
-  /**
-   * repo: user specified a repo
-   * local: user specified a local directory
-   * worktree: host created a worktree
-   */
-  origin?: WorkingDirectoryOrigin;
-}
-
-// Clean it up according to rules instructions
-type WorkingDirectoryOrigin = { kind: 'repo'} | 
-  { kind: 'local' } | 
-  { kind: 'worktree', mainWorktree: URI }; // eg /Users/roblou/code/vscode
 
 /**
  * Full state for a single session, loaded when a client subscribes to the session's URI.

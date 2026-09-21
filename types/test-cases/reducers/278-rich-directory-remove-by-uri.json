@@ -1,0 +1,15 @@
+{
+  "description": "Remove targets a rich entry by URI and preserves remaining order",
+  "reducer": "session",
+  "initial": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": ["file:///a", { "uri": "file:///b", "origin": { "kind": "local" } }, { "uri": "file:///c" }]
+  },
+  "actions": [{ "type": "session/workingDirectoryRemoved", "directory": "file:///b" }],
+  "expected": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": ["file:///a", { "uri": "file:///c" }]
+  }
+}

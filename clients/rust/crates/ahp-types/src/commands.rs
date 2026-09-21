@@ -17,9 +17,8 @@ use crate::actions::{ActionEnvelope, StateAction};
 use crate::state::{
     AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
     AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, RepositorySource, SessionActiveClient, SessionConfigSchema, SessionSummary,
-    SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange,
-    Turn,
+    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
+    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -186,6 +185,20 @@ pub enum ResourceWriteMode {
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// Requested repository source, not a resolved working directory.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositorySource {
+    /// Credential-free repository source URI.
+    pub source: Uri,
+    /// Requested branch, tag, or commit. Omit to use the host's default revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    /// Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subdirectory: Option<String>,
+}
+
 /// Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -318,6 +331,10 @@ pub struct RepositoryPreparationCapabilities {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
+    /// Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+    /// Hosts project records to URIs when absent and retain this choice on reconnect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_directory_info: Option<JsonObject>,
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -712,9 +729,9 @@ pub struct CreateChatParams {
     /// origin; any `responsePartId` there is provenance only, not a live range.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<ChatSource>,
-    /// Initial working-directory subset for this chat. Every entry MUST be
-    /// present in the owning session's `workingDirectories`; the server MUST
-    /// reject any entry that is not. When absent, the chat inherits the full
+    /// Initial working-directory URI subset for this chat. Every URI MUST match
+    /// a URI string or record's `uri` in the owning session's `workingDirectories`;
+    /// the server MUST reject any entry that does not. When absent, the chat inherits the full
     /// session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
     /// the source chat's `workingDirectories`; this field is ignored for forks.
     ///
@@ -1408,7 +1425,7 @@ pub struct ResolveSessionConfigParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Repository context only; no checkout is prepared.
+    /// Repositories used as configuration context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repositories: Option<Vec<RepositorySource>>,
     /// Current user-filled configuration values
@@ -1446,7 +1463,7 @@ pub struct SessionConfigCompletionsParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
-    /// Repository context only; no checkout is prepared.
+    /// Repositories used as configuration context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repositories: Option<Vec<RepositorySource>>,
     /// Current user-filled configuration values (provides context for the query)

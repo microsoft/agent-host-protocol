@@ -229,6 +229,25 @@ public struct SideChatSource: Codable, Sendable {
     }
 }
 
+public struct RepositorySource: Codable, Sendable {
+    /// Credential-free repository source URI.
+    public var source: String
+    /// Requested branch, tag, or commit. Omit to use the host's default revision.
+    public var revision: String?
+    /// Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.
+    public var subdirectory: String?
+
+    public init(
+        source: String,
+        revision: String? = nil,
+        subdirectory: String? = nil
+    ) {
+        self.source = source
+        self.revision = revision
+        self.subdirectory = subdirectory
+    }
+}
+
 public struct InitializeParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String
@@ -386,6 +405,9 @@ public struct InitializeResult: Codable, Sendable {
 }
 
 public struct ClientCapabilities: Codable, Sendable {
+    /// Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+    /// Hosts project records to URIs when absent and retain this choice on reconnect.
+    public var workingDirectoryInfo: [String: AnyCodable]?
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -400,8 +422,10 @@ public struct ClientCapabilities: Codable, Sendable {
     public var mcpApps: [String: AnyCodable]?
 
     public init(
+        workingDirectoryInfo: [String: AnyCodable]? = nil,
         mcpApps: [String: AnyCodable]? = nil
     ) {
+        self.workingDirectoryInfo = workingDirectoryInfo
         self.mcpApps = mcpApps
     }
 }
@@ -774,9 +798,9 @@ public struct CreateChatParams: Codable, Sendable {
     /// also snapshots and preserves that exact selected text in the created chat's
     /// origin; any `responsePartId` there is provenance only, not a live range.
     public var source: ChatSource?
-    /// Initial working-directory subset for this chat. Every entry MUST be
-    /// present in the owning session's `workingDirectories`; the server MUST
-    /// reject any entry that is not. When absent, the chat inherits the full
+    /// Initial working-directory URI subset for this chat. Every URI MUST match
+    /// a URI string or record's `uri` in the owning session's `workingDirectories`;
+    /// the server MUST reject any entry that does not. When absent, the chat inherits the full
     /// session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
     /// the source chat's `workingDirectories`; this field is ignored for forks.
     ///
@@ -1621,7 +1645,7 @@ public struct ResolveSessionConfigParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
-    /// Repository context only; no checkout is prepared.
+    /// Repositories used as configuration context.
     public var repositories: [RepositorySource]?
     /// Current user-filled configuration values
     public var config: [String: AnyCodable]?
@@ -1779,7 +1803,7 @@ public struct SessionConfigCompletionsParams: Codable, Sendable {
     public var provider: String?
     /// Working directory for the session
     public var workingDirectory: String?
-    /// Repository context only; no checkout is prepared.
+    /// Repositories used as configuration context.
     public var repositories: [RepositorySource]?
     /// Current user-filled configuration values (provides context for the query)
     public var config: [String: AnyCodable]?

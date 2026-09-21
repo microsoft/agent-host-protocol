@@ -940,17 +940,18 @@ type SessionActiveClientRemovedAction struct {
 	ClientId string `json:"clientId"`
 }
 
-// A working directory was added to the session's
+// A working directory was added or updated in the session's
 // {@link SessionState.workingDirectories} set.
 //
-// Membership semantics keyed by the directory URI: the reducer appends
-// `directory` when the set does not already contain it (creating the set if
-// absent) and is a no-op when it is already present. Only valid when the agent
-// advertises {@link AgentCapabilities.multipleWorkingDirectories}.
+// Upsert keyed by URI. A rich record replaces the existing entry in place;
+// a URI-only duplicate preserves known metadata. Only valid when the agent
+// advertises {@link AgentCapabilities.multipleWorkingDirectories}. Clients
+// MUST omit `repo` and use only local or absent `origin`; the host validates
+// and enriches the entry before accepting it.
 type SessionWorkingDirectorySetAction struct {
 	Type ActionType `json:"type"`
 	// The working directory to grant the session's agent tool access to.
-	Directory URI `json:"directory"`
+	Directory WorkingDirectoryEntry `json:"directory"`
 }
 
 // A working directory was removed from the session's
@@ -981,6 +982,8 @@ type SessionWorkingDirectoryRemovedAction struct {
 // for example, `[A, B, C]` with `B → C` becomes `[A, C]`. When it occurs
 // before the target, it retains its earlier position and the target is removed;
 // `[A, B, C]` with `C → A` becomes `[A, B]`.
+// A rich replacement supplies the complete entry; a URI-only replacement
+// preserves metadata already known for that URI.
 //
 // Only valid when the agent advertises
 // {@link AgentCapabilities.multipleWorkingDirectories}. Replacing index `0`
@@ -988,12 +991,13 @@ type SessionWorkingDirectoryRemovedAction struct {
 // {@link MultipleWorkingDirectoriesCapability.primaryReplacement}; clients
 // MUST NOT target an immutable primary. The host MUST validate and apply its
 // backend side effect before broadcasting an accepted action, or reject it.
+// Clients MUST omit `repo` and use only local or absent `origin`.
 type SessionWorkingDirectoryReplacedAction struct {
 	Type ActionType `json:"type"`
 	// URI of the existing entry to replace.
 	Directory URI `json:"directory"`
-	// URI to place in the replaced entry's position.
-	Replacement URI `json:"replacement"`
+	// Complete entry to place in the replaced entry's position.
+	Replacement WorkingDirectoryEntry `json:"replacement"`
 }
 
 // A working directory was added to this chat's
@@ -1002,8 +1006,9 @@ type SessionWorkingDirectoryReplacedAction struct {
 // Membership semantics keyed by the directory URI: the reducer appends
 // `directory` when the chat's subset does not already contain it (creating the
 // subset if absent) and is a no-op when it is already present. `directory` MUST
-// be one of the owning session's {@link SessionState.workingDirectories}; a host
-// MUST reject a directory that is not. Only valid when the agent advertises
+// match a URI string or record's `uri` in the owning session's
+// {@link SessionState.workingDirectories}; a host MUST reject a directory that
+// does not. Only valid when the agent advertises
 // {@link AgentCapabilities.multipleWorkingDirectories}.
 type ChatWorkingDirectorySetAction struct {
 	Type ActionType `json:"type"`

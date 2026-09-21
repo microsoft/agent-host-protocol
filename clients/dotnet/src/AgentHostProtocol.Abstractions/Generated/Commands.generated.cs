@@ -96,6 +96,21 @@ public enum ResourceWriteMode
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// <summary>Requested repository source, not a resolved working directory.</summary>
+public sealed record RepositorySource
+{
+    /// <summary>Credential-free repository source URI.</summary>
+    public required string Source { get; init; }
+
+    /// <summary>Requested branch, tag, or commit. Omit to use the host's default revision.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Revision { get; init; }
+
+    /// <summary>Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Subdirectory { get; init; }
+}
+
 /// <summary>Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.</summary>
 public sealed record InitializeParams
@@ -260,6 +275,11 @@ public sealed record Implementation
 /// are reserved for future per-capability options.</summary>
 public sealed record ClientCapabilities
 {
+    /// <summary>Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+    /// Hosts project records to URIs when absent and retain this choice on reconnect.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? WorkingDirectoryInfo { get; init; }
+
     /// <summary>Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -637,9 +657,9 @@ public sealed record CreateChatParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatSource? Source { get; init; }
 
-    /// <summary>Initial working-directory subset for this chat. Every entry MUST be
-    /// present in the owning session's `workingDirectories`; the server MUST
-    /// reject any entry that is not. When absent, the chat inherits the full
+    /// <summary>Initial working-directory URI subset for this chat. Every URI MUST match
+    /// a URI string or record's `uri` in the owning session's `workingDirectories`;
+    /// the server MUST reject any entry that does not. When absent, the chat inherits the full
     /// session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
     /// the source chat's `workingDirectories`; this field is ignored for forks.
     ///
@@ -1385,7 +1405,7 @@ public sealed record ResolveSessionConfigParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
 
-    /// <summary>Repository context only; no checkout is prepared.</summary>
+    /// <summary>Repositories used as configuration context.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 
@@ -1427,7 +1447,7 @@ public sealed record SessionConfigCompletionsParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkingDirectory { get; init; }
 
-    /// <summary>Repository context only; no checkout is prepared.</summary>
+    /// <summary>Repositories used as configuration context.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<RepositorySource>? Repositories { get; init; }
 

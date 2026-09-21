@@ -68,7 +68,7 @@ use ahp_types::state::{
     ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
     ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
-    ToolCallStreamingState, ToolInput, Turn, TurnState,
+    ToolCallStreamingState, ToolInput, Turn, TurnState, WorkingDirectoryEntry,
 };
 use jiff::{SignedDuration, Timestamp};
 
@@ -819,17 +819,21 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
         }
         StateAction::SessionWorkingDirectorySet(a) => {
             let list = state.working_directories.get_or_insert_with(Vec::new);
-            if list.contains(&a.directory) {
-                return ReduceOutcome::NoOp;
+            if let Some(idx) = list.iter().position(|d| d.uri() == a.directory.uri()) {
+                if matches!(a.directory, WorkingDirectoryEntry::Uri(_)) {
+                    return ReduceOutcome::NoOp;
+                }
+                list[idx] = a.directory.clone();
+            } else {
+                list.push(a.directory.clone());
             }
-            list.push(a.directory.clone());
             ReduceOutcome::Applied
         }
         StateAction::SessionWorkingDirectoryRemoved(a) => {
             let Some(list) = state.working_directories.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
-            let Some(idx) = list.iter().position(|d| *d == a.directory) else {
+            let Some(idx) = list.iter().position(|d| d.uri() == &a.directory) else {
                 return ReduceOutcome::NoOp;
             };
             list.remove(idx);
@@ -839,25 +843,26 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             let Some(list) = state.working_directories.as_mut() else {
                 return ReduceOutcome::NoOp;
             };
-            let Some(idx) = list.iter().position(|directory| directory == &a.directory) else {
+            let Some(idx) = list
+                .iter()
+                .position(|directory| directory.uri() == &a.directory)
+            else {
                 return ReduceOutcome::NoOp;
             };
-            if list[..idx]
-                .iter()
-                .any(|directory| directory == &a.replacement)
-            {
+            let replacement_idx = list.iter().position(|d| d.uri() == a.replacement.uri());
+            let replacement = match (&a.replacement, replacement_idx) {
+                (WorkingDirectoryEntry::Uri(_), Some(i)) => list[i].clone(),
+                _ => a.replacement.clone(),
+            };
+            if let Some(i) = replacement_idx.filter(|&i| i < idx) {
+                list[i] = replacement;
                 list.remove(idx);
-                return ReduceOutcome::Applied;
-            }
-            let mut updated = Vec::with_capacity(list.len());
-            for (i, directory) in list.iter().enumerate() {
-                if i == idx {
-                    updated.push(a.replacement.clone());
-                } else if directory != &a.replacement {
-                    updated.push(directory.clone());
+            } else {
+                list[idx] = replacement;
+                if let Some(i) = replacement_idx.filter(|&i| i > idx) {
+                    list.remove(i);
                 }
             }
-            *list = updated;
             ReduceOutcome::Applied
         }
         StateAction::SessionInputNeededSet(a) => {
@@ -2182,7 +2187,6 @@ mod tests {
             origin: None,
             project: None,
             working_directories: None,
-            repositories: None,
             annotations: None,
             lifecycle: SessionLifecycle::Creating,
             creation_error: None,

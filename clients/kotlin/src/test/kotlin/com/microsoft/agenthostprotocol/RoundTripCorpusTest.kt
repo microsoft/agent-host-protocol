@@ -35,6 +35,11 @@ import com.microsoft.agenthostprotocol.generated.Customization
 import com.microsoft.agenthostprotocol.generated.CreateSessionParams
 import com.microsoft.agenthostprotocol.generated.Implementation
 import com.microsoft.agenthostprotocol.generated.InitializeResult
+import com.microsoft.agenthostprotocol.generated.InitializeParams
+import com.microsoft.agenthostprotocol.generated.SubscribeResult
+import com.microsoft.agenthostprotocol.generated.ReconnectResult
+import com.microsoft.agenthostprotocol.generated.ListSessionsResult
+import com.microsoft.agenthostprotocol.generated.SessionSummaryChangedParams
 import com.microsoft.agenthostprotocol.generated.JsonRpcErrorResponse
 import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
@@ -256,6 +261,11 @@ class RoundTripCorpusTest {
             "PartialSessionSummary" -> rt(PartialSessionSummary.serializer())
             "Implementation" -> rt(Implementation.serializer())
             "InitializeResult" -> rt(InitializeResult.serializer())
+            "InitializeParams" -> rt(InitializeParams.serializer())
+            "SubscribeResult" -> rt(SubscribeResult.serializer())
+            "ReconnectResult" -> rt(ReconnectResult.serializer())
+            "ListSessionsResult" -> rt(ListSessionsResult.serializer())
+            "SessionSummaryChangedParams" -> rt(SessionSummaryChangedParams.serializer())
             "CreateSessionParams" -> rt(CreateSessionParams.serializer())
             "ResolveSessionConfigParams" -> rt(ResolveSessionConfigParams.serializer())
             "SessionConfigCompletionsParams" -> rt(SessionConfigCompletionsParams.serializer())

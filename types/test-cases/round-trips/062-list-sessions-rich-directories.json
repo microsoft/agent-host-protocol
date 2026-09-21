@@ -1,0 +1,22 @@
+{
+  "name": "list-sessions-rich-directories",
+  "group": "A",
+  "description": "Session list summaries preserve mixed directories and their source associations.",
+  "type": "ListSessionsResult",
+  "input": { "items": [{
+    "resource": "ahp-session:/directories", "provider": "example", "title": "Directories", "status": 1,
+    "createdAt": "2026-09-21T00:00:00.000Z", "modifiedAt": "2026-09-21T00:00:00.000Z",
+    "workingDirectories": ["file:///legacy", {
+      "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+    }]
+  }] },
+  "acceptableOutputs": [{ "items": [{
+    "resource": "ahp-session:/directories", "provider": "example", "title": "Directories", "status": 1,
+    "createdAt": "2026-09-21T00:00:00.000Z", "modifiedAt": "2026-09-21T00:00:00.000Z",
+    "workingDirectories": ["file:///legacy", {
+      "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+      "origin": { "kind": "worktree", "mainWorktree": "file:///main" }
+    }]
+  }] }]
+}

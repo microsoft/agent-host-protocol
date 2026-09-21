@@ -157,6 +157,7 @@ function mapType(tsType: string): string {
   if (tsType === 'URI') return 'URI';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
   if (tsType === 'ToolInput') return 'ToolInput';
+  if (tsType === 'URI | WorkingDirectory') return 'WorkingDirectoryEntry';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -358,8 +359,8 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
     // token: optional null-able stays a single pointer (avoid `**T`).
     const alreadyPointer = goType.startsWith('*');
     const optional = hasQuestionToken || hasUnionUndefined || alreadyPointer;
-    const presenceSensitiveCollection = iface.getName() === 'AutomationDefinitionPatch'
-      && (tsName === 'triggers' || tsName === '_meta');
+    const presenceSensitiveCollection = /^Record<string,\s*never>$/.test(tsType)
+      || (iface.getName() === 'AutomationDefinitionPatch' && (tsName === 'triggers' || tsName === '_meta'));
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }
@@ -725,7 +726,7 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
-  'SessionOriginKind',
+  'SessionOriginKind', 'WorkingDirectoryOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
@@ -739,7 +740,10 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
-  { name: 'RepositorySource' },
+  { name: 'WorkingDirectory' },
+  { name: 'LocalWorkingDirectoryOrigin' },
+  { name: 'RepoWorkingDirectoryOrigin' },
+  { name: 'WorktreeWorkingDirectoryOrigin' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
   { name: 'AgentSelection' },
@@ -1121,6 +1125,19 @@ const SESSION_INPUT_REQUEST_UNION: UnionConfig = {
   unknown: true,
 };
 
+const WORKING_DIRECTORY_ORIGIN_UNION: UnionConfig = {
+  name: 'WorkingDirectoryOrigin',
+  discriminantField: 'kind',
+  doc: 'Host-reported working-directory provenance.',
+  variants: [
+    { variantName: 'Local', innerType: 'LocalWorkingDirectoryOrigin', wireValue: 'local' },
+    { variantName: 'Repo', innerType: 'RepoWorkingDirectoryOrigin', wireValue: 'repo' },
+    { variantName: 'Worktree', innerType: 'WorktreeWorkingDirectoryOrigin', wireValue: 'worktree' },
+  ],
+  unknown: true,
+  injectDiscriminantOnMarshal: true,
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1388,6 +1405,52 @@ func containsAll(m map[string]json.RawMessage, keys ...string) bool {
 }`;
 }
 
+function generateWorkingDirectoryEntry(): string {
+  return `// WorkingDirectoryEntry is a legacy URI or a complete working-directory record.
+type WorkingDirectoryEntry struct {
+\tURI       *URI
+\tDirectory *WorkingDirectory
+}
+
+func (d WorkingDirectoryEntry) GetURI() URI {
+\tif d.Directory != nil {
+\t\treturn d.Directory.Uri
+\t}
+\tif d.URI != nil {
+\t\treturn *d.URI
+\t}
+\treturn ""
+}
+
+func (d WorkingDirectoryEntry) MarshalJSON() ([]byte, error) {
+\tif d.Directory != nil {
+\t\treturn json.Marshal(d.Directory)
+\t}
+\tif d.URI != nil {
+\t\treturn json.Marshal(*d.URI)
+\t}
+\treturn nil, fmt.Errorf("WorkingDirectoryEntry requires a URI or directory")
+}
+
+func (d *WorkingDirectoryEntry) UnmarshalJSON(data []byte) error {
+\t*d = WorkingDirectoryEntry{}
+\tvar uri *URI
+\tif err := json.Unmarshal(data, &uri); err == nil && uri != nil {
+\t\td.URI = uri
+\t\treturn nil
+\t}
+\tvar directory *WorkingDirectory
+\tif err := json.Unmarshal(data, &directory); err != nil {
+\t\treturn err
+\t}
+\tif directory == nil {
+\t\treturn fmt.Errorf("WorkingDirectoryEntry requires a URI or directory")
+\t}
+\td.Directory = directory
+\treturn nil
+}`;
+}
+
 function generateToolInput(): string {
   return `// ToolInput is raw tool input represented inline or by content reference.
 type ToolInput struct {
@@ -1422,7 +1485,7 @@ func (t *ToolInput) UnmarshalJSON(data []byte) error {
 }
 
 function generateStateFile(project: Project): string {
-  const lines: string[] = [HEADER_WITH_IMPORTS];
+  const lines: string[] = [GENERATED_BANNER, '\nimport (\n\t"encoding/json"\n\t"fmt"\n)\n'];
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of STATE_ENUMS) {
@@ -1454,6 +1517,8 @@ function generateStateFile(project: Project): string {
   lines.push('');
 
   lines.push(generateToolInput());
+  lines.push('');
+  lines.push(generateWorkingDirectoryEntry());
   lines.push('');
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
@@ -1494,6 +1559,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, WORKING_DIRECTORY_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
@@ -1718,6 +1785,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
+  { name: 'RepositorySource' },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   { name: 'RepositoryPreparationCapabilities' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
@@ -1767,6 +1835,7 @@ const RECONNECT_RESULT_UNION: UnionConfig = {
     { variantName: 'Replay', innerType: 'ReconnectReplayResult', wireValue: 'replay' },
     { variantName: 'Snapshot', innerType: 'ReconnectSnapshotResult', wireValue: 'snapshot' },
   ],
+  injectDiscriminantOnMarshal: true,
 };
 
 const CHAT_SOURCE_UNION: UnionConfig = {
@@ -2325,6 +2394,7 @@ function checkExhaustiveness(project: Project): void {
     'ToolCallConfirmationState',
     'ReconnectResult',
     'SessionOrigin',
+    'WorkingDirectoryOrigin',
     'AutomationTrigger',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',

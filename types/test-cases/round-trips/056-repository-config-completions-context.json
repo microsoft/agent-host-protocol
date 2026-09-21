@@ -6,7 +6,7 @@
   "input": {
     "channel": "ahp-root://",
     "workingDirectory": "file:///work/context",
-    "repositories": [{ "source": "https://example.org/team/project.git" }],
+    "repositories": [{ "source": "https://example.org/team/project.git", "subdirectory": "packages/api" }],
     "config": { "mode": "review" },
     "property": "mode",
     "query": "re"
@@ -14,7 +14,7 @@
   "acceptableOutputs": [{
     "channel": "ahp-root://",
     "workingDirectory": "file:///work/context",
-    "repositories": [{ "source": "https://example.org/team/project.git" }],
+    "repositories": [{ "source": "https://example.org/team/project.git", "subdirectory": "packages/api" }],
     "config": { "mode": "review" },
     "property": "mode",
     "query": "re"

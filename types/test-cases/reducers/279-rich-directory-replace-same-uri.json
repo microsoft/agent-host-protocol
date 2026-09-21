@@ -1,0 +1,18 @@
+{
+  "description": "Same-URI replacement refreshes the full primary record in place",
+  "reducer": "session",
+  "initial": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": [{ "uri": "file:///a", "origin": { "kind": "local" } }, "file:///b"]
+  },
+  "actions": [{
+    "type": "session/workingDirectoryReplaced", "directory": "file:///a",
+    "replacement": { "uri": "file:///a", "repo": "https://example.org/project.git" }
+  }],
+  "expected": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": [{ "uri": "file:///a", "repo": "https://example.org/project.git" }, "file:///b"]
+  }
+}

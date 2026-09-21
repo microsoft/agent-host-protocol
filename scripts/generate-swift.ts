@@ -109,6 +109,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   if (tsType === 'URI') return 'String';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
   if (tsType === 'ToolInput') return 'ToolInput';
+  if (tsType === 'URI | WorkingDirectory') return 'WorkingDirectoryEntry';
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
 
@@ -682,7 +683,7 @@ const STATE_ENUMS = [
   'TerminalClaimKind', 'TerminalLifecycleStatus',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
-  'SessionOriginKind',
+  'SessionOriginKind', 'WorkingDirectoryOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
 ];
@@ -692,7 +693,7 @@ const STATE_STRUCTS = [
   'AgentCapabilities',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
-  'RepositorySource',
+  'WorkingDirectory', 'LocalWorkingDirectoryOrigin', 'RepoWorkingDirectoryOrigin', 'WorktreeWorkingDirectoryOrigin',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
   'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
@@ -1066,6 +1067,38 @@ public enum StringOrMarkdown: Codable, Sendable, Equatable {
 }`;
 }
 
+function generateWorkingDirectoryEntry(): string {
+  return `/// A legacy URI or a complete working-directory record.
+public enum WorkingDirectoryEntry: Codable, Sendable {
+    case uri(String)
+    case directory(WorkingDirectory)
+
+    public var uri: String {
+        switch self {
+        case .uri(let value): return value
+        case .directory(let value): return value.uri
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let uri = try? container.decode(String.self) {
+            self = .uri(uri)
+        } else {
+            self = .directory(try container.decode(WorkingDirectory.self))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .uri(let value): try container.encode(value)
+        case .directory(let value): try container.encode(value)
+        }
+    }
+}`;
+}
+
 function generateToolInput(): string {
   return `/// Raw tool input represented inline or by content reference.
 public enum ToolInput: Codable, Sendable {
@@ -1226,6 +1259,18 @@ public enum ChatOrigin: Codable, Sendable {
 }`;
 }
 
+const WORKING_DIRECTORY_ORIGIN_UNION: UnionConfig = {
+  name: 'WorkingDirectoryOrigin',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'local', structName: 'LocalWorkingDirectoryOrigin', discriminantValue: 'local' },
+    { caseName: 'repo', structName: 'RepoWorkingDirectoryOrigin', discriminantValue: 'repo' },
+    { caseName: 'worktree', structName: 'WorktreeWorkingDirectoryOrigin', discriminantValue: 'worktree' },
+  ],
+  unknown: true,
+  injectDiscriminantOnEncode: true,
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1305,6 +1350,8 @@ function generateStateFile(project: Project): string {
   lines.push('// MARK: - Tool Input\n');
   lines.push(generateToolInput());
   lines.push('');
+  lines.push(generateWorkingDirectoryEntry());
+  lines.push('');
 
   lines.push('// MARK: - Discriminated Unions\n');
   lines.push(generateChatOriginSwift());
@@ -1344,6 +1391,8 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, SESSION_INPUT_REQUEST_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, SESSION_ORIGIN_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, WORKING_DIRECTORY_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_TRIGGER_UNION));
   lines.push('');
@@ -1630,6 +1679,7 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
+  'RepositorySource',
   'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
   'RepositoryPreparationCapabilities',
   'AutomationCreateCapability',
@@ -2384,6 +2434,7 @@ function checkExhaustiveness(project: Project): void {
     'JsonRpcErrorCode',             // type-level alias over JsonRpcErrorCodes const enum
     'ReconnectResult',              // RECONNECT_RESULT_UNION discriminated union
     'SessionOrigin',                // SESSION_ORIGIN_UNION discriminated union
+    'WorkingDirectoryOrigin',
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union

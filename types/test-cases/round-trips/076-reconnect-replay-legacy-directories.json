@@ -1,0 +1,24 @@
+{
+  "name": "reconnect-replay-legacy-directories",
+  "group": "A",
+  "description": "Legacy replay set and replace actions remain URI-only.",
+  "type": "ReconnectResult",
+  "input": {
+    "type": "replay", "missing": [],
+    "actions": [
+      { "channel": "ahp-session:/directories", "serverSeq": 5,
+        "action": { "type": "session/workingDirectorySet", "directory": "file:///legacy" } },
+      { "channel": "ahp-session:/directories", "serverSeq": 6,
+        "action": { "type": "session/workingDirectoryReplaced", "directory": "file:///legacy", "replacement": "file:///tree/packages/api" } }
+    ]
+  },
+  "acceptableOutputs": [{
+    "type": "replay", "missing": [],
+    "actions": [
+      { "channel": "ahp-session:/directories", "serverSeq": 5,
+        "action": { "type": "session/workingDirectorySet", "directory": "file:///legacy" } },
+      { "channel": "ahp-session:/directories", "serverSeq": 6,
+        "action": { "type": "session/workingDirectoryReplaced", "directory": "file:///legacy", "replacement": "file:///tree/packages/api" } }
+    ]
+  }]
+}

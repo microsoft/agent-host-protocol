@@ -1,0 +1,14 @@
+{
+  "name": "initialize-working-directory-info",
+  "group": "A",
+  "description": "A client opts into rich directories without changing other capability flags.",
+  "type": "InitializeParams",
+  "input": {
+    "channel": "ahp-root://", "clientId": "rich-client", "protocolVersions": ["0.9.0"],
+    "capabilities": { "workingDirectoryInfo": {}, "mcpApps": {} }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://", "clientId": "rich-client", "protocolVersions": ["0.9.0"],
+    "capabilities": { "workingDirectoryInfo": {}, "mcpApps": {} }
+  }]
+}

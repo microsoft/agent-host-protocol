@@ -1,7 +1,7 @@
 {
   "name": "repository-session-summary",
   "group": "A",
-  "description": "Session summaries retain ordered repository intent, repeated sources, and omitted revisions.",
+  "description": "Session summaries carry URI-only and rich directories with local, absent, and repository provenance.",
   "type": "SessionSummary",
   "input": {
     "resource": "ahp-session:/repository-session",
@@ -10,12 +10,12 @@
     "status": 1,
     "createdAt": "2026-09-20T12:00:00.000Z",
     "modifiedAt": "2026-09-20T12:00:00.000Z",
-    "repositories": [
-      { "source": "https://example.org/team/project.git" },
-      { "source": "https://example.org/team/project.git", "revision": "main" },
-      { "source": "https://example.org/team/project.git", "revision": "feature" }
-    ],
-    "workingDirectories": ["file:///work/project", "file:///work/project-worktree"]
+    "workingDirectories": [
+      "file:///work/legacy",
+      { "uri": "file:///work/local", "origin": { "kind": "local" } },
+      { "uri": "file:///work/unspecified" },
+      { "uri": "file:///work/project", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } }
+    ]
   },
   "acceptableOutputs": [{
     "resource": "ahp-session:/repository-session",
@@ -24,11 +24,11 @@
     "status": 1,
     "createdAt": "2026-09-20T12:00:00.000Z",
     "modifiedAt": "2026-09-20T12:00:00.000Z",
-    "repositories": [
-      { "source": "https://example.org/team/project.git" },
-      { "source": "https://example.org/team/project.git", "revision": "main" },
-      { "source": "https://example.org/team/project.git", "revision": "feature" }
-    ],
-    "workingDirectories": ["file:///work/project", "file:///work/project-worktree"]
+    "workingDirectories": [
+      "file:///work/legacy",
+      { "uri": "file:///work/local", "origin": { "kind": "local" } },
+      { "uri": "file:///work/unspecified" },
+      { "uri": "file:///work/project", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } }
+    ]
   }]
 }

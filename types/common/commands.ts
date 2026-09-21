@@ -206,6 +206,11 @@ export interface InitializeParams extends BaseParams {
  */
 export interface ClientCapabilities {
   /**
+   * Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+   * Hosts project records to URIs when absent and retain this choice on reconnect.
+   */
+  workingDirectoryInfo?: Record<string, never>;
+  /**
    * Client can render
    * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
    * it can host the View sandbox, run the `ui/*` protocol against it,
