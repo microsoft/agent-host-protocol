@@ -1444,6 +1444,7 @@ const ACTION_VARIANTS: {
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
   { type: 'chat/reasoning', variantName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },

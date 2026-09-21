@@ -44,6 +44,7 @@ const (
 	ActionTypeChatError                          ActionType = "chat/error"
 	ActionTypeChatTurnResume                     ActionType = "chat/turnResume"
 	ActionTypeChatActivityChanged                ActionType = "chat/activityChanged"
+	ActionTypeChatChangesetsChanged              ActionType = "chat/changesetsChanged"
 	ActionTypeChatWorkingDirectorySet            ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved        ActionType = "chat/workingDirectoryRemoved"
 	ActionTypeSessionTitleChanged                ActionType = "session/titleChanged"
@@ -639,6 +640,21 @@ type ChatActivityChangedAction struct {
 	Type ActionType `json:"type"`
 	// Human-readable description of current activity; omit or set `undefined` to clear
 	Activity *string `json:"activity,omitempty"`
+}
+
+// The {@link Changeset | catalogue of changesets} the agent host advertises
+// for this chat changed. Replaces
+// {@link ChatState.changesets | `state.changesets`} entirely
+// (full-replacement semantics) — set to `undefined` to clear the catalogue.
+//
+// Entries SHOULD describe Branch, Uncommitted Changes, or other views scoped
+// to the chat's effective {@link ChatState.workingDirectories | working
+// directories}. Clients subscribe to each advertised changeset URI for
+// file-level updates through the existing `changeset/*` action stream.
+type ChatChangesetsChangedAction struct {
+	Type ActionType `json:"type"`
+	// New catalogue, or `undefined` to clear it.
+	Changesets []Changeset `json:"changesets,omitempty"`
 }
 
 // Session title updated. Fired by the server when the title is auto-generated
@@ -1688,6 +1704,7 @@ func (*ChatTurnCancelledAction) isStateAction()                  {}
 func (*ChatErrorAction) isStateAction()                          {}
 func (*ChatTurnResumeAction) isStateAction()                     {}
 func (*ChatActivityChangedAction) isStateAction()                {}
+func (*ChatChangesetsChangedAction) isStateAction()              {}
 func (*SessionTitleChangedAction) isStateAction()                {}
 func (*ChatUsageAction) isStateAction()                          {}
 func (*ChatReasoningAction) isStateAction()                      {}
@@ -1925,6 +1942,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/activityChanged":
 		var value ChatActivityChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/changesetsChanged":
+		var value ChatChangesetsChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

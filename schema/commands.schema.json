@@ -4078,6 +4078,13 @@
           },
           "description": "The subset of the session's\n{@link SessionState.workingDirectories | `workingDirectories`} that this\nchat's agent has tool access to. Every entry MUST be present in the owning\nsession's `workingDirectories`; servers MUST reject a\n`chat/workingDirectorySet` action that violates this constraint.\n\nWhen absent, the chat inherits the full session set. When present but empty\n(not recommended), the chat has no working-directory tool access at all.\n\nDispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to\nupdate the subset on a running chat."
         },
+        "changesets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Changeset"
+          },
+          "description": "Catalogue of changesets the server can produce for this chat. Each entry\nadvertises a subscribable view of file changes scoped to the chat's\neffective working directories and the URI template the client expands\nbefore subscribing. See {@link Changeset} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model.\n\nThis catalogue is intentionally absent from {@link ChatSummary}; clients\nobtain it by subscribing to the chat channel."
+        },
         "turns": {
           "type": "array",
           "items": {
@@ -8593,6 +8600,25 @@
         "type"
       ]
     },
+    "ChatChangesetsChangedAction": {
+      "type": "object",
+      "description": "The {@link Changeset | catalogue of changesets} the agent host advertises\nfor this chat changed. Replaces\n{@link ChatState.changesets | `state.changesets`} entirely\n(full-replacement semantics) — set to `undefined` to clear the catalogue.\n\nEntries SHOULD describe Branch, Uncommitted Changes, or other views scoped\nto the chat's effective {@link ChatState.workingDirectories | working\ndirectories}. Clients subscribe to each advertised changeset URI for\nfile-level updates through the existing `changeset/*` action stream.",
+      "properties": {
+        "type": {
+          "const": "chat/changesetsChanged"
+        },
+        "changesets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Changeset"
+          },
+          "description": "New catalogue, or `undefined` to clear it."
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
     "ChatWorkingDirectorySetAction": {
       "type": "object",
       "description": "A working directory was added to this chat's\n{@link ChatState.workingDirectories} subset.\n\nMembership semantics keyed by the directory URI: the reducer appends\n`directory` when the chat's subset does not already contain it (creating the\nsubset if absent) and is a no-op when it is already present. `directory` MUST\nbe one of the owning session's {@link SessionState.workingDirectories}; a host\nMUST reject a directory that is not. Only valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}.",
@@ -9728,6 +9754,9 @@
         },
         {
           "$ref": "#/$defs/ChatActivityChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatChangesetsChangedAction"
         },
         {
           "$ref": "#/$defs/ChatWorkingDirectorySetAction"

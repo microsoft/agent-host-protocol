@@ -94,6 +94,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(ChangesetStatusChangedAction))]
 [JsonSerializable(typeof(ChangesSummary))]
 [JsonSerializable(typeof(ChatActivityChangedAction))]
+[JsonSerializable(typeof(ChatChangesetsChangedAction))]
 [JsonSerializable(typeof(ChatDeltaAction))]
 [JsonSerializable(typeof(ChatDraftChangedAction))]
 [JsonSerializable(typeof(ChatErrorAction))]

@@ -1387,6 +1387,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/error', caseName: 'chatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', caseName: 'chatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', caseName: 'chatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/changesetsChanged', caseName: 'chatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', caseName: 'sessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', caseName: 'chatUsage', tsInterface: 'ChatUsageAction' },
   { type: 'chat/reasoning', caseName: 'chatReasoning', tsInterface: 'ChatReasoningAction' },

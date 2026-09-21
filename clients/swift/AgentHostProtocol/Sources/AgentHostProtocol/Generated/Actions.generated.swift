@@ -31,6 +31,7 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatError
     case chatTurnResume
     case chatActivityChanged
+    case chatChangesetsChanged
     case chatWorkingDirectorySet
     case chatWorkingDirectoryRemoved
     case sessionTitleChanged
@@ -134,6 +135,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/error": self = .chatError
         case "chat/turnResume": self = .chatTurnResume
         case "chat/activityChanged": self = .chatActivityChanged
+        case "chat/changesetsChanged": self = .chatChangesetsChanged
         case "chat/workingDirectorySet": self = .chatWorkingDirectorySet
         case "chat/workingDirectoryRemoved": self = .chatWorkingDirectoryRemoved
         case "session/titleChanged": self = .sessionTitleChanged
@@ -237,6 +239,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatError: try container.encode("chat/error")
         case .chatTurnResume: try container.encode("chat/turnResume")
         case .chatActivityChanged: try container.encode("chat/activityChanged")
+        case .chatChangesetsChanged: try container.encode("chat/changesetsChanged")
         case .chatWorkingDirectorySet: try container.encode("chat/workingDirectorySet")
         case .chatWorkingDirectoryRemoved: try container.encode("chat/workingDirectoryRemoved")
         case .sessionTitleChanged: try container.encode("session/titleChanged")
@@ -1173,6 +1176,20 @@ public struct ChatActivityChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.activity = activity
+    }
+}
+
+public struct ChatChangesetsChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New catalogue, or `undefined` to clear it.
+    public var changesets: [Changeset]?
+
+    public init(
+        type: ActionType,
+        changesets: [Changeset]? = nil
+    ) {
+        self.type = type
+        self.changesets = changesets
     }
 }
 
@@ -2419,6 +2436,7 @@ public enum StateAction: Codable, Sendable {
     case chatError(ChatErrorAction)
     case chatTurnResume(ChatTurnResumeAction)
     case chatActivityChanged(ChatActivityChangedAction)
+    case chatChangesetsChanged(ChatChangesetsChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
     case chatUsage(ChatUsageAction)
     case chatReasoning(ChatReasoningAction)
@@ -2552,6 +2570,8 @@ public enum StateAction: Codable, Sendable {
             self = .chatTurnResume(try ChatTurnResumeAction(from: decoder))
         case "chat/activityChanged":
             self = .chatActivityChanged(try ChatActivityChangedAction(from: decoder))
+        case "chat/changesetsChanged":
+            self = .chatChangesetsChanged(try ChatChangesetsChangedAction(from: decoder))
         case "session/titleChanged":
             self = .sessionTitleChanged(try SessionTitleChangedAction(from: decoder))
         case "chat/usage":
@@ -2726,6 +2746,7 @@ public enum StateAction: Codable, Sendable {
         case .chatError(let v): try v.encode(to: encoder)
         case .chatTurnResume(let v): try v.encode(to: encoder)
         case .chatActivityChanged(let v): try v.encode(to: encoder)
+        case .chatChangesetsChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)
         case .chatUsage(let v): try v.encode(to: encoder)
         case .chatReasoning(let v): try v.encode(to: encoder)

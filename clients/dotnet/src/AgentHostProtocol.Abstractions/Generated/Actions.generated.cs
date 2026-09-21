@@ -63,6 +63,8 @@ public enum ActionType
     ChatTurnResume,
     [WireValue("chat/activityChanged")]
     ChatActivityChanged,
+    [WireValue("chat/changesetsChanged")]
+    ChatChangesetsChanged,
     [WireValue("chat/workingDirectorySet")]
     ChatWorkingDirectorySet,
     [WireValue("chat/workingDirectoryRemoved")]
@@ -1673,6 +1675,24 @@ public sealed record ChatActivityChangedAction
     public string? Activity { get; init; }
 }
 
+/// <summary>The {@link Changeset | catalogue of changesets} the agent host advertises
+/// for this chat changed. Replaces
+/// {@link ChatState.changesets | `state.changesets`} entirely
+/// (full-replacement semantics) — set to `undefined` to clear the catalogue.
+///
+/// Entries SHOULD describe Branch, Uncommitted Changes, or other views scoped
+/// to the chat's effective {@link ChatState.workingDirectories | working
+/// directories}. Clients subscribe to each advertised changeset URI for
+/// file-level updates through the existing `changeset/*` action stream.</summary>
+public sealed record ChatChangesetsChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>New catalogue, or `undefined` to clear it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Changeset>? Changesets { get; init; }
+}
+
 /// <summary>A working directory was added to this chat's
 /// {@link ChatState.workingDirectories} subset.
 ///
@@ -2618,6 +2638,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/error"] = typeof(ChatErrorAction),
         ["chat/turnResume"] = typeof(ChatTurnResumeAction),
         ["chat/activityChanged"] = typeof(ChatActivityChangedAction),
+        ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),
         ["chat/usage"] = typeof(ChatUsageAction),

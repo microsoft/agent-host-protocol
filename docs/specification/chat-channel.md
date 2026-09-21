@@ -2,7 +2,7 @@
 
 <StabilityIndex level="2" />
 
-A chat channel carries the full state of a single conversation thread: turns, streaming responses, tool calls, pending messages, and input requests. A chat always belongs to a [session](./session-channel); a session may contain one or many chats. Chats are independently subscribable so a client can observe a subset of activity without paying the bandwidth cost of every chat in the session.
+A chat channel carries the full state of a single conversation thread: turns, streaming responses, tool calls, pending messages, input requests, and an optional per-chat changeset catalogue. A chat always belongs to a [session](./session-channel); a session may contain one or many chats. Chats are independently subscribable so a client can observe a subset of activity without paying the bandwidth cost of every chat in the session.
 
 ## URI
 
@@ -16,7 +16,7 @@ Multiple chat channels may be active simultaneously. Clients subscribe to each c
 
 ## State
 
-Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)). Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
+Subscribers receive a [`ChatState`](/reference/chat#chatstate) snapshot. `ChatState` denormalizes the [`ChatSummary`](/reference/chat#chatsummary) fields directly onto itself (`resource`, `title`, `status`, `activity`, `modifiedAt`, `origin`, `workingDirectories`) and adds the conversation contents (history of completed turns, the active turn if any, pending messages, outstanding input requests, and the user's in-progress [`draft`](#drafts)) plus the optional [`changesets`](#per-chat-changesets) catalogue. Producers MUST keep the chat's `ChatSummary` in the session catalog consistent with these inlined summary fields — typically by dispatching a matching [`session/chatUpdated`](/reference/session#actions) whenever any summary field on the chat changes. Refer to the [State Model guide](/guide/state-model) for a structural overview.
 
 When a client subscribes with `view.turns`, the server MAY expose only a tail of
 the most recent completed turns in the initial snapshot. The requested number is
@@ -42,6 +42,22 @@ Clients MAY periodically sync their local input state into the draft by dispatch
 ### Per-chat working directory
 
 `ChatState.workingDirectories` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is **optional**. When absent, the chat inherits the session's full [`workingDirectories`](/reference/session#sessionsummary) set; when present it MUST be a subset of that set. Hosts MAY set a per-chat subset to give individual chats their own filesystem context — for example, allocating a separate git worktree per chat so multiple chats in the same session can make independent edits that the orchestrating chat later merges back.
+
+### Per-chat changesets
+
+[`ChatState.changesets`](/reference/chat#chatstate) is an optional catalogue of
+the existing [`Changeset`](/reference/changeset#changeset) model. Hosts SHOULD
+use it to advertise Branch, Uncommitted Changes, and other views scoped to the
+chat's effective working directories. `ChatSummary` intentionally omits this
+catalogue so session chat navigation remains lightweight; a client obtains it
+from the subscribed chat state.
+
+Each catalogue entry resolves to an independently subscribable
+[`ChangesetState`](/reference/changeset#changesetstate). File-level updates
+continue to use the existing `changeset/*` action contract. When the catalogue
+itself changes, the server dispatches
+[`chat/changesetsChanged`](/reference/chat#chatchangesetschangedaction), which
+fully replaces the catalogue or clears it when `changesets` is absent.
 
 ## Relationship to the session channel
 

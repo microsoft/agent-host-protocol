@@ -958,6 +958,9 @@ public static class Reducers
             case ChatActivityChangedAction a:
                 state.Activity = a.Activity;
                 return ReduceOutcome.Applied;
+            case ChatChangesetsChangedAction a:
+                state.Changesets = CopyList(a.Changesets);
+                return ReduceOutcome.Applied;
             case ChatWorkingDirectorySetAction a:
                 {
                     // Membership keyed by the directory URI, over this chat's subset of

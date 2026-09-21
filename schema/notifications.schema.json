@@ -2685,6 +2685,13 @@
           },
           "description": "The subset of the session's\n{@link SessionState.workingDirectories | `workingDirectories`} that this\nchat's agent has tool access to. Every entry MUST be present in the owning\nsession's `workingDirectories`; servers MUST reject a\n`chat/workingDirectorySet` action that violates this constraint.\n\nWhen absent, the chat inherits the full session set. When present but empty\n(not recommended), the chat has no working-directory tool access at all.\n\nDispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to\nupdate the subset on a running chat."
         },
+        "changesets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Changeset"
+          },
+          "description": "Catalogue of changesets the server can produce for this chat. Each entry\nadvertises a subscribable view of file changes scoped to the chat's\neffective working directories and the URI template the client expands\nbefore subscribing. See {@link Changeset} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model.\n\nThis catalogue is intentionally absent from {@link ChatSummary}; clients\nobtain it by subscribing to the chat channel."
+        },
         "turns": {
           "type": "array",
           "items": {

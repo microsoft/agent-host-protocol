@@ -1198,6 +1198,17 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; set; }
 
+    /// <summary>Catalogue of changesets the server can produce for this chat. Each entry
+    /// advertises a subscribable view of file changes scoped to the chat's
+    /// effective working directories and the URI template the client expands
+    /// before subscribing. See {@link Changeset} for the full shape and
+    /// {@link /guide/changesets | Changesets} for an overview of the model.
+    ///
+    /// This catalogue is intentionally absent from {@link ChatSummary}; clients
+    /// obtain it by subscribing to the chat channel.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Changeset>? Changesets { get; set; }
+
     /// <summary>Completed turns</summary>
     public required List<Turn> Turns { get; set; }
 

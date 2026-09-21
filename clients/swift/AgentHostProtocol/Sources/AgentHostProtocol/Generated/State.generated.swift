@@ -1639,6 +1639,15 @@ public struct ChatState: Codable, Sendable {
     /// Dispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to
     /// update the subset on a running chat.
     public var workingDirectories: [String]?
+    /// Catalogue of changesets the server can produce for this chat. Each entry
+    /// advertises a subscribable view of file changes scoped to the chat's
+    /// effective working directories and the URI template the client expands
+    /// before subscribing. See {@link Changeset} for the full shape and
+    /// {@link /guide/changesets | Changesets} for an overview of the model.
+    ///
+    /// This catalogue is intentionally absent from {@link ChatSummary}; clients
+    /// obtain it by subscribing to the chat channel.
+    public var changesets: [Changeset]?
     /// Completed turns
     public var turns: [Turn]
     /// Cursor for loading older completed turns into this chat state.
@@ -1678,6 +1687,7 @@ public struct ChatState: Codable, Sendable {
         case origin
         case interactivity
         case workingDirectories
+        case changesets
         case turns
         case turnsNextCursor
         case activeTurn
@@ -1696,6 +1706,7 @@ public struct ChatState: Codable, Sendable {
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil,
+        changesets: [Changeset]? = nil,
         turns: [Turn],
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
@@ -1712,6 +1723,7 @@ public struct ChatState: Codable, Sendable {
         self.origin = origin
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories
+        self.changesets = changesets
         self.turns = turns
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn

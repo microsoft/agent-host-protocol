@@ -1482,6 +1482,7 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'chat/workingDirectorySet', variantName: 'ChatWorkingDirectorySet', tsInterface: 'ChatWorkingDirectorySetAction' },
   { type: 'chat/workingDirectoryRemoved', variantName: 'ChatWorkingDirectoryRemoved', tsInterface: 'ChatWorkingDirectoryRemovedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },

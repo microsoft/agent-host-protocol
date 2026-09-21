@@ -151,6 +151,7 @@ ChatState {
   modifiedAt: string
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
   workingDirectories?: URI[]      // subset of session's workingDirectories
+  changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
 
   turns: Turn[]                       // completed turns
   turnsNextCursor?: string            // page older turns via fetchTurns
@@ -160,6 +161,13 @@ ChatState {
   draft?: Message                     // user's in-progress input
 }
 ```
+
+`changesets` is state-only and deliberately omitted from the lightweight
+`ChatSummary`. Active clients discover it by subscribing to the chat, then
+subscribe to each advertised `Changeset.uriTemplate` through the existing
+changeset channel contract. Hosts scope a chat's catalogue to its effective
+working directories: the chat's subset when present, otherwise the full
+session set.
 
 Fork and side-chat creation both reference source turns by stable identifiers.
 Both source forms are fully discriminated — `{ kind: 'fork', chat, turnId }`

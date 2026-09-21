@@ -449,6 +449,13 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
     case ActionType.ChatActivityChanged:
       return { ...state, activity: action.activity };
 
+    case ActionType.ChatChangesetsChanged: {
+      const { changesets: _omit, ...stateWithoutChangesets } = state;
+      return action.changesets
+        ? { ...stateWithoutChangesets, changesets: action.changesets }
+        : stateWithoutChangesets;
+    }
+
     // ── Working Directories ───────────────────────────────────────────────
 
     case ActionType.ChatWorkingDirectorySet: {
