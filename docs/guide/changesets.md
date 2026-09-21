@@ -60,8 +60,8 @@ unknown variables.
 
 | Variables in template                     | Meaning                                                                      |
 | ----------------------------------------- | ---------------------------------------------------------------------------- |
-| _(none)_                                  | A static, session-wide changeset. The template is itself a subscribable URI. |
-| `{turnId}`                                | Per-turn slice. Expand with a `Turn.id` from one of the session's chats.     |
+| _(none)_                                  | A static changeset scoped to the advertising session or chat. The template is itself a subscribable URI. |
+| `{turnId}`                                | Per-turn slice. Expand with a `Turn.id` from the advertising chat or session. |
 | `{originalTurnId}` and `{modifiedTurnId}` | Diff between two turns. Both must be present.                                |
 
 ### Multiroot Sessions

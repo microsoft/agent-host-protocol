@@ -7139,7 +7139,7 @@
     },
     "Changeset": {
       "type": "object",
-      "description": "Catalogue entry describing one changeset the server can produce for a\nsession.\n\nCatalogue entries are intentionally lightweight — just enough to render a\nchip or list row without subscribing. Full per-changeset detail\n({@link ChangesetState}) lives on the subscribable URI obtained by\nexpanding {@link uriTemplate}.",
+      "description": "Catalogue entry describing one changeset the server can produce for a\nsession or chat.\n\nCatalogue entries are intentionally lightweight — just enough to render a\nchip or list row without subscribing. Full per-changeset detail\n({@link ChangesetState}) lives on the subscribable URI obtained by\nexpanding {@link uriTemplate}.",
       "properties": {
         "label": {
           "type": "string",
@@ -7147,7 +7147,7 @@
         },
         "uriTemplate": {
           "type": "string",
-          "description": "RFC 6570 URI template. Clients parse the variables directly out of the\ntemplate using the standard `{name}` syntax — they are not redeclared\nhere.\n\nOnly the following template shapes are defined by this protocol; any\nother variable name MUST be ignored by clients (there is no\nprotocol-defined way to obtain values for unknown variables):\n\n| Variables in template                       | Meaning                                                                              |\n| ------------------------------------------- | ------------------------------------------------------------------------------------ |\n| _(none)_                                    | A static, session-wide changeset. The template is itself a subscribable URI.         |\n| `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the session.                            |\n| `{originalTurnId}` and `{modifiedTurnId}`   | Diff between two turns. Both variables MUST be present.                              |\n\nFuture protocol versions MAY add new well-known variables."
+          "description": "RFC 6570 URI template. Clients parse the variables directly out of the\ntemplate using the standard `{name}` syntax — they are not redeclared\nhere.\n\nOnly the following template shapes are defined by this protocol; any\nother variable name MUST be ignored by clients (there is no\nprotocol-defined way to obtain values for unknown variables):\n\n| Variables in template                       | Meaning                                                                              |\n| ------------------------------------------- | ------------------------------------------------------------------------------------ |\n| _(none)_                                    | A static changeset scoped to the advertising session or chat. The template is itself a subscribable URI. |\n| `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the advertising chat or session.        |\n| `{originalTurnId}` and `{modifiedTurnId}`   | Diff between two turns. Both variables MUST be present.                              |\n\nFuture protocol versions MAY add new well-known variables."
         },
         "description": {
           "type": "string",
@@ -7159,7 +7159,7 @@
         },
         "capabilities": {
           "$ref": "#/$defs/ChangesetCapabilities",
-          "description": "Optional capability declarations for this changeset. Absent (or an empty\nobject) means the changeset advertises no optional capabilities.\n\nBecause the catalogue entry is delivered up-front on\n{@link ChangesetState | the session's changeset list}, clients can decide\nwhether to surface capability-gated UI (such as review checkboxes) without\nfirst subscribing to the changeset URI. Mirrors the presence-flag\nconvention of `ClientCapabilities`."
+          "description": "Optional capability declarations for this changeset. Absent (or an empty\nobject) means the changeset advertises no optional capabilities.\n\nBecause the catalogue entry is delivered up-front on the advertising\nsession or chat's changeset list, clients can decide whether to surface\ncapability-gated UI (such as review checkboxes) without first subscribing\nto the changeset URI. Mirrors the presence-flag convention of\n`ClientCapabilities`."
         }
       },
       "required": [

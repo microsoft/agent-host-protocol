@@ -4897,7 +4897,7 @@ pub struct Snapshot {
 }
 
 /// Catalogue entry describing one changeset the server can produce for a
-/// session.
+/// session or chat.
 ///
 /// Catalogue entries are intentionally lightweight — just enough to render a
 /// chip or list row without subscribing. Full per-changeset detail
@@ -4918,8 +4918,8 @@ pub struct Changeset {
     ///
     /// | Variables in template                       | Meaning                                                                              |
     /// | ------------------------------------------- | ------------------------------------------------------------------------------------ |
-    /// | _(none)_                                    | A static, session-wide changeset. The template is itself a subscribable URI.         |
-    /// | `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the session.                            |
+    /// | _(none)_                                    | A static changeset scoped to the advertising session or chat. The template is itself a subscribable URI. |
+    /// | `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the advertising chat or session.        |
     /// | `{originalTurnId}` and `{modifiedTurnId}`   | Diff between two turns. Both variables MUST be present.                              |
     ///
     /// Future protocol versions MAY add new well-known variables.
@@ -4948,11 +4948,11 @@ pub struct Changeset {
     /// Optional capability declarations for this changeset. Absent (or an empty
     /// object) means the changeset advertises no optional capabilities.
     ///
-    /// Because the catalogue entry is delivered up-front on
-    /// {@link ChangesetState | the session's changeset list}, clients can decide
-    /// whether to surface capability-gated UI (such as review checkboxes) without
-    /// first subscribing to the changeset URI. Mirrors the presence-flag
-    /// convention of `ClientCapabilities`.
+    /// Because the catalogue entry is delivered up-front on the advertising
+    /// session or chat's changeset list, clients can decide whether to surface
+    /// capability-gated UI (such as review checkboxes) without first subscribing
+    /// to the changeset URI. Mirrors the presence-flag convention of
+    /// `ClientCapabilities`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capabilities: Option<ChangesetCapabilities>,
 }
