@@ -108,6 +108,13 @@ final class ReducersTests: XCTestCase {
         XCTAssertTrue(isClientDispatchable(action))
     }
 
+    func testChatArchiveIsClientDispatchable() {
+        let action: StateAction = .chatIsArchivedChanged(
+            ChatIsArchivedChangedAction(type: .chatIsArchivedChanged, isArchived: true)
+        )
+        XCTAssertTrue(isClientDispatchable(action))
+    }
+
     func testClientDispatchableReturnsFalse() {
         let action: StateAction = .sessionReady(SessionReadyAction(type: .sessionReady))
         XCTAssertFalse(isClientDispatchable(action))

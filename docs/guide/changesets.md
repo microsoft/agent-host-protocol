@@ -1,23 +1,32 @@
 # Changesets
 
 A **changeset** is a named, individually subscribable view of file changes
-associated with a session. Changesets generalise the v0.1.0
+associated with a session or one of its chats. Changesets generalise the v0.1.0
 `SessionSummary.diffs` field: a session can expose any number of
 changesets — uncommitted working-tree edits, the diff between two turns,
 the cumulative changes for the whole session, the staged index, etc. —
-each with its own URI, lifecycle, and update stream.
+each with its own URI, lifecycle, and update stream. A chat can additionally
+advertise its own Branch and Uncommitted Changes views, scoped to that chat's
+effective working directories.
 
 ## Concepts
 
 ### Changeset Catalogue
 
-Each session's `SessionState` advertises the set of changesets the
-server can produce. The catalogue entry is intentionally lightweight —
-just enough to render a chip or list row without subscribing — and
-references a full subscribable `ChangesetState` by URI.
+Each session's `SessionState` can advertise session-level changesets, and each
+subscribed `ChatState` can advertise changesets for that chat. The catalogue
+entry is intentionally lightweight — just enough to render a chip or list row
+without subscribing — and references a full subscribable `ChangesetState` by
+URI. `ChatSummary` does not carry this catalogue; clients that need per-chat
+changesets subscribe to that chat.
 
 ```typescript
 SessionState {
+  // ...existing fields...
+  changesets?: Changeset[]
+}
+
+ChatState {
   // ...existing fields...
   changesets?: Changeset[]
 }
@@ -51,8 +60,8 @@ unknown variables.
 
 | Variables in template                     | Meaning                                                                      |
 | ----------------------------------------- | ---------------------------------------------------------------------------- |
-| _(none)_                                  | A static, session-wide changeset. The template is itself a subscribable URI. |
-| `{turnId}`                                | Per-turn slice. Expand with a `Turn.id` from one of the session's chats.     |
+| _(none)_                                  | A static changeset scoped to the advertising session or chat. The template is itself a subscribable URI. |
+| `{turnId}`                                | Per-turn slice. Expand with a `Turn.id` from the advertising chat or session. |
 | `{originalTurnId}` and `{modifiedTurnId}` | Diff between two turns. Both must be present.                                |
 
 ### Multiroot Sessions
@@ -68,6 +77,13 @@ A host MAY *also* advertise dedicated per-directory changesets — one catalogue
 entry per working directory — for clients that prefer server-scoped views. This
 needs no extra field: the `changesets` catalogue is already a list, so a host
 lists one entry per directory alongside the spanning ones.
+
+For a chat catalogue, "session-wide" above means the chat's effective working
+directory set: `ChatState.workingDirectories` when present, otherwise the
+owning session's full `workingDirectories`. A host SHOULD scope each advertised
+chat changeset to that set. This allows chats backed by different repositories
+or worktrees to expose independent Branch and Uncommitted Changes entries while
+reusing the same changeset state and action contract.
 
 ### Changeset State
 
@@ -213,8 +229,9 @@ a JSON-RPC error.
 
 ## Lifecycle
 
-1. The server publishes the catalogue on `SessionState.changesets`.
-   Updates ride on the `session/changesetsChanged` action.
+1. The server publishes a catalogue on `SessionState.changesets` and/or
+   `ChatState.changesets`. Updates ride on `session/changesetsChanged` or
+   `chat/changesetsChanged`, respectively.
 2. The client picks catalogue entries whose template variables it can
    satisfy and subscribes to the resulting URIs.
 3. The server returns a `ChangesetState` snapshot (`status: 'computing'`
@@ -225,7 +242,8 @@ a JSON-RPC error.
 4. The user invokes a `ChangesetOperation`. The client calls
    `invokeChangesetOperation`. The server applies the operation and
    emits any resulting changeset updates.
-5. When a session ends, all of its changesets implicitly become
+5. When a chat ends, its chat-scoped changesets implicitly become
+   un-subscribable. When a session ends, all remaining changesets implicitly become
    un-subscribable. Existing subscriptions receive `changeset/cleared`
    and the server unsubscribes them.
 

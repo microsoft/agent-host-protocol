@@ -559,6 +559,13 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatChangesetsChangedAction:
+		if a.Changesets == nil {
+			state.Changesets = nil
+		} else {
+			state.Changesets = append([]ahptypes.Changeset(nil), a.Changesets...)
+		}
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatWorkingDirectorySetAction:
 		for _, d := range state.WorkingDirectories {
 			if d == a.Directory {
@@ -790,6 +797,9 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 		return ReduceOutcomeApplied
 	case *ahptypes.ChatDraftChangedAction:
 		state.Draft = a.Draft
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatIsArchivedChangedAction:
+		state.Status = withStatusFlag(state.Status, ahptypes.SessionStatusIsArchived, a.IsArchived)
 		return ReduceOutcomeApplied
 	}
 	return ReduceOutcomeOutOfScope

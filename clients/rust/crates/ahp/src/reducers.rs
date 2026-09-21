@@ -1101,6 +1101,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.activity = a.activity.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatChangesetsChanged(a) => {
+            state.changesets = a.changesets.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::ChatWorkingDirectorySet(a) => {
             let list = state.working_directories.get_or_insert_with(Vec::new);
             if list.contains(&a.directory) {
@@ -1318,6 +1322,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatDraftChanged(a) => {
             state.draft = a.draft.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatIsArchivedChanged(a) => {
+            state.status = with_status_flag(state.status, SessionStatus::IsArchived, a.is_archived);
             ReduceOutcome::Applied
         }
         _ => ReduceOutcome::OutOfScope,
@@ -2200,6 +2208,7 @@ mod tests {
             origin: None,
             interactivity: None,
             working_directories: None,
+            changesets: None,
             turns: Vec::new(),
             turns_next_cursor: None,
             active_turn: None,

@@ -1628,6 +1628,17 @@ data class ChatState(
      */
     val workingDirectories: List<String>? = null,
     /**
+     * Catalogue of changesets the server can produce for this chat. Each entry
+     * advertises a subscribable view of file changes scoped to the chat's
+     * effective working directories and the URI template the client expands
+     * before subscribing. See {@link Changeset} for the full shape and
+     * {@link /guide/changesets | Changesets} for an overview of the model.
+     *
+     * This catalogue is intentionally absent from {@link ChatSummary}; clients
+     * obtain it by subscribing to the chat channel.
+     */
+    val changesets: List<Changeset>? = null,
+    /**
      * Completed turns
      */
     val turns: List<Turn>,
@@ -4860,8 +4871,8 @@ data class Changeset(
      *
      * | Variables in template                       | Meaning                                                                              |
      * | ------------------------------------------- | ------------------------------------------------------------------------------------ |
-     * | _(none)_                                    | A static, session-wide changeset. The template is itself a subscribable URI.         |
-     * | `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the session.                            |
+     * | _(none)_                                    | A static changeset scoped to the advertising session or chat. The template is itself a subscribable URI. |
+     * | `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the advertising chat or session.        |
      * | `{originalTurnId}` and `{modifiedTurnId}`   | Diff between two turns. Both variables MUST be present.                              |
      *
      * Future protocol versions MAY add new well-known variables.
@@ -4895,11 +4906,11 @@ data class Changeset(
      * Optional capability declarations for this changeset. Absent (or an empty
      * object) means the changeset advertises no optional capabilities.
      *
-     * Because the catalogue entry is delivered up-front on
-     * {@link ChangesetState | the session's changeset list}, clients can decide
-     * whether to surface capability-gated UI (such as review checkboxes) without
-     * first subscribing to the changeset URI. Mirrors the presence-flag
-     * convention of `ClientCapabilities`.
+     * Because the catalogue entry is delivered up-front on the advertising
+     * session or chat's changeset list, clients can decide whether to surface
+     * capability-gated UI (such as review checkboxes) without first subscribing
+     * to the changeset URI. Mirrors the presence-flag convention of
+     * `ClientCapabilities`.
      */
     val capabilities: ChangesetCapabilities? = null
 )

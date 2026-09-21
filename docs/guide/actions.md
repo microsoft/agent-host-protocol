@@ -103,6 +103,7 @@ Tool calls follow a discriminated-union state machine — see [State Model — T
 | `session/activityChanged` | No | Server updated the session's current activity description |
 | `chat/activityChanged` | No | Server updated a chat's current activity description |
 | `session/changesetsChanged` | No | The catalog of changesets the host advertises for this session changed (full replacement) |
+| `chat/changesetsChanged` | No | The catalog of changesets the host advertises for this chat changed (full replacement) |
 | `session/isReadChanged` | **Yes** | Client marked session as read or unread |
 | `session/isArchivedChanged` | **Yes** | Client archived or unarchived session |
 | `session/configChanged` | **Yes** | Mutable session config values changed |

@@ -6,6 +6,7 @@
 
 import { ActionType } from '../common/actions.js';
 import type { StringOrMarkdown, FileEdit, UsageInfo, URI } from '../common/state.js';
+import type { Changeset } from '../channels-changeset/state.js';
 import type { McpAuthRequirement } from '../channels-session/state.js';
 import type {
   Message,
@@ -546,6 +547,26 @@ export interface ChatActivityChangedAction {
 }
 
 /**
+ * The {@link Changeset | catalogue of changesets} the agent host advertises
+ * for this chat changed. Replaces
+ * {@link ChatState.changesets | `state.changesets`} entirely
+ * (full-replacement semantics) — set to `undefined` to clear the catalogue.
+ *
+ * Entries SHOULD describe Branch, Uncommitted Changes, or other views scoped
+ * to the chat's effective {@link ChatState.workingDirectories | working
+ * directories}. Clients subscribe to each advertised changeset URI for
+ * file-level updates through the existing `changeset/*` action stream.
+ *
+ * @category Chat Actions
+ * @version 1
+ */
+export interface ChatChangesetsChangedAction {
+  type: ActionType.ChatChangesetsChanged;
+  /** New catalogue, or `undefined` to clear it. */
+  changesets: Changeset[] | undefined;
+}
+
+/**
  * A working directory was added to this chat's
  * {@link ChatState.workingDirectories} subset.
  *
@@ -771,6 +792,23 @@ export interface ChatDraftChangedAction {
   draft?: Message;
 }
 
+/**
+ * The archived state of the chat changed.
+ *
+ * Dispatched by a client to archive a chat independently of its owning
+ * session or to restore it. Archiving the session's default chat is equivalent
+ * to archiving the session and SHOULD use `session/isArchivedChanged` instead.
+ *
+ * @category Chat Actions
+ * @version 1
+ * @clientDispatchable
+ */
+export interface ChatIsArchivedChangedAction {
+  type: ActionType.ChatIsArchivedChanged;
+  /** Whether the chat is archived */
+  isArchived: boolean;
+}
+
 // ─── Session Input Actions ──────────────────────────────────────────────────
 
 /**
@@ -848,6 +886,7 @@ export type ChatAction =
   | ChatErrorAction
   | ChatTurnResumeAction
   | ChatActivityChangedAction
+  | ChatChangesetsChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction
@@ -858,6 +897,7 @@ export type ChatAction =
   | ChatPendingMessageRemovedAction
   | ChatQueuedMessagesReorderedAction
   | ChatDraftChangedAction
+  | ChatIsArchivedChangedAction
   | ChatInputRequestedAction
   | ChatInputAnswerChangedAction
   | ChatInputCompletedAction

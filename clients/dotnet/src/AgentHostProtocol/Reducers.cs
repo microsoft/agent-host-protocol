@@ -958,6 +958,9 @@ public static class Reducers
             case ChatActivityChangedAction a:
                 state.Activity = a.Activity;
                 return ReduceOutcome.Applied;
+            case ChatChangesetsChangedAction a:
+                state.Changesets = CopyList(a.Changesets);
+                return ReduceOutcome.Applied;
             case ChatWorkingDirectorySetAction a:
                 {
                     // Membership keyed by the directory URI, over this chat's subset of
@@ -1075,6 +1078,9 @@ public static class Reducers
                 return ApplyChatQueuedMessagesReordered(state, a);
             case ChatDraftChangedAction a:
                 state.Draft = a.Draft;
+                return ReduceOutcome.Applied;
+            case ChatIsArchivedChangedAction a:
+                state.Status = WithStatusFlag(state.Status, SessionStatus.IsArchived, a.IsArchived);
                 return ReduceOutcome.Applied;
         }
 
@@ -2453,6 +2459,7 @@ public static class Reducers
         "chat/pendingMessageRemoved",
         "chat/queuedMessagesReordered",
         "chat/draftChanged",
+        "chat/isArchivedChanged",
         "chat/inputAnswerChanged",
         "chat/inputCompleted",
         "chat/truncated",

@@ -63,6 +63,8 @@ public enum ActionType
     ChatTurnResume,
     [WireValue("chat/activityChanged")]
     ChatActivityChanged,
+    [WireValue("chat/changesetsChanged")]
+    ChatChangesetsChanged,
     [WireValue("chat/workingDirectorySet")]
     ChatWorkingDirectorySet,
     [WireValue("chat/workingDirectoryRemoved")]
@@ -97,6 +99,8 @@ public enum ActionType
     ChatQueuedMessagesReordered,
     [WireValue("chat/draftChanged")]
     ChatDraftChanged,
+    [WireValue("chat/isArchivedChanged")]
+    ChatIsArchivedChanged,
     [WireValue("chat/inputRequested")]
     ChatInputRequested,
     [WireValue("chat/inputAnswerChanged")]
@@ -1673,6 +1677,24 @@ public sealed record ChatActivityChangedAction
     public string? Activity { get; init; }
 }
 
+/// <summary>The {@link Changeset | catalogue of changesets} the agent host advertises
+/// for this chat changed. Replaces
+/// {@link ChatState.changesets | `state.changesets`} entirely
+/// (full-replacement semantics) — set to `undefined` to clear the catalogue.
+///
+/// Entries SHOULD describe Branch, Uncommitted Changes, or other views scoped
+/// to the chat's effective {@link ChatState.workingDirectories | working
+/// directories}. Clients subscribe to each advertised changeset URI for
+/// file-level updates through the existing `changeset/*` action stream.</summary>
+public sealed record ChatChangesetsChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>New catalogue, or `undefined` to clear it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<Changeset>? Changesets { get; init; }
+}
+
 /// <summary>A working directory was added to this chat's
 /// {@link ChatState.workingDirectories} subset.
 ///
@@ -1865,6 +1887,19 @@ public sealed record ChatDraftChangedAction
     /// <summary>New draft message, or `undefined` to clear it</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Message? Draft { get; init; }
+}
+
+/// <summary>The archived state of the chat changed.
+///
+/// Dispatched by a client to archive a chat independently of its owning
+/// session or to restore it. Archiving the session's default chat is equivalent
+/// to archiving the session and SHOULD use `session/isArchivedChanged` instead.</summary>
+public sealed record ChatIsArchivedChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Whether the chat is archived</summary>
+    public bool IsArchived { get; init; }
 }
 
 /// <summary>A session requested input from the user.
@@ -2618,6 +2653,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/error"] = typeof(ChatErrorAction),
         ["chat/turnResume"] = typeof(ChatTurnResumeAction),
         ["chat/activityChanged"] = typeof(ChatActivityChangedAction),
+        ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),
         ["chat/usage"] = typeof(ChatUsageAction),
@@ -2628,6 +2664,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/pendingMessageRemoved"] = typeof(ChatPendingMessageRemovedAction),
         ["chat/queuedMessagesReordered"] = typeof(ChatQueuedMessagesReorderedAction),
         ["chat/draftChanged"] = typeof(ChatDraftChangedAction),
+        ["chat/isArchivedChanged"] = typeof(ChatIsArchivedChangedAction),
         ["chat/inputRequested"] = typeof(ChatInputRequestedAction),
         ["chat/inputAnswerChanged"] = typeof(ChatInputAnswerChangedAction),
         ["chat/inputCompleted"] = typeof(ChatInputCompletedAction),

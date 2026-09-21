@@ -963,6 +963,9 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)
 
+    is StateActionChatChangesetsChanged ->
+        state.copy(changesets = action.value.changesets)
+
     is StateActionChatWorkingDirectorySet -> {
         val list = state.workingDirectories ?: emptyList()
         if (list.contains(action.value.directory)) {
@@ -1530,6 +1533,10 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
     }
 
     is StateActionChatDraftChanged -> state.copy(draft = action.value.draft)
+
+    is StateActionChatIsArchivedChanged -> state.copy(
+        status = withStatusFlag(state.status, SessionStatus.IS_ARCHIVED, action.value.isArchived),
+    )
 
     else -> state
 

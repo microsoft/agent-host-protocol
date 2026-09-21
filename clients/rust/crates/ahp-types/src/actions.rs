@@ -55,6 +55,7 @@ pub enum ActionType {
     ChatError,
     ChatTurnResume,
     ChatActivityChanged,
+    ChatChangesetsChanged,
     ChatWorkingDirectorySet,
     ChatWorkingDirectoryRemoved,
     SessionTitleChanged,
@@ -72,6 +73,7 @@ pub enum ActionType {
     ChatPendingMessageRemoved,
     ChatQueuedMessagesReordered,
     ChatDraftChanged,
+    ChatIsArchivedChanged,
     ChatInputRequested,
     ChatInputAnswerChanged,
     ChatInputCompleted,
@@ -169,6 +171,7 @@ impl serde::Serialize for ActionType {
             Self::ChatError => serializer.serialize_str("chat/error"),
             Self::ChatTurnResume => serializer.serialize_str("chat/turnResume"),
             Self::ChatActivityChanged => serializer.serialize_str("chat/activityChanged"),
+            Self::ChatChangesetsChanged => serializer.serialize_str("chat/changesetsChanged"),
             Self::ChatWorkingDirectorySet => serializer.serialize_str("chat/workingDirectorySet"),
             Self::ChatWorkingDirectoryRemoved => {
                 serializer.serialize_str("chat/workingDirectoryRemoved")
@@ -204,6 +207,7 @@ impl serde::Serialize for ActionType {
                 serializer.serialize_str("chat/queuedMessagesReordered")
             }
             Self::ChatDraftChanged => serializer.serialize_str("chat/draftChanged"),
+            Self::ChatIsArchivedChanged => serializer.serialize_str("chat/isArchivedChanged"),
             Self::ChatInputRequested => serializer.serialize_str("chat/inputRequested"),
             Self::ChatInputAnswerChanged => serializer.serialize_str("chat/inputAnswerChanged"),
             Self::ChatInputCompleted => serializer.serialize_str("chat/inputCompleted"),
@@ -329,6 +333,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/error" => Self::ChatError,
             "chat/turnResume" => Self::ChatTurnResume,
             "chat/activityChanged" => Self::ChatActivityChanged,
+            "chat/changesetsChanged" => Self::ChatChangesetsChanged,
             "chat/workingDirectorySet" => Self::ChatWorkingDirectorySet,
             "chat/workingDirectoryRemoved" => Self::ChatWorkingDirectoryRemoved,
             "session/titleChanged" => Self::SessionTitleChanged,
@@ -346,6 +351,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/pendingMessageRemoved" => Self::ChatPendingMessageRemoved,
             "chat/queuedMessagesReordered" => Self::ChatQueuedMessagesReordered,
             "chat/draftChanged" => Self::ChatDraftChanged,
+            "chat/isArchivedChanged" => Self::ChatIsArchivedChanged,
             "chat/inputRequested" => Self::ChatInputRequested,
             "chat/inputAnswerChanged" => Self::ChatInputAnswerChanged,
             "chat/inputCompleted" => Self::ChatInputCompleted,
@@ -1046,6 +1052,23 @@ pub struct ChatActivityChangedAction {
     pub activity: Option<String>,
 }
 
+/// The {@link Changeset | catalogue of changesets} the agent host advertises
+/// for this chat changed. Replaces
+/// {@link ChatState.changesets | `state.changesets`} entirely
+/// (full-replacement semantics) — set to `undefined` to clear the catalogue.
+///
+/// Entries SHOULD describe Branch, Uncommitted Changes, or other views scoped
+/// to the chat's effective {@link ChatState.workingDirectories | working
+/// directories}. Clients subscribe to each advertised changeset URI for
+/// file-level updates through the existing `changeset/*` action stream.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatChangesetsChangedAction {
+    /// New catalogue, or `undefined` to clear it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changesets: Option<Vec<Changeset>>,
+}
+
 /// Session title updated. Fired by the server when the title is auto-generated
 /// from conversation, or dispatched by a client to rename a session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1387,6 +1410,18 @@ pub struct ChatDraftChangedAction {
     /// New draft message, or `undefined` to clear it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub draft: Option<Message>,
+}
+
+/// The archived state of the chat changed.
+///
+/// Dispatched by a client to archive a chat independently of its owning
+/// session or to restore it. Archiving the session's default chat is equivalent
+/// to archiving the session and SHOULD use `session/isArchivedChanged` instead.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatIsArchivedChangedAction {
+    /// Whether the chat is archived
+    pub is_archived: bool,
 }
 
 /// A session requested input from the user.
@@ -2241,6 +2276,8 @@ pub enum StateAction {
     ChatTurnResume(ChatTurnResumeAction),
     #[serde(rename = "chat/activityChanged")]
     ChatActivityChanged(ChatActivityChangedAction),
+    #[serde(rename = "chat/changesetsChanged")]
+    ChatChangesetsChanged(ChatChangesetsChangedAction),
     #[serde(rename = "session/titleChanged")]
     SessionTitleChanged(SessionTitleChangedAction),
     #[serde(rename = "chat/usage")]
@@ -2283,6 +2320,8 @@ pub enum StateAction {
     ChatQueuedMessagesReordered(ChatQueuedMessagesReorderedAction),
     #[serde(rename = "chat/draftChanged")]
     ChatDraftChanged(ChatDraftChangedAction),
+    #[serde(rename = "chat/isArchivedChanged")]
+    ChatIsArchivedChanged(ChatIsArchivedChangedAction),
     #[serde(rename = "chat/inputRequested")]
     ChatInputRequested(ChatInputRequestedAction),
     #[serde(rename = "chat/inputAnswerChanged")]

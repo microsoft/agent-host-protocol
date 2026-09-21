@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`ChatState.changesets` and `chat/changesetsChanged` expose each chat's changeset catalogue through the subscribed chat channel."
+}

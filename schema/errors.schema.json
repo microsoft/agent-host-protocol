@@ -2548,6 +2548,13 @@
           },
           "description": "The subset of the session's\n{@link SessionState.workingDirectories | `workingDirectories`} that this\nchat's agent has tool access to. Every entry MUST be present in the owning\nsession's `workingDirectories`; servers MUST reject a\n`chat/workingDirectorySet` action that violates this constraint.\n\nWhen absent, the chat inherits the full session set. When present but empty\n(not recommended), the chat has no working-directory tool access at all.\n\nDispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to\nupdate the subset on a running chat."
         },
+        "changesets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Changeset"
+          },
+          "description": "Catalogue of changesets the server can produce for this chat. Each entry\nadvertises a subscribable view of file changes scoped to the chat's\neffective working directories and the URI template the client expands\nbefore subscribing. See {@link Changeset} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model.\n\nThis catalogue is intentionally absent from {@link ChatSummary}; clients\nobtain it by subscribing to the chat channel."
+        },
         "turns": {
           "type": "array",
           "items": {
@@ -4824,7 +4831,7 @@
     },
     "Changeset": {
       "type": "object",
-      "description": "Catalogue entry describing one changeset the server can produce for a\nsession.\n\nCatalogue entries are intentionally lightweight — just enough to render a\nchip or list row without subscribing. Full per-changeset detail\n({@link ChangesetState}) lives on the subscribable URI obtained by\nexpanding {@link uriTemplate}.",
+      "description": "Catalogue entry describing one changeset the server can produce for a\nsession or chat.\n\nCatalogue entries are intentionally lightweight — just enough to render a\nchip or list row without subscribing. Full per-changeset detail\n({@link ChangesetState}) lives on the subscribable URI obtained by\nexpanding {@link uriTemplate}.",
       "properties": {
         "label": {
           "type": "string",
@@ -4832,7 +4839,7 @@
         },
         "uriTemplate": {
           "type": "string",
-          "description": "RFC 6570 URI template. Clients parse the variables directly out of the\ntemplate using the standard `{name}` syntax — they are not redeclared\nhere.\n\nOnly the following template shapes are defined by this protocol; any\nother variable name MUST be ignored by clients (there is no\nprotocol-defined way to obtain values for unknown variables):\n\n| Variables in template                       | Meaning                                                                              |\n| ------------------------------------------- | ------------------------------------------------------------------------------------ |\n| _(none)_                                    | A static, session-wide changeset. The template is itself a subscribable URI.         |\n| `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the session.                            |\n| `{originalTurnId}` and `{modifiedTurnId}`   | Diff between two turns. Both variables MUST be present.                              |\n\nFuture protocol versions MAY add new well-known variables."
+          "description": "RFC 6570 URI template. Clients parse the variables directly out of the\ntemplate using the standard `{name}` syntax — they are not redeclared\nhere.\n\nOnly the following template shapes are defined by this protocol; any\nother variable name MUST be ignored by clients (there is no\nprotocol-defined way to obtain values for unknown variables):\n\n| Variables in template                       | Meaning                                                                              |\n| ------------------------------------------- | ------------------------------------------------------------------------------------ |\n| _(none)_                                    | A static changeset scoped to the advertising session or chat. The template is itself a subscribable URI. |\n| `{turnId}`                                  | Per-turn slice. Expand with a `Turn.id` from the advertising chat or session.        |\n| `{originalTurnId}` and `{modifiedTurnId}`   | Diff between two turns. Both variables MUST be present.                              |\n\nFuture protocol versions MAY add new well-known variables."
         },
         "description": {
           "type": "string",
@@ -4844,7 +4851,7 @@
         },
         "capabilities": {
           "$ref": "#/$defs/ChangesetCapabilities",
-          "description": "Optional capability declarations for this changeset. Absent (or an empty\nobject) means the changeset advertises no optional capabilities.\n\nBecause the catalogue entry is delivered up-front on\n{@link ChangesetState | the session's changeset list}, clients can decide\nwhether to surface capability-gated UI (such as review checkboxes) without\nfirst subscribing to the changeset URI. Mirrors the presence-flag\nconvention of `ClientCapabilities`."
+          "description": "Optional capability declarations for this changeset. Absent (or an empty\nobject) means the changeset advertises no optional capabilities.\n\nBecause the catalogue entry is delivered up-front on the advertising\nsession or chat's changeset list, clients can decide whether to surface\ncapability-gated UI (such as review checkboxes) without first subscribing\nto the changeset URI. Mirrors the presence-flag convention of\n`ClientCapabilities`."
         }
       },
       "required": [
@@ -8327,6 +8334,9 @@
           "$ref": "#/$defs/ChatActivityChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatChangesetsChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatWorkingDirectorySetAction"
         },
         {
@@ -8349,6 +8359,9 @@
         },
         {
           "$ref": "#/$defs/ChatDraftChangedAction"
+        },
+        {
+          "$ref": "#/$defs/ChatIsArchivedChangedAction"
         },
         {
           "$ref": "#/$defs/ChatInputRequestedAction"
@@ -9757,6 +9770,25 @@
         "type"
       ]
     },
+    "ChatChangesetsChangedAction": {
+      "type": "object",
+      "description": "The {@link Changeset | catalogue of changesets} the agent host advertises\nfor this chat changed. Replaces\n{@link ChatState.changesets | `state.changesets`} entirely\n(full-replacement semantics) — set to `undefined` to clear the catalogue.\n\nEntries SHOULD describe Branch, Uncommitted Changes, or other views scoped\nto the chat's effective {@link ChatState.workingDirectories | working\ndirectories}. Clients subscribe to each advertised changeset URI for\nfile-level updates through the existing `changeset/*` action stream.",
+      "properties": {
+        "type": {
+          "const": "chat/changesetsChanged"
+        },
+        "changesets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Changeset"
+          },
+          "description": "New catalogue, or `undefined` to clear it."
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
     "ChatWorkingDirectorySetAction": {
       "type": "object",
       "description": "A working directory was added to this chat's\n{@link ChatState.workingDirectories} subset.\n\nMembership semantics keyed by the directory URI: the reducer appends\n`directory` when the chat's subset does not already contain it (creating the\nsubset if absent) and is a no-op when it is already present. `directory` MUST\nbe one of the owning session's {@link SessionState.workingDirectories}; a host\nMUST reject a directory that is not. Only valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}.",
@@ -9933,6 +9965,23 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "ChatIsArchivedChangedAction": {
+      "type": "object",
+      "description": "The archived state of the chat changed.\n\nDispatched by a client to archive a chat independently of its owning\nsession or to restore it. Archiving the session's default chat is equivalent\nto archiving the session and SHOULD use `session/isArchivedChanged` instead.",
+      "properties": {
+        "type": {
+          "const": "chat/isArchivedChanged"
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "Whether the chat is archived"
+        }
+      },
+      "required": [
+        "type",
+        "isArchived"
       ]
     },
     "ChatInputRequestedAction": {
