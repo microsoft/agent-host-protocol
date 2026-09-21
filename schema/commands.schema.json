@@ -124,6 +124,11 @@
       "type": "object",
       "description": "Optional capabilities a client declares during `initialize`.\n\nEach field is a presence flag: an empty object `{}` means \"supported\",\nabsence means \"not supported\". Sub-fields on individual capabilities\nare reserved for future per-capability options.",
       "properties": {
+        "workingDirectoryInfo": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Client accepts rich {@link WorkingDirectory} records as well as URI strings.\nHosts project records to URIs when absent and retain this choice on reconnect."
+        },
         "mcpApps": {
           "type": "object",
           "additionalProperties": {},
@@ -993,7 +998,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Repository context only; no checkout is prepared.",
+          "description": "Repositories used as configuration context.",
           "minItems": 1
         },
         "config": {
@@ -1075,7 +1080,7 @@
           "items": {
             "$ref": "#/$defs/RepositorySource"
           },
-          "description": "Repository context only; no checkout is prepared.",
+          "description": "Repositories used as configuration context.",
           "minItems": 1
         },
         "config": {
@@ -1111,6 +1116,27 @@
       },
       "required": [
         "items"
+      ]
+    },
+    "RepositorySource": {
+      "type": "object",
+      "description": "Requested repository source, not a resolved working directory.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/URI",
+          "description": "Credential-free repository source URI."
+        },
+        "revision": {
+          "type": "string",
+          "description": "Requested branch, tag, or commit. Omit to use the host's default revision."
+        },
+        "subdirectory": {
+          "type": "string",
+          "description": "Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths."
+        }
+      },
+      "required": [
+        "source"
       ]
     },
     "CreateSessionParams": {
@@ -1363,7 +1389,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "Initial working-directory subset for this chat. Every entry MUST be\npresent in the owning session's `workingDirectories`; the server MUST\nreject any entry that is not. When absent, the chat inherits the full\nsession set. Forked chats (those whose `source.kind` is `\"fork\"`) inherit\nthe source chat's `workingDirectories`; this field is ignored for forks.\n\nA client MUST NOT supply this field unless the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}."
+          "description": "Initial working-directory URI subset for this chat. Every URI MUST match\na URI string or record's `uri` in the owning session's `workingDirectories`;\nthe server MUST reject any entry that does not. When absent, the chat inherits the full\nsession set. Forked chats (those whose `source.kind` is `\"fork\"`) inherit\nthe source chat's `workingDirectories`; this field is ignored for forks.\n\nA client MUST NOT supply this field unless the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}."
         }
       },
       "required": [
@@ -2379,21 +2405,63 @@
         "run"
       ]
     },
-    "RepositorySource": {
+    "LocalWorkingDirectoryOrigin": {
       "type": "object",
-      "description": "Requested repository source, not a resolved checkout.",
       "properties": {
-        "source": {
-          "$ref": "#/$defs/URI",
-          "description": "Credential-free repository source URI."
-        },
-        "revision": {
-          "type": "string",
-          "description": "Requested branch, tag, or commit. Omit to use the host's default revision."
+        "kind": {
+          "const": "local"
         }
       },
       "required": [
-        "source"
+        "kind"
+      ]
+    },
+    "RepoWorkingDirectoryOrigin": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "repo"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "WorktreeWorkingDirectoryOrigin": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "worktree"
+        },
+        "mainWorktree": {
+          "$ref": "#/$defs/URI",
+          "description": "Main worktree associated with the host-prepared worktree."
+        }
+      },
+      "required": [
+        "kind",
+        "mainWorktree"
+      ]
+    },
+    "WorkingDirectory": {
+      "type": "object",
+      "description": "An actual working directory, uniquely keyed by `uri` within the session.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Actual selected directory, which may be a repository subdirectory."
+        },
+        "repo": {
+          "$ref": "#/$defs/URI",
+          "description": "Credential-free repository source association, not a checkout identity."
+        },
+        "origin": {
+          "$ref": "#/$defs/WorkingDirectoryOrigin",
+          "description": "Host-reported provenance; omission means unspecified."
+        }
+      },
+      "required": [
+        "uri"
       ]
     },
     "SessionMetadata": {
@@ -2427,17 +2495,16 @@
         "workingDirectories": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/URI"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/URI"
+              },
+              {
+                "$ref": "#/$defs/WorkingDirectory"
+              }
+            ]
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
-        },
-        "repositories": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/RepositorySource"
-          },
-          "description": "Immutable repository inputs accepted at creation.",
-          "minItems": 1
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set.\nEntries are uniquely keyed by URI. Rich records require\n{@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -2481,17 +2548,16 @@
         "workingDirectories": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/URI"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/URI"
+              },
+              {
+                "$ref": "#/$defs/WorkingDirectory"
+              }
+            ]
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
-        },
-        "repositories": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/RepositorySource"
-          },
-          "description": "Immutable repository inputs accepted at creation.",
-          "minItems": 1
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set.\nEntries are uniquely keyed by URI. Rich records require\n{@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -2797,17 +2863,16 @@
         "workingDirectories": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/URI"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/URI"
+              },
+              {
+                "$ref": "#/$defs/WorkingDirectory"
+              }
+            ]
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
-        },
-        "repositories": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/RepositorySource"
-          },
-          "description": "Immutable repository inputs accepted at creation.",
-          "minItems": 1
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set.\nEntries are uniquely keyed by URI. Rich records require\n{@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -4159,7 +4224,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "The subset of the session's\n{@link SessionState.workingDirectories | `workingDirectories`} that this\nchat's agent has tool access to. Every entry MUST be present in the owning\nsession's `workingDirectories`; servers MUST reject a\n`chat/workingDirectorySet` action that violates this constraint.\n\nWhen absent, the chat inherits the full session set. When present but empty\n(not recommended), the chat has no working-directory tool access at all.\n\nDispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to\nupdate the subset on a running chat."
+          "description": "The subset of the session's\n{@link SessionState.workingDirectories | `workingDirectories`} that this\nchat's agent has tool access to. Every URI MUST match a URI string or a\nrecord's `uri` in the owning session's set; servers MUST reject a\n`chat/workingDirectorySet` action that violates this constraint.\n\nWhen absent, the chat inherits the full session set. When present but empty\n(not recommended), the chat has no working-directory tool access at all.\n\nDirectory metadata belongs to the session, not the chat.\nDispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to\nupdate the subset on a running chat."
         },
         "changesets": {
           "type": "array",
@@ -7757,13 +7822,20 @@
     },
     "SessionWorkingDirectorySetAction": {
       "type": "object",
-      "description": "A working directory was added to the session's\n{@link SessionState.workingDirectories} set.\n\nMembership semantics keyed by the directory URI: the reducer appends\n`directory` when the set does not already contain it (creating the set if\nabsent) and is a no-op when it is already present. Only valid when the agent\nadvertises {@link AgentCapabilities.multipleWorkingDirectories}.",
+      "description": "A working directory was added or updated in the session's\n{@link SessionState.workingDirectories} set.\n\nUpsert keyed by URI. A rich record replaces the existing entry in place;\na URI-only duplicate preserves known metadata. Only valid when the agent\nadvertises {@link AgentCapabilities.multipleWorkingDirectories}. Clients\nMUST omit `repo` and use only local or absent `origin`; the host validates\nand enriches the entry before accepting it.",
       "properties": {
         "type": {
           "const": "session/workingDirectorySet"
         },
         "directory": {
-          "$ref": "#/$defs/URI",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/URI"
+            },
+            {
+              "$ref": "#/$defs/WorkingDirectory"
+            }
+          ],
           "description": "The working directory to grant the session's agent tool access to."
         }
       },
@@ -7791,7 +7863,7 @@
     },
     "SessionWorkingDirectoryReplacedAction": {
       "type": "object",
-      "description": "Atomically replaces one of the session's working directories.\n\nThis is a targeted compare-and-swap: the reducer is a no-op when\n{@link SessionState.workingDirectories} does not contain `directory`.\nOtherwise it replaces that entry with `replacement` and deduplicates the\nresult, preserving every other directory's relative order. When\n`replacement` occurs after the target, it moves to the target's position;\nfor example, `[A, B, C]` with `B → C` becomes `[A, C]`. When it occurs\nbefore the target, it retains its earlier position and the target is removed;\n`[A, B, C]` with `C → A` becomes `[A, B]`.\n\nOnly valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}. Replacing index `0`\nadditionally requires\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement}; clients\nMUST NOT target an immutable primary. The host MUST validate and apply its\nbackend side effect before broadcasting an accepted action, or reject it.",
+      "description": "Atomically replaces one of the session's working directories.\n\nThis is a targeted compare-and-swap: the reducer is a no-op when\n{@link SessionState.workingDirectories} does not contain `directory`.\nOtherwise it replaces that entry with `replacement` and deduplicates the\nresult, preserving every other directory's relative order. When\n`replacement` occurs after the target, it moves to the target's position;\nfor example, `[A, B, C]` with `B → C` becomes `[A, C]`. When it occurs\nbefore the target, it retains its earlier position and the target is removed;\n`[A, B, C]` with `C → A` becomes `[A, B]`.\nA rich replacement supplies the complete entry; a URI-only replacement\npreserves metadata already known for that URI.\n\nOnly valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}. Replacing index `0`\nadditionally requires\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement}; clients\nMUST NOT target an immutable primary. The host MUST validate and apply its\nbackend side effect before broadcasting an accepted action, or reject it.\nClients MUST omit `repo` and use only local or absent `origin`.",
       "properties": {
         "type": {
           "const": "session/workingDirectoryReplaced"
@@ -7801,8 +7873,15 @@
           "description": "URI of the existing entry to replace."
         },
         "replacement": {
-          "$ref": "#/$defs/URI",
-          "description": "URI to place in the replaced entry's position."
+          "oneOf": [
+            {
+              "$ref": "#/$defs/URI"
+            },
+            {
+              "$ref": "#/$defs/WorkingDirectory"
+            }
+          ],
+          "description": "Complete entry to place in the replaced entry's position."
         }
       },
       "required": [
@@ -8704,7 +8783,7 @@
     },
     "ChatWorkingDirectorySetAction": {
       "type": "object",
-      "description": "A working directory was added to this chat's\n{@link ChatState.workingDirectories} subset.\n\nMembership semantics keyed by the directory URI: the reducer appends\n`directory` when the chat's subset does not already contain it (creating the\nsubset if absent) and is a no-op when it is already present. `directory` MUST\nbe one of the owning session's {@link SessionState.workingDirectories}; a host\nMUST reject a directory that is not. Only valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}.",
+      "description": "A working directory was added to this chat's\n{@link ChatState.workingDirectories} subset.\n\nMembership semantics keyed by the directory URI: the reducer appends\n`directory` when the chat's subset does not already contain it (creating the\nsubset if absent) and is a no-op when it is already present. `directory` MUST\nmatch a URI string or record's `uri` in the owning session's\n{@link SessionState.workingDirectories}; a host MUST reject a directory that\ndoes not. Only valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}.",
       "properties": {
         "type": {
           "const": "chat/workingDirectorySet"
@@ -10191,6 +10270,20 @@
       ],
       "type": "string",
       "description": "Policy configuration state for a model."
+    },
+    "WorkingDirectoryOrigin": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/LocalWorkingDirectoryOrigin"
+        },
+        {
+          "$ref": "#/$defs/RepoWorkingDirectoryOrigin"
+        },
+        {
+          "$ref": "#/$defs/WorktreeWorkingDirectoryOrigin"
+        }
+      ],
+      "description": "Host-reported preparation result, independent of the creation input."
     },
     "SessionStatus": {
       "enum": [
