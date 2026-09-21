@@ -2174,6 +2174,8 @@ mod tests {
             origin: None,
             project: None,
             working_directories: None,
+            repository_source: None,
+            repository_revision: None,
             annotations: None,
             lifecycle: SessionLifecycle::Creating,
             creation_error: None,
