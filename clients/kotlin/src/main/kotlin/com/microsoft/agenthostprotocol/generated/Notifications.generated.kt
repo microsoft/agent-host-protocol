@@ -266,5 +266,17 @@ data class PartialSessionSummary(
      * and session notifications.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Lightweight ordered chat catalog for session-list presentation.
+     *
+     * This intentionally omits volatile chat state such as status and activity,
+     * while retaining interactivity so generic clients can hide chats or present
+     * them as read-only without subscribing to the session channel.
+     */
+    val chats: List<SessionChatSummary>? = null,
+    /**
+     * Chat that receives input when no specific chat is selected.
+     */
+    val defaultChat: String? = null
 )

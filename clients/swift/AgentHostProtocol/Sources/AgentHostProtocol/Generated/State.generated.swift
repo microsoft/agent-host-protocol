@@ -2189,6 +2189,14 @@ public struct SessionSummary: Codable, Sendable {
     /// SHOULD keep the payload small because summaries appear in session lists
     /// and session notifications.
     public var meta: [String: AnyCodable]?
+    /// Lightweight ordered chat catalog for session-list presentation.
+    ///
+    /// This intentionally omits volatile chat state such as status and activity,
+    /// while retaining interactivity so generic clients can hide chats or present
+    /// them as read-only without subscribing to the session channel.
+    public var chats: [SessionChatSummary]?
+    /// Chat that receives input when no specific chat is selected.
+    public var defaultChat: String?
 
     enum CodingKeys: String, CodingKey {
         case provider
@@ -2206,6 +2214,8 @@ public struct SessionSummary: Codable, Sendable {
         case modifiedAt
         case changes
         case meta = "_meta"
+        case chats
+        case defaultChat
     }
 
     public init(
@@ -2223,7 +2233,9 @@ public struct SessionSummary: Codable, Sendable {
         createdAt: String,
         modifiedAt: String,
         changes: ChangesSummary? = nil,
-        meta: [String: AnyCodable]? = nil
+        meta: [String: AnyCodable]? = nil,
+        chats: [SessionChatSummary]? = nil,
+        defaultChat: String? = nil
     ) {
         self.provider = provider
         self.title = title
@@ -2240,6 +2252,35 @@ public struct SessionSummary: Codable, Sendable {
         self.modifiedAt = modifiedAt
         self.changes = changes
         self.meta = meta
+        self.chats = chats
+        self.defaultChat = defaultChat
+    }
+}
+
+public struct SessionChatSummary: Codable, Sendable {
+    /// Canonical chat URI
+    public var resource: String
+    /// Human-readable chat title
+    public var title: String
+    /// How this chat was created, when known
+    public var origin: ChatOrigin?
+    /// How the user can interact with this chat.
+    ///
+    /// Generic clients use this to omit hidden chats and disable input for
+    /// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
+    /// backward compatibility.
+    public var interactivity: ChatInteractivity?
+
+    public init(
+        resource: String,
+        title: String,
+        origin: ChatOrigin? = nil,
+        interactivity: ChatInteractivity? = nil
+    ) {
+        self.resource = resource
+        self.title = title
+        self.origin = origin
+        self.interactivity = interactivity
     }
 }
 

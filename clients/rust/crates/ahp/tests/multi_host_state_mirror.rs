@@ -483,6 +483,8 @@ fn non_action_event_is_ignored() {
                 changes: None,
                 annotations: None,
                 meta: None,
+                chats: None,
+                default_chat: None,
             },
         }),
     };

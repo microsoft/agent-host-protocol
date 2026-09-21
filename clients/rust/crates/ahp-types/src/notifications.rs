@@ -14,7 +14,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 #[allow(unused_imports)]
 use crate::state::{
     AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
-    ProjectInfo, ProtectedResourceMetadata, SessionOrigin, SessionStatus, SessionSummary,
+    ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus,
+    SessionSummary,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -327,4 +328,14 @@ pub struct PartialSessionSummary {
     /// and session notifications.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+    /// Lightweight ordered chat catalog for session-list presentation.
+    ///
+    /// This intentionally omits volatile chat state such as status and activity,
+    /// while retaining interactivity so generic clients can hide chats or present
+    /// them as read-only without subscribing to the session channel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chats: Option<Vec<SessionChatSummary>>,
+    /// Chat that receives input when no specific chat is selected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_chat: Option<Uri>,
 }

@@ -2101,7 +2101,43 @@ data class SessionSummary(
      * and session notifications.
      */
     @SerialName("_meta")
-    val meta: Map<String, JsonElement>? = null
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Lightweight ordered chat catalog for session-list presentation.
+     *
+     * This intentionally omits volatile chat state such as status and activity,
+     * while retaining interactivity so generic clients can hide chats or present
+     * them as read-only without subscribing to the session channel.
+     */
+    val chats: List<SessionChatSummary>? = null,
+    /**
+     * Chat that receives input when no specific chat is selected.
+     */
+    val defaultChat: String? = null
+)
+
+@Serializable
+data class SessionChatSummary(
+    /**
+     * Canonical chat URI
+     */
+    val resource: String,
+    /**
+     * Human-readable chat title
+     */
+    val title: String,
+    /**
+     * How this chat was created, when known
+     */
+    val origin: ChatOrigin? = null,
+    /**
+     * How the user can interact with this chat.
+     *
+     * Generic clients use this to omit hidden chats and disable input for
+     * read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
+     * backward compatibility.
+     */
+    val interactivity: ChatInteractivity? = null
 )
 
 @Serializable

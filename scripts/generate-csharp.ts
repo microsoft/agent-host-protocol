@@ -689,6 +689,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'SessionToolClientExecutionRequest' },
   { name: 'SessionToolAuthenticationRequest' },
   { name: 'SessionSummary', mutable: true },
+  { name: 'SessionChatSummary' },
   { name: 'ChangesSummary' },
   { name: 'ProjectInfo' },
   { name: 'SessionConfigPropertySchema' },

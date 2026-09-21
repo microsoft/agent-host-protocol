@@ -3544,6 +3544,17 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Lightweight server-defined metadata clients may use for the session\npresentation. The protocol does not interpret these values; producers\nSHOULD keep the payload small because summaries appear in session lists\nand session notifications."
+        },
+        "chats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SessionChatSummary"
+          },
+          "description": "Lightweight ordered chat catalog for session-list presentation.\n\nThis intentionally omits volatile chat state such as status and activity,\nwhile retaining interactivity so generic clients can hide chats or present\nthem as read-only without subscribing to the session channel."
+        },
+        "defaultChat": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat that receives input when no specific chat is selected."
         }
       },
       "required": [
@@ -3553,6 +3564,32 @@
         "resource",
         "createdAt",
         "modifiedAt"
+      ]
+    },
+    "SessionChatSummary": {
+      "type": "object",
+      "description": "Lightweight chat information suitable for listing a session without\nsubscribing to its session channel.",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/URI",
+          "description": "Canonical chat URI"
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable chat title"
+        },
+        "origin": {
+          "$ref": "#/$defs/ChatOrigin",
+          "description": "How this chat was created, when known"
+        },
+        "interactivity": {
+          "$ref": "#/$defs/ChatInteractivity",
+          "description": "How the user can interact with this chat.\n\nGeneric clients use this to omit hidden chats and disable input for\nread-only chats. Absence defaults to {@link ChatInteractivity.Full} for\nbackward compatibility."
+        }
+      },
+      "required": [
+        "resource",
+        "title"
       ]
     },
     "ChangesSummary": {

@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`SessionSummary.chats`, `SessionChatSummary.interactivity`, and `SessionSummary.defaultChat` expose lightweight chat navigation data without requiring a session subscription."
+}

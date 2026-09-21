@@ -1190,6 +1190,31 @@ type SessionSummary struct {
 	// SHOULD keep the payload small because summaries appear in session lists
 	// and session notifications.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Lightweight ordered chat catalog for session-list presentation.
+	//
+	// This intentionally omits volatile chat state such as status and activity,
+	// while retaining interactivity so generic clients can hide chats or present
+	// them as read-only without subscribing to the session channel.
+	Chats []SessionChatSummary `json:"chats,omitempty"`
+	// Chat that receives input when no specific chat is selected.
+	DefaultChat *URI `json:"defaultChat,omitempty"`
+}
+
+// Lightweight chat information suitable for listing a session without
+// subscribing to its session channel.
+type SessionChatSummary struct {
+	// Canonical chat URI
+	Resource URI `json:"resource"`
+	// Human-readable chat title
+	Title string `json:"title"`
+	// How this chat was created, when known
+	Origin *ChatOrigin `json:"origin,omitempty"`
+	// How the user can interact with this chat.
+	//
+	// Generic clients use this to omit hidden chats and disable input for
+	// read-only chats. Absence defaults to {@link ChatInteractivity.Full} for
+	// backward compatibility.
+	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
 }
 
 // Aggregate counts describing the file changes associated with a session.
