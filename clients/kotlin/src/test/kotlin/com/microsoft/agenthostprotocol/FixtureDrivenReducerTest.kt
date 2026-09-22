@@ -1,7 +1,6 @@
 package com.microsoft.agenthostprotocol
 
 import com.microsoft.agenthostprotocol.generated.ChatState
-import com.microsoft.agenthostprotocol.generated.AccountsState
 import com.microsoft.agenthostprotocol.generated.ChangesetState
 import com.microsoft.agenthostprotocol.generated.AnnotationsState
 import com.microsoft.agenthostprotocol.generated.AutomationState
@@ -117,14 +116,6 @@ class FixtureDrivenReducerTest {
         )
 
         when (reducer) {
-            "accounts" -> compareFixture(
-                file = file,
-                initial = initial,
-                expected = expected,
-                serializer = AccountsState.serializer(),
-                run = { state -> actions.fold(state, ::accountsReducer) },
-            )
-
             "root" -> compareFixture(
                 file = file,
                 initial = initial,

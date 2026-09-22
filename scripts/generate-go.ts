@@ -157,7 +157,6 @@ function mapType(tsType: string): string {
   if (tsType === 'URI') return 'URI';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
   if (tsType === 'ToolInput') return 'ToolInput';
-  if (/^\{\s*consumer:\s*AccountConsumer;?\s*\}$/.test(tsType)) return 'AuthBeginTarget';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -165,9 +164,19 @@ function mapType(tsType: string): string {
   // SessionStatus is a bitset — Go keeps it as the typed alias for round-trip.
   if (tsType === 'SessionStatus') return 'SessionStatus';
 
-  const stateMembers = tsType.split(/\s*\|\s*/);
-  if (stateMembers.length > 1 && stateMembers.every(member =>
-    /^(?:I)?(?:Root|Accounts|Session|Chat|Terminal|Changeset|ResourceWatch|Annotations|Automation|AutomationRun)State$/.test(member))) {
+  if (
+    tsType === 'IRootState | ISessionState' ||
+    tsType === 'IRootState | ISessionState | ITerminalState' ||
+    tsType === 'RootState | SessionState' ||
+    tsType === 'RootState | SessionState | TerminalState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | AnnotationsState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
+    tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState'
+  ) {
     return 'SnapshotState';
   }
 
@@ -349,8 +358,9 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
     // token: optional null-able stays a single pointer (avoid `**T`).
     const alreadyPointer = goType.startsWith('*');
     const optional = hasQuestionToken || hasUnionUndefined || alreadyPointer;
-    const presenceSensitiveCollection = iface.getName() === 'AutomationDefinitionPatch'
-      && (tsName === 'triggers' || tsName === '_meta');
+    const presenceSensitiveCollection = (iface.getName() === 'AutomationDefinitionPatch'
+      && (tsName === 'triggers' || tsName === '_meta'))
+      || (iface.getName() === 'InitializeResult' && tsName === 'accountRevocation');
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }
@@ -704,7 +714,6 @@ function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string 
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
-  'AccountConsumerKind', 'AuthAttemptStatus',
   'PolicyState', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'PendingMessageKind', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -723,15 +732,8 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
-  { name: 'AccountsState' },
-  { name: 'HostAccount' },
-  { name: 'AgentAccountConsumer' },
-  { name: 'McpServerAccountConsumer' },
-  { name: 'AuthAttemptBase' },
-  { name: 'AuthAttemptPendingState' },
-  { name: 'AuthAttemptCompletedState' },
-  { name: 'AuthAttemptFailedState' },
   { name: 'Icon' },
+  { name: 'AuthenticationAccount' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
   { name: 'RootConfigState' },
@@ -885,29 +887,6 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
 ];
-
-const ACCOUNT_CONSUMER_UNION: UnionConfig = {
-  name: 'AccountConsumer',
-  discriminantField: 'kind',
-  doc: 'AccountConsumer identifies an agent resource or a session MCP customization.',
-  variants: [
-    { variantName: 'Agent', innerType: 'AgentAccountConsumer', wireValue: 'agent' },
-    { variantName: 'McpServer', innerType: 'McpServerAccountConsumer', wireValue: 'mcpServer' },
-  ],
-  unknown: true,
-};
-
-const AUTH_ATTEMPT_STATE_UNION: UnionConfig = {
-  name: 'AuthAttemptState',
-  discriminantField: 'status',
-  doc: 'AuthAttemptState is a pending or retained authentication admission outcome.',
-  variants: [
-    { variantName: 'Pending', innerType: 'AuthAttemptPendingState', wireValue: 'pending' },
-    { variantName: 'Completed', innerType: 'AuthAttemptCompletedState', wireValue: 'completed' },
-    { variantName: 'Failed', innerType: 'AuthAttemptFailedState', wireValue: 'failed' },
-  ],
-  unknown: true,
-};
 
 const RESPONSE_PART_UNION: UnionConfig = {
   name: 'ResponsePart',
@@ -1289,15 +1268,14 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 
 function generateSnapshotState(): string {
   return `// SnapshotState is the state payload of a snapshot — root, session,
-// accounts, chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
 // or automation-run state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (accounts → automationRun → automations → session → chat → terminal → changeset →
+// (automationRun → automations → session → chat → terminal → changeset →
 // resourceWatch → annotations → root).
 type SnapshotState struct {
 \tRoot          *RootState          \`json:"-"\`
-\tAccounts      *AccountsState      \`json:"-"\`
 \tSession       *SessionState       \`json:"-"\`
 \tChat          *ChatState          \`json:"-"\`
 \tTerminal      *TerminalState      \`json:"-"\`
@@ -1311,8 +1289,6 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 \tswitch {
-\tcase s.Accounts != nil:
-\t\treturn json.Marshal(s.Accounts)
 \tcase s.AutomationRun != nil:
 \t\treturn json.Marshal(s.AutomationRun)
 \tcase s.Automations != nil:
@@ -1345,12 +1321,6 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 \t\treturn err
 \t}
 \tswitch {
-\tcase containsAll(probe, "accounts", "attempts"):
-\t\tvar v AccountsState
-\t\tif err := json.Unmarshal(data, &v); err != nil {
-\t\t\treturn err
-\t\t}
-\t\ts.Accounts = &v
 \tcase containsAll(probe, "automation", "origin", "sessions"):
 \t\tvar v AutomationRunState
 \t\tif err := json.Unmarshal(data, &v); err != nil {
@@ -1532,10 +1502,6 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(project, ACCOUNT_CONSUMER_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, AUTH_ATTEMPT_STATE_UNION));
-  lines.push('');
   lines.push(generateChatOriginGo());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1551,10 +1517,6 @@ const ACTION_VARIANTS: {
   variantName: string;
   tsInterface: string;
 }[] = [
-  { type: 'accounts/set', variantName: 'AccountSet', tsInterface: 'AccountSetAction' },
-  { type: 'accounts/removed', variantName: 'AccountRemoved', tsInterface: 'AccountRemovedAction' },
-  { type: 'accounts/authAttemptSet', variantName: 'AuthAttemptSet', tsInterface: 'AuthAttemptSetAction' },
-  { type: 'accounts/authAttemptRemoved', variantName: 'AuthAttemptRemoved', tsInterface: 'AuthAttemptRemovedAction' },
   { type: 'root/agentsChanged', variantName: 'RootAgentsChanged', tsInterface: 'RootAgentsChangedAction' },
   { type: 'root/activeSessionsChanged', variantName: 'RootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
@@ -1754,12 +1716,9 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthFlowKind', 'BrokeredAuthenticationBindingKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
-  { name: 'AuthFlowSupport' }, { name: 'AuthenticationCapability' },
-  { name: 'AuthBeginParams' }, { name: 'AuthBeginResult' },
-  { name: 'BrokeredAuthenticationAttemptBinding' }, { name: 'BrokeredAuthenticationAccountBinding' },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
@@ -1788,6 +1747,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
+  { name: 'AuthRevokedParams' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
   { name: 'SessionConfigCompletionsParams' }, { name: 'SessionConfigCompletionsResult' },
@@ -1799,16 +1759,6 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
 ];
-
-const BROKERED_AUTHENTICATION_BINDING_UNION: UnionConfig = {
-  name: 'BrokeredAuthenticationBinding',
-  discriminantField: 'kind',
-  doc: 'BrokeredAuthenticationBinding binds token delivery to an attempt or live account.',
-  variants: [
-    { variantName: 'Attempt', innerType: 'BrokeredAuthenticationAttemptBinding', wireValue: 'attempt' },
-    { variantName: 'Account', innerType: 'BrokeredAuthenticationAccountBinding', wireValue: 'account' },
-  ],
-};
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
   name: 'ReconnectResult',
@@ -1963,13 +1913,6 @@ func (t ChangesetOperationTarget) MarshalJSON() ([]byte, error) {
 
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [HEADER_WITH_IMPORTS];
-  lines.push('// AuthBeginTarget identifies the exact consumer selected for admission.');
-  lines.push('type AuthBeginTarget struct {');
-  lines.push('\tConsumer AccountConsumer `json:"consumer"`');
-  lines.push('}');
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, BROKERED_AUTHENTICATION_BINDING_UNION));
-  lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of COMMAND_ENUMS) {
@@ -2340,7 +2283,6 @@ function checkExhaustiveness(project: Project): void {
   ]);
 
   const knownSpecial = new Set<string>([
-    'AccountConsumer', 'AuthAttemptState', 'BrokeredAuthenticationBinding', 'AccountsAction',
     'URI',
     'JsonPrimitive',
     'BaseParams',

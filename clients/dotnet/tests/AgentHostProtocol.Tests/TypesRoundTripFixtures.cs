@@ -136,26 +136,12 @@ public sealed class TypesRoundTripFixtures
     {
         switch (type)
         {
-            case "AccountsState":
-                return Wrap(Ser.Deserialize<AccountsState>(inputJson));
-            case "HostAccount":
-                return Wrap(Ser.Deserialize<HostAccount>(inputJson));
-            case "AccountConsumer":
-                return Wrap(Ser.Deserialize<AccountConsumer>(inputJson));
-            case "AuthAttemptState":
-                return Wrap(Ser.Deserialize<AuthAttemptState>(inputJson));
-            case "AuthBeginParams":
-                return Wrap(Ser.Deserialize<AuthBeginParams>(inputJson));
-            case "AuthBeginResult":
-                return Wrap(Ser.Deserialize<AuthBeginResult>(inputJson));
             case "AuthenticateParams":
                 return Wrap(Ser.Deserialize<AuthenticateParams>(inputJson));
-            case "AuthenticateResult":
-                return Wrap(Ser.Deserialize<AuthenticateResult>(inputJson));
-            case "BrokeredAuthenticationBinding":
-                return Wrap(Ser.Deserialize<BrokeredAuthenticationBinding>(inputJson));
-            case "AuthenticationCapability":
-                return Wrap(Ser.Deserialize<AuthenticationCapability>(inputJson));
+            case "AuthRevokedParams":
+                return Wrap(Ser.Deserialize<AuthRevokedParams>(inputJson));
+            case "AhpClientNotification":
+                return Wrap(Ser.Deserialize<JsonRpcNotification>(inputJson));
             case "ActionEnvelope":
                 return Wrap(Ser.Deserialize<ActionEnvelope>(inputJson));
             case "StateAction":

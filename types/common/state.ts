@@ -16,7 +16,6 @@ import type { AnnotationsState } from '../channels-annotations/state.js';
 import type { ChatState } from '../channels-chat/state.js';
 import type { AutomationState } from '../channels-automation/state.js';
 import type { AutomationRunState } from '../channels-automation-run/state.js';
-import type { AccountsState } from '../channels-accounts/state.js';
 
 // ─── Type Aliases ────────────────────────────────────────────────────────────
 
@@ -76,6 +75,33 @@ export interface Icon {
    * If not provided, the client should assume the icon can be used with any theme.
    */
   theme?: 'light' | 'dark';
+}
+
+// ─── Authentication Account ────────────────────────────────────────────────
+
+/**
+ * Account identity attached to a client-supplied credential.
+ *
+ * This is not a host-assigned account handle or a credential lifetime. Both
+ * fields are compared exactly; the same identity MUST survive token rotation
+ * and be comparable across clients using the same authority. Display names,
+ * client-local session ids, and token hashes are not account identifiers.
+ *
+ * @category Authentication
+ */
+export interface AuthenticationAccount {
+  /**
+   * Nonempty canonical authorization-server identifier for this account,
+   * consistent with the protected resource's advertised authorization servers.
+   * This namespaces `id`; it is not an agent provider id or a client implementation.
+   */
+  authority: string;
+  /**
+   * Nonempty stable account identifier within the authority. Pairwise
+   * identifiers from different OAuth clients require a trusted provider
+   * mapping before they can identify the same account.
+   */
+  id: string;
 }
 
 // ─── Protected Resource Metadata (RFC 9728) ─────────────────────────────────
@@ -336,7 +362,7 @@ export interface Snapshot {
   /** The subscribed channel URI (e.g. `ahp-root://`, `ahp-session:/<uuid>`, or `ahp-chat:/<uuid>`) */
   resource: URI;
   /** The current state of the resource */
-  state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | AccountsState;
+  state: RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState;
   /** The `serverSeq` at which this snapshot was taken. Subsequent actions will have `serverSeq > fromSeq`. */
   fromSeq: number;
 }

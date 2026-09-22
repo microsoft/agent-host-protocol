@@ -118,56 +118,6 @@ public func rootReducer(state: RootState, action: StateAction) -> RootState {
 }
 
 
-// MARK: - Accounts Reducer
-
-private func authAttemptID(_ attempt: AuthAttemptState) -> String? {
-    switch attempt {
-    case .pending(let value): return value.id
-    case .completed(let value): return value.id
-    case .failed(let value): return value.id
-    case .unknown(let raw): return (raw.value as? [String: Any])?["id"] as? String
-    }
-}
-
-/// Pure reducer for the standalone host accounts channel.
-public func accountsReducer(state: AccountsState, action: StateAction) -> AccountsState {
-    switch action {
-    case .accountSet(let a):
-        var next = state
-        if let index = next.accounts.firstIndex(where: { $0.id == a.account.id }) {
-            next.accounts[index] = a.account
-        } else {
-            next.accounts.append(a.account)
-        }
-        return next
-
-    case .accountRemoved(let a):
-        guard let index = state.accounts.firstIndex(where: { $0.id == a.id }) else { return state }
-        var next = state
-        next.accounts.remove(at: index)
-        return next
-
-    case .authAttemptSet(let a):
-        guard let id = authAttemptID(a.attempt) else { return state }
-        var next = state
-        if let index = next.attempts.firstIndex(where: { authAttemptID($0) == id }) {
-            next.attempts[index] = a.attempt
-        } else {
-            next.attempts.append(a.attempt)
-        }
-        return next
-
-    case .authAttemptRemoved(let a):
-        guard let index = state.attempts.firstIndex(where: { authAttemptID($0) == a.id }) else { return state }
-        var next = state
-        next.attempts.remove(at: index)
-        return next
-
-    default:
-        return state
-    }
-}
-
 // MARK: - Chat Reducer
 
 /// Pure reducer for chat state.

@@ -1,108 +1,135 @@
-# Account-safe sign-out on a shared host
+# Client-brokered account identity and revocation
 
-This proposal adds a **standalone, capability-gated protocol contract**, with
-canonical types, schemas, reducers, client support, and shared conformance
-fixtures. It does not depend on
-[#404, host-owned authentication](https://github.com/microsoft/agent-host-protocol/pull/404).
-Clients still acquire tokens; hosts own their admission, selection, use, and
-invalidation.
+This proposal fills two gaps in the existing client-supplied token flow:
+identify the account owning a credential, and let the client notify the host
+when it withdraws that account's credentials.
 
-The normative contract and wire walkthrough are in
-[Accounts Channel](../specification/accounts-channel.md). The
-[generated reference](/reference/accounts) is derived from the canonical source,
-not from illustrative declarations in this document.
+It does not introduce host-owned authentication. There is no account channel,
+account catalogue, consumer-selection model, admission RPC, attempt lifecycle,
+new reducer, or host-issued account handle. It is independent of
+[#404](https://github.com/microsoft/agent-host-protocol/pull/404).
 
-## Why this is an account operation
+## Protocol delta
 
-```text
-A supplies account A -> B selects account B -> A signs out
+| Surface | Addition |
+| --- | --- |
+| `InitializeResult` | Optional `accountRevocation: {}` presence capability. |
+| `AuthenticateParams` | Optional `account: AuthenticationAccount`, containing `authority` and `id`. |
+| Client-to-host notification | `auth/revoked` with `channel: "ahp-root://"`, `resource`, and the same `account`. |
+
+`AuthenticateResult` remains `{}`. There are no new request/response methods,
+actions, notifications in the opposite direction, error codes, or protocol
+version changes.
+
+The notification reports a broker-owned fact. It does not require a new
+host-owned account collection for clients to mutate or subscribe to.
+
+The account's authority qualifies its id so two authorization servers cannot
+collide. This is identity supplied by the client's auth provider, not a new
+host-managed account object. It must be stable across token rotation and
+comparable across clients; a local session id or token fingerprint is not
+sufficient.
+
+Canonical definitions:
+[AuthenticationAccount](../../types/common/state.ts),
+[AuthenticateParams / AuthRevokedParams](../../types/common/commands.ts), and
+[ClientNotificationMap](../../types/common/messages.ts).
+The normative rules are in
+[Authentication: account-scoped revocation](../specification/authentication.md#account-scoped-revocation).
+
+## Wire example
+
+The initialize result advertises:
+
+```json
+{ "accountRevocation": {} }
 ```
 
-A local cache cannot tell A whether the shared host now uses B. An empty-token
-clear can revoke B; comparing A's last token can miss A's rotated credential.
-The host must remove a named authorization lifetime atomically, including
-replayable and derived credentials, without interrupting unrelated work.
+The existing token push identifies its owner:
 
-This is generic authentication, not an IDE extension. The old private revoke
-method, vendor metadata, local account IDs, and token fingerprints are not the
-proposed API.
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "authenticate",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.test",
+    "token": "example-token",
+    "account": {
+      "authority": "https://login.example.test",
+      "id": "account-a"
+    }
+  }
+}
+```
 
-## What lands here
+On sign-out, the client sends a notification, not an empty-token push:
 
-| Surface | Source |
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "auth/revoked",
+  "params": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.test",
+    "account": {
+      "authority": "https://login.example.test",
+      "id": "account-a"
+    }
+  }
+}
+```
+
+## Required behavior
+
+- If B replaced A, processing A's notification must not clear B's credential.
+- Rotation does not change account identity. Revocation removes every matching
+  token/scope variant, including the host's provider-replay copies.
+- Authentication, revocation, and provider replay share the host's ordering
+  boundary. Earlier pending work cannot reinstall a revoked credential later.
+- The host promptly stops work actually using affected credentials. Chat
+  ancestry alone is not a reason to stop independent work using another account.
+- Known derived credentials follow the source's revocation. Revoking only a
+  derived credential does not revoke its source. Externally derived credentials
+  require the broker to send the corresponding notifications; no public
+  dependency graph is added.
+- Matching is by protected resource and authority-qualified account, with no
+  client-supplied scope filter. Clients withdrawing the account from multiple
+  resources send a notification for each contributed resource.
+
+## Deliberate limits
+
+This is not a permanent account revocation barrier. A later `authenticate`
+may authorize the account again. The host cannot distinguish a deliberate
+sign-in from an incorrectly replayed credential using these fields alone.
+Clients must cancel stale forwarding, purge token replay caches, and re-check
+their live auth provider before reconnect authentication.
+
+The notification has no acknowledgement and is not durably replayed by AHP.
+Sending it is not proof of completed host cleanup, especially after a
+disconnect. A client reconnecting while the account remains withdrawn
+reissues the applicable notification before forwarding new tokens; it must
+not blindly replay an old withdrawal after a newer local sign-in.
+
+## Verification boundary
+
+Shared fixtures and client tests validate the account and notification wire
+shapes, including absent/present capability markers. They do not simulate
+credential revocation inside a real host. Host integration must additionally
+verify these acceptance cases:
+
+| Scenario | Expected result |
 | --- | --- |
-| Accounts, consumer keys, pending/completed/failed admissions | [`types/channels-accounts/state.ts`](../../types/channels-accounts/state.ts) |
-| Four keyed actions, including client-dispatchable removal/cancellation | [`types/channels-accounts/actions.ts`](../../types/channels-accounts/actions.ts) |
-| Capability, `authBegin`, and discriminated token bindings | [`types/channels-accounts/commands.ts`](../../types/channels-accounts/commands.ts) |
-| Bound delivery and returned account ID on `authenticate` | [`types/common/commands.ts`](../../types/common/commands.ts) |
-| Pure account-state reducer | [`types/channels-accounts/reducer.ts`](../../types/channels-accounts/reducer.ts) |
-| Snapshot, message, action-origin, and version wiring | [`types/index.ts`](../../types/index.ts) |
-| Generated schemas and all client mirrors | [State schema](/schema/state.schema.json), [clients guide](/guide/clients) |
-| Reducer, wire-shape, and client conformance cases | [Shared fixtures](https://github.com/microsoft/agent-host-protocol/tree/main/types/test-cases), [`types/accounts.test.ts`](../../types/accounts.test.ts) |
+| A supplies account A; B replaces it with B; A signs out using stale local state. | B's selected credential and work survive. |
+| A's credential rotates or is supplied with several scope sets. | Withdrawing A removes every matching variant, not one token string. |
+| A's provider delivery starts before withdrawal and completes afterward. | Completion cannot restore A's removed credential. |
+| A's turn has an independently authorized child using B. | Work using A stops promptly; B's work is not cancelled by ancestry. |
+| A source credential has a known derived credential. | Source withdrawal invalidates both; derived-only withdrawal preserves the source. |
+| Connection drops during withdrawal, with A still signed out locally. | Client rechecks its provider and reissues withdrawal before token delivery. It cannot claim confirmed remote cleanup. |
+| A valid `authenticate` arrives after withdrawal. | It may reauthorize A; this addition does not identify stale versus intentional resubmission. |
+| Host omits `accountRevocation`. | Client does not rely on the notification or fall back to clearing a shared resource. |
 
-The protocol version constant is unchanged. `clientBrokered` advertisement,
-flow acknowledgement, and ordinary account-channel permissions gate the new
-behavior. Old implementations must not be allowed to silently ignore a binding
-and perform legacy unconditional revocation.
-
-## Bounded design choices
-
-- **One host-authoritative account lifetime.** Its opaque ID survives rotation
-  and retires on removal. It is not a permanent human identity or an upstream
-  grant; independent grants are not coalesced merely because they name the
-  same person.
-- **Actions for state, commands for secrets.** `accounts/removed` carries only
-  the key. `authBegin` reserves admission; only `authenticate` carries a token.
-  Host-authored account updates and ordinary rejected-action echoes let every
-  subscribed client converge.
-- **Admission and renewal are different.** The single-use attempt closes the
-  first-delivery race. Later renewal references a live account and cannot
-  change its consumer selection. Removed handles cannot be silently re-enrolled.
-- **Recovery is part of the lifetime.** A completed admission receipt remains
-  while its account is live, so a lost response does not make sign-out
-  impossible. Consumer changes invalidate competing attempts, including a
-  selection that later changes back to its original value.
-- **Existing consumers, not a new catalogue.** Agents use `(provider, resource)`.
-  MCP servers use `(session, customizationId)`. Cross-session preference
-  identity, host-run OAuth, and a challenge catalogue are not prerequisites.
-- **Credential dependency, not ancestry.** Removing a source invalidates its
-  dependent access; removing a derived lifetime leaves the source available.
-  Active work stops based on actual credentials and operation ownership, not a
-  walk of every descendant chat.
-
-For example, Microsoft sign-out invalidates derived GitHub EMU access, while
-GitHub-only sign-out leaves Microsoft usable for other consumers. The normative
-rules use only generic source/derived lifetimes, never those provider names.
-
-## Relationship to host-owned authentication
-
-The names `ahp-accounts://`, `authBegin`, and `accounts/removed` intentionally
-align with #404. Their complete brokered semantics are defined here, rather
-than imported from that proposal. Host-owned acquisition could later feed the
-same account lifecycle, but must preserve account-safe removal, retained
-receipts, and explicit consumer selection.
-
-This addition neither implements host-owned OAuth nor replaces #404's design.
-Likewise [#439](https://github.com/microsoft/agent-host-protocol/pull/439)
-addresses a different token-routing concern; a server display name is not the
-consumer key used here.
-
-## Review and verification boundaries
-
-Review the concrete lifetime semantics, admission binding, MCP consumer key,
-and permission boundary in the types and specification. The shared fixtures
-test state projection and serialization, including preservation of B when A
-is removed, terminal receipt retention, unknown state variants, and explicit
-bindings. Client tests cover channel routing and reconciliation.
-
-This repository does not contain the VS Code credential-holding host. Its
-provider ordering, persistent revocation, trusted identity/lineage validation,
-and work containment still need implementation and the
-[host acceptance cases](../specification/accounts-channel.md#_7-host-acceptance-cases)
-before that host can advertise the capability. The type-safe protocol proposal
-is not a claim that those host scenarios have already been exercised.
-
-The independently scoped work in
-[microsoft/vscode#337204](https://github.com/microsoft/vscode/pull/337204) and
-[microsoft/vscode#337188](https://github.com/microsoft/vscode/pull/337188)
-is not changed or bundled here.
+Existing [microsoft/vscode#337204](https://github.com/microsoft/vscode/pull/337204)
+and [microsoft/vscode#337188](https://github.com/microsoft/vscode/pull/337188)
+remain separate; this proposal does not modify that implementation.

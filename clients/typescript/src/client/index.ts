@@ -20,7 +20,6 @@ export {
   RpcError,
   RpcTimeoutError,
   TransportError,
-  UnsupportedCapabilityError,
 } from './error.js';
 export type { TransportErrorKind } from './error.js';
 export { InMemoryTransport } from './transport.js';

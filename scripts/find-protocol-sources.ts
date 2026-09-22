@@ -26,7 +26,6 @@ export const PROTOCOL_SOURCE_DIRS: readonly string[] = [
   'channels-resource-watch',
   'channels-automation',
   'channels-automation-run',
-  'channels-accounts',
 ];
 
 /**

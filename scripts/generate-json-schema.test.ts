@@ -96,6 +96,10 @@ function schemaAccepts(
   }
 
   const schema = dereferenceSchema(root, node as Record<string, unknown>);
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    return false;
+  }
+
   const oneOf = schema.oneOf;
   if (Array.isArray(oneOf)) {
     return oneOf.filter(branch => schemaAccepts(root, branch as JsonNode, value)).length === 1;
@@ -298,73 +302,43 @@ describe('generated JSON schemas', () => {
   }
 });
 
-describe('client-brokered authentication schema', () => {
+describe('account-scoped authentication schema', () => {
   const schema = loadSchema('commands.schema.json');
   const defs = schema.$defs as Record<string, Record<string, unknown>>;
-  const consumer = { kind: 'agent', provider: 'assistant', resource: 'https://api.example.test' };
+  const account = { authority: 'https://login.example.test', id: 'account-a' };
+  const target = { channel: 'ahp-root://', resource: 'https://api.example.test' };
 
-  it('requires an exact consumer without a challenge-catalogue dependency', () => {
-    const params = {
-      channel: 'ahp-accounts://',
-      flows: [{ kind: 'clientBrokered' }],
-      target: { consumer },
-    };
-    assert.equal(schemaAccepts(schema, defs.AuthBeginParams, params), true);
-    assert.equal(schemaAccepts(schema, defs.AuthBeginParams, { ...params, target: { challengeId: 'one' } }), false);
-    assert.equal(schemaAccepts(schema, defs.AccountConsumer, { kind: 'mcpServer', session: 'ahp-session:/one' }), false);
-    assert.equal(schemaAccepts(schema, defs.AccountConsumer, {
-      kind: 'mcpServer', session: 'ahp-session:/one', customizationId: 'server-1',
-    }), true);
-  });
-
-  it('never accepts an unknown or incomplete token binding as a known variant', () => {
-    for (const binding of [
-      { kind: 'attempt', attemptId: 'one' },
-      { kind: 'account', accountId: 'account-a' },
-    ]) {
-      assert.equal(schemaAccepts(schema, defs.BrokeredAuthenticationBinding, binding), true);
-    }
-    for (const binding of [
-      {},
-      { kind: 'attempt' },
-      { kind: 'account', attemptId: 'one' },
-      { kind: 'unconditional', accountId: 'account-a' },
-    ]) {
-      assert.equal(schemaAccepts(schema, defs.BrokeredAuthenticationBinding, binding), false);
-    }
-  });
-
-  it('keeps legacy authenticate valid while preserving explicit bindings and results', () => {
-    const baseline = { channel: 'ahp-root://', resource: consumer.resource, token: 'test-credential' };
+  it('keeps the account optional on token delivery but requires a complete supplied identity', () => {
+    const baseline = { ...target, token: 'test-credential' };
     assert.equal(schemaAccepts(schema, defs.AuthenticateParams, baseline), true);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, { ...baseline, account }), true);
     assert.equal(schemaAccepts(schema, defs.AuthenticateParams, {
-      ...baseline, binding: { kind: 'account', accountId: 'account-a' },
-    }), true);
-    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, {
-      ...baseline, binding: { kind: 'unconditional' },
+      ...baseline, account: { id: 'account-a' },
     }), false);
-    assert.equal(schemaAccepts(schema, defs.AuthenticateResult, { accountId: 'account-a' }), true);
-    assert.equal(schemaAccepts(schema, defs.AuthenticateResult, { accountId: 42 }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, {
+      ...baseline, account: { authority: account.authority, id: 42 },
+    }), false);
   });
 
-  it('requires outcome-specific data without interpreting future statuses as success', () => {
-    const attempt = { id: 'one', consumer, resource: consumer.resource };
-    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, { ...attempt, status: 'pending' }), true);
-    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, { ...attempt, status: 'completed' }), false);
-    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, {
-      ...attempt, status: 'completed', accountId: 'account-a',
-    }), true);
-    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, { ...attempt, status: 'failed' }), false);
-    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, {
-      ...attempt, status: 'failed', error: { errorType: 'Conflict', message: 'Admission expired' },
-    }), true);
-    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, { ...attempt, status: 'futurePending' }), false);
+  it('requires resource, authority, and account id on revocation', () => {
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, { ...target, account }), true);
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, target), false);
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, {
+      channel: 'ahp-root://', account,
+    }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, {
+      ...target, account: { authority: account.authority },
+    }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, {
+      ...target, channel: 'ahp-session:/one', account,
+    }), false);
   });
 
-  it('requires both keyed collections in an accounts snapshot', () => {
-    assert.equal(schemaAccepts(schema, defs.AccountsState, { accounts: [], attempts: [] }), true);
-    assert.equal(schemaAccepts(schema, defs.AccountsState, { accounts: [] }), false);
-    assert.equal(schemaAccepts(schema, defs.AccountsState, { attempts: [] }), false);
+  it('accepts the presence capability and preserves baseline initialization', () => {
+    const initialized = { protocolVersion: '0.9.0', serverSeq: 1, snapshots: [] };
+    assert.equal(schemaAccepts(schema, defs.InitializeResult, initialized), true);
+    assert.equal(schemaAccepts(schema, defs.InitializeResult, { ...initialized, accountRevocation: {} }), true);
+    assert.equal(schemaAccepts(schema, defs.InitializeResult, { ...initialized, accountRevocation: true }), false);
   });
 });
 

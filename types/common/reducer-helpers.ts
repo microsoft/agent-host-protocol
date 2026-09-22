@@ -20,8 +20,6 @@ import type {
   ClientAutomationAction,
   AutomationRunAction,
   ClientAutomationRunAction,
-  AccountsAction,
-  ClientAccountsAction,
 } from '../action-origin.generated.js';
 import { IS_CLIENT_DISPATCHABLE } from '../action-origin.generated.js';
 
@@ -46,6 +44,6 @@ export function softAssertNever(value: never, log?: (msg: string) => void): void
  * Servers SHOULD call this to validate incoming `dispatchAction` requests
  * and reject any action the client is not allowed to originate.
  */
-export function isClientDispatchable(action: RootAction | SessionAction | TerminalAction | ChangesetAction | AnnotationsAction | AutomationAction | AutomationRunAction | AccountsAction): action is ClientRootAction | ClientSessionAction | ClientTerminalAction | ClientChangesetAction | ClientAnnotationsAction | ClientAutomationAction | ClientAutomationRunAction | ClientAccountsAction {
+export function isClientDispatchable(action: RootAction | SessionAction | TerminalAction | ChangesetAction | AnnotationsAction | AutomationAction | AutomationRunAction): action is ClientRootAction | ClientSessionAction | ClientTerminalAction | ClientChangesetAction | ClientAnnotationsAction | ClientAutomationAction | ClientAutomationRunAction {
   return IS_CLIENT_DISPATCHABLE[action.type];
 }

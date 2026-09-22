@@ -164,15 +164,6 @@ public sealed class AhpClient : IAhpClient
     private readonly IAhpSerializer _serializer;
     private readonly ClientConfig _cfg;
 
-    private volatile AuthenticationCapability? _authentication;
-
-    internal AuthenticationCapability? NegotiatedAuthentication => _authentication;
-
-    internal void RestoreNegotiatedAuthentication(AuthenticationCapability? authentication) =>
-        _authentication = authentication is null
-            ? null
-            : authentication with { Flows = new List<AuthFlowSupport>(authentication.Flows) };
-
     // Outbound queue (reader goroutine in Go; here driven by a Task).
     private readonly Channel<OutboundMessage> _outbound;
 
@@ -1054,68 +1045,7 @@ public sealed class AhpClient : IAhpClient
                 "protocol",
                 $"ahp: server selected unoffered protocol version '{result.ProtocolVersion}'");
         }
-        RestoreNegotiatedAuthentication(result.Authentication);
         return result;
-    }
-
-    /// <summary>
-    /// Begins client-brokered authentication on the accounts channel. Requires
-    /// the host to advertise the flow in its initialize response.
-    /// </summary>
-    public async Task<AuthBeginResult> AuthBeginAsync(
-        AuthBeginParams parameters, CancellationToken cancellationToken = default)
-    {
-        Guard.ThrowIfNull(parameters, nameof(parameters));
-        RequireBrokeredAuthentication();
-        if (!parameters.Flows.Exists(flow => flow.Kind == AuthFlowKind.ClientBrokered))
-            throw new AhpTransportException("protocol", "ahp: authBegin requires an offered clientBrokered flow");
-        var result = await RequestAsync<AuthBeginParams, AuthBeginResult>(
-            "authBegin", parameters with { Channel = ProtocolVersion.AccountsResourceUri }, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new AhpRpcException(JsonRpcErrorCodes.InternalError, "ahp: authBegin returned no result");
-        if (result.Flow != AuthFlowKind.ClientBrokered || string.IsNullOrEmpty(result.AttemptId))
-            throw new AhpTransportException("protocol", "ahp: authBegin returned an unsupported flow or missing attempt id");
-        return result;
-    }
-
-    /// <summary>
-    /// Submits a token on the root channel. A binding requires advertised
-    /// client-brokered authentication and is never dropped or retried as legacy authentication.
-    /// </summary>
-    public async Task<AuthenticateResult> AuthenticateAsync(
-        AuthenticateParams parameters, CancellationToken cancellationToken = default)
-    {
-        Guard.ThrowIfNull(parameters, nameof(parameters));
-        if (parameters.Binding is not null)
-        {
-            RequireBrokeredAuthentication();
-            bool valid = parameters.Binding.Value switch
-            {
-                BrokeredAuthenticationAttemptBinding binding => !string.IsNullOrEmpty(binding.AttemptId),
-                BrokeredAuthenticationAccountBinding binding => !string.IsNullOrEmpty(binding.AccountId),
-                _ => false,
-            };
-            if (!valid)
-                throw new AhpTransportException("protocol", "ahp: authenticate requires a supported nonempty binding");
-        }
-        var result = await RequestAsync<AuthenticateParams, AuthenticateResult>(
-            "authenticate", parameters with { Channel = ProtocolVersion.RootResourceUri }, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new AhpRpcException(JsonRpcErrorCodes.InternalError, "ahp: authenticate returned no result");
-        if (parameters.Binding is not null)
-        {
-            if (string.IsNullOrEmpty(result.AccountId))
-                throw new AhpTransportException("protocol", "ahp: bound authenticate returned no account id");
-            if (parameters.Binding.Value is BrokeredAuthenticationAccountBinding binding && result.AccountId != binding.AccountId)
-                throw new AhpTransportException("protocol", "ahp: bound authenticate returned a different account id");
-        }
-        return result;
-    }
-
-    private void RequireBrokeredAuthentication()
-    {
-        if (_authentication?.Flows.Exists(flow => flow.Kind == AuthFlowKind.ClientBrokered) != true)
-            throw new AhpTransportException("protocol", "ahp: host did not advertise clientBrokered authentication");
     }
 
     /// <summary>Re-establishes a dropped connection via the <c>reconnect</c> flow.</summary>
@@ -1215,17 +1145,6 @@ public sealed class AhpClient : IAhpClient
             sub.Close();
             throw;
         }
-    }
-
-    /// <summary>
-    /// Subscribes to the host's accounts channel after an initialize response
-    /// advertising authentication support.
-    /// </summary>
-    public Task<(SubscribeResult Result, Subscription Sub)> SubscribeAccountsAsync(
-        SubscriptionDeliveryOptions? delivery = null, CancellationToken cancellationToken = default)
-    {
-        RequireBrokeredAuthentication();
-        return SubscribeAsync(ProtocolVersion.AccountsResourceUri, delivery, cancellationToken);
     }
 
     /// <summary>

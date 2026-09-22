@@ -13,12 +13,6 @@ internal static class GeneratedActionMetadata
     {
         switch (action)
         {
-            case AccountRemovedAction value:
-                actionType = value.Type;
-                return true;
-            case AccountSetAction value:
-                actionType = value.Type;
-                return true;
             case AnnotationsEntryRemovedAction value:
                 actionType = value.Type;
                 return true;
@@ -32,12 +26,6 @@ internal static class GeneratedActionMetadata
                 actionType = value.Type;
                 return true;
             case AnnotationsUpdatedAction value:
-                actionType = value.Type;
-                return true;
-            case AuthAttemptRemovedAction value:
-                actionType = value.Type;
-                return true;
-            case AuthAttemptSetAction value:
                 actionType = value.Type;
                 return true;
             case AutomationCreateRequestedAction value:
@@ -385,15 +373,11 @@ internal static class GeneratedActionMetadata
     public static string GetWireName(ActionType actionType) =>
         actionType switch
         {
-            ActionType.AccountRemoved => "accounts/removed",
-            ActionType.AccountSet => "accounts/set",
             ActionType.AnnotationsEntryRemoved => "annotations/entryRemoved",
             ActionType.AnnotationsEntrySet => "annotations/entrySet",
             ActionType.AnnotationsRemoved => "annotations/removed",
             ActionType.AnnotationsSet => "annotations/set",
             ActionType.AnnotationsUpdated => "annotations/updated",
-            ActionType.AuthAttemptRemoved => "accounts/authAttemptRemoved",
-            ActionType.AuthAttemptSet => "accounts/authAttemptSet",
             ActionType.AutomationCreateRequested => "automation/createRequested",
             ActionType.AutomationRemoved => "automation/removed",
             ActionType.AutomationRunCancelRequested => "automationRun/cancelRequested",

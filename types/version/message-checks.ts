@@ -73,7 +73,6 @@ type _ExpectedCommands =
   | 'resourceRequest'
   | 'fetchTurns'
   | 'authenticate'
-  | 'authBegin'
   | 'resolveSessionConfig'
   | 'sessionConfigCompletions'
   | 'completions'
@@ -85,7 +84,8 @@ type _ExpectedCommands =
 /** All methods annotated `@messageType Notification` (client → server). */
 type _ExpectedClientNotifications =
   | 'unsubscribe'
-  | 'dispatchAction';
+  | 'dispatchAction'
+  | 'auth/revoked';
 
 /** All server → client notification methods. */
 type _ExpectedServerNotifications =

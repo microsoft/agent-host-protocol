@@ -12,7 +12,6 @@ import AgentHostProtocol
 /// `Snapshot` values from `AHPClient`.
 public actor AHPStateMirror {
     public private(set) var rootState: RootState = RootState(agents: [])
-    public private(set) var accountsState: AccountsState?
     public private(set) var sessions: [String: SessionState] = [:]
     public private(set) var chats: [String: ChatState] = [:]
     public private(set) var terminals: [String: TerminalState] = [:]
@@ -36,10 +35,6 @@ public actor AHPStateMirror {
         let action = envelope.action
         if channel == RootResourceURI {
             rootState = rootReducer(state: rootState, action: action)
-            return
-        }
-        if channel == AccountsResourceURI, let state = accountsState {
-            accountsState = accountsReducer(state: state, action: action)
             return
         }
         if channel.hasPrefix("ahp-session:"), var session = sessions[channel] {
@@ -90,8 +85,6 @@ public actor AHPStateMirror {
         switch snapshot.state {
         case .root(let state):
             rootState = state
-        case .accounts(let state):
-            accountsState = state
         case .session(let state):
             sessions[snapshot.resource] = state
         case .chat(let state):
@@ -123,7 +116,6 @@ public actor AHPStateMirror {
     /// Reset the mirror to its initial empty state.
     public func reset() {
         rootState = RootState(agents: [])
-        accountsState = nil
         sessions.removeAll()
         chats.removeAll()
         terminals.removeAll()

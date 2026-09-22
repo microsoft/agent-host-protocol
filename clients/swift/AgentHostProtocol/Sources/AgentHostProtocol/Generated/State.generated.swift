@@ -1101,67 +1101,6 @@ public enum AutomationRunOriginKind: String, Codable, Sendable {
     case trigger = "trigger"
 }
 
-/// A consumer whose credential selection the host manages.
-///
-/// Unknown consumer kinds MUST NOT be interpreted as a known consumer.
-public enum AccountConsumerKind: Codable, Sendable, Equatable {
-    case agent
-    case mcpServer
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let raw = try container.decode(String.self)
-        switch raw {
-        case "agent": self = .agent
-        case "mcpServer": self = .mcpServer
-        default: self = .unknown(raw)
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .agent: try container.encode("agent")
-        case .mcpServer: try container.encode("mcpServer")
-        case .unknown(let raw): try container.encode(raw)
-        }
-    }
-}
-
-/// Lifecycle of a client-brokered credential admission.
-///
-/// Clients preserve unknown statuses but MUST NOT interpret them as success.
-public enum AuthAttemptStatus: Codable, Sendable, Equatable {
-    case pending
-    case completed
-    case failed
-    /// Unknown raw value from a newer protocol version, preserved verbatim.
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let raw = try container.decode(String.self)
-        switch raw {
-        case "pending": self = .pending
-        case "completed": self = .completed
-        case "failed": self = .failed
-        default: self = .unknown(raw)
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .pending: try container.encode("pending")
-        case .completed: try container.encode("completed")
-        case .failed: try container.encode("failed")
-        case .unknown(let raw): try container.encode(raw)
-        }
-    }
-}
-
 // MARK: - State Types
 
 public struct Icon: Codable, Sendable {
@@ -1273,6 +1212,25 @@ public struct ProtectedResourceMetadata: Codable, Sendable {
         self.resourcePolicyUri = resourcePolicyUri
         self.resourceTosUri = resourceTosUri
         self.required = required
+    }
+}
+
+public struct AuthenticationAccount: Codable, Sendable {
+    /// Nonempty canonical authorization-server identifier for this account,
+    /// consistent with the protected resource's advertised authorization servers.
+    /// This namespaces `id`; it is not an agent provider id or a client implementation.
+    public var authority: String
+    /// Nonempty stable account identifier within the authority. Pairwise
+    /// identifiers from different OAuth clients require a trusted provider
+    /// mapping before they can identify the same account.
+    public var id: String
+
+    public init(
+        authority: String,
+        id: String
+    ) {
+        self.authority = authority
+        self.id = id
     }
 }
 
@@ -6741,160 +6699,6 @@ public struct AutomationRunState: Codable, Sendable {
     }
 }
 
-public struct AccountsState: Codable, Sendable {
-    /// Live, host-authoritative account lifetimes, keyed by `HostAccount.id`.
-    public var accounts: [HostAccount]
-    /// Pending and retained terminal admissions, keyed by `AuthAttemptState.id`.
-    public var attempts: [AuthAttemptState]
-
-    public init(
-        accounts: [HostAccount],
-        attempts: [AuthAttemptState]
-    ) {
-        self.accounts = accounts
-        self.attempts = attempts
-    }
-}
-
-public struct HostAccount: Codable, Sendable {
-    /// Opaque, host-assigned key, stable across rotation and scoped to the host
-    /// authority. Removal retires it permanently; a deliberate later admission
-    /// receives a new id. Possessing the id is not permission to use or remove it.
-    public var id: String
-    /// Display label, not an identity proof.
-    public var label: String
-    /// Whether the host can contain and remove its local credential lifetime.
-    /// This does not promise upstream grant revocation or authorize the caller.
-    public var removable: Bool
-    /// Explicit consumer selections. A consumer MUST NOT select two accounts.
-    /// Removing this entry drops these selections but MUST NOT select a fallback.
-    /// Previously started work can still depend on this account after a move;
-    /// this list is therefore not the host's complete revocation set.
-    public var consumers: [AccountConsumer]
-
-    public init(
-        id: String,
-        label: String,
-        removable: Bool,
-        consumers: [AccountConsumer]
-    ) {
-        self.id = id
-        self.label = label
-        self.removable = removable
-        self.consumers = consumers
-    }
-}
-
-public struct AgentAccountConsumer: Codable, Sendable {
-    public var kind: AccountConsumerKind
-    /// Matches `AgentInfo.provider`.
-    public var provider: String
-    /// Exact identifier from the provider's advertised protected resources.
-    public var resource: String
-
-    public init(
-        kind: AccountConsumerKind,
-        provider: String,
-        resource: String
-    ) {
-        self.kind = kind
-        self.provider = provider
-        self.resource = resource
-    }
-}
-
-public struct McpServerAccountConsumer: Codable, Sendable {
-    public var kind: AccountConsumerKind
-    /// Session URI containing the customization.
-    public var session: String
-    /// Session-unique `McpServerCustomization.id`, not its display name.
-    public var customizationId: String
-
-    public init(
-        kind: AccountConsumerKind,
-        session: String,
-        customizationId: String
-    ) {
-        self.kind = kind
-        self.session = session
-        self.customizationId = customizationId
-    }
-}
-
-public struct AuthAttemptPendingState: Codable, Sendable {
-    /// Host-assigned, single-use id. Not a bearer authorization.
-    public var id: String
-    /// Host-validated consumer selected for this admission.
-    public var consumer: AccountConsumer
-    /// Exact protected resource captured when the attempt was admitted.
-    public var resource: String
-    public var status: AuthAttemptStatus
-
-    public init(
-        id: String,
-        consumer: AccountConsumer,
-        resource: String,
-        status: AuthAttemptStatus
-    ) {
-        self.id = id
-        self.consumer = consumer
-        self.resource = resource
-        self.status = status
-    }
-}
-
-public struct AuthAttemptCompletedState: Codable, Sendable {
-    /// Host-assigned, single-use id. Not a bearer authorization.
-    public var id: String
-    /// Host-validated consumer selected for this admission.
-    public var consumer: AccountConsumer
-    /// Exact protected resource captured when the attempt was admitted.
-    public var resource: String
-    public var status: AuthAttemptStatus
-    /// The admitted authorization lifetime, which may subsequently be removed.
-    public var accountId: String
-
-    public init(
-        id: String,
-        consumer: AccountConsumer,
-        resource: String,
-        status: AuthAttemptStatus,
-        accountId: String
-    ) {
-        self.id = id
-        self.consumer = consumer
-        self.resource = resource
-        self.status = status
-        self.accountId = accountId
-    }
-}
-
-public struct AuthAttemptFailedState: Codable, Sendable {
-    /// Host-assigned, single-use id. Not a bearer authorization.
-    public var id: String
-    /// Host-validated consumer selected for this admission.
-    public var consumer: AccountConsumer
-    /// Exact protected resource captured when the attempt was admitted.
-    public var resource: String
-    public var status: AuthAttemptStatus
-    /// Failure details, with no token or other secret content.
-    public var error: ErrorInfo
-
-    public init(
-        id: String,
-        consumer: AccountConsumer,
-        resource: String,
-        status: AuthAttemptStatus,
-        error: ErrorInfo
-    ) {
-        self.id = id
-        self.consumer = consumer
-        self.resource = resource
-        self.status = status
-        self.error = error
-    }
-}
-
 // MARK: - Customization Enablement Union
 
 /// A single explicit customization enablement decision.
@@ -7930,82 +7734,6 @@ public enum AutomationRunLifecycle: Codable, Sendable {
     }
 }
 
-public enum AccountConsumer: Codable, Sendable {
-    case agent(AgentAccountConsumer)
-    case mcpServer(McpServerAccountConsumer)
-    /// Unknown or future discriminant; the raw payload is preserved
-    /// and re-encoded verbatim for forward-compatibility.
-    case unknown(AnyCodable)
-
-    private enum DiscriminantKey: String, CodingKey {
-        case discriminant = "kind"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: DiscriminantKey.self)
-        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
-            self = .unknown(try AnyCodable(from: decoder))
-            return
-        }
-        switch discriminant {
-        case "agent":
-            self = .agent(try AgentAccountConsumer(from: decoder))
-        case "mcpServer":
-            self = .mcpServer(try McpServerAccountConsumer(from: decoder))
-        default:
-            self = .unknown(try AnyCodable(from: decoder))
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        switch self {
-        case .agent(let value): try value.encode(to: encoder)
-        case .mcpServer(let value): try value.encode(to: encoder)
-        case .unknown(let value): try value.encode(to: encoder)
-        }
-    }
-}
-
-public enum AuthAttemptState: Codable, Sendable {
-    case pending(AuthAttemptPendingState)
-    case completed(AuthAttemptCompletedState)
-    case failed(AuthAttemptFailedState)
-    /// Unknown or future discriminant; the raw payload is preserved
-    /// and re-encoded verbatim for forward-compatibility.
-    case unknown(AnyCodable)
-
-    private enum DiscriminantKey: String, CodingKey {
-        case discriminant = "status"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: DiscriminantKey.self)
-        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
-            self = .unknown(try AnyCodable(from: decoder))
-            return
-        }
-        switch discriminant {
-        case "pending":
-            self = .pending(try AuthAttemptPendingState(from: decoder))
-        case "completed":
-            self = .completed(try AuthAttemptCompletedState(from: decoder))
-        case "failed":
-            self = .failed(try AuthAttemptFailedState(from: decoder))
-        default:
-            self = .unknown(try AnyCodable(from: decoder))
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        switch self {
-        case .pending(let value): try value.encode(to: encoder)
-        case .completed(let value): try value.encode(to: encoder)
-        case .failed(let value): try value.encode(to: encoder)
-        case .unknown(let value): try value.encode(to: encoder)
-        }
-    }
-}
-
 public enum ToolResultContent: Codable, Sendable {
     case text(ToolResultTextContent)
     case embeddedResource(ToolResultEmbeddedResourceContent)
@@ -8064,7 +7792,6 @@ public enum ToolResultContent: Codable, Sendable {
 /// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
-    case accounts(AccountsState)
     case session(SessionState)
     case chat(ChatState)
     case terminal(TerminalState)
@@ -8095,8 +7822,6 @@ public enum SnapshotState: Codable, Sendable {
             self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)
-        } else if let accounts = try? AccountsState(from: decoder) {
-            self = .accounts(accounts)
         } else {
             self = .root(try RootState(from: decoder))
         }
@@ -8105,7 +7830,6 @@ public enum SnapshotState: Codable, Sendable {
     public func encode(to encoder: Encoder) throws {
         switch self {
         case .root(let state): try state.encode(to: encoder)
-        case .accounts(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
         case .terminal(let state): try state.encode(to: encoder)

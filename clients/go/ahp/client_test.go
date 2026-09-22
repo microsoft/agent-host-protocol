@@ -64,6 +64,42 @@ func (t *memTransport) Close(ctx context.Context) error {
 	return nil
 }
 
+func TestClientSendsTypedAuthRevokedNotification(t *testing.T) {
+	clientSide, serverSide := newMemTransportPair()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, err := Connect(ctx, clientSide, DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Shutdown(context.Background())
+	params := ahptypes.AuthRevokedParams{
+		Channel: ahptypes.RootResourceURI, Resource: "https://api.example.test",
+		Account: ahptypes.AuthenticationAccount{Authority: "https://issuer.example.test/", Id: "user-123"},
+	}
+	if err := client.Notify(ctx, "auth/revoked", params); err != nil {
+		t.Fatal(err)
+	}
+	frame, err := serverSide.Recv(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message, err := frame.IntoParsed()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if message.Notification == nil || message.Request != nil || message.Notification.Method != "auth/revoked" {
+		t.Fatalf("expected auth/revoked notification, got %+v", message)
+	}
+	var decoded ahptypes.AuthRevokedParams
+	if err := json.Unmarshal(message.Notification.Params, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Channel != params.Channel || decoded.Resource != params.Resource || decoded.Account != params.Account {
+		t.Fatalf("notification parameters changed: %+v", decoded)
+	}
+}
+
 // TestClientRequestRoundTrip drives a fake server that responds to a
 // single `initialize` request with a stub result.
 func TestClientRequestRoundTrip(t *testing.T) {

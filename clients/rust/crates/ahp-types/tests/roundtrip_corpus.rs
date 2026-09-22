@@ -29,17 +29,13 @@
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
     commands::{
-        AuthBeginParams, AuthBeginResult, AuthenticateParams, AuthenticateResult,
-        AuthenticationCapability, BrokeredAuthenticationBinding, ChangesetOperationTarget,
-        ChatSource, Implementation, InitializeResult,
+        AuthRevokedParams, AuthenticateParams, ChangesetOperationTarget, ChatSource,
+        Implementation, InitializeResult,
     },
     common::StringOrMarkdown,
-    messages::JsonRpcMessage,
+    messages::{JsonRpcMessage, JsonRpcNotification},
     notifications::{PartialSessionSummary, SessionAddedParams},
-    state::{
-        AccountConsumer, AccountsState, AuthAttemptState, ChatInputQuestion, Customization,
-        HostAccount, SessionStatus, SessionSummary, Snapshot,
-    },
+    state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary, Snapshot},
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
 };
 use serde_json::{Number, Value};
@@ -212,16 +208,6 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
     }
 
     match type_name {
-        "AccountsState" => round_trip!(AccountsState),
-        "AccountConsumer" => round_trip!(AccountConsumer),
-        "HostAccount" => round_trip!(HostAccount),
-        "AuthAttemptState" => round_trip!(AuthAttemptState),
-        "AuthBeginParams" => round_trip!(AuthBeginParams),
-        "AuthBeginResult" => round_trip!(AuthBeginResult),
-        "AuthenticateParams" => round_trip!(AuthenticateParams),
-        "AuthenticateResult" => round_trip!(AuthenticateResult),
-        "AuthenticationCapability" => round_trip!(AuthenticationCapability),
-        "BrokeredAuthenticationBinding" => round_trip!(BrokeredAuthenticationBinding),
         "ActionEnvelope" => round_trip!(ActionEnvelope),
         "StateAction" => round_trip!(StateAction),
         "Customization" => round_trip!(Customization),
@@ -240,6 +226,9 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "PartialSessionSummary" => round_trip!(PartialSessionSummary),
         "Implementation" => round_trip!(Implementation),
         "InitializeResult" => round_trip!(InitializeResult),
+        "AuthenticateParams" => round_trip!(AuthenticateParams),
+        "AuthRevokedParams" => round_trip!(AuthRevokedParams),
+        "AhpClientNotification" => round_trip!(JsonRpcNotification),
         "ChatSource" => round_trip!(ChatSource),
         "Snapshot" => round_trip!(Snapshot),
         other => Err(format!(

@@ -1,7 +1,7 @@
 /**
  * Host-aware reducer façade for multi-host consumers.
  *
- * Wraps the existing pure reducers (`accountsReducer`, `rootReducer`, `sessionReducer`,
+ * Wraps the existing pure reducers (`rootReducer`, `sessionReducer`,
  * `terminalReducer`, `changesetReducer`) the way a single-host
  * consumer would, but keys session/terminal/changeset state by
  * `(hostId, uri)` so URIs that legitimately collide across hosts (the
@@ -31,7 +31,6 @@
 import type { ActionEnvelope } from '../../types/common/actions.js';
 import type { Snapshot, URI } from '../../types/common/state.js';
 import type {
-  AccountsAction,
   ChangesetAction,
   AutomationAction,
   AutomationRunAction,
@@ -40,14 +39,12 @@ import type {
   TerminalAction,
 } from '../../types/action-origin.generated.js';
 import type { ChangesetState } from '../../types/channels-changeset/state.js';
-import type { AccountsState } from '../../types/channels-accounts/state.js';
 import type { RootState } from '../../types/channels-root/state.js';
 import type { SessionState } from '../../types/channels-session/state.js';
 import type { TerminalState } from '../../types/channels-terminal/state.js';
 import type { AutomationEntry, AutomationState } from '../../types/channels-automation/state.js';
 import type { AutomationRunState } from '../../types/channels-automation-run/state.js';
 import { changesetReducer } from '../../types/channels-changeset/reducer.js';
-import { accountsReducer } from '../../types/channels-accounts/reducer.js';
 import { rootReducer } from '../../types/channels-root/reducer.js';
 import { sessionReducer } from '../../types/channels-session/reducer.js';
 import { terminalReducer } from '../../types/channels-terminal/reducer.js';
@@ -56,7 +53,6 @@ import { automationRunReducer } from '../../types/channels-automation-run/reduce
 import { ROOT_RESOURCE_URI, type HostId, type HostSubscriptionEvent } from './types.js';
 
 const INITIAL_ROOT: RootState = { agents: [] };
-const ACCOUNTS_URI = 'ahp-accounts://' as const;
 const AUTOMATIONS_URI = 'ahp-automations://' as const;
 
 /**
@@ -95,7 +91,7 @@ function hostedResourceKeyPrefix(hostId: HostId): string {
 }
 
 /**
- * In-memory mirror of per-host accounts/root/session/terminal/changeset state,
+ * In-memory mirror of per-host root/session/terminal/changeset state,
  * fed by {@link ActionEnvelope}s and snapshot states tagged with their
  * host of origin.
  *
@@ -106,7 +102,6 @@ function hostedResourceKeyPrefix(hostId: HostId): string {
  */
 export class MultiHostStateMirror {
   private readonly rootStatesMap = new Map<HostId, RootState>();
-  private readonly accountsStatesMap = new Map<HostId, AccountsState>();
   private readonly sessionsMap = new Map<string, SessionState>();
   private readonly terminalsMap = new Map<string, TerminalState>();
   private readonly changesetsMap = new Map<string, ChangesetState>();
@@ -117,11 +112,6 @@ export class MultiHostStateMirror {
   /** All known root states keyed by host. */
   get rootStates(): ReadonlyMap<HostId, RootState> {
     return this.rootStatesMap;
-  }
-
-  /** Standalone accounts-channel states keyed by host. */
-  get accountsStates(): ReadonlyMap<HostId, AccountsState> {
-    return this.accountsStatesMap;
   }
 
   /** All known session states keyed by `hostedResourceKey(hostId, uri)`. */
@@ -157,11 +147,6 @@ export class MultiHostStateMirror {
   /** Look up the root state for `hostId`. */
   getRoot(hostId: HostId): RootState | undefined {
     return this.rootStatesMap.get(hostId);
-  }
-
-  /** Look up the accounts-channel state for `hostId`. */
-  getAccounts(hostId: HostId): AccountsState | undefined {
-    return this.accountsStatesMap.get(hostId);
   }
 
   /** Look up a session by `(hostId, uri)`. */
@@ -201,17 +186,9 @@ export class MultiHostStateMirror {
    * Apply a single action envelope scoped to `hostId`. Routing uses
    * `envelope.channel`: {@link ROOT_RESOURCE_URI} is the root channel,
    * every other URI is identified by the channel the server announces.
-   * Rejected accounts mutations acknowledge dispatch without changing state.
    */
   applyEnvelope(hostId: HostId, envelope: ActionEnvelope): void {
     const { channel, action } = envelope;
-    if (channel === ACCOUNTS_URI) {
-      if (envelope.rejectionReason !== undefined) return;
-      const current = this.accountsStatesMap.get(hostId);
-      if (!current) return;
-      this.accountsStatesMap.set(hostId, accountsReducer(current, action as AccountsAction));
-      return;
-    }
     if (channel === ROOT_RESOURCE_URI) {
       const root = this.rootStatesMap.get(hostId) ?? INITIAL_ROOT;
       this.rootStatesMap.set(hostId, rootReducer(root, action as RootAction));
@@ -254,16 +231,12 @@ export class MultiHostStateMirror {
   }
 
   /**
-   * Seed the mirror from a {@link Snapshot} scoped to `hostId` — accounts, root,
+   * Seed the mirror from a {@link Snapshot} scoped to `hostId` — root,
    * session, terminal, or changeset as the snapshot's `state` shape
    * dictates.
    */
   applySnapshot(hostId: HostId, snapshot: Snapshot): void {
     const { resource } = snapshot;
-    if (resource === ACCOUNTS_URI) {
-      this.accountsStatesMap.set(hostId, snapshot.state as AccountsState);
-      return;
-    }
     if (resource === ROOT_RESOURCE_URI) {
       this.rootStatesMap.set(hostId, snapshot.state as RootState);
       return;
@@ -291,10 +264,9 @@ export class MultiHostStateMirror {
     }
   }
 
-  /** Drop every slot keyed under `hostId`, including its accounts catalogue. */
+  /** Drop every slot keyed under `hostId` — root, sessions, terminals, changesets. */
   resetHost(hostId: HostId): void {
     this.rootStatesMap.delete(hostId);
-    this.accountsStatesMap.delete(hostId);
     this.automationCatalogsMap.delete(hostId);
     const prefix = hostedResourceKeyPrefix(hostId);
     for (const key of this.sessionsMap.keys()) {
@@ -317,7 +289,6 @@ export class MultiHostStateMirror {
   /** Drop every host's state. */
   reset(): void {
     this.rootStatesMap.clear();
-    this.accountsStatesMap.clear();
     this.sessionsMap.clear();
     this.terminalsMap.clear();
     this.changesetsMap.clear();

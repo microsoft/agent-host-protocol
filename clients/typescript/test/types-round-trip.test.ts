@@ -59,15 +59,8 @@ import type {
   SessionSummary,
 } from '../src/types/channels-session/state.js';
 import type { SessionAddedParams } from '../src/types/channels-root/notifications.js';
-import type {
-  AuthenticateParams, AuthenticateResult, Implementation, InitializeResult,
-} from '../src/types/common/commands.js';
-import type {
-  AuthBeginParams, AuthBeginResult, AuthenticationCapability, BrokeredAuthenticationBinding,
-} from '../src/types/channels-accounts/commands.js';
-import type {
-  AccountConsumer, AccountsState, AuthAttemptState, HostAccount,
-} from '../src/types/channels-accounts/state.js';
+import type { AuthenticateParams, AuthRevokedParams, Implementation, InitializeResult } from '../src/types/common/commands.js';
+import type { AhpClientNotification } from '../src/types/common/messages.js';
 import type { ChatSource } from '../src/types/channels-chat/commands.js';
 
 // ─── Fixture directory ───────────────────────────────────────────────────────
@@ -238,16 +231,6 @@ function runFixture(file: string, root: FixtureRoot): void | 'skipped' {
 
 function bindToType(file: string, type: string, parsed: unknown): void {
   switch (type) {
-    case 'AccountsState': void (parsed as AccountsState); break;
-    case 'AccountConsumer': void (parsed as AccountConsumer); break;
-    case 'HostAccount': void (parsed as HostAccount); break;
-    case 'AuthAttemptState': void (parsed as AuthAttemptState); break;
-    case 'AuthBeginParams': void (parsed as AuthBeginParams); break;
-    case 'AuthBeginResult': void (parsed as AuthBeginResult); break;
-    case 'AuthenticateParams': void (parsed as AuthenticateParams); break;
-    case 'AuthenticateResult': void (parsed as AuthenticateResult); break;
-    case 'AuthenticationCapability': void (parsed as AuthenticationCapability); break;
-    case 'BrokeredAuthenticationBinding': void (parsed as BrokeredAuthenticationBinding); break;
     case 'ActionEnvelope':     void (parsed as ActionEnvelope); break;
     case 'StateAction':        void (parsed as StateAction); break;
     case 'Customization':      void (parsed as Customization); break;
@@ -261,6 +244,9 @@ function bindToType(file: string, type: string, parsed: unknown): void {
     case 'PartialSessionSummary': void (parsed as Partial<SessionSummary>); break;
     case 'Implementation':     void (parsed as Implementation); break;
     case 'InitializeResult':    void (parsed as InitializeResult); break;
+    case 'AuthenticateParams':  void (parsed as AuthenticateParams); break;
+    case 'AuthRevokedParams':    void (parsed as AuthRevokedParams); break;
+    case 'AhpClientNotification': void (parsed as AhpClientNotification); break;
     case 'ChatSource':          void (parsed as ChatSource); break;
     case 'Snapshot':            void (parsed as Snapshot); break;
     default:

@@ -141,8 +141,6 @@ func TestFixtureDrivenReducerParity(t *testing.T) {
 			switch fixture.Reducer {
 			case "root":
 				runFixture[ahptypes.RootState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToRoot)
-			case "accounts":
-				runFixture[ahptypes.AccountsState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToAccounts)
 			case "session":
 				runFixture[ahptypes.SessionState](tt, fixture.Initial, fixture.Expected, actions, ApplyActionToSession)
 			case "chat":

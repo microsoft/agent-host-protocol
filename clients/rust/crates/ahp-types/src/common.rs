@@ -17,9 +17,6 @@ pub type Uri = String;
 /// terminals changed, config changed). Always present on every host.
 pub const ROOT_RESOURCE_URI: &str = "ahp-root://";
 
-/// Singleton accounts channel on hosts advertising brokered authentication.
-pub const ACCOUNTS_RESOURCE_URI: &str = "ahp-accounts://";
-
 /// A string that may optionally be rendered as Markdown.
 ///
 /// Serialized as either a plain JSON string or `{ "markdown": "..." }`.

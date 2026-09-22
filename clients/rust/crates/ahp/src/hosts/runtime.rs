@@ -94,7 +94,6 @@ pub(super) fn spawn(
         server_seq: 0,
         default_directory: None,
         automations: None,
-        authentication: None,
         root_state: RootState {
             agents: vec![],
             active_sessions: None,
@@ -275,17 +274,11 @@ impl HostRuntime {
             let can_reconnect = snapshot.server_seq > 0 && !snapshot.subscriptions.is_empty();
             let subscriptions = snapshot.subscriptions.clone();
             let server_seq = snapshot.server_seq;
-            let authentication = snapshot.authentication.clone();
             drop(snapshot);
 
             if can_reconnect {
                 match client
-                    .reconnect_with_authentication(
-                        self.client_id.clone(),
-                        server_seq,
-                        subscriptions.clone(),
-                        authentication,
-                    )
+                    .reconnect(self.client_id.clone(), server_seq, subscriptions.clone())
                     .await
                 {
                     Ok(result) => (subscriptions, server_seq, None, Some(result)),
@@ -355,7 +348,6 @@ impl HostRuntime {
                 state.protocol_version = Some(init.protocol_version.clone());
                 state.default_directory = init.default_directory.clone();
                 state.automations = init.automations.clone();
-                state.authentication = init.authentication.clone();
                 state.completion_trigger_characters = init
                     .completion_trigger_characters
                     .clone()

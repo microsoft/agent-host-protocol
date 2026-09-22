@@ -1,13 +1,13 @@
 /**
  * Common Command Types — Connection-level commands (handshake, ping,
  * reconnect, subscribe/unsubscribe, dispatchAction) plus the filesystem
- * `resource*` family and `authenticate` that aren't specific to any one
- * state channel.
+ * `resource*` family, `authenticate`, and `auth/revoked` that aren't specific
+ * to any one state channel.
  *
  * @module common/commands
  */
 
-import type { URI, Snapshot } from './state.js';
+import type { URI, Snapshot, AuthenticationAccount } from './state.js';
 import type { ActionEnvelope, StateAction } from './actions.js';
 import type { AutomationRunCancelRequestedAction } from '../channels-automation-run/actions.js';
 import type { AutomationCreateRequestedAction } from '../channels-automation/actions.js';
@@ -18,7 +18,6 @@ import type {
   AutomationState,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
-import type { AuthenticationCapability, BrokeredAuthenticationBinding } from '../channels-accounts/commands.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -295,15 +294,14 @@ export interface InitializeResult {
    */
   automations?: AutomationCapabilities;
   /**
-   * Account-managed authentication support. The `clientBrokered` flow enables
-   * `ahp-accounts://`, `authBegin`, and bound `authenticate` delivery.
+   * Supports `AuthenticateParams.account` and the client-to-host
+   * `auth/revoked` notification together. Presence (`{}`) means supported.
+   * Clients MUST check this capability before relying on account-scoped
+   * revocation, and MUST NOT fall back to an empty-token resource-wide clear.
    *
-   * Clients MUST check the flow before using it. A missing capability is not
-   * permission to fall back to empty-token revocation of shared credentials.
-   *
-   * @see {@link /specification/accounts-channel | Accounts Channel}
+   * @see {@link /specification/authentication#account-scoped-revocation | Account-scoped revocation}
    */
-  authentication?: AuthenticationCapability;
+  accountRevocation?: Record<string, never>;
 }
 
 /**
@@ -1178,8 +1176,9 @@ export interface AuthenticateParams extends BaseParams {
    * authorization server did not supply an expiry or the expiry is otherwise
    * unknown. When supplied, the value MUST be a positive integer.
    *
-   * This field is irrelevant when `token` is empty to revoke authentication
-   * and SHOULD be omitted in that case.
+   * This field is irrelevant when `token` is empty for baseline resource-wide
+   * revocation and SHOULD be omitted in that case. Identified credentials use
+   * `auth/revoked`, not empty-token delivery.
    *
    * @integer
    * @minimum 1
@@ -1195,29 +1194,58 @@ export interface AuthenticateParams extends BaseParams {
    */
   scopes?: string[];
   /**
-   * Required for shared client-brokered credentials after negotiating the
-   * `clientBrokered` flow. Attempt bindings complete a live admission; account
-   * bindings renew a live lifetime without changing consumer selection.
+   * Account owning this credential, supplied by the client's authentication
+   * provider and stable across rotation. Required for account-scoped revocation.
    *
-   * The token MUST be nonempty. Hosts reject missing/unknown bindings in a
-   * shared context, and MUST NOT ignore a binding or interpret it as a legacy
-   * unbound push. Removed lifetimes and stale attempts fail with `Conflict`.
-   * Sign-out uses key-only `accounts/removed`, not an empty token.
+   * The host validates the association using its trusted provider context;
+   * this descriptor is not proof of identity or permission. It must accompany
+   * every refresh, not just the first token. An identified token must be
+   * nonempty; withdrawal uses `auth/revoked` instead.
    */
-  binding?: BrokeredAuthenticationBinding;
+  account?: AuthenticationAccount;
 }
 
 /**
  * Result of the `authenticate` command.
  *
- * An empty object on baseline success; bound delivery MUST return `accountId`.
- * If the token is invalid or the resource is unrecognized, the server MUST
- * return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams`
- * `-32602`). Clients MUST treat a missing account id after bound delivery as
- * an unconfirmed protocol failure, not retry without the binding. An
- * account-bound renewal MUST return the same account id that was requested.
+ * An empty object on success. If the token is invalid or the resource is
+ * unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`
+ * `-32007` or `InvalidParams` `-32602`).
  */
 export interface AuthenticateResult {
-  /** Admitted or renewed host account lifetime; required for bound delivery. */
-  accountId?: string;
+}
+
+// ─── auth/revoked ──────────────────────────────────────────────────────────
+
+/**
+ * The client withdraws credentials for an account at a protected resource.
+ *
+ * Requires `InitializeResult.accountRevocation`. This client-to-host
+ * notification has no response and is not an acknowledgement that host
+ * cleanup succeeded. It does not revoke the upstream OAuth grant.
+ *
+ * The host orders it with authentication and provider replay, removes all
+ * matching scope/token variants and pending deliveries, and promptly stops
+ * work using those credentials. The current credential is cleared only if
+ * both resource and account match; another account's credentials and work
+ * remain untouched. Known dependent credentials are also invalidated.
+ *
+ * A later `authenticate` can authorize the account again. This notification
+ * does not establish a permanent revocation barrier or a new account lifetime.
+ * Clients must cancel stale forwarding and re-check their authentication
+ * provider before replaying credentials after reconnect.
+ *
+ * @category Commands
+ * @method auth/revoked
+ * @direction Client → Server
+ * @messageType Notification
+ * @version 1
+ * @see {@link /specification/authentication#account-scoped-revocation | Account-scoped revocation}
+ */
+export interface AuthRevokedParams extends BaseParams {
+  channel: 'ahp-root://';
+  /** Exact protected-resource identifier used in `authenticate`. */
+  resource: string;
+  /** The same authority-qualified account identity supplied with its tokens. */
+  account: AuthenticationAccount;
 }

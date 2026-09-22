@@ -35,7 +35,6 @@ function readChannelSources(baseName: string): string {
     'channels-resource-watch',
     'channels-automation',
     'channels-automation-run',
-    'channels-accounts',
   ];
   return dirs
     .map(dir => {
@@ -62,7 +61,7 @@ function parseCommandMethods(source: string): MethodInfo[] {
   const jsdocRe = /\/\*\*[\s\S]*?\*\//g;
   for (const match of source.matchAll(jsdocRe)) {
     const block = match[0];
-    const methodMatch = block.match(/@method\s+(\w+)/);
+    const methodMatch = block.match(/@method\s+([\w/]+)/);
     const typeMatch = block.match(/@messageType\s+(Request|Notification)/);
     if (methodMatch && typeMatch) {
       results.push({

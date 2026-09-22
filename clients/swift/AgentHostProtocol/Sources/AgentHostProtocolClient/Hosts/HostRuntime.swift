@@ -72,7 +72,6 @@ internal final class HostRuntime: Sendable {
             serverSeq: 0,
             defaultDirectory: nil,
             automations: nil,
-            authentication: nil,
             rootState: RootState(agents: []),
             subscriptions: config.initialSubscriptions,
             completionTriggerCharacters: [],
@@ -374,7 +373,6 @@ internal final class HostRuntime: Sendable {
                     state.protocolVersion = init1.protocolVersion
                     state.defaultDirectory = init1.defaultDirectory
                     state.automations = init1.automations
-                    state.authentication = init1.authentication
                     state.completionTriggerCharacters = init1.completionTriggerCharacters ?? []
                     if let snap = init1.snapshots.first(where: { $0.resource == RootResourceURI }) {
                         if case .root(let root) = snap.state {

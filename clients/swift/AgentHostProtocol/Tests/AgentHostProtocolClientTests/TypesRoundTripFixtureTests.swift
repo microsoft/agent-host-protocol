@@ -36,6 +36,23 @@ import AgentHostProtocol
 
 final class TypesRoundTripFixtureTests: XCTestCase {
 
+    func testAccountRevocationCapabilityDistinguishesPresenceFromAbsence() throws {
+        for advertised in [false, true] {
+            let result = InitializeResult(
+                protocolVersion: "0.9.0", serverSeq: 0, snapshots: [],
+                accountRevocation: advertised ? [:] : nil
+            )
+            let encoded = try JSONEncoder().encode(result)
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+            let decoded = try JSONDecoder().decode(InitializeResult.self, from: encoded)
+            XCTAssertEqual(decoded.accountRevocation != nil, advertised)
+            XCTAssertEqual(object["accountRevocation"] != nil, advertised)
+            if advertised {
+                XCTAssertEqual((object["accountRevocation"] as? NSDictionary)?.count, 0)
+            }
+        }
+    }
+
     // MARK: - Fixture directory
 
     private static let fixtureDir: URL = {
@@ -162,16 +179,22 @@ final class TypesRoundTripFixtureTests: XCTestCase {
         }
 
         switch type {
-        case "AuthAttemptState":
-            return try reencode(dec.decode(AuthAttemptState.self, from: inputData))
-        case "AuthBeginParams":
-            return try reencode(dec.decode(AuthBeginParams.self, from: inputData))
-        case "AuthBeginResult":
-            return try reencode(dec.decode(AuthBeginResult.self, from: inputData))
         case "AuthenticateParams":
             return try reencode(dec.decode(AuthenticateParams.self, from: inputData))
-        case "AuthenticateResult":
-            return try reencode(dec.decode(AuthenticateResult.self, from: inputData))
+        case "AuthRevokedParams":
+            return try reencode(dec.decode(AuthRevokedParams.self, from: inputData))
+        case "AhpClientNotification":
+            let object = try JSONSerialization.jsonObject(with: inputData) as? [String: Any]
+            switch object?["method"] as? String {
+            case "auth/revoked":
+                return try reencode(dec.decode(JsonRpcNotification<AuthRevokedParams>.self, from: inputData))
+            case "unsubscribe":
+                return try reencode(dec.decode(JsonRpcNotification<UnsubscribeParams>.self, from: inputData))
+            case "dispatchAction":
+                return try reencode(dec.decode(JsonRpcNotification<DispatchActionParams>.self, from: inputData))
+            default:
+                throw FixtureError.message("Unknown client notification method")
+            }
         case "ActionEnvelope":
             return try reencode(dec.decode(ActionEnvelope.self, from: inputData))
         case "StateAction":

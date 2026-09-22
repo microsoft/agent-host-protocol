@@ -15,27 +15,6 @@ var _ = json.RawMessage(nil)
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
-// A consumer whose credential selection the host manages.
-//
-// Unknown consumer kinds MUST NOT be interpreted as a known consumer.
-type AccountConsumerKind string
-
-const (
-	AccountConsumerKindAgent     AccountConsumerKind = "agent"
-	AccountConsumerKindMcpServer AccountConsumerKind = "mcpServer"
-)
-
-// Lifecycle of a client-brokered credential admission.
-//
-// Clients preserve unknown statuses but MUST NOT interpret them as success.
-type AuthAttemptStatus string
-
-const (
-	AuthAttemptStatusPending   AuthAttemptStatus = "pending"
-	AuthAttemptStatusCompleted AuthAttemptStatus = "completed"
-	AuthAttemptStatusFailed    AuthAttemptStatus = "failed"
-)
-
 // Policy configuration state for a model.
 type PolicyState string
 
@@ -563,110 +542,6 @@ const (
 
 // ─── Structs ──────────────────────────────────────────────────────────
 
-// Shared accounts and credential admissions on `ahp-accounts://`.
-//
-// Exposed only when `InitializeResult.authentication.flows` advertises
-// `clientBrokered`. Subscription and mutation are separately authorized.
-// State contains no access, refresh, or identity tokens.
-type AccountsState struct {
-	// Live, host-authoritative account lifetimes, keyed by `HostAccount.id`.
-	Accounts []HostAccount `json:"accounts"`
-	// Pending and retained terminal admissions, keyed by `AuthAttemptState.id`.
-	Attempts []AuthAttemptState `json:"attempts"`
-}
-
-// A host-held, revocable authorization lifetime for one verified identity.
-//
-// Rotations and resource/scope variants in the same ownership context share
-// this entry, even when supplied by different clients. Independently owned
-// grants MUST NOT be coalesced merely because their human identity matches.
-// Tokens, token hashes, and client-local identity assertions never belong here.
-type HostAccount struct {
-	// Opaque, host-assigned key, stable across rotation and scoped to the host
-	// authority. Removal retires it permanently; a deliberate later admission
-	// receives a new id. Possessing the id is not permission to use or remove it.
-	Id string `json:"id"`
-	// Display label, not an identity proof.
-	Label string `json:"label"`
-	// Whether the host can contain and remove its local credential lifetime.
-	// This does not promise upstream grant revocation or authorize the caller.
-	Removable bool `json:"removable"`
-	// Explicit consumer selections. A consumer MUST NOT select two accounts.
-	// Removing this entry drops these selections but MUST NOT select a fallback.
-	// Previously started work can still depend on this account after a move;
-	// this list is therefore not the host's complete revocation set.
-	Consumers []AccountConsumer `json:"consumers"`
-}
-
-// One protected resource used by an advertised agent provider.
-type AgentAccountConsumer struct {
-	Kind AccountConsumerKind `json:"kind"`
-	// Matches `AgentInfo.provider`.
-	Provider string `json:"provider"`
-	// Exact identifier from the provider's advertised protected resources.
-	Resource string `json:"resource"`
-}
-
-// One host-published MCP server customization in a live session.
-//
-// The host resolves its resource, rather than treating a server name as a
-// globally unique identity. A replaced customization or changed resource
-// requires a fresh admission; a missing binding MUST NOT select another account.
-type McpServerAccountConsumer struct {
-	Kind AccountConsumerKind `json:"kind"`
-	// Session URI containing the customization.
-	Session URI `json:"session"`
-	// Session-unique `McpServerCustomization.id`, not its display name.
-	CustomizationId string `json:"customizationId"`
-}
-
-// Correlation and target shared by every admission outcome.
-type AuthAttemptBase struct {
-	// Host-assigned, single-use id. Not a bearer authorization.
-	Id string `json:"id"`
-	// Host-validated consumer selected for this admission.
-	Consumer AccountConsumer `json:"consumer"`
-	// Exact protected resource captured when the attempt was admitted.
-	Resource string `json:"resource"`
-}
-
-// Awaiting a client-supplied token. No credential is usable from this state.
-type AuthAttemptPendingState struct {
-	// Host-assigned, single-use id. Not a bearer authorization.
-	Id string `json:"id"`
-	// Host-validated consumer selected for this admission.
-	Consumer AccountConsumer `json:"consumer"`
-	// Exact protected resource captured when the attempt was admitted.
-	Resource string            `json:"resource"`
-	Status   AuthAttemptStatus `json:"status"`
-}
-
-// Admission committed. Retained so a lost response can be reconciled.
-type AuthAttemptCompletedState struct {
-	// Host-assigned, single-use id. Not a bearer authorization.
-	Id string `json:"id"`
-	// Host-validated consumer selected for this admission.
-	Consumer AccountConsumer `json:"consumer"`
-	// Exact protected resource captured when the attempt was admitted.
-	Resource string            `json:"resource"`
-	Status   AuthAttemptStatus `json:"status"`
-	// The admitted authorization lifetime, which may subsequently be removed.
-	AccountId string `json:"accountId"`
-}
-
-// Admission failed or expired without installing a usable credential.
-type AuthAttemptFailedState struct {
-	// Host-assigned, single-use id. Not a bearer authorization.
-	Id string `json:"id"`
-	// Host-validated consumer selected for this admission.
-	Consumer AccountConsumer `json:"consumer"`
-	// Exact protected resource captured when the attempt was admitted.
-	Resource string            `json:"resource"`
-	Status   AuthAttemptStatus `json:"status"`
-	// Failure details, with no token or other secret content.
-	Error ErrorInfo `json:"error"`
-}
-
 // An optionally-sized icon that can be displayed in a user interface.
 type Icon struct {
 	// A standard URI pointing to an icon resource. May be an HTTP/HTTPS URL or a
@@ -692,6 +567,23 @@ type Icon struct {
 	//
 	// If not provided, the client should assume the icon can be used with any theme.
 	Theme *string `json:"theme,omitempty"`
+}
+
+// Account identity attached to a client-supplied credential.
+//
+// This is not a host-assigned account handle or a credential lifetime. Both
+// fields are compared exactly; the same identity MUST survive token rotation
+// and be comparable across clients using the same authority. Display names,
+// client-local session ids, and token hashes are not account identifiers.
+type AuthenticationAccount struct {
+	// Nonempty canonical authorization-server identifier for this account,
+	// consistent with the protected resource's advertised authorization servers.
+	// This namespaces `id`; it is not an agent provider id or a client implementation.
+	Authority string `json:"authority"`
+	// Nonempty stable account identifier within the authority. Pairwise
+	// identifiers from different OAuth clients require a trusted provider
+	// mapping before they can identify the same account.
+	Id string `json:"id"`
 }
 
 // Describes a protected resource's authentication requirements using
@@ -5926,133 +5818,6 @@ func (u AutomationRunLifecycle) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
-// AccountConsumer identifies an agent resource or a session MCP customization.
-type AccountConsumer struct {
-	Value isAccountConsumer
-}
-
-// isAccountConsumer is the marker interface implemented by every
-// concrete variant of AccountConsumer.
-type isAccountConsumer interface{ isAccountConsumer() }
-
-func (*AgentAccountConsumer) isAccountConsumer()     {}
-func (*McpServerAccountConsumer) isAccountConsumer() {}
-
-// AccountConsumerUnknown carries an unrecognized AccountConsumer variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
-type AccountConsumerUnknown struct {
-	Raw json.RawMessage
-}
-
-func (*AccountConsumerUnknown) isAccountConsumer() {}
-
-// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
-func (u *AccountConsumer) UnmarshalJSON(data []byte) error {
-	disc, _, err := readDiscriminator(data, "kind")
-	if err != nil {
-		return err
-	}
-	switch disc {
-	case "agent":
-		var value AgentAccountConsumer
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "mcpServer":
-		var value McpServerAccountConsumer
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	default:
-		raw := make(json.RawMessage, len(data))
-		copy(raw, data)
-		u.Value = &AccountConsumerUnknown{Raw: raw}
-	}
-	return nil
-}
-
-// MarshalJSON encodes the active variant back to JSON.
-func (u AccountConsumer) MarshalJSON() ([]byte, error) {
-	if unk, ok := u.Value.(*AccountConsumerUnknown); ok {
-		if len(unk.Raw) == 0 {
-			return []byte("null"), nil
-		}
-		return unk.Raw, nil
-	}
-	if u.Value == nil {
-		return []byte("null"), nil
-	}
-	return json.Marshal(u.Value)
-}
-
-// AuthAttemptState is a pending or retained authentication admission outcome.
-type AuthAttemptState struct {
-	Value isAuthAttemptState
-}
-
-// isAuthAttemptState is the marker interface implemented by every
-// concrete variant of AuthAttemptState.
-type isAuthAttemptState interface{ isAuthAttemptState() }
-
-func (*AuthAttemptPendingState) isAuthAttemptState()   {}
-func (*AuthAttemptCompletedState) isAuthAttemptState() {}
-func (*AuthAttemptFailedState) isAuthAttemptState()    {}
-
-// AuthAttemptStateUnknown carries an unrecognized AuthAttemptState variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
-type AuthAttemptStateUnknown struct {
-	Raw json.RawMessage
-}
-
-func (*AuthAttemptStateUnknown) isAuthAttemptState() {}
-
-// UnmarshalJSON decodes the variant indicated by the "status" discriminator.
-func (u *AuthAttemptState) UnmarshalJSON(data []byte) error {
-	disc, _, err := readDiscriminator(data, "status")
-	if err != nil {
-		return err
-	}
-	switch disc {
-	case "pending":
-		var value AuthAttemptPendingState
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "completed":
-		var value AuthAttemptCompletedState
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	case "failed":
-		var value AuthAttemptFailedState
-		if err := json.Unmarshal(data, &value); err != nil {
-			return err
-		}
-		u.Value = &value
-	default:
-		raw := make(json.RawMessage, len(data))
-		copy(raw, data)
-		u.Value = &AuthAttemptStateUnknown{Raw: raw}
-	}
-	return nil
-}
-
-// MarshalJSON encodes the active variant back to JSON.
-func (u AuthAttemptState) MarshalJSON() ([]byte, error) {
-	if unk, ok := u.Value.(*AuthAttemptStateUnknown); ok {
-		if len(unk.Raw) == 0 {
-			return []byte("null"), nil
-		}
-		return unk.Raw, nil
-	}
-	if u.Value == nil {
-		return []byte("null"), nil
-	}
-	return json.Marshal(u.Value)
-}
-
 // ChatOrigin describes how a chat came into existence.
 type ChatOrigin struct {
 	Value isChatOrigin
@@ -6150,15 +5915,14 @@ func (o ChatOrigin) MarshalJSON() ([]byte, error) {
 }
 
 // SnapshotState is the state payload of a snapshot — root, session,
-// accounts, chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
 // or automation-run state. The active
 // variant is chosen by which pointer field is non-nil; UnmarshalJSON probes
 // for required fields in the canonical order
-// (accounts → automationRun → automations → session → chat → terminal → changeset →
+// (automationRun → automations → session → chat → terminal → changeset →
 // resourceWatch → annotations → root).
 type SnapshotState struct {
 	Root          *RootState          `json:"-"`
-	Accounts      *AccountsState      `json:"-"`
 	Session       *SessionState       `json:"-"`
 	Chat          *ChatState          `json:"-"`
 	Terminal      *TerminalState      `json:"-"`
@@ -6172,8 +5936,6 @@ type SnapshotState struct {
 // MarshalJSON encodes whichever variant is currently populated.
 func (s SnapshotState) MarshalJSON() ([]byte, error) {
 	switch {
-	case s.Accounts != nil:
-		return json.Marshal(s.Accounts)
 	case s.AutomationRun != nil:
 		return json.Marshal(s.AutomationRun)
 	case s.Automations != nil:
@@ -6206,12 +5968,6 @@ func (s *SnapshotState) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch {
-	case containsAll(probe, "accounts", "attempts"):
-		var v AccountsState
-		if err := json.Unmarshal(data, &v); err != nil {
-			return err
-		}
-		s.Accounts = &v
 	case containsAll(probe, "automation", "origin", "sessions"):
 		var v AutomationRunState
 		if err := json.Unmarshal(data, &v); err != nil {

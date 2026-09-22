@@ -57,16 +57,6 @@ public sealed class HostClientHandle
     /// </summary>
     public void CheckAliveOrThrow() => CheckAlive();
 
-    /// <summary>Begins a capability-gated authentication attempt through this live connection.</summary>
-    public Task<AuthBeginResult> AuthBeginAsync(
-        AuthBeginParams parameters, CancellationToken cancellationToken = default) =>
-        CheckAlive().AuthBeginAsync(parameters, cancellationToken);
-
-    /// <summary>Submits credentials through this live connection without discarding an account or attempt binding.</summary>
-    public Task<AuthenticateResult> AuthenticateAsync(
-        AuthenticateParams parameters, CancellationToken cancellationToken = default) =>
-        CheckAlive().AuthenticateAsync(parameters, cancellationToken);
-
     /// <summary>
     /// Dispatches an action through this connection on <paramref name="channel"/>,
     /// refusing (throwing) if the host was removed or the connection has been

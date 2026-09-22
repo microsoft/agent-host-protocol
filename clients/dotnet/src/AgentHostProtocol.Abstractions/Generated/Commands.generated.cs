@@ -7,39 +7,6 @@
 
 namespace Microsoft.AgentHostProtocol;
 
-/// <summary>Identifies the exact consumer selected for authentication admission.</summary>
-public sealed record AuthBeginTarget
-{
-    public required AccountConsumer Consumer { get; init; }
-}
-
-/// <summary>BrokeredAuthenticationBinding binds token delivery to an attempt or live account.</summary>
-[JsonConverter(typeof(BrokeredAuthenticationBindingConverter))]
-public sealed class BrokeredAuthenticationBinding : AhpUnion
-{
-    /// <summary>Creates an empty BrokeredAuthenticationBinding (no active variant).</summary>
-    public BrokeredAuthenticationBinding() { }
-
-    /// <summary>Creates a BrokeredAuthenticationBinding wrapping the given variant value.</summary>
-    public BrokeredAuthenticationBinding(object? value) : base(value) { }
-}
-
-/// <summary>System.Text.Json converter for the BrokeredAuthenticationBinding discriminated union.</summary>
-internal sealed class BrokeredAuthenticationBindingConverter : UnionConverter<BrokeredAuthenticationBinding>
-{
-    public BrokeredAuthenticationBindingConverter()
-        : base(
-            discriminator: "kind",
-            variants: new Dictionary<string, Type>
-            {
-        ["attempt"] = typeof(BrokeredAuthenticationAttemptBinding),
-        ["account"] = typeof(BrokeredAuthenticationAccountBinding),
-            },
-            allowUnknown: false)
-    {
-    }
-}
-
 // ─── Enums ────────────────────────────────────────────────────────────
 
 /// <summary>Discriminant for reconnect result types.</summary>
@@ -127,121 +94,7 @@ public enum ResourceWriteMode
     Insert,
 }
 
-/// <summary>Authentication flow name. Unknown future names round-trip without becoming supported flows.</summary>
-[JsonConverter(typeof(AuthFlowKindConverter))]
-public readonly record struct AuthFlowKind(string Value)
-{
-    public static AuthFlowKind ClientBrokered { get; } = new("clientBrokered");
-    public override string ToString() => Value ?? string.Empty;
-}
-
-internal sealed class AuthFlowKindConverter : JsonConverter<AuthFlowKind>
-{
-    public override AuthFlowKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
-        reader.TokenType == JsonTokenType.String
-            ? new AuthFlowKind(reader.GetString()!)
-            : throw new JsonException("Authentication flow kind must be a string");
-
-    public override void Write(Utf8JsonWriter writer, AuthFlowKind value, JsonSerializerOptions options) =>
-        writer.WriteStringValue(value.Value);
-}
-
-/// <summary>Whether token delivery completes an admission or renews a live account.
-///
-/// Unknown bindings MUST be rejected, never interpreted as unbound delivery.</summary>
-[JsonConverter(typeof(WireEnumConverter<BrokeredAuthenticationBindingKind>))]
-public enum BrokeredAuthenticationBindingKind
-{
-    [WireValue("attempt")]
-    Attempt,
-    [WireValue("account")]
-    Account,
-}
-
 // ─── Command Payloads ─────────────────────────────────────────────────
-
-/// <summary>A supported or offered authentication flow.</summary>
-public sealed record AuthFlowSupport
-{
-    public AuthFlowKind Kind { get; init; }
-}
-
-/// <summary>Authentication support advertised in `InitializeResult.authentication`.
-///
-/// Advertising `clientBrokered` commits the host to the accounts-channel
-/// contract, including account-safe invalidation and containment of active work.
-/// It does not require host-run OAuth or refresh-token storage.</summary>
-public sealed record AuthenticationCapability
-{
-    /// <summary>Flow descriptors clients may select; absence of a kind means unsupported.</summary>
-    public required List<AuthFlowSupport> Flows { get; init; }
-}
-
-/// <summary>Reserve a single-use client-brokered credential admission.
-///
-/// The client MUST check the `clientBrokered` capability before calling. The
-/// host validates the consumer, caller, and offered flow, captures the current
-/// selection/resource as preconditions, and publishes a pending attempt before
-/// responding. It performs no OAuth flow and accepts no credential here.
-/// Changing that consumer's selection or resource invalidates competing pending
-/// attempts, even if a later change restores the original selection.
-///
-/// Completion uses `authenticate` with an attempt binding. Only the initiating
-/// authorization context, including a verified reconnect, may complete or
-/// cancel the attempt. A correlation id alone grants no authority.</summary>
-public sealed record AuthBeginParams
-{
-    public required string Channel { get; init; }
-
-    /// <summary>Optional JSON-serializable metadata associated with this request.
-    /// Receivers MUST ignore keys they do not understand.</summary>
-    [JsonPropertyName("_meta")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Dictionary<string, JsonElement>? Meta { get; init; }
-
-    /// <summary>Exact consumer from the host's current root or session state.</summary>
-    public required AuthBeginTarget Target { get; init; }
-
-    /// <summary>Offered flows. MUST include `clientBrokered`; an empty or unsupported
-    /// offer fails with `InvalidParams` without creating an attempt.</summary>
-    public required List<AuthFlowSupport> Flows { get; init; }
-
-    /// <summary>Explicit live account to reauthorize. The host MUST verify the delivered
-    /// identity matches it. Omission admits an identity, reusing an existing
-    /// lifetime only when both verified identity and ownership context match.
-    /// Neither intent is inferred from a challenge.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? AccountId { get; init; }
-}
-
-/// <summary>Acknowledgement of the selected client-brokered flow.
-///
-/// The client MUST verify this flow before sending an attempt-bound token.</summary>
-public sealed record AuthBeginResult
-{
-    public AuthFlowKind Flow { get; init; }
-
-    /// <summary>Host-issued id of the published pending admission.</summary>
-    public required string AttemptId { get; init; }
-}
-
-/// <summary>Complete a live admission; its consumer preconditions still apply.</summary>
-public sealed record BrokeredAuthenticationAttemptBinding
-{
-    public BrokeredAuthenticationBindingKind Kind { get; init; }
-
-    /// <summary>Pending attempt from `authBegin`.</summary>
-    public required string AttemptId { get; init; }
-}
-
-/// <summary>Renew credentials under a live account without changing any selections.</summary>
-public sealed record BrokeredAuthenticationAccountBinding
-{
-    public BrokeredAuthenticationBindingKind Kind { get; init; }
-
-    /// <summary>Live host-issued account lifetime. Retired ids fail with `Conflict`.</summary>
-    public required string AccountId { get; init; }
-}
 
 /// <summary>Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.</summary>
@@ -366,13 +219,12 @@ public sealed record InitializeResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCapabilities? Automations { get; init; }
 
-    /// <summary>Account-managed authentication support. The `clientBrokered` flow enables
-    /// `ahp-accounts://`, `authBegin`, and bound `authenticate` delivery.
-    ///
-    /// Clients MUST check the flow before using it. A missing capability is not
-    /// permission to fall back to empty-token revocation of shared credentials.</summary>
+    /// <summary>Supports `AuthenticateParams.account` and the client-to-host
+    /// `auth/revoked` notification together. Presence (`{}`) means supported.
+    /// Clients MUST check this capability before relying on account-scoped
+    /// revocation, and MUST NOT fall back to an empty-token resource-wide clear.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public AuthenticationCapability? Authentication { get; init; }
+    public Dictionary<string, JsonElement>? AccountRevocation { get; init; }
 }
 
 /// <summary>Identifies a protocol implementation — the software (and build) on one end
@@ -1417,8 +1269,9 @@ public sealed record AuthenticateParams
     /// authorization server did not supply an expiry or the expiry is otherwise
     /// unknown. When supplied, the value MUST be a positive integer.
     ///
-    /// This field is irrelevant when `token` is empty to revoke authentication
-    /// and SHOULD be omitted in that case.</summary>
+    /// This field is irrelevant when `token` is empty for baseline resource-wide
+    /// revocation and SHOULD be omitted in that case. Identified credentials use
+    /// `auth/revoked`, not empty-token delivery.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? ExpiresIn { get; init; }
 
@@ -1431,31 +1284,57 @@ public sealed record AuthenticateParams
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Scopes { get; init; }
 
-    /// <summary>Required for shared client-brokered credentials after negotiating the
-    /// `clientBrokered` flow. Attempt bindings complete a live admission; account
-    /// bindings renew a live lifetime without changing consumer selection.
+    /// <summary>Account owning this credential, supplied by the client's authentication
+    /// provider and stable across rotation. Required for account-scoped revocation.
     ///
-    /// The token MUST be nonempty. Hosts reject missing/unknown bindings in a
-    /// shared context, and MUST NOT ignore a binding or interpret it as a legacy
-    /// unbound push. Removed lifetimes and stale attempts fail with `Conflict`.
-    /// Sign-out uses key-only `accounts/removed`, not an empty token.</summary>
+    /// The host validates the association using its trusted provider context;
+    /// this descriptor is not proof of identity or permission. It must accompany
+    /// every refresh, not just the first token. An identified token must be
+    /// nonempty; withdrawal uses `auth/revoked` instead.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public BrokeredAuthenticationBinding? Binding { get; init; }
+    public AuthenticationAccount? Account { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.
 ///
-/// An empty object on baseline success; bound delivery MUST return `accountId`.
-/// If the token is invalid or the resource is unrecognized, the server MUST
-/// return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams`
-/// `-32602`). Clients MUST treat a missing account id after bound delivery as
-/// an unconfirmed protocol failure, not retry without the binding. An
-/// account-bound renewal MUST return the same account id that was requested.</summary>
+/// An empty object on success. If the token is invalid or the resource is
+/// unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`
+/// `-32007` or `InvalidParams` `-32602`).</summary>
 public sealed record AuthenticateResult
 {
-    /// <summary>Admitted or renewed host account lifetime; required for bound delivery.</summary>
+}
+
+/// <summary>The client withdraws credentials for an account at a protected resource.
+///
+/// Requires `InitializeResult.accountRevocation`. This client-to-host
+/// notification has no response and is not an acknowledgement that host
+/// cleanup succeeded. It does not revoke the upstream OAuth grant.
+///
+/// The host orders it with authentication and provider replay, removes all
+/// matching scope/token variants and pending deliveries, and promptly stops
+/// work using those credentials. The current credential is cleared only if
+/// both resource and account match; another account's credentials and work
+/// remain untouched. Known dependent credentials are also invalidated.
+///
+/// A later `authenticate` can authorize the account again. This notification
+/// does not establish a permanent revocation barrier or a new account lifetime.
+/// Clients must cancel stale forwarding and re-check their authentication
+/// provider before replaying credentials after reconnect.</summary>
+public sealed record AuthRevokedParams
+{
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? AccountId { get; init; }
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Exact protected-resource identifier used in `authenticate`.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>The same authority-qualified account identity supplied with its tokens.</summary>
+    public required AuthenticationAccount Account { get; init; }
 }
 
 /// <summary>Creates a new terminal on the server.

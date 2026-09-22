@@ -22,7 +22,6 @@ internal struct HostInternal {
     var serverSeq: Int
     var defaultDirectory: String?
     var automations: AutomationCapabilities?
-    var authentication: AuthenticationCapability?
     var rootState: RootState
     var subscriptions: [String]
     var completionTriggerCharacters: [String]
@@ -47,7 +46,6 @@ internal struct HostInternal {
             serverSeq: serverSeq,
             defaultDirectory: defaultDirectory,
             automations: automations,
-            authentication: authentication,
             agents: rootState.agents,
             activeSessions: rootState.activeSessions,
             terminals: rootState.terminals,

@@ -134,9 +134,6 @@ object AhpCommands {
     fun authenticate(id: Long, params: AuthenticateParams): JsonRpcRequest<AuthenticateParams> =
         JsonRpcRequest(id = id, method = "authenticate", params = params)
 
-    fun authBegin(id: Long, params: AuthBeginParams): JsonRpcRequest<AuthBeginParams> =
-        JsonRpcRequest(id = id, method = "authBegin", params = params)
-
     fun createTerminal(id: Long, params: CreateTerminalParams): JsonRpcRequest<CreateTerminalParams> =
         JsonRpcRequest(id = id, method = "createTerminal", params = params)
 
@@ -165,4 +162,7 @@ object AhpClientNotifications {
 
     fun dispatchAction(params: DispatchActionParams): JsonRpcNotification<DispatchActionParams> =
         JsonRpcNotification(method = "dispatchAction", params = params)
+
+    fun authRevoked(params: AuthRevokedParams): JsonRpcNotification<AuthRevokedParams> =
+        JsonRpcNotification(method = "auth/revoked", params = params)
 }

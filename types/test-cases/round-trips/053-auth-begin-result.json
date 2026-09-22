@@ -1,8 +1,0 @@
-{
-  "name": "auth-begin-result",
-  "group": "A",
-  "description": "Admission explicitly acknowledges the selected brokered flow before token delivery.",
-  "type": "AuthBeginResult",
-  "input": { "flow": "clientBrokered", "attemptId": "one" },
-  "acceptableOutputs": [{ "flow": "clientBrokered", "attemptId": "one" }]
-}

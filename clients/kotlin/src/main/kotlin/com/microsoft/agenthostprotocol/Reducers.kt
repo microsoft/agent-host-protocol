@@ -11,7 +11,6 @@ import com.microsoft.agenthostprotocol.generated.*
 import java.time.Instant
 import java.time.format.DateTimeFormatterBuilder
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 
 // ─── Reducer Interface ──────────────────────────────────────────────────────
 
@@ -21,10 +20,10 @@ import kotlinx.serialization.json.JsonPrimitive
  *
  * The companion top-level functions ([rootReducer], [sessionReducer], [chatReducer],
  * [terminalReducer], [changesetReducer], [annotationsReducer], [resourceWatchReducer],
- * [accountsReducer], [automationReducer], and [automationRunReducer]) are the canonical implementations.
+ * [automationReducer], and [automationRunReducer]) are the canonical implementations.
  * The object instances on this interface ([RootReducer], [SessionReducer], [ChatReducer],
  * [TerminalReducer], [ChangesetReducer], [AnnotationsReducer], [ResourceWatchReducer],
- * [AccountsReducer], [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
+ * [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
  * instance is needed.
  */
 public fun interface Reducer<S, A> {
@@ -35,12 +34,6 @@ public fun interface Reducer<S, A> {
 public object RootReducer : Reducer<RootState, StateAction> {
     override fun reduce(state: RootState, action: StateAction): RootState =
         rootReducer(state, action)
-}
-
-/** Pure accounts reducer as a [Reducer] instance. Delegates to [accountsReducer]. */
-public object AccountsReducer : Reducer<AccountsState, StateAction> {
-    override fun reduce(state: AccountsState, action: StateAction): AccountsState =
-        accountsReducer(state, action)
 }
 
 /** Pure session reducer as a [Reducer] instance. Delegates to [sessionReducer]. */
@@ -504,51 +497,6 @@ private fun upsertInputRequest(state: ChatState, request: ChatInputRequest): Cha
     return next.copy(
         status = withStatusFlag(chatSummaryStatus(next), SessionStatus.IS_READ, false),
     )
-}
-
-// ─── Accounts Reducer ───────────────────────────────────────────────────────
-
-private fun authAttemptId(attempt: AuthAttemptState): String? = when (attempt) {
-    is AuthAttemptStatePending -> attempt.value.id
-    is AuthAttemptStateCompleted -> attempt.value.id
-    is AuthAttemptStateFailed -> attempt.value.id
-    is AuthAttemptStateUnknown -> (attempt.raw["id"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-}
-
-/** Pure reducer for the standalone host accounts channel. */
-public fun accountsReducer(state: AccountsState, action: StateAction): AccountsState = when (action) {
-    is StateActionAccountSet -> {
-        val account = action.value.account
-        val index = state.accounts.indexOfFirst { it.id == account.id }
-        state.copy(accounts = if (index < 0) {
-            state.accounts + account
-        } else {
-            state.accounts.toMutableList().also { it[index] = account }
-        })
-    }
-    is StateActionAccountRemoved -> {
-        val index = state.accounts.indexOfFirst { it.id == action.value.id }
-        if (index < 0) state
-        else state.copy(accounts = state.accounts.toMutableList().also { it.removeAt(index) })
-    }
-    is StateActionAuthAttemptSet -> {
-        val attempt = action.value.attempt
-        val id = authAttemptId(attempt)
-        if (id == null) state else {
-            val index = state.attempts.indexOfFirst { authAttemptId(it) == id }
-            state.copy(attempts = if (index < 0) {
-                state.attempts + attempt
-            } else {
-                state.attempts.toMutableList().also { it[index] = attempt }
-            })
-        }
-    }
-    is StateActionAuthAttemptRemoved -> {
-        val index = state.attempts.indexOfFirst { authAttemptId(it) == action.value.id }
-        if (index < 0) state
-        else state.copy(attempts = state.attempts.toMutableList().also { it.removeAt(index) })
-    }
-    else -> state
 }
 
 // ─── Root Reducer ───────────────────────────────────────────────────────────

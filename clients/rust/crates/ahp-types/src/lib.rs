@@ -133,13 +133,11 @@ pub mod state;
 pub mod version;
 
 pub use actions::{ActionEnvelope, ActionOrigin, ActionType, StateAction};
-pub use common::{StringOrMarkdown, Uri, ACCOUNTS_RESOURCE_URI, ROOT_RESOURCE_URI};
+pub use common::{StringOrMarkdown, Uri, ROOT_RESOURCE_URI};
 pub use errors::{AhpErrorCode, JsonRpcErrorCode};
 pub use messages::{JsonRpcError, JsonRpcErrorResponse, JsonRpcMessage};
 pub use notifications::{
     AuthRequiredParams, SessionAddedParams, SessionRemovedParams, SessionSummaryChangedParams,
 };
-pub use state::{
-    AccountsState, Icon, ProtectedResourceMetadata, RootState, SessionState, TerminalState,
-};
+pub use state::{Icon, ProtectedResourceMetadata, RootState, SessionState, TerminalState};
 pub use version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS};

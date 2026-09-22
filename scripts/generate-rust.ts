@@ -164,7 +164,6 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | AccountsState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -210,7 +209,6 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
   if (tsType.startsWith("'") && tsType.endsWith("'")) return 'String';
   if (/^'[^']*'(\s*\|\s*'[^']*')+$/.test(tsType)) return 'String';
 
-  if (containerName === 'AuthBeginParams' && propName === 'target') return 'AuthBeginTarget';
   if (tsType.startsWith('{')) return 'AnyValue';
 
   return stripIPrefix(tsType);
@@ -755,7 +753,6 @@ function generateStructFromInterface(
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
-  'AccountConsumerKind', 'AuthAttemptStatus',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
@@ -795,16 +792,9 @@ function isBitsetEnum(enumDecl: EnumDeclaration): boolean {
  * discriminated union have `omitDiscriminants: true` set.
  */
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
-  { name: 'AccountsState' },
-  { name: 'HostAccount' },
-  { name: 'AgentAccountConsumer', omitDiscriminants: true },
-  { name: 'McpServerAccountConsumer', omitDiscriminants: true },
-  { name: 'AuthAttemptBase' },
-  { name: 'AuthAttemptPendingState', omitDiscriminants: true },
-  { name: 'AuthAttemptCompletedState', omitDiscriminants: true },
-  { name: 'AuthAttemptFailedState', omitDiscriminants: true },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
+  { name: 'AuthenticationAccount' },
   { name: 'RootState' },
   { name: 'RootConfigState' },
   { name: 'AgentInfo' },
@@ -1239,27 +1229,6 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
-const ACCOUNT_CONSUMER_UNION: UnionConfig = {
-  name: 'AccountConsumer',
-  discriminantField: 'kind',
-  doc: 'A host-managed agent or session MCP server consumer.',
-  variants: [
-    { variantName: 'Agent', innerType: 'AgentAccountConsumer', wireValue: 'agent' },
-    { variantName: 'McpServer', innerType: 'McpServerAccountConsumer', wireValue: 'mcpServer' },
-  ],
-};
-
-const AUTH_ATTEMPT_STATE_UNION: UnionConfig = {
-  name: 'AuthAttemptState',
-  discriminantField: 'status',
-  doc: 'A pending or retained terminal authentication admission.',
-  variants: [
-    { variantName: 'Pending', innerType: 'AuthAttemptPendingState', wireValue: 'pending' },
-    { variantName: 'Completed', innerType: 'AuthAttemptCompletedState', wireValue: 'completed' },
-    { variantName: 'Failed', innerType: 'AuthAttemptFailedState', wireValue: 'failed' },
-  ],
-};
-
 function generateChatOrigin(project: Project): string {
   const originKind = findEnum(project, 'ChatOriginKind');
   if (!originKind) throw new Error('ChatOriginKind enum not found');
@@ -1318,8 +1287,7 @@ function generateSnapshotState(): string {
 /// then changeset (has required \`status\` and \`files\`), then resource-watch
 /// (has required \`root\` and \`recursive\`), then annotations (has required
 /// \`annotations\`), then the automation catalogue (has required
-/// \`entries\`), then accounts (has required \`accounts\` and \`attempts\`),
-/// then root.
+/// \`automations\`), then root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -1331,7 +1299,6 @@ pub enum SnapshotState {
     Annotations(Box<AnnotationsState>),
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
-    Accounts(Box<AccountsState>),
     Root(Box<RootState>),
 }`;
 }
@@ -1390,10 +1357,6 @@ function generateStateFile(project: Project): string {
   lines.push('');
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
-  lines.push(generateDiscriminatedUnion(project, ACCOUNT_CONSUMER_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, AUTH_ATTEMPT_STATE_UNION));
-  lines.push('');
   lines.push(generateChatOrigin(project));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, RESPONSE_PART_UNION));
@@ -1456,10 +1419,6 @@ const ACTION_VARIANTS: {
   /** Box the variant payload in the `StateAction` enum (reduces enum size). */
   boxed?: boolean;
 }[] = [
-  { type: 'accounts/set', variantName: 'AccountSet', tsInterface: 'AccountSetAction' },
-  { type: 'accounts/removed', variantName: 'AccountRemoved', tsInterface: 'AccountRemovedAction' },
-  { type: 'accounts/authAttemptSet', variantName: 'AuthAttemptSet', tsInterface: 'AuthAttemptSetAction' },
-  { type: 'accounts/authAttemptRemoved', variantName: 'AuthAttemptRemoved', tsInterface: 'AuthAttemptRemovedAction' },
   { type: 'root/agentsChanged', variantName: 'RootAgentsChanged', tsInterface: 'RootAgentsChangedAction' },
   { type: 'root/activeSessionsChanged', variantName: 'RootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
@@ -1635,7 +1594,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AuthAttemptState, HostAccount, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1739,13 +1698,9 @@ pub struct ActionEnvelope {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['AuthFlowKind', 'BrokeredAuthenticationBindingKind', 'ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
-  { name: 'AuthenticationCapability' }, { name: 'AuthFlowSupport' },
-  { name: 'AuthBeginParams' }, { name: 'AuthBeginResult' },
-  { name: 'BrokeredAuthenticationAttemptBinding', omitDiscriminants: true },
-  { name: 'BrokeredAuthenticationAccountBinding', omitDiscriminants: true },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
@@ -1775,6 +1730,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
+  { name: 'AuthRevokedParams' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
   { name: 'SessionConfigCompletionsParams' }, { name: 'SessionConfigCompletionsResult' },
@@ -1807,22 +1763,12 @@ const CHAT_SOURCE_UNION: UnionConfig = {
   ],
 };
 
-const BROKERED_AUTHENTICATION_BINDING_UNION: UnionConfig = {
-  name: 'BrokeredAuthenticationBinding',
-  discriminantField: 'kind',
-  doc: 'Token delivery completing an attempt or renewing a live account.',
-  variants: [
-    { variantName: 'Attempt', innerType: 'BrokeredAuthenticationAttemptBinding', wireValue: 'attempt' },
-    { variantName: 'Account', innerType: 'BrokeredAuthenticationAccountBinding', wireValue: 'account' },
-  ],
-};
-
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AccountConsumer, AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AuthenticationAccount, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -1835,12 +1781,6 @@ function generateCommandsFile(project: Project): string {
   }
 
   lines.push('// ─── Command Payloads ─────────────────────────────────────────────────\n');
-  lines.push(`/// Exact consumer for a client-brokered authentication attempt.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AuthBeginTarget {
-    pub consumer: AccountConsumer,
-}
-`);
   const generated = new Set<string>();
   for (const entry of COMMAND_STRUCTS) {
     if (generated.has(entry.name)) continue;
@@ -1861,8 +1801,6 @@ pub struct AuthBeginTarget {
   }
 
   lines.push('// ─── ChatSource Union ─────────────────────────────────────────────────\n');
-  lines.push(generateDiscriminatedUnion(project, BROKERED_AUTHENTICATION_BINDING_UNION));
-  lines.push('');
   lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
   lines.push('');
 
@@ -2258,9 +2196,6 @@ function checkExhaustiveness(project: Project): void {
     'PaginatedResult',              // base interface; flattened into each paginated command result struct
     'StringOrMarkdown',
     'ToolInput',
-    'AccountConsumer',
-    'AuthAttemptState',
-    'BrokeredAuthenticationBinding',
     'ToolCallState',
     'StateAction',
     'ActionEnvelope',

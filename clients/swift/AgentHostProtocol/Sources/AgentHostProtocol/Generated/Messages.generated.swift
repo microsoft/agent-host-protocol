@@ -134,10 +134,6 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "authenticate", params: params)
     }
 
-    public static func authBegin(id: Int, params: AuthBeginParams) -> JsonRpcRequest<AuthBeginParams> {
-        JsonRpcRequest(id: id, method: "authBegin", params: params)
-    }
-
     public static func sessionConfigCompletions(id: Int, params: SessionConfigCompletionsParams) -> JsonRpcRequest<SessionConfigCompletionsParams> {
         JsonRpcRequest(id: id, method: "sessionConfigCompletions", params: params)
     }
@@ -163,5 +159,9 @@ public enum AHPClientNotifications {
 
     public static func dispatchAction(params: DispatchActionParams) -> JsonRpcNotification<DispatchActionParams> {
         JsonRpcNotification(method: "dispatchAction", params: params)
+    }
+
+    public static func authRevoked(params: AuthRevokedParams) -> JsonRpcNotification<AuthRevokedParams> {
+        JsonRpcNotification(method: "auth/revoked", params: params)
     }
 }

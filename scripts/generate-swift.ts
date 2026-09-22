@@ -86,7 +86,6 @@ function partialSwiftName(tsInterfaceName: string): string {
 /** Map a TypeScript type string to a Swift type string */
 function mapType(tsType: string, propName?: string, containerName?: string): string {
   tsType = tsType.replace(/import\([^)]+\)\./g, '').trim();
-  if (containerName === 'AuthBeginParams' && propName === 'target') return 'AuthBeginTarget';
 
   // Remove outer parens
   while (tsType.startsWith('(') && tsType.endsWith(')')) {
@@ -121,7 +120,6 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
-    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | AccountsState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -687,11 +685,10 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
-  'AccountConsumerKind', 'AuthAttemptStatus',
 ];
 
 const STATE_STRUCTS = [
-  'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
+  'Icon', 'ProtectedResourceMetadata', 'AuthenticationAccount', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
@@ -756,28 +753,7 @@ const STATE_STRUCTS = [
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
-  'AccountsState', 'HostAccount', 'AgentAccountConsumer', 'McpServerAccountConsumer',
-  'AuthAttemptPendingState', 'AuthAttemptCompletedState', 'AuthAttemptFailedState',
 ];
-
-const ACCOUNT_CONSUMER_UNION: UnionConfig = {
-  name: 'AccountConsumer',
-  discriminantField: 'kind',
-  variants: [
-    { caseName: 'agent', structName: 'AgentAccountConsumer', discriminantValue: 'agent' },
-    { caseName: 'mcpServer', structName: 'McpServerAccountConsumer', discriminantValue: 'mcpServer' },
-  ],
-};
-
-const AUTH_ATTEMPT_STATE_UNION: UnionConfig = {
-  name: 'AuthAttemptState',
-  discriminantField: 'status',
-  variants: [
-    { caseName: 'pending', structName: 'AuthAttemptPendingState', discriminantValue: 'pending' },
-    { caseName: 'completed', structName: 'AuthAttemptCompletedState', discriminantValue: 'completed' },
-    { caseName: 'failed', structName: 'AuthAttemptFailedState', discriminantValue: 'failed' },
-  ],
-};
 
 const RESPONSE_PART_UNION: UnionConfig = {
   name: 'ResponsePart',
@@ -1118,7 +1094,6 @@ function generateSnapshotState(): string {
   return `/// The state payload of a snapshot.
 public enum SnapshotState: Codable, Sendable {
     case root(RootState)
-    case accounts(AccountsState)
     case session(SessionState)
     case chat(ChatState)
     case terminal(TerminalState)
@@ -1149,8 +1124,6 @@ public enum SnapshotState: Codable, Sendable {
             self = .automations(automations)
         } else if let automationRun = try? AutomationRunState(from: decoder) {
             self = .automationRun(automationRun)
-        } else if let accounts = try? AccountsState(from: decoder) {
-            self = .accounts(accounts)
         } else {
             self = .root(try RootState(from: decoder))
         }
@@ -1159,7 +1132,6 @@ public enum SnapshotState: Codable, Sendable {
     public func encode(to encoder: Encoder) throws {
         switch self {
         case .root(let state): try state.encode(to: encoder)
-        case .accounts(let state): try state.encode(to: encoder)
         case .session(let state): try state.encode(to: encoder)
         case .chat(let state): try state.encode(to: encoder)
         case .terminal(let state): try state.encode(to: encoder)
@@ -1378,10 +1350,6 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(project, ACCOUNT_CONSUMER_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, AUTH_ATTEMPT_STATE_UNION));
-  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1394,10 +1362,6 @@ function generateStateFile(project: Project): string {
 
 /** Action type discriminant values mapped to struct names */
 const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[] = [
-  { type: 'accounts/set', caseName: 'accountSet', tsInterface: 'AccountSetAction' },
-  { type: 'accounts/removed', caseName: 'accountRemoved', tsInterface: 'AccountRemovedAction' },
-  { type: 'accounts/authAttemptSet', caseName: 'authAttemptSet', tsInterface: 'AuthAttemptSetAction' },
-  { type: 'accounts/authAttemptRemoved', caseName: 'authAttemptRemoved', tsInterface: 'AuthAttemptRemovedAction' },
   { type: 'root/agentsChanged', caseName: 'rootAgentsChanged', tsInterface: 'RootAgentsChangedAction' },
   { type: 'root/activeSessionsChanged', caseName: 'rootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
   { type: 'session/ready', caseName: 'sessionReady', tsInterface: 'SessionReadyAction' },
@@ -1662,7 +1626,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthFlowKind', 'BrokeredAuthenticationBindingKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult', 'ClientCapabilities', 'AutomationCapabilities',
@@ -1687,9 +1651,7 @@ const COMMAND_STRUCTS = [
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
-  'AuthenticateParams', 'AuthenticateResult',
-  'AuthBeginParams', 'AuthBeginResult', 'AuthFlowSupport', 'AuthenticationCapability',
-  'BrokeredAuthenticationAttemptBinding', 'BrokeredAuthenticationAccountBinding',
+  'AuthenticateParams', 'AuthenticateResult', 'AuthRevokedParams',
   'CreateTerminalParams', 'DisposeTerminalParams',
   'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
   'SessionConfigPropertySchema', 'SessionConfigSchema',
@@ -1721,15 +1683,6 @@ const CHAT_SOURCE_UNION: UnionConfig = {
   ],
 };
 
-const BROKERED_AUTHENTICATION_BINDING_UNION: UnionConfig = {
-  name: 'BrokeredAuthenticationBinding',
-  discriminantField: 'kind',
-  variants: [
-    { caseName: 'attempt', structName: 'BrokeredAuthenticationAttemptBinding', discriminantValue: 'attempt' },
-    { caseName: 'account', structName: 'BrokeredAuthenticationAccountBinding', discriminantValue: 'account' },
-  ],
-};
-
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1743,14 +1696,6 @@ function generateCommandsFile(project: Project): string {
   }
 
   lines.push('// MARK: - Command Types\n');
-  lines.push(generateSwiftStruct('AuthBeginTarget', [{
-    name: 'consumer',
-    wireName: 'consumer',
-    type: 'AccountConsumer',
-    optional: false,
-    doc: 'Exact consumer selected for authentication.',
-  }]));
-  lines.push('');
   lines.push(generateFixedChatSourceBranchSwift(
     'ForkChatSource',
     'fork',
@@ -1781,8 +1726,6 @@ function generateCommandsFile(project: Project): string {
 
   lines.push('// MARK: - Command Unions\n');
   lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, BROKERED_AUTHENTICATION_BINDING_UNION));
   lines.push('');
 
   lines.push('// MARK: - ReconnectResult Union\n');
@@ -2193,10 +2136,6 @@ public enum AHPCommands {
         JsonRpcRequest(id: id, method: "authenticate", params: params)
     }
 
-    public static func authBegin(id: Int, params: AuthBeginParams) -> JsonRpcRequest<AuthBeginParams> {
-        JsonRpcRequest(id: id, method: "authBegin", params: params)
-    }
-
     public static func sessionConfigCompletions(id: Int, params: SessionConfigCompletionsParams) -> JsonRpcRequest<SessionConfigCompletionsParams> {
         JsonRpcRequest(id: id, method: "sessionConfigCompletions", params: params)
     }
@@ -2222,6 +2161,10 @@ public enum AHPClientNotifications {
 
     public static func dispatchAction(params: DispatchActionParams) -> JsonRpcNotification<DispatchActionParams> {
         JsonRpcNotification(method: "dispatchAction", params: params)
+    }
+
+    public static func authRevoked(params: AuthRevokedParams) -> JsonRpcNotification<AuthRevokedParams> {
+        JsonRpcNotification(method: "auth/revoked", params: params)
     }
 }
 `;
@@ -2420,11 +2363,6 @@ function checkExhaustiveness(project: Project): void {
     'ChatToolCallDeniedAction',
     'ChatToolCallConfirmedAction',
     'ChatAction',
-    'AccountsAction',              // source-only union covered by StateAction
-    'AccountConsumer',             // ACCOUNT_CONSUMER_UNION discriminated union
-    'AuthAttemptState',            // AUTH_ATTEMPT_STATE_UNION discriminated union
-    'AuthAttemptBase',             // base interface flattened into admission variants
-    'BrokeredAuthenticationBinding', // BROKERED_AUTHENTICATION_BINDING_UNION
     'MessageAttachment',            // MESSAGE_ATTACHMENT_UNION discriminated union
     'MessageAttachmentBase',        // base interface, flattened into the variant structs via `extends`
     'SessionMetadata',              // base interface, flattened into SessionState / SessionSummary via `extends`

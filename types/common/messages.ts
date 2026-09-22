@@ -37,6 +37,7 @@ import type {
   DispatchActionParams,
   AuthenticateParams,
   AuthenticateResult,
+  AuthRevokedParams,
 } from './commands.js';
 import type {
   ListSessionsParams,
@@ -78,7 +79,6 @@ import type {
   FetchAutomationRunsParams,
   FetchAutomationRunsResult,
 } from '../channels-automation/commands.js';
-import type { AuthBeginParams, AuthBeginResult } from '../channels-accounts/commands.js';
 
 import type { ActionEnvelope } from './actions.js';
 import type {
@@ -179,7 +179,6 @@ export interface CommandMap {
   'resourceRequest': { params: ResourceRequestParams; result: ResourceRequestResult };
   'fetchTurns': { params: FetchTurnsParams; result: FetchTurnsResult };
   'authenticate': { params: AuthenticateParams; result: AuthenticateResult };
-  'authBegin': { params: AuthBeginParams; result: AuthBeginResult };
   'resolveSessionConfig': { params: ResolveSessionConfigParams; result: ResolveSessionConfigResult };
   'sessionConfigCompletions': { params: SessionConfigCompletionsParams; result: SessionConfigCompletionsResult };
   'completions': { params: CompletionsParams; result: CompletionsResult };
@@ -230,6 +229,7 @@ export interface ServerCommandMap {
 export interface ClientNotificationMap {
   'unsubscribe': { params: UnsubscribeParams };
   'dispatchAction': { params: DispatchActionParams };
+  'auth/revoked': { params: AuthRevokedParams };
 }
 
 /**

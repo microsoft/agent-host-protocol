@@ -1,0 +1,14 @@
+{
+  "name": "account-revocation-capability",
+  "group": "A",
+  "description": "The presence capability survives serialization even though its value is an empty object.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.9.0", "serverSeq": 1, "snapshots": [],
+    "accountRevocation": {}
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "0.9.0", "serverSeq": 1, "snapshots": [],
+    "accountRevocation": {}
+  }]
+}

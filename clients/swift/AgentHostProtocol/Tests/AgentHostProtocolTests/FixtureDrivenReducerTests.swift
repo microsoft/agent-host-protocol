@@ -168,10 +168,6 @@ final class FixtureDrivenReducerTests: XCTestCase {
         }()
 
         switch fixture.reducer {
-        case "accounts":
-            try compareFixture(file: file, fixture: fixture, stateType: AccountsState.self) { state in
-                actions.reduce(state) { accountsReducer(state: $0, action: $1) }
-            }
         case "root":
             try compareFixture(file: file, fixture: fixture, stateType: RootState.self) { state in
                 actions.reduce(state) { rootReducer(state: $0, action: $1) }

@@ -17,7 +17,7 @@ const GENERATED_HEADER = `// Generated from types/actions.ts — do not edit
 // Run \`npm run generate\` to regenerate.
 `;
 
-type ActionScope = 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun' | 'accounts';
+type ActionScope = 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
 
 interface ActionInfo {
   /** The interface name (e.g. 'RootAgentsChangedAction') */
@@ -157,7 +157,6 @@ export function generateActionOrigin(project: Project, outDir: string): void {
       : category === 'Resource Watch Actions' ? 'resourceWatch'
       : category === 'Automation Actions' ? 'automation'
       : category === 'Automation Run Actions' ? 'automationRun'
-      : category === 'Accounts Actions' ? 'accounts'
       : 'session';
     const isClientDispatchable = hasJsDocTag(node as any, 'clientDispatchable');
 
@@ -212,7 +211,6 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const resourceWatchActions = actions.filter(a => a.scope === 'resourceWatch');
   const automationActions = actions.filter(a => a.scope === 'automation');
   const automationRunActions = actions.filter(a => a.scope === 'automationRun');
-  const accountsActions = actions.filter(a => a.scope === 'accounts');
   const clientRootActions = rootActions.filter(a => a.isClientDispatchable);
   const serverRootActions = rootActions.filter(a => !a.isClientDispatchable);
   const clientSessionActions = sessionActions.filter(a => a.isClientDispatchable);
@@ -231,8 +229,6 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   const serverAutomationActions = automationActions.filter(a => !a.isClientDispatchable);
   const clientAutomationRunActions = automationRunActions.filter(a => a.isClientDispatchable);
   const serverAutomationRunActions = automationRunActions.filter(a => !a.isClientDispatchable);
-  const clientAccountsActions = accountsActions.filter(a => a.isClientDispatchable);
-  const serverAccountsActions = accountsActions.filter(a => !a.isClientDispatchable);
 
   const lines: string[] = [GENERATED_HEADER];
 
@@ -524,30 +520,6 @@ export function generateActionOrigin(project: Project, outDir: string): void {
   lines.push(`;`);
   lines.push(``);
 
-
-  lines.push(`/** Union of all accounts-scoped actions. */`);
-  lines.push(`export type AccountsAction =`);
-  for (const a of accountsActions) {
-    lines.push(`  | ${a.name}`);
-  }
-  lines.push(`;`);
-  lines.push(``);
-
-  lines.push(`/** Union of accounts actions that clients may dispatch. */`);
-  lines.push(`export type ClientAccountsAction =`);
-  for (const a of clientAccountsActions) {
-    lines.push(`  | ${a.name}`);
-  }
-  lines.push(`;`);
-  lines.push(``);
-
-  lines.push(`/** Union of accounts actions that only the server may produce. */`);
-  lines.push(`export type ServerAccountsAction =`);
-  for (const a of serverAccountsActions) {
-    lines.push(`  | ${a.name}`);
-  }
-  lines.push(`;`);
-  lines.push(``);
 
   // IS_CLIENT_DISPATCHABLE map
   lines.push(`// ─── Client-Dispatchable Map ─────────────────────────────────────────────────`);

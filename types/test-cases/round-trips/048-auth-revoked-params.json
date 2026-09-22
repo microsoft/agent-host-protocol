@@ -1,0 +1,16 @@
+{
+  "name": "auth-revoked-params",
+  "group": "A",
+  "description": "Revocation names a resource and account, not a token, scope filter, or host-owned lifetime.",
+  "type": "AuthRevokedParams",
+  "input": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.test",
+    "account": { "authority": "https://login.example.test", "id": "account-a" }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "resource": "https://api.example.test",
+    "account": { "authority": "https://login.example.test", "id": "account-a" }
+  }]
+}

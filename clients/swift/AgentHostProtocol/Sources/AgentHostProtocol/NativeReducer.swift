@@ -110,20 +110,6 @@ public struct AHPRootReducer: Reducer {
 }
 
 
-// MARK: - Accounts Reducer (Protocol-based)
-
-/// Protocol-based reducer for the standalone host accounts channel.
-public struct AHPAccountsReducer: Reducer {
-    public typealias State = AccountsState
-    public typealias Action = StateAction
-
-    public init() {}
-
-    public func reduce(into state: inout AccountsState, action: StateAction) {
-        state = accountsReducer(state: state, action: action)
-    }
-}
-
 // MARK: - Chat Reducer (Protocol-based)
 
 /// Protocol-based chat reducer for AHP chat state.

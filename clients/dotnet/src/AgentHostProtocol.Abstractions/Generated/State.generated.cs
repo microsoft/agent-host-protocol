@@ -9,32 +9,6 @@ namespace Microsoft.AgentHostProtocol;
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
-/// <summary>A consumer whose credential selection the host manages.
-///
-/// Unknown consumer kinds MUST NOT be interpreted as a known consumer.</summary>
-[JsonConverter(typeof(WireEnumConverter<AccountConsumerKind>))]
-public enum AccountConsumerKind
-{
-    [WireValue("agent")]
-    Agent,
-    [WireValue("mcpServer")]
-    McpServer,
-}
-
-/// <summary>Lifecycle of a client-brokered credential admission.
-///
-/// Clients preserve unknown statuses but MUST NOT interpret them as success.</summary>
-[JsonConverter(typeof(WireEnumConverter<AuthAttemptStatus>))]
-public enum AuthAttemptStatus
-{
-    [WireValue("pending")]
-    Pending,
-    [WireValue("completed")]
-    Completed,
-    [WireValue("failed")]
-    Failed,
-}
-
 /// <summary>Policy configuration state for a model.</summary>
 [JsonConverter(typeof(WireEnumConverter<PolicyState>))]
 public enum PolicyState
@@ -693,139 +667,6 @@ public enum AutomationRunOriginKind
 
 // ─── Classes ──────────────────────────────────────────────────────────
 
-/// <summary>Shared accounts and credential admissions on `ahp-accounts://`.
-///
-/// Exposed only when `InitializeResult.authentication.flows` advertises
-/// `clientBrokered`. Subscription and mutation are separately authorized.
-/// State contains no access, refresh, or identity tokens.</summary>
-public sealed class AccountsState
-{
-    /// <summary>Live, host-authoritative account lifetimes, keyed by `HostAccount.id`.</summary>
-    public required List<HostAccount> Accounts { get; set; }
-
-    /// <summary>Pending and retained terminal admissions, keyed by `AuthAttemptState.id`.</summary>
-    public required List<AuthAttemptState> Attempts { get; set; }
-}
-
-/// <summary>A host-held, revocable authorization lifetime for one verified identity.
-///
-/// Rotations and resource/scope variants in the same ownership context share
-/// this entry, even when supplied by different clients. Independently owned
-/// grants MUST NOT be coalesced merely because their human identity matches.
-/// Tokens, token hashes, and client-local identity assertions never belong here.</summary>
-public sealed record HostAccount
-{
-    /// <summary>Opaque, host-assigned key, stable across rotation and scoped to the host
-    /// authority. Removal retires it permanently; a deliberate later admission
-    /// receives a new id. Possessing the id is not permission to use or remove it.</summary>
-    public required string Id { get; init; }
-
-    /// <summary>Display label, not an identity proof.</summary>
-    public required string Label { get; init; }
-
-    /// <summary>Whether the host can contain and remove its local credential lifetime.
-    /// This does not promise upstream grant revocation or authorize the caller.</summary>
-    public bool Removable { get; init; }
-
-    /// <summary>Explicit consumer selections. A consumer MUST NOT select two accounts.
-    /// Removing this entry drops these selections but MUST NOT select a fallback.
-    /// Previously started work can still depend on this account after a move;
-    /// this list is therefore not the host's complete revocation set.</summary>
-    public required List<AccountConsumer> Consumers { get; init; }
-}
-
-/// <summary>One protected resource used by an advertised agent provider.</summary>
-public sealed record AgentAccountConsumer
-{
-    public AccountConsumerKind Kind { get; init; }
-
-    /// <summary>Matches `AgentInfo.provider`.</summary>
-    public required string Provider { get; init; }
-
-    /// <summary>Exact identifier from the provider's advertised protected resources.</summary>
-    public required string Resource { get; init; }
-}
-
-/// <summary>One host-published MCP server customization in a live session.
-///
-/// The host resolves its resource, rather than treating a server name as a
-/// globally unique identity. A replaced customization or changed resource
-/// requires a fresh admission; a missing binding MUST NOT select another account.</summary>
-public sealed record McpServerAccountConsumer
-{
-    public AccountConsumerKind Kind { get; init; }
-
-    /// <summary>Session URI containing the customization.</summary>
-    public required string Session { get; init; }
-
-    /// <summary>Session-unique `McpServerCustomization.id`, not its display name.</summary>
-    public required string CustomizationId { get; init; }
-}
-
-/// <summary>Correlation and target shared by every admission outcome.</summary>
-public sealed record AuthAttemptBase
-{
-    /// <summary>Host-assigned, single-use id. Not a bearer authorization.</summary>
-    public required string Id { get; init; }
-
-    /// <summary>Host-validated consumer selected for this admission.</summary>
-    public required AccountConsumer Consumer { get; init; }
-
-    /// <summary>Exact protected resource captured when the attempt was admitted.</summary>
-    public required string Resource { get; init; }
-}
-
-/// <summary>Awaiting a client-supplied token. No credential is usable from this state.</summary>
-public sealed record AuthAttemptPendingState
-{
-    /// <summary>Host-assigned, single-use id. Not a bearer authorization.</summary>
-    public required string Id { get; init; }
-
-    /// <summary>Host-validated consumer selected for this admission.</summary>
-    public required AccountConsumer Consumer { get; init; }
-
-    /// <summary>Exact protected resource captured when the attempt was admitted.</summary>
-    public required string Resource { get; init; }
-
-    public AuthAttemptStatus Status { get; init; }
-}
-
-/// <summary>Admission committed. Retained so a lost response can be reconciled.</summary>
-public sealed record AuthAttemptCompletedState
-{
-    /// <summary>Host-assigned, single-use id. Not a bearer authorization.</summary>
-    public required string Id { get; init; }
-
-    /// <summary>Host-validated consumer selected for this admission.</summary>
-    public required AccountConsumer Consumer { get; init; }
-
-    /// <summary>Exact protected resource captured when the attempt was admitted.</summary>
-    public required string Resource { get; init; }
-
-    public AuthAttemptStatus Status { get; init; }
-
-    /// <summary>The admitted authorization lifetime, which may subsequently be removed.</summary>
-    public required string AccountId { get; init; }
-}
-
-/// <summary>Admission failed or expired without installing a usable credential.</summary>
-public sealed record AuthAttemptFailedState
-{
-    /// <summary>Host-assigned, single-use id. Not a bearer authorization.</summary>
-    public required string Id { get; init; }
-
-    /// <summary>Host-validated consumer selected for this admission.</summary>
-    public required AccountConsumer Consumer { get; init; }
-
-    /// <summary>Exact protected resource captured when the attempt was admitted.</summary>
-    public required string Resource { get; init; }
-
-    public AuthAttemptStatus Status { get; init; }
-
-    /// <summary>Failure details, with no token or other secret content.</summary>
-    public required ErrorInfo Error { get; init; }
-}
-
 /// <summary>An optionally-sized icon that can be displayed in a user interface.</summary>
 public sealed record Icon
 {
@@ -858,6 +699,25 @@ public sealed record Icon
     /// If not provided, the client should assume the icon can be used with any theme.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Theme { get; init; }
+}
+
+/// <summary>Account identity attached to a client-supplied credential.
+///
+/// This is not a host-assigned account handle or a credential lifetime. Both
+/// fields are compared exactly; the same identity MUST survive token rotation
+/// and be comparable across clients using the same authority. Display names,
+/// client-local session ids, and token hashes are not account identifiers.</summary>
+public sealed record AuthenticationAccount
+{
+    /// <summary>Nonempty canonical authorization-server identifier for this account,
+    /// consistent with the protected resource's advertised authorization servers.
+    /// This namespaces `id`; it is not an agent provider id or a client implementation.</summary>
+    public required string Authority { get; init; }
+
+    /// <summary>Nonempty stable account identifier within the authority. Pairwise
+    /// identifiers from different OAuth clients require a trusted provider
+    /// mapping before they can identify the same account.</summary>
+    public required string Id { get; init; }
 }
 
 /// <summary>Describes a protected resource's authentication requirements using
@@ -5707,61 +5567,6 @@ internal sealed class CustomizationEnablementConverter : UnionConverter<Customiz
     }
 }
 
-/// <summary>AccountConsumer identifies an agent resource or a session MCP customization.</summary>
-[JsonConverter(typeof(AccountConsumerConverter))]
-public sealed class AccountConsumer : AhpUnion
-{
-    /// <summary>Creates an empty AccountConsumer (no active variant).</summary>
-    public AccountConsumer() { }
-
-    /// <summary>Creates a AccountConsumer wrapping the given variant value.</summary>
-    public AccountConsumer(object? value) : base(value) { }
-}
-
-/// <summary>System.Text.Json converter for the AccountConsumer discriminated union.</summary>
-internal sealed class AccountConsumerConverter : UnionConverter<AccountConsumer>
-{
-    public AccountConsumerConverter()
-        : base(
-            discriminator: "kind",
-            variants: new Dictionary<string, Type>
-            {
-        ["agent"] = typeof(AgentAccountConsumer),
-        ["mcpServer"] = typeof(McpServerAccountConsumer),
-            },
-            allowUnknown: true)
-    {
-    }
-}
-
-/// <summary>AuthAttemptState is a pending or retained authentication admission outcome.</summary>
-[JsonConverter(typeof(AuthAttemptStateConverter))]
-public sealed class AuthAttemptState : AhpUnion
-{
-    /// <summary>Creates an empty AuthAttemptState (no active variant).</summary>
-    public AuthAttemptState() { }
-
-    /// <summary>Creates a AuthAttemptState wrapping the given variant value.</summary>
-    public AuthAttemptState(object? value) : base(value) { }
-}
-
-/// <summary>System.Text.Json converter for the AuthAttemptState discriminated union.</summary>
-internal sealed class AuthAttemptStateConverter : UnionConverter<AuthAttemptState>
-{
-    public AuthAttemptStateConverter()
-        : base(
-            discriminator: "status",
-            variants: new Dictionary<string, Type>
-            {
-        ["pending"] = typeof(AuthAttemptPendingState),
-        ["completed"] = typeof(AuthAttemptCompletedState),
-        ["failed"] = typeof(AuthAttemptFailedState),
-            },
-            allowUnknown: true)
-    {
-    }
-}
-
 /// <summary>ResponsePart is a single part of a response stream (text, tool call, reasoning, content reference).</summary>
 [JsonConverter(typeof(ResponsePartConverter))]
 public sealed class ResponsePart : AhpUnion
@@ -6512,20 +6317,16 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
 
 /// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
-  /// accounts, chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+  /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
   /// or automation-run state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (accounts → automationRun → automations → chat → session → terminal →
-/// changeset → resource-watch → annotations → root).
+/// (chat → session → terminal → changeset → resource-watch → annotations → root).
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
-
-    /// <summary>Accounts state variant, when populated.</summary>
-    public AccountsState? Accounts { get; set; }
 
     /// <summary>Session state variant, when populated.</summary>
     public SessionState? Session { get; set; }
@@ -6560,11 +6361,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("accounts", out _) && root.TryGetProperty("attempts", out _))
-        {
-            result.Accounts = root.Deserialize(AhpJsonTypeInfo.Get<AccountsState>(options));
-        }
-        else if (root.TryGetProperty("automation", out _) &&
+        if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -6610,7 +6407,6 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
-        if (value.Accounts is not null) { JsonSerializer.Serialize(writer, value.Accounts, AhpJsonTypeInfo.Get<AccountsState>(options)); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }

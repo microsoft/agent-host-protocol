@@ -36,10 +36,6 @@ pub enum TransportError {
 /// Errors produced by the SDK client.
 #[derive(Debug, Error)]
 pub enum ClientError {
-    /// The host did not advertise the capability required by this operation.
-    #[error("host does not advertise {0}")]
-    UnsupportedCapability(&'static str),
-
     /// A transport-level error prevented the request from completing.
     #[error("transport error: {0}")]
     Transport(#[from] TransportError),

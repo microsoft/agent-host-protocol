@@ -32,6 +32,8 @@ import { ActionType } from '../src/types/common/actions.js';
 import { ContentEncoding } from '../src/types/common/commands.js';
 import { CompletionItemKind } from '../src/types/channels-session/commands.js';
 import type {
+  AuthenticateParams,
+  AuthRevokedParams,
   DispatchActionParams,
   InitializeParams,
   InitializeResult,
@@ -106,6 +108,47 @@ test('initialize round-trip', async () => {
   assert.equal(got.protocolVersion, '0.2.0');
 
   await client.shutdown();
+});
+
+test('account authentication and revocation use generic request/notify without fallback', async t => {
+  const [transport, server] = InMemoryTransport.pair();
+  const client = new AhpClient(transport);
+  client.connect();
+  t.after(() => client.shutdown());
+
+  const initialize = client.initialize({ clientId: 'demo', protocolVersions: ['0.9.0'] });
+  reply(server, (await readRequest(server)).id, {
+    protocolVersion: '0.9.0', serverSeq: 0, snapshots: [], accountRevocation: {},
+  } satisfies InitializeResult);
+  assert.deepEqual((await initialize).accountRevocation, {});
+
+  const account = { authority: 'https://login.example.test', id: 'account-1' };
+  const resource = 'https://api.example.test';
+  for (const identity of [account, undefined]) {
+    const params: AuthenticateParams = {
+      channel: ROOT, resource, token: 'example-test-credential',
+      expiresIn: 120, scopes: ['read'],
+      ...(identity ? { account: identity } : {}),
+    };
+    const authenticate = client.request('authenticate', params);
+    const request = await readRequest(server);
+    assert.equal(request.method, 'authenticate');
+    assert.deepEqual(request.params, params);
+    reply(server, request.id, {});
+    assert.deepEqual(await authenticate, {});
+  }
+
+  const revoked: AuthRevokedParams = { channel: ROOT, resource, account };
+  client.notify('auth/revoked', revoked);
+  assert.deepEqual(await readNotification(server), {
+    jsonrpc: '2.0', method: 'auth/revoked', params: revoked,
+  });
+
+  const ping = client.ping();
+  const next = await readRequest(server);
+  assert.equal(next.method, 'ping');
+  reply(server, next.id, null);
+  await ping;
 });
 
 test('subscribe attaches before sending the request and fans out an action', async () => {

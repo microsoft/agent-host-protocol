@@ -15,4 +15,3 @@ export * from './channels-terminal/commands.js';
 export * from './channels-changeset/commands.js';
 export * from './channels-resource-watch/commands.js';
 export * from './channels-automation/commands.js';
-export * from './channels-accounts/commands.js';

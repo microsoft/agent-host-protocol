@@ -155,65 +155,6 @@ fn root_states_are_isolated_per_host() {
 }
 
 #[test]
-fn accounts_are_host_isolated_and_rejected_removals_do_not_change_state() {
-    let mut mirror = MultiHostStateMirror::new();
-    let host_a = HostId::new("alpha");
-    let host_b = HostId::new("beta");
-    let snapshot: Snapshot = serde_json::from_value(serde_json::json!({
-        "resource":"ahp-accounts://","fromSeq":0,
-        "state":{
-            "accounts":[{"id":"account-1","label":"Example","removable":true,"consumers":[]}],
-            "attempts":[{
-                "id":"attempt-1","status":"pending","resource":"https://api.example.test",
-                "consumer":{"kind":"agent","provider":"copilot","resource":"https://api.example.test"}
-            }]
-        }
-    })).expect("accounts snapshot");
-    mirror.apply_snapshot(&host_a, &snapshot);
-    mirror.apply_snapshot(&host_b, &snapshot);
-    for action in [
-        serde_json::json!({"type":"accounts/removed","id":"account-1"}),
-        serde_json::json!({"type":"accounts/authAttemptRemoved","id":"attempt-1"}),
-    ] {
-        let mut envelope: ActionEnvelope = serde_json::from_value(serde_json::json!({
-            "channel":"ahp-accounts://","serverSeq":1,"action":action,
-            "origin":{"clientId":"client-1","clientSeq":1},"rejectionReason":"Permission denied"
-        }))
-        .expect("rejected removal");
-        mirror.apply_envelope(&host_a, &envelope);
-        let accounts = mirror
-            .accounts_states()
-            .get(&host_a)
-            .expect("host accounts");
-        assert_eq!(
-            accounts,
-            mirror
-                .accounts_states()
-                .get(&host_b)
-                .expect("unchanged other host")
-        );
-        envelope.rejection_reason = None;
-        mirror.apply_envelope(&host_a, &envelope);
-        let accounts = mirror
-            .accounts_states()
-            .get(&host_a)
-            .expect("host accounts");
-        match &envelope.action {
-            StateAction::AccountRemoved(_) => assert!(accounts.accounts.is_empty()),
-            StateAction::AuthAttemptRemoved(_) => assert!(accounts.attempts.is_empty()),
-            _ => unreachable!(),
-        }
-        mirror.apply_snapshot(&host_a, &snapshot);
-    }
-    assert!(mirror.root_states().is_empty());
-    mirror.reset_host(&host_a);
-    assert!(!mirror.accounts_states().contains_key(&host_a));
-    assert!(mirror.accounts_states().contains_key(&host_b));
-    mirror.reset();
-    assert!(mirror.accounts_states().is_empty());
-}
-
-#[test]
 fn session_uri_collision_across_hosts_does_not_clobber() {
     let mut mirror = MultiHostStateMirror::new();
 

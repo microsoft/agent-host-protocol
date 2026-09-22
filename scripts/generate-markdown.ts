@@ -74,7 +74,6 @@ const DIR_TO_PAGE: Record<string, string> = {
   'channels-otlp': 'otlp',
   'channels-automation': 'automation',
   'channels-automation-run': 'automation-run',
-  'channels-accounts': 'accounts',
 };
 
 /**
@@ -532,21 +531,15 @@ function parseRegistryInterface(project: Project, ifaceName: string, hasResult: 
  * declared in the given source files, in declaration order, with cross-links
  * to other channel pages.
  */
-function emitStateTypesSection(sourceFiles: SourceFile[], category?: string): string {
+function emitStateTypesSection(sourceFiles: SourceFile[]): string {
   const lines: string[] = [];
   for (const sf of sourceFiles) {
     for (const stmt of sf.getStatements()) {
-      if (!Node.isInterfaceDeclaration(stmt) && !Node.isTypeAliasDeclaration(stmt) && !Node.isEnumDeclaration(stmt)) {
-        continue;
-      }
-      if (!stmt.isExported() || (category && getJsDocTag(stmt, 'category') !== category)) {
-        continue;
-      }
-      if (Node.isInterfaceDeclaration(stmt)) {
+      if (Node.isInterfaceDeclaration(stmt) && stmt.isExported()) {
         lines.push(renderInterfaceBlock(stmt));
-      } else if (Node.isTypeAliasDeclaration(stmt)) {
+      } else if (Node.isTypeAliasDeclaration(stmt) && stmt.isExported()) {
         lines.push(renderTypeAliasBlock(stmt));
-      } else {
+      } else if (Node.isEnumDeclaration(stmt) && stmt.isExported()) {
         lines.push(renderEnumBlock(stmt));
       }
     }
@@ -1395,30 +1388,6 @@ function generateAutomationRunChannelPage(project: Project): string {
   return lines.join('\n');
 }
 
-function generateAccountsChannelPage(project: Project): string {
-  currentPage = 'accounts';
-  const stateSf = findChannelSourceFile(project, 'channels-accounts', 'state.ts');
-  const actionsSf = findChannelSourceFile(project, 'channels-accounts', 'actions.ts');
-  const commandsSf = findChannelSourceFile(project, 'channels-accounts', 'commands.ts');
-  const lines: string[] = [
-    GENERATED_HEADER,
-    '# Accounts Channel\n',
-    stabilityIndex(stateSf),
-    schemaLink('state.schema.json'),
-  ];
-  if (stateSf) {
-    lines.push('## State Types\n', emitStateTypesSection([stateSf]));
-  }
-  if (actionsSf) {
-    lines.push('## Actions\n', schemaLink('actions.schema.json'), emitActionsSection([actionsSf]));
-  }
-  if (commandsSf) {
-    lines.push('## Commands\n', schemaLink('commands.schema.json'), emitCommandsSection(project, [commandsSf]));
-    lines.push('## Authentication Types\n', emitStateTypesSection([commandsSf], 'Authentication'));
-  }
-  return lines.join('\n');
-}
-
 function generateMcpChannelPage(_project: Project): string {
   currentPage = 'mcp';
   const lines: string[] = [GENERATED_HEADER];
@@ -1451,7 +1420,6 @@ export function generateMarkdownDocs(project: Project, outDir: string): void {
     { filename: 'otlp.md', generator: generateOtlpChannelPage },
     { filename: 'automation.md', generator: generateAutomationChannelPage },
     { filename: 'automation-run.md', generator: generateAutomationRunChannelPage },
-    { filename: 'accounts.md', generator: generateAccountsChannelPage },
     { filename: 'mcp.md', generator: generateMcpChannelPage },
     { filename: 'messages.md', generator: generateMessagesPage },
     { filename: 'error-codes.md', generator: generateErrorCodesPage },

@@ -29,14 +29,12 @@ package com.microsoft.agenthostprotocol
 // generated types and re-encodes with Ahp.json.
 
 import com.microsoft.agenthostprotocol.generated.ActionEnvelope
-import com.microsoft.agenthostprotocol.generated.AuthAttemptState
-import com.microsoft.agenthostprotocol.generated.AuthBeginParams
-import com.microsoft.agenthostprotocol.generated.AuthBeginResult
 import com.microsoft.agenthostprotocol.generated.AuthenticateParams
-import com.microsoft.agenthostprotocol.generated.AuthenticateResult
+import com.microsoft.agenthostprotocol.generated.AuthRevokedParams
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
 import com.microsoft.agenthostprotocol.generated.ChatSource
 import com.microsoft.agenthostprotocol.generated.Customization
+import com.microsoft.agenthostprotocol.generated.DispatchActionParams
 import com.microsoft.agenthostprotocol.generated.Implementation
 import com.microsoft.agenthostprotocol.generated.InitializeResult
 import com.microsoft.agenthostprotocol.generated.JsonRpcErrorResponse
@@ -51,6 +49,7 @@ import com.microsoft.agenthostprotocol.generated.SessionSummary
 import com.microsoft.agenthostprotocol.generated.Snapshot
 import com.microsoft.agenthostprotocol.generated.StateAction
 import com.microsoft.agenthostprotocol.generated.StringOrMarkdown
+import com.microsoft.agenthostprotocol.generated.UnsubscribeParams
 import java.io.File
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -222,12 +221,15 @@ class RoundTripCorpusTest {
         }
 
         return when (typeName) {
-            "ActionEnvelope" -> rt(ActionEnvelope.serializer())
-            "AuthAttemptState" -> rt(AuthAttemptState.serializer())
-            "AuthBeginParams" -> rt(AuthBeginParams.serializer())
-            "AuthBeginResult" -> rt(AuthBeginResult.serializer())
             "AuthenticateParams" -> rt(AuthenticateParams.serializer())
-            "AuthenticateResult" -> rt(AuthenticateResult.serializer())
+            "AuthRevokedParams" -> rt(AuthRevokedParams.serializer())
+            "AhpClientNotification" -> when (json.parseToJsonElement(inputJson).jsonObject["method"]?.jsonPrimitive?.contentOrNull) {
+                "auth/revoked" -> rt(JsonRpcNotification.serializer(AuthRevokedParams.serializer()))
+                "unsubscribe" -> rt(JsonRpcNotification.serializer(UnsubscribeParams.serializer()))
+                "dispatchAction" -> rt(JsonRpcNotification.serializer(DispatchActionParams.serializer()))
+                else -> fail("$file: unknown client notification method")
+            }
+            "ActionEnvelope" -> rt(ActionEnvelope.serializer())
             "StateAction" -> rt(StateAction.serializer())
             "Customization" -> rt(Customization.serializer())
             // SessionStatus decodes via the REAL generated value class — no Long sidestep.

@@ -31,6 +31,5 @@ export {
   resourceWatchReducer,
   automationReducer,
   automationRunReducer,
-  accountsReducer,
   isClientDispatchable,
 } from './reducers.js';

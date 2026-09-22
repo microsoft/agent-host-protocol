@@ -1,7 +1,7 @@
 /**
  * Error taxonomy for {@link AhpClient}.
  *
- * Error families surface to consumers:
+ * Five error families surface to consumers:
  *
  * - {@link TransportError} — failures of the underlying {@link AhpTransport}
  *   (closed connection, I/O, undecodable frames).
@@ -11,8 +11,6 @@
  *   error, the wait just elapsed.
  * - {@link ClientClosedError} — the client was shut down (or the transport
  *   was torn down) while a request was in flight.
- * - {@link UnsupportedCapabilityError} — the host did not advertise a
- *   capability required by the requested operation.
  * - {@link AhpClientError} — base class; consumers can use `instanceof` to
  *   catch every error this SDK throws.
  *
@@ -87,13 +85,5 @@ export class ClientClosedError extends AhpClientError {
   constructor(message = 'client shut down') {
     super(message);
     this.name = 'ClientClosedError';
-  }
-}
-
-/** The host did not advertise a capability required by this operation. */
-export class UnsupportedCapabilityError extends AhpClientError {
-  constructor(readonly capability: string) {
-    super(`Host does not advertise ${capability}`);
-    this.name = 'UnsupportedCapabilityError';
   }
 }

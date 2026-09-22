@@ -116,8 +116,7 @@ function partialKotlinName(tsInterfaceName: string): string {
 }
 
 /** Map a TypeScript type string to a Kotlin type string. */
-function mapType(tsType: string, propName?: string, containerName?: string): string {
-  if (containerName === 'AuthBeginParams' && propName === 'target') return 'AuthBeginTarget';
+function mapType(tsType: string): string {
   tsType = tsType.replace(/import\([^)]+\)\./g, '').trim();
 
   // Remove outer parens
@@ -155,7 +154,6 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
-    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | AccountsState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -306,7 +304,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): KotlinProp
     .map(p => {
       const tsName = p.getName();
       const tsType = getPropertyType(p);
-      let kt = mapType(tsType, tsName, iface.getName());
+      let kt = mapType(tsType);
       // `@format float` overrides the default Long → Double for number properties.
       if (kt === 'Long' && hasFormatFloat(p)) {
         kt = 'Double';
@@ -838,7 +836,6 @@ function generateSnapshotState(): string {
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
     @JvmInline value class Root(val value: RootState) : SnapshotState
-    @JvmInline value class Accounts(val value: AccountsState) : SnapshotState
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Chat(val value: ChatState) : SnapshotState
     @JvmInline value class Terminal(val value: TerminalState) : SnapshotState
@@ -869,8 +866,6 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // key); TerminalState has required \`content\`; RootState is the
         // catch-all.
         return when {
-            obj.containsKey("accounts") && obj.containsKey("attempts") ->
-                SnapshotState.Accounts(input.json.decodeFromJsonElement(AccountsState.serializer(), element))
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
@@ -894,7 +889,6 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             ?: error("SnapshotState can only be serialized to JSON")
         val element: JsonElement = when (value) {
             is SnapshotState.Root -> output.json.encodeToJsonElement(RootState.serializer(), value.value)
-            is SnapshotState.Accounts -> output.json.encodeToJsonElement(AccountsState.serializer(), value.value)
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)
             is SnapshotState.Terminal -> output.json.encodeToJsonElement(TerminalState.serializer(), value.value)
@@ -986,11 +980,10 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
-  'AccountConsumerKind', 'AuthAttemptStatus',
 ];
 
 const STATE_STRUCTS = [
-  'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
+  'Icon', 'ProtectedResourceMetadata', 'AuthenticationAccount', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
@@ -1055,28 +1048,7 @@ const STATE_STRUCTS = [
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
-  'AccountsState', 'HostAccount', 'AgentAccountConsumer', 'McpServerAccountConsumer',
-  'AuthAttemptPendingState', 'AuthAttemptCompletedState', 'AuthAttemptFailedState',
 ];
-
-const ACCOUNT_CONSUMER_UNION: UnionConfig = {
-  name: 'AccountConsumer',
-  discriminantField: 'kind',
-  variants: [
-    { caseName: 'Agent', structName: 'AgentAccountConsumer', discriminantValue: 'agent' },
-    { caseName: 'McpServer', structName: 'McpServerAccountConsumer', discriminantValue: 'mcpServer' },
-  ],
-};
-
-const AUTH_ATTEMPT_STATE_UNION: UnionConfig = {
-  name: 'AuthAttemptState',
-  discriminantField: 'status',
-  variants: [
-    { caseName: 'Pending', structName: 'AuthAttemptPendingState', discriminantValue: 'pending' },
-    { caseName: 'Completed', structName: 'AuthAttemptCompletedState', discriminantValue: 'completed' },
-    { caseName: 'Failed', structName: 'AuthAttemptFailedState', discriminantValue: 'failed' },
-  ],
-};
 
 const RESPONSE_PART_UNION: UnionConfig = {
   name: 'ResponsePart',
@@ -1482,10 +1454,6 @@ function generateStateFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
   lines.push('');
-  lines.push(generateDiscriminatedUnion(project, ACCOUNT_CONSUMER_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, AUTH_ATTEMPT_STATE_UNION));
-  lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
   lines.push(generateSnapshotState());
@@ -1497,10 +1465,6 @@ function generateStateFile(project: Project): string {
 // ─── Actions File Generator ──────────────────────────────────────────────────
 
 const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[] = [
-  { type: 'accounts/set', caseName: 'AccountSet', tsInterface: 'AccountSetAction' },
-  { type: 'accounts/removed', caseName: 'AccountRemoved', tsInterface: 'AccountRemovedAction' },
-  { type: 'accounts/authAttemptSet', caseName: 'AuthAttemptSet', tsInterface: 'AuthAttemptSetAction' },
-  { type: 'accounts/authAttemptRemoved', caseName: 'AuthAttemptRemoved', tsInterface: 'AuthAttemptRemovedAction' },
   { type: 'root/agentsChanged', caseName: 'RootAgentsChanged', tsInterface: 'RootAgentsChangedAction' },
   { type: 'root/activeSessionsChanged', caseName: 'RootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
   { type: 'session/ready', caseName: 'SessionReady', tsInterface: 'SessionReadyAction' },
@@ -1755,7 +1719,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthFlowKind', 'BrokeredAuthenticationBindingKind'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
@@ -1781,9 +1745,7 @@ const COMMAND_STRUCTS = [
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
-  'AuthenticateParams', 'AuthenticateResult',
-  'AuthBeginParams', 'AuthBeginResult', 'AuthFlowSupport', 'AuthenticationCapability',
-  'BrokeredAuthenticationAttemptBinding', 'BrokeredAuthenticationAccountBinding',
+  'AuthenticateParams', 'AuthenticateResult', 'AuthRevokedParams',
   'CreateTerminalParams', 'DisposeTerminalParams',
   'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
   'SessionConfigPropertySchema', 'SessionConfigSchema',
@@ -1812,15 +1774,6 @@ const CHAT_SOURCE_UNION: UnionConfig = {
   variants: [
     { caseName: 'Fork', structName: 'ForkChatSource', discriminantValue: 'fork' },
     { caseName: 'SideChat', structName: 'SideChatSource', discriminantValue: 'sideChat' },
-  ],
-};
-
-const BROKERED_AUTHENTICATION_BINDING_UNION: UnionConfig = {
-  name: 'BrokeredAuthenticationBinding',
-  discriminantField: 'kind',
-  variants: [
-    { caseName: 'Attempt', structName: 'BrokeredAuthenticationAttemptBinding', discriminantValue: 'attempt' },
-    { caseName: 'Account', structName: 'BrokeredAuthenticationAccountBinding', discriminantValue: 'account' },
   ],
 };
 
@@ -2013,16 +1966,6 @@ function generateCommandsFile(project: Project): string {
   lines.push('// ─── ChatSource Union ───────────────────────────────────────────────────────');
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
-  lines.push('');
-  lines.push(generateDiscriminatedUnion(project, BROKERED_AUTHENTICATION_BINDING_UNION));
-  lines.push('');
-  lines.push(generateKotlinDataClass('AuthBeginTarget', [{
-    name: 'consumer',
-    wireName: 'consumer',
-    type: 'AccountConsumer',
-    optional: false,
-    doc: 'Exact consumer selected for authentication.',
-  }]));
   lines.push('');
 
   lines.push('// ─── ReconnectResult Union ──────────────────────────────────────────────────');
@@ -2285,9 +2228,6 @@ object AhpCommands {
     fun authenticate(id: Long, params: AuthenticateParams): JsonRpcRequest<AuthenticateParams> =
         JsonRpcRequest(id = id, method = "authenticate", params = params)
 
-    fun authBegin(id: Long, params: AuthBeginParams): JsonRpcRequest<AuthBeginParams> =
-        JsonRpcRequest(id = id, method = "authBegin", params = params)
-
     fun createTerminal(id: Long, params: CreateTerminalParams): JsonRpcRequest<CreateTerminalParams> =
         JsonRpcRequest(id = id, method = "createTerminal", params = params)
 
@@ -2316,6 +2256,9 @@ object AhpClientNotifications {
 
     fun dispatchAction(params: DispatchActionParams): JsonRpcNotification<DispatchActionParams> =
         JsonRpcNotification(method = "dispatchAction", params = params)
+
+    fun authRevoked(params: AuthRevokedParams): JsonRpcNotification<AuthRevokedParams> =
+        JsonRpcNotification(method = "auth/revoked", params = params)
 }
 `;
 }
@@ -2402,11 +2345,6 @@ function checkExhaustiveness(project: Project): void {
     'ChatToolCallDeniedAction',   // merged into ChatToolCallConfirmedAction
     'ChatToolCallConfirmedAction', // emitted as merged variant
     'ChatAction',                // source-only union covered by StateAction
-    'AccountsAction',            // source-only union covered by StateAction
-    'AccountConsumer',           // ACCOUNT_CONSUMER_UNION discriminated union
-    'AuthAttemptState',          // AUTH_ATTEMPT_STATE_UNION discriminated union
-    'AuthAttemptBase',           // base interface flattened into admission variants
-    'BrokeredAuthenticationBinding', // BROKERED_AUTHENTICATION_BINDING_UNION
     'MessageAttachment',            // MESSAGE_ATTACHMENT_UNION discriminated union
     'MessageAttachmentBase',        // base interface, flattened into the variant data classes via `extends`
     'SessionMetadata',              // base interface, flattened into SessionState / SessionSummary via `extends`
