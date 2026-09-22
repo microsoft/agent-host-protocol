@@ -6,6 +6,29 @@ import AgentHostProtocol
 
 final class AHPStateMirrorTests: XCTestCase {
 
+    func testAccountsStateRequiresSnapshotAndUsesOnlyItsOwnChannel() async {
+        let mirror = AHPStateMirror()
+        let account = HostAccount(id: "a1", label: "Account", removable: true, consumers: [])
+        let action = StateAction.accountSet(AccountSetAction(type: .accountSet, account: account))
+        await mirror.apply(ActionEnvelope(channel: AccountsResourceURI, action: action, serverSeq: 1))
+        let unseeded = await mirror.accountsState
+        XCTAssertNil(unseeded)
+
+        await mirror.applySnapshot(Snapshot(
+            resource: AccountsResourceURI, state: .accounts(AccountsState(accounts: [], attempts: [])), fromSeq: 1
+        ))
+        await mirror.apply(ActionEnvelope(channel: RootResourceURI, action: action, serverSeq: 2))
+        let afterRoot = await mirror.accountsState
+        XCTAssertTrue(afterRoot?.accounts.isEmpty == true)
+        await mirror.apply(ActionEnvelope(channel: AccountsResourceURI, action: action, serverSeq: 3))
+        let updated = await mirror.accountsState
+        XCTAssertEqual(updated?.accounts.map(\.id), ["a1"])
+
+        await mirror.reset()
+        let reset = await mirror.accountsState
+        XCTAssertNil(reset)
+    }
+
     func testApplySnapshotSeedsRootState() async {
         let mirror = AHPStateMirror()
         let agents = [

@@ -73,6 +73,7 @@ type _ExpectedCommands =
   | 'resourceRequest'
   | 'fetchTurns'
   | 'authenticate'
+  | 'authBegin'
   | 'resolveSessionConfig'
   | 'sessionConfigCompletions'
   | 'completions'

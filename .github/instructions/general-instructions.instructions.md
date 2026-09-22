@@ -67,6 +67,7 @@ A spec change ripples into every `clients/<lang>/` mirror, so you often need to 
 | Toolchain | Image | Notes |
 | --- | --- | --- |
 | JDK 17 (Kotlin client) | `docker.io/library/eclipse-temurin:17-jdk` | Gradle comes from the repo's `./gradlew` wrapper. |
+| Swift 6.2 (portable checks) | `docker.io/library/swift@sha256:9bea530093ffff8cf6c259991715ee843fe4d0f932e612f7f4b79cca6e00db87` | `6.2-noble`; portable checks do not replace native macOS/XCTest validation of Apple-only transports. |
 
 Mount the **repo root** (the shared conformance fixtures under `types/test-cases/` are resolved by walking up from the working directory, so a client-dir-only mount fails) and keep build caches out of `$HOME`. Example — run the Kotlin client's tests:
 

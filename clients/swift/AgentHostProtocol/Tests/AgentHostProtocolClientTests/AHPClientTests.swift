@@ -7,6 +7,266 @@ import AgentHostProtocol
 
 final class AHPClientTests: XCTestCase {
 
+    func testAccountsSubscriptionStreamsTypedActionsAndDispatchesRemoval() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+        let account = HostAccount(id: "a1", label: "Account", removable: true, consumers: [])
+        let serverTask = Task {
+            let request = try await readRequest(from: serverSide, expectedMethod: "subscribe")
+            let params = try JSONDecoder().decode(
+                SubscribeParams.self, from: JSONEncoder().encode(try XCTUnwrap(request.params))
+            )
+            XCTAssertEqual(params.channel, AccountsResourceURI)
+            try await respond(
+                to: request.id,
+                with: SubscribeResult(snapshot: Snapshot(
+                    resource: AccountsResourceURI,
+                    state: .accounts(AccountsState(accounts: [], attempts: [])),
+                    fromSeq: 0
+                )),
+                on: serverSide
+            )
+            try await pushNotification(
+                method: "action",
+                params: ActionEnvelope(
+                    channel: AccountsResourceURI,
+                    action: .accountSet(AccountSetAction(type: .accountSet, account: account)),
+                    serverSeq: 1
+                ),
+                on: serverSide
+            )
+            let removal = try await readDispatchNotification(from: serverSide)
+            XCTAssertEqual(removal.channel, AccountsResourceURI)
+            guard case .accountRemoved(let action) = removal.action else {
+                return XCTFail("Expected account removal, not legacy token clearing")
+            }
+            XCTAssertEqual(action.id, "a1")
+        }
+
+        let (result, stream) = try await client.subscribe(AccountsResourceURI)
+        let mirror = AHPStateMirror()
+        await mirror.applySnapshot(try XCTUnwrap(result.snapshot))
+        var iterator = stream.makeAsyncIterator()
+        guard case .action(let envelope) = try await nextWithTimeout(&iterator) else {
+            return XCTFail("Expected accounts action")
+        }
+        await mirror.apply(envelope)
+        let state = await mirror.accountsState
+        XCTAssertEqual(state?.accounts.first?.id, "a1")
+        try await client.dispatch(
+            .accountRemoved(AccountRemovedAction(type: .accountRemoved, id: "a1")), channel: AccountsResourceURI
+        )
+        try await serverTask.value
+        await client.shutdown()
+    }
+
+    func testAuthBeginAndAuthenticateWrappersPreserveExplicitBindings() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+        let serverTask = Task {
+            let initialize = try await readRequest(from: serverSide, expectedMethod: "initialize")
+            try await respond(
+                to: initialize.id,
+                with: InitializeResult(
+                    protocolVersion: "0.9.0", serverSeq: 0, snapshots: [],
+                    authentication: AuthenticationCapability(flows: [AuthFlowSupport(kind: .clientBrokered)])
+                ),
+                on: serverSide
+            )
+            let begin = try await readRequest(from: serverSide, expectedMethod: "authBegin")
+            let params = try JSONDecoder().decode(
+                AuthBeginParams.self, from: JSONEncoder().encode(try XCTUnwrap(begin.params))
+            )
+            XCTAssertEqual(params.channel, AccountsResourceURI)
+            XCTAssertEqual(params.accountId, "a1")
+            XCTAssertEqual(params.flows.map(\.kind), [.clientBrokered])
+            guard case .mcpServer(let consumer) = params.target.consumer else {
+                return XCTFail("Expected session-bound MCP consumer")
+            }
+            XCTAssertEqual(consumer.session, "ahp-session:/s1")
+            XCTAssertEqual(consumer.customizationId, "mcp-1")
+            try await respond(
+                to: begin.id, with: AuthBeginResult(flow: .clientBrokered, attemptId: "attempt-1"), on: serverSide
+            )
+            for kind in ["attempt", "account"] {
+                let authenticate = try await readRequest(from: serverSide, expectedMethod: "authenticate")
+                let params = try JSONDecoder().decode(
+                    AuthenticateParams.self, from: JSONEncoder().encode(try XCTUnwrap(authenticate.params))
+                )
+                XCTAssertEqual(params.channel, RootResourceURI)
+                XCTAssertEqual(params.token, "opaque")
+                XCTAssertEqual(params.expiresIn, 300)
+                XCTAssertEqual(params.scopes, ["read"])
+                switch params.binding {
+                case .attempt(let binding):
+                    XCTAssertEqual(kind, "attempt")
+                    XCTAssertEqual(binding.attemptId, "attempt-1")
+                case .account(let binding):
+                    XCTAssertEqual(kind, "account")
+                    XCTAssertEqual(binding.accountId, "a1")
+                case nil:
+                    XCTFail("Authentication binding must not be discarded")
+                }
+                try await respond(to: authenticate.id, with: AuthenticateResult(accountId: "a1"), on: serverSide)
+            }
+        }
+
+        let initialized = try await client.initialize(clientId: "client", protocolVersions: ["0.9.0"])
+        XCTAssertEqual(initialized.authentication?.flows.first?.kind, .clientBrokered)
+        let result = try await client.authBegin(AuthBeginParams(
+            channel: "",
+            target: AuthBeginTarget(consumer: .mcpServer(McpServerAccountConsumer(
+                kind: .mcpServer, session: "ahp-session:/s1", customizationId: "mcp-1"
+            ))),
+            flows: [AuthFlowSupport(kind: .clientBrokered)],
+            accountId: "a1"
+        ))
+        XCTAssertEqual(result.flow, .clientBrokered)
+        let bindings: [BrokeredAuthenticationBinding] = [
+            .attempt(BrokeredAuthenticationAttemptBinding(kind: .attempt, attemptId: result.attemptId)),
+            .account(BrokeredAuthenticationAccountBinding(kind: .account, accountId: "a1")),
+        ]
+        for binding in bindings {
+            let authenticated = try await client.authenticate(AuthenticateParams(
+                channel: "", resource: "https://api.example.com", token: "opaque",
+                expiresIn: 300, scopes: ["read"], binding: binding
+            ))
+            XCTAssertEqual(authenticated.accountId, "a1")
+        }
+        try await serverTask.value
+        await client.shutdown()
+    }
+
+    func testBoundAuthenticationRejectsUnconfirmedResponsesWithoutFallback() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+        let attempt = BrokeredAuthenticationBinding.attempt(
+            BrokeredAuthenticationAttemptBinding(kind: .attempt, attemptId: "attempt-1")
+        )
+        let account = BrokeredAuthenticationBinding.account(
+            BrokeredAuthenticationAccountBinding(kind: .account, accountId: "a1")
+        )
+        let scenarios: [(BrokeredAuthenticationBinding, AuthenticateResult)] = [
+            (attempt, AuthenticateResult()),
+            (account, AuthenticateResult()),
+            (attempt, AuthenticateResult(accountId: "")),
+            (account, AuthenticateResult(accountId: "")),
+            (account, AuthenticateResult(accountId: "different-account")),
+        ]
+        let serverTask = Task {
+            for (_, result) in scenarios {
+                let request = try await readRequest(from: serverSide, expectedMethod: "authenticate")
+                let params = try JSONDecoder().decode(
+                    AuthenticateParams.self, from: JSONEncoder().encode(try XCTUnwrap(request.params))
+                )
+                XCTAssertNotNil(params.binding, "Unconfirmed responses must not cause an unbound retry")
+                try await respond(to: request.id, with: result, on: serverSide)
+            }
+            let legacy = try await readRequest(from: serverSide, expectedMethod: "authenticate")
+            let params = try JSONDecoder().decode(
+                AuthenticateParams.self, from: JSONEncoder().encode(try XCTUnwrap(legacy.params))
+            )
+            XCTAssertNil(params.binding)
+            try await respond(to: legacy.id, with: AuthenticateResult(), on: serverSide)
+            let ping = try await readRequest(from: serverSide, expectedMethod: "ping")
+            try await respond(to: ping.id, with: AnyCodable(NSNull()), on: serverSide)
+        }
+        for (binding, _) in scenarios {
+            do {
+                _ = try await client.authenticate(AuthenticateParams(
+                    channel: RootResourceURI, resource: "https://api.example.com", token: "opaque", binding: binding
+                ))
+                XCTFail("Expected an unconfirmed authentication response to fail")
+            } catch AHPClientError.decoding {
+            }
+        }
+        let legacy = try await client.authenticate(AuthenticateParams(
+            channel: RootResourceURI, resource: "https://api.example.com", token: "opaque"
+        ))
+        XCTAssertNil(legacy.accountId)
+        try await client.ping()
+        try await serverTask.value
+        await client.shutdown()
+    }
+
+    func testAuthBeginRejectsUnsupportedFlowAndEmptyAttemptId() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+        let results = [
+            AuthBeginResult(flow: .unknown("futureFlow"), attemptId: "attempt-1"),
+            AuthBeginResult(flow: .clientBrokered, attemptId: ""),
+        ]
+        let serverTask = Task {
+            for result in results {
+                let request = try await readRequest(from: serverSide, expectedMethod: "authBegin")
+                try await respond(to: request.id, with: result, on: serverSide)
+            }
+            let ping = try await readRequest(from: serverSide, expectedMethod: "ping")
+            try await respond(to: ping.id, with: AnyCodable(NSNull()), on: serverSide)
+        }
+        for _ in results {
+            do {
+                _ = try await client.authBegin(AuthBeginParams(
+                    channel: AccountsResourceURI,
+                    target: AuthBeginTarget(consumer: .agent(AgentAccountConsumer(
+                        kind: .agent, provider: "copilot", resource: "https://api.example.com"
+                    ))),
+                    flows: [AuthFlowSupport(kind: .clientBrokered)]
+                ))
+                XCTFail("Expected invalid admission acknowledgement to fail")
+            } catch AHPClientError.decoding {
+            }
+        }
+        try await client.ping()
+        try await serverTask.value
+        await client.shutdown()
+    }
+
+    func testBrokeredErrorsSurfaceWithoutLegacyFallback() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+        let serverTask = Task {
+            for method in ["authBegin", "authenticate"] {
+                let request = try await readRequest(from: serverSide, expectedMethod: method)
+                try await serverSide.send(.encoded(.errorResponse(
+                    id: request.id,
+                    error: JsonRpcError(code: -32602, message: "Unsupported or stale binding")
+                )))
+            }
+            let ping = try await readRequest(from: serverSide, expectedMethod: "ping")
+            try await respond(to: ping.id, with: AnyCodable(NSNull()), on: serverSide)
+        }
+        do {
+            _ = try await client.authBegin(AuthBeginParams(
+                channel: AccountsResourceURI,
+                target: AuthBeginTarget(consumer: .agent(AgentAccountConsumer(
+                    kind: .agent, provider: "copilot", resource: "https://api.example.com"
+                ))),
+                flows: [AuthFlowSupport(kind: .clientBrokered)]
+            ))
+            XCTFail("Expected admission failure")
+        } catch AHPClientError.rpc(let code, _, _) {
+            XCTAssertEqual(code, -32602)
+        }
+        do {
+            _ = try await client.authenticate(AuthenticateParams(
+                channel: RootResourceURI, resource: "https://api.example.com", token: "opaque",
+                binding: .account(BrokeredAuthenticationAccountBinding(kind: .account, accountId: "retired"))
+            ))
+            XCTFail("Expected account-bound authentication failure")
+        } catch AHPClientError.rpc(let code, _, _) {
+            XCTAssertEqual(code, -32602)
+        }
+        try await client.ping()
+        try await serverTask.value
+        await client.shutdown()
+    }
+
     // MARK: - request_response_round_trip
 
     func testInitializeHandshakeRoundTrip() async throws {

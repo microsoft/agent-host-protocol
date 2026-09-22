@@ -15,13 +15,62 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
-    AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AccountConsumer, AgentSelection, AutomationDefinition, AutomationSchedule,
+    AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message,
+    MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange,
+    Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
+
+/// Negotiated credential-acquisition flows.
+///
+/// Unknown flows are not support for client-brokered admission. Hosts MUST
+/// reject unsupported offers instead of silently choosing another flow.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AuthFlowKind {
+    /// Client acquires the token; the host owns admission, use, and removal.
+    ClientBrokered,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for AuthFlowKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::ClientBrokered => serializer.serialize_str("clientBrokered"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AuthFlowKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "clientBrokered" => Self::ClientBrokered,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Whether token delivery completes an admission or renews a live account.
+///
+/// Unknown bindings MUST be rejected, never interpreted as unbound delivery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum BrokeredAuthenticationBindingKind {
+    #[serde(rename = "attempt")]
+    Attempt,
+    #[serde(rename = "account")]
+    Account,
+}
 
 /// Discriminant for reconnect result types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -185,6 +234,92 @@ pub enum ResourceWriteMode {
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// Exact consumer for a client-brokered authentication attempt.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AuthBeginTarget {
+    pub consumer: AccountConsumer,
+}
+
+/// Authentication support advertised in `InitializeResult.authentication`.
+///
+/// Advertising `clientBrokered` commits the host to the accounts-channel
+/// contract, including account-safe invalidation and containment of active work.
+/// It does not require host-run OAuth or refresh-token storage.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthenticationCapability {
+    /// Flow descriptors clients may select; absence of a kind means unsupported.
+    pub flows: Vec<AuthFlowSupport>,
+}
+
+/// A supported or offered authentication flow.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthFlowSupport {
+    pub kind: AuthFlowKind,
+}
+
+/// Reserve a single-use client-brokered credential admission.
+///
+/// The client MUST check the `clientBrokered` capability before calling. The
+/// host validates the consumer, caller, and offered flow, captures the current
+/// selection/resource as preconditions, and publishes a pending attempt before
+/// responding. It performs no OAuth flow and accepts no credential here.
+/// Changing that consumer's selection or resource invalidates competing pending
+/// attempts, even if a later change restores the original selection.
+///
+/// Completion uses `authenticate` with an attempt binding. Only the initiating
+/// authorization context, including a verified reconnect, may complete or
+/// cancel the attempt. A correlation id alone grants no authority.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthBeginParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Exact consumer from the host's current root or session state.
+    pub target: AuthBeginTarget,
+    /// Offered flows. MUST include `clientBrokered`; an empty or unsupported
+    /// offer fails with `InvalidParams` without creating an attempt.
+    pub flows: Vec<AuthFlowSupport>,
+    /// Explicit live account to reauthorize. The host MUST verify the delivered
+    /// identity matches it. Omission admits an identity, reusing an existing
+    /// lifetime only when both verified identity and ownership context match.
+    /// Neither intent is inferred from a challenge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
+}
+
+/// Acknowledgement of the selected client-brokered flow.
+///
+/// The client MUST verify this flow before sending an attempt-bound token.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthBeginResult {
+    pub flow: AuthFlowKind,
+    /// Host-issued id of the published pending admission.
+    pub attempt_id: String,
+}
+
+/// Complete a live admission; its consumer preconditions still apply.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrokeredAuthenticationAttemptBinding {
+    /// Pending attempt from `authBegin`.
+    pub attempt_id: String,
+}
+
+/// Renew credentials under a live account without changing any selections.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrokeredAuthenticationAccountBinding {
+    /// Live host-issued account lifetime. Retired ids fail with `Conflict`.
+    pub account_id: String,
+}
+
 /// Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -292,6 +427,13 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+    /// Account-managed authentication support. The `clientBrokered` flow enables
+    /// `ahp-accounts://`, `authBegin`, and bound `authenticate` delivery.
+    ///
+    /// Clients MUST check the flow before using it. A missing capability is not
+    /// permission to fall back to empty-token revocation of shared credentials.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication: Option<AuthenticationCapability>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -1309,16 +1451,33 @@ pub struct AuthenticateParams {
     /// token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
+    /// Required for shared client-brokered credentials after negotiating the
+    /// `clientBrokered` flow. Attempt bindings complete a live admission; account
+    /// bindings renew a live lifetime without changing consumer selection.
+    ///
+    /// The token MUST be nonempty. Hosts reject missing/unknown bindings in a
+    /// shared context, and MUST NOT ignore a binding or interpret it as a legacy
+    /// unbound push. Removed lifetimes and stale attempts fail with `Conflict`.
+    /// Sign-out uses key-only `accounts/removed`, not an empty token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<BrokeredAuthenticationBinding>,
 }
 
 /// Result of the `authenticate` command.
 ///
-/// An empty object on success. If the token is invalid or the resource is
-/// unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`
-/// `-32007` or `InvalidParams` `-32602`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// An empty object on baseline success; bound delivery MUST return `accountId`.
+/// If the token is invalid or the resource is unrecognized, the server MUST
+/// return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams`
+/// `-32602`). Clients MUST treat a missing account id after bound delivery as
+/// an unconfirmed protocol failure, not retry without the binding. An
+/// account-bound renewal MUST return the same account id that was requested.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct AuthenticateResult {}
+pub struct AuthenticateResult {
+    /// Admitted or renewed host account lifetime; required for bound delivery.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
+}
 
 /// Creates a new terminal on the server.
 ///
@@ -1677,6 +1836,16 @@ pub struct FetchAutomationRunsParams {
 pub struct FetchAutomationRunsResult {}
 
 // ─── ChatSource Union ─────────────────────────────────────────────────
+
+/// Token delivery completing an attempt or renewing a live account.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum BrokeredAuthenticationBinding {
+    #[serde(rename = "attempt")]
+    Attempt(BrokeredAuthenticationAttemptBinding),
+    #[serde(rename = "account")]
+    Account(BrokeredAuthenticationAccountBinding),
+}
 
 /// How a new chat uses a source chat.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

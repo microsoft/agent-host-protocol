@@ -8,7 +8,7 @@ The channel concept is woven into every wire message. **Every command and every 
 
 | Direction | Methods | `channel` value |
 |---|---|---|
-| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, `runAutomation`, and `fetchAutomationRuns` | The owning channel's URI (e.g. `ahp-session:/<uuid>` or `ahp-automations://`). |
+| Client → Server commands (channel-scoped) | `subscribe`, `createSession`, `disposeSession`, `createTerminal`, `disposeTerminal`, `fetchTurns`, `completions`, `invokeChangesetOperation`, `runAutomation`, `fetchAutomationRuns`, and `authBegin` | The owning channel's URI (e.g. `ahp-session:/<uuid>`, `ahp-automations://`, or `ahp-accounts://`). |
 | Client → Server commands (connection-level) | `initialize`, `ping`, `reconnect`, `listSessions`, `authenticate`, `resolveSessionConfig`, `sessionConfigCompletions`, `resourceRead`, `resourceWrite`, `resourceList`, `resourceCopy`, `resourceDelete`, `resourceMove`, `resourceResolve`, `resourceMkdir`, `resourceRequest`, `createResourceWatch` | Literal `'ahp-root://'`. |
 | Server → Client commands (bidirectional `resource*` family) | The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins). | Literal `'ahp-root://'`. |
 | Client → Server | `dispatchAction` | The channel the action targets. |
@@ -25,6 +25,7 @@ The rest of this page details the URI scheme and the lifecycle of a subscription
 | URI | State type | Description |
 |---|---|---|
 | `ahp-root://` | `RootState` | Global state (agents, terminals, host config). Always present. |
+| `ahp-accounts://` | `AccountsState` | Host-authoritative accounts and brokered admissions. Requires the typed `clientBrokered` authentication capability and separate account-channel authorization. |
 | `ahp-automations://` | `AutomationState` | Full state for every visible automation. Present when `InitializeResult.automations` is advertised. |
 | `ahp-session:/<uuid>` | `SessionState` | Per-session state (metadata plus the `chats` catalog). The session's provider is carried on `SessionSummary.provider`, not in the URI scheme. |
 | `ahp-chat:/<cid>` | `ChatState` | Per-chat conversation state (turns, streaming, tool calls, pending messages, input requests, changeset catalogue). A session starts with a default chat; multi-chat hosts add more via `createChat`. See [Chat Channel](/specification/chat-channel). |
@@ -137,6 +138,7 @@ State channels deliver mutations via the `action` server notification. The param
 ```
 
 - Root actions go to all clients subscribed to `ahp-root://`.
+- Accounts actions go only to clients authorized and subscribed to `ahp-accounts://`.
 - Session actions go to all clients subscribed to that session's URI.
 - Chat actions go to all clients subscribed to that chat's URI.
 - Terminal actions go to all clients subscribed to that terminal's URI.

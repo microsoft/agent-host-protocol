@@ -603,6 +603,61 @@ public static class Reducers
         return ReduceOutcome.NoOp;
     }
 
+    // ─── Accounts Reducer ──────────────────────────────────────────────────
+
+    private static string AuthAttemptId(AuthAttemptState attempt) => attempt.Value switch
+    {
+        AuthAttemptPendingState value => value.Id,
+        AuthAttemptCompletedState value => value.Id,
+        AuthAttemptFailedState value => value.Id,
+        JsonElement value when value.TryGetProperty("id", out JsonElement id) => id.GetString() ?? string.Empty,
+        _ => string.Empty,
+    };
+
+    /// <summary>
+    /// Projects authoritative account and admission actions into state.
+    /// Rejected envelopes must not be applied; credential authorization and
+    /// removability checks belong to the host, not this reducer.
+    /// </summary>
+    public static ReduceOutcome ApplyToAccounts(AccountsState state, StateAction action)
+    {
+        Guard.ThrowIfNull(state, nameof(state));
+        Guard.ThrowIfNull(action, nameof(action));
+        switch (action.Value)
+        {
+            case AccountSetAction a:
+                {
+                    int index = state.Accounts.FindIndex(account => account.Id == a.Account.Id);
+                    if (index < 0) state.Accounts.Add(a.Account);
+                    else state.Accounts[index] = a.Account;
+                    return ReduceOutcome.Applied;
+                }
+            case AccountRemovedAction a:
+                {
+                    int index = state.Accounts.FindIndex(account => account.Id == a.Id);
+                    if (index < 0) return ReduceOutcome.NoOp;
+                    state.Accounts.RemoveAt(index);
+                    return ReduceOutcome.Applied;
+                }
+            case AuthAttemptSetAction a:
+                {
+                    string id = AuthAttemptId(a.Attempt);
+                    int index = state.Attempts.FindIndex(attempt => AuthAttemptId(attempt) == id);
+                    if (index < 0) state.Attempts.Add(a.Attempt);
+                    else state.Attempts[index] = a.Attempt;
+                    return ReduceOutcome.Applied;
+                }
+            case AuthAttemptRemovedAction a:
+                {
+                    int index = state.Attempts.FindIndex(attempt => AuthAttemptId(attempt) == a.Id);
+                    if (index < 0) return ReduceOutcome.NoOp;
+                    state.Attempts.RemoveAt(index);
+                    return ReduceOutcome.Applied;
+                }
+        }
+        return ReduceOutcome.OutOfScope;
+    }
+
     // ─── Root Reducer ──────────────────────────────────────────────────────
 
     /// <summary>

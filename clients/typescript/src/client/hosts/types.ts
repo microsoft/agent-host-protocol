@@ -15,6 +15,7 @@ import type { ClientIdStore } from './client-id-store.js';
 import type { HostTransportFactory } from './factory.js';
 import { defaultReconnectPolicy, type ReconnectPolicy } from './policy.js';
 import type { AhpClientConfig } from '../client.js';
+import type { AuthenticationCapability } from '../../types/channels-accounts/commands.js';
 
 /**
  * Opaque, consumer-supplied identifier for a host registered with
@@ -172,6 +173,8 @@ export interface HostHandle {
   readonly defaultDirectory: string | null;
   /** Automation support advertised by the host. */
   readonly automations: AutomationCapabilities | null;
+  /** Authentication support from the latest successful initialization. */
+  readonly authentication: AuthenticationCapability | null;
   /** Agents currently advertised by the host (mirrored from root state). */
   readonly agents: readonly AgentInfo[];
   /** Active session count from root state, when present. */

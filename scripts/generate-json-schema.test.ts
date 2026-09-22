@@ -298,6 +298,76 @@ describe('generated JSON schemas', () => {
   }
 });
 
+describe('client-brokered authentication schema', () => {
+  const schema = loadSchema('commands.schema.json');
+  const defs = schema.$defs as Record<string, Record<string, unknown>>;
+  const consumer = { kind: 'agent', provider: 'assistant', resource: 'https://api.example.test' };
+
+  it('requires an exact consumer without a challenge-catalogue dependency', () => {
+    const params = {
+      channel: 'ahp-accounts://',
+      flows: [{ kind: 'clientBrokered' }],
+      target: { consumer },
+    };
+    assert.equal(schemaAccepts(schema, defs.AuthBeginParams, params), true);
+    assert.equal(schemaAccepts(schema, defs.AuthBeginParams, { ...params, target: { challengeId: 'one' } }), false);
+    assert.equal(schemaAccepts(schema, defs.AccountConsumer, { kind: 'mcpServer', session: 'ahp-session:/one' }), false);
+    assert.equal(schemaAccepts(schema, defs.AccountConsumer, {
+      kind: 'mcpServer', session: 'ahp-session:/one', customizationId: 'server-1',
+    }), true);
+  });
+
+  it('never accepts an unknown or incomplete token binding as a known variant', () => {
+    for (const binding of [
+      { kind: 'attempt', attemptId: 'one' },
+      { kind: 'account', accountId: 'account-a' },
+    ]) {
+      assert.equal(schemaAccepts(schema, defs.BrokeredAuthenticationBinding, binding), true);
+    }
+    for (const binding of [
+      {},
+      { kind: 'attempt' },
+      { kind: 'account', attemptId: 'one' },
+      { kind: 'unconditional', accountId: 'account-a' },
+    ]) {
+      assert.equal(schemaAccepts(schema, defs.BrokeredAuthenticationBinding, binding), false);
+    }
+  });
+
+  it('keeps legacy authenticate valid while preserving explicit bindings and results', () => {
+    const baseline = { channel: 'ahp-root://', resource: consumer.resource, token: 'test-credential' };
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, baseline), true);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, {
+      ...baseline, binding: { kind: 'account', accountId: 'account-a' },
+    }), true);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, {
+      ...baseline, binding: { kind: 'unconditional' },
+    }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateResult, { accountId: 'account-a' }), true);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateResult, { accountId: 42 }), false);
+  });
+
+  it('requires outcome-specific data without interpreting future statuses as success', () => {
+    const attempt = { id: 'one', consumer, resource: consumer.resource };
+    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, { ...attempt, status: 'pending' }), true);
+    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, { ...attempt, status: 'completed' }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, {
+      ...attempt, status: 'completed', accountId: 'account-a',
+    }), true);
+    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, { ...attempt, status: 'failed' }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, {
+      ...attempt, status: 'failed', error: { errorType: 'Conflict', message: 'Admission expired' },
+    }), true);
+    assert.equal(schemaAccepts(schema, defs.AuthAttemptState, { ...attempt, status: 'futurePending' }), false);
+  });
+
+  it('requires both keyed collections in an accounts snapshot', () => {
+    assert.equal(schemaAccepts(schema, defs.AccountsState, { accounts: [], attempts: [] }), true);
+    assert.equal(schemaAccepts(schema, defs.AccountsState, { accounts: [] }), false);
+    assert.equal(schemaAccepts(schema, defs.AccountsState, { attempts: [] }), false);
+  });
+});
+
 describe('typeAdmitsUndefined', () => {
   // Guards the depth-aware union splitting these checks depend on: only a
   // *top-level* `undefined` member means the property may be absent on the

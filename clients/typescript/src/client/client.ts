@@ -13,6 +13,8 @@
 
 import type { StateAction } from '../types/actions.js';
 import type {
+  AuthenticateParams,
+  AuthenticateResult,
   DispatchActionParams,
   InitializeParams,
   InitializeResult,
@@ -43,6 +45,12 @@ import type {
   SubscribeResult,
   UnsubscribeParams,
 } from '../types/common/commands.js';
+import { AuthFlowKind, BrokeredAuthenticationBindingKind } from '../types/channels-accounts/commands.js';
+import type {
+  AuthBeginParams,
+  AuthBeginResult,
+  AuthenticationCapability,
+} from '../types/channels-accounts/commands.js';
 import type {
   CreateResourceWatchParams,
   CreateResourceWatchResult,
@@ -81,6 +89,7 @@ import {
   RpcError,
   RpcTimeoutError,
   TransportError,
+  UnsupportedCapabilityError,
 } from './error.js';
 import {
   type AhpTransport,
@@ -249,6 +258,7 @@ export class AhpClient {
   private state: ConnectionState = { status: 'idle' };
   private receiveLoop: Promise<void> | null = null;
   private serverRequestHandler: ServerRequestHandler | null = null;
+  private authenticationCapability: AuthenticationCapability | undefined;
 
   constructor(transport: AhpTransport, config: AhpClientConfig = {}) {
     this.transport = transport;
@@ -263,6 +273,11 @@ export class AhpClient {
   /** Current connection state. */
   get connectionState(): ConnectionState {
     return this.state;
+  }
+
+  /** Authentication capability from the most recent successful handshake. */
+  get authentication(): AuthenticationCapability | undefined {
+    return this.authenticationCapability;
   }
 
   /** AsyncIterable stream of connection-state transitions. */
@@ -369,6 +384,8 @@ export class AhpClient {
     clientId: string;
     lastSeenServerSeq: number;
     subscriptions: readonly URI[];
+    /** Capability from this host's previous initialization, restored only after successful reconnect. */
+    authentication?: AuthenticationCapability;
   }): Promise<ReconnectResult> {
     const params: ReconnectParams = {
       channel: 'ahp-root://',
@@ -376,7 +393,11 @@ export class AhpClient {
       lastSeenServerSeq: args.lastSeenServerSeq,
       subscriptions: [...args.subscriptions],
     };
-    return this.request('reconnect', params);
+    const result = await this.request('reconnect', params);
+    if (args.authentication !== undefined) {
+      this.authenticationCapability = args.authentication;
+    }
+    return result;
   }
 
   /**
@@ -473,6 +494,30 @@ export class AhpClient {
   async ping(): Promise<void> {
     const params: PingParams = { channel: 'ahp-root://' };
     await this.request('ping', params);
+  }
+
+  /**
+   * Begin client-brokered authentication on the standalone accounts channel.
+   * Requires the host's `authentication.flows` to advertise `clientBrokered`.
+   */
+  async authBegin(params: Omit<AuthBeginParams, 'channel'>): Promise<AuthBeginResult> {
+    return this.request('authBegin', { ...params, channel: 'ahp-accounts://' });
+  }
+
+  /**
+   * Deliver a credential without altering or dropping its optional brokered
+   * binding. Bound credentials require advertised client-brokered support.
+   * Account-bound renewal must confirm the same account lifetime.
+   */
+  async authenticate(params: AuthenticateParams): Promise<AuthenticateResult> {
+    const expectedAccountId = params.binding?.kind === BrokeredAuthenticationBindingKind.Account
+      ? params.binding.accountId
+      : undefined;
+    const result = await this.request('authenticate', params);
+    if (expectedAccountId !== undefined && result.accountId !== expectedAccountId) {
+      throw new TransportError('protocol', 'Host returned a different account for a bound renewal');
+    }
+    return result;
   }
 
   // ─── Resource commands ─────────────────────────────────────────────────────
@@ -595,6 +640,7 @@ export class AhpClient {
     params: CommandMap[M]['params'],
   ): Promise<CommandMap[M]['result']> {
     this.assertOpen();
+    this.assertAuthenticationSupport(method, params);
     const id = this.nextRequestId++;
     const msg: JsonRpcRequest = {
       jsonrpc: '2.0',
@@ -605,7 +651,27 @@ export class AhpClient {
 
     return new Promise<CommandMap[M]['result']>((resolve, reject) => {
       const pending: PendingRequest = {
-        resolve: value => resolve(value as CommandMap[M]['result']),
+        resolve: value => {
+          if (method === 'authBegin') {
+            const result = value as AuthBeginResult | null | undefined;
+            if (result?.flow !== AuthFlowKind.ClientBrokered
+              || typeof result.attemptId !== 'string' || result.attemptId.length === 0) {
+              reject(new TransportError('protocol', 'Host did not confirm a client-brokered authentication attempt'));
+              return;
+            }
+          }
+          if (method === 'authenticate' && (params as AuthenticateParams).binding !== undefined) {
+            const accountId = (value as AuthenticateResult | null | undefined)?.accountId;
+            if (typeof accountId !== 'string' || accountId.length === 0) {
+              reject(new TransportError('protocol', 'Host did not confirm the bound authentication account'));
+              return;
+            }
+          }
+          if (method === 'initialize') {
+            this.authenticationCapability = (value as InitializeResult).authentication;
+          }
+          resolve(value as CommandMap[M]['result']);
+        },
         reject,
         method: method as string,
         timer: null,
@@ -642,6 +708,7 @@ export class AhpClient {
     params: ClientNotificationMap[M]['params'],
   ): void {
     this.assertOpen();
+    this.assertAuthenticationSupport(method, params);
     const msg: JsonRpcNotification = {
       jsonrpc: '2.0',
       method: method as string,
@@ -661,6 +728,18 @@ export class AhpClient {
 
   private assertOpen(): void {
     if (this.isClosed()) throw new ClientClosedError();
+  }
+
+  private assertAuthenticationSupport(
+    method: string,
+    params: { channel: URI; binding?: unknown },
+  ): void {
+    const brokered = method === 'authBegin'
+      || (method === 'authenticate' && params.binding !== undefined)
+      || ((method === 'subscribe' || method === 'dispatchAction') && params.channel === 'ahp-accounts://');
+    if (brokered && !this.authenticationCapability?.flows.some(flow => flow.kind === AuthFlowKind.ClientBrokered)) {
+      throw new UnsupportedCapabilityError('authentication.flows.clientBrokered');
+    }
   }
 
   private async sendMessage(msg: JsonRpcMessage): Promise<void> {

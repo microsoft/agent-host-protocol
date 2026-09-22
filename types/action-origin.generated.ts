@@ -101,6 +101,10 @@ import type {
   AutomationRunSessionRemovedAction,
   AutomationRunPrimarySessionChangedAction,
   AutomationRunCancelRequestedAction,
+  AccountSetAction,
+  AccountRemovedAction,
+  AuthAttemptSetAction,
+  AuthAttemptRemovedAction,
 } from './actions.js';
 
 import { ActionType } from './actions.js';
@@ -413,6 +417,26 @@ export type ServerAutomationRunAction =
   | AutomationRunPrimarySessionChangedAction
 ;
 
+/** Union of all accounts-scoped actions. */
+export type AccountsAction =
+  | AccountSetAction
+  | AccountRemovedAction
+  | AuthAttemptSetAction
+  | AuthAttemptRemovedAction
+;
+
+/** Union of accounts actions that clients may dispatch. */
+export type ClientAccountsAction =
+  | AccountRemovedAction
+  | AuthAttemptRemovedAction
+;
+
+/** Union of accounts actions that only the server may produce. */
+export type ServerAccountsAction =
+  | AccountSetAction
+  | AuthAttemptSetAction
+;
+
 // ─── Client-Dispatchable Map ─────────────────────────────────────────────────
 
 /**
@@ -518,4 +542,8 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.AutomationRunSessionRemoved]: false,
   [ActionType.AutomationRunPrimarySessionChanged]: false,
   [ActionType.AutomationRunCancelRequested]: true,
+  [ActionType.AccountSet]: false,
+  [ActionType.AccountRemoved]: true,
+  [ActionType.AuthAttemptSet]: false,
+  [ActionType.AuthAttemptRemoved]: true,
 };

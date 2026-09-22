@@ -2,7 +2,7 @@
  * Convenience reducer-driven state store, mirroring the Swift
  * `AHPStateMirror` and the Rust reducers example.
  *
- * Tracks root, session, terminal, changeset, automation catalogue, and
+ * Tracks root, accounts, session, terminal, changeset, automation catalogue, and
  * automation-run state. Apply {@link Snapshot}s and {@link ActionEnvelope}s and
  * the mirror keeps those resources up to date via the generated reducers.
  *
@@ -15,6 +15,7 @@
 import type { ActionEnvelope } from '../types/common/actions.js';
 import type { Snapshot, URI } from '../types/common/state.js';
 import type {
+  AccountsAction,
   ChangesetAction,
   AutomationAction,
   AutomationRunAction,
@@ -23,12 +24,14 @@ import type {
   TerminalAction,
 } from '../types/action-origin.generated.js';
 import type { ChangesetState } from '../types/channels-changeset/state.js';
+import type { AccountsState } from '../types/channels-accounts/state.js';
 import type { RootState } from '../types/channels-root/state.js';
 import type { SessionState } from '../types/channels-session/state.js';
 import type { TerminalState } from '../types/channels-terminal/state.js';
 import type { AutomationEntry, AutomationState } from '../types/channels-automation/state.js';
 import type { AutomationRunState } from '../types/channels-automation-run/state.js';
 import { changesetReducer } from '../types/channels-changeset/reducer.js';
+import { accountsReducer } from '../types/channels-accounts/reducer.js';
 import { rootReducer } from '../types/channels-root/reducer.js';
 import { sessionReducer } from '../types/channels-session/reducer.js';
 import { terminalReducer } from '../types/channels-terminal/reducer.js';
@@ -36,6 +39,7 @@ import { automationReducer } from '../types/channels-automation/reducer.js';
 import { automationRunReducer } from '../types/channels-automation-run/reducer.js';
 
 const ROOT_URI = 'ahp-root://' as const;
+const ACCOUNTS_URI = 'ahp-accounts://' as const;
 const AUTOMATIONS_URI = 'ahp-automations://' as const;
 
 const INITIAL_ROOT: RootState = { agents: [] };
@@ -44,6 +48,7 @@ const INITIAL_AUTOMATION_CATALOG: AutomationState = { entries: [] };
 /** Reducer-driven state container synchronised with server events. */
 export class AhpStateMirror {
   private rootState: RootState = INITIAL_ROOT;
+  private accountsState: AccountsState = { accounts: [], attempts: [] };
   private readonly sessionsMap = new Map<URI, SessionState>();
   private readonly terminalsMap = new Map<URI, TerminalState>();
   private readonly changesetsMap = new Map<URI, ChangesetState>();
@@ -54,6 +59,11 @@ export class AhpStateMirror {
   /** Current root state. */
   get root(): RootState {
     return this.rootState;
+  }
+
+  /** Current standalone accounts-channel state. */
+  get accounts(): AccountsState {
+    return this.accountsState;
   }
 
   /** All known sessions keyed by URI. */
@@ -111,6 +121,10 @@ export class AhpStateMirror {
       this.rootState = snapshot.state as RootState;
       return;
     }
+    if (resource === ACCOUNTS_URI) {
+      this.accountsState = snapshot.state as AccountsState;
+      return;
+    }
     if (resource.startsWith('ahp-session:')) {
       this.sessionsMap.set(resource, snapshot.state as SessionState);
       return;
@@ -135,16 +149,22 @@ export class AhpStateMirror {
 
   /**
    * Apply a server-pushed {@link ActionEnvelope}, routing through the
-   * matching reducer. Unknown channels are ignored.
+   * matching reducer. Unknown channels and rejected accounts mutations
+   * are ignored; dispatch does not optimistically change this mirror.
    *
    * The channel-based routing here discriminates which reducer applies;
    * the action is cast to the appropriate per-channel subset (the
-   * `RootAction` / `SessionAction` / `TerminalAction` / `ChangesetAction`
+   * `AccountsAction` / `RootAction` / `SessionAction` / `TerminalAction` / `ChangesetAction`
    * unions generated from `@clientDispatchable` annotations) because
    * TypeScript cannot infer that narrowing from the channel string alone.
    */
   apply(envelope: ActionEnvelope): void {
     const { channel, action } = envelope;
+    if (channel === ACCOUNTS_URI) {
+      if (envelope.rejectionReason !== undefined) return;
+      this.accountsState = accountsReducer(this.accountsState, action as AccountsAction);
+      return;
+    }
     if (channel === ROOT_URI) {
       this.rootState = rootReducer(this.rootState, action as RootAction);
       return;

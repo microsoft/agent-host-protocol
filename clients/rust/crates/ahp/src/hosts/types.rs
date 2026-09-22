@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use ahp_types::actions::ActionEnvelope;
-use ahp_types::commands::AutomationCapabilities;
+use ahp_types::commands::{AuthenticationCapability, AutomationCapabilities};
 use ahp_types::state::{AgentInfo, RootState, SessionSummary, TerminalInfo};
 use thiserror::Error;
 use tokio::sync::{broadcast, Mutex};
@@ -239,6 +239,8 @@ pub struct HostHandle {
     pub default_directory: Option<String>,
     /// Automation support advertised by the host.
     pub automations: Option<AutomationCapabilities>,
+    /// Authentication support from the latest successful initialization.
+    pub authentication: Option<AuthenticationCapability>,
     /// Agents currently advertised by the host (mirrored from root state).
     pub agents: Vec<AgentInfo>,
     /// Active session count from root state, when present.
@@ -548,6 +550,7 @@ pub(super) struct HostInternal {
     pub(super) server_seq: i64,
     pub(super) default_directory: Option<String>,
     pub(super) automations: Option<AutomationCapabilities>,
+    pub(super) authentication: Option<AuthenticationCapability>,
     pub(super) root_state: RootState,
     pub(super) subscriptions: Vec<String>,
     pub(super) completion_trigger_characters: Vec<String>,
@@ -569,6 +572,7 @@ impl HostInternal {
             server_seq: self.server_seq,
             default_directory: self.default_directory.clone(),
             automations: self.automations.clone(),
+            authentication: self.authentication.clone(),
             agents: self.root_state.agents.clone(),
             active_sessions: self.root_state.active_sessions,
             terminals: self.root_state.terminals.clone(),

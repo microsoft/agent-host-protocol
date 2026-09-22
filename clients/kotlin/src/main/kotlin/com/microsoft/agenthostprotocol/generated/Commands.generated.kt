@@ -152,6 +152,46 @@ enum class ResourceWriteMode {
     INSERT
 }
 
+/**
+ * Negotiated credential-acquisition flows.
+ *
+ * Unknown flows are not support for client-brokered admission. Hosts MUST
+ * reject unsupported offers instead of silently choosing another flow.
+ */
+@Serializable(with = AuthFlowKindSerializer::class)
+@JvmInline
+value class AuthFlowKind(val rawValue: String) {
+    companion object {
+        /**
+         * Client acquires the token; the host owns admission, use, and removal.
+         */
+        val CLIENT_BROKERED: AuthFlowKind = AuthFlowKind("clientBrokered")
+    }
+}
+
+internal object AuthFlowKindSerializer : KSerializer<AuthFlowKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AuthFlowKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AuthFlowKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AuthFlowKind =
+        AuthFlowKind(decoder.decodeString())
+}
+
+/**
+ * Whether token delivery completes an admission or renews a live account.
+ *
+ * Unknown bindings MUST be rejected, never interpreted as unbound delivery.
+ */
+@Serializable
+enum class BrokeredAuthenticationBindingKind {
+    @SerialName("attempt")
+    ATTEMPT,
+    @SerialName("account")
+    ACCOUNT
+}
+
 // ─── Command Types ──────────────────────────────────────────────────────────
 
 /**
@@ -390,7 +430,15 @@ data class InitializeResult(
      * `ahp-automations://` for {@link AutomationState}; absence means the
      * host does not expose an automation catalogue or automation commands.
      */
-    val automations: AutomationCapabilities? = null
+    val automations: AutomationCapabilities? = null,
+    /**
+     * Account-managed authentication support. The `clientBrokered` flow enables
+     * `ahp-accounts://`, `authBegin`, and bound `authenticate` delivery.
+     *
+     * Clients MUST check the flow before using it. A missing capability is not
+     * permission to fall back to empty-token revocation of shared credentials.
+     */
+    val authentication: AuthenticationCapability? = null
 )
 
 @Serializable
@@ -1242,11 +1290,97 @@ data class AuthenticateParams(
      * Omit when the client doesn't track granted scopes separately from the
      * token.
      */
-    val scopes: List<String>? = null
+    val scopes: List<String>? = null,
+    /**
+     * Required for shared client-brokered credentials after negotiating the
+     * `clientBrokered` flow. Attempt bindings complete a live admission; account
+     * bindings renew a live lifetime without changing consumer selection.
+     *
+     * The token MUST be nonempty. Hosts reject missing/unknown bindings in a
+     * shared context, and MUST NOT ignore a binding or interpret it as a legacy
+     * unbound push. Removed lifetimes and stale attempts fail with `Conflict`.
+     * Sign-out uses key-only `accounts/removed`, not an empty token.
+     */
+    val binding: BrokeredAuthenticationBinding? = null
 )
 
 @Serializable
-class AuthenticateResult
+data class AuthenticateResult(
+    /**
+     * Admitted or renewed host account lifetime; required for bound delivery.
+     */
+    val accountId: String? = null
+)
+
+@Serializable
+data class AuthBeginParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Exact consumer from the host's current root or session state.
+     */
+    val target: AuthBeginTarget,
+    /**
+     * Offered flows. MUST include `clientBrokered`; an empty or unsupported
+     * offer fails with `InvalidParams` without creating an attempt.
+     */
+    val flows: List<AuthFlowSupport>,
+    /**
+     * Explicit live account to reauthorize. The host MUST verify the delivered
+     * identity matches it. Omission admits an identity, reusing an existing
+     * lifetime only when both verified identity and ownership context match.
+     * Neither intent is inferred from a challenge.
+     */
+    val accountId: String? = null
+)
+
+@Serializable
+data class AuthBeginResult(
+    val flow: AuthFlowKind,
+    /**
+     * Host-issued id of the published pending admission.
+     */
+    val attemptId: String
+)
+
+@Serializable
+data class AuthFlowSupport(
+    val kind: AuthFlowKind
+)
+
+@Serializable
+data class AuthenticationCapability(
+    /**
+     * Flow descriptors clients may select; absence of a kind means unsupported.
+     */
+    val flows: List<AuthFlowSupport>
+)
+
+@Serializable
+data class BrokeredAuthenticationAttemptBinding(
+    val kind: BrokeredAuthenticationBindingKind,
+    /**
+     * Pending attempt from `authBegin`.
+     */
+    val attemptId: String
+)
+
+@Serializable
+data class BrokeredAuthenticationAccountBinding(
+    val kind: BrokeredAuthenticationBindingKind,
+    /**
+     * Live host-issued account lifetime. Retired ids fail with `Conflict`.
+     */
+    val accountId: String
+)
 
 @Serializable
 data class CreateTerminalParams(
@@ -1724,6 +1858,52 @@ internal object ChatSourceSerializer : KSerializer<ChatSource> {
         output.encodeJsonElement(element)
     }
 }
+
+@Serializable(with = BrokeredAuthenticationBindingSerializer::class)
+sealed interface BrokeredAuthenticationBinding
+
+@JvmInline
+value class BrokeredAuthenticationBindingAttempt(val value: BrokeredAuthenticationAttemptBinding) : BrokeredAuthenticationBinding
+@JvmInline
+value class BrokeredAuthenticationBindingAccount(val value: BrokeredAuthenticationAccountBinding) : BrokeredAuthenticationBinding
+
+internal object BrokeredAuthenticationBindingSerializer : KSerializer<BrokeredAuthenticationBinding> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("BrokeredAuthenticationBinding")
+
+    override fun deserialize(decoder: Decoder): BrokeredAuthenticationBinding {
+        val input = decoder as? JsonDecoder
+            ?: error("BrokeredAuthenticationBinding can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for BrokeredAuthenticationBinding")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: error("Missing kind discriminator on BrokeredAuthenticationBinding")
+        return when (discriminant) {
+            "attempt" -> BrokeredAuthenticationBindingAttempt(input.json.decodeFromJsonElement(BrokeredAuthenticationAttemptBinding.serializer(), element))
+            "account" -> BrokeredAuthenticationBindingAccount(input.json.decodeFromJsonElement(BrokeredAuthenticationAccountBinding.serializer(), element))
+            else -> error("Unknown BrokeredAuthenticationBinding discriminator: $discriminant")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: BrokeredAuthenticationBinding) {
+        val output = encoder as? JsonEncoder
+            ?: error("BrokeredAuthenticationBinding can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is BrokeredAuthenticationBindingAttempt -> output.json.encodeToJsonElement(BrokeredAuthenticationAttemptBinding.serializer(), value.value)
+            is BrokeredAuthenticationBindingAccount -> output.json.encodeToJsonElement(BrokeredAuthenticationAccountBinding.serializer(), value.value)
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable
+data class AuthBeginTarget(
+    /**
+     * Exact consumer selected for authentication.
+     */
+    val consumer: AccountConsumer
+)
 
 // ─── ReconnectResult Union ──────────────────────────────────────────────────
 

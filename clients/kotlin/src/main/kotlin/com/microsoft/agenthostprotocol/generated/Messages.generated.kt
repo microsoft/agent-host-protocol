@@ -134,6 +134,9 @@ object AhpCommands {
     fun authenticate(id: Long, params: AuthenticateParams): JsonRpcRequest<AuthenticateParams> =
         JsonRpcRequest(id = id, method = "authenticate", params = params)
 
+    fun authBegin(id: Long, params: AuthBeginParams): JsonRpcRequest<AuthBeginParams> =
+        JsonRpcRequest(id = id, method = "authBegin", params = params)
+
     fun createTerminal(id: Long, params: CreateTerminalParams): JsonRpcRequest<CreateTerminalParams> =
         JsonRpcRequest(id = id, method = "createTerminal", params = params)
 

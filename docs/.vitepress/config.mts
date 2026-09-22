@@ -65,6 +65,7 @@ export default withMermaid(defineConfig({
           text: 'Channels',
           items: [
             { text: 'Root Channel', link: '/specification/root-channel' },
+            { text: 'Accounts Channel', link: '/specification/accounts-channel' },
             { text: 'Session Channel', link: '/specification/session-channel' },
             { text: 'Chat Channel', link: '/specification/chat-channel' },
             { text: 'Automation Catalogue Channel', link: '/specification/automation-channel' },
@@ -88,6 +89,7 @@ export default withMermaid(defineConfig({
           text: 'Channels',
           items: [
             { text: 'Root Channel', link: '/reference/root' },
+            { text: 'Accounts Channel', link: '/reference/accounts' },
             { text: 'Session Channel', link: '/reference/session' },
             { text: 'Chat Channel', link: '/reference/chat' },
             { text: 'Terminal Channel', link: '/reference/terminal' },

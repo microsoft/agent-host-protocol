@@ -79,6 +79,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Lifecycle](/specification/lifecycle)** — Connection handshake, reconnection, and disconnection.
 - **[Channels & Subscriptions](/specification/subscriptions)** — The channel model, the universal `channel: URI` routing key, and the subscription mechanism shared by every channel type.
 - **[Authentication](/specification/authentication)** — RFC 9728 / RFC 6750 authentication flow.
+- **[Accounts Channel](/specification/accounts-channel)** — `ahp-accounts://` — capability-gated shared client-brokered authentication, account-safe sign-out, and admission recovery.
 - **[Root Channel](/specification/root-channel)** — `ahp-root://` — agents, terminals catalogue, host config, session catalogue events.
 - **[Session Channel](/specification/session-channel)** — `ahp-session:/<uuid>` — per-session state: the `chats` catalog, default chat, active clients, customizations, changesets, and aggregated status.
 - **[Automation Catalogue Channel](/specification/automation-channel)** — `ahp-automations://` — synchronized full states for durable trigger-based session workflows.
@@ -89,6 +90,7 @@ The specification is organised around the **channels** that AHP exposes — each
 - **[Versioning](/specification/versioning)** — Protocol version negotiation and compatibility.
 - **[Common Types](/reference/common)** — Cross-cutting types, base command/notification shapes, and JSON-RPC wire types.
 - **[Root Channel Reference](/reference/root)** — `RootState`, root actions, root commands, and root notifications.
+- **[Accounts Channel Reference](/reference/accounts)** — `AccountsState`, keyed account actions, and brokered admission commands.
 - **[Session Channel Reference](/reference/session)** — `SessionState`, session actions, and session commands.
 - **[Chat Channel Reference](/reference/chat)** — `ChatState`, chat actions, and chat commands.
 - **[Terminal Channel Reference](/reference/terminal)** — `TerminalState`, terminal actions, and terminal commands.

@@ -29,6 +29,11 @@ package com.microsoft.agenthostprotocol
 // generated types and re-encodes with Ahp.json.
 
 import com.microsoft.agenthostprotocol.generated.ActionEnvelope
+import com.microsoft.agenthostprotocol.generated.AuthAttemptState
+import com.microsoft.agenthostprotocol.generated.AuthBeginParams
+import com.microsoft.agenthostprotocol.generated.AuthBeginResult
+import com.microsoft.agenthostprotocol.generated.AuthenticateParams
+import com.microsoft.agenthostprotocol.generated.AuthenticateResult
 import com.microsoft.agenthostprotocol.generated.ChangesetOperationTarget
 import com.microsoft.agenthostprotocol.generated.ChatSource
 import com.microsoft.agenthostprotocol.generated.Customization
@@ -218,6 +223,11 @@ class RoundTripCorpusTest {
 
         return when (typeName) {
             "ActionEnvelope" -> rt(ActionEnvelope.serializer())
+            "AuthAttemptState" -> rt(AuthAttemptState.serializer())
+            "AuthBeginParams" -> rt(AuthBeginParams.serializer())
+            "AuthBeginResult" -> rt(AuthBeginResult.serializer())
+            "AuthenticateParams" -> rt(AuthenticateParams.serializer())
+            "AuthenticateResult" -> rt(AuthenticateResult.serializer())
             "StateAction" -> rt(StateAction.serializer())
             "Customization" -> rt(Customization.serializer())
             // SessionStatus decodes via the REAL generated value class — no Long sidestep.

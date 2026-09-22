@@ -169,6 +169,34 @@ final class MultiHostClientTests: XCTestCase {
         await multi.shutdown()
     }
 
+    func testAuthenticationCapabilityPersistsAcrossReconnectWithoutAutoSubscription() async throws {
+        let mode = ReconnectResponseModeSwitch()
+        let multi = MultiHostClient()
+        _ = try await multi.add(HostConfig(
+            id: "local",
+            label: "Local",
+            transportFactory: makeReconnectResultFactory(
+                mode: mode,
+                authenticationCapability: AuthenticationCapability(flows: [AuthFlowSupport(kind: .clientBrokered)])
+            )
+        ))
+        await waitForHostState(multi, id: "local") { $0.isConnected }
+        let initialValue = await multi.host("local")
+        let initial = try XCTUnwrap(initialValue)
+        XCTAssertEqual(initial.authentication?.flows.first?.kind, .clientBrokered)
+        XCTAssertFalse(initial.subscriptions.contains(AccountsResourceURI))
+
+        try await multi.reconnect("local")
+        await waitUntil {
+            guard let snapshot = await multi.host("local") else { return false }
+            return snapshot.generation > initial.generation && snapshot.state.isConnected
+        }
+        let reconnectedValue = await multi.host("local")
+        let reconnected = try XCTUnwrap(reconnectedValue)
+        XCTAssertEqual(reconnected.authentication?.flows.first?.kind, .clientBrokered)
+        await multi.shutdown()
+    }
+
     // MARK: - dispatch_can_use_explicit_client_seq
 
     func testDispatchCanUseExplicitClientSeqThroughMultiHostSurfaces() async throws {
@@ -1155,7 +1183,8 @@ private func actionEnvelope(from event: HostSubscriptionEvent?) -> ActionEnvelop
 
 private func makeReconnectResultFactory(
     mode: ReconnectResponseModeSwitch,
-    automationCapabilities: AutomationCapabilities? = nil
+    automationCapabilities: AutomationCapabilities? = nil,
+    authenticationCapability: AuthenticationCapability? = nil
 ) -> HostTransportFactory {
     { _ in
         let (clientSide, serverSide) = InMemoryTransport.pair()
@@ -1163,7 +1192,8 @@ private func makeReconnectResultFactory(
             await driveReconnectResultHost(
                 transport: serverSide,
                 mode: mode,
-                automationCapabilities: automationCapabilities
+                automationCapabilities: automationCapabilities,
+                authenticationCapability: authenticationCapability
             )
         }
         return clientSide
@@ -1173,7 +1203,8 @@ private func makeReconnectResultFactory(
 private func driveReconnectResultHost(
     transport: InMemoryTransport,
     mode: ReconnectResponseModeSwitch,
-    automationCapabilities: AutomationCapabilities?
+    automationCapabilities: AutomationCapabilities?,
+    authenticationCapability: AuthenticationCapability?
 ) async {
     while !Task.isCancelled {
         let frame: TransportMessage?
@@ -1197,7 +1228,8 @@ private func driveReconnectResultHost(
             result = initializeResult(
                 serverSeq: 40,
                 activeSessions: 1,
-                automationCapabilities: automationCapabilities
+                automationCapabilities: automationCapabilities,
+                authenticationCapability: authenticationCapability
             )
         case "reconnect":
             result = reconnectResult(for: currentMode)
@@ -1222,7 +1254,8 @@ private func driveReconnectResultHost(
 private func initializeResult(
     serverSeq: Int,
     activeSessions: Int,
-    automationCapabilities: AutomationCapabilities? = nil
+    automationCapabilities: AutomationCapabilities? = nil,
+    authenticationCapability: AuthenticationCapability? = nil
 ) -> [String: Any] {
     var result: [String: Any] = [
         "protocolVersion": "0.1.0",
@@ -1233,6 +1266,11 @@ private func initializeResult(
        let data = try? JSONEncoder().encode(automationCapabilities),
        let object = try? JSONSerialization.jsonObject(with: data) {
         result["automations"] = object
+    }
+    if let authenticationCapability,
+       let data = try? JSONEncoder().encode(authenticationCapability),
+       let object = try? JSONSerialization.jsonObject(with: data) {
+        result["authentication"] = object
     }
     return result
 }

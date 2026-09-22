@@ -78,6 +78,7 @@ import type {
   FetchAutomationRunsParams,
   FetchAutomationRunsResult,
 } from '../channels-automation/commands.js';
+import type { AuthBeginParams, AuthBeginResult } from '../channels-accounts/commands.js';
 
 import type { ActionEnvelope } from './actions.js';
 import type {
@@ -178,6 +179,7 @@ export interface CommandMap {
   'resourceRequest': { params: ResourceRequestParams; result: ResourceRequestResult };
   'fetchTurns': { params: FetchTurnsParams; result: FetchTurnsResult };
   'authenticate': { params: AuthenticateParams; result: AuthenticateResult };
+  'authBegin': { params: AuthBeginParams; result: AuthBeginResult };
   'resolveSessionConfig': { params: ResolveSessionConfigParams; result: ResolveSessionConfigResult };
   'sessionConfigCompletions': { params: SessionConfigCompletionsParams; result: SessionConfigCompletionsResult };
   'completions': { params: CompletionsParams; result: CompletionsResult };

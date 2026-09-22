@@ -88,6 +88,12 @@ If a client attempts to create or use a session with an agent that requires auth
 
 See [Authentication](/specification/authentication) for the full specification.
 
+For shared client-brokered credentials, hosts advertise
+`authentication.flows: [{ kind: "clientBrokered" }]` in `InitializeResult`.
+Clients use the separately authorized [Accounts Channel](/specification/accounts-channel)
+and bound token delivery. Reconnection MUST reconcile account/attempt state
+before token replay; a removed lifetime is never automatically admitted again.
+
 ## Reconnection
 
 If the transport connection drops, the client reconnects and sends a `reconnect` **request**:

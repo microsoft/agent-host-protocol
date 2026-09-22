@@ -13,6 +13,59 @@ import (
 // json.RawMessage directly (rare but possible). Compiled out.
 var _ = json.RawMessage(nil)
 
+// AuthBeginTarget identifies the exact consumer selected for admission.
+type AuthBeginTarget struct {
+	Consumer AccountConsumer `json:"consumer"`
+}
+
+// BrokeredAuthenticationBinding binds token delivery to an attempt or live account.
+type BrokeredAuthenticationBinding struct {
+	Value isBrokeredAuthenticationBinding
+}
+
+// isBrokeredAuthenticationBinding is the marker interface implemented by every
+// concrete variant of BrokeredAuthenticationBinding.
+type isBrokeredAuthenticationBinding interface{ isBrokeredAuthenticationBinding() }
+
+func (*BrokeredAuthenticationAttemptBinding) isBrokeredAuthenticationBinding() {}
+func (*BrokeredAuthenticationAccountBinding) isBrokeredAuthenticationBinding() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *BrokeredAuthenticationBinding) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("BrokeredAuthenticationBinding", "kind")
+	}
+	switch disc {
+	case "attempt":
+		var value BrokeredAuthenticationAttemptBinding
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "account":
+		var value BrokeredAuthenticationAccountBinding
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		return unknownDiscriminatorError("BrokeredAuthenticationBinding", "kind", disc)
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u BrokeredAuthenticationBinding) MarshalJSON() ([]byte, error) {
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
 // ─── Enums ────────────────────────────────────────────────────────────
 
 // Discriminant for reconnect result types.
@@ -87,7 +140,96 @@ const (
 	ResourceWriteModeInsert   ResourceWriteMode = "insert"
 )
 
+// Negotiated credential-acquisition flows.
+//
+// Unknown flows are not support for client-brokered admission. Hosts MUST
+// reject unsupported offers instead of silently choosing another flow.
+type AuthFlowKind string
+
+const (
+	// Client acquires the token; the host owns admission, use, and removal.
+	AuthFlowKindClientBrokered AuthFlowKind = "clientBrokered"
+)
+
+// Whether token delivery completes an admission or renews a live account.
+//
+// Unknown bindings MUST be rejected, never interpreted as unbound delivery.
+type BrokeredAuthenticationBindingKind string
+
+const (
+	BrokeredAuthenticationBindingKindAttempt BrokeredAuthenticationBindingKind = "attempt"
+	BrokeredAuthenticationBindingKindAccount BrokeredAuthenticationBindingKind = "account"
+)
+
 // ─── Command Payloads ─────────────────────────────────────────────────
+
+// A supported or offered authentication flow.
+type AuthFlowSupport struct {
+	Kind AuthFlowKind `json:"kind"`
+}
+
+// Authentication support advertised in `InitializeResult.authentication`.
+//
+// Advertising `clientBrokered` commits the host to the accounts-channel
+// contract, including account-safe invalidation and containment of active work.
+// It does not require host-run OAuth or refresh-token storage.
+type AuthenticationCapability struct {
+	// Flow descriptors clients may select; absence of a kind means unsupported.
+	Flows []AuthFlowSupport `json:"flows"`
+}
+
+// Reserve a single-use client-brokered credential admission.
+//
+// The client MUST check the `clientBrokered` capability before calling. The
+// host validates the consumer, caller, and offered flow, captures the current
+// selection/resource as preconditions, and publishes a pending attempt before
+// responding. It performs no OAuth flow and accepts no credential here.
+// Changing that consumer's selection or resource invalidates competing pending
+// attempts, even if a later change restores the original selection.
+//
+// Completion uses `authenticate` with an attempt binding. Only the initiating
+// authorization context, including a verified reconnect, may complete or
+// cancel the attempt. A correlation id alone grants no authority.
+type AuthBeginParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Exact consumer from the host's current root or session state.
+	Target AuthBeginTarget `json:"target"`
+	// Offered flows. MUST include `clientBrokered`; an empty or unsupported
+	// offer fails with `InvalidParams` without creating an attempt.
+	Flows []AuthFlowSupport `json:"flows"`
+	// Explicit live account to reauthorize. The host MUST verify the delivered
+	// identity matches it. Omission admits an identity, reusing an existing
+	// lifetime only when both verified identity and ownership context match.
+	// Neither intent is inferred from a challenge.
+	AccountId *string `json:"accountId,omitempty"`
+}
+
+// Acknowledgement of the selected client-brokered flow.
+//
+// The client MUST verify this flow before sending an attempt-bound token.
+type AuthBeginResult struct {
+	Flow AuthFlowKind `json:"flow"`
+	// Host-issued id of the published pending admission.
+	AttemptId string `json:"attemptId"`
+}
+
+// Complete a live admission; its consumer preconditions still apply.
+type BrokeredAuthenticationAttemptBinding struct {
+	Kind BrokeredAuthenticationBindingKind `json:"kind"`
+	// Pending attempt from `authBegin`.
+	AttemptId string `json:"attemptId"`
+}
+
+// Renew credentials under a live account without changing any selections.
+type BrokeredAuthenticationAccountBinding struct {
+	Kind BrokeredAuthenticationBindingKind `json:"kind"`
+	// Live host-issued account lifetime. Retired ids fail with `Conflict`.
+	AccountId string `json:"accountId"`
+}
 
 // Establishes a new connection and negotiates the protocol version.
 // This MUST be the first message sent by the client.
@@ -180,6 +322,12 @@ type InitializeResult struct {
 	// `ahp-automations://` for {@link AutomationState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
+	// Account-managed authentication support. The `clientBrokered` flow enables
+	// `ahp-accounts://`, `authBegin`, and bound `authenticate` delivery.
+	//
+	// Clients MUST check the flow before using it. A missing capability is not
+	// permission to fall back to empty-token revocation of shared credentials.
+	Authentication *AuthenticationCapability `json:"authentication,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -1016,14 +1164,28 @@ type AuthenticateParams struct {
 	// Omit when the client doesn't track granted scopes separately from the
 	// token.
 	Scopes []string `json:"scopes,omitempty"`
+	// Required for shared client-brokered credentials after negotiating the
+	// `clientBrokered` flow. Attempt bindings complete a live admission; account
+	// bindings renew a live lifetime without changing consumer selection.
+	//
+	// The token MUST be nonempty. Hosts reject missing/unknown bindings in a
+	// shared context, and MUST NOT ignore a binding or interpret it as a legacy
+	// unbound push. Removed lifetimes and stale attempts fail with `Conflict`.
+	// Sign-out uses key-only `accounts/removed`, not an empty token.
+	Binding *BrokeredAuthenticationBinding `json:"binding,omitempty"`
 }
 
 // Result of the `authenticate` command.
 //
-// An empty object on success. If the token is invalid or the resource is
-// unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`
-// `-32007` or `InvalidParams` `-32602`).
+// An empty object on baseline success; bound delivery MUST return `accountId`.
+// If the token is invalid or the resource is unrecognized, the server MUST
+// return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams`
+// `-32602`). Clients MUST treat a missing account id after bound delivery as
+// an unconfirmed protocol failure, not retry without the binding. An
+// account-bound renewal MUST return the same account id that was requested.
 type AuthenticateResult struct {
+	// Admitted or renewed host account lifetime; required for bound delivery.
+	AccountId *string `json:"accountId,omitempty"`
 }
 
 // Creates a new terminal on the server.

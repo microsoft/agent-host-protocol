@@ -60,6 +60,9 @@ public sealed class FixtureDrivenReducerTests
                 case "root":
                     RunFixture<RootState>(initial, expected, actions, Reducers.ApplyToRoot);
                     break;
+                case "accounts":
+                    RunFixture<AccountsState>(initial, expected, actions, Reducers.ApplyToAccounts);
+                    break;
                 case "session":
                     RunFixture<SessionState>(initial, expected, actions, Reducers.ApplyToSession);
                     break;

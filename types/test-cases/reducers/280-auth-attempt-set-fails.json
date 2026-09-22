@@ -1,0 +1,27 @@
+{
+  "description": "accounts/authAttemptSet records a failed admission without an account id",
+  "reducer": "accounts",
+  "initial": {
+    "accounts": [],
+    "attempts": [{
+      "id": "attempt-1", "status": "pending", "resource": "https://api.example.test",
+      "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+    }]
+  },
+  "actions": [{
+    "type": "accounts/authAttemptSet",
+    "attempt": {
+      "id": "attempt-1", "status": "failed", "resource": "https://api.example.test",
+      "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" },
+      "error": { "errorType": "Conflict", "message": "Account was removed during admission" }
+    }
+  }],
+  "expected": {
+    "accounts": [],
+    "attempts": [{
+      "id": "attempt-1", "status": "failed", "resource": "https://api.example.test",
+      "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" },
+      "error": { "errorType": "Conflict", "message": "Account was removed during admission" }
+    }]
+  }
+}

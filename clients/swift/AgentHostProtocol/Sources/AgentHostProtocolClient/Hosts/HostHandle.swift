@@ -37,6 +37,8 @@ public struct HostHandle: Sendable {
     public let defaultDirectory: String?
     /// Automation support advertised by the host.
     public let automations: AutomationCapabilities?
+    /// Authentication flows advertised by the host. `nil` means accounts support is unavailable.
+    public let authentication: AuthenticationCapability?
     /// Agents currently advertised by the host (mirrored from root state).
     public let agents: [AgentInfo]
     /// Active session count from root state, when present.
@@ -67,6 +69,7 @@ public struct HostHandle: Sendable {
         serverSeq: Int,
         defaultDirectory: String?,
         automations: AutomationCapabilities? = nil,
+        authentication: AuthenticationCapability? = nil,
         agents: [AgentInfo],
         activeSessions: Int?,
         terminals: [TerminalInfo]?,
@@ -85,6 +88,7 @@ public struct HostHandle: Sendable {
         self.serverSeq = serverSeq
         self.defaultDirectory = defaultDirectory
         self.automations = automations
+        self.authentication = authentication
         self.agents = agents
         self.activeSessions = activeSessions
         self.terminals = terminals

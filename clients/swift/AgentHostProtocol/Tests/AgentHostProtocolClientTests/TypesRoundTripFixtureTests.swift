@@ -162,6 +162,16 @@ final class TypesRoundTripFixtureTests: XCTestCase {
         }
 
         switch type {
+        case "AuthAttemptState":
+            return try reencode(dec.decode(AuthAttemptState.self, from: inputData))
+        case "AuthBeginParams":
+            return try reencode(dec.decode(AuthBeginParams.self, from: inputData))
+        case "AuthBeginResult":
+            return try reencode(dec.decode(AuthBeginResult.self, from: inputData))
+        case "AuthenticateParams":
+            return try reencode(dec.decode(AuthenticateParams.self, from: inputData))
+        case "AuthenticateResult":
+            return try reencode(dec.decode(AuthenticateResult.self, from: inputData))
         case "ActionEnvelope":
             return try reencode(dec.decode(ActionEnvelope.self, from: inputData))
         case "StateAction":

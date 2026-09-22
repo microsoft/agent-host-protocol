@@ -104,6 +104,10 @@ public enum ActionType: Codable, Sendable, Equatable {
     case automationRunSessionRemoved
     case automationRunPrimarySessionChanged
     case automationRunCancelRequested
+    case accountSet
+    case accountRemoved
+    case authAttemptSet
+    case authAttemptRemoved
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -209,6 +213,10 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "automationRun/sessionRemoved": self = .automationRunSessionRemoved
         case "automationRun/primarySessionChanged": self = .automationRunPrimarySessionChanged
         case "automationRun/cancelRequested": self = .automationRunCancelRequested
+        case "accounts/set": self = .accountSet
+        case "accounts/removed": self = .accountRemoved
+        case "accounts/authAttemptSet": self = .authAttemptSet
+        case "accounts/authAttemptRemoved": self = .authAttemptRemoved
         default: self = .unknown(raw)
         }
     }
@@ -314,6 +322,10 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .automationRunSessionRemoved: try container.encode("automationRun/sessionRemoved")
         case .automationRunPrimarySessionChanged: try container.encode("automationRun/primarySessionChanged")
         case .automationRunCancelRequested: try container.encode("automationRun/cancelRequested")
+        case .accountSet: try container.encode("accounts/set")
+        case .accountRemoved: try container.encode("accounts/removed")
+        case .authAttemptSet: try container.encode("accounts/authAttemptSet")
+        case .authAttemptRemoved: try container.encode("accounts/authAttemptRemoved")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -358,6 +370,62 @@ public struct ActionEnvelope: Codable, Sendable {
 }
 
 // MARK: - Action Types
+
+public struct AccountSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// Complete account entry.
+    public var account: HostAccount
+
+    public init(
+        type: ActionType,
+        account: HostAccount
+    ) {
+        self.type = type
+        self.account = account
+    }
+}
+
+public struct AccountRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Host-issued account lifetime to retire. No resource or token precondition.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
+    }
+}
+
+public struct AuthAttemptSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// Complete admission entry.
+    public var attempt: AuthAttemptState
+
+    public init(
+        type: ActionType,
+        attempt: AuthAttemptState
+    ) {
+        self.type = type
+        self.attempt = attempt
+    }
+}
+
+public struct AuthAttemptRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Host-issued attempt id.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
+    }
+}
 
 public struct RootAgentsChangedAction: Codable, Sendable {
     public var type: ActionType
@@ -2428,6 +2496,10 @@ public struct PartialChatSummary: Codable, Sendable {
 
 /// Discriminated union of all state actions.
 public enum StateAction: Codable, Sendable {
+    case accountSet(AccountSetAction)
+    case accountRemoved(AccountRemovedAction)
+    case authAttemptSet(AuthAttemptSetAction)
+    case authAttemptRemoved(AuthAttemptRemovedAction)
     case rootAgentsChanged(RootAgentsChangedAction)
     case rootActiveSessionsChanged(RootActiveSessionsChangedAction)
     case sessionReady(SessionReadyAction)
@@ -2538,6 +2610,14 @@ public enum StateAction: Codable, Sendable {
         let container = try decoder.container(keyedBy: TypeKey.self)
         let type = try container.decode(String.self, forKey: .type)
         switch type {
+        case "accounts/set":
+            self = .accountSet(try AccountSetAction(from: decoder))
+        case "accounts/removed":
+            self = .accountRemoved(try AccountRemovedAction(from: decoder))
+        case "accounts/authAttemptSet":
+            self = .authAttemptSet(try AuthAttemptSetAction(from: decoder))
+        case "accounts/authAttemptRemoved":
+            self = .authAttemptRemoved(try AuthAttemptRemovedAction(from: decoder))
         case "root/agentsChanged":
             self = .rootAgentsChanged(try RootAgentsChangedAction(from: decoder))
         case "root/activeSessionsChanged":
@@ -2741,6 +2821,10 @@ public enum StateAction: Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         switch self {
+        case .accountSet(let v): try v.encode(to: encoder)
+        case .accountRemoved(let v): try v.encode(to: encoder)
+        case .authAttemptSet(let v): try v.encode(to: encoder)
+        case .authAttemptRemoved(let v): try v.encode(to: encoder)
         case .rootAgentsChanged(let v): try v.encode(to: encoder)
         case .rootActiveSessionsChanged(let v): try v.encode(to: encoder)
         case .sessionReady(let v): try v.encode(to: encoder)

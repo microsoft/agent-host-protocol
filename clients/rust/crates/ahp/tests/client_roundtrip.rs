@@ -40,6 +40,360 @@ impl Transport for MemTransport {
     }
 }
 
+async fn read_accounts_request(server: &mut MemTransport) -> ahp_types::messages::JsonRpcRequest {
+    let frame = tokio::time::timeout(std::time::Duration::from_secs(2), server.recv())
+        .await
+        .expect("request timeout")
+        .expect("receive")
+        .expect("frame");
+    match frame.into_parsed().expect("decode request") {
+        JsonRpcMessage::Request(request) => request,
+        other => panic!("expected request, got {other:?}"),
+    }
+}
+
+async fn reply_accounts_request(server: &mut MemTransport, id: u64, result: serde_json::Value) {
+    server
+        .send(
+            TransportMessage::encode(&JsonRpcMessage::SuccessResponse(JsonRpcSuccessResponse {
+                jsonrpc: JsonRpcVersion::V2,
+                id,
+                result,
+            }))
+            .expect("encode response"),
+        )
+        .await
+        .expect("send response");
+}
+
+async fn initialize_accounts(
+    client: &Client,
+    server: &mut MemTransport,
+    authentication: serde_json::Value,
+) {
+    let (result, ()) = tokio::join!(
+        client.initialize("client-1".into(), vec!["0.9.0".into()], vec![]),
+        async {
+            let request = read_accounts_request(server).await;
+            assert_eq!(request.method, "initialize");
+            reply_accounts_request(
+                server,
+                request.id,
+                serde_json::json!({
+                    "protocolVersion":"0.9.0","serverSeq":0,"snapshots":[],
+                    "authentication":authentication
+                }),
+            )
+            .await;
+        }
+    );
+    result.expect("initialize");
+}
+
+#[tokio::test]
+async fn accounts_commands_preserve_brokered_bindings_and_correlate_rejected_dispatches() {
+    use ahp_types::commands::{AuthBeginParams, AuthenticateParams};
+    use ahp_types::state::SnapshotState;
+    let (transport, mut server) = pair();
+    let client = Client::connect(transport, ClientConfig::default())
+        .await
+        .expect("connect");
+    initialize_accounts(
+        &client,
+        &mut server,
+        serde_json::json!({"flows":[{"kind":"clientBrokered"}]}),
+    )
+    .await;
+
+    let params = serde_json::json!({
+        "channel":"ahp-accounts://",
+        "target":{"consumer":{"kind":"mcpServer","session":"ahp-session:/s1","customizationId":"mcp-1"}},
+        "flows":[{"kind":"clientBrokered"}],"accountId":"account-1"
+    });
+    let typed: AuthBeginParams = serde_json::from_value(params.clone()).expect("begin params");
+    let (begin, ()) = tokio::join!(client.auth_begin(typed), async {
+        let request = read_accounts_request(&mut server).await;
+        assert_eq!(request.method, "authBegin");
+        assert_eq!(request.params, Some(params));
+        reply_accounts_request(
+            &mut server,
+            request.id,
+            serde_json::json!({
+                "flow":"clientBrokered","attemptId":"attempt-1"
+            }),
+        )
+        .await;
+    });
+    assert_eq!(begin.expect("begin result").attempt_id, "attempt-1");
+
+    for binding in [
+        serde_json::json!({"kind":"attempt","attemptId":"attempt-1"}),
+        serde_json::json!({"kind":"account","accountId":"account-1"}),
+    ] {
+        let params = serde_json::json!({
+            "channel":"ahp-root://","resource":"https://api.example.test",
+            "token":"example-test-credential","expiresIn":120,"scopes":["read"],"binding":binding
+        });
+        let typed: AuthenticateParams =
+            serde_json::from_value(params.clone()).expect("bound params");
+        let (result, ()) = tokio::join!(client.authenticate(typed), async {
+            let request = read_accounts_request(&mut server).await;
+            assert_eq!(request.method, "authenticate");
+            assert_eq!(request.params, Some(params));
+            reply_accounts_request(
+                &mut server,
+                request.id,
+                serde_json::json!({"accountId":"account-1"}),
+            )
+            .await;
+        });
+        assert_eq!(
+            result.expect("bound result").account_id.as_deref(),
+            Some("account-1")
+        );
+    }
+
+    let (subscription, ()) = tokio::join!(client.subscribe("ahp-accounts://".into()), async {
+        let request = read_accounts_request(&mut server).await;
+        assert_eq!(request.method, "subscribe");
+        assert_eq!(
+            request.params,
+            Some(serde_json::json!({"channel":"ahp-accounts://"}))
+        );
+        reply_accounts_request(&mut server, request.id, serde_json::json!({
+                "snapshot":{"resource":"ahp-accounts://","fromSeq":1,"state":{"accounts":[],"attempts":[]}}
+            })).await;
+    });
+    let (snapshot, mut subscription) = subscription.expect("subscribe accounts");
+    assert!(matches!(
+        snapshot.snapshot.expect("accounts snapshot").state,
+        SnapshotState::Accounts(_)
+    ));
+    let action = StateAction::AccountRemoved(ahp_types::actions::AccountRemovedAction {
+        id: "account-1".into(),
+    });
+    let dispatch = client
+        .dispatch("ahp-accounts://".into(), action.clone())
+        .await
+        .expect("dispatch");
+    let frame = server
+        .recv()
+        .await
+        .expect("receive dispatch")
+        .expect("dispatch frame");
+    let JsonRpcMessage::Notification(notification) = frame.into_parsed().expect("decode dispatch")
+    else {
+        panic!("expected notification");
+    };
+    assert_eq!(notification.method, "dispatchAction");
+    assert_eq!(
+        notification.params,
+        Some(serde_json::json!({
+            "channel":"ahp-accounts://","clientSeq":dispatch.client_seq,
+            "action":{"type":"accounts/removed","id":"account-1"}
+        }))
+    );
+    let envelope = serde_json::json!({
+        "channel":"ahp-accounts://","serverSeq":2,"action":{"type":"accounts/removed","id":"account-1"},
+        "origin":{"clientId":"client-1","clientSeq":dispatch.client_seq},"rejectionReason":"Permission denied"
+    });
+    server
+        .send(
+            TransportMessage::encode(&JsonRpcMessage::Notification(JsonRpcNotification {
+                jsonrpc: JsonRpcVersion::V2,
+                method: "action".into(),
+                params: Some(envelope),
+            }))
+            .expect("encode rejection"),
+        )
+        .await
+        .expect("send rejection");
+    let event = tokio::time::timeout(std::time::Duration::from_secs(2), subscription.recv())
+        .await
+        .expect("rejection timeout")
+        .expect("subscription event");
+    let SubscriptionEvent::Action(rejected) = event else {
+        panic!("expected action")
+    };
+    assert_eq!(rejected.action, action);
+    assert_eq!(
+        rejected.rejection_reason.as_deref(),
+        Some("Permission denied")
+    );
+    assert_eq!(
+        rejected.origin.expect("origin").client_seq,
+        dispatch.client_seq
+    );
+    client.shutdown().await;
+}
+
+#[tokio::test]
+async fn accounts_capability_gates_requests_and_removals_without_legacy_fallback() {
+    use ahp::{ClientError, TransportError};
+    use ahp_types::commands::{AuthBeginParams, AuthenticateParams};
+    let begin = serde_json::json!({
+        "channel":"ahp-accounts://",
+        "target":{"consumer":{"kind":"agent","provider":"copilot","resource":"https://api.example.test"}},
+        "flows":[{"kind":"clientBrokered"}]
+    });
+    let bound = serde_json::json!({
+        "channel":"ahp-root://","resource":"https://api.example.test","token":"example-test-credential",
+        "binding":{"kind":"attempt","attemptId":"attempt-1"}
+    });
+    for capability in [
+        serde_json::Value::Null,
+        serde_json::json!({"flows":[]}),
+        serde_json::json!({"flows":[{"kind":"futureFlow"}]}),
+    ] {
+        let (transport, mut server) = pair();
+        let client = Client::connect(transport, ClientConfig::default())
+            .await
+            .expect("connect");
+        initialize_accounts(&client, &mut server, capability).await;
+        let begin_params: AuthBeginParams =
+            serde_json::from_value(begin.clone()).expect("begin params");
+        assert!(matches!(
+            client.auth_begin(begin_params).await,
+            Err(ClientError::UnsupportedCapability(_))
+        ));
+        let bound_params: AuthenticateParams =
+            serde_json::from_value(bound.clone()).expect("bound params");
+        assert!(matches!(
+            client.authenticate(bound_params).await,
+            Err(ClientError::UnsupportedCapability(_))
+        ));
+        assert!(matches!(
+            client.subscribe("ahp-accounts://".into()).await,
+            Err(ClientError::UnsupportedCapability(_))
+        ));
+        assert!(matches!(
+            client
+                .dispatch(
+                    "ahp-accounts://".into(),
+                    StateAction::AccountRemoved(ahp_types::actions::AccountRemovedAction {
+                        id: "account-1".into()
+                    })
+                )
+                .await,
+            Err(ClientError::UnsupportedCapability(_))
+        ));
+        let (ping, ()) = tokio::join!(client.ping(), async {
+            let request = read_accounts_request(&mut server).await;
+            assert_eq!(
+                request.method, "ping",
+                "no unbound or empty-token fallback traffic"
+            );
+            reply_accounts_request(&mut server, request.id, serde_json::Value::Null).await;
+        });
+        ping.expect("ping");
+        client.shutdown().await;
+    }
+
+    let (transport, mut server) = pair();
+    let client = Client::connect(transport, ClientConfig::default())
+        .await
+        .expect("connect");
+    initialize_accounts(
+        &client,
+        &mut server,
+        serde_json::json!({"flows":[{"kind":"clientBrokered"}]}),
+    )
+    .await;
+    let (result, ()) = tokio::join!(
+        client.authenticate(serde_json::from_value(bound).expect("bound params")),
+        async {
+            let request = read_accounts_request(&mut server).await;
+            reply_accounts_request(&mut server, request.id, serde_json::json!({})).await;
+        }
+    );
+    assert!(matches!(
+        result,
+        Err(ClientError::Transport(TransportError::Protocol(_)))
+    ));
+    let renewal: AuthenticateParams = serde_json::from_value(serde_json::json!({
+        "channel":"ahp-root://","resource":"https://api.example.test","token":"example-test-credential",
+        "binding":{"kind":"account","accountId":"account-1"}
+    }))
+    .expect("renewal params");
+    let (result, ()) = tokio::join!(client.authenticate(renewal), async {
+        let request = read_accounts_request(&mut server).await;
+        reply_accounts_request(
+            &mut server,
+            request.id,
+            serde_json::json!({"accountId":"another-account"}),
+        )
+        .await;
+    });
+    assert!(matches!(
+        result,
+        Err(ClientError::Transport(TransportError::Protocol(_)))
+    ));
+    let (result, ()) = tokio::join!(
+        client.auth_begin(serde_json::from_value(begin).expect("begin params")),
+        async {
+            let request = read_accounts_request(&mut server).await;
+            reply_accounts_request(
+                &mut server,
+                request.id,
+                serde_json::json!({"flow":"futureFlow","attemptId":"attempt-1"}),
+            )
+            .await;
+        }
+    );
+    assert!(matches!(
+        result,
+        Err(ClientError::Transport(TransportError::Protocol(_)))
+    ));
+    let (ping, ()) = tokio::join!(client.ping(), async {
+        let request = read_accounts_request(&mut server).await;
+        assert_eq!(request.method, "ping");
+        reply_accounts_request(&mut server, request.id, serde_json::Value::Null).await;
+    });
+    ping.expect("ping");
+    client.shutdown().await;
+}
+
+#[tokio::test]
+async fn accounts_reconnect_restores_capability_only_after_host_acceptance() {
+    let (transport, mut server) = pair();
+    let client = Client::connect(transport, ClientConfig::default())
+        .await
+        .expect("connect");
+    let authentication = serde_json::from_value(serde_json::json!({
+        "flows":[{"kind":"clientBrokered"}]
+    }))
+    .expect("authentication capability");
+    let (result, ()) = tokio::join!(
+        client.reconnect_with_authentication(
+            "client-1".into(),
+            2,
+            vec!["ahp-accounts://".into()],
+            Some(authentication)
+        ),
+        async {
+            let request = read_accounts_request(&mut server).await;
+            assert_eq!(
+                request.params,
+                Some(serde_json::json!({
+                    "channel":"ahp-root://","clientId":"client-1","lastSeenServerSeq":2,"subscriptions":["ahp-accounts://"]
+                }))
+            );
+            assert!(client.authentication().await.is_none());
+            reply_accounts_request(
+                &mut server,
+                request.id,
+                serde_json::json!({
+                    "type":"replay","actions":[],"missing":[]
+                }),
+            )
+            .await;
+        }
+    );
+    result.expect("reconnect");
+    assert!(client.authentication().await.is_some());
+    client.shutdown().await;
+}
+
 #[tokio::test]
 async fn request_response_and_action_fanout() {
     let (client_side, mut server_side) = pair();

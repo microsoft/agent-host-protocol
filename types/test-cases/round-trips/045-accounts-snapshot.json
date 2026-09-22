@@ -1,0 +1,62 @@
+{
+  "name": "accounts-snapshot",
+  "group": "A",
+  "description": "Accounts snapshots preserve agent and session-scoped MCP selections and admission outcomes.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-accounts://",
+    "fromSeq": 8,
+    "state": {
+      "accounts": [{
+        "id": "account-a", "label": "A", "removable": true,
+        "consumers": [
+          { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" },
+          { "kind": "mcpServer", "session": "ahp-session:/one", "customizationId": "server-1" }
+        ]
+      }],
+      "attempts": [
+        {
+          "id": "one", "status": "pending", "resource": "https://api.example.test",
+          "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+        },
+        {
+          "id": "two", "status": "completed", "accountId": "account-a", "resource": "https://api.example.test",
+          "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+        },
+        {
+          "id": "three", "status": "failed", "resource": "https://tools.example.test",
+          "consumer": { "kind": "mcpServer", "session": "ahp-session:/one", "customizationId": "server-1" },
+          "error": { "errorType": "Conflict", "message": "The consumer changed" }
+        }
+      ]
+    }
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-accounts://",
+    "fromSeq": 8,
+    "state": {
+      "accounts": [{
+        "id": "account-a", "label": "A", "removable": true,
+        "consumers": [
+          { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" },
+          { "kind": "mcpServer", "session": "ahp-session:/one", "customizationId": "server-1" }
+        ]
+      }],
+      "attempts": [
+        {
+          "id": "one", "status": "pending", "resource": "https://api.example.test",
+          "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+        },
+        {
+          "id": "two", "status": "completed", "accountId": "account-a", "resource": "https://api.example.test",
+          "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+        },
+        {
+          "id": "three", "status": "failed", "resource": "https://tools.example.test",
+          "consumer": { "kind": "mcpServer", "session": "ahp-session:/one", "customizationId": "server-1" },
+          "error": { "errorType": "Conflict", "message": "The consumer changed" }
+        }
+      ]
+    }
+  }]
+}

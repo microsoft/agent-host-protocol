@@ -1,6 +1,7 @@
 //! Host-aware reducer façade for multi-host consumers.
 //!
 //! Wraps the existing pure reducers:
+//! [`apply_action_to_accounts`](crate::reducers::apply_action_to_accounts),
 //! [`apply_action_to_automation`](crate::reducers::apply_action_to_automation),
 //! [`apply_action_to_automation_run`](crate::reducers::apply_action_to_automation_run),
 //! [`apply_action_to_root`](crate::reducers::apply_action_to_root),
@@ -37,16 +38,17 @@
 use std::collections::HashMap;
 
 use ahp_types::actions::ActionEnvelope;
-use ahp_types::common::ROOT_RESOURCE_URI;
+use ahp_types::common::{ACCOUNTS_RESOURCE_URI, ROOT_RESOURCE_URI};
 use ahp_types::state::{
-    AnnotationsState, AutomationEntry, AutomationRunState, AutomationState, ChangesetState,
-    ChatState, ResourceWatchState, RootState, SessionState, SnapshotState, TerminalState,
+    AccountsState, AnnotationsState, AutomationEntry, AutomationRunState, AutomationState,
+    ChangesetState, ChatState, ResourceWatchState, RootState, SessionState, SnapshotState,
+    TerminalState,
 };
 
 use crate::hosts::{HostId, HostSubscriptionEvent};
 use crate::reducers::{
-    apply_action_to_automation, apply_action_to_automation_run, apply_action_to_chat,
-    apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
+    apply_action_to_accounts, apply_action_to_automation, apply_action_to_automation_run,
+    apply_action_to_chat, apply_action_to_root, apply_action_to_session, apply_action_to_terminal,
 };
 use crate::SubscriptionEvent;
 
@@ -76,7 +78,7 @@ impl HostedResourceKey {
     }
 }
 
-/// In-memory mirror of per-host root/session/terminal/changeset/automation state,
+/// In-memory mirror of per-host accounts/root/session/terminal/changeset/automation state,
 /// fed by [`ActionEnvelope`]s and snapshot states tagged with their
 /// host of origin.
 ///
@@ -91,6 +93,7 @@ impl HostedResourceKey {
 #[derive(Debug, Default)]
 pub struct MultiHostStateMirror {
     root_states: HashMap<HostId, RootState>,
+    accounts_states: HashMap<HostId, AccountsState>,
     sessions: HashMap<HostedResourceKey, SessionState>,
     chats: HashMap<HostedResourceKey, ChatState>,
     terminals: HashMap<HostedResourceKey, TerminalState>,
@@ -111,6 +114,11 @@ impl MultiHostStateMirror {
     /// Borrow the root states map keyed by host.
     pub fn root_states(&self) -> &HashMap<HostId, RootState> {
         &self.root_states
+    }
+
+    /// Borrow standalone accounts-channel states keyed by host.
+    pub fn accounts_states(&self) -> &HashMap<HostId, AccountsState> {
+        &self.accounts_states
     }
 
     /// Borrow the session states map keyed by `(host_id, uri)`.
@@ -172,8 +180,17 @@ impl MultiHostStateMirror {
     /// Apply a single action envelope, scoped to `host`. Routing uses
     /// `envelope.channel`: [`ROOT_RESOURCE_URI`] is the root channel,
     /// every other channel is identified by the URI the server
-    /// announces.
+    /// announces. Rejected accounts mutations acknowledge dispatch without
+    /// changing this non-optimistic mirror.
     pub fn apply_envelope(&mut self, host: &HostId, envelope: &ActionEnvelope) {
+        if envelope.channel == ACCOUNTS_RESOURCE_URI {
+            if envelope.rejection_reason.is_none() {
+                if let Some(accounts) = self.accounts_states.get_mut(host) {
+                    apply_action_to_accounts(accounts, &envelope.action);
+                }
+            }
+            return;
+        }
         if envelope.channel == ROOT_RESOURCE_URI {
             let root = self
                 .root_states
@@ -220,12 +237,16 @@ impl MultiHostStateMirror {
     }
 
     /// Seed the mirror from a [`Snapshot`](ahp_types::state::Snapshot)
-    /// scoped to `host` — root, session, terminal, changeset,
+    /// scoped to `host` — accounts, root, session, terminal, changeset,
     /// resource-watch, annotations, automation, or automation-run as the
     /// snapshot's `state` discriminator dictates.
     pub fn apply_snapshot(&mut self, host: &HostId, snapshot: &ahp_types::state::Snapshot) {
         let key = HostedResourceKey::new(host.clone(), snapshot.resource.clone());
         match &snapshot.state {
+            SnapshotState::Accounts(state) => {
+                self.accounts_states
+                    .insert(host.clone(), state.as_ref().clone());
+            }
             SnapshotState::Root(state) => {
                 self.root_states
                     .insert(host.clone(), state.as_ref().clone());
@@ -259,11 +280,12 @@ impl MultiHostStateMirror {
         }
     }
 
-    /// Drop every slot keyed under `host` — root state, sessions,
+    /// Drop every slot keyed under `host` — accounts, root state, sessions,
     /// terminals, changesets, resource watches, annotations, automations,
     /// and automation runs.
     pub fn reset_host(&mut self, host: &HostId) {
         self.root_states.remove(host);
+        self.accounts_states.remove(host);
         self.sessions.retain(|key, _| &key.host_id != host);
         self.chats.retain(|key, _| &key.host_id != host);
         self.terminals.retain(|key, _| &key.host_id != host);
@@ -278,6 +300,7 @@ impl MultiHostStateMirror {
     /// Drop every host's state.
     pub fn reset(&mut self) {
         self.root_states.clear();
+        self.accounts_states.clear();
         self.sessions.clear();
         self.chats.clear();
         self.terminals.clear();

@@ -59,6 +59,10 @@ type URI = string
 // config changed). Always present on every host.
 const RootResourceURI URI = "ahp-root://"
 
+// AccountsResourceURI is the host-scoped accounts and authentication-attempt
+// channel, available when initialize advertises an authentication capability.
+const AccountsResourceURI URI = "ahp-accounts://"
+
 // JSONObject is a typed alias for an opaque JSON object. Used for
 // `_meta`, `structuredContent`, and other Record<string, unknown>
 // fields where preserving the raw JSON is preferable to forcing a

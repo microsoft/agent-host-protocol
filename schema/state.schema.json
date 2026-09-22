@@ -424,6 +424,9 @@
             },
             {
               "$ref": "#/$defs/AutomationRunState"
+            },
+            {
+              "$ref": "#/$defs/AccountsState"
             }
           ],
           "description": "The current state of the resource"
@@ -5612,6 +5615,219 @@
         "sessions"
       ]
     },
+    "AgentAccountConsumer": {
+      "type": "object",
+      "description": "One protected resource used by an advertised agent provider.",
+      "properties": {
+        "kind": {
+          "const": "agent"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Matches `AgentInfo.provider`."
+        },
+        "resource": {
+          "type": "string",
+          "description": "Exact identifier from the provider's advertised protected resources."
+        }
+      },
+      "required": [
+        "kind",
+        "provider",
+        "resource"
+      ]
+    },
+    "McpServerAccountConsumer": {
+      "type": "object",
+      "description": "One host-published MCP server customization in a live session.\n\nThe host resolves its resource, rather than treating a server name as a\nglobally unique identity. A replaced customization or changed resource\nrequires a fresh admission; a missing binding MUST NOT select another account.",
+      "properties": {
+        "kind": {
+          "const": "mcpServer"
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Session URI containing the customization."
+        },
+        "customizationId": {
+          "type": "string",
+          "description": "Session-unique `McpServerCustomization.id`, not its display name."
+        }
+      },
+      "required": [
+        "kind",
+        "session",
+        "customizationId"
+      ]
+    },
+    "HostAccount": {
+      "type": "object",
+      "description": "A host-held, revocable authorization lifetime for one verified identity.\n\nRotations and resource/scope variants in the same ownership context share\nthis entry, even when supplied by different clients. Independently owned\ngrants MUST NOT be coalesced merely because their human identity matches.\nTokens, token hashes, and client-local identity assertions never belong here.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Opaque, host-assigned key, stable across rotation and scoped to the host\nauthority. Removal retires it permanently; a deliberate later admission\nreceives a new id. Possessing the id is not permission to use or remove it."
+        },
+        "label": {
+          "type": "string",
+          "description": "Display label, not an identity proof."
+        },
+        "removable": {
+          "type": "boolean",
+          "description": "Whether the host can contain and remove its local credential lifetime.\nThis does not promise upstream grant revocation or authorize the caller."
+        },
+        "consumers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AccountConsumer"
+          },
+          "description": "Explicit consumer selections. A consumer MUST NOT select two accounts.\nRemoving this entry drops these selections but MUST NOT select a fallback.\nPreviously started work can still depend on this account after a move;\nthis list is therefore not the host's complete revocation set."
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "removable",
+        "consumers"
+      ]
+    },
+    "AuthAttemptBase": {
+      "type": "object",
+      "description": "Correlation and target shared by every admission outcome.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Host-assigned, single-use id. Not a bearer authorization."
+        },
+        "consumer": {
+          "$ref": "#/$defs/AccountConsumer",
+          "description": "Host-validated consumer selected for this admission."
+        },
+        "resource": {
+          "type": "string",
+          "description": "Exact protected resource captured when the attempt was admitted."
+        }
+      },
+      "required": [
+        "id",
+        "consumer",
+        "resource"
+      ]
+    },
+    "AuthAttemptPendingState": {
+      "type": "object",
+      "description": "Awaiting a client-supplied token. No credential is usable from this state.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Host-assigned, single-use id. Not a bearer authorization."
+        },
+        "consumer": {
+          "$ref": "#/$defs/AccountConsumer",
+          "description": "Host-validated consumer selected for this admission."
+        },
+        "resource": {
+          "type": "string",
+          "description": "Exact protected resource captured when the attempt was admitted."
+        },
+        "status": {
+          "const": "pending"
+        }
+      },
+      "required": [
+        "id",
+        "consumer",
+        "resource",
+        "status"
+      ]
+    },
+    "AuthAttemptCompletedState": {
+      "type": "object",
+      "description": "Admission committed. Retained so a lost response can be reconciled.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Host-assigned, single-use id. Not a bearer authorization."
+        },
+        "consumer": {
+          "$ref": "#/$defs/AccountConsumer",
+          "description": "Host-validated consumer selected for this admission."
+        },
+        "resource": {
+          "type": "string",
+          "description": "Exact protected resource captured when the attempt was admitted."
+        },
+        "status": {
+          "const": "completed"
+        },
+        "accountId": {
+          "type": "string",
+          "description": "The admitted authorization lifetime, which may subsequently be removed."
+        }
+      },
+      "required": [
+        "id",
+        "consumer",
+        "resource",
+        "status",
+        "accountId"
+      ]
+    },
+    "AuthAttemptFailedState": {
+      "type": "object",
+      "description": "Admission failed or expired without installing a usable credential.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Host-assigned, single-use id. Not a bearer authorization."
+        },
+        "consumer": {
+          "$ref": "#/$defs/AccountConsumer",
+          "description": "Host-validated consumer selected for this admission."
+        },
+        "resource": {
+          "type": "string",
+          "description": "Exact protected resource captured when the attempt was admitted."
+        },
+        "status": {
+          "const": "failed"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo",
+          "description": "Failure details, with no token or other secret content."
+        }
+      },
+      "required": [
+        "id",
+        "consumer",
+        "resource",
+        "status",
+        "error"
+      ]
+    },
+    "AccountsState": {
+      "type": "object",
+      "description": "Shared accounts and credential admissions on `ahp-accounts://`.\n\nExposed only when `InitializeResult.authentication.flows` advertises\n`clientBrokered`. Subscription and mutation are separately authorized.\nState contains no access, refresh, or identity tokens.",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HostAccount"
+          },
+          "description": "Live, host-authoritative account lifetimes, keyed by `HostAccount.id`."
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthAttemptState"
+          },
+          "description": "Pending and retained terminal admissions, keyed by `AuthAttemptState.id`."
+        }
+      },
+      "required": [
+        "accounts",
+        "attempts"
+      ]
+    },
     "StringOrMarkdown": {
       "oneOf": [
         {
@@ -6156,6 +6372,31 @@
         }
       ],
       "description": "Discriminated lifecycle of an automation run."
+    },
+    "AccountConsumer": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AgentAccountConsumer"
+        },
+        {
+          "$ref": "#/$defs/McpServerAccountConsumer"
+        }
+      ],
+      "description": "Exact consumer selecting an account. Selection and token renewal are distinct:\nrenewing an account MUST NOT change which account a consumer selects."
+    },
+    "AuthAttemptState": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AuthAttemptPendingState"
+        },
+        {
+          "$ref": "#/$defs/AuthAttemptCompletedState"
+        },
+        {
+          "$ref": "#/$defs/AuthAttemptFailedState"
+        }
+      ],
+      "description": "Recoverable admission state. Cancellation removes a pending entry. A completed\noutcome MUST remain while its account lifetime is live; otherwise a client\nlosing the response could not discover which account to remove. Failed\noutcomes and receipts for removed accounts may expire under host policy."
     },
     "URI": {
       "type": "string",

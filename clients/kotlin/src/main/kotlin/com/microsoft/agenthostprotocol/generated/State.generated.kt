@@ -1141,6 +1141,55 @@ enum class AutomationRunOriginKind {
     TRIGGER
 }
 
+/**
+ * A consumer whose credential selection the host manages.
+ *
+ * Unknown consumer kinds MUST NOT be interpreted as a known consumer.
+ */
+@Serializable(with = AccountConsumerKindSerializer::class)
+@JvmInline
+value class AccountConsumerKind(val rawValue: String) {
+    companion object {
+        val AGENT: AccountConsumerKind = AccountConsumerKind("agent")
+        val MCP_SERVER: AccountConsumerKind = AccountConsumerKind("mcpServer")
+    }
+}
+
+internal object AccountConsumerKindSerializer : KSerializer<AccountConsumerKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AccountConsumerKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AccountConsumerKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AccountConsumerKind =
+        AccountConsumerKind(decoder.decodeString())
+}
+
+/**
+ * Lifecycle of a client-brokered credential admission.
+ *
+ * Clients preserve unknown statuses but MUST NOT interpret them as success.
+ */
+@Serializable(with = AuthAttemptStatusSerializer::class)
+@JvmInline
+value class AuthAttemptStatus(val rawValue: String) {
+    companion object {
+        val PENDING: AuthAttemptStatus = AuthAttemptStatus("pending")
+        val COMPLETED: AuthAttemptStatus = AuthAttemptStatus("completed")
+        val FAILED: AuthAttemptStatus = AuthAttemptStatus("failed")
+    }
+}
+
+internal object AuthAttemptStatusSerializer : KSerializer<AuthAttemptStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AuthAttemptStatus", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: AuthAttemptStatus) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): AuthAttemptStatus =
+        AuthAttemptStatus(decoder.decodeString())
+}
+
 // ─── State Types ────────────────────────────────────────────────────────────
 
 @Serializable
@@ -5651,6 +5700,129 @@ data class AutomationRunState(
     val meta: Map<String, JsonElement>? = null
 )
 
+@Serializable
+data class AccountsState(
+    /**
+     * Live, host-authoritative account lifetimes, keyed by `HostAccount.id`.
+     */
+    val accounts: List<HostAccount>,
+    /**
+     * Pending and retained terminal admissions, keyed by `AuthAttemptState.id`.
+     */
+    val attempts: List<AuthAttemptState>
+)
+
+@Serializable
+data class HostAccount(
+    /**
+     * Opaque, host-assigned key, stable across rotation and scoped to the host
+     * authority. Removal retires it permanently; a deliberate later admission
+     * receives a new id. Possessing the id is not permission to use or remove it.
+     */
+    val id: String,
+    /**
+     * Display label, not an identity proof.
+     */
+    val label: String,
+    /**
+     * Whether the host can contain and remove its local credential lifetime.
+     * This does not promise upstream grant revocation or authorize the caller.
+     */
+    val removable: Boolean,
+    /**
+     * Explicit consumer selections. A consumer MUST NOT select two accounts.
+     * Removing this entry drops these selections but MUST NOT select a fallback.
+     * Previously started work can still depend on this account after a move;
+     * this list is therefore not the host's complete revocation set.
+     */
+    val consumers: List<AccountConsumer>
+)
+
+@Serializable
+data class AgentAccountConsumer(
+    val kind: AccountConsumerKind,
+    /**
+     * Matches `AgentInfo.provider`.
+     */
+    val provider: String,
+    /**
+     * Exact identifier from the provider's advertised protected resources.
+     */
+    val resource: String
+)
+
+@Serializable
+data class McpServerAccountConsumer(
+    val kind: AccountConsumerKind,
+    /**
+     * Session URI containing the customization.
+     */
+    val session: String,
+    /**
+     * Session-unique `McpServerCustomization.id`, not its display name.
+     */
+    val customizationId: String
+)
+
+@Serializable
+data class AuthAttemptPendingState(
+    /**
+     * Host-assigned, single-use id. Not a bearer authorization.
+     */
+    val id: String,
+    /**
+     * Host-validated consumer selected for this admission.
+     */
+    val consumer: AccountConsumer,
+    /**
+     * Exact protected resource captured when the attempt was admitted.
+     */
+    val resource: String,
+    val status: AuthAttemptStatus
+)
+
+@Serializable
+data class AuthAttemptCompletedState(
+    /**
+     * Host-assigned, single-use id. Not a bearer authorization.
+     */
+    val id: String,
+    /**
+     * Host-validated consumer selected for this admission.
+     */
+    val consumer: AccountConsumer,
+    /**
+     * Exact protected resource captured when the attempt was admitted.
+     */
+    val resource: String,
+    val status: AuthAttemptStatus,
+    /**
+     * The admitted authorization lifetime, which may subsequently be removed.
+     */
+    val accountId: String
+)
+
+@Serializable
+data class AuthAttemptFailedState(
+    /**
+     * Host-assigned, single-use id. Not a bearer authorization.
+     */
+    val id: String,
+    /**
+     * Host-validated consumer selected for this admission.
+     */
+    val consumer: AccountConsumer,
+    /**
+     * Exact protected resource captured when the attempt was admitted.
+     */
+    val resource: String,
+    val status: AuthAttemptStatus,
+    /**
+     * Failure details, with no token or other secret content.
+     */
+    val error: ErrorInfo
+)
+
 // ─── Customization Enablement Union ─────────────────────────────────────
 
 /**
@@ -6942,6 +7114,108 @@ internal object AutomationRunLifecycleSerializer : KSerializer<AutomationRunLife
     }
 }
 
+@Serializable(with = AccountConsumerSerializer::class)
+sealed interface AccountConsumer
+
+@JvmInline
+value class AccountConsumerAgent(val value: AgentAccountConsumer) : AccountConsumer
+@JvmInline
+value class AccountConsumerMcpServer(val value: McpServerAccountConsumer) : AccountConsumer
+/**
+ * Forward-compat catch-all for unknown AccountConsumer discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class AccountConsumerUnknown(val raw: JsonObject) : AccountConsumer
+
+internal object AccountConsumerSerializer : KSerializer<AccountConsumer> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AccountConsumer")
+
+    override fun deserialize(decoder: Decoder): AccountConsumer {
+        val input = decoder as? JsonDecoder
+            ?: error("AccountConsumer can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AccountConsumer")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return AccountConsumerUnknown(obj)
+        return when (discriminant) {
+            "agent" -> AccountConsumerAgent(input.json.decodeFromJsonElement(AgentAccountConsumer.serializer(), element))
+            "mcpServer" -> AccountConsumerMcpServer(input.json.decodeFromJsonElement(McpServerAccountConsumer.serializer(), element))
+            else -> AccountConsumerUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AccountConsumer) {
+        val output = encoder as? JsonEncoder
+            ?: error("AccountConsumer can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AccountConsumerAgent -> output.json.encodeToJsonElement(AgentAccountConsumer.serializer(), value.value)
+            is AccountConsumerMcpServer -> output.json.encodeToJsonElement(McpServerAccountConsumer.serializer(), value.value)
+            is AccountConsumerUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
+@Serializable(with = AuthAttemptStateSerializer::class)
+sealed interface AuthAttemptState
+
+@JvmInline
+value class AuthAttemptStatePending(val value: AuthAttemptPendingState) : AuthAttemptState
+@JvmInline
+value class AuthAttemptStateCompleted(val value: AuthAttemptCompletedState) : AuthAttemptState
+@JvmInline
+value class AuthAttemptStateFailed(val value: AuthAttemptFailedState) : AuthAttemptState
+/**
+ * Forward-compat catch-all for unknown AuthAttemptState discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class AuthAttemptStateUnknown(val raw: JsonObject) : AuthAttemptState
+
+internal object AuthAttemptStateSerializer : KSerializer<AuthAttemptState> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("AuthAttemptState")
+
+    override fun deserialize(decoder: Decoder): AuthAttemptState {
+        val input = decoder as? JsonDecoder
+            ?: error("AuthAttemptState can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for AuthAttemptState")
+        val discriminant = (obj["status"] as? JsonPrimitive)?.content
+            ?: return AuthAttemptStateUnknown(obj)
+        return when (discriminant) {
+            "pending" -> AuthAttemptStatePending(input.json.decodeFromJsonElement(AuthAttemptPendingState.serializer(), element))
+            "completed" -> AuthAttemptStateCompleted(input.json.decodeFromJsonElement(AuthAttemptCompletedState.serializer(), element))
+            "failed" -> AuthAttemptStateFailed(input.json.decodeFromJsonElement(AuthAttemptFailedState.serializer(), element))
+            else -> AuthAttemptStateUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: AuthAttemptState) {
+        val output = encoder as? JsonEncoder
+            ?: error("AuthAttemptState can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is AuthAttemptStatePending -> output.json.encodeToJsonElement(AuthAttemptPendingState.serializer(), value.value)
+            is AuthAttemptStateCompleted -> output.json.encodeToJsonElement(AuthAttemptCompletedState.serializer(), value.value)
+            is AuthAttemptStateFailed -> output.json.encodeToJsonElement(AuthAttemptFailedState.serializer(), value.value)
+            is AuthAttemptStateUnknown -> value.raw
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
 @Serializable(with = ToolResultContentSerializer::class)
 sealed interface ToolResultContent {
     @JvmInline value class Text(val value: ToolResultTextContent) : ToolResultContent
@@ -7005,6 +7279,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 @Serializable(with = SnapshotStateSerializer::class)
 sealed interface SnapshotState {
     @JvmInline value class Root(val value: RootState) : SnapshotState
+    @JvmInline value class Accounts(val value: AccountsState) : SnapshotState
     @JvmInline value class Session(val value: SessionState) : SnapshotState
     @JvmInline value class Chat(val value: ChatState) : SnapshotState
     @JvmInline value class Terminal(val value: TerminalState) : SnapshotState
@@ -7035,6 +7310,8 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
         // key); TerminalState has required `content`; RootState is the
         // catch-all.
         return when {
+            obj.containsKey("accounts") && obj.containsKey("attempts") ->
+                SnapshotState.Accounts(input.json.decodeFromJsonElement(AccountsState.serializer(), element))
             obj.containsKey("automation") && obj.containsKey("origin") && obj.containsKey("sessions") ->
                 SnapshotState.AutomationRun(input.json.decodeFromJsonElement(AutomationRunState.serializer(), element))
             obj.containsKey("entries") ->
@@ -7058,6 +7335,7 @@ internal object SnapshotStateSerializer : KSerializer<SnapshotState> {
             ?: error("SnapshotState can only be serialized to JSON")
         val element: JsonElement = when (value) {
             is SnapshotState.Root -> output.json.encodeToJsonElement(RootState.serializer(), value.value)
+            is SnapshotState.Accounts -> output.json.encodeToJsonElement(AccountsState.serializer(), value.value)
             is SnapshotState.Session -> output.json.encodeToJsonElement(SessionState.serializer(), value.value)
             is SnapshotState.Chat -> output.json.encodeToJsonElement(ChatState.serializer(), value.value)
             is SnapshotState.Terminal -> output.json.encodeToJsonElement(TerminalState.serializer(), value.value)

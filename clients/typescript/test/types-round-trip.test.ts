@@ -59,7 +59,15 @@ import type {
   SessionSummary,
 } from '../src/types/channels-session/state.js';
 import type { SessionAddedParams } from '../src/types/channels-root/notifications.js';
-import type { Implementation, InitializeResult } from '../src/types/common/commands.js';
+import type {
+  AuthenticateParams, AuthenticateResult, Implementation, InitializeResult,
+} from '../src/types/common/commands.js';
+import type {
+  AuthBeginParams, AuthBeginResult, AuthenticationCapability, BrokeredAuthenticationBinding,
+} from '../src/types/channels-accounts/commands.js';
+import type {
+  AccountConsumer, AccountsState, AuthAttemptState, HostAccount,
+} from '../src/types/channels-accounts/state.js';
 import type { ChatSource } from '../src/types/channels-chat/commands.js';
 
 // ─── Fixture directory ───────────────────────────────────────────────────────
@@ -230,6 +238,16 @@ function runFixture(file: string, root: FixtureRoot): void | 'skipped' {
 
 function bindToType(file: string, type: string, parsed: unknown): void {
   switch (type) {
+    case 'AccountsState': void (parsed as AccountsState); break;
+    case 'AccountConsumer': void (parsed as AccountConsumer); break;
+    case 'HostAccount': void (parsed as HostAccount); break;
+    case 'AuthAttemptState': void (parsed as AuthAttemptState); break;
+    case 'AuthBeginParams': void (parsed as AuthBeginParams); break;
+    case 'AuthBeginResult': void (parsed as AuthBeginResult); break;
+    case 'AuthenticateParams': void (parsed as AuthenticateParams); break;
+    case 'AuthenticateResult': void (parsed as AuthenticateResult); break;
+    case 'AuthenticationCapability': void (parsed as AuthenticationCapability); break;
+    case 'BrokeredAuthenticationBinding': void (parsed as BrokeredAuthenticationBinding); break;
     case 'ActionEnvelope':     void (parsed as ActionEnvelope); break;
     case 'StateAction':        void (parsed as StateAction); break;
     case 'Customization':      void (parsed as Customization); break;

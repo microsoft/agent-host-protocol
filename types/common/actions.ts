@@ -130,6 +130,12 @@ import type {
   AutomationRunPrimarySessionChangedAction,
   AutomationRunCancelRequestedAction,
 } from '../channels-automation-run/actions.js';
+import type {
+  AccountSetAction,
+  AccountRemovedAction,
+  AuthAttemptSetAction,
+  AuthAttemptRemovedAction,
+} from '../channels-accounts/actions.js';
 
 // ─── Action Type Enum ────────────────────────────────────────────────────────
 
@@ -238,6 +244,10 @@ export const enum ActionType {
   AutomationRunSessionRemoved = 'automationRun/sessionRemoved',
   AutomationRunPrimarySessionChanged = 'automationRun/primarySessionChanged',
   AutomationRunCancelRequested = 'automationRun/cancelRequested',
+  AccountSet = 'accounts/set',
+  AccountRemoved = 'accounts/removed',
+  AuthAttemptSet = 'accounts/authAttemptSet',
+  AuthAttemptRemoved = 'accounts/authAttemptRemoved',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -371,4 +381,8 @@ export type StateAction =
   | AutomationRunSessionSetAction
   | AutomationRunSessionRemovedAction
   | AutomationRunPrimarySessionChangedAction
-  | AutomationRunCancelRequestedAction;
+  | AutomationRunCancelRequestedAction
+  | AccountSetAction
+  | AccountRemovedAction
+  | AuthAttemptSetAction
+  | AuthAttemptRemovedAction;

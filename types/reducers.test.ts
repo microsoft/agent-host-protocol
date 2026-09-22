@@ -27,11 +27,12 @@ import {
   resourceWatchReducer,
   automationReducer,
   automationRunReducer,
+  accountsReducer,
   isClientDispatchable,
 } from './reducers.js';
-import { IS_CLIENT_DISPATCHABLE } from './action-origin.generated.js';
+import { IS_CLIENT_DISPATCHABLE, type AccountsAction } from './action-origin.generated.js';
 import { ActionType } from './actions.js';
-import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState } from './state.js';
+import type { RootState, SessionState, ChatState, TerminalState, ChangesetState, AnnotationsState, ResourceWatchState, AutomationState, AutomationRunState, AccountsState } from './state.js';
 import {
   SessionStatus,
   TurnState,
@@ -58,6 +59,7 @@ function readChannelSources(baseName: string): string {
     'channels-resource-watch',
     'channels-automation',
     'channels-automation-run',
+    'channels-accounts',
   ];
   return dirs
     .map(dir => {
@@ -73,11 +75,11 @@ function readChannelSources(baseName: string): string {
 
 // ─── Fixture Loading ─────────────────────────────────────────────────────────
 
-type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState;
+type FixtureState = RootState | SessionState | ChatState | TerminalState | ChangesetState | AnnotationsState | ResourceWatchState | AutomationState | AutomationRunState | AccountsState;
 
 interface Fixture {
   description: string;
-  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun';
+  reducer: 'root' | 'session' | 'chat' | 'terminal' | 'changeset' | 'annotations' | 'resourceWatch' | 'automation' | 'automationRun' | 'accounts';
   initial: FixtureState;
   actions: unknown[];
   expected: FixtureState;
@@ -131,6 +133,8 @@ describe('reducer fixtures', () => {
           state = automationReducer(state as AutomationState, action as any);
         } else if (fixture.reducer === 'automationRun') {
           state = automationRunReducer(state as AutomationRunState, action as any);
+        } else if (fixture.reducer === 'accounts') {
+          state = accountsReducer(state as AccountsState, action as AccountsAction);
         } else {
           state = sessionReducer(state as SessionState, action as any);
         }

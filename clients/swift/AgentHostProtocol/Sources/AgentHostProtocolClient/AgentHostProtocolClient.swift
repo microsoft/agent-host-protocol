@@ -25,3 +25,6 @@ import Foundation
 /// TODO(codegen): Source this from `AgentHostProtocol` once codegen exposes a
 /// shared constant (TypeScript/Rust/Swift would all benefit).
 public let RootResourceURI: String = "ahp-root://"
+
+/// Well-known standalone accounts channel, available when the host advertises authentication support.
+public let AccountsResourceURI: String = "ahp-accounts://"

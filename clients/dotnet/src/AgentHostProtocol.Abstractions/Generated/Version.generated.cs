@@ -35,4 +35,7 @@ public static class ProtocolVersion
 
     /// <summary>The well-known channel URI for the root channel.</summary>
     public const string RootResourceUri = "ahp-root://";
+
+    /// <summary>The host-scoped accounts channel, available when authentication is advertised.</summary>
+    public const string AccountsResourceUri = "ahp-accounts://";
 }

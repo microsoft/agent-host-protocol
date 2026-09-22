@@ -1,0 +1,25 @@
+{
+  "description": "accounts/authAttemptRemoved removes only the named pending admission",
+  "reducer": "accounts",
+  "initial": {
+    "accounts": [{ "id": "account-1", "label": "One", "removable": true, "consumers": [] }],
+    "attempts": [
+      {
+        "id": "attempt-1", "status": "pending", "resource": "https://api.example.test",
+        "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+      },
+      {
+        "id": "attempt-2", "status": "pending", "resource": "https://tools.example.test",
+        "consumer": { "kind": "mcpServer", "session": "ahp-session:/one", "customizationId": "server-1" }
+      }
+    ]
+  },
+  "actions": [{ "type": "accounts/authAttemptRemoved", "id": "attempt-1" }],
+  "expected": {
+    "accounts": [{ "id": "account-1", "label": "One", "removable": true, "consumers": [] }],
+    "attempts": [{
+      "id": "attempt-2", "status": "pending", "resource": "https://tools.example.test",
+      "consumer": { "kind": "mcpServer", "session": "ahp-session:/one", "customizationId": "server-1" }
+    }]
+  }
+}

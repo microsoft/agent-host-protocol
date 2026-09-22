@@ -1,0 +1,16 @@
+{
+  "name": "authenticate-attempt-binding",
+  "group": "A",
+  "description": "Credential delivery preserves the single-use admission binding.",
+  "type": "AuthenticateParams",
+  "input": {
+    "channel": "ahp-root://", "resource": "https://api.example.test",
+    "token": "test-credential", "scopes": ["read"], "expiresIn": 3600,
+    "binding": { "kind": "attempt", "attemptId": "one" }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://", "resource": "https://api.example.test",
+    "token": "test-credential", "scopes": ["read"], "expiresIn": 3600,
+    "binding": { "kind": "attempt", "attemptId": "one" }
+  }]
+}

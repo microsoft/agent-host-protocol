@@ -466,6 +466,71 @@ func updateResponsePart(state *ahptypes.ChatState, turnID, partID string, update
 	return ReduceOutcomeNoOp
 }
 
+// ─── Accounts Reducer ──────────────────────────────────────────────────
+
+func authAttemptID(attempt ahptypes.AuthAttemptState) string {
+	switch value := attempt.Value.(type) {
+	case *ahptypes.AuthAttemptPendingState:
+		return value.Id
+	case *ahptypes.AuthAttemptCompletedState:
+		return value.Id
+	case *ahptypes.AuthAttemptFailedState:
+		return value.Id
+	case *ahptypes.AuthAttemptStateUnknown:
+		var base struct {
+			Id string `json:"id"`
+		}
+		if json.Unmarshal(value.Raw, &base) == nil {
+			return base.Id
+		}
+	}
+	return ""
+}
+
+// ApplyActionToAccounts projects authoritative account and admission actions
+// into state. Rejected envelopes must not be applied; credential authorization
+// and removability checks belong to the host, not this reducer.
+func ApplyActionToAccounts(state *ahptypes.AccountsState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.AccountSetAction:
+		for i := range state.Accounts {
+			if state.Accounts[i].Id == a.Account.Id {
+				state.Accounts[i] = a.Account
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Accounts = append(state.Accounts, a.Account)
+		return ReduceOutcomeApplied
+	case *ahptypes.AccountRemovedAction:
+		for i := range state.Accounts {
+			if state.Accounts[i].Id == a.Id {
+				state.Accounts = append(state.Accounts[:i], state.Accounts[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	case *ahptypes.AuthAttemptSetAction:
+		id := authAttemptID(a.Attempt)
+		for i := range state.Attempts {
+			if authAttemptID(state.Attempts[i]) == id {
+				state.Attempts[i] = a.Attempt
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Attempts = append(state.Attempts, a.Attempt)
+		return ReduceOutcomeApplied
+	case *ahptypes.AuthAttemptRemovedAction:
+		for i := range state.Attempts {
+			if authAttemptID(state.Attempts[i]) == a.Id {
+				state.Attempts = append(state.Attempts[:i], state.Attempts[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
+	}
+	return ReduceOutcomeOutOfScope
+}
+
 // ─── Root Reducer ──────────────────────────────────────────────────────
 
 // ApplyActionToRoot applies action to the [ahptypes.RootState] in

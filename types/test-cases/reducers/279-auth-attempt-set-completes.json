@@ -1,0 +1,25 @@
+{
+  "description": "accounts/authAttemptSet replaces pending with a recoverable completed outcome",
+  "reducer": "accounts",
+  "initial": {
+    "accounts": [],
+    "attempts": [{
+      "id": "attempt-1", "status": "pending", "resource": "https://api.example.test",
+      "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+    }]
+  },
+  "actions": [{
+    "type": "accounts/authAttemptSet",
+    "attempt": {
+      "id": "attempt-1", "status": "completed", "accountId": "account-1", "resource": "https://api.example.test",
+      "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+    }
+  }],
+  "expected": {
+    "accounts": [],
+    "attempts": [{
+      "id": "attempt-1", "status": "completed", "accountId": "account-1", "resource": "https://api.example.test",
+      "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+    }]
+  }
+}

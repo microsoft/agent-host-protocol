@@ -114,7 +114,7 @@ Clients push Bearer tokens to the server using the [`authenticate`](/reference/c
 
 `expiresIn` is optional and corresponds to the `expires_in` field in an OAuth 2.0 token response, as defined by [RFC 6749 section 5.1](https://datatracker.ietf.org/doc/html/rfc6749#section-5.1). It is the access token's remaining lifetime in seconds when the client sends the `authenticate` request. When supplied, it MUST be a positive integer.
 
-If the client retained the original token response, it MUST subtract elapsed time from the original `expires_in` value before forwarding it. The client MUST omit `expiresIn` when the authorization server did not supply an expiry or the expiry is otherwise unknown. An empty `token` revokes authentication for the resource; `expiresIn` is irrelevant and SHOULD be omitted in that request.
+If the client retained the original token response, it MUST subtract elapsed time from the original `expires_in` value before forwarding it. The client MUST omit `expiresIn` when the authorization server did not supply an expiry or the expiry is otherwise unknown. In the baseline connection-scoped flow, an empty `token` revokes authentication for the resource; `expiresIn` is irrelevant and SHOULD be omitted in that request. Shared account-managed contexts MUST reject that unbound revocation; they use [keyed account removal](/specification/accounts-channel) instead.
 
 `scopes` is optional and lets the client tell the server which OAuth scopes the pushed token actually grants — useful when resolving a `requiredScopes` challenge (from a live `McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth`) without the server needing to decode an opaque token.
 
@@ -230,4 +230,8 @@ Root state is global and visible to all subscribed clients. In the baseline flow
 
 The baseline does not define account-safe sign-out for a credential used by multiple connections. A resource identifies an upstream service, not an account; a client's token cache cannot authoritatively decide which shared credential to clear.
 
-The [account-safe shared-host sign-out proposal](../proposals/client-brokered-revocation.md) independently defines an explicitly negotiated, host-authoritative account model for client-brokered credentials. It does not require host-owned credential acquisition or the [host-owned authentication proposal](https://github.com/microsoft/agent-host-protocol/pull/404) to land first. It is a design draft, not part of the current wire contract. In particular, empty-token `authenticate` is not a conditional account-removal mechanism.
+Hosts that share credentials across clients can negotiate the optional [Accounts Channel](/specification/accounts-channel). `InitializeResult.authentication.flows` advertises `clientBrokered`; clients reserve admission with `authBegin`, deliver a nonempty token with an attempt/account `binding`, and receive the host's `accountId`. Renewal does not change consumer selection. Signing out dispatches `accounts/removed` with that host-issued id, never an empty token or client-derived identity.
+
+The host is authoritative for ordering, token rotation, provider replay, dependent credentials, and affected-work containment. Hosts MUST NOT admit legacy unbound pushes into the same shared account-managed context. If the capability is unavailable, clients MUST report host sign-out as unsupported or unconfirmed rather than silently downgrade to unconditional revocation.
+
+This is independent of host-owned credential acquisition. See the [proposal rationale](../proposals/client-brokered-revocation.md) for the design boundaries.

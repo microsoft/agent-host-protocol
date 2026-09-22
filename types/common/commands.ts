@@ -18,6 +18,7 @@ import type {
   AutomationState,
 } from '../channels-automation/state.js';
 import type { TelemetryCapabilities } from '../channels-otlp/state.js';
+import type { AuthenticationCapability, BrokeredAuthenticationBinding } from '../channels-accounts/commands.js';
 
 // ─── BaseParams ──────────────────────────────────────────────────────────────
 
@@ -293,6 +294,16 @@ export interface InitializeResult {
    * @see {@link /guide/automations | Automations Guide}
    */
   automations?: AutomationCapabilities;
+  /**
+   * Account-managed authentication support. The `clientBrokered` flow enables
+   * `ahp-accounts://`, `authBegin`, and bound `authenticate` delivery.
+   *
+   * Clients MUST check the flow before using it. A missing capability is not
+   * permission to fall back to empty-token revocation of shared credentials.
+   *
+   * @see {@link /specification/accounts-channel | Accounts Channel}
+   */
+  authentication?: AuthenticationCapability;
 }
 
 /**
@@ -1183,14 +1194,30 @@ export interface AuthenticateParams extends BaseParams {
    * token.
    */
   scopes?: string[];
+  /**
+   * Required for shared client-brokered credentials after negotiating the
+   * `clientBrokered` flow. Attempt bindings complete a live admission; account
+   * bindings renew a live lifetime without changing consumer selection.
+   *
+   * The token MUST be nonempty. Hosts reject missing/unknown bindings in a
+   * shared context, and MUST NOT ignore a binding or interpret it as a legacy
+   * unbound push. Removed lifetimes and stale attempts fail with `Conflict`.
+   * Sign-out uses key-only `accounts/removed`, not an empty token.
+   */
+  binding?: BrokeredAuthenticationBinding;
 }
 
 /**
  * Result of the `authenticate` command.
  *
- * An empty object on success. If the token is invalid or the resource is
- * unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`
- * `-32007` or `InvalidParams` `-32602`).
+ * An empty object on baseline success; bound delivery MUST return `accountId`.
+ * If the token is invalid or the resource is unrecognized, the server MUST
+ * return a JSON-RPC error (e.g. `AuthRequired` `-32007` or `InvalidParams`
+ * `-32602`). Clients MUST treat a missing account id after bound delivery as
+ * an unconfirmed protocol failure, not retry without the binding. An
+ * account-bound renewal MUST return the same account id that was requested.
  */
 export interface AuthenticateResult {
+  /** Admitted or renewed host account lifetime; required for bound delivery. */
+  accountId?: string;
 }

@@ -43,6 +43,7 @@ public struct HostedResourceKey: Hashable, Sendable {
 /// Dropping action envelopes desyncs the mirror irreversibly.
 public actor MultiHostStateMirror {
     public private(set) var rootStates: [HostId: RootState] = [:]
+    public private(set) var accountsStates: [HostId: AccountsState] = [:]
     public private(set) var sessions: [HostedResourceKey: SessionState] = [:]
     public private(set) var chats: [HostedResourceKey: ChatState] = [:]
     public private(set) var terminals: [HostedResourceKey: TerminalState] = [:]
@@ -74,6 +75,10 @@ public actor MultiHostStateMirror {
         if channel == RootResourceURI {
             let current = rootStates[host, default: RootState(agents: [])]
             rootStates[host] = rootReducer(state: current, action: action)
+            return
+        }
+        if channel == AccountsResourceURI, let state = accountsStates[host] {
+            accountsStates[host] = accountsReducer(state: state, action: action)
             return
         }
         let key = HostedResourceKey(hostId: host, uri: channel)
@@ -129,6 +134,8 @@ public actor MultiHostStateMirror {
         switch snapshot.state {
         case .root(let state):
             rootStates[host] = state
+        case .accounts(let state):
+            accountsStates[host] = state
         case .session(let state):
             sessions[key] = state
         case .chat(let state):
@@ -151,6 +158,7 @@ public actor MultiHostStateMirror {
     /// Reset every state slot keyed under `host`.
     public func reset(host: HostId) {
         rootStates.removeValue(forKey: host)
+        accountsStates.removeValue(forKey: host)
         sessions = sessions.filter { $0.key.hostId != host }
         chats = chats.filter { $0.key.hostId != host }
         terminals = terminals.filter { $0.key.hostId != host }
@@ -165,6 +173,7 @@ public actor MultiHostStateMirror {
     /// Reset every host's state.
     public func reset() {
         rootStates.removeAll()
+        accountsStates.removeAll()
         sessions.removeAll()
         chats.removeAll()
         terminals.removeAll()

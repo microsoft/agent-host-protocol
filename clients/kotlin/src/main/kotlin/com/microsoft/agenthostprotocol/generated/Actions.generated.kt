@@ -127,6 +127,10 @@ value class ActionType(val rawValue: String) {
         val AUTOMATION_RUN_SESSION_REMOVED: ActionType = ActionType("automationRun/sessionRemoved")
         val AUTOMATION_RUN_PRIMARY_SESSION_CHANGED: ActionType = ActionType("automationRun/primarySessionChanged")
         val AUTOMATION_RUN_CANCEL_REQUESTED: ActionType = ActionType("automationRun/cancelRequested")
+        val ACCOUNT_SET: ActionType = ActionType("accounts/set")
+        val ACCOUNT_REMOVED: ActionType = ActionType("accounts/removed")
+        val AUTH_ATTEMPT_SET: ActionType = ActionType("accounts/authAttemptSet")
+        val AUTH_ATTEMPT_REMOVED: ActionType = ActionType("accounts/authAttemptRemoved")
     }
 }
 
@@ -161,6 +165,42 @@ data class ActionEnvelope(
 )
 
 // ─── Action Types ───────────────────────────────────────────────────────────
+
+@Serializable
+data class AccountSetAction(
+    val type: ActionType,
+    /**
+     * Complete account entry.
+     */
+    val account: HostAccount
+)
+
+@Serializable
+data class AccountRemovedAction(
+    val type: ActionType,
+    /**
+     * Host-issued account lifetime to retire. No resource or token precondition.
+     */
+    val id: String
+)
+
+@Serializable
+data class AuthAttemptSetAction(
+    val type: ActionType,
+    /**
+     * Complete admission entry.
+     */
+    val attempt: AuthAttemptState
+)
+
+@Serializable
+data class AuthAttemptRemovedAction(
+    val type: ActionType,
+    /**
+     * Host-issued attempt id.
+     */
+    val id: String
+)
 
 @Serializable
 data class RootAgentsChangedAction(
@@ -1599,6 +1639,10 @@ data class PartialChatSummary(
 @Serializable(with = StateActionSerializer::class)
 sealed interface StateAction
 
+@JvmInline value class StateActionAccountSet(val value: AccountSetAction) : StateAction
+@JvmInline value class StateActionAccountRemoved(val value: AccountRemovedAction) : StateAction
+@JvmInline value class StateActionAuthAttemptSet(val value: AuthAttemptSetAction) : StateAction
+@JvmInline value class StateActionAuthAttemptRemoved(val value: AuthAttemptRemovedAction) : StateAction
 @JvmInline value class StateActionRootAgentsChanged(val value: RootAgentsChangedAction) : StateAction
 @JvmInline value class StateActionRootActiveSessionsChanged(val value: RootActiveSessionsChangedAction) : StateAction
 @JvmInline value class StateActionSessionReady(val value: SessionReadyAction) : StateAction
@@ -1712,6 +1756,10 @@ internal object StateActionSerializer : KSerializer<StateAction> {
         val type = (obj["type"] as? JsonPrimitive)?.contentOrNull
             ?: return StateActionUnknown(obj)
         return when (type) {
+            "accounts/set" -> StateActionAccountSet(input.json.decodeFromJsonElement(AccountSetAction.serializer(), element))
+            "accounts/removed" -> StateActionAccountRemoved(input.json.decodeFromJsonElement(AccountRemovedAction.serializer(), element))
+            "accounts/authAttemptSet" -> StateActionAuthAttemptSet(input.json.decodeFromJsonElement(AuthAttemptSetAction.serializer(), element))
+            "accounts/authAttemptRemoved" -> StateActionAuthAttemptRemoved(input.json.decodeFromJsonElement(AuthAttemptRemovedAction.serializer(), element))
             "root/agentsChanged" -> StateActionRootAgentsChanged(input.json.decodeFromJsonElement(RootAgentsChangedAction.serializer(), element))
             "root/activeSessionsChanged" -> StateActionRootActiveSessionsChanged(input.json.decodeFromJsonElement(RootActiveSessionsChangedAction.serializer(), element))
             "session/ready" -> StateActionSessionReady(input.json.decodeFromJsonElement(SessionReadyAction.serializer(), element))
@@ -1818,6 +1866,10 @@ internal object StateActionSerializer : KSerializer<StateAction> {
         val output = encoder as? JsonEncoder
             ?: error("StateAction can only be serialized to JSON")
         val element: JsonElement = when (value) {
+            is StateActionAccountSet -> output.json.encodeToJsonElement(AccountSetAction.serializer(), value.value)
+            is StateActionAccountRemoved -> output.json.encodeToJsonElement(AccountRemovedAction.serializer(), value.value)
+            is StateActionAuthAttemptSet -> output.json.encodeToJsonElement(AuthAttemptSetAction.serializer(), value.value)
+            is StateActionAuthAttemptRemoved -> output.json.encodeToJsonElement(AuthAttemptRemovedAction.serializer(), value.value)
             is StateActionRootAgentsChanged -> output.json.encodeToJsonElement(RootAgentsChangedAction.serializer(), value.value)
             is StateActionRootActiveSessionsChanged -> output.json.encodeToJsonElement(RootActiveSessionsChangedAction.serializer(), value.value)
             is StateActionSessionReady -> output.json.encodeToJsonElement(SessionReadyAction.serializer(), value.value)

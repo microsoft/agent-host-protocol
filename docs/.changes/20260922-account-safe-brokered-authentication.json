@@ -1,0 +1,5 @@
+{
+  "type": "security",
+  "message": "Add capability-gated client-brokered account lifetimes, bound token admission and renewal, and keyed shared-host sign-out with replay, dependency, and affected-work containment requirements.",
+  "issues": [153]
+}

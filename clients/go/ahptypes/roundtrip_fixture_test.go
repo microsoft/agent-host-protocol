@@ -190,6 +190,46 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 	}
 
 	switch typ {
+	case "AccountsState":
+		var v AccountsState
+		dec(&v)
+		return enc(&v)
+	case "HostAccount":
+		var v HostAccount
+		dec(&v)
+		return enc(&v)
+	case "AccountConsumer":
+		var v AccountConsumer
+		dec(&v)
+		return enc(&v)
+	case "AuthAttemptState":
+		var v AuthAttemptState
+		dec(&v)
+		return enc(&v)
+	case "AuthBeginParams":
+		var v AuthBeginParams
+		dec(&v)
+		return enc(&v)
+	case "AuthBeginResult":
+		var v AuthBeginResult
+		dec(&v)
+		return enc(&v)
+	case "AuthenticateParams":
+		var v AuthenticateParams
+		dec(&v)
+		return enc(&v)
+	case "AuthenticateResult":
+		var v AuthenticateResult
+		dec(&v)
+		return enc(&v)
+	case "BrokeredAuthenticationBinding":
+		var v BrokeredAuthenticationBinding
+		dec(&v)
+		return enc(&v)
+	case "AuthenticationCapability":
+		var v AuthenticationCapability
+		dec(&v)
+		return enc(&v)
 	case "ActionEnvelope":
 		var v ActionEnvelope
 		dec(&v)

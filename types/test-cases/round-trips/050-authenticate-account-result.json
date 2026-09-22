@@ -1,0 +1,8 @@
+{
+  "name": "authenticate-account-result",
+  "group": "A",
+  "description": "Bound authentication returns the host account lifetime for subsequent renewal and removal.",
+  "type": "AuthenticateResult",
+  "input": { "accountId": "account-a" },
+  "acceptableOutputs": [{ "accountId": "account-a" }]
+}

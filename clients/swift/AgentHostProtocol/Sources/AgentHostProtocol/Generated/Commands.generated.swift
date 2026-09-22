@@ -127,7 +127,54 @@ public enum ResourceWriteMode: String, Codable, Sendable {
     case insert = "insert"
 }
 
+/// Negotiated credential-acquisition flows.
+///
+/// Unknown flows are not support for client-brokered admission. Hosts MUST
+/// reject unsupported offers instead of silently choosing another flow.
+public enum AuthFlowKind: Codable, Sendable, Equatable {
+    /// Client acquires the token; the host owns admission, use, and removal.
+    case clientBrokered
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "clientBrokered": self = .clientBrokered
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .clientBrokered: try container.encode("clientBrokered")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Whether token delivery completes an admission or renews a live account.
+///
+/// Unknown bindings MUST be rejected, never interpreted as unbound delivery.
+public enum BrokeredAuthenticationBindingKind: String, Codable, Sendable {
+    case attempt = "attempt"
+    case account = "account"
+}
+
 // MARK: - Command Types
+
+public struct AuthBeginTarget: Codable, Sendable {
+    /// Exact consumer selected for authentication.
+    public var consumer: AccountConsumer
+
+    public init(
+        consumer: AccountConsumer
+    ) {
+        self.consumer = consumer
+    }
+}
 
 /// Copies source history through a completed turn into the new chat.
 public struct ForkChatSource: Codable, Sendable {
@@ -341,6 +388,12 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Account-managed authentication support. The `clientBrokered` flow enables
+    /// `ahp-accounts://`, `authBegin`, and bound `authenticate` delivery.
+    ///
+    /// Clients MUST check the flow before using it. A missing capability is not
+    /// permission to fall back to empty-token revocation of shared credentials.
+    public var authentication: AuthenticationCapability?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -353,6 +406,7 @@ public struct InitializeResult: Codable, Sendable {
         case terminalCommandPrefix
         case telemetry
         case automations
+        case authentication
     }
 
     public init(
@@ -365,7 +419,8 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        authentication: AuthenticationCapability? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -377,6 +432,7 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.authentication = authentication
     }
 }
 
@@ -1484,6 +1540,15 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Omit when the client doesn't track granted scopes separately from the
     /// token.
     public var scopes: [String]?
+    /// Required for shared client-brokered credentials after negotiating the
+    /// `clientBrokered` flow. Attempt bindings complete a live admission; account
+    /// bindings renew a live lifetime without changing consumer selection.
+    ///
+    /// The token MUST be nonempty. Hosts reject missing/unknown bindings in a
+    /// shared context, and MUST NOT ignore a binding or interpret it as a legacy
+    /// unbound push. Removed lifetimes and stale attempts fail with `Conflict`.
+    /// Sign-out uses key-only `accounts/removed`, not an empty token.
+    public var binding: BrokeredAuthenticationBinding?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1492,6 +1557,7 @@ public struct AuthenticateParams: Codable, Sendable {
         case token
         case expiresIn
         case scopes
+        case binding
     }
 
     public init(
@@ -1500,7 +1566,8 @@ public struct AuthenticateParams: Codable, Sendable {
         resource: String,
         token: String,
         expiresIn: Int? = nil,
-        scopes: [String]? = nil
+        scopes: [String]? = nil,
+        binding: BrokeredAuthenticationBinding? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1508,14 +1575,121 @@ public struct AuthenticateParams: Codable, Sendable {
         self.token = token
         self.expiresIn = expiresIn
         self.scopes = scopes
+        self.binding = binding
     }
 }
 
 public struct AuthenticateResult: Codable, Sendable {
+    /// Admitted or renewed host account lifetime; required for bound delivery.
+    public var accountId: String?
 
     public init(
-
+        accountId: String? = nil
     ) {
+        self.accountId = accountId
+    }
+}
+
+public struct AuthBeginParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Exact consumer from the host's current root or session state.
+    public var target: AuthBeginTarget
+    /// Offered flows. MUST include `clientBrokered`; an empty or unsupported
+    /// offer fails with `InvalidParams` without creating an attempt.
+    public var flows: [AuthFlowSupport]
+    /// Explicit live account to reauthorize. The host MUST verify the delivered
+    /// identity matches it. Omission admits an identity, reusing an existing
+    /// lifetime only when both verified identity and ownership context match.
+    /// Neither intent is inferred from a challenge.
+    public var accountId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case target
+        case flows
+        case accountId
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        target: AuthBeginTarget,
+        flows: [AuthFlowSupport],
+        accountId: String? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.target = target
+        self.flows = flows
+        self.accountId = accountId
+    }
+}
+
+public struct AuthBeginResult: Codable, Sendable {
+    public var flow: AuthFlowKind
+    /// Host-issued id of the published pending admission.
+    public var attemptId: String
+
+    public init(
+        flow: AuthFlowKind,
+        attemptId: String
+    ) {
+        self.flow = flow
+        self.attemptId = attemptId
+    }
+}
+
+public struct AuthFlowSupport: Codable, Sendable {
+    public var kind: AuthFlowKind
+
+    public init(
+        kind: AuthFlowKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct AuthenticationCapability: Codable, Sendable {
+    /// Flow descriptors clients may select; absence of a kind means unsupported.
+    public var flows: [AuthFlowSupport]
+
+    public init(
+        flows: [AuthFlowSupport]
+    ) {
+        self.flows = flows
+    }
+}
+
+public struct BrokeredAuthenticationAttemptBinding: Codable, Sendable {
+    public var kind: BrokeredAuthenticationBindingKind
+    /// Pending attempt from `authBegin`.
+    public var attemptId: String
+
+    public init(
+        kind: BrokeredAuthenticationBindingKind,
+        attemptId: String
+    ) {
+        self.kind = kind
+        self.attemptId = attemptId
+    }
+}
+
+public struct BrokeredAuthenticationAccountBinding: Codable, Sendable {
+    public var kind: BrokeredAuthenticationBindingKind
+    /// Live host-issued account lifetime. Retired ids fail with `Conflict`.
+    public var accountId: String
+
+    public init(
+        kind: BrokeredAuthenticationBindingKind,
+        accountId: String
+    ) {
+        self.kind = kind
+        self.accountId = accountId
     }
 }
 
@@ -2124,6 +2298,35 @@ public enum ChatSource: Codable, Sendable {
         case .fork(let value): try value.encode(to: encoder)
         case .sideChat(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum BrokeredAuthenticationBinding: Codable, Sendable {
+    case attempt(BrokeredAuthenticationAttemptBinding)
+    case account(BrokeredAuthenticationAccountBinding)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        let discriminant = try container.decode(String.self, forKey: .discriminant)
+        switch discriminant {
+        case "attempt":
+            self = .attempt(try BrokeredAuthenticationAttemptBinding(from: decoder))
+        case "account":
+            self = .account(try BrokeredAuthenticationAccountBinding(from: decoder))
+        default:
+            throw DecodingError.dataCorruptedError(forKey: .discriminant, in: container, debugDescription: "Unknown BrokeredAuthenticationBinding discriminant: \(discriminant)")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .attempt(let value): try value.encode(to: encoder)
+        case .account(let value): try value.encode(to: encoder)
         }
     }
 }

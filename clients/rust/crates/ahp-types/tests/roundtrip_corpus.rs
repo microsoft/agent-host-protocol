@@ -28,11 +28,18 @@
 
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
-    commands::{ChangesetOperationTarget, ChatSource, Implementation, InitializeResult},
+    commands::{
+        AuthBeginParams, AuthBeginResult, AuthenticateParams, AuthenticateResult,
+        AuthenticationCapability, BrokeredAuthenticationBinding, ChangesetOperationTarget,
+        ChatSource, Implementation, InitializeResult,
+    },
     common::StringOrMarkdown,
     messages::JsonRpcMessage,
     notifications::{PartialSessionSummary, SessionAddedParams},
-    state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary, Snapshot},
+    state::{
+        AccountConsumer, AccountsState, AuthAttemptState, ChatInputQuestion, Customization,
+        HostAccount, SessionStatus, SessionSummary, Snapshot,
+    },
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
 };
 use serde_json::{Number, Value};
@@ -205,6 +212,16 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
     }
 
     match type_name {
+        "AccountsState" => round_trip!(AccountsState),
+        "AccountConsumer" => round_trip!(AccountConsumer),
+        "HostAccount" => round_trip!(HostAccount),
+        "AuthAttemptState" => round_trip!(AuthAttemptState),
+        "AuthBeginParams" => round_trip!(AuthBeginParams),
+        "AuthBeginResult" => round_trip!(AuthBeginResult),
+        "AuthenticateParams" => round_trip!(AuthenticateParams),
+        "AuthenticateResult" => round_trip!(AuthenticateResult),
+        "AuthenticationCapability" => round_trip!(AuthenticationCapability),
+        "BrokeredAuthenticationBinding" => round_trip!(BrokeredAuthenticationBinding),
         "ActionEnvelope" => round_trip!(ActionEnvelope),
         "StateAction" => round_trip!(StateAction),
         "Customization" => round_trip!(Customization),

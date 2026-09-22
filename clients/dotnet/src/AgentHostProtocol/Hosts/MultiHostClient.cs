@@ -29,6 +29,7 @@ internal sealed class HostEntry : IDisposable
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private HostState _state = new() { Kind = HostStateKind.Disconnected };
     private string _protoVer = "";
+    private AuthenticationCapability? _authentication;
     private DateTimeOffset _updatedAt;
 
     // ── Swift-parity observable per-host state (guarded by _gate) ──────────
@@ -187,6 +188,11 @@ internal sealed class HostEntry : IDisposable
     /// </summary>
     public AhpClient? CurrentClient => _client;
 
+    public AuthenticationCapability? Authentication
+    {
+        get { lock (_gate) return _authentication; }
+    }
+
     public void SetClient(AhpClient? client, string protoVer)
     {
         // _protoVer is read together with _state/_updatedAt by Snapshot(), so the
@@ -202,6 +208,7 @@ internal sealed class HostEntry : IDisposable
             }
             else
             {
+                _authentication = client.NegotiatedAuthentication;
                 _clientReady.TrySetResult(client);
             }
         }
@@ -869,6 +876,7 @@ public sealed class MultiHostClient : IMultiHostClient
 
                 if (reconnectResult?.Value is ReconnectReplayResult replay)
                 {
+                    client.RestoreNegotiatedAuthentication(entry.Authentication);
                     var summaries = await FetchSessionSummariesAsync(entry, client, cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
                     await entry.ConnectionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -892,6 +900,7 @@ public sealed class MultiHostClient : IMultiHostClient
 
                 if (reconnectResult?.Value is ReconnectSnapshotResult snapshot)
                 {
+                    client.RestoreNegotiatedAuthentication(entry.Authentication);
                     var summaries = await FetchSessionSummariesAsync(entry, client, cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
                     await entry.ConnectionGate.WaitAsync(cancellationToken).ConfigureAwait(false);

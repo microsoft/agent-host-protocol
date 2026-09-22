@@ -61,6 +61,15 @@ When a model has a `configSchema`, clients present it as a form and pass the res
 
 Root state is mutated only by server-originated actions (e.g. `root/agentsChanged`).
 
+## Accounts State
+
+The optional [Accounts Channel](/specification/accounts-channel) at
+`ahp-accounts://` holds `accounts` and `attempts`, each keyed by a host-issued
+id. Accounts name revocable authorization lifetimes and their consumer
+selections; attempts retain admission outcomes for reconnection. Neither
+collection contains tokens. Account state is separately authorized rather than
+included in the global root snapshot.
+
 ## Session State
 
 Subscribable on a [Session Channel](/specification/session-channel) at `ahp-session:/<uuid>`. Contains the full state for a single session.

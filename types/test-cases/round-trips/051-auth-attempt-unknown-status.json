@@ -1,0 +1,16 @@
+{
+  "name": "auth-attempt-unknown-status",
+  "group": "A",
+  "description": "An unknown admission status is preserved, not decoded as completed.",
+  "type": "AuthAttemptState",
+  "input": {
+    "id": "future", "status": "pendingApproval", "resource": "https://api.example.test",
+    "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" },
+    "hint": "requires additional approval"
+  },
+  "acceptableOutputs": [{
+    "id": "future", "status": "pendingApproval", "resource": "https://api.example.test",
+    "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" },
+    "hint": "requires additional approval"
+  }]
+}

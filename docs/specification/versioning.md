@@ -31,6 +31,7 @@ Until more granular annotations are introduced, a channel's index applies to its
 | Channel | Stability |
 | --- | --- |
 | [Root](/specification/root-channel) | **2 - Stable** |
+| [Accounts](/specification/accounts-channel) | **1.0 - Early development** |
 | [Session](/specification/session-channel) | **2 - Stable** |
 | [Chat](/specification/chat-channel) | **2 - Stable** |
 | [Terminal](/specification/terminal-channel) | **2 - Stable** |

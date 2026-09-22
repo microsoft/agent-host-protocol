@@ -6,6 +6,54 @@ import AgentHostProtocol
 
 final class MultiHostStateMirrorTests: XCTestCase {
 
+    func testAccountsStatesAndResetsAreIsolatedPerHost() async {
+        let mirror = MultiHostStateMirror()
+        let alpha = HostAccount(id: "a1", label: "Alpha", removable: true, consumers: [])
+        let beta = HostAccount(id: "a1", label: "Beta", removable: false, consumers: [])
+        await mirror.apply(
+            host: "unsubscribed",
+            envelope: ActionEnvelope(
+                channel: AccountsResourceURI,
+                action: .accountSet(AccountSetAction(type: .accountSet, account: alpha)),
+                serverSeq: 1
+            )
+        )
+        for (host, account) in [(HostId("alpha"), alpha), (HostId("beta"), beta)] {
+            await mirror.applySnapshot(
+                host: host,
+                snapshot: Snapshot(
+                    resource: AccountsResourceURI,
+                    state: .accounts(AccountsState(accounts: [account], attempts: [])),
+                    fromSeq: 1
+                )
+            )
+        }
+        let initial = await mirror.accountsStates
+        XCTAssertNil(initial["unsubscribed"])
+        XCTAssertEqual(initial["alpha"]?.accounts.first?.label, "Alpha")
+        XCTAssertEqual(initial["beta"]?.accounts.first?.label, "Beta")
+
+        await mirror.apply(
+            host: "alpha",
+            envelope: ActionEnvelope(
+                channel: AccountsResourceURI,
+                action: .accountRemoved(AccountRemovedAction(type: .accountRemoved, id: "a1")),
+                serverSeq: 2
+            )
+        )
+        let removed = await mirror.accountsStates
+        XCTAssertTrue(removed["alpha"]?.accounts.isEmpty == true)
+        XCTAssertEqual(removed["beta"]?.accounts.first?.label, "Beta")
+
+        await mirror.reset(host: "alpha")
+        let hostReset = await mirror.accountsStates
+        XCTAssertNil(hostReset["alpha"])
+        XCTAssertNotNil(hostReset["beta"])
+        await mirror.reset()
+        let reset = await mirror.accountsStates
+        XCTAssertTrue(reset.isEmpty)
+    }
+
     // MARK: - root_states_are_isolated_per_host
 
     func testRootStatesAreIsolatedPerHost() async {

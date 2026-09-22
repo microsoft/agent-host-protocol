@@ -273,6 +273,40 @@ public actor AHPClient {
         return result
     }
 
+    /// Begin authentication for an explicit consumer on the accounts channel.
+    /// Call only when `InitializeResult.authentication.flows` contains `clientBrokered`;
+    /// an unknown advertised flow does not enable client-brokered authentication.
+    /// Errors are surfaced without retrying with legacy resource-scoped authentication.
+    @discardableResult
+    public func authBegin(_ params: AuthBeginParams) async throws -> AuthBeginResult {
+        var params = params
+        params.channel = AccountsResourceURI
+        let result: AuthBeginResult = try await request(method: "authBegin", params: params)
+        guard result.flow == .clientBrokered, !result.attemptId.isEmpty else {
+            throw AHPClientError.decoding("authBegin must confirm clientBrokered with a nonempty attemptId")
+        }
+        return result
+    }
+
+    /// Submit a brokered token, preserving its attempt or account binding.
+    /// Bound authentication requires host-advertised authentication support.
+    /// Missing or mismatched account acknowledgements fail without retrying unbound.
+    @discardableResult
+    public func authenticate(_ params: AuthenticateParams) async throws -> AuthenticateResult {
+        var params = params
+        params.channel = RootResourceURI
+        let result: AuthenticateResult = try await request(method: "authenticate", params: params)
+        if let binding = params.binding {
+            guard let accountId = result.accountId, !accountId.isEmpty else {
+                throw AHPClientError.decoding("Bound authenticate response is missing a nonempty accountId")
+            }
+            if case .account(let account) = binding, account.accountId != accountId {
+                throw AHPClientError.decoding("Bound authenticate response returned a different accountId")
+            }
+        }
+        return result
+    }
+
     /// Re-establish identity on a fresh transport with `reconnect`.
     ///
     /// This is *only* the typed handshake on the current connection — opening a

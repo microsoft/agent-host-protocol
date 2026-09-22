@@ -1,0 +1,30 @@
+{
+  "description": "removing A preserves B's selection and retained admission outcomes",
+  "reducer": "accounts",
+  "initial": {
+    "accounts": [
+      { "id": "account-a", "label": "A", "removable": true, "consumers": [] },
+      {
+        "id": "account-b", "label": "B", "removable": true,
+        "consumers": [{ "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }]
+      }
+    ],
+    "attempts": [{
+      "id": "attempt-a", "status": "completed", "accountId": "account-a",
+      "resource": "https://api.example.test",
+      "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+    }]
+  },
+  "actions": [{ "type": "accounts/removed", "id": "account-a" }],
+  "expected": {
+    "accounts": [{
+      "id": "account-b", "label": "B", "removable": true,
+      "consumers": [{ "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }]
+    }],
+    "attempts": [{
+      "id": "attempt-a", "status": "completed", "accountId": "account-a",
+      "resource": "https://api.example.test",
+      "consumer": { "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }
+    }]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "accounts reducer preserves state on an unknown future action",
+  "reducer": "accounts",
+  "initial": {
+    "accounts": [{ "id": "account-1", "label": "One", "removable": true, "consumers": [] }],
+    "attempts": []
+  },
+  "actions": [{ "type": "accounts/futureAction", "hint": "ignored" }],
+  "expected": {
+    "accounts": [{ "id": "account-1", "label": "One", "removable": true, "consumers": [] }],
+    "attempts": []
+  }
+}

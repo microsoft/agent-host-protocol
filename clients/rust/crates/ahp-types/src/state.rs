@@ -13,6 +13,85 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
+/// A consumer whose credential selection the host manages.
+///
+/// Unknown consumer kinds MUST NOT be interpreted as a known consumer.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AccountConsumerKind {
+    Agent,
+    McpServer,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for AccountConsumerKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Agent => serializer.serialize_str("agent"),
+            Self::McpServer => serializer.serialize_str("mcpServer"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AccountConsumerKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "agent" => Self::Agent,
+            "mcpServer" => Self::McpServer,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Lifecycle of a client-brokered credential admission.
+///
+/// Clients preserve unknown statuses but MUST NOT interpret them as success.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AuthAttemptStatus {
+    Pending,
+    Completed,
+    Failed,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for AuthAttemptStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Pending => serializer.serialize_str("pending"),
+            Self::Completed => serializer.serialize_str("completed"),
+            Self::Failed => serializer.serialize_str("failed"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AuthAttemptStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "pending" => Self::Pending,
+            "completed" => Self::Completed,
+            "failed" => Self::Failed,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Policy configuration state for a model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum PolicyState {
@@ -1424,6 +1503,121 @@ pub enum AutomationRunOriginKind {
 }
 
 // ─── Structs ──────────────────────────────────────────────────────────
+
+/// Shared accounts and credential admissions on `ahp-accounts://`.
+///
+/// Exposed only when `InitializeResult.authentication.flows` advertises
+/// `clientBrokered`. Subscription and mutation are separately authorized.
+/// State contains no access, refresh, or identity tokens.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountsState {
+    /// Live, host-authoritative account lifetimes, keyed by `HostAccount.id`.
+    pub accounts: Vec<HostAccount>,
+    /// Pending and retained terminal admissions, keyed by `AuthAttemptState.id`.
+    pub attempts: Vec<AuthAttemptState>,
+}
+
+/// A host-held, revocable authorization lifetime for one verified identity.
+///
+/// Rotations and resource/scope variants in the same ownership context share
+/// this entry, even when supplied by different clients. Independently owned
+/// grants MUST NOT be coalesced merely because their human identity matches.
+/// Tokens, token hashes, and client-local identity assertions never belong here.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostAccount {
+    /// Opaque, host-assigned key, stable across rotation and scoped to the host
+    /// authority. Removal retires it permanently; a deliberate later admission
+    /// receives a new id. Possessing the id is not permission to use or remove it.
+    pub id: String,
+    /// Display label, not an identity proof.
+    pub label: String,
+    /// Whether the host can contain and remove its local credential lifetime.
+    /// This does not promise upstream grant revocation or authorize the caller.
+    pub removable: bool,
+    /// Explicit consumer selections. A consumer MUST NOT select two accounts.
+    /// Removing this entry drops these selections but MUST NOT select a fallback.
+    /// Previously started work can still depend on this account after a move;
+    /// this list is therefore not the host's complete revocation set.
+    pub consumers: Vec<AccountConsumer>,
+}
+
+/// One protected resource used by an advertised agent provider.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentAccountConsumer {
+    /// Matches `AgentInfo.provider`.
+    pub provider: String,
+    /// Exact identifier from the provider's advertised protected resources.
+    pub resource: String,
+}
+
+/// One host-published MCP server customization in a live session.
+///
+/// The host resolves its resource, rather than treating a server name as a
+/// globally unique identity. A replaced customization or changed resource
+/// requires a fresh admission; a missing binding MUST NOT select another account.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerAccountConsumer {
+    /// Session URI containing the customization.
+    pub session: Uri,
+    /// Session-unique `McpServerCustomization.id`, not its display name.
+    pub customization_id: String,
+}
+
+/// Correlation and target shared by every admission outcome.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthAttemptBase {
+    /// Host-assigned, single-use id. Not a bearer authorization.
+    pub id: String,
+    /// Host-validated consumer selected for this admission.
+    pub consumer: AccountConsumer,
+    /// Exact protected resource captured when the attempt was admitted.
+    pub resource: String,
+}
+
+/// Awaiting a client-supplied token. No credential is usable from this state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthAttemptPendingState {
+    /// Host-assigned, single-use id. Not a bearer authorization.
+    pub id: String,
+    /// Host-validated consumer selected for this admission.
+    pub consumer: AccountConsumer,
+    /// Exact protected resource captured when the attempt was admitted.
+    pub resource: String,
+}
+
+/// Admission committed. Retained so a lost response can be reconciled.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthAttemptCompletedState {
+    /// Host-assigned, single-use id. Not a bearer authorization.
+    pub id: String,
+    /// Host-validated consumer selected for this admission.
+    pub consumer: AccountConsumer,
+    /// Exact protected resource captured when the attempt was admitted.
+    pub resource: String,
+    /// The admitted authorization lifetime, which may subsequently be removed.
+    pub account_id: String,
+}
+
+/// Admission failed or expired without installing a usable credential.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthAttemptFailedState {
+    /// Host-assigned, single-use id. Not a bearer authorization.
+    pub id: String,
+    /// Host-validated consumer selected for this admission.
+    pub consumer: AccountConsumer,
+    /// Exact protected resource captured when the attempt was admitted.
+    pub resource: String,
+    /// Failure details, with no token or other secret content.
+    pub error: ErrorInfo,
+}
 
 /// An optionally-sized icon that can be displayed in a user interface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -5714,6 +5908,36 @@ pub enum ToolInput {
 
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
+/// A host-managed agent or session MCP server consumer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum AccountConsumer {
+    #[serde(rename = "agent")]
+    Agent(AgentAccountConsumer),
+    #[serde(rename = "mcpServer")]
+    McpServer(McpServerAccountConsumer),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// A pending or retained terminal authentication admission.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "status")]
+pub enum AuthAttemptState {
+    #[serde(rename = "pending")]
+    Pending(AuthAttemptPendingState),
+    #[serde(rename = "completed")]
+    Completed(AuthAttemptCompletedState),
+    #[serde(rename = "failed")]
+    Failed(AuthAttemptFailedState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
 /// How a chat came into existence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
@@ -6122,7 +6346,8 @@ pub enum AutomationRunLifecycle {
 /// then changeset (has required `status` and `files`), then resource-watch
 /// (has required `root` and `recursive`), then annotations (has required
 /// `annotations`), then the automation catalogue (has required
-/// `automations`), then root.
+/// `entries`), then accounts (has required `accounts` and `attempts`),
+/// then root.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
@@ -6134,5 +6359,6 @@ pub enum SnapshotState {
     Annotations(Box<AnnotationsState>),
     Automations(Box<AutomationState>),
     AutomationRun(Box<AutomationRunState>),
+    Accounts(Box<AccountsState>),
     Root(Box<RootState>),
 }

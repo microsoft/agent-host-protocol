@@ -37,6 +37,7 @@ import { rootReducer } from '../../types/channels-root/reducer.js';
 import type { RootAction } from '../../types/action-origin.generated.js';
 import type { StateAction } from '../../types/common/actions.js';
 import type { AutomationCapabilities } from '../../types/common/commands.js';
+import type { AuthenticationCapability } from '../../types/channels-accounts/commands.js';
 import {
   HostNotConnectedError,
   HostShutDownError,
@@ -73,6 +74,7 @@ export interface HostShared {
   serverSeq: number;
   defaultDirectory: string | null;
   automations: AutomationCapabilities | null;
+  authentication: AuthenticationCapability | null;
   rootState: RootState;
   subscriptions: URI[];
   completionTriggerCharacters: string[];
@@ -104,6 +106,7 @@ export function makeInitialShared(
     serverSeq: 0,
     defaultDirectory: null,
     automations: null,
+    authentication: null,
     rootState: { agents: [] },
     subscriptions: [...config.initialSubscriptions],
     completionTriggerCharacters: [],
@@ -127,6 +130,7 @@ export function snapshotHandle(shared: HostShared): HostHandle {
     serverSeq: shared.serverSeq,
     defaultDirectory: shared.defaultDirectory,
     automations: shared.automations,
+    authentication: shared.authentication,
     agents: [...shared.rootState.agents],
     activeSessions: shared.rootState.activeSessions ?? null,
     terminals: shared.rootState.terminals ? [...shared.rootState.terminals] : null,
@@ -583,6 +587,7 @@ export class HostRuntime {
                 clientId: this.shared.clientId,
                 lastSeenServerSeq: prior.serverSeq,
                 subscriptions: prior.subscriptions,
+                authentication: this.shared.authentication ?? undefined,
               }),
               cancelSignal,
             );
@@ -683,6 +688,7 @@ export class HostRuntime {
         this.shared.currentClient = client;
         this.shared.lastConnectedAt = Date.now();
         this.shared.lastError = null;
+        this.shared.authentication = client.authentication ?? null;
         if (this.shared.serverSeq < initServerSeq) {
           this.shared.serverSeq = initServerSeq;
         }

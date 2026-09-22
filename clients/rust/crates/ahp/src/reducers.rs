@@ -1,7 +1,7 @@
 //! Pure state reducers ported from `types/reducers.ts`.
 //!
 //! Reducers mutate state in place and return a [`ReduceOutcome`]. Use
-//! [`apply_action_to_root`], [`apply_action_to_session`],
+//! [`apply_action_to_accounts`], [`apply_action_to_root`], [`apply_action_to_session`],
 //! [`apply_action_to_chat`], [`apply_action_to_terminal`],
 //! [`apply_action_to_changeset`], [`apply_action_to_annotations`], and
 //! [`apply_action_to_resource_watch`] to dispatch any [`StateAction`]
@@ -57,14 +57,14 @@ use ahp_types::actions::{
     ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, ChangesetOperationStatus,
-    ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization,
-    ConfirmationOption, Customization, CustomizationEnablement, ErrorResponsePart,
-    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState,
-    TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
+    AccountsState, ActiveTurn, AnnotationsState, AuthAttemptState, AutomationRunState,
+    AutomationState, ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest,
+    ChatState, ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ErrorResponsePart, InputRequestResponsePart, McpServerStartingState, McpServerState,
+    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
+    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
+    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
     ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
     ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
@@ -651,6 +651,76 @@ where
         }
     }
     ReduceOutcome::NoOp
+}
+
+// ─── Accounts Reducer ─────────────────────────────────────────────────
+
+fn auth_attempt_id(attempt: &AuthAttemptState) -> Option<&str> {
+    match attempt {
+        AuthAttemptState::Pending(attempt) => Some(&attempt.id),
+        AuthAttemptState::Completed(attempt) => Some(&attempt.id),
+        AuthAttemptState::Failed(attempt) => Some(&attempt.id),
+        AuthAttemptState::Unknown(value) => value.get("id").and_then(serde_json::Value::as_str),
+    }
+}
+
+/// Project an accounts action without authorizing credentials or selecting fallbacks.
+///
+/// Callers must exclude envelopes carrying `rejection_reason`; those acknowledge
+/// a rejected dispatch rather than a committed state change.
+pub fn apply_action_to_accounts(state: &mut AccountsState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::AccountSet(action) => {
+            if let Some(account) = state
+                .accounts
+                .iter_mut()
+                .find(|account| account.id == action.account.id)
+            {
+                *account = action.account.clone();
+            } else {
+                state.accounts.push(action.account.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::AccountRemoved(action) => {
+            let Some(index) = state
+                .accounts
+                .iter()
+                .position(|account| account.id == action.id)
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            state.accounts.remove(index);
+            ReduceOutcome::Applied
+        }
+        StateAction::AuthAttemptSet(action) => {
+            let Some(id) = auth_attempt_id(&action.attempt) else {
+                return ReduceOutcome::NoOp;
+            };
+            if let Some(attempt) = state
+                .attempts
+                .iter_mut()
+                .find(|attempt| auth_attempt_id(attempt) == Some(id))
+            {
+                *attempt = action.attempt.clone();
+            } else {
+                state.attempts.push(action.attempt.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::AuthAttemptRemoved(action) => {
+            let Some(index) = state
+                .attempts
+                .iter()
+                .position(|attempt| auth_attempt_id(attempt) == Some(action.id.as_str()))
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            state.attempts.remove(index);
+            ReduceOutcome::Applied
+        }
+        _ => ReduceOutcome::OutOfScope,
+    }
 }
 
 // ─── Root Reducer ─────────────────────────────────────────────────────
@@ -2600,6 +2670,14 @@ mod tests {
             }
 
             match reducer {
+                "accounts" => run_fixture::<AccountsState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_accounts,
+                    &file_name,
+                    description,
+                ),
                 "root" => run_fixture::<RootState>(
                     initial,
                     expected,

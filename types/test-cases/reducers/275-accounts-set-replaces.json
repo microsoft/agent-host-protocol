@@ -1,0 +1,25 @@
+{
+  "description": "accounts/set replaces the full entry in place without duplicate ids",
+  "reducer": "accounts",
+  "initial": {
+    "accounts": [
+      {
+        "id": "account-a", "label": "A", "removable": true,
+        "consumers": [{ "kind": "agent", "provider": "assistant", "resource": "https://api.example.test" }]
+      },
+      { "id": "account-b", "label": "B", "removable": true, "consumers": [] }
+    ],
+    "attempts": []
+  },
+  "actions": [{
+    "type": "accounts/set",
+    "account": { "id": "account-a", "label": "Renamed A", "removable": false, "consumers": [] }
+  }],
+  "expected": {
+    "accounts": [
+      { "id": "account-a", "label": "Renamed A", "removable": false, "consumers": [] },
+      { "id": "account-b", "label": "B", "removable": true, "consumers": [] }
+    ],
+    "attempts": []
+  }
+}

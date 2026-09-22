@@ -19,6 +19,7 @@ public sealed class MultiHostStateMirror
     // host id and a URI compose into one collision-free key with value equality —
     // no ad-hoc tuple delimiter to confuse with reserved URI characters.
     private readonly ConcurrentDictionary<HostId, RootState> _roots = new();
+    private readonly ConcurrentDictionary<HostId, AccountsState> _accounts = new();
     private readonly ConcurrentDictionary<HostedResourceKey, SessionState> _sessions = new();
     private readonly ConcurrentDictionary<HostedResourceKey, ChatState> _chats = new();
     private readonly ConcurrentDictionary<HostedResourceKey, TerminalState> _terminals = new();
@@ -35,6 +36,18 @@ public sealed class MultiHostStateMirror
     /// <summary>Returns the root snapshot for <paramref name="hostId"/>, or (default, false) if absent.</summary>
     public (RootState? Value, bool Found) Root(HostId hostId) =>
         _roots.TryGetValue(hostId, out var v) ? (v, true) : (default, false);
+
+    /// <summary>Stores the host's accounts and authentication-attempt snapshot.</summary>
+    public void PutAccounts(HostId hostId, AccountsState state)
+    {
+        Guard.ThrowIfNull(hostId, nameof(hostId));
+        Guard.ThrowIfNull(state, nameof(state));
+        _accounts[hostId] = state;
+    }
+
+    /// <summary>Returns the host's accounts snapshot, or (default, false) if absent.</summary>
+    public (AccountsState? Value, bool Found) Accounts(HostId hostId) =>
+        _accounts.TryGetValue(hostId, out var v) ? (v, true) : (default, false);
 
     /// <summary>Stores a session snapshot under (hostId, uri).</summary>
     public void PutSession(HostId hostId, string uri, SessionState state)
@@ -92,6 +105,7 @@ public sealed class MultiHostStateMirror
     public void DropHost(HostId hostId)
     {
         _roots.TryRemove(hostId, out _);
+        _accounts.TryRemove(hostId, out _);
         foreach (var k in _sessions.Keys) if (k.HostId.Equals(hostId)) _sessions.TryRemove(k, out _);
         foreach (var k in _chats.Keys) if (k.HostId.Equals(hostId)) _chats.TryRemove(k, out _);
         foreach (var k in _terminals.Keys) if (k.HostId.Equals(hostId)) _terminals.TryRemove(k, out _);
@@ -102,6 +116,7 @@ public sealed class MultiHostStateMirror
     public void DropResource(HostId hostId, string uri)
     {
         var key = new HostedResourceKey(hostId, uri);
+        if (uri == ProtocolVersion.AccountsResourceUri) _accounts.TryRemove(hostId, out _);
         _sessions.TryRemove(key, out _);
         _chats.TryRemove(key, out _);
         _terminals.TryRemove(key, out _);

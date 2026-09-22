@@ -164,6 +164,7 @@ function mapType(tsType: string): string {
 
   if (tsType === 'URI') return 'string';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
+  if (/^\{\s*consumer:\s*AccountConsumer;?\s*\}$/.test(tsType)) return 'AuthBeginTarget';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -459,6 +460,29 @@ function generateBitsetEnum(enumDecl: EnumDeclaration): string {
 }
 
 function generateEnum(enumDecl: EnumDeclaration): string {
+  if (enumDecl.getName() === 'AuthFlowKind') {
+    const members = enumDecl.getMembers().map(member =>
+      `    public static AuthFlowKind ${member.getName()} { get; } = new(${JSON.stringify(String(member.getValue()))});`,
+    ).join('\n');
+    return `/// <summary>Authentication flow name. Unknown future names round-trip without becoming supported flows.</summary>
+[JsonConverter(typeof(AuthFlowKindConverter))]
+public readonly record struct AuthFlowKind(string Value)
+{
+${members}
+    public override string ToString() => Value ?? string.Empty;
+}
+
+internal sealed class AuthFlowKindConverter : JsonConverter<AuthFlowKind>
+{
+    public override AuthFlowKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType == JsonTokenType.String
+            ? new AuthFlowKind(reader.GetString()!)
+            : throw new JsonException("Authentication flow kind must be a string");
+
+    public override void Write(Utf8JsonWriter writer, AuthFlowKind value, JsonSerializerOptions options) =>
+        writer.WriteStringValue(value.Value);
+}`;
+  }
   const values = enumDecl.getMembers().map((m) => m.getValue());
   const isNumeric = values.every((v) => typeof v === 'number');
   return isNumeric ? generateBitsetEnum(enumDecl) : generateStringEnum(enumDecl);
@@ -631,6 +655,7 @@ function generateDiscriminatedUnion(cfg: UnionConfig): string {
 // ─── State File Generator ────────────────────────────────────────────────────
 
 const STATE_ENUMS = [
+  'AccountConsumerKind', 'AuthAttemptStatus',
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
   'SessionOriginKind',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind',
@@ -651,6 +676,14 @@ const STATE_ENUMS = [
 // `mutable: true` marks the STATE types the reducers mutate in place — these
 // stay `class` with `{ get; set; }`. Everything else is a write-once `record`.
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean }[] = [
+  { name: 'AccountsState', mutable: true },
+  { name: 'HostAccount' },
+  { name: 'AgentAccountConsumer' },
+  { name: 'McpServerAccountConsumer' },
+  { name: 'AuthAttemptBase' },
+  { name: 'AuthAttemptPendingState' },
+  { name: 'AuthAttemptCompletedState' },
+  { name: 'AuthAttemptFailedState' },
   { name: 'Icon' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState', mutable: true },
@@ -805,6 +838,29 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState', mutable: true },
 ];
+
+const ACCOUNT_CONSUMER_UNION: UnionConfig = {
+  name: 'AccountConsumer',
+  discriminantField: 'kind',
+  doc: 'AccountConsumer identifies an agent resource or a session MCP customization.',
+  variants: [
+    { variantName: 'Agent', innerType: 'AgentAccountConsumer', wireValue: 'agent' },
+    { variantName: 'McpServer', innerType: 'McpServerAccountConsumer', wireValue: 'mcpServer' },
+  ],
+  unknown: true,
+};
+
+const AUTH_ATTEMPT_STATE_UNION: UnionConfig = {
+  name: 'AuthAttemptState',
+  discriminantField: 'status',
+  doc: 'AuthAttemptState is a pending or retained authentication admission outcome.',
+  variants: [
+    { variantName: 'Pending', innerType: 'AuthAttemptPendingState', wireValue: 'pending' },
+    { variantName: 'Completed', innerType: 'AuthAttemptCompletedState', wireValue: 'completed' },
+    { variantName: 'Failed', innerType: 'AuthAttemptFailedState', wireValue: 'failed' },
+  ],
+  unknown: true,
+};
 
 const RESPONSE_PART_UNION: UnionConfig = {
   name: 'ResponsePart',
@@ -1249,16 +1305,20 @@ internal sealed class CustomizationEnablementConverter : UnionConverter<Customiz
 function generateSnapshotState(): string {
   return `/// <summary>
 /// SnapshotState is the state payload of a snapshot — root, session,
-  /// chat, terminal, changeset, resource-watch, annotations, automation catalogue,
+  /// accounts, chat, terminal, changeset, resource-watch, annotations, automation catalogue,
   /// or automation-run state. Read
 /// probes for distinctive fields in an order where no probe shadows another
-/// (chat → session → terminal → changeset → resource-watch → annotations → root).
+/// (accounts → automationRun → automations → chat → session → terminal →
+/// changeset → resource-watch → annotations → root).
 /// </summary>
 [JsonConverter(typeof(SnapshotStateConverter))]
 public sealed class SnapshotState
 {
     /// <summary>Root state variant, when populated.</summary>
     public RootState? Root { get; set; }
+
+    /// <summary>Accounts state variant, when populated.</summary>
+    public AccountsState? Accounts { get; set; }
 
     /// <summary>Session state variant, when populated.</summary>
     public SessionState? Session { get; set; }
@@ -1293,7 +1353,11 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        if (root.TryGetProperty("accounts", out _) && root.TryGetProperty("attempts", out _))
+        {
+            result.Accounts = root.Deserialize(AhpJsonTypeInfo.Get<AccountsState>(options));
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -1339,6 +1403,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Accounts is not null) { JsonSerializer.Serialize(writer, value.Accounts, AhpJsonTypeInfo.Get<AccountsState>(options)); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
@@ -1385,6 +1450,7 @@ function generateStateFile(project: Project): string {
   lines.push(CUSTOMIZATION_ENABLEMENT_UNION_CS);
   lines.push('');
   for (const u of [
+    ACCOUNT_CONSUMER_UNION, AUTH_ATTEMPT_STATE_UNION,
     RESPONSE_PART_UNION, TOOL_CALL_STATE_UNION, TOOL_CALL_CONFIRMATION_STATE_UNION,
     TOOL_CALL_RISK_ASSESSMENT_UNION,
     TERMINAL_CLAIM_UNION, TERMINAL_CONTENT_PART_UNION,
@@ -1411,6 +1477,10 @@ function generateStateFile(project: Project): string {
 // ─── Actions File Generator ──────────────────────────────────────────────────
 
 const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string }[] = [
+  { type: 'accounts/set', variantName: 'AccountSet', tsInterface: 'AccountSetAction' },
+  { type: 'accounts/removed', variantName: 'AccountRemoved', tsInterface: 'AccountRemovedAction' },
+  { type: 'accounts/authAttemptSet', variantName: 'AuthAttemptSet', tsInterface: 'AuthAttemptSetAction' },
+  { type: 'accounts/authAttemptRemoved', variantName: 'AuthAttemptRemoved', tsInterface: 'AuthAttemptRemovedAction' },
   { type: 'root/agentsChanged', variantName: 'RootAgentsChanged', tsInterface: 'RootAgentsChangedAction' },
   { type: 'root/activeSessionsChanged', variantName: 'RootActiveSessionsChanged', tsInterface: 'RootActiveSessionsChangedAction' },
   { type: 'root/configChanged', variantName: 'RootConfigChanged', tsInterface: 'RootConfigChangedAction' },
@@ -2074,9 +2144,12 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode', 'AuthFlowKind', 'BrokeredAuthenticationBindingKind'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
+  { name: 'AuthFlowSupport' }, { name: 'AuthenticationCapability' },
+  { name: 'AuthBeginParams' }, { name: 'AuthBeginResult' },
+  { name: 'BrokeredAuthenticationAttemptBinding' }, { name: 'BrokeredAuthenticationAccountBinding' },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   // Implementation identity carried by InitializeParams.clientInfo /
   // InitializeResult.serverInfo (upstream #309). Must be generated as its own
@@ -2129,6 +2202,16 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
 ];
+
+const BROKERED_AUTHENTICATION_BINDING_UNION: UnionConfig = {
+  name: 'BrokeredAuthenticationBinding',
+  discriminantField: 'kind',
+  doc: 'BrokeredAuthenticationBinding binds token delivery to an attempt or live account.',
+  variants: [
+    { variantName: 'Attempt', innerType: 'BrokeredAuthenticationAttemptBinding', wireValue: 'attempt' },
+    { variantName: 'Account', innerType: 'BrokeredAuthenticationAccountBinding', wireValue: 'account' },
+  ],
+};
 
 const CHAT_SOURCE_UNION: UnionConfig = {
   name: 'ChatSource',
@@ -2205,6 +2288,14 @@ internal sealed class ChangesetOperationTargetConverter : UnionConverter<Changes
 
 function generateCommandsFile(project: Project): string {
   const lines: string[] = [fileHeader()];
+  lines.push('/// <summary>Identifies the exact consumer selected for authentication admission.</summary>');
+  lines.push('public sealed record AuthBeginTarget');
+  lines.push('{');
+  lines.push('    public required AccountConsumer Consumer { get; init; }');
+  lines.push('}');
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(BROKERED_AUTHENTICATION_BINDING_UNION));
+  lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
   for (const enumName of COMMAND_ENUMS) {
@@ -2513,6 +2604,9 @@ ${supportedLiteral}
 
     /// <summary>The well-known channel URI for the root channel.</summary>
     public const string RootResourceUri = "ahp-root://";
+
+    /// <summary>The host-scoped accounts channel, available when authentication is advertised.</summary>
+    public const string AccountsResourceUri = "ahp-accounts://";
 }
 `;
 }
@@ -2554,6 +2648,7 @@ function checkExhaustiveness(project: Project): void {
   ]);
 
   const knownSpecial = new Set<string>([
+    'AccountConsumer', 'AuthAttemptState', 'BrokeredAuthenticationBinding', 'AccountsAction',
     'URI', 'JsonPrimitive', 'BaseParams', 'StringOrMarkdown', 'ToolCallState', 'StateAction',
     'ActionEnvelope', 'ActionOrigin', 'ResponsePart', 'ToolResultContent',
     'SessionToolCallApprovedAction', 'SessionToolCallDeniedAction',

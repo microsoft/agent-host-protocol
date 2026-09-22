@@ -27,6 +27,7 @@ type HostedResourceKey struct {
 type MultiHostStateMirror struct {
 	mu            sync.RWMutex
 	roots         map[string]ahptypes.RootState
+	accounts      map[string]ahptypes.AccountsState
 	session       map[HostedResourceKey]ahptypes.SessionState
 	chat          map[HostedResourceKey]ahptypes.ChatState
 	term          map[HostedResourceKey]ahptypes.TerminalState
@@ -40,6 +41,7 @@ type MultiHostStateMirror struct {
 func NewMultiHostStateMirror() *MultiHostStateMirror {
 	return &MultiHostStateMirror{
 		roots:         make(map[string]ahptypes.RootState),
+		accounts:      make(map[string]ahptypes.AccountsState),
 		session:       make(map[HostedResourceKey]ahptypes.SessionState),
 		chat:          make(map[HostedResourceKey]ahptypes.ChatState),
 		term:          make(map[HostedResourceKey]ahptypes.TerminalState),
@@ -63,6 +65,21 @@ func (m *MultiHostStateMirror) Root(hostID string) (ahptypes.RootState, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	v, ok := m.roots[hostID]
+	return v, ok
+}
+
+// PutAccounts stores the host's accounts and authentication-attempt snapshot.
+func (m *MultiHostStateMirror) PutAccounts(hostID string, state ahptypes.AccountsState) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.accounts[hostID] = state
+}
+
+// Accounts returns the accounts snapshot for hostID, or (zero, false) if absent.
+func (m *MultiHostStateMirror) Accounts(hostID string) (ahptypes.AccountsState, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	v, ok := m.accounts[hostID]
 	return v, ok
 }
 
@@ -183,6 +200,7 @@ func (m *MultiHostStateMirror) DropHost(hostID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.roots, hostID)
+	delete(m.accounts, hostID)
 	delete(m.automationCat, hostID)
 	for k := range m.session {
 		if k.HostID == hostID {
@@ -222,6 +240,9 @@ func (m *MultiHostStateMirror) DropResource(hostID string, uri ahptypes.URI) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	k := HostedResourceKey{hostID, uri}
+	if uri == ahptypes.AccountsResourceURI {
+		delete(m.accounts, hostID)
+	}
 	if uri == "ahp-automations://" {
 		delete(m.automationCat, hostID)
 		for key := range m.automation {

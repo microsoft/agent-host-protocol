@@ -240,6 +240,8 @@ type Client struct {
 	serverRequestMu      sync.Mutex
 	serverRequestHandler ServerRequestHandler
 
+	authentication atomic.Pointer[ahptypes.AuthenticationCapability]
+
 	nextID        atomic.Uint64
 	nextClientSeq atomic.Int64
 
@@ -774,7 +776,89 @@ func (c *Client) Initialize(ctx context.Context, clientID string, protocolVersio
 	if err := c.Request(ctx, "initialize", params, &out); err != nil {
 		return nil, err
 	}
+	if out.Authentication == nil {
+		c.authentication.Store(nil)
+	} else {
+		c.authentication.Store(&ahptypes.AuthenticationCapability{
+			Flows: append([]ahptypes.AuthFlowSupport(nil), out.Authentication.Flows...),
+		})
+	}
 	return &out, nil
+}
+
+// AuthBegin begins a client-brokered authentication attempt on the accounts
+// channel. The host must advertise the flow in its initialize response.
+func (c *Client) AuthBegin(ctx context.Context, params ahptypes.AuthBeginParams) (*ahptypes.AuthBeginResult, error) {
+	if err := c.requireBrokeredAuthentication(); err != nil {
+		return nil, err
+	}
+	offered := false
+	for _, flow := range params.Flows {
+		if flow.Kind == ahptypes.AuthFlowKindClientBrokered {
+			offered = true
+			break
+		}
+	}
+	if !offered {
+		return nil, &TransportError{Kind: "protocol", Err: errors.New("authBegin requires an offered clientBrokered flow")}
+	}
+	params.Channel = ahptypes.AccountsResourceURI
+	var out ahptypes.AuthBeginResult
+	if err := c.Request(ctx, "authBegin", params, &out); err != nil {
+		return nil, err
+	}
+	if out.Flow != ahptypes.AuthFlowKindClientBrokered || out.AttemptId == "" {
+		return nil, &TransportError{Kind: "protocol", Err: errors.New("authBegin returned an unsupported flow or missing attempt id")}
+	}
+	return &out, nil
+}
+
+// Authenticate submits a token on the root channel. Bound authentication is
+// only sent to a host advertising clientBrokered authentication; the binding
+// is never silently discarded or retried as legacy authentication.
+func (c *Client) Authenticate(ctx context.Context, params ahptypes.AuthenticateParams) (*ahptypes.AuthenticateResult, error) {
+	if params.Binding != nil {
+		if err := c.requireBrokeredAuthentication(); err != nil {
+			return nil, err
+		}
+		switch binding := params.Binding.Value.(type) {
+		case *ahptypes.BrokeredAuthenticationAttemptBinding:
+			if binding == nil || binding.AttemptId == "" {
+				return nil, &TransportError{Kind: "protocol", Err: errors.New("authenticate requires a nonempty attempt binding")}
+			}
+		case *ahptypes.BrokeredAuthenticationAccountBinding:
+			if binding == nil || binding.AccountId == "" {
+				return nil, &TransportError{Kind: "protocol", Err: errors.New("authenticate requires a nonempty account binding")}
+			}
+		default:
+			return nil, &TransportError{Kind: "protocol", Err: errors.New("authenticate requires a supported binding")}
+		}
+	}
+	params.Channel = ahptypes.RootResourceURI
+	var out ahptypes.AuthenticateResult
+	if err := c.Request(ctx, "authenticate", params, &out); err != nil {
+		return nil, err
+	}
+	if params.Binding != nil {
+		if out.AccountId == nil || *out.AccountId == "" {
+			return nil, &TransportError{Kind: "protocol", Err: errors.New("bound authenticate returned no account id")}
+		}
+		if binding, ok := params.Binding.Value.(*ahptypes.BrokeredAuthenticationAccountBinding); ok && *out.AccountId != binding.AccountId {
+			return nil, &TransportError{Kind: "protocol", Err: errors.New("bound authenticate returned a different account id")}
+		}
+	}
+	return &out, nil
+}
+
+func (c *Client) requireBrokeredAuthentication() error {
+	if capability := c.authentication.Load(); capability != nil {
+		for _, flow := range capability.Flows {
+			if flow.Kind == ahptypes.AuthFlowKindClientBrokered {
+				return nil
+			}
+		}
+	}
+	return &TransportError{Kind: "protocol", Err: errors.New("host did not advertise clientBrokered authentication")}
 }
 
 // Reconnect re-establishes a dropped connection with the server's
@@ -810,6 +894,15 @@ func (c *Client) Ping(ctx context.Context) error {
 // together with a per-URI [Subscription] handle.
 func (c *Client) Subscribe(ctx context.Context, uri string) (*ahptypes.SubscribeResult, *Subscription, error) {
 	return c.SubscribeWithDelivery(ctx, uri, nil)
+}
+
+// SubscribeAccounts subscribes to the host's accounts channel after an
+// initialize response advertising authentication support.
+func (c *Client) SubscribeAccounts(ctx context.Context, delivery *ahptypes.SubscriptionDeliveryOptions) (*ahptypes.SubscribeResult, *Subscription, error) {
+	if err := c.requireBrokeredAuthentication(); err != nil {
+		return nil, nil, err
+	}
+	return c.SubscribeWithDelivery(ctx, ahptypes.AccountsResourceURI, delivery)
 }
 
 // SubscribeWithDelivery sends a `subscribe` request with advisory delivery

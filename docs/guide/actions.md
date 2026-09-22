@@ -32,6 +32,23 @@ These mutate root state and travel on the [Root Channel](/specification/root-cha
 | `root/terminalsChanged` | No | Lightweight terminal catalogue changed (full replacement) |
 | `root/configChanged` | **Yes** | Host-level configuration values changed |
 
+## Accounts Actions
+
+Accounts actions travel on the capability-gated `ahp-accounts://` channel.
+See [Accounts Channel](/specification/accounts-channel) for host authorization,
+revocation ordering, and cancellation semantics.
+
+| Type | Client-dispatchable? | When |
+| --- | --- | --- |
+| `accounts/set` | No | Host upserts a complete account and its consumer selections. |
+| `accounts/removed` | Yes | Retire a named account lifetime after host containment. |
+| `accounts/authAttemptSet` | No | Host publishes a pending or terminal admission outcome. |
+| `accounts/authAttemptRemoved` | Yes | Cancel a pending admission; hosts also discard eligible retained outcomes. |
+
+Reducers project accepted state; they do not authorize a credential mutation.
+A rejected removal/cancellation is echoed with `rejectionReason` and is not
+applied to confirmed state.
+
 ## Automation Catalogue Actions
 
 Automation catalogue actions travel on `ahp-automations://`.

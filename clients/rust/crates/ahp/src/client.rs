@@ -32,17 +32,18 @@ use std::time::Duration;
 
 use ahp_types::actions::{ActionEnvelope, StateAction};
 use ahp_types::commands::{
-    CompletionsParams, CompletionsResult, CreateResourceWatchParams, CreateResourceWatchResult,
-    DispatchActionParams, InitializeParams, InitializeResult, ReconnectParams, ReconnectResult,
-    ResourceCopyParams, ResourceCopyResult, ResourceDeleteParams, ResourceDeleteResult,
-    ResourceListParams, ResourceListResult, ResourceMkdirParams, ResourceMkdirResult,
-    ResourceMoveParams, ResourceMoveResult, ResourceReadParams, ResourceReadResult,
-    ResourceRequestParams, ResourceRequestResult, ResourceResolveParams, ResourceResolveResult,
-    ResourceWriteParams, ResourceWriteResult, SessionConfigCompletionsParams,
-    SessionConfigCompletionsResult, SubscribeParams, SubscribeResult, SubscribeView,
-    SubscriptionDeliveryOptions, UnsubscribeParams,
+    AuthBeginParams, AuthBeginResult, AuthFlowKind, AuthenticateParams, AuthenticateResult,
+    AuthenticationCapability, BrokeredAuthenticationBinding, CompletionsParams, CompletionsResult,
+    CreateResourceWatchParams, CreateResourceWatchResult, DispatchActionParams, InitializeParams,
+    InitializeResult, ReconnectParams, ReconnectResult, ResourceCopyParams, ResourceCopyResult,
+    ResourceDeleteParams, ResourceDeleteResult, ResourceListParams, ResourceListResult,
+    ResourceMkdirParams, ResourceMkdirResult, ResourceMoveParams, ResourceMoveResult,
+    ResourceReadParams, ResourceReadResult, ResourceRequestParams, ResourceRequestResult,
+    ResourceResolveParams, ResourceResolveResult, ResourceWriteParams, ResourceWriteResult,
+    SessionConfigCompletionsParams, SessionConfigCompletionsResult, SubscribeParams,
+    SubscribeResult, SubscribeView, SubscriptionDeliveryOptions, UnsubscribeParams,
 };
-use ahp_types::common::{Uri, ROOT_RESOURCE_URI};
+use ahp_types::common::{Uri, ACCOUNTS_RESOURCE_URI, ROOT_RESOURCE_URI};
 use ahp_types::errors::json_rpc_error_codes;
 use ahp_types::messages::{
     ActionNotificationParams, JsonRpcError, JsonRpcErrorResponse, JsonRpcMessage,
@@ -191,6 +192,7 @@ type PendingMap = HashMap<u64, oneshot::Sender<Result<Value, JsonRpcError>>>;
 
 struct Shared {
     pending: Mutex<PendingMap>,
+    authentication: Mutex<Option<AuthenticationCapability>>,
     subscriptions: Mutex<HashMap<String, broadcast::Sender<SubscriptionEvent>>>,
     /// Top-level all-events broadcast.
     ///
@@ -377,6 +379,7 @@ impl Client {
         let (all_events_tx, _) = broadcast::channel::<ClientEvent>(config.subscription_buffer);
         let shared = Arc::new(Shared {
             pending: Mutex::new(HashMap::new()),
+            authentication: Mutex::new(None),
             subscriptions: Mutex::new(HashMap::new()),
             all_events: std::sync::Mutex::new(Some(all_events_tx)),
             outbound: outbound_tx,
@@ -418,6 +421,12 @@ impl Client {
     {
         let id = self.shared.next_id.fetch_add(1, Ordering::Relaxed);
         let params_val = serde_json::to_value(&params)?;
+        self.check_authentication_support(method, &params_val)
+            .await?;
+        let bound_authentication = method == "authenticate"
+            && params_val
+                .get("binding")
+                .is_some_and(|binding| !binding.is_null());
         let params_any = if params_val.is_null() {
             None
         } else {
@@ -459,6 +468,41 @@ impl Client {
         };
 
         match result {
+            Ok(Ok(value)) if method == "authBegin" => {
+                if value.get("flow").and_then(Value::as_str) != Some("clientBrokered")
+                    || value
+                        .get("attemptId")
+                        .and_then(Value::as_str)
+                        .map_or(true, str::is_empty)
+                {
+                    return Err(crate::TransportError::Protocol(
+                        "host did not confirm a client-brokered authentication attempt".into(),
+                    )
+                    .into());
+                }
+                Ok(serde_json::from_value(value)?)
+            }
+            Ok(Ok(value)) if bound_authentication => {
+                if value
+                    .get("accountId")
+                    .and_then(Value::as_str)
+                    .map_or(true, str::is_empty)
+                {
+                    return Err(crate::TransportError::Protocol(
+                        "host did not confirm the bound authentication account".into(),
+                    )
+                    .into());
+                }
+                Ok(serde_json::from_value(value)?)
+            }
+            Ok(Ok(value)) if method == "initialize" => {
+                let authentication = serde_json::from_value(
+                    value.get("authentication").cloned().unwrap_or(Value::Null),
+                )?;
+                let result = serde_json::from_value(value)?;
+                *self.shared.authentication.lock().await = authentication;
+                Ok(result)
+            }
             Ok(Ok(value)) => Ok(serde_json::from_value(value)?),
             Ok(Err(e)) => Err(ClientError::Rpc(e)),
             Err(_) => Err(ClientError::Shutdown),
@@ -468,6 +512,8 @@ impl Client {
     /// Send a JSON-RPC notification (fire-and-forget).
     pub async fn notify<P: Serialize>(&self, method: &str, params: P) -> Result<(), ClientError> {
         let params_val = serde_json::to_value(&params)?;
+        self.check_authentication_support(method, &params_val)
+            .await?;
         let params_any = if params_val.is_null() {
             None
         } else {
@@ -483,6 +529,70 @@ impl Client {
             .send(Outbound::Message(msg))
             .await
             .map_err(|_| ClientError::Shutdown)
+    }
+
+    /// Authentication capability from the most recent successful handshake.
+    pub async fn authentication(&self) -> Option<AuthenticationCapability> {
+        self.shared.authentication.lock().await.clone()
+    }
+
+    /// Begin brokered authentication. Requires advertised `clientBrokered` support.
+    pub async fn auth_begin(
+        &self,
+        params: AuthBeginParams,
+    ) -> Result<AuthBeginResult, ClientError> {
+        self.request("authBegin", params).await
+    }
+
+    /// Deliver a credential, preserving any brokered binding without fallback.
+    /// Account-bound renewal must confirm the same account lifetime.
+    pub async fn authenticate(
+        &self,
+        params: AuthenticateParams,
+    ) -> Result<AuthenticateResult, ClientError> {
+        let result: AuthenticateResult = self.request("authenticate", &params).await?;
+        if let Some(BrokeredAuthenticationBinding::Account(binding)) = &params.binding {
+            if result.account_id.as_deref() != Some(binding.account_id.as_str()) {
+                return Err(crate::TransportError::Protocol(
+                    "host returned a different account for a bound renewal".into(),
+                )
+                .into());
+            }
+        }
+        Ok(result)
+    }
+
+    async fn check_authentication_support(
+        &self,
+        method: &str,
+        params: &Value,
+    ) -> Result<(), ClientError> {
+        let brokered = method == "authBegin"
+            || (method == "authenticate"
+                && params
+                    .get("binding")
+                    .is_some_and(|binding| !binding.is_null()))
+            || (matches!(method, "subscribe" | "dispatchAction")
+                && params.get("channel").and_then(Value::as_str) == Some(ACCOUNTS_RESOURCE_URI));
+        if brokered
+            && !self
+                .shared
+                .authentication
+                .lock()
+                .await
+                .as_ref()
+                .is_some_and(|capability| {
+                    capability
+                        .flows
+                        .iter()
+                        .any(|flow| flow.kind == AuthFlowKind::ClientBrokered)
+                })
+        {
+            return Err(ClientError::UnsupportedCapability(
+                "authentication.flows.clientBrokered",
+            ));
+        }
+        Ok(())
     }
 
     /// Issue the `initialize` handshake.
@@ -520,6 +630,20 @@ impl Client {
         last_seen_server_seq: i64,
         subscriptions: Vec<String>,
     ) -> Result<ReconnectResult, ClientError> {
+        self.reconnect_with_authentication(client_id, last_seen_server_seq, subscriptions, None)
+            .await
+    }
+
+    /// Reconnect, retaining capabilities from this host's prior initialization.
+    ///
+    /// The capability is restored only after the host accepts the reconnect.
+    pub async fn reconnect_with_authentication(
+        &self,
+        client_id: String,
+        last_seen_server_seq: i64,
+        subscriptions: Vec<String>,
+        authentication: Option<AuthenticationCapability>,
+    ) -> Result<ReconnectResult, ClientError> {
         let params = ReconnectParams {
             channel: ROOT_RESOURCE_URI.to_string(),
             meta: None,
@@ -527,7 +651,11 @@ impl Client {
             last_seen_server_seq,
             subscriptions,
         };
-        self.request("reconnect", params).await
+        let result = self.request("reconnect", params).await?;
+        if let Some(authentication) = authentication {
+            *self.shared.authentication.lock().await = Some(authentication);
+        }
+        Ok(result)
     }
 
     /// Protocol-level liveness `ping`.
