@@ -213,7 +213,7 @@ Using the standard OAuth 2.0 Protected Resource Metadata format means:
 
 ### Why `authenticate` instead of including tokens in `initialize`?
 
-- Authentication is per-resource, not per-connection
+- Tokens are supplied per protected resource, rather than as one connection-wide credential
 - Clients may authenticate for multiple resources independently
 - Tokens can be refreshed or rotated without re-initializing the connection
 - Not all clients need to authenticate (some agents may not require auth)
@@ -224,4 +224,10 @@ Using the standard OAuth 2.0 Protected Resource Metadata format means:
 
 ### Why not store auth status in root state?
 
-Root state is global and visible to all subscribed clients. Authentication status is per-connection (each client authenticates independently), so it is kept imperative via commands and notifications rather than polluting the shared state tree.
+Root state is global and visible to all subscribed clients. In the baseline flow described here, authentication status is per-connection: each client authenticates independently for each protected resource. It is therefore kept in commands and notifications rather than the shared state tree.
+
+### What about credentials shared across clients?
+
+The baseline does not define account-safe sign-out for a credential used by multiple connections. A resource identifies an upstream service, not an account; a client's token cache cannot authoritatively decide which shared credential to clear.
+
+The [account-safe shared-host sign-out proposal](../proposals/client-brokered-revocation.md) explores an explicitly negotiated, host-authoritative account model for client-brokered credentials, building on [the host-owned authentication proposal](https://github.com/microsoft/agent-host-protocol/pull/404). It is a design draft, not part of the current wire contract. In particular, empty-token `authenticate` is not a conditional account-removal mechanism.
