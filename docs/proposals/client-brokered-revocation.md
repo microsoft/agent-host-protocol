@@ -1,10 +1,11 @@
 # Account-safe sign-out on a shared host
 
-> **Design draft, not implemented protocol.** This is a bounded addition to
-> [#404, host-owned authentication](https://github.com/microsoft/agent-host-protocol/pull/404),
-> not a replacement for it. It reuses that proposal's accounts channel,
-> account-removal action, and sign-in attempts for **client-brokered**
-> credentials. The wire sketches below are proposed changes, not fields that
+> **Independent design draft, not implemented protocol.** This proposal defines
+> account-safe sign-out for **client-brokered** credentials on a shared host.
+> It can be reviewed, implemented, and shipped without
+> [#404, host-owned authentication](https://github.com/microsoft/agent-host-protocol/pull/404).
+> That proposal is a possible future credential-acquisition path, not a
+> prerequisite. The wire sketches below are proposed changes, not fields that
 > current clients or hosts support.
 >
 > No canonical types, generated clients, schemas, or protocol versions change
@@ -28,7 +29,7 @@ not "clear whatever currently authenticates this resource." The host decides
 atomically which credentials and work depend on that account. This contract
 must be the same for an IDE, CLI, browser, or other AHP client.
 
-## 2. Relationship to the existing designs
+## 2. Scope and relationship to other work
 
 The [current authentication spec](../specification/authentication.md) describes
 connection-scoped credentials, delivered independently per protected resource.
@@ -41,25 +42,26 @@ introduced implicitly through metadata.
 | --- | --- | --- |
 | Existing client-brokered baseline | Client obtains and pushes tokens. | Connection-scoped; no account-safe shared-host revocation guarantee. |
 | Proposed shared client-brokered mode | Client still obtains tokens. Host validates and admits them to an account. | Host-authoritative account state, explicit consumer selection, account-scoped removal across connections. |
-| Host-owned mode in #404 | Host obtains and may refresh credentials. | Same accounts/removal model; host-owned OAuth flows remain separate. |
+| Future host-owned acquisition, such as #404 | Host obtains and may refresh credentials. | Could use the same account lifecycle later; not required here. |
 
-This draft deliberately amends three points in #404:
+This proposal introduces its own small accounts/admission/removal contract in
+section 3. It depends only on existing AHP initialization, subscriptions,
+actions, reconciliation, authentication discovery, and token delivery.
+It does **not** require host-run OAuth, `authComplete`, device-code or browser
+relay flows, a challenge catalogue, refresh-token storage, or a cross-session
+account-preference system.
 
-1. A pushed credential is not inherently **non-removable**. The host may forget
-   its own usable copies without revoking a client's upstream grant.
-   `HostAccount.removable` can be true for a negotiated shared brokered account.
-2. An account ID names one **host-held authorization lifetime** for an identity.
-   It survives token rotation, but is retired on removal. An independently
-   owned grant must not be merged into that removal lifetime merely because
-   the human identity is the same.
-3. Rejected removals use the existing ordered
-   [`ActionEnvelope.rejectionReason`](../guide/reconciliation.md), not silence.
-   Successful sign-out also has a prompt, credential-scoped active-work rule.
+The names `ahp-accounts://`, `authBegin`, and `accounts/removed` intentionally
+align with #404, but their required behavior and types are defined here. A host
+can implement only this proposal. Future host-owned acquisition can integrate
+with this foundation rather than making brokered sign-out wait for it.
 
-Everything else stays small: `HostAccount` remains an identity plus consumers,
-not a credential catalogue. No tokens, scope sets, expiry clocks, token hashes,
-or credential-health fields are added to account state. No new revoke command
-or vendor-specific metadata is introduced.
+Three decisions belong to this contract regardless of #404: the host can remove
+its copies of a brokered credential without revoking the upstream grant;
+account IDs name revocable authorization lifetimes; and rejected removals use
+the existing ordered
+[`ActionEnvelope.rejectionReason`](../guide/reconciliation.md), not silence.
+Integration with other acquisition modes must preserve those guarantees.
 
 ### Identity, selection, and ownership
 
@@ -71,9 +73,9 @@ or vendor-specific metadata is introduced.
   Pairwise subjects from different OAuth clients require a trusted mapping.
   Email, display label, client-local account ID, and token equality are not
   identity proofs. Opaque tokens do not justify an unverified identity claim.
-- **Consumer:** reuse #404's `AccountConsumer`: an agent's `(provider, resource)`
-  or an MCP server's host-published identity. Both union arms need a `kind`.
-  A consumer selects an account; a token refresh does not select a consumer.
+- **Consumer:** an agent's `(provider, resource)` or a session's exact MCP
+  customization, as defined below using existing AHP state. A consumer selects
+  an account; a token refresh does not select a consumer.
 - **Work:** the host records the account lifetime actually authorizing a unit
   of work. Switching a consumer to B does not relabel already-running A work.
 
@@ -90,30 +92,134 @@ An ambient credential the host cannot stop rediscovering is not removable.
 
 ## 3. Minimal proposed wire surface
 
-Reuse `ahp-accounts://`, `HostAccount`, `AuthAttemptState`, `accounts/set`,
-`accounts/updated`, and key-only `accounts/removed` from #404. Secrets still
-travel only in the existing `authenticate` request, never in actions or state.
+This section defines the complete new surface needed for brokered sign-out.
+`URI`, `BaseParams`, and `ErrorInfo` below are existing AHP types. None of the
+other declarations requires a type from an unmerged proposal.
 
-Add one **`clientBrokered` flow kind** to #404's flow support/request, begin
-result, and pending-attempt unions. It means "reserve a client-supplied
-credential admission," not "the host runs OAuth." A broker-only host can
-advertise just this flow; it need not implement device code, callback relaying,
-refresh-token storage, or any host-owned acquisition.
+### Accounts state and actions
+
+Introduce the singleton state channel `ahp-accounts://`. It uses ordinary
+`subscribe`, snapshots, ordered action envelopes, and reconnect replay. Reading
+the account list and mutating it are separately authorized by host policy;
+`subscribe` may fail with `PermissionDenied`. Account IDs are not permissions.
 
 ```ts
-// Additions to #404's flow unions; names are provisional.
+interface AccountsState {
+  accounts: HostAccount[];
+  attempts: AuthAttemptState[];
+}
+
+interface HostAccount {
+  id: string;
+  label: string;
+  removable: boolean;
+  consumers: AccountConsumer[];
+}
+
+type AccountConsumer =
+  | { kind: 'agent'; provider: string; resource: string }
+  | { kind: 'mcpServer'; session: URI; customizationId: string };
+
+interface AuthAttemptBase {
+  id: string;
+  consumer: AccountConsumer;
+  resource: string;
+}
+
+interface AuthAttemptPendingState extends AuthAttemptBase {
+  status: 'pending';
+}
+
+interface AuthAttemptCompletedState extends AuthAttemptBase {
+  status: 'completed';
+  accountId: string;
+}
+
+interface AuthAttemptFailedState extends AuthAttemptBase {
+  status: 'failed';
+  error: ErrorInfo;
+}
+
+type AuthAttemptState =
+  | AuthAttemptPendingState
+  | AuthAttemptCompletedState
+  | AuthAttemptFailedState;
+
+type AccountsAction =
+  | { type: 'accounts/set'; account: HostAccount }
+  | { type: 'accounts/removed'; id: string }
+  | { type: 'accounts/authAttemptSet'; attempt: AuthAttemptState }
+  | { type: 'accounts/authAttemptRemoved'; id: string };
+```
+
+`id` is host-assigned and `label` is display text, never an identity proof.
+`removable` describes whether local removal is possible, not whether a grant
+can be revoked upstream; caller authorization is still checked on every
+mutation. `consumers` records explicit selections, never token contents.
+No credential inventory, account-health state, or public lineage graph is added.
+
+| Action | Producer | Reducer and host behavior |
+| --- | --- | --- |
+| `accounts/set` | Host | Upsert the complete account by `id`; insert or replace in place. |
+| `accounts/removed` | Client or host | Remove by `id`, a no-op when absent. The host performs the revocation boundary before accepting a client's action. |
+| `accounts/authAttemptSet` | Host | Upsert the complete attempt by `id`. Expiry or failed admission becomes `failed` with an `ErrorInfo`. |
+| `accounts/authAttemptRemoved` | Client or host | Remove by `id`, a no-op when absent. Client removal cancels a pending admission before acceptance; host removal also garbage-collects terminal attempts. |
+
+A client trying to cancel an already completed/failed attempt receives an
+ordered rejection, leaving the terminal result available to reconcile. If
+completion won the race, the client reads its `accountId` and removes the
+account separately. Hosts retain terminal outcomes for reconnect recovery for
+a documented period; after that period an unresolved admission is unconfirmed,
+not proof of failure or permission to replay. Cancelled or expired attempts
+cannot later install credentials.
+
+**Consumer discovery does not need a new challenge catalogue.** The agent key
+comes from `AgentInfo.provider` and its advertised `protectedResources`. The MCP
+key is the session URI plus the `id` of its host-published
+`McpServerCustomization`, not a server name or manifest URI guessed by a client.
+The host resolves the MCP resource from that server's current auth requirement
+or existing binding and captures it for the attempt. It rejects an unknown
+consumer or one whose resource it cannot determine.
+
+These MCP keys intentionally identify a live session customization, not a
+persistent cross-session preference. If the session/customization disappears,
+or its resource changes during admission, fail with `Conflict` and require a
+fresh target. Hosts MUST NOT reuse the same key for a different consumer while
+bindings or attempts still reference it. Missing bindings never fall back to a
+different account. Longer-lived MCP identity can be added independently later.
+
+### Brokered admission and token delivery
+
+Introduce a typed `InitializeResult.authentication` capability and the
+`authBegin` request below. **`clientBrokered`** means "reserve admission of a
+client-supplied credential," not "the host runs OAuth." It is the only flow
+required here. Tokens still travel only in `authenticate`, never in actions,
+state, or `authBegin`.
+
+```ts
 interface ClientBrokeredFlow {
   kind: 'clientBrokered';
 }
 
-interface ClientBrokeredBeginResult {
-  flow: 'clientBrokered';
-  attemptId: string;
+interface AuthenticationCapability {
+  flows: ClientBrokeredFlow[];
 }
 
-interface ClientBrokeredPendingState extends AuthAttemptBase {
-  status: AuthAttemptStatus.Pending;
-  flow: AuthFlowKind.ClientBrokered;
+interface InitializeResult {
+  // Addition to the existing result.
+  authentication?: AuthenticationCapability;
+}
+
+interface AuthBeginParams extends BaseParams {
+  channel: 'ahp-accounts://';
+  target: { consumer: AccountConsumer };
+  flows: ClientBrokeredFlow[];
+  accountId?: string;
+}
+
+interface AuthBeginResult {
+  flow: 'clientBrokered';
+  attemptId: string;
 }
 
 type BrokeredAuthenticationBinding =
@@ -133,28 +239,29 @@ interface AuthenticateResult {
 The optional fields preserve the baseline wire shape. In shared brokered mode,
 `binding`, a **nonempty** token, and the successful result's `accountId` are
 required. Missing fields are errors, not requests to infer an account.
+`flows` must offer `clientBrokered`; an empty or unsupported offer is rejected
+with `InvalidParams`, without creating an attempt or starting another flow.
 
 ### Admission is distinct from renewal
 
-1. The client reads a host-published challenge or consumer, then calls
-   `authBegin` with `flows: [{ kind: "clientBrokered" }]`. For this new flow,
-   `accountId`, when present, explicitly names a live account to reauthorize;
-   omission means admission of an identity, not an implicit default from a
-   challenge. A challenge tied to an existing account requires an explicit
-   matching `accountId`; switching identities instead targets its published
-   consumer. This makes the existing proposal's ambiguous default explicit.
+1. The client selects a consumer from existing root/session state, then calls
+   `authBegin` with `flows: [{ kind: "clientBrokered" }]`. `accountId`, when
+   present, explicitly names a live account to reauthorize; omission means
+   admission of an identity. Neither intent is inferred from a challenge.
+   The host validates the target and flow before recording the attempt.
 2. The host records a single-use attempt, its initiating connection's
    authorization context, target, account intent, and place in host order.
-   The attempt captures the consumer's current binding as a precondition.
-   `attemptId` is a correlation key, not a bearer authorization.
+   The attempt captures the consumer's current binding and resource as
+   preconditions. Only that authorized context, including a verified reconnect,
+   may complete or cancel it; `attemptId` is not a bearer authorization.
 3. The client obtains a token and supplies it with `binding.kind: "attempt"`.
    The host verifies identity, resource, ownership/lineage, and the still-live
    attempt. Admission reuses the live account ID for that verified identity
    and ownership lifetime, or allocates one if none exists. Explicit
    reauthorization MUST match the requested account, not silently switch it.
 4. The host commits the credential and intended consumer selection, publishes
-   the ordinary account/attempt state actions, and returns `accountId`.
-   A conflicting consumer selection since `authBegin` fails with `Conflict`
+   `accounts/set` and a completed `accounts/authAttemptSet`, and returns
+   `accountId`. A conflicting consumer selection since `authBegin` fails with `Conflict`
    rather than overwriting the newer choice.
 5. Subsequent rotation uses `binding.kind: "account"`. It updates credentials
    under that live account **without changing any consumer's selection**.
@@ -167,7 +274,9 @@ are not retried as unbound authentication.
 If a consumer move needs multiple keyed actions, detach it from the old account
 before attaching it to the new one. The host's authorization decision is atomic;
 an intermediate client view must neither contain duplicate selection nor cause
-fallback to another identity.
+fallback to another identity. These are host-authored `accounts/set` actions
+computed from current authoritative state, not client-authored replacement
+arrays. A separate `accounts/updated` binding-management API is not required.
 
 For resource matching, use the exact identifier the host advertised. Admission
 must match the attempt's target; renewal must be authorized for that resource
@@ -180,7 +289,7 @@ the signing-out client.
 
 ### Capability and compatibility rules
 
-Use #404's typed `InitializeResult.authentication.flows` advertisement:
+The capability defined above is advertised as an initialize-result fragment:
 
 ```json
 {
@@ -190,12 +299,14 @@ Use #404's typed `InitializeResult.authentication.flows` advertisement:
 }
 ```
 
-This is an initialize-result fragment, not a new top-level capability system.
-The client selects the flow in `authBegin`; no duplicate client capability is
-needed. The host must return `flow: "clientBrokered"` before an attempt-bound
-transfer. Renewal under an already admitted account requires the advertised
-flow and reconciled account state, not another admission attempt. Account
-operations remain subject to the negotiated protocol version and normal
+This uses AHP's existing typed-capability system, with no dependency on another
+authentication proposal. The client selects the flow in `authBegin`; no
+duplicate client capability is needed. The host must return
+`flow: "clientBrokered"` before an attempt-bound transfer. Renewal under an
+already admitted account requires the advertised flow and reconciled account
+state, not another admission attempt. Clients explicitly subscribe to
+`ahp-accounts://`; its state/actions are not sent to unsubscribed legacy clients.
+Account operations remain subject to the negotiated protocol version and
 account-channel permissions.
 
 - An old host cannot advertise this contract merely by ignoring new fields.
@@ -327,8 +438,8 @@ accepted echo means the host has contained credential use and replay, not that
 an upstream OAuth server has revoked a grant.
 
 For client-brokered grants, the host MUST NOT revoke the client's upstream grant
-under this contract. Host-owned grants keep #404's separate upstream-revocation
-policy. Remote failure must never undo a completed local removal.
+under this contract. Upstream revocation of independently host-owned grants is
+outside this proposal. Remote failure must never undo a completed local removal.
 
 ## 5. Dependent credentials and active work
 
@@ -371,9 +482,11 @@ or an upstream revocation request. Queued approvals, callbacks, refreshes, and
 stream events must not restart the stopped work.
 
 The host publishes existing terminal turn state, such as `chat/turnCancelled`
-or `chat/error`, and existing auth-required state/challenges for consumers that
-need another sign-in. No special cancellation RPC or account-health enum is
-required. Action delivery remains normally ordered; this does not invent an
+or `chat/error`, and existing `McpServerAuthRequiredState` /
+`ToolCallAuthRequiredState` where applicable. Agent requests continue to use
+`AuthRequired` errors and `auth/required` notifications. No new challenge
+catalogue, cancellation RPC, or account-health enum is required.
+Action delivery remains normally ordered; this does not invent an
 atomic cross-channel notification. Dependent removals and cancellation state
 are published before the accepted root account-removal echo. Intermediate
 client views never authorize credential use.
@@ -402,8 +515,8 @@ and honest terminal/error state.
 
 ## 6. Compact wire walkthrough
 
-Assume the host advertised `clientBrokered` and published challenge `need-1`
-for the registered `assistant` consumer and `https://api.example.test`.
+Assume the host advertised `clientBrokered` and root state advertises provider
+`assistant` with protected resource `https://api.example.test`.
 The following arrays are ordered JSON-RPC transcripts, not batch requests.
 
 First admission (the host, not the client, assigns `account-a`):
@@ -414,7 +527,11 @@ First admission (the host, not the client, assigns `account-a`):
     "jsonrpc": "2.0", "id": 2, "method": "authBegin",
     "params": {
       "channel": "ahp-accounts://",
-      "target": { "challengeId": "need-1" },
+      "target": {
+        "consumer": {
+          "kind": "agent", "provider": "assistant", "resource": "https://api.example.test"
+        }
+      },
       "flows": [{ "kind": "clientBrokered" }]
     }
   },
@@ -434,8 +551,8 @@ First admission (the host, not the client, assigns `account-a`):
 ]
 ```
 
-The host also publishes `accounts/set` and the completed attempt carrying
-`accountId`, as in #404. Another broker renewing A uses
+The host also publishes `accounts/set` and `accounts/authAttemptSet` with
+`status: "completed"` and `accountId`. Another broker renewing A uses
 `binding: { "kind": "account", "accountId": "account-a" }`; neither the ID nor
 consumer selection changes because the token changes.
 
@@ -499,6 +616,7 @@ documentation PR**. Pure reducers alone cannot prove provider containment.
 
 | Case | Required observable result |
 | --- | --- |
+| Host implements only this proposal, without host-owned acquisition or a challenge catalogue | Advertise `clientBrokered`, admit a token for an existing root/session consumer, rotate it, and remove the account using only the surface in section 3. |
 | A's dedup cache is stale after B selects a different account | Removing A preserves B's tokens, selection, and active work; no empty-token clear is sent for B. |
 | Another client rotates A before removal | Remove every A credential, including the new token; same host account ID throughout rotation. |
 | A has read/write, unknown-scope, and multiple-resource credentials | Remove all A variants, with no scope/resource guessed from the signing-out client's cache. Preserve B variants sharing the same resource. |
@@ -513,11 +631,13 @@ documentation PR**. Pure reducers alone cannot prove provider containment.
 | Client connects to an older host | No new bound token or unconditional revoke is sent; local sign-out is distinguished from unsupported host sign-out. |
 | Legacy client sends unbound auth into an account-managed context | Reject or route only to a genuinely isolated baseline context; never mutate the shared account. |
 | Duplicate, unauthorized, or non-removable account removal | Absent account: ordered no-op. Denied removal: ordered rejection with origin; optimistic state reconciles. |
+| Client cancels an admission while token validation completes | Cancellation first prevents installation. Completion first rejects cancellation and preserves the result so the client can remove its account. |
 | SDK abort fails or hangs during sign-out | Further credential use and replay are fenced promptly; affected work reaches terminal state without waiting for expiry or idle. |
 | A source is removed while derived access is live or being exchanged | Invalidate the transitive dependents, reject late exchange results, preserve unrelated accounts. |
 | Only the derived account is removed | Source remains available to its other consumers; no reverse cascade. |
 | Parent turn uses A, independent child uses B | Stop the parent; preserve B child. An independent child actually using A must stop. |
 | Two MCP servers or agents share resource and scopes but not account selection | Delivery and revocation honor exact consumers and account lifetimes, not broad resource fan-out. |
+| MCP customization disappears, is replaced, or changes resource during admission | Reject the stale target; do not fall back by server name or select another account. |
 
 ## 8. Review decisions and eventual implementation
 
@@ -526,24 +646,31 @@ canonical types, review:
 
 - **The lifetime boundary:** agree that `HostAccount.id` can represent an
   identity's revocable enrollment, and that independently owned grants cannot
-  be coalesced. If #404 requires a permanent identity ID instead, a separate
-  lifetime handle is needed; a token hash or generation counter is not a fix.
-- **Brokered admission:** agree on the small `clientBrokered` extension to
-  `authBegin`/attempts and its explicit account intent, including recovery of a
-  lost completion after attempt retention expires. Until recoverable, that
+  be coalesced. This proposal defines that boundary itself; it does not need
+  another acquisition mode's identity design to settle first.
+- **Brokered admission:** review `authBegin`/attempts and explicit account
+  intent, including recovery of a lost completion after attempt retention
+  expires. Until recoverable, that
   outcome must remain unconfirmed, not become an automatic sign-in.
 - **Identity and external lineage:** define the trusted provider contract for
   opaque tokens, pairwise subjects, and derivation outside the host. This draft
   requires fail-closed behavior rather than accepting client identity metadata.
-- **Consumer identity:** reconcile MCP targeting with
-  [#439](https://github.com/microsoft/agent-host-protocol/pull/439) and #404.
-  A server name alone is not globally unique. Missing or renamed bindings must
-  require rebinding, not silently select a different account.
+- **Consumer identity:** review the session/customization key and fail-closed
+  rebinding rule. Cross-session preferences and the server-name routing in
+  [#439](https://github.com/microsoft/agent-host-protocol/pull/439) are separate
+  extensions, not prerequisites for this key.
 
-The eventual implementation starts in `types/`: flow/command additions,
-accounts state/actions, `@clientDispatchable` removal and attempt cancellation,
-reducers, and the version registry. Generate the schema and all client mirrors
-from that source; add keyed-collection reducer fixtures for every branch,
+**Landing independently:** the implementation PR can introduce precisely the
+surface in section 3 on current AHP, with no host-owned flows. If #404 proceeds
+later, reconcile its acquisition flows with this account lifecycle, including
+local removability of brokered accounts and retired IDs. That future integration
+must not become a dependency of client-brokered sign-out.
+
+The eventual implementation starts in `types/`: the capability, `authBegin`,
+bound `authenticate`, accounts state and four actions, `@clientDispatchable`
+removal and attempt cancellation, reducers, snapshot/channel routing, and the
+version registry. Generate the schema and all client mirrors from that source;
+add keyed-collection reducer fixtures for every branch,
 message/compatibility tests, and host integration tests for the cases above.
 Run `npm run generate`, `npm test`, documentation validation, and the affected
 client suites. This docs-only draft intentionally adds no release fragment.
