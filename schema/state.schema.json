@@ -3879,15 +3879,21 @@
         "startedAt": {
           "type": "string",
           "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
-        },
-        "duration": {
-          "type": "number",
-          "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
         }
       },
       "required": [
         "confirmed"
       ]
+    },
+    "ToolCallCompletedTimingFields": {
+      "type": "object",
+      "description": "Timing available after tool execution finishes.",
+      "properties": {
+        "duration": {
+          "type": "integer",
+          "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
+        }
+      }
     },
     "ToolCallRunningState": {
       "type": "object",
@@ -3937,10 +3943,6 @@
         "startedAt": {
           "type": "string",
           "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
-        },
-        "duration": {
-          "type": "number",
-          "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
         },
         "status": {
           "const": "running"
@@ -4010,10 +4012,6 @@
         "startedAt": {
           "type": "string",
           "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
-        },
-        "duration": {
-          "type": "number",
-          "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
         },
         "status": {
           "const": "auth-required"
@@ -4126,7 +4124,7 @@
           "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
         },
         "duration": {
-          "type": "number",
+          "type": "integer",
           "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
         },
         "status": {
@@ -4229,7 +4227,7 @@
           "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
         },
         "duration": {
-          "type": "number",
+          "type": "integer",
           "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
         },
         "status": {

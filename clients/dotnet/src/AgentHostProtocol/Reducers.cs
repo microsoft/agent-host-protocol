@@ -1472,7 +1472,6 @@ public static class Reducers
                 Confirmed = running.Confirmed,
                 SelectedOption = running.SelectedOption,
                 StartedAt = running.StartedAt,
-                Duration = running.Duration,
                 Content = CopyList(running.Content),
                 Auth = a.Auth,
             });
@@ -1508,7 +1507,6 @@ public static class Reducers
                 Confirmed = authRequired.Confirmed,
                 SelectedOption = authRequired.SelectedOption,
                 StartedAt = authRequired.StartedAt,
-                Duration = authRequired.Duration,
                 Content = CopyList(authRequired.Content),
             });
         });

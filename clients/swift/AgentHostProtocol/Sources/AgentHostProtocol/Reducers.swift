@@ -523,7 +523,6 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 confirmed: running.confirmed,
                 selectedOption: running.selectedOption,
                 startedAt: running.startedAt,
-                duration: running.duration,
                 status: .authRequired,
                 auth: a.auth,
                 content: running.content
@@ -548,7 +547,6 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 confirmed: authRequired.confirmed,
                 selectedOption: authRequired.selectedOption,
                 startedAt: authRequired.startedAt,
-                duration: authRequired.duration,
                 status: .running,
                 content: authRequired.content
             ))

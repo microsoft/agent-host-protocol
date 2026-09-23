@@ -358,6 +358,8 @@ export interface ChatToolCallCompleteAction extends ToolCallActionBase {
    *
    * When both timing fields are available, the execution completion timestamp
    * is the tool call state's `startedAt` plus `duration`.
+   *
+   * @integer
    */
   duration?: number;
   /** If true, the result requires client approval before finalizing */

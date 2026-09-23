@@ -3548,15 +3548,6 @@ public struct ToolCallRunningState: Codable, Sendable {
     ///
     /// Absent when timing was not reported by the producer.
     public var startedAt: String?
-    /// Elapsed tool execution duration in milliseconds, measured by the
-    /// producer's own clock.
-    ///
-    /// Available after execution finishes when reported by the producer. Clients
-    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
-    /// differ — and MUST treat it as opaque, producer-supplied data. When both
-    /// timing fields are available, the execution completion timestamp is
-    /// `startedAt + duration`.
-    public var duration: Int?
     public var status: ToolCallStatus
     /// Partial content produced while the tool is still executing.
     ///
@@ -3576,7 +3567,6 @@ public struct ToolCallRunningState: Codable, Sendable {
         case confirmed
         case selectedOption
         case startedAt
-        case duration
         case status
         case content
     }
@@ -3593,7 +3583,6 @@ public struct ToolCallRunningState: Codable, Sendable {
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
         startedAt: String? = nil,
-        duration: Int? = nil,
         status: ToolCallStatus,
         content: [ToolResultContent]? = nil
     ) {
@@ -3608,7 +3597,6 @@ public struct ToolCallRunningState: Codable, Sendable {
         self.confirmed = confirmed
         self.selectedOption = selectedOption
         self.startedAt = startedAt
-        self.duration = duration
         self.status = status
         self.content = content
     }
@@ -3648,15 +3636,6 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
     ///
     /// Absent when timing was not reported by the producer.
     public var startedAt: String?
-    /// Elapsed tool execution duration in milliseconds, measured by the
-    /// producer's own clock.
-    ///
-    /// Available after execution finishes when reported by the producer. Clients
-    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
-    /// differ — and MUST treat it as opaque, producer-supplied data. When both
-    /// timing fields are available, the execution completion timestamp is
-    /// `startedAt + duration`.
-    public var duration: Int?
     public var status: ToolCallStatus
     /// The authentication challenge blocking this invocation.
     public var auth: McpAuthRequirement
@@ -3675,7 +3654,6 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         case confirmed
         case selectedOption
         case startedAt
-        case duration
         case status
         case auth
         case content
@@ -3693,7 +3671,6 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
         startedAt: String? = nil,
-        duration: Int? = nil,
         status: ToolCallStatus,
         auth: McpAuthRequirement,
         content: [ToolResultContent]? = nil
@@ -3709,7 +3686,6 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         self.confirmed = confirmed
         self.selectedOption = selectedOption
         self.startedAt = startedAt
-        self.duration = duration
         self.status = status
         self.auth = auth
         self.content = content

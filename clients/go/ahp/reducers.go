@@ -1483,7 +1483,6 @@ func applyToolCallAuthRequired(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 			Confirmed:         s.Confirmed,
 			SelectedOption:    s.SelectedOption,
 			StartedAt:         s.StartedAt,
-			Duration:          s.Duration,
 			Auth:              a.Auth,
 			Content:           append([]ahptypes.ToolResultContent(nil), s.Content...),
 		}}
@@ -1513,7 +1512,6 @@ func applyToolCallAuthResolved(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 			Confirmed:         s.Confirmed,
 			SelectedOption:    s.SelectedOption,
 			StartedAt:         s.StartedAt,
-			Duration:          s.Duration,
 			Content:           append([]ahptypes.ToolResultContent(nil), s.Content...),
 		}}
 	})

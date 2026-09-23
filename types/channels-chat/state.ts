@@ -1351,6 +1351,14 @@ interface ToolCallPostConfirmationFields {
    * Absent when timing was not reported by the producer.
    */
   startedAt?: string;
+}
+
+/**
+ * Timing available after tool execution finishes.
+ *
+ * @category Tool Call Types
+ */
+interface ToolCallCompletedTimingFields {
   /**
    * Elapsed tool execution duration in milliseconds, measured by the
    * producer's own clock.
@@ -1360,6 +1368,8 @@ interface ToolCallPostConfirmationFields {
    * differ — and MUST treat it as opaque, producer-supplied data. When both
    * timing fields are available, the execution completion timestamp is
    * `startedAt + duration`.
+   *
+   * @integer
    */
   duration?: number;
 }
@@ -1426,7 +1436,7 @@ export interface ToolCallAuthRequiredState extends ToolCallBase, ToolCallParamet
  *
  * @category Tool Call Types
  */
-export interface ToolCallPendingResultConfirmationState extends ToolCallBase, ToolCallParameterFields, ToolCallResult, ToolCallPostConfirmationFields {
+export interface ToolCallPendingResultConfirmationState extends ToolCallBase, ToolCallParameterFields, ToolCallResult, ToolCallPostConfirmationFields, ToolCallCompletedTimingFields {
   status: ToolCallStatus.PendingResultConfirmation;
 }
 
@@ -1435,7 +1445,7 @@ export interface ToolCallPendingResultConfirmationState extends ToolCallBase, To
  *
  * @category Tool Call Types
  */
-export interface ToolCallCompletedState extends ToolCallBase, ToolCallParameterFields, ToolCallResult, ToolCallPostConfirmationFields {
+export interface ToolCallCompletedState extends ToolCallBase, ToolCallParameterFields, ToolCallResult, ToolCallPostConfirmationFields, ToolCallCompletedTimingFields {
   status: ToolCallStatus.Completed;
 }
 

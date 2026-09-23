@@ -2186,17 +2186,8 @@ type ToolCallRunningState struct {
 	// ISO 8601 timestamp when tool execution first started.
 	//
 	// Absent when timing was not reported by the producer.
-	StartedAt *string `json:"startedAt,omitempty"`
-	// Elapsed tool execution duration in milliseconds, measured by the
-	// producer's own clock.
-	//
-	// Available after execution finishes when reported by the producer. Clients
-	// MUST NOT derive this by subtracting timestamps — cross-client clocks may
-	// differ — and MUST treat it as opaque, producer-supplied data. When both
-	// timing fields are available, the execution completion timestamp is
-	// `startedAt + duration`.
-	Duration *int64         `json:"duration,omitempty"`
-	Status   ToolCallStatus `json:"status"`
+	StartedAt *string        `json:"startedAt,omitempty"`
+	Status    ToolCallStatus `json:"status"`
 	// Partial content produced while the tool is still executing.
 	//
 	// For example, a terminal content block lets clients subscribe to live
@@ -2264,17 +2255,8 @@ type ToolCallAuthRequiredState struct {
 	// ISO 8601 timestamp when tool execution first started.
 	//
 	// Absent when timing was not reported by the producer.
-	StartedAt *string `json:"startedAt,omitempty"`
-	// Elapsed tool execution duration in milliseconds, measured by the
-	// producer's own clock.
-	//
-	// Available after execution finishes when reported by the producer. Clients
-	// MUST NOT derive this by subtracting timestamps — cross-client clocks may
-	// differ — and MUST treat it as opaque, producer-supplied data. When both
-	// timing fields are available, the execution completion timestamp is
-	// `startedAt + duration`.
-	Duration *int64         `json:"duration,omitempty"`
-	Status   ToolCallStatus `json:"status"`
+	StartedAt *string        `json:"startedAt,omitempty"`
+	Status    ToolCallStatus `json:"status"`
 	// The authentication challenge blocking this invocation.
 	Auth McpAuthRequirement `json:"auth"`
 	// Partial content produced before the call paused for authentication.

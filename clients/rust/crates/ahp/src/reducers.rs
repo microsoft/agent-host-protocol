@@ -1410,7 +1410,6 @@ fn apply_tool_call_ready(state: &mut ChatState, a: &ChatToolCallReadyAction) -> 
                         confirmed,
                         selected_option: None,
                         started_at,
-                        duration: None,
                         content: None,
                     })
                 } else {
@@ -1496,7 +1495,6 @@ fn apply_tool_call_confirmed(
                 },
                 selected_option,
                 started_at: a.started_at.clone(),
-                duration: None,
                 content: None,
             })
         } else {
@@ -1713,7 +1711,6 @@ fn apply_tool_call_auth_required(
                     confirmed: s.confirmed,
                     selected_option: s.selected_option,
                     started_at: s.started_at,
-                    duration: s.duration,
                     status: ToolCallStatus::AuthRequired,
                     auth: a.auth.clone(),
                     content: s.content,
@@ -1744,7 +1741,6 @@ fn apply_tool_call_auth_resolved(
                 confirmed: s.confirmed,
                 selected_option: s.selected_option,
                 started_at: s.started_at,
-                duration: s.duration,
                 content: s.content,
             }),
             other => other,

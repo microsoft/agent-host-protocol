@@ -727,7 +727,6 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           confirmed: tc.confirmed,
           ...(tc.selectedOption ? { selectedOption: tc.selectedOption } : {}),
           ...(tc.startedAt !== undefined ? { startedAt: tc.startedAt } : {}),
-          ...(tc.duration !== undefined ? { duration: tc.duration } : {}),
           ...(tc.content ? { content: tc.content } : {}),
           auth: action.auth,
         };
@@ -747,7 +746,6 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           confirmed: tc.confirmed,
           ...(tc.selectedOption ? { selectedOption: tc.selectedOption } : {}),
           ...(tc.startedAt !== undefined ? { startedAt: tc.startedAt } : {}),
-          ...(tc.duration !== undefined ? { duration: tc.duration } : {}),
           ...(tc.content ? { content: tc.content } : {}),
         };
       }));
