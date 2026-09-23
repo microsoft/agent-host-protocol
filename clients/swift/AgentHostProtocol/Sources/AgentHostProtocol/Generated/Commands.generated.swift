@@ -341,6 +341,22 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Host/runtime-owned local-canvas support. Presence means the SERVER
+    /// currently has a working runtime able to serve `openCanvas` /
+    /// `invokeCanvasAction` for at least one qualifying (explicitly installed
+    /// and trust-eligible) extension/package source; absence means the host
+    /// has no available canvas runtime, and clients MUST treat every canvas as
+    /// {@link CanvasAvailabilityStatus.Unsupported} regardless of what
+    /// {@link ClientCapabilities.canvases} declared.
+    ///
+    /// **Protocol version support alone is not a runtime capability**: a host
+    /// speaking protocol `>= 0.10.0` without this field present MUST NOT be
+    /// assumed to have a usable canvas runtime. This field — not the
+    /// negotiated `protocolVersion` — is the authoritative signal, and is
+    /// independent of any individual canvas's live availability
+    /// ({@link CanvasAvailabilityState}) or trust decision
+    /// ({@link CanvasTrustState}).
+    public var canvases: CanvasCapabilities?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -353,6 +369,7 @@ public struct InitializeResult: Codable, Sendable {
         case terminalCommandPrefix
         case telemetry
         case automations
+        case canvases
     }
 
     public init(
@@ -365,7 +382,8 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        canvases: CanvasCapabilities? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -377,6 +395,7 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.canvases = canvases
     }
 }
 
@@ -393,11 +412,30 @@ public struct ClientCapabilities: Codable, Sendable {
     /// capability is declared. Clients that omit it MUST treat
     /// App-bearing tool calls as ordinary MCP tool calls.
     public var mcpApps: [String: AnyCodable]?
+    /// Client can render local canvases: `listCanvasTypes`, `openCanvas`,
+    /// subscribe to the resulting `ahp-canvas:` channel, and drive
+    /// `resolveCanvasSource` / `invokeCanvasAction` / `restartCanvasProvider` /
+    /// `closeCanvas`.
+    ///
+    /// Hosts SHOULD NOT offer canvas admission to a client that omits this
+    /// capability; such a client MUST be treated as if every canvas were
+    /// {@link CanvasAvailabilityStatus.Unsupported}. Omission does not imply
+    /// anything about server/runtime execution trust — see
+    /// {@link CanvasTrustStatus}, which is a separate, host-owned decision.
+    ///
+    /// This declares only the CLIENT's rendering capability. Protocol version
+    /// support alone (i.e. speaking >= 0.10.0) is not evidence that the SERVER
+    /// actually has a working canvas runtime — see
+    /// {@link InitializeResult.canvases}, the server-side counterpart, which a
+    /// client MUST also check before treating canvases as usable.
+    public var canvases: [String: AnyCodable]?
 
     public init(
-        mcpApps: [String: AnyCodable]? = nil
+        mcpApps: [String: AnyCodable]? = nil,
+        canvases: [String: AnyCodable]? = nil
     ) {
         self.mcpApps = mcpApps
+        self.canvases = canvases
     }
 }
 
@@ -424,6 +462,14 @@ public struct AutomationCapabilities: Codable, Sendable {
         self.schedules = schedules
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
+    }
+}
+
+public struct CanvasCapabilities: Codable, Sendable {
+
+    public init(
+
+    ) {
     }
 }
 
@@ -2087,6 +2133,296 @@ public struct FetchAutomationRunsResult: Codable, Sendable {
     public init(
 
     ) {
+    }
+}
+
+public struct ListCanvasTypesParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Maximum number of entries to return in this page. The server SHOULD respect
+    /// this bound but MAY return fewer entries and MAY impose its own upper cap.
+    /// Omit to let the server choose the page size.
+    public var limit: Int?
+    /// Opaque pagination cursor from a previous {@link PaginatedResult.nextCursor}.
+    /// Omit to fetch the first page. Cursors are server-defined and MUST be treated
+    /// as opaque — do not parse, modify, or persist them across connections. An
+    /// unrecognised cursor SHOULD be rejected with an `InvalidParams` error.
+    public var cursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case limit
+        case cursor
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        limit: Int? = nil,
+        cursor: String? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.limit = limit
+        self.cursor = cursor
+    }
+}
+
+public struct ListCanvasTypesResult: Codable, Sendable {
+    /// Opaque cursor for the next page. Present when more entries exist beyond the
+    /// returned page; absent signals the end of the collection. Pass it back as
+    /// {@link PaginatedParams.cursor} to fetch the following page.
+    public var nextCursor: String?
+    /// Discovered canvas type declarations.
+    public var types: [CanvasTypeDeclaration]
+
+    public init(
+        nextCursor: String? = nil,
+        types: [CanvasTypeDeclaration]
+    ) {
+        self.nextCursor = nextCursor
+        self.types = types
+    }
+}
+
+public struct OpenCanvasParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Canvas URI (client-chosen, e.g. `ahp-canvas:/<uuid>`); honored only when this call first establishes `identity` — see above.
+    public var canvas: String
+    /// Logical identity to open or re-admit.
+    public var identity: CanvasIdentityKey
+    /// Initial (or updated, on a later effectful call) display title.
+    public var title: String
+    /// Initial (or updated) display icon.
+    public var icon: Icon?
+    /// Bounded JSON input for this open call (e.g. seed parameters the
+    /// provider uses to initialize the canvas), opaque to the protocol. See
+    /// {@link CanvasTypeDeclaration.openInputSchema} /
+    /// `openInputSchemaRef` for the expected shape. The JSON-serialized value
+    /// MUST NOT exceed `CANVAS_INPUT_MAX_LENGTH`.
+    public var input: AnyCodable?
+    /// Durable client-generated idempotency key bounding retry deduplication
+    /// for this call within a live window; see the idempotency rules above.
+    /// MUST NOT exceed `CANVAS_REQUEST_ID_MAX_LENGTH`.
+    public var requestId: String
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case canvas
+        case identity
+        case title
+        case icon
+        case input
+        case requestId
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        canvas: String,
+        identity: CanvasIdentityKey,
+        title: String,
+        icon: Icon? = nil,
+        input: AnyCodable? = nil,
+        requestId: String
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.canvas = canvas
+        self.identity = identity
+        self.title = title
+        self.icon = icon
+        self.input = input
+        self.requestId = requestId
+    }
+}
+
+public struct OpenCanvasResult: Codable, Sendable {
+    /// The catalog entry for the opened (or already-open) canvas.
+    public var canvas: CanvasEntry
+
+    public init(
+        canvas: CanvasEntry
+    ) {
+        self.canvas = canvas
+    }
+}
+
+public struct ResolveCanvasSourceParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil
+    ) {
+        self.channel = channel
+        self.meta = meta
+    }
+}
+
+public struct ResolveCanvasSourceResult: Codable, Sendable {
+    /// Current {@link CanvasEntry.availability}.
+    public var availability: CanvasAvailabilityStatus
+    /// Current {@link CanvasIdentity.incarnation}.
+    public var incarnation: String
+    /// Current {@link CanvasEntry.revision}.
+    public var revision: Int
+    /// Present only when a live endpoint currently exists (`availability` is `empty` or `ready`); absent otherwise. Transient — see {@link CanvasSourcePresentation}.
+    public var source: CanvasSourcePresentation?
+
+    public init(
+        availability: CanvasAvailabilityStatus,
+        incarnation: String,
+        revision: Int,
+        source: CanvasSourcePresentation? = nil
+    ) {
+        self.availability = availability
+        self.incarnation = incarnation
+        self.revision = revision
+        self.source = source
+    }
+}
+
+public struct InvokeCanvasActionParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Matches a {@link CanvasActionDeclaration.id} from the canvas's current declared actions.
+    public var actionId: String
+    /// Input conforming to the declared action's `inputSchema`/`inputSchemaRef`,
+    /// if any. The JSON-serialized value MUST NOT exceed
+    /// `CANVAS_INPUT_MAX_LENGTH`.
+    public var input: AnyCodable?
+    /// Expected {@link CanvasIdentity.incarnation}. Required — see above. The
+    /// server MUST reject the call with `Conflict` if the canvas's live
+    /// endpoint has since been superseded, rather than deliver the call to it.
+    public var incarnation: String
+    /// Durable client-generated idempotency key bounding retry
+    /// deduplication for this invocation within a live window. The server is
+    /// not required to guarantee exactly-once execution across a crash. MUST
+    /// NOT exceed `CANVAS_REQUEST_ID_MAX_LENGTH`.
+    public var requestId: String
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case actionId
+        case input
+        case incarnation
+        case requestId
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        actionId: String,
+        input: AnyCodable? = nil,
+        incarnation: String,
+        requestId: String
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.actionId = actionId
+        self.input = input
+        self.incarnation = incarnation
+        self.requestId = requestId
+    }
+}
+
+public struct InvokeCanvasActionResult: Codable, Sendable {
+    /// The provider's raw reply, opaque to the protocol. MUST NOT exceed `CANVAS_RESULT_MAX_LENGTH` once JSON-serialized.
+    public var result: AnyCodable
+
+    public init(
+        result: AnyCodable
+    ) {
+        self.result = result
+    }
+}
+
+public struct RestartCanvasProviderParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Durable client-generated idempotency key, following the same
+    /// requestId-scoped idempotency rules as `openCanvas`. MUST NOT exceed
+    /// `CANVAS_REQUEST_ID_MAX_LENGTH`.
+    public var requestId: String
+    /// Expected current {@link CanvasIdentity.incarnation}; required — see above.
+    public var incarnation: String
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case requestId
+        case incarnation
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        requestId: String,
+        incarnation: String
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.requestId = requestId
+        self.incarnation = incarnation
+    }
+}
+
+public struct CloseCanvasParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Durable client-generated idempotency key, following the same
+    /// requestId-scoped idempotency rules as `openCanvas`. MUST NOT exceed
+    /// `CANVAS_REQUEST_ID_MAX_LENGTH`.
+    public var requestId: String
+    /// Expected current {@link CanvasEntry.revision}; required when an entry still exists — see above.
+    public var revision: Int
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case requestId
+        case revision
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        requestId: String,
+        revision: Int
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.requestId = requestId
+        self.revision = revision
     }
 }
 

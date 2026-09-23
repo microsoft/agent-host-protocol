@@ -1,0 +1,18 @@
+{
+  "name": "canvas-icon-changed-null",
+  "group": "A",
+  "description": "canvas/iconChanged keeps its required icon field when the value is null so consumers can distinguish removal from an invalid omitted field.",
+  "type": "StateAction",
+  "input": {
+    "type": "canvas/iconChanged",
+    "icon": null,
+    "revision": 3
+  },
+  "acceptableOutputs": [
+    {
+      "type": "canvas/iconChanged",
+      "icon": null,
+      "revision": 3
+    }
+  ]
+}

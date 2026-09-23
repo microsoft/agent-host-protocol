@@ -154,6 +154,7 @@ function mapType(tsType: string): string {
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState' ||
     tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState' ||
+    tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | CanvasState' ||
     tsType === 'RootState | SessionState | ChatState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState' ||
     tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState' ||
@@ -226,6 +227,7 @@ interface KotlinProp {
   wireName: string;   // JSON key
   type: string;       // Kotlin type
   optional: boolean;  // emit `= null` default
+  requiredNullable: boolean;
   doc: string;
 }
 
@@ -310,7 +312,9 @@ function extractProps(iface: InterfaceDeclaration, project: Project): KotlinProp
         kt = 'Double';
       }
       const hasUnionUndefined = /\|\s*undefined/.test(tsType);
-      const isOptional = p.hasQuestionToken() || hasUnionUndefined || kt.endsWith('?');
+      const hasUnionNull = /\|\s*null/.test(tsType);
+      const hasQuestionToken = p.hasQuestionToken();
+      const isOptional = hasQuestionToken || hasUnionUndefined || kt.endsWith('?');
       const finalType = isOptional && !kt.endsWith('?') ? kt + '?' : kt;
       const kName = tsName.startsWith('_')
         ? kotlinPropName(tsName)
@@ -323,6 +327,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): KotlinProp
         wireName: tsName,
         type: finalType,
         optional: isOptional,
+        requiredNullable: hasUnionNull && !hasQuestionToken && !hasUnionUndefined,
         doc: getPropertyDoc(p),
       };
     });
@@ -472,8 +477,11 @@ function generateKotlinDataClass(
   props: KotlinProp[],
 ): string {
   const lines: string[] = [];
+  const requiredNullable = props.filter(p => p.requiredNullable);
 
-  lines.push('@Serializable');
+  lines.push(requiredNullable.length > 0
+    ? `@Serializable(with = ${ktName}Serializer::class)`
+    : '@Serializable');
 
   if (props.length === 0) {
     lines.push(`class ${ktName}`);
@@ -489,12 +497,63 @@ function generateKotlinDataClass(
     if (p.name !== p.wireName) {
       lines.push(`    @SerialName(${JSON.stringify(p.wireName)})`);
     }
-    const defaultVal = p.optional ? ' = null' : '';
+    const defaultVal = p.optional && !p.requiredNullable ? ' = null' : '';
     const trailing = idx === props.length - 1 ? '' : ',';
     lines.push(`    val ${p.name}: ${p.type}${defaultVal}${trailing}`);
   });
 
   lines.push(')');
+  if (requiredNullable.length > 0) {
+    const wireName = `${ktName}Wire`;
+    lines.push('');
+    lines.push('@Serializable');
+    lines.push(`private data class ${wireName}(`);
+    props.forEach((p, idx) => {
+      if (p.name !== p.wireName) {
+        lines.push(`    @SerialName(${JSON.stringify(p.wireName)})`);
+      }
+      const defaultVal = p.optional && !p.requiredNullable ? ' = null' : '';
+      const trailing = idx === props.length - 1 ? '' : ',';
+      lines.push(`    val ${p.name}: ${p.type}${defaultVal}${trailing}`);
+    });
+    lines.push(')');
+    lines.push('');
+    lines.push(`internal object ${ktName}Serializer : KSerializer<${ktName}> {`);
+    lines.push(`    override val descriptor: SerialDescriptor = ${wireName}.serializer().descriptor`);
+    lines.push('');
+    lines.push(`    override fun deserialize(decoder: Decoder): ${ktName} {`);
+    lines.push('        val input = decoder as? JsonDecoder');
+    lines.push(`            ?: error(${JSON.stringify(`${ktName} can only be deserialized from JSON`)})`);
+    lines.push('        val element = input.decodeJsonElement()');
+    lines.push('        val obj = element as? JsonObject');
+    lines.push(`            ?: throw kotlinx.serialization.SerializationException(${JSON.stringify(`Expected JsonObject for ${ktName}`)})`);
+    for (const p of requiredNullable) {
+      lines.push(`        if (!obj.containsKey(${JSON.stringify(p.wireName)})) throw kotlinx.serialization.SerializationException(${JSON.stringify(`${ktName}: missing required field "${p.wireName}"`)})`);
+    }
+    lines.push(`        val wire = input.json.decodeFromJsonElement(${wireName}.serializer(), element)`);
+    lines.push(`        return ${ktName}(`);
+    for (const p of props) {
+      lines.push(`            ${p.name} = wire.${p.name},`);
+    }
+    lines.push('        )');
+    lines.push('    }');
+    lines.push('');
+    lines.push(`    override fun serialize(encoder: Encoder, value: ${ktName}) {`);
+    lines.push('        val output = encoder as? JsonEncoder');
+    lines.push(`            ?: error(${JSON.stringify(`${ktName} can only be serialized to JSON`)})`);
+    lines.push(`        val wire = ${wireName}(`);
+    for (const p of props) {
+      lines.push(`            ${p.name} = value.${p.name},`);
+    }
+    lines.push('        )');
+    lines.push(`        var element: JsonElement = output.json.encodeToJsonElement(${wireName}.serializer(), wire)`);
+    for (const p of requiredNullable) {
+      lines.push(`        if (value.${p.name} == null) element = JsonObject(element.jsonObject + (${JSON.stringify(p.wireName)} to kotlinx.serialization.json.JsonNull))`);
+    }
+    lines.push('        output.encodeJsonElement(element)');
+    lines.push('    }');
+    lines.push('}');
+  }
   return lines.join('\n');
 }
 
@@ -735,6 +794,7 @@ function generatePartialDataClassFromInterface(
   const props = extractProps(iface, project).map(p => ({
     ...p,
     optional: true,
+    requiredNullable: false,
     type: p.type.endsWith('?') ? p.type : `${p.type}?`,
   }));
   return generateKotlinDataClass(partialKotlinName(tsInterfaceName), props);
@@ -980,6 +1040,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'CanvasSourceKind', 'CanvasTrustStatus', 'CanvasAvailabilityStatus',
 ];
 
 const STATE_STRUCTS = [
@@ -1048,6 +1109,13 @@ const STATE_STRUCTS = [
   'AutomationCompletedRunLifecycle',
   'AutomationFailedRunLifecycle', 'AutomationCancelledRunLifecycle',
   'AutomationRunSummary', 'AutomationRunState',
+  'CanvasExtensionSource', 'CanvasPackageSource', 'CanvasIdentityKey', 'CanvasIdentity',
+  'CanvasTrustedState', 'CanvasPendingTrustState', 'CanvasBlockedTrustState',
+  'CanvasActionDeclaration',
+  'CanvasUnsupportedAvailabilityState', 'CanvasNotLoadedAvailabilityState',
+  'CanvasLoadingAvailabilityState', 'CanvasEmptyAvailabilityState',
+  'CanvasReadyAvailabilityState', 'CanvasFailedAvailabilityState',
+  'CanvasEntry', 'CanvasState', 'CanvasTypeDeclaration', 'CanvasSourcePresentation',
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1363,6 +1431,41 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   injectDiscriminantOnSerialize: true,
 };
 
+const CANVAS_SOURCE_UNION: UnionConfig = {
+  name: 'CanvasSource',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Extension', structName: 'CanvasExtensionSource', discriminantValue: 'extension' },
+    { caseName: 'Package', structName: 'CanvasPackageSource', discriminantValue: 'package' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
+const CANVAS_TRUST_STATE_UNION: UnionConfig = {
+  name: 'CanvasTrustState',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'Trusted', structName: 'CanvasTrustedState', discriminantValue: 'trusted' },
+    { caseName: 'Pending', structName: 'CanvasPendingTrustState', discriminantValue: 'pending' },
+    { caseName: 'Blocked', structName: 'CanvasBlockedTrustState', discriminantValue: 'blocked' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
+const CANVAS_AVAILABILITY_STATE_UNION: UnionConfig = {
+  name: 'CanvasAvailabilityState',
+  discriminantField: 'status',
+  variants: [
+    { caseName: 'Unsupported', structName: 'CanvasUnsupportedAvailabilityState', discriminantValue: 'unsupported' },
+    { caseName: 'NotLoaded', structName: 'CanvasNotLoadedAvailabilityState', discriminantValue: 'notLoaded' },
+    { caseName: 'Loading', structName: 'CanvasLoadingAvailabilityState', discriminantValue: 'loading' },
+    { caseName: 'Empty', structName: 'CanvasEmptyAvailabilityState', discriminantValue: 'empty' },
+    { caseName: 'Ready', structName: 'CanvasReadyAvailabilityState', discriminantValue: 'ready' },
+    { caseName: 'Failed', structName: 'CanvasFailedAvailabilityState', discriminantValue: 'failed' },
+  ],
+  injectDiscriminantOnSerialize: true,
+};
+
 function generateStateFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
 
@@ -1453,6 +1556,12 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_SOURCE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_TRUST_STATE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_AVAILABILITY_STATE_UNION));
   lines.push('');
   lines.push(generateToolResultContentUnion());
   lines.push('');
@@ -1563,6 +1672,13 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'automationRun/sessionRemoved', caseName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', caseName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', caseName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'session/canvasSet', caseName: 'SessionCanvasSet', tsInterface: 'SessionCanvasSetAction' },
+  { type: 'session/canvasRemoved', caseName: 'SessionCanvasRemoved', tsInterface: 'SessionCanvasRemovedAction' },
+  { type: 'canvas/availabilityChanged', caseName: 'CanvasAvailabilityChanged', tsInterface: 'CanvasAvailabilityChangedAction' },
+  { type: 'canvas/trustChanged', caseName: 'CanvasTrustChanged', tsInterface: 'CanvasTrustChangedAction' },
+  { type: 'canvas/incarnationChanged', caseName: 'CanvasIncarnationChanged', tsInterface: 'CanvasIncarnationChangedAction' },
+  { type: 'canvas/titleChanged', caseName: 'CanvasTitleChanged', tsInterface: 'CanvasTitleChangedAction' },
+  { type: 'canvas/iconChanged', caseName: 'CanvasIconChanged', tsInterface: 'CanvasIconChangedAction' },
 ];
 
 /** Merged data class for the approved/denied tool call confirmed action. */
@@ -1723,7 +1839,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
-  'ClientCapabilities', 'AutomationCapabilities',
+  'ClientCapabilities', 'AutomationCapabilities', 'CanvasCapabilities',
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
@@ -1757,6 +1873,11 @@ const COMMAND_STRUCTS = [
   'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',
   'RunAutomationParams', 'RunAutomationResult',
   'FetchAutomationRunsParams', 'FetchAutomationRunsResult',
+  'ListCanvasTypesParams', 'ListCanvasTypesResult',
+  'OpenCanvasParams', 'OpenCanvasResult',
+  'ResolveCanvasSourceParams', 'ResolveCanvasSourceResult',
+  'InvokeCanvasActionParams', 'InvokeCanvasActionResult',
+  'RestartCanvasProviderParams', 'CloseCanvasParams',
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -2368,6 +2489,9 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTrigger',            // AUTOMATION_TRIGGER_UNION discriminated union
     'AutomationRunOrigin',          // AUTOMATION_RUN_ORIGIN_UNION discriminated union
     'AutomationRunLifecycle',       // AUTOMATION_RUN_LIFECYCLE_UNION discriminated union
+    'CanvasSource',                 // CANVAS_SOURCE_UNION discriminated union
+    'CanvasTrustState',             // CANVAS_TRUST_STATE_UNION discriminated union
+    'CanvasAvailabilityState',      // CANVAS_AVAILABILITY_STATE_UNION discriminated union
     'ForkChatSource',               // generateFixedChatSourceBranchKotlin()
     'SideChatSource',               // generateFixedChatSourceBranchKotlin()
     'ChangesetOperationTarget',     // generateChangesetOperationTargetKotlin()

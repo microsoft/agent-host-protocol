@@ -1,0 +1,41 @@
+{
+  "description": "canvas/iconChanged replaces the display icon and applies the action's asserted revision",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "icon": { "src": "https://example.com/old.png" },
+    "trust": { "status": "trusted" },
+    "availability": { "status": "empty" },
+    "revision": 1
+  },
+  "actions": [
+    {
+      "type": "canvas/iconChanged",
+      "icon": { "src": "https://example.com/new.png", "contentType": "image/png" },
+      "revision": 2
+    }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "icon": { "src": "https://example.com/new.png", "contentType": "image/png" },
+    "trust": { "status": "trusted" },
+    "availability": { "status": "empty" },
+    "revision": 2
+  }
+}

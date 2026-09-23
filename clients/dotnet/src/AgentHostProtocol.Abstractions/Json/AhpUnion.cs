@@ -14,6 +14,8 @@ namespace Microsoft.AgentHostProtocol;
 /// </summary>
 public abstract class AhpUnion
 {
+    internal string? Discriminator { get; set; }
+
     /// <summary>
     /// The active variant value. Either one of the union's concrete payload
     /// types, a raw <see cref="System.Text.Json.JsonElement"/> for an unknown

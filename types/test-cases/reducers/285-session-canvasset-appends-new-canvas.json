@@ -1,0 +1,55 @@
+{
+  "description": "session/canvasSet appends a new canvas entry when its resource is unknown",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": []
+  },
+  "actions": [
+    {
+      "type": "session/canvasSet",
+      "canvas": {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-1"
+        },
+        "title": "Widget",
+        "trust": { "status": "pending" },
+        "availability": "notLoaded",
+        "revision": 1
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "canvases": [
+      {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-1"
+        },
+        "title": "Widget",
+        "trust": { "status": "pending" },
+        "availability": "notLoaded",
+        "revision": 1
+      }
+    ]
+  }
+}

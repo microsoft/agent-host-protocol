@@ -79,7 +79,13 @@ type _ExpectedCommands =
   | 'invokeChangesetOperation'
   | 'listAutomationTriggerDefinitions'
   | 'runAutomation'
-  | 'fetchAutomationRuns';
+  | 'fetchAutomationRuns'
+  | 'listCanvasTypes'
+  | 'openCanvas'
+  | 'resolveCanvasSource'
+  | 'invokeCanvasAction'
+  | 'restartCanvasProvider'
+  | 'closeCanvas';
 
 /** All methods annotated `@messageType Notification` (client → server). */
 type _ExpectedClientNotifications =

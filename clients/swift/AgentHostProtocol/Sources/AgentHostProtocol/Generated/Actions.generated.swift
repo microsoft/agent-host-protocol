@@ -104,6 +104,13 @@ public enum ActionType: Codable, Sendable, Equatable {
     case automationRunSessionRemoved
     case automationRunPrimarySessionChanged
     case automationRunCancelRequested
+    case sessionCanvasSet
+    case sessionCanvasRemoved
+    case canvasAvailabilityChanged
+    case canvasTrustChanged
+    case canvasIncarnationChanged
+    case canvasTitleChanged
+    case canvasIconChanged
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     case unknown(String)
 
@@ -209,6 +216,13 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "automationRun/sessionRemoved": self = .automationRunSessionRemoved
         case "automationRun/primarySessionChanged": self = .automationRunPrimarySessionChanged
         case "automationRun/cancelRequested": self = .automationRunCancelRequested
+        case "session/canvasSet": self = .sessionCanvasSet
+        case "session/canvasRemoved": self = .sessionCanvasRemoved
+        case "canvas/availabilityChanged": self = .canvasAvailabilityChanged
+        case "canvas/trustChanged": self = .canvasTrustChanged
+        case "canvas/incarnationChanged": self = .canvasIncarnationChanged
+        case "canvas/titleChanged": self = .canvasTitleChanged
+        case "canvas/iconChanged": self = .canvasIconChanged
         default: self = .unknown(raw)
         }
     }
@@ -314,6 +328,13 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .automationRunSessionRemoved: try container.encode("automationRun/sessionRemoved")
         case .automationRunPrimarySessionChanged: try container.encode("automationRun/primarySessionChanged")
         case .automationRunCancelRequested: try container.encode("automationRun/cancelRequested")
+        case .sessionCanvasSet: try container.encode("session/canvasSet")
+        case .sessionCanvasRemoved: try container.encode("session/canvasRemoved")
+        case .canvasAvailabilityChanged: try container.encode("canvas/availabilityChanged")
+        case .canvasTrustChanged: try container.encode("canvas/trustChanged")
+        case .canvasIncarnationChanged: try container.encode("canvas/incarnationChanged")
+        case .canvasTitleChanged: try container.encode("canvas/titleChanged")
+        case .canvasIconChanged: try container.encode("canvas/iconChanged")
         case .unknown(let raw): try container.encode(raw)
         }
     }
@@ -2378,6 +2399,148 @@ public struct AutomationRunCancelRequestedAction: Codable, Sendable {
     }
 }
 
+public struct SessionCanvasSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// The canvas entry to add or update, matched by `resource`.
+    public var canvas: CanvasEntry
+
+    public init(
+        type: ActionType,
+        canvas: CanvasEntry
+    ) {
+        self.type = type
+        self.canvas = canvas
+    }
+}
+
+public struct SessionCanvasRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Entry in {@link SessionState.canvases} to remove, matching {@link CanvasEntry.resource}.
+    public var resource: String
+
+    public init(
+        type: ActionType,
+        resource: String
+    ) {
+        self.type = type
+        self.resource = resource
+    }
+}
+
+public struct CanvasAvailabilityChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New {@link CanvasState.availability}.
+    public var availability: CanvasAvailabilityState
+    /// The {@link CanvasState.revision} this action results in. The reducer
+    /// MUST reject (no-op) this action if `revision` is not strictly greater
+    /// than the canvas's current `revision` — this is how stale/out-of-order
+    /// deliveries are consistently rejected across every canvas action, not
+    /// just this one.
+    public var revision: Int
+
+    public init(
+        type: ActionType,
+        availability: CanvasAvailabilityState,
+        revision: Int
+    ) {
+        self.type = type
+        self.availability = availability
+        self.revision = revision
+    }
+}
+
+public struct CanvasTrustChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New {@link CanvasState.trust}.
+    public var trust: CanvasTrustState
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    public var revision: Int
+
+    public init(
+        type: ActionType,
+        trust: CanvasTrustState,
+        revision: Int
+    ) {
+        self.type = type
+        self.trust = trust
+        self.revision = revision
+    }
+}
+
+public struct CanvasIncarnationChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New {@link CanvasIdentity.incarnation}. MUST differ from the previous value and MUST NOT be reused for this logical identity.
+    public var incarnation: String
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    public var revision: Int
+
+    public init(
+        type: ActionType,
+        incarnation: String,
+        revision: Int
+    ) {
+        self.type = type
+        self.incarnation = incarnation
+        self.revision = revision
+    }
+}
+
+public struct CanvasTitleChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New {@link CanvasState.title}.
+    public var title: String
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    public var revision: Int
+
+    public init(
+        type: ActionType,
+        title: String,
+        revision: Int
+    ) {
+        self.type = type
+        self.title = title
+        self.revision = revision
+    }
+}
+
+public struct CanvasIconChangedAction: Codable, Sendable {
+    public var type: ActionType
+    /// New {@link CanvasState.icon}; `null` removes the current icon.
+    public var icon: Icon?
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    public var revision: Int
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case icon
+        case revision
+    }
+
+    public init(
+        type: ActionType,
+        icon: Icon?,
+        revision: Int
+    ) {
+        self.type = type
+        self.icon = icon
+        self.revision = revision
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.type = try container.decode(ActionType.self, forKey: .type)
+        self.icon = try container.decode(Icon?.self, forKey: .icon)
+        self.revision = try container.decode(Int.self, forKey: .revision)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(type, forKey: .type)
+        try container.encode(icon, forKey: .icon)
+        try container.encode(revision, forKey: .revision)
+    }
+}
+
 // MARK: - Partial Summary Types
 
 public struct PartialChatSummary: Codable, Sendable {
@@ -2526,6 +2689,13 @@ public enum StateAction: Codable, Sendable {
     case automationRunSessionRemoved(AutomationRunSessionRemovedAction)
     case automationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction)
     case automationRunCancelRequested(AutomationRunCancelRequestedAction)
+    case sessionCanvasSet(SessionCanvasSetAction)
+    case sessionCanvasRemoved(SessionCanvasRemovedAction)
+    case canvasAvailabilityChanged(CanvasAvailabilityChangedAction)
+    case canvasTrustChanged(CanvasTrustChangedAction)
+    case canvasIncarnationChanged(CanvasIncarnationChangedAction)
+    case canvasTitleChanged(CanvasTitleChangedAction)
+    case canvasIconChanged(CanvasIconChangedAction)
     /// Unknown or future action type; reducers treat this as a no-op.
     /// The raw payload (including its `type` discriminant) is preserved
     /// as an `AnyCodable` so a decode→encode round-trip re-emits it
@@ -2734,6 +2904,20 @@ public enum StateAction: Codable, Sendable {
             self = .automationRunPrimarySessionChanged(try AutomationRunPrimarySessionChangedAction(from: decoder))
         case "automationRun/cancelRequested":
             self = .automationRunCancelRequested(try AutomationRunCancelRequestedAction(from: decoder))
+        case "session/canvasSet":
+            self = .sessionCanvasSet(try SessionCanvasSetAction(from: decoder))
+        case "session/canvasRemoved":
+            self = .sessionCanvasRemoved(try SessionCanvasRemovedAction(from: decoder))
+        case "canvas/availabilityChanged":
+            self = .canvasAvailabilityChanged(try CanvasAvailabilityChangedAction(from: decoder))
+        case "canvas/trustChanged":
+            self = .canvasTrustChanged(try CanvasTrustChangedAction(from: decoder))
+        case "canvas/incarnationChanged":
+            self = .canvasIncarnationChanged(try CanvasIncarnationChangedAction(from: decoder))
+        case "canvas/titleChanged":
+            self = .canvasTitleChanged(try CanvasTitleChangedAction(from: decoder))
+        case "canvas/iconChanged":
+            self = .canvasIconChanged(try CanvasIconChangedAction(from: decoder))
         default:
             self = .unknown(try AnyCodable(from: decoder))
         }
@@ -2839,6 +3023,13 @@ public enum StateAction: Codable, Sendable {
         case .automationRunSessionRemoved(let v): try v.encode(to: encoder)
         case .automationRunPrimarySessionChanged(let v): try v.encode(to: encoder)
         case .automationRunCancelRequested(let v): try v.encode(to: encoder)
+        case .sessionCanvasSet(let v): try v.encode(to: encoder)
+        case .sessionCanvasRemoved(let v): try v.encode(to: encoder)
+        case .canvasAvailabilityChanged(let v): try v.encode(to: encoder)
+        case .canvasTrustChanged(let v): try v.encode(to: encoder)
+        case .canvasIncarnationChanged(let v): try v.encode(to: encoder)
+        case .canvasTitleChanged(let v): try v.encode(to: encoder)
+        case .canvasIconChanged(let v): try v.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

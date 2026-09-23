@@ -1,0 +1,41 @@
+{
+  "description": "session/canvasRemoved removes the matching canvas entry and is a no-op for an unknown resource",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "canvases": [
+      {
+        "resource": "ahp-canvas:/c1",
+        "identity": {
+          "chat": "ahp-chat:/s1/c1",
+          "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+          "canvasType": "contoso.widget",
+          "instanceId": "w1",
+          "incarnation": "gen-1"
+        },
+        "title": "Widget",
+        "trust": { "status": "trusted" },
+        "availability": "ready",
+        "revision": 2
+      }
+    ]
+  },
+  "actions": [
+    { "type": "session/canvasRemoved", "resource": "ahp-canvas:/unknown" },
+    { "type": "session/canvasRemoved", "resource": "ahp-canvas:/c1" }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "canvases": []
+  }
+}

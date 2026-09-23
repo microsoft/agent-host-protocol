@@ -850,6 +850,26 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		}
 		state.Chats = append(state.Chats, a.Summary)
 		return ReduceOutcomeApplied
+	case *ahptypes.SessionCanvasSetAction:
+		for i := range state.Canvases {
+			if state.Canvases[i].Resource == a.Canvas.Resource {
+				if a.Canvas.Revision <= state.Canvases[i].Revision {
+					return ReduceOutcomeNoOp
+				}
+				state.Canvases[i] = a.Canvas
+				return ReduceOutcomeApplied
+			}
+		}
+		state.Canvases = append(state.Canvases, a.Canvas)
+		return ReduceOutcomeApplied
+	case *ahptypes.SessionCanvasRemovedAction:
+		for i := range state.Canvases {
+			if state.Canvases[i].Resource == a.Resource {
+				state.Canvases = append(state.Canvases[:i], state.Canvases[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
 	case *ahptypes.SessionChatRemovedAction:
 		for i := range state.Chats {
 			if state.Chats[i].Resource == a.Chat {
@@ -1861,6 +1881,46 @@ func ApplyActionToResourceWatch(state *ahptypes.ResourceWatchState, action ahpty
 		return ReduceOutcomeNoOp
 	}
 	return ReduceOutcomeOutOfScope
+}
+
+// ApplyActionToCanvas applies an action to canvas state while rejecting stale
+// or duplicate revisions.
+func ApplyActionToCanvas(state *ahptypes.CanvasState, action ahptypes.StateAction) ReduceOutcome {
+	switch a := action.Value.(type) {
+	case *ahptypes.CanvasAvailabilityChangedAction:
+		if a.Revision <= state.Revision {
+			return ReduceOutcomeNoOp
+		}
+		state.Availability = a.Availability
+		state.Revision = a.Revision
+	case *ahptypes.CanvasTrustChangedAction:
+		if a.Revision <= state.Revision {
+			return ReduceOutcomeNoOp
+		}
+		state.Trust = a.Trust
+		state.Revision = a.Revision
+	case *ahptypes.CanvasIncarnationChangedAction:
+		if a.Revision <= state.Revision {
+			return ReduceOutcomeNoOp
+		}
+		state.Identity.Incarnation = a.Incarnation
+		state.Revision = a.Revision
+	case *ahptypes.CanvasTitleChangedAction:
+		if a.Revision <= state.Revision {
+			return ReduceOutcomeNoOp
+		}
+		state.Title = a.Title
+		state.Revision = a.Revision
+	case *ahptypes.CanvasIconChangedAction:
+		if a.Revision <= state.Revision {
+			return ReduceOutcomeNoOp
+		}
+		state.Icon = a.Icon
+		state.Revision = a.Revision
+	default:
+		return ReduceOutcomeOutOfScope
+	}
+	return ReduceOutcomeApplied
 }
 
 // ApplyActionToAutomation applies an action to automation catalogue state.

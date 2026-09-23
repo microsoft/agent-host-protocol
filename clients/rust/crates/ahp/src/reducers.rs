@@ -4,7 +4,7 @@
 //! [`apply_action_to_root`], [`apply_action_to_session`],
 //! [`apply_action_to_chat`], [`apply_action_to_terminal`],
 //! [`apply_action_to_changeset`], [`apply_action_to_annotations`], and
-//! [`apply_action_to_resource_watch`] to dispatch any [`StateAction`]
+//! [`apply_action_to_resource_watch`], and [`apply_action_to_canvas`] to dispatch any [`StateAction`]
 //! against the matching scope; unrelated actions short-circuit as
 //! [`ReduceOutcome::OutOfScope`] so a client holding every state tree can
 //! blindly fan each action out.
@@ -57,14 +57,14 @@ use ahp_types::actions::{
     ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, ChangesetOperationStatus,
-    ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization,
-    ConfirmationOption, Customization, CustomizationEnablement, ErrorResponsePart,
-    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState,
-    TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
+    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, CanvasState,
+    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest, ChatState,
+    ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ErrorResponsePart, InputRequestResponsePart, McpServerStartingState, McpServerState,
+    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
+    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
+    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
     ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
     ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
@@ -713,6 +713,34 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             } else {
                 state.chats.push(a.summary.clone());
             }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasSet(a) => {
+            let canvases = state.canvases.get_or_insert_with(Vec::new);
+            if let Some(idx) = canvases
+                .iter()
+                .position(|canvas| canvas.resource == a.canvas.resource)
+            {
+                if a.canvas.revision <= canvases[idx].revision {
+                    return ReduceOutcome::NoOp;
+                }
+                canvases[idx] = a.canvas.clone();
+            } else {
+                canvases.push(a.canvas.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasRemoved(a) => {
+            let Some(canvases) = state.canvases.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = canvases
+                .iter()
+                .position(|canvas| canvas.resource == a.resource)
+            else {
+                return ReduceOutcome::NoOp;
+            };
+            canvases.remove(idx);
             ReduceOutcome::Applied
         }
         StateAction::SessionChatRemoved(a) => {
@@ -2076,6 +2104,49 @@ pub fn apply_action_to_resource_watch(
     }
 }
 
+/// Apply a [`StateAction`] to a [`CanvasState`] in place.
+pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::CanvasAvailabilityChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.availability = a.availability.clone();
+            state.revision = a.revision;
+        }
+        StateAction::CanvasTrustChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.trust = a.trust.clone();
+            state.revision = a.revision;
+        }
+        StateAction::CanvasIncarnationChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.identity.incarnation = a.incarnation.clone();
+            state.revision = a.revision;
+        }
+        StateAction::CanvasTitleChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.title = a.title.clone();
+            state.revision = a.revision;
+        }
+        StateAction::CanvasIconChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.icon = a.icon.clone();
+            state.revision = a.revision;
+        }
+        _ => return ReduceOutcome::OutOfScope,
+    }
+    ReduceOutcome::Applied
+}
+
 /// Apply a [`StateAction`] to an [`AutomationState`] in place.
 pub fn apply_action_to_automation(
     state: &mut AutomationState,
@@ -2192,6 +2263,7 @@ mod tests {
             config: None,
             customizations: None,
             changesets: None,
+            canvases: None,
             input_needed: None,
             meta: None,
         }
@@ -2653,6 +2725,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_resource_watch,
+                    &file_name,
+                    description,
+                ),
+                "canvas" => run_fixture::<CanvasState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_canvas,
                     &file_name,
                     description,
                 ),

@@ -36,6 +36,16 @@ use ahp_types::{
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
 };
 use serde_json::{Number, Value};
+
+#[test]
+fn canvas_icon_changed_requires_icon() {
+    let result =
+        serde_json::from_str::<StateAction>(r#"{"type":"canvas/iconChanged","revision":3}"#);
+    assert!(
+        result.is_err(),
+        "canvas/iconChanged without icon decoded successfully"
+    );
+}
 use std::{collections::BTreeMap, fs, path::PathBuf};
 
 // ─── Fixture directory ───────────────────────────────────────────────────────

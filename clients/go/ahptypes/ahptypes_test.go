@@ -36,9 +36,11 @@ func TestActionEnvelopeRoundTrip(t *testing.T) {
 	if err := json.Unmarshal([]byte(wire), &env); err != nil {
 		t.Fatalf("unmarshal envelope: %v", err)
 	}
+
 	if env.Channel != "ahp-session:/s1" {
 		t.Errorf("channel = %q, want ahp-session:/s1", env.Channel)
 	}
+
 	if env.ServerSeq != 7 {
 		t.Errorf("serverSeq = %d, want 7", env.ServerSeq)
 	}
@@ -61,6 +63,29 @@ func TestActionEnvelopeRoundTrip(t *testing.T) {
 	}
 	if back.ServerSeq != env.ServerSeq || back.Channel != env.Channel {
 		t.Errorf("round-trip mismatch: got %+v", back)
+	}
+}
+
+func TestCanvasIconChangedRequiresIcon(t *testing.T) {
+	var action StateAction
+	err := json.Unmarshal(
+		[]byte(`{"type":"canvas/iconChanged","revision":3}`),
+		&action,
+	)
+	if err == nil {
+		t.Fatal("canvas/iconChanged without icon decoded successfully")
+	}
+}
+
+func TestCanvasIconChangedRequiresRevision(t *testing.T) {
+	for _, wire := range []string{
+		`{"type":"canvas/iconChanged","icon":null}`,
+		`{"type":"canvas/iconChanged","icon":null,"revision":null}`,
+	} {
+		var action StateAction
+		if err := json.Unmarshal([]byte(wire), &action); err == nil {
+			t.Fatalf("canvas/iconChanged with invalid revision decoded successfully: %s", wire)
+		}
 	}
 }
 

@@ -1429,6 +1429,156 @@ pub enum AutomationRunOriginKind {
     Trigger,
 }
 
+/// Discriminant for {@link CanvasSource} — what kind of package originates a
+/// canvas type.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasSourceKind {
+    /// An explicitly installed host extension.
+    Extension,
+    /// An explicitly installed package (not a host extension).
+    Package,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasSourceKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Extension => serializer.serialize_str("extension"),
+            Self::Package => serializer.serialize_str("package"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasSourceKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "extension" => Self::Extension,
+            "package" => Self::Package,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Discriminant for {@link CanvasTrustState} — whether the host currently
+/// permits this canvas's declared actions to execute.
+///
+/// Trust is independent of {@link CanvasAvailabilityStatus | availability}:
+/// a canvas may be perfectly capable of rendering while blocked from
+/// executing actions, and vice versa. Trust decisions are host/runtime
+/// authority, not something this protocol grants.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasTrustStatus {
+    /// Declared actions may be invoked.
+    Trusted,
+    /// A trust decision has not yet been made (e.g. first use of a new/changed source).
+    Pending,
+    /// The host has denied execution; declared actions MUST NOT be invoked.
+    Blocked,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasTrustStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Trusted => serializer.serialize_str("trusted"),
+            Self::Pending => serializer.serialize_str("pending"),
+            Self::Blocked => serializer.serialize_str("blocked"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasTrustStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "trusted" => Self::Trusted,
+            "pending" => Self::Pending,
+            "blocked" => Self::Blocked,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Discriminant for {@link CanvasAvailabilityState} — the canvas's current
+/// live resolution state, independent of its durable
+/// {@link CanvasEntry | membership} in a session's catalog.
+///
+/// An empty catalog membership list is not itself a close, and a canvas may
+/// remain a recorded member while its live availability cycles through these
+/// states any number of times (e.g. across provider restarts).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasAvailabilityStatus {
+    /// The connected client or host does not support this canvas type (e.g.
+    /// the client omitted the `canvases` capability, or no local runtime can
+    /// render this `canvasType`). Distinct from `blocked` trust, which is a
+    /// policy decision rather than a capability gap.
+    Unsupported,
+    /// Recorded but not yet resolved to a live endpoint since it was opened or the host last restarted.
+    NotLoaded,
+    /// Currently resolving or (re)connecting to a live endpoint.
+    Loading,
+    /// Live and reachable, but the provider has not yet produced content to render.
+    Empty,
+    /// Live, reachable, and has declared its current actions.
+    Ready,
+    /// The live endpoint failed to resolve, or resolution otherwise failed.
+    Failed,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasAvailabilityStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Unsupported => serializer.serialize_str("unsupported"),
+            Self::NotLoaded => serializer.serialize_str("notLoaded"),
+            Self::Loading => serializer.serialize_str("loading"),
+            Self::Empty => serializer.serialize_str("empty"),
+            Self::Ready => serializer.serialize_str("ready"),
+            Self::Failed => serializer.serialize_str("failed"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasAvailabilityStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "unsupported" => Self::Unsupported,
+            "notLoaded" => Self::NotLoaded,
+            "loading" => Self::Loading,
+            "empty" => Self::Empty,
+            "ready" => Self::Ready,
+            "failed" => Self::Failed,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 // ─── Structs ──────────────────────────────────────────────────────────
 
 /// An optionally-sized icon that can be displayed in a user interface.
@@ -2100,6 +2250,16 @@ pub struct SessionState {
     /// {@link /guide/changesets | Changesets} for an overview of the model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changesets: Option<Vec<Changeset>>,
+    /// Catalog of canvases opened for chats in this session. Presence is
+    /// durable logical membership, admitted via `openCanvas` or host publication
+    /// of a correlated, already-open native instance under that command's
+    /// admission rules. Membership is never implied by discovery, subscription,
+    /// source resolution, a chat's existence, or a client's earlier focus.
+    /// Each entry's {@link CanvasIdentity.chat | `identity.chat`} identifies the
+    /// exact backing chat; a canvas never migrates to a different chat. See
+    /// {@link CanvasEntry} for the full membership/availability/trust model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<Vec<CanvasEntry>>,
     /// Outstanding input the session is blocked on, aggregated across every chat
     /// so a client can discover and answer it from the session channel alone,
     /// without subscribing to individual chats.
@@ -5698,6 +5858,350 @@ pub struct AutomationRunState {
     pub meta: Option<JsonObject>,
 }
 
+/// A canvas type provided by an installed host extension.
+///
+/// `extensionId` is the identity-bearing field for comparison purposes (see
+/// {@link CanvasIdentityKey}). `version` is display/informational metadata
+/// only — it MUST NOT be treated as identity-bearing (two `CanvasSource`
+/// values that differ only in `version` are the same source).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasExtensionSource {
+    /// Stable extension identifier (host-defined format, e.g. `publisher.name`).
+    /// MUST NOT exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub extension_id: String,
+    /// Installed extension version, when known. Metadata only — not identity-bearing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
+/// A canvas type provided by an installed package that is not a host
+/// extension (e.g. a workspace-declared runtime package).
+///
+/// `sourceId` — not `packageName` — is the identity-bearing field: the same
+/// declared package name MAY be installed in more than one scope (e.g. a
+/// workspace-local copy and a globally-installed copy, or two different
+/// registries), and each such installation is a distinct source with its own
+/// `sourceId`. `packageName` and `version` are display/informational metadata
+/// only and MUST NOT be treated as identity-bearing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasPackageSource {
+    /// Stable, host- or package-manager-assigned unique identifier for this
+    /// specific installed package instance/scope (opaque format). This is the
+    /// identity-bearing field — see {@link CanvasIdentityKey}. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub source_id: String,
+    /// Declared package name, for display only — MUST NOT be used to compare source identity; see `sourceId`.
+    pub package_name: String,
+    /// Installed package version, when known. Metadata only — not identity-bearing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
+/// The logical identity of a canvas, excluding the host-assigned
+/// {@link CanvasIdentity.incarnation | `incarnation`}.
+///
+/// Two canvases are the same logical canvas iff `chat`, `canvasType`,
+/// `instanceId`, and `source`'s **identity-bearing** fields are all equal:
+/// `kind` plus `extensionId` (for {@link CanvasExtensionSource}) or `kind`
+/// plus `sourceId` (for {@link CanvasPackageSource}). `source.version` (and
+/// `CanvasPackageSource.packageName`) are metadata and MUST NOT factor into
+/// this comparison. Clients MUST NOT treat
+/// {@link CanvasIdentity.instanceId | `instanceId`} alone as a stable key —
+/// it is only unique within the scope of `(chat, source, canvasType)`.
+///
+/// This logical tuple does not widen the owning runtime's native instance-ID
+/// namespace. A runtime may require session-wide native IDs across providers;
+/// hosts MUST preserve that constraint rather than hide native collisions
+/// with an invented provider namespace.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasIdentityKey {
+    /// The exact backing chat this canvas belongs to. A canvas is never
+    /// re-associated with a different chat; opening a new one for another chat
+    /// creates a distinct canvas.
+    pub chat: Uri,
+    /// The extension or package that declares this canvas's type.
+    pub source: CanvasSource,
+    /// Provider-declared canvas type (host/provider-defined format). MUST NOT
+    /// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub canvas_type: String,
+    /// Provider-chosen stable identifier for this canvas instance, scoped to
+    /// `(chat, source, canvasType)`. Stable across reloads and host/window
+    /// restarts for the same logical canvas. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub instance_id: String,
+}
+
+/// Full identity of a canvas, including the host-assigned
+/// {@link CanvasIdentity.incarnation | `incarnation`}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasIdentity {
+    /// The exact backing chat this canvas belongs to. A canvas is never
+    /// re-associated with a different chat; opening a new one for another chat
+    /// creates a distinct canvas.
+    pub chat: Uri,
+    /// The extension or package that declares this canvas's type.
+    pub source: CanvasSource,
+    /// Provider-declared canvas type (host/provider-defined format). MUST NOT
+    /// exceed {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub canvas_type: String,
+    /// Provider-chosen stable identifier for this canvas instance, scoped to
+    /// `(chat, source, canvasType)`. Stable across reloads and host/window
+    /// restarts for the same logical canvas. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub instance_id: String,
+    /// Opaque, host-generated token identifying the current generation of this
+    /// canvas's live endpoint. The host mints a fresh token whenever a provider
+    /// restart retires the previous live endpoint and establishes a new one for
+    /// the same logical instance (see {@link CanvasIncarnationChangedAction |
+    /// `canvas/incarnationChanged`}); it is not changed by a plain page reload
+    /// or transient presentation credential renewal for the same still-live
+    /// endpoint.
+    ///
+    /// `incarnation` is **opaque**: clients and hosts MUST compare it only for
+    /// equality, never parse it, sort it, or perform arithmetic on it (e.g. it
+    /// is not guaranteed to be numeric or monotonically increasing). The host
+    /// MUST NOT reuse a token for this logical identity once it has been
+    /// superseded, including across a host/process restart — if the host
+    /// cannot otherwise guarantee non-reuse, it MUST mint tokens (e.g. random
+    /// or timestamp-derived) that make accidental reuse practically
+    /// impossible, rather than a small resettable counter.
+    ///
+    /// Clients and hosts use `incarnation` to reject stale callbacks and
+    /// in-flight effects addressed to a superseded endpoint.
+    pub incarnation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTrustedState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasPendingTrustState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasBlockedTrustState {
+    /// Optional human-readable reason surfaced to the user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// One action a canvas declares it can perform, invoked via
+/// `invokeCanvasAction`.
+///
+/// Declarations are carried only on the full {@link CanvasState}, loaded when
+/// a client subscribes — never duplicated into the lightweight
+/// {@link CanvasEntry} catalog entry, keeping session summaries small.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasActionDeclaration {
+    /// Stable identifier, unique within this canvas, matching `invokeCanvasAction`'s `actionId`.
+    pub id: String,
+    /// Human-readable display name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Description of what invoking the action does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Inline JSON Schema for the expected `input`, when small enough to embed
+    /// (see {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH},
+    /// checked by {@link isCanvasSchemaWithinLimits}). Optional because some
+    /// declared actions take no input. Mutually exclusive with
+    /// `inputSchemaRef` — a declaration MUST supply at most one of the two.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<AnyValue>,
+    /// Bounded out-of-band reference to a larger JSON Schema, used instead of
+    /// `inputSchema` when the schema would exceed
+    /// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+    /// inlined. AHP does not mandate a specific resolution mechanism for this
+    /// URI (e.g. a host MAY make it `resourceRead`-able).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema_ref: Option<Uri>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasUnsupportedAvailabilityState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasNotLoadedAvailabilityState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasLoadingAvailabilityState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasEmptyAvailabilityState {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasReadyAvailabilityState {
+    /// Actions currently declared by the live provider (full replacement each time this state is produced).
+    pub actions: Vec<CanvasActionDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasFailedAvailabilityState {
+    /// Stable machine-readable and human-readable failure information.
+    pub error: ErrorInfo,
+}
+
+/// Lightweight catalog entry for a canvas, carried in
+/// {@link SessionState.canvases | `SessionState.canvases`}. Presence
+/// represents durable **logical membership** — it is unaffected by the live
+/// {@link CanvasEntry.availability | `availability`} cycling through
+/// `notLoaded`/`loading`/`empty`/`ready`/`failed` any number of times.
+///
+/// Membership is admitted by `openCanvas` or by host publication of a
+/// correlated, already-open native instance under that command's admission
+/// rules, never by discovery, subscription, or source resolution.
+///
+/// The full state, including declared actions, lives in {@link CanvasState},
+/// loaded when a client subscribes to {@link CanvasEntry.resource}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasEntry {
+    /// Subscribable `ahp-canvas:` URI matching {@link CanvasState.resource}.
+    pub resource: Uri,
+    /// Full identity, including current incarnation.
+    pub identity: CanvasIdentity,
+    /// Human-readable display title.
+    pub title: String,
+    /// Optional display icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<Icon>,
+    /// Current trust decision matching {@link CanvasState.trust}.
+    pub trust: CanvasTrustState,
+    /// Current availability status matching {@link CanvasState.availability}'s discriminant.
+    pub availability: CanvasAvailabilityStatus,
+    /// Monotonically increasing counter bumped on every change to this
+    /// canvas's state (trust, availability, or incarnation). Clients MAY use it
+    /// to detect and reject stale reads without a full deep comparison.
+    /// Transient presentation credential renewal alone does not require a
+    /// revision change.
+    pub revision: i64,
+    /// Opaque host-defined summary metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+/// Full state for a single canvas, loaded when a client subscribes to the
+/// canvas's URI.
+///
+/// `CanvasState` **denormalizes** every {@link CanvasEntry} field directly
+/// onto itself, replacing `availability`'s lightweight status with the full
+/// {@link CanvasAvailabilityState} (including declared actions or failure
+/// detail). Producers MUST keep the two representations consistent: any
+/// change to the inlined fields SHOULD also be announced on the owning
+/// session via {@link SessionCanvasSetAction | `session/canvasSet`}.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasState {
+    /// URI of this canvas channel.
+    pub resource: Uri,
+    /// Full identity, including current incarnation.
+    pub identity: CanvasIdentity,
+    /// Human-readable display title.
+    pub title: String,
+    /// Optional display icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<Icon>,
+    /// Current trust decision.
+    pub trust: CanvasTrustState,
+    /// Current live resolution state.
+    pub availability: CanvasAvailabilityState,
+    /// Matches {@link CanvasEntry.revision}.
+    pub revision: i64,
+    /// Opaque host-defined metadata.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+}
+
+/// A canvas type an installed extension or package currently makes available
+/// to open for a chat, as returned by `listCanvasTypes`.
+///
+/// `CanvasTypeDeclaration` is **discovery-only** metadata about a TYPE — it is
+/// unrelated to {@link CanvasEntry}, which represents durable membership of
+/// an already-opened INSTANCE in {@link SessionState.canvases}. Browsing the
+/// catalogue (via `listCanvasTypes`) MUST NOT execute or start a provider,
+/// or open, materialize, or admit a canvas. Membership requires `openCanvas`
+/// or host publication of a correlated, already-open native instance under
+/// that command's admission rules.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTypeDeclaration {
+    /// The extension or package that declares this canvas type.
+    pub source: CanvasSource,
+    /// Provider-declared canvas type (host/provider-defined format), passed as
+    /// {@link CanvasIdentityKey.canvasType} to `openCanvas`. MUST NOT exceed
+    /// {@link CANVAS_IDENTITY_FIELD_MAX_LENGTH}.
+    pub canvas_type: String,
+    /// Human-readable display name for a canvas-type picker.
+    pub title: String,
+    /// Description of what this canvas type does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Optional display icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<Icon>,
+    /// Inline JSON Schema describing the `openCanvas` `input` this type
+    /// expects, when small enough to embed (see {@link CANVAS_SCHEMA_MAX_PROPERTIES}
+    /// / {@link CANVAS_SCHEMA_MAX_DEPTH}). Mutually exclusive with
+    /// `openInputSchemaRef`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_input_schema: Option<AnyValue>,
+    /// Bounded out-of-band reference to a larger open-input JSON Schema, used
+    /// instead of `openInputSchema` when it would exceed
+    /// {@link CANVAS_SCHEMA_MAX_PROPERTIES} / {@link CANVAS_SCHEMA_MAX_DEPTH} if
+    /// inlined.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_input_schema_ref: Option<Uri>,
+    /// Advisory, statically-known preview of actions this canvas type
+    /// typically declares once opened (bounded to
+    /// {@link CANVAS_MAX_DECLARED_ACTIONS}). This is **not authoritative** —
+    /// the actual invocable actions for an opened instance are always
+    /// {@link CanvasReadyAvailabilityState.actions}, which MAY differ (e.g.
+    /// depend on live provider configuration) and MUST be used instead of this
+    /// preview once the canvas is open.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_actions: Option<Vec<CanvasActionDeclaration>>,
+}
+
+/// Transient, renderer-neutral presentation of a canvas's current live
+/// endpoint, returned by `resolveCanvasSource`.
+///
+/// This is a plain URL, not any renderer- or process-model-specific handle
+/// (e.g. not an Electron `WebContentsView`, a browser tab id, or a webview
+/// panel reference) — how a client actually presents it (a VS Code Webview,
+/// the Integrated Browser, or otherwise) is entirely a client/host
+/// implementation detail outside this protocol.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasSourcePresentation {
+    /// Ephemeral URL to the canvas's current live endpoint. Transient: MUST
+    /// NOT be persisted (including durable canvas/session state or editor
+    /// restoration data), written to routine logs, or treated as a stable
+    /// identity. A host MAY embed
+    /// short-lived, single-use credentials in it; such credentials are never
+    /// durable authority. Renewed credentials MAY produce a different URL for
+    /// the same incarnation and revision. Reuse is safe only while the
+    /// credential is known to remain valid and reusable.
+    pub url: String,
+    /// Advisory expiry hint for `url` (and any embedded credential), when
+    /// known. Omission does not imply indefinite validity or reusability, and
+    /// an unexpired credential may still be single-use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+}
+
 // ─── Customization Enablement Union ───────────────────────────────────────
 
 /// A single explicit customization enablement decision.
@@ -5768,7 +6272,7 @@ pub enum ChatOrigin {
 }
 
 /// A single part of a response stream (text, tool call, reasoning, content reference).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind")]
 pub enum ResponsePart {
     #[serde(rename = "markdown")]
@@ -5791,8 +6295,44 @@ pub enum ResponsePart {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for ResponsePart {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("kind").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("markdown") => serde_json::from_value::<MarkdownResponsePart>(raw)
+                .map(Self::Markdown)
+                .map_err(serde::de::Error::custom),
+            Some("contentRef") => serde_json::from_value::<ResourceResponsePart>(raw)
+                .map(Self::ContentRef)
+                .map_err(serde::de::Error::custom),
+            Some("toolCall") => serde_json::from_value::<ToolCallResponsePart>(raw)
+                .map(|value| Self::ToolCall(Box::new(value)))
+                .map_err(serde::de::Error::custom),
+            Some("reasoning") => serde_json::from_value::<ReasoningResponsePart>(raw)
+                .map(Self::Reasoning)
+                .map_err(serde::de::Error::custom),
+            Some("systemNotification") => {
+                serde_json::from_value::<SystemNotificationResponsePart>(raw)
+                    .map(Self::SystemNotification)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("inputRequest") => serde_json::from_value::<InputRequestResponsePart>(raw)
+                .map(Self::InputRequest)
+                .map_err(serde::de::Error::custom),
+            Some("error") => serde_json::from_value::<ErrorResponsePart>(raw)
+                .map(Self::Error)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// Full tool call lifecycle state.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "status")]
 pub enum ToolCallState {
     #[serde(rename = "streaming")]
@@ -5815,8 +6355,46 @@ pub enum ToolCallState {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for ToolCallState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("status").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("streaming") => serde_json::from_value::<ToolCallStreamingState>(raw)
+                .map(Self::Streaming)
+                .map_err(serde::de::Error::custom),
+            Some("pending-confirmation") => {
+                serde_json::from_value::<ToolCallPendingConfirmationState>(raw)
+                    .map(Self::PendingConfirmation)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("running") => serde_json::from_value::<ToolCallRunningState>(raw)
+                .map(Self::Running)
+                .map_err(serde::de::Error::custom),
+            Some("auth-required") => serde_json::from_value::<ToolCallAuthRequiredState>(raw)
+                .map(|value| Self::AuthRequired(Box::new(value)))
+                .map_err(serde::de::Error::custom),
+            Some("pending-result-confirmation") => {
+                serde_json::from_value::<ToolCallPendingResultConfirmationState>(raw)
+                    .map(Self::PendingResultConfirmation)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("completed") => serde_json::from_value::<ToolCallCompletedState>(raw)
+                .map(Self::Completed)
+                .map_err(serde::de::Error::custom),
+            Some("cancelled") => serde_json::from_value::<ToolCallCancelledState>(raw)
+                .map(Self::Cancelled)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// A tool call blocked on parameter- or result-confirmation.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "status")]
 pub enum ToolCallConfirmationState {
     #[serde(rename = "pending-confirmation")]
@@ -5827,6 +6405,29 @@ pub enum ToolCallConfirmationState {
     /// Reducers treat this as a no-op.
     #[serde(untagged)]
     Unknown(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for ToolCallConfirmationState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("status").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("pending-confirmation") => {
+                serde_json::from_value::<ToolCallPendingConfirmationState>(raw)
+                    .map(Self::PendingConfirmation)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("pending-result-confirmation") => {
+                serde_json::from_value::<ToolCallPendingResultConfirmationState>(raw)
+                    .map(Self::PendingResultConfirmation)
+                    .map_err(serde::de::Error::custom)
+            }
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
 }
 
 /// Who currently holds a terminal.
@@ -5840,7 +6441,7 @@ pub enum TerminalClaim {
 }
 
 /// A content part within terminal output.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type")]
 pub enum TerminalContentPart {
     #[serde(rename = "unclassified")]
@@ -5853,8 +6454,27 @@ pub enum TerminalContentPart {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for TerminalContentPart {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("type").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("unclassified") => serde_json::from_value::<TerminalUnclassifiedPart>(raw)
+                .map(Self::Unclassified)
+                .map_err(serde::de::Error::custom),
+            Some("command") => serde_json::from_value::<TerminalCommandPart>(raw)
+                .map(Self::Command)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// One question within a chat input request.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind")]
 pub enum ChatInputQuestion {
     #[serde(rename = "text")]
@@ -5875,8 +6495,39 @@ pub enum ChatInputQuestion {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for ChatInputQuestion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("kind").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("text") => serde_json::from_value::<ChatInputTextQuestion>(raw)
+                .map(Self::Text)
+                .map_err(serde::de::Error::custom),
+            Some("number") => serde_json::from_value::<ChatInputNumberQuestion>(raw)
+                .map(Self::Number)
+                .map_err(serde::de::Error::custom),
+            Some("integer") => serde_json::from_value::<ChatInputNumberQuestion>(raw)
+                .map(Self::Integer)
+                .map_err(serde::de::Error::custom),
+            Some("boolean") => serde_json::from_value::<ChatInputBooleanQuestion>(raw)
+                .map(Self::Boolean)
+                .map_err(serde::de::Error::custom),
+            Some("single-select") => serde_json::from_value::<ChatInputSingleSelectQuestion>(raw)
+                .map(Self::SingleSelect)
+                .map_err(serde::de::Error::custom),
+            Some("multi-select") => serde_json::from_value::<ChatInputMultiSelectQuestion>(raw)
+                .map(Self::MultiSelect)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// Value captured for one answer.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind")]
 pub enum ChatInputAnswerValue {
     #[serde(rename = "text")]
@@ -5895,6 +6546,36 @@ pub enum ChatInputAnswerValue {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for ChatInputAnswerValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("kind").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("text") => serde_json::from_value::<ChatInputTextAnswerValue>(raw)
+                .map(Self::Text)
+                .map_err(serde::de::Error::custom),
+            Some("number") => serde_json::from_value::<ChatInputNumberAnswerValue>(raw)
+                .map(Self::Number)
+                .map_err(serde::de::Error::custom),
+            Some("boolean") => serde_json::from_value::<ChatInputBooleanAnswerValue>(raw)
+                .map(Self::Boolean)
+                .map_err(serde::de::Error::custom),
+            Some("selected") => serde_json::from_value::<ChatInputSelectedAnswerValue>(raw)
+                .map(Self::Selected)
+                .map_err(serde::de::Error::custom),
+            Some("selected-many") => {
+                serde_json::from_value::<ChatInputSelectedManyAnswerValue>(raw)
+                    .map(Self::SelectedMany)
+                    .map_err(serde::de::Error::custom)
+            }
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// Draft, submitted, or skipped answer for one question.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "state")]
@@ -5908,7 +6589,7 @@ pub enum ChatInputAnswer {
 }
 
 /// Content block in a tool result.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type")]
 pub enum ToolResultContent {
     #[serde(rename = "text")]
@@ -5929,8 +6610,41 @@ pub enum ToolResultContent {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for ToolResultContent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("type").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("text") => serde_json::from_value::<ToolResultTextContent>(raw)
+                .map(Self::Text)
+                .map_err(serde::de::Error::custom),
+            Some("embeddedResource") => {
+                serde_json::from_value::<ToolResultEmbeddedResourceContent>(raw)
+                    .map(Self::EmbeddedResource)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("resource") => serde_json::from_value::<ToolResultResourceContent>(raw)
+                .map(Self::Resource)
+                .map_err(serde::de::Error::custom),
+            Some("fileEdit") => serde_json::from_value::<ToolResultFileEditContent>(raw)
+                .map(Self::FileEdit)
+                .map_err(serde::de::Error::custom),
+            Some("terminal") => serde_json::from_value::<ToolResultTerminalContent>(raw)
+                .map(Self::Terminal)
+                .map_err(serde::de::Error::custom),
+            Some("subagent") => serde_json::from_value::<ToolResultSubagentContent>(raw)
+                .map(Self::Subagent)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// An attachment associated with a `Message`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type")]
 pub enum MessageAttachment {
     #[serde(rename = "simple")]
@@ -5949,8 +6663,38 @@ pub enum MessageAttachment {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for MessageAttachment {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("type").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("simple") => serde_json::from_value::<SimpleMessageAttachment>(raw)
+                .map(Self::Simple)
+                .map_err(serde::de::Error::custom),
+            Some("embeddedResource") => {
+                serde_json::from_value::<MessageEmbeddedResourceAttachment>(raw)
+                    .map(Self::EmbeddedResource)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("resource") => serde_json::from_value::<MessageResourceAttachment>(raw)
+                .map(Self::Resource)
+                .map_err(serde::de::Error::custom),
+            Some("annotations") => serde_json::from_value::<MessageAnnotationsAttachment>(raw)
+                .map(Self::Annotations)
+                .map_err(serde::de::Error::custom),
+            Some("chat") => serde_json::from_value::<MessageChatAttachment>(raw)
+                .map(Self::Chat)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// A top-level customization (plugin, directory, or bare MCP server).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type")]
 pub enum Customization {
     #[serde(rename = "plugin")]
@@ -5965,8 +6709,30 @@ pub enum Customization {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for Customization {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("type").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("plugin") => serde_json::from_value::<PluginCustomization>(raw)
+                .map(Self::Plugin)
+                .map_err(serde::de::Error::custom),
+            Some("directory") => serde_json::from_value::<DirectoryCustomization>(raw)
+                .map(Self::Directory)
+                .map_err(serde::de::Error::custom),
+            Some("mcpServer") => serde_json::from_value::<McpServerCustomization>(raw)
+                .map(|value| Self::McpServer(Box::new(value)))
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// A child customization living inside a plugin or directory.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type")]
 pub enum ChildCustomization {
     #[serde(rename = "agent")]
@@ -5987,6 +6753,37 @@ pub enum ChildCustomization {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for ChildCustomization {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("type").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("agent") => serde_json::from_value::<AgentCustomization>(raw)
+                .map(Self::Agent)
+                .map_err(serde::de::Error::custom),
+            Some("skill") => serde_json::from_value::<SkillCustomization>(raw)
+                .map(Self::Skill)
+                .map_err(serde::de::Error::custom),
+            Some("prompt") => serde_json::from_value::<PromptCustomization>(raw)
+                .map(Self::Prompt)
+                .map_err(serde::de::Error::custom),
+            Some("rule") => serde_json::from_value::<RuleCustomization>(raw)
+                .map(Self::Rule)
+                .map_err(serde::de::Error::custom),
+            Some("hook") => serde_json::from_value::<HookCustomization>(raw)
+                .map(Self::Hook)
+                .map_err(serde::de::Error::custom),
+            Some("mcpServer") => serde_json::from_value::<McpServerCustomization>(raw)
+                .map(|value| Self::McpServer(Box::new(value)))
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// Host-reported load state for a container customization.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind")]
@@ -6002,7 +6799,7 @@ pub enum CustomizationLoadState {
 }
 
 /// Discriminated lifecycle status of an MCP server customization.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind")]
 pub enum McpServerState {
     #[serde(rename = "starting")]
@@ -6021,8 +6818,36 @@ pub enum McpServerState {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for McpServerState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("kind").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("starting") => serde_json::from_value::<McpServerStartingState>(raw)
+                .map(Self::Starting)
+                .map_err(serde::de::Error::custom),
+            Some("ready") => serde_json::from_value::<McpServerReadyState>(raw)
+                .map(Self::Ready)
+                .map_err(serde::de::Error::custom),
+            Some("authRequired") => serde_json::from_value::<McpServerAuthRequiredState>(raw)
+                .map(|value| Self::AuthRequired(Box::new(value)))
+                .map_err(serde::de::Error::custom),
+            Some("error") => serde_json::from_value::<McpServerErrorState>(raw)
+                .map(Self::Error)
+                .map_err(serde::de::Error::custom),
+            Some("stopped") => serde_json::from_value::<McpServerStoppedState>(raw)
+                .map(Self::Stopped)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// Reference to the contributor of the tool being called.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind")]
 pub enum ToolCallContributor {
     #[serde(rename = "client")]
@@ -6035,8 +6860,27 @@ pub enum ToolCallContributor {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for ToolCallContributor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("kind").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("client") => serde_json::from_value::<ToolCallClientContributor>(raw)
+                .map(Self::Client)
+                .map_err(serde::de::Error::custom),
+            Some("mcp") => serde_json::from_value::<ToolCallMcpContributor>(raw)
+                .map(Self::Mcp)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// Asynchronous model-judge confirmation rationale.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "status")]
 pub enum ToolCallRiskAssessment {
     #[serde(rename = "loading")]
@@ -6047,6 +6891,25 @@ pub enum ToolCallRiskAssessment {
     /// Reducers treat this as a no-op.
     #[serde(untagged)]
     Unknown(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for ToolCallRiskAssessment {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("status").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("loading") => serde_json::from_value::<ToolCallRiskAssessmentLoadingState>(raw)
+                .map(Self::Loading)
+                .map_err(serde::de::Error::custom),
+            Some("complete") => serde_json::from_value::<ToolCallRiskAssessmentCompleteState>(raw)
+                .map(Self::Complete)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
 }
 
 /// Current lifecycle of a terminal process.
@@ -6060,7 +6923,7 @@ pub enum TerminalLifecycleState {
 }
 
 /// One outstanding piece of input a session is blocked on, aggregated across all chats.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind")]
 pub enum SessionInputRequest {
     #[serde(rename = "chatInput")]
@@ -6077,8 +6940,39 @@ pub enum SessionInputRequest {
     Unknown(serde_json::Value),
 }
 
+impl<'de> Deserialize<'de> for SessionInputRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("kind").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("chatInput") => serde_json::from_value::<SessionChatInputRequest>(raw)
+                .map(Self::ChatInput)
+                .map_err(serde::de::Error::custom),
+            Some("toolConfirmation") => {
+                serde_json::from_value::<SessionToolConfirmationRequest>(raw)
+                    .map(Self::ToolConfirmation)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("toolClientExecution") => {
+                serde_json::from_value::<SessionToolClientExecutionRequest>(raw)
+                    .map(Self::ToolClientExecution)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("toolAuthentication") => {
+                serde_json::from_value::<SessionToolAuthenticationRequest>(raw)
+                    .map(|value| Self::ToolAuthentication(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
 /// Durable origin of a session.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind")]
 pub enum SessionOrigin {
     #[serde(rename = "automation")]
@@ -6087,6 +6981,22 @@ pub enum SessionOrigin {
     /// Reducers treat this as a no-op.
     #[serde(untagged)]
     Unknown(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for SessionOrigin {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("kind").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("automation") => serde_json::from_value::<AutomationSessionOrigin>(raw)
+                .map(Self::Automation)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
 }
 
 /// Automatic trigger for an automation.
@@ -6123,6 +7033,132 @@ pub enum AutomationRunLifecycle {
     Failed(AutomationFailedRunLifecycle),
     #[serde(rename = "cancelled")]
     Cancelled(AutomationCancelledRunLifecycle),
+}
+
+/// Identifies the explicitly installed extension or package that declares a canvas type.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind")]
+pub enum CanvasSource {
+    #[serde(rename = "extension")]
+    Extension(CanvasExtensionSource),
+    #[serde(rename = "package")]
+    Package(CanvasPackageSource),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for CanvasSource {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("kind").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("extension") => serde_json::from_value::<CanvasExtensionSource>(raw)
+                .map(Self::Extension)
+                .map_err(serde::de::Error::custom),
+            Some("package") => serde_json::from_value::<CanvasPackageSource>(raw)
+                .map(Self::Package)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
+/// Current trust decision governing whether a canvas's declared actions may execute.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "status")]
+pub enum CanvasTrustState {
+    #[serde(rename = "trusted")]
+    Trusted(CanvasTrustedState),
+    #[serde(rename = "pending")]
+    Pending(CanvasPendingTrustState),
+    #[serde(rename = "blocked")]
+    Blocked(CanvasBlockedTrustState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for CanvasTrustState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("status").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("trusted") => serde_json::from_value::<CanvasTrustedState>(raw)
+                .map(Self::Trusted)
+                .map_err(serde::de::Error::custom),
+            Some("pending") => serde_json::from_value::<CanvasPendingTrustState>(raw)
+                .map(Self::Pending)
+                .map_err(serde::de::Error::custom),
+            Some("blocked") => serde_json::from_value::<CanvasBlockedTrustState>(raw)
+                .map(Self::Blocked)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
+}
+
+/// Current live resolution state of a canvas.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "status")]
+pub enum CanvasAvailabilityState {
+    #[serde(rename = "unsupported")]
+    Unsupported(CanvasUnsupportedAvailabilityState),
+    #[serde(rename = "notLoaded")]
+    NotLoaded(CanvasNotLoadedAvailabilityState),
+    #[serde(rename = "loading")]
+    Loading(CanvasLoadingAvailabilityState),
+    #[serde(rename = "empty")]
+    Empty(CanvasEmptyAvailabilityState),
+    #[serde(rename = "ready")]
+    Ready(CanvasReadyAvailabilityState),
+    #[serde(rename = "failed")]
+    Failed(CanvasFailedAvailabilityState),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for CanvasAvailabilityState {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("status").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("unsupported") => {
+                serde_json::from_value::<CanvasUnsupportedAvailabilityState>(raw)
+                    .map(Self::Unsupported)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("notLoaded") => serde_json::from_value::<CanvasNotLoadedAvailabilityState>(raw)
+                .map(Self::NotLoaded)
+                .map_err(serde::de::Error::custom),
+            Some("loading") => serde_json::from_value::<CanvasLoadingAvailabilityState>(raw)
+                .map(Self::Loading)
+                .map_err(serde::de::Error::custom),
+            Some("empty") => serde_json::from_value::<CanvasEmptyAvailabilityState>(raw)
+                .map(Self::Empty)
+                .map_err(serde::de::Error::custom),
+            Some("ready") => serde_json::from_value::<CanvasReadyAvailabilityState>(raw)
+                .map(Self::Ready)
+                .map_err(serde::de::Error::custom),
+            Some("failed") => serde_json::from_value::<CanvasFailedAvailabilityState>(raw)
+                .map(Self::Failed)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
 }
 
 /// The state payload of a snapshot.

@@ -25,7 +25,7 @@ public enum ReduceOutcome
 /// <summary>
 /// Pure reducers for the Agent Host Protocol. <see cref="ApplyToRoot"/>,
 /// <see cref="ApplyToSession"/>, <see cref="ApplyToTerminal"/>, and
-/// <see cref="ApplyToChangeset"/> apply a <see cref="StateAction"/> to the
+/// <see cref="ApplyToChangeset"/>, and <see cref="ApplyToCanvas"/> apply a <see cref="StateAction"/> to the
 /// matching state tree in place.
 /// </summary>
 public static class Reducers
@@ -876,6 +876,36 @@ public static class Reducers
                 });
             case SessionChatAddedAction a:
                 return ApplySessionChatAdded(state, a);
+            case SessionCanvasSetAction a:
+                state.Canvases ??= [];
+                int canvasIndex = state.Canvases.FindIndex(c => c.Resource == a.Canvas.Resource);
+                if (canvasIndex < 0)
+                {
+                    state.Canvases.Add(a.Canvas);
+                    return ReduceOutcome.Applied;
+                }
+
+                if (a.Canvas.Revision <= state.Canvases[canvasIndex].Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                state.Canvases[canvasIndex] = a.Canvas;
+                return ReduceOutcome.Applied;
+            case SessionCanvasRemovedAction a:
+                if (state.Canvases is null)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                int removalIndex = state.Canvases.FindIndex(c => c.Resource == a.Resource);
+                if (removalIndex < 0)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                state.Canvases.RemoveAt(removalIndex);
+                return ReduceOutcome.Applied;
             case SessionChatRemovedAction a:
                 return ApplySessionChatRemoved(state, a);
             case SessionChatUpdatedAction a:
@@ -2352,6 +2382,64 @@ public static class Reducers
         }
 
         return ReduceOutcome.OutOfScope;
+    }
+
+    /// <summary>Applies an action to canvas state while rejecting stale or duplicate revisions.</summary>
+    public static ReduceOutcome ApplyToCanvas(CanvasState state, StateAction action)
+    {
+        Guard.ThrowIfNull(state, nameof(state));
+        Guard.ThrowIfNull(action, nameof(action));
+
+        switch (action.Value)
+        {
+            case CanvasAvailabilityChangedAction changed:
+                if (changed.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                state.Availability = changed.Availability;
+                state.Revision = changed.Revision;
+                return ReduceOutcome.Applied;
+            case CanvasTrustChangedAction changed:
+                if (changed.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                state.Trust = changed.Trust;
+                state.Revision = changed.Revision;
+                return ReduceOutcome.Applied;
+            case CanvasIncarnationChangedAction changed:
+                if (changed.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                state.Identity = state.Identity with { Incarnation = changed.Incarnation };
+                state.Revision = changed.Revision;
+                return ReduceOutcome.Applied;
+            case CanvasTitleChangedAction changed:
+                if (changed.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                state.Title = changed.Title;
+                state.Revision = changed.Revision;
+                return ReduceOutcome.Applied;
+            case CanvasIconChangedAction changed:
+                if (changed.Revision <= state.Revision)
+                {
+                    return ReduceOutcome.NoOp;
+                }
+
+                state.Icon = changed.Icon;
+                state.Revision = changed.Revision;
+                return ReduceOutcome.Applied;
+            default:
+                return ReduceOutcome.OutOfScope;
+        }
     }
 
     /// <summary>Applies an action to the automation catalogue in place.</summary>

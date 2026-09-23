@@ -68,6 +68,15 @@ public sealed class TypesRoundTripFixtures
         Assert.Equal(ProtocolVersion.Current, ProtocolVersion.Supported[0]);
     }
 
+    [Fact]
+    public void CanvasIconChangedRequiresRevision()
+    {
+        Assert.Throws<JsonException>(() =>
+            Ser.Deserialize<StateAction>("""{"type":"canvas/iconChanged","icon":null}"""));
+        Assert.Throws<JsonException>(() =>
+            Ser.Deserialize<StateAction>("""{"type":"canvas/iconChanged","icon":null,"revision":null}"""));
+    }
+
     // ── Verifier ──────────────────────────────────────────────────────────
 
     private static void VerifyFixture(string path)

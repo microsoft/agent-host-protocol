@@ -15,10 +15,11 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
-    Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
-    ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
-    ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
-    ErrorResponsePart, McpAuthRequirement, McpServerState, Message, ModelSelection,
+    CanvasAvailabilityState, CanvasEntry, CanvasTrustState, Changeset, ChangesetFile,
+    ChangesetOperation, ChangesetOperationStatus, ChangesetStatus, ChatInputAnswer,
+    ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ChatSummary,
+    ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
+    ErrorResponsePart, Icon, McpAuthRequirement, McpServerState, Message, ModelSelection,
     PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection,
     TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolDefinition, ToolInput,
@@ -128,6 +129,13 @@ pub enum ActionType {
     AutomationRunSessionRemoved,
     AutomationRunPrimarySessionChanged,
     AutomationRunCancelRequested,
+    SessionCanvasSet,
+    SessionCanvasRemoved,
+    CanvasAvailabilityChanged,
+    CanvasTrustChanged,
+    CanvasIncarnationChanged,
+    CanvasTitleChanged,
+    CanvasIconChanged,
     /// Unknown raw value from a newer protocol version, preserved verbatim.
     Unknown(String),
 }
@@ -296,6 +304,15 @@ impl serde::Serialize for ActionType {
             Self::AutomationRunCancelRequested => {
                 serializer.serialize_str("automationRun/cancelRequested")
             }
+            Self::SessionCanvasSet => serializer.serialize_str("session/canvasSet"),
+            Self::SessionCanvasRemoved => serializer.serialize_str("session/canvasRemoved"),
+            Self::CanvasAvailabilityChanged => {
+                serializer.serialize_str("canvas/availabilityChanged")
+            }
+            Self::CanvasTrustChanged => serializer.serialize_str("canvas/trustChanged"),
+            Self::CanvasIncarnationChanged => serializer.serialize_str("canvas/incarnationChanged"),
+            Self::CanvasTitleChanged => serializer.serialize_str("canvas/titleChanged"),
+            Self::CanvasIconChanged => serializer.serialize_str("canvas/iconChanged"),
             Self::Unknown(value) => serializer.serialize_str(value),
         }
     }
@@ -406,6 +423,13 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "automationRun/sessionRemoved" => Self::AutomationRunSessionRemoved,
             "automationRun/primarySessionChanged" => Self::AutomationRunPrimarySessionChanged,
             "automationRun/cancelRequested" => Self::AutomationRunCancelRequested,
+            "session/canvasSet" => Self::SessionCanvasSet,
+            "session/canvasRemoved" => Self::SessionCanvasRemoved,
+            "canvas/availabilityChanged" => Self::CanvasAvailabilityChanged,
+            "canvas/trustChanged" => Self::CanvasTrustChanged,
+            "canvas/incarnationChanged" => Self::CanvasIncarnationChanged,
+            "canvas/titleChanged" => Self::CanvasTitleChanged,
+            "canvas/iconChanged" => Self::CanvasIconChanged,
             _ => Self::Unknown(raw),
         })
     }
@@ -442,6 +466,14 @@ pub struct ActionEnvelope {
 }
 
 // ─── Action Payloads ─────────────────────────────────────────────────
+
+fn deserialize_required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
 
 /// Fired when available agent backends or their models change.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2182,6 +2214,119 @@ pub struct AutomationRunPrimarySessionChangedAction {
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunCancelRequestedAction {}
 
+/// A canvas was admitted (opened) or its catalog entry changed.
+///
+/// Upsert semantics keyed by {@link CanvasEntry.resource | `resource`}: the
+/// server dispatches this with the full entry to record a newly opened
+/// canvas, or to republish it after a trust/availability/incarnation change
+/// so subscribers following only the session channel stay in sync with
+/// {@link CanvasState}. Never client-dispatchable: admission is through
+/// `openCanvas` or host publication of a correlated, already-open native
+/// instance under that command's admission rules. Both paths MUST use the
+/// same singular identity-to-resource binding; repeated native observations
+/// MUST NOT create a second entry. A stale/out-of-order delivery
+/// (`canvas.revision` not strictly greater than the currently-recorded entry's
+/// revision) MUST be rejected (no-op) rather than overwrite a newer entry with
+/// older data.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasSetAction {
+    /// The canvas entry to add or update, matched by `resource`.
+    pub canvas: CanvasEntry,
+}
+
+/// A canvas was logically closed.
+///
+/// Remove semantics keyed by `resource`: an unknown URI is a no-op. This
+/// represents durable membership removal, not a client hiding a local
+/// tab/view — see `closeCanvas`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionCanvasRemovedAction {
+    /// Entry in {@link SessionState.canvases} to remove, matching {@link CanvasEntry.resource}.
+    pub resource: Uri,
+}
+
+/// Replaces the canvas's live resolution state.
+///
+/// Dispatched by the host on every availability transition, including
+/// initial resolution after admission by `openCanvas` or a correlated native
+/// open, provider restart, and endpoint failure/recovery. A client-local page
+/// reload or transient presentation credential renewal alone does not require
+/// this action or a revision change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasAvailabilityChangedAction {
+    /// New {@link CanvasState.availability}.
+    pub availability: CanvasAvailabilityState,
+    /// The {@link CanvasState.revision} this action results in. The reducer
+    /// MUST reject (no-op) this action if `revision` is not strictly greater
+    /// than the canvas's current `revision` — this is how stale/out-of-order
+    /// deliveries are consistently rejected across every canvas action, not
+    /// just this one.
+    pub revision: i64,
+}
+
+/// Replaces the canvas's trust decision.
+///
+/// Dispatched by the host whenever the execution-trust decision for this
+/// canvas's declared actions changes (e.g. a pending decision resolves, or an
+/// administrator revokes a previously trusted source).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTrustChangedAction {
+    /// New {@link CanvasState.trust}.
+    pub trust: CanvasTrustState,
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    pub revision: i64,
+}
+
+/// Records that the canvas's live endpoint was replaced by a fresh one for
+/// the same logical instance (e.g. the owning provider restarted).
+///
+/// Renewing transient presentation credentials for the same live endpoint is
+/// not endpoint replacement and MUST NOT trigger this action.
+///
+/// The host MUST dispatch {@link CanvasAvailabilityChangedAction} to
+/// transition through `notLoaded`/`loading` around this change. Receivers
+/// MUST reject in-flight `invokeCanvasAction` replies and stale server-pushed
+/// callbacks addressed to a superseded `incarnation` — because `incarnation`
+/// is opaque (see {@link CanvasIdentity.incarnation}), that rejection is
+/// driven by the accompanying `revision` bump here, not by comparing
+/// `incarnation` values for order.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasIncarnationChangedAction {
+    /// New {@link CanvasIdentity.incarnation}. MUST differ from the previous value and MUST NOT be reused for this logical identity.
+    pub incarnation: String,
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    pub revision: i64,
+}
+
+/// Replaces the canvas's display title.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasTitleChangedAction {
+    /// New {@link CanvasState.title}.
+    pub title: String,
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    pub revision: i64,
+}
+
+/// Replaces or removes the canvas's display icon.
+///
+/// This is presentation metadata only. It does not replace the live endpoint,
+/// change the canvas incarnation, or replay any canvas effect.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasIconChangedAction {
+    /// New {@link CanvasState.icon}; `null` removes the current icon.
+    #[serde(deserialize_with = "deserialize_required_nullable")]
+    pub icon: Option<Icon>,
+    /// The {@link CanvasState.revision} this action results in; see {@link CanvasAvailabilityChangedAction.revision}.
+    pub revision: i64,
+}
+
 // ─── Partial Summaries ────────────────────────────────────────────────
 
 /// Partial equivalent of ChatSummary — every field is optional for delta updates.
@@ -2222,7 +2367,7 @@ pub struct PartialChatSummary {
 // ─── StateAction Union ───────────────────────────────────────────────
 
 /// Discriminated union of every state action.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type")]
 pub enum StateAction {
     #[serde(rename = "root/agentsChanged")]
@@ -2421,8 +2566,466 @@ pub enum StateAction {
     AutomationRunPrimarySessionChanged(AutomationRunPrimarySessionChangedAction),
     #[serde(rename = "automationRun/cancelRequested")]
     AutomationRunCancelRequested(AutomationRunCancelRequestedAction),
+    #[serde(rename = "session/canvasSet")]
+    SessionCanvasSet(SessionCanvasSetAction),
+    #[serde(rename = "session/canvasRemoved")]
+    SessionCanvasRemoved(SessionCanvasRemovedAction),
+    #[serde(rename = "canvas/availabilityChanged")]
+    CanvasAvailabilityChanged(Box<CanvasAvailabilityChangedAction>),
+    #[serde(rename = "canvas/trustChanged")]
+    CanvasTrustChanged(CanvasTrustChangedAction),
+    #[serde(rename = "canvas/incarnationChanged")]
+    CanvasIncarnationChanged(CanvasIncarnationChangedAction),
+    #[serde(rename = "canvas/titleChanged")]
+    CanvasTitleChanged(CanvasTitleChangedAction),
+    #[serde(rename = "canvas/iconChanged")]
+    CanvasIconChanged(CanvasIconChangedAction),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]
     Unknown(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for StateAction {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = raw.get("type").and_then(serde_json::Value::as_str);
+        match discriminator {
+            Some("root/agentsChanged") => serde_json::from_value::<RootAgentsChangedAction>(raw)
+                .map(Self::RootAgentsChanged)
+                .map_err(serde::de::Error::custom),
+            Some("root/activeSessionsChanged") => {
+                serde_json::from_value::<RootActiveSessionsChangedAction>(raw)
+                    .map(Self::RootActiveSessionsChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("root/configChanged") => serde_json::from_value::<RootConfigChangedAction>(raw)
+                .map(Self::RootConfigChanged)
+                .map_err(serde::de::Error::custom),
+            Some("session/ready") => serde_json::from_value::<SessionReadyAction>(raw)
+                .map(Self::SessionReady)
+                .map_err(serde::de::Error::custom),
+            Some("session/creationFailed") => {
+                serde_json::from_value::<SessionCreationFailedAction>(raw)
+                    .map(Self::SessionCreationFailed)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/chatAdded") => serde_json::from_value::<SessionChatAddedAction>(raw)
+                .map(Self::SessionChatAdded)
+                .map_err(serde::de::Error::custom),
+            Some("session/chatRemoved") => serde_json::from_value::<SessionChatRemovedAction>(raw)
+                .map(Self::SessionChatRemoved)
+                .map_err(serde::de::Error::custom),
+            Some("session/chatUpdated") => serde_json::from_value::<SessionChatUpdatedAction>(raw)
+                .map(Self::SessionChatUpdated)
+                .map_err(serde::de::Error::custom),
+            Some("session/defaultChatChanged") => {
+                serde_json::from_value::<SessionDefaultChatChangedAction>(raw)
+                    .map(Self::SessionDefaultChatChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/turnStarted") => serde_json::from_value::<ChatTurnStartedAction>(raw)
+                .map(Self::ChatTurnStarted)
+                .map_err(serde::de::Error::custom),
+            Some("chat/delta") => serde_json::from_value::<ChatDeltaAction>(raw)
+                .map(Self::ChatDelta)
+                .map_err(serde::de::Error::custom),
+            Some("chat/responsePart") => serde_json::from_value::<ChatResponsePartAction>(raw)
+                .map(Self::ChatResponsePart)
+                .map_err(serde::de::Error::custom),
+            Some("chat/toolCallStart") => serde_json::from_value::<ChatToolCallStartAction>(raw)
+                .map(Self::ChatToolCallStart)
+                .map_err(serde::de::Error::custom),
+            Some("chat/toolCallDelta") => serde_json::from_value::<ChatToolCallDeltaAction>(raw)
+                .map(Self::ChatToolCallDelta)
+                .map_err(serde::de::Error::custom),
+            Some("chat/toolCallReady") => serde_json::from_value::<ChatToolCallReadyAction>(raw)
+                .map(Self::ChatToolCallReady)
+                .map_err(serde::de::Error::custom),
+            Some("chat/toolCallConfirmed") => {
+                serde_json::from_value::<ChatToolCallConfirmedAction>(raw)
+                    .map(Self::ChatToolCallConfirmed)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/toolCallComplete") => {
+                serde_json::from_value::<ChatToolCallCompleteAction>(raw)
+                    .map(Self::ChatToolCallComplete)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/toolCallResultConfirmed") => {
+                serde_json::from_value::<ChatToolCallResultConfirmedAction>(raw)
+                    .map(Self::ChatToolCallResultConfirmed)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/toolCallContentChanged") => {
+                serde_json::from_value::<ChatToolCallContentChangedAction>(raw)
+                    .map(Self::ChatToolCallContentChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/toolCallAuthRequired") => {
+                serde_json::from_value::<ChatToolCallAuthRequiredAction>(raw)
+                    .map(Self::ChatToolCallAuthRequired)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/toolCallAuthResolved") => {
+                serde_json::from_value::<ChatToolCallAuthResolvedAction>(raw)
+                    .map(Self::ChatToolCallAuthResolved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/turnComplete") => serde_json::from_value::<ChatTurnCompleteAction>(raw)
+                .map(Self::ChatTurnComplete)
+                .map_err(serde::de::Error::custom),
+            Some("chat/turnCancelled") => serde_json::from_value::<ChatTurnCancelledAction>(raw)
+                .map(Self::ChatTurnCancelled)
+                .map_err(serde::de::Error::custom),
+            Some("chat/error") => serde_json::from_value::<ChatErrorAction>(raw)
+                .map(Self::ChatError)
+                .map_err(serde::de::Error::custom),
+            Some("chat/turnResume") => serde_json::from_value::<ChatTurnResumeAction>(raw)
+                .map(Self::ChatTurnResume)
+                .map_err(serde::de::Error::custom),
+            Some("chat/activityChanged") => {
+                serde_json::from_value::<ChatActivityChangedAction>(raw)
+                    .map(Self::ChatActivityChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/titleChanged") => {
+                serde_json::from_value::<SessionTitleChangedAction>(raw)
+                    .map(Self::SessionTitleChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/usage") => serde_json::from_value::<ChatUsageAction>(raw)
+                .map(Self::ChatUsage)
+                .map_err(serde::de::Error::custom),
+            Some("chat/reasoning") => serde_json::from_value::<ChatReasoningAction>(raw)
+                .map(Self::ChatReasoning)
+                .map_err(serde::de::Error::custom),
+            Some("session/isReadChanged") => {
+                serde_json::from_value::<SessionIsReadChangedAction>(raw)
+                    .map(Self::SessionIsReadChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/isArchivedChanged") => {
+                serde_json::from_value::<SessionIsArchivedChangedAction>(raw)
+                    .map(Self::SessionIsArchivedChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/activityChanged") => {
+                serde_json::from_value::<SessionActivityChangedAction>(raw)
+                    .map(Self::SessionActivityChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/changesetsChanged") => {
+                serde_json::from_value::<SessionChangesetsChangedAction>(raw)
+                    .map(Self::SessionChangesetsChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/serverToolsChanged") => {
+                serde_json::from_value::<SessionServerToolsChangedAction>(raw)
+                    .map(Self::SessionServerToolsChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/activeClientSet") => {
+                serde_json::from_value::<SessionActiveClientSetAction>(raw)
+                    .map(Self::SessionActiveClientSet)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/activeClientRemoved") => {
+                serde_json::from_value::<SessionActiveClientRemovedAction>(raw)
+                    .map(Self::SessionActiveClientRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/workingDirectorySet") => {
+                serde_json::from_value::<SessionWorkingDirectorySetAction>(raw)
+                    .map(Self::SessionWorkingDirectorySet)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/workingDirectoryRemoved") => {
+                serde_json::from_value::<SessionWorkingDirectoryRemovedAction>(raw)
+                    .map(Self::SessionWorkingDirectoryRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/workingDirectoryReplaced") => {
+                serde_json::from_value::<SessionWorkingDirectoryReplacedAction>(raw)
+                    .map(Self::SessionWorkingDirectoryReplaced)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/workingDirectorySet") => {
+                serde_json::from_value::<ChatWorkingDirectorySetAction>(raw)
+                    .map(Self::ChatWorkingDirectorySet)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/workingDirectoryRemoved") => {
+                serde_json::from_value::<ChatWorkingDirectoryRemovedAction>(raw)
+                    .map(Self::ChatWorkingDirectoryRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/inputNeededSet") => {
+                serde_json::from_value::<SessionInputNeededSetAction>(raw)
+                    .map(|value| Self::SessionInputNeededSet(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/inputNeededRemoved") => {
+                serde_json::from_value::<SessionInputNeededRemovedAction>(raw)
+                    .map(Self::SessionInputNeededRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/pendingMessageSet") => {
+                serde_json::from_value::<ChatPendingMessageSetAction>(raw)
+                    .map(Self::ChatPendingMessageSet)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/pendingMessageRemoved") => {
+                serde_json::from_value::<ChatPendingMessageRemovedAction>(raw)
+                    .map(Self::ChatPendingMessageRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/queuedMessagesReordered") => {
+                serde_json::from_value::<ChatQueuedMessagesReorderedAction>(raw)
+                    .map(Self::ChatQueuedMessagesReordered)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/draftChanged") => serde_json::from_value::<ChatDraftChangedAction>(raw)
+                .map(Self::ChatDraftChanged)
+                .map_err(serde::de::Error::custom),
+            Some("chat/inputRequested") => serde_json::from_value::<ChatInputRequestedAction>(raw)
+                .map(Self::ChatInputRequested)
+                .map_err(serde::de::Error::custom),
+            Some("chat/inputAnswerChanged") => {
+                serde_json::from_value::<ChatInputAnswerChangedAction>(raw)
+                    .map(Self::ChatInputAnswerChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/inputCompleted") => serde_json::from_value::<ChatInputCompletedAction>(raw)
+                .map(Self::ChatInputCompleted)
+                .map_err(serde::de::Error::custom),
+            Some("session/customizationsChanged") => {
+                serde_json::from_value::<SessionCustomizationsChangedAction>(raw)
+                    .map(Self::SessionCustomizationsChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/customizationToggled") => {
+                serde_json::from_value::<SessionCustomizationToggledAction>(raw)
+                    .map(Self::SessionCustomizationToggled)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/customizationUpdated") => {
+                serde_json::from_value::<SessionCustomizationUpdatedAction>(raw)
+                    .map(|value| Self::SessionCustomizationUpdated(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/customizationRemoved") => {
+                serde_json::from_value::<SessionCustomizationRemovedAction>(raw)
+                    .map(Self::SessionCustomizationRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/mcpServerStateChanged") => {
+                serde_json::from_value::<SessionMcpServerStateChangedAction>(raw)
+                    .map(|value| Self::SessionMcpServerStateChanged(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/mcpServerStartRequested") => {
+                serde_json::from_value::<SessionMcpServerStartRequestedAction>(raw)
+                    .map(Self::SessionMcpServerStartRequested)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/mcpServerStopRequested") => {
+                serde_json::from_value::<SessionMcpServerStopRequestedAction>(raw)
+                    .map(Self::SessionMcpServerStopRequested)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("chat/truncated") => serde_json::from_value::<ChatTruncatedAction>(raw)
+                .map(Self::ChatTruncated)
+                .map_err(serde::de::Error::custom),
+            Some("chat/turnsLoaded") => serde_json::from_value::<ChatTurnsLoadedAction>(raw)
+                .map(Self::ChatTurnsLoaded)
+                .map_err(serde::de::Error::custom),
+            Some("session/configChanged") => {
+                serde_json::from_value::<SessionConfigChangedAction>(raw)
+                    .map(Self::SessionConfigChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/metaChanged") => serde_json::from_value::<SessionMetaChangedAction>(raw)
+                .map(Self::SessionMetaChanged)
+                .map_err(serde::de::Error::custom),
+            Some("changeset/statusChanged") => {
+                serde_json::from_value::<ChangesetStatusChangedAction>(raw)
+                    .map(Self::ChangesetStatusChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("changeset/fileSet") => serde_json::from_value::<ChangesetFileSetAction>(raw)
+                .map(Self::ChangesetFileSet)
+                .map_err(serde::de::Error::custom),
+            Some("changeset/fileRemoved") => {
+                serde_json::from_value::<ChangesetFileRemovedAction>(raw)
+                    .map(Self::ChangesetFileRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("changeset/filesReviewChanged") => {
+                serde_json::from_value::<ChangesetFilesReviewChangedAction>(raw)
+                    .map(Self::ChangesetFilesReviewChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("changeset/contentChanged") => {
+                serde_json::from_value::<ChangesetContentChangedAction>(raw)
+                    .map(|value| Self::ChangesetContentChanged(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("changeset/operationsChanged") => {
+                serde_json::from_value::<ChangesetOperationsChangedAction>(raw)
+                    .map(Self::ChangesetOperationsChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("changeset/operationStatusChanged") => {
+                serde_json::from_value::<ChangesetOperationStatusChangedAction>(raw)
+                    .map(Self::ChangesetOperationStatusChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("changeset/cleared") => serde_json::from_value::<ChangesetClearedAction>(raw)
+                .map(Self::ChangesetCleared)
+                .map_err(serde::de::Error::custom),
+            Some("annotations/set") => serde_json::from_value::<AnnotationsSetAction>(raw)
+                .map(Self::AnnotationsSet)
+                .map_err(serde::de::Error::custom),
+            Some("annotations/updated") => serde_json::from_value::<AnnotationsUpdatedAction>(raw)
+                .map(Self::AnnotationsUpdated)
+                .map_err(serde::de::Error::custom),
+            Some("annotations/removed") => serde_json::from_value::<AnnotationsRemovedAction>(raw)
+                .map(Self::AnnotationsRemoved)
+                .map_err(serde::de::Error::custom),
+            Some("annotations/entrySet") => {
+                serde_json::from_value::<AnnotationsEntrySetAction>(raw)
+                    .map(Self::AnnotationsEntrySet)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("annotations/entryRemoved") => {
+                serde_json::from_value::<AnnotationsEntryRemovedAction>(raw)
+                    .map(Self::AnnotationsEntryRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("root/terminalsChanged") => {
+                serde_json::from_value::<RootTerminalsChangedAction>(raw)
+                    .map(Self::RootTerminalsChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("terminal/data") => serde_json::from_value::<TerminalDataAction>(raw)
+                .map(Self::TerminalData)
+                .map_err(serde::de::Error::custom),
+            Some("terminal/input") => serde_json::from_value::<TerminalInputAction>(raw)
+                .map(Self::TerminalInput)
+                .map_err(serde::de::Error::custom),
+            Some("terminal/resized") => serde_json::from_value::<TerminalResizedAction>(raw)
+                .map(Self::TerminalResized)
+                .map_err(serde::de::Error::custom),
+            Some("terminal/claimed") => serde_json::from_value::<TerminalClaimedAction>(raw)
+                .map(Self::TerminalClaimed)
+                .map_err(serde::de::Error::custom),
+            Some("terminal/titleChanged") => {
+                serde_json::from_value::<TerminalTitleChangedAction>(raw)
+                    .map(Self::TerminalTitleChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("terminal/cwdChanged") => serde_json::from_value::<TerminalCwdChangedAction>(raw)
+                .map(Self::TerminalCwdChanged)
+                .map_err(serde::de::Error::custom),
+            Some("terminal/exited") => serde_json::from_value::<TerminalExitedAction>(raw)
+                .map(Self::TerminalExited)
+                .map_err(serde::de::Error::custom),
+            Some("terminal/cleared") => serde_json::from_value::<TerminalClearedAction>(raw)
+                .map(Self::TerminalCleared)
+                .map_err(serde::de::Error::custom),
+            Some("terminal/commandDetectionAvailable") => {
+                serde_json::from_value::<TerminalCommandDetectionAvailableAction>(raw)
+                    .map(Self::TerminalCommandDetectionAvailable)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("terminal/commandExecuted") => {
+                serde_json::from_value::<TerminalCommandExecutedAction>(raw)
+                    .map(Self::TerminalCommandExecuted)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("terminal/commandFinished") => {
+                serde_json::from_value::<TerminalCommandFinishedAction>(raw)
+                    .map(Self::TerminalCommandFinished)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("resourceWatch/changed") => {
+                serde_json::from_value::<ResourceWatchChangedAction>(raw)
+                    .map(Self::ResourceWatchChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("automation/createRequested") => {
+                serde_json::from_value::<AutomationCreateRequestedAction>(raw)
+                    .map(|value| Self::AutomationCreateRequested(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("automation/updateRequested") => {
+                serde_json::from_value::<AutomationUpdateRequestedAction>(raw)
+                    .map(|value| Self::AutomationUpdateRequested(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("automation/set") => serde_json::from_value::<AutomationSetAction>(raw)
+                .map(|value| Self::AutomationSet(Box::new(value)))
+                .map_err(serde::de::Error::custom),
+            Some("automation/removed") => serde_json::from_value::<AutomationRemovedAction>(raw)
+                .map(Self::AutomationRemoved)
+                .map_err(serde::de::Error::custom),
+            Some("automationRun/lifecycleChanged") => {
+                serde_json::from_value::<AutomationRunLifecycleChangedAction>(raw)
+                    .map(|value| Self::AutomationRunLifecycleChanged(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("automationRun/sessionSet") => {
+                serde_json::from_value::<AutomationRunSessionSetAction>(raw)
+                    .map(Self::AutomationRunSessionSet)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("automationRun/sessionRemoved") => {
+                serde_json::from_value::<AutomationRunSessionRemovedAction>(raw)
+                    .map(Self::AutomationRunSessionRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("automationRun/primarySessionChanged") => {
+                serde_json::from_value::<AutomationRunPrimarySessionChangedAction>(raw)
+                    .map(Self::AutomationRunPrimarySessionChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("automationRun/cancelRequested") => {
+                serde_json::from_value::<AutomationRunCancelRequestedAction>(raw)
+                    .map(Self::AutomationRunCancelRequested)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("session/canvasSet") => serde_json::from_value::<SessionCanvasSetAction>(raw)
+                .map(Self::SessionCanvasSet)
+                .map_err(serde::de::Error::custom),
+            Some("session/canvasRemoved") => {
+                serde_json::from_value::<SessionCanvasRemovedAction>(raw)
+                    .map(Self::SessionCanvasRemoved)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("canvas/availabilityChanged") => {
+                serde_json::from_value::<CanvasAvailabilityChangedAction>(raw)
+                    .map(|value| Self::CanvasAvailabilityChanged(Box::new(value)))
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("canvas/trustChanged") => serde_json::from_value::<CanvasTrustChangedAction>(raw)
+                .map(Self::CanvasTrustChanged)
+                .map_err(serde::de::Error::custom),
+            Some("canvas/incarnationChanged") => {
+                serde_json::from_value::<CanvasIncarnationChangedAction>(raw)
+                    .map(Self::CanvasIncarnationChanged)
+                    .map_err(serde::de::Error::custom)
+            }
+            Some("canvas/titleChanged") => serde_json::from_value::<CanvasTitleChangedAction>(raw)
+                .map(Self::CanvasTitleChanged)
+                .map_err(serde::de::Error::custom),
+            Some("canvas/iconChanged") => serde_json::from_value::<CanvasIconChangedAction>(raw)
+                .map(Self::CanvasIconChanged)
+                .map_err(serde::de::Error::custom),
+            _ => Ok(Self::Unknown(raw)),
+        }
+    }
 }

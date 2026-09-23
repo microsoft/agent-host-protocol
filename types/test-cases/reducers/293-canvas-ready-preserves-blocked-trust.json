@@ -1,0 +1,39 @@
+{
+  "description": "canvas/availabilityChanged becoming ready preserves blocked trust and the current incarnation",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/native",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "native-widget",
+      "incarnation": "native-endpoint-1"
+    },
+    "title": "Native Widget",
+    "trust": { "status": "blocked", "reason": "Execution denied by policy" },
+    "availability": { "status": "empty" },
+    "revision": 1
+  },
+  "actions": [
+    {
+      "type": "canvas/availabilityChanged",
+      "availability": { "status": "ready", "actions": [{ "id": "refresh", "title": "Refresh" }] },
+      "revision": 2
+    }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/native",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "native-widget",
+      "incarnation": "native-endpoint-1"
+    },
+    "title": "Native Widget",
+    "trust": { "status": "blocked", "reason": "Execution denied by policy" },
+    "availability": { "status": "ready", "actions": [{ "id": "refresh", "title": "Refresh" }] },
+    "revision": 2
+  }
+}

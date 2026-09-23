@@ -20,10 +20,10 @@ import kotlinx.serialization.json.JsonElement
  *
  * The companion top-level functions ([rootReducer], [sessionReducer], [chatReducer],
  * [terminalReducer], [changesetReducer], [annotationsReducer], [resourceWatchReducer],
- * [automationReducer], and [automationRunReducer]) are the canonical implementations.
+ * [canvasReducer], [automationReducer], and [automationRunReducer]) are the canonical implementations.
  * The object instances on this interface ([RootReducer], [SessionReducer], [ChatReducer],
  * [TerminalReducer], [ChangesetReducer], [AnnotationsReducer], [ResourceWatchReducer],
- * [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
+ * [CanvasReducer], [AutomationReducer], and [AutomationRunReducer]) wrap them for use as values where an
  * instance is needed.
  */
 public fun interface Reducer<S, A> {
@@ -70,6 +70,12 @@ public object AnnotationsReducer : Reducer<AnnotationsState, StateAction> {
 public object ResourceWatchReducer : Reducer<ResourceWatchState, StateAction> {
     override fun reduce(state: ResourceWatchState, action: StateAction): ResourceWatchState =
         resourceWatchReducer(state, action)
+}
+
+/** Pure canvas reducer as a [Reducer] instance. Delegates to [canvasReducer]. */
+public object CanvasReducer : Reducer<CanvasState, StateAction> {
+    override fun reduce(state: CanvasState, action: StateAction): CanvasState =
+        canvasReducer(state, action)
 }
 
 /** Pure automation reducer as a [Reducer] instance. Delegates to [automationReducer]. */
@@ -558,6 +564,27 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
             updated[idx] = summary
             state.copy(chats = updated)
         }
+    }
+
+    is StateActionSessionCanvasSet -> {
+        val canvas = action.value.canvas
+        val canvases = state.canvases.orEmpty()
+        val idx = canvases.indexOfFirst { it.resource == canvas.resource }
+        if (idx < 0) {
+            state.copy(canvases = canvases + canvas)
+        } else if (canvas.revision <= canvases[idx].revision) {
+            state
+        } else {
+            val updated = canvases.toMutableList()
+            updated[idx] = canvas
+            state.copy(canvases = updated)
+        }
+    }
+
+    is StateActionSessionCanvasRemoved -> {
+        val canvases = state.canvases ?: return state
+        val idx = canvases.indexOfFirst { it.resource == action.value.resource }
+        if (idx < 0) state else state.copy(canvases = canvases.toMutableList().also { it.removeAt(idx) })
     }
 
     is StateActionSessionChatRemoved -> {
@@ -1850,6 +1877,36 @@ public fun annotationsReducer(state: AnnotationsState, action: StateAction): Ann
  */
 public fun resourceWatchReducer(state: ResourceWatchState, action: StateAction): ResourceWatchState = when (action) {
     is StateActionResourceWatchChanged -> state
+    else -> state
+}
+
+// ─── Canvas Reducer ─────────────────────────────────────────────────────────
+
+/** Pure reducer for [CanvasState]. Rejects stale or duplicate revisions. */
+public fun canvasReducer(state: CanvasState, action: StateAction): CanvasState = when (action) {
+    is StateActionCanvasAvailabilityChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(availability = action.value.availability, revision = action.value.revision)
+
+    is StateActionCanvasTrustChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(trust = action.value.trust, revision = action.value.revision)
+
+    is StateActionCanvasIncarnationChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(
+            identity = state.identity.copy(incarnation = action.value.incarnation),
+            revision = action.value.revision,
+        )
+
+    is StateActionCanvasTitleChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(title = action.value.title, revision = action.value.revision)
+
+    is StateActionCanvasIconChanged ->
+        if (action.value.revision <= state.revision) state
+        else state.copy(icon = action.value.icon, revision = action.value.revision)
+
     else -> state
 }
 
