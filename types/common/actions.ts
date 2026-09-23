@@ -44,6 +44,8 @@ import type {
   SessionChangesetsChangedAction,
   SessionConfigChangedAction,
   SessionMetaChangedAction,
+  SessionCanvasSetAction,
+  SessionCanvasRemovedAction,
 } from '../channels-session/actions.js';
 
 import type {
@@ -130,6 +132,12 @@ import type {
   AutomationRunPrimarySessionChangedAction,
   AutomationRunCancelRequestedAction,
 } from '../channels-automation-run/actions.js';
+import type {
+  CanvasAvailabilityChangedAction,
+  CanvasTrustChangedAction,
+  CanvasIncarnationChangedAction,
+  CanvasTitleChangedAction,
+} from '../channels-canvas/actions.js';
 
 // ─── Action Type Enum ────────────────────────────────────────────────────────
 
@@ -238,6 +246,12 @@ export const enum ActionType {
   AutomationRunSessionRemoved = 'automationRun/sessionRemoved',
   AutomationRunPrimarySessionChanged = 'automationRun/primarySessionChanged',
   AutomationRunCancelRequested = 'automationRun/cancelRequested',
+  SessionCanvasSet = 'session/canvasSet',
+  SessionCanvasRemoved = 'session/canvasRemoved',
+  CanvasAvailabilityChanged = 'canvas/availabilityChanged',
+  CanvasTrustChanged = 'canvas/trustChanged',
+  CanvasIncarnationChanged = 'canvas/incarnationChanged',
+  CanvasTitleChanged = 'canvas/titleChanged',
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────────────
@@ -306,6 +320,8 @@ export type StateAction =
   | SessionChangesetsChangedAction
   | SessionConfigChangedAction
   | SessionMetaChangedAction
+  | SessionCanvasSetAction
+  | SessionCanvasRemovedAction
   | ChatTurnStartedAction
   | ChatDeltaAction
   | ChatResponsePartAction
@@ -371,4 +387,8 @@ export type StateAction =
   | AutomationRunSessionSetAction
   | AutomationRunSessionRemovedAction
   | AutomationRunPrimarySessionChangedAction
-  | AutomationRunCancelRequestedAction;
+  | AutomationRunCancelRequestedAction
+  | CanvasAvailabilityChangedAction
+  | CanvasTrustChangedAction
+  | CanvasIncarnationChangedAction
+  | CanvasTitleChangedAction;

@@ -164,6 +164,7 @@ function mapType(tsType: string, propName?: string, containerName?: string): str
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState'
     || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState'
+    || tsType === 'RootState | SessionState | TerminalState | ChangesetState | ResourceWatchState | AnnotationsState | ChatState | AutomationState | AutomationRunState | CanvasState'
     || tsType === 'RootState | SessionState | ChatState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState'
     || tsType === 'RootState | SessionState | ChatState | TerminalState | ChangesetState'
@@ -768,6 +769,7 @@ const STATE_ENUMS = [
   'SessionOriginKind',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'CanvasSourceKind', 'CanvasTrustStatus', 'CanvasAvailabilityStatus',
 ];
 
 /**
@@ -945,6 +947,24 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'AutomationCancelledRunLifecycle', omitDiscriminants: true },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState' },
+  { name: 'CanvasExtensionSource', omitDiscriminants: true },
+  { name: 'CanvasPackageSource', omitDiscriminants: true },
+  { name: 'CanvasIdentityKey' },
+  { name: 'CanvasIdentity' },
+  { name: 'CanvasTrustedState', omitDiscriminants: true },
+  { name: 'CanvasPendingTrustState', omitDiscriminants: true },
+  { name: 'CanvasBlockedTrustState', omitDiscriminants: true },
+  { name: 'CanvasActionDeclaration' },
+  { name: 'CanvasUnsupportedAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasNotLoadedAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasLoadingAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasEmptyAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasReadyAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasFailedAvailabilityState', omitDiscriminants: true },
+  { name: 'CanvasEntry' },
+  { name: 'CanvasState' },
+  { name: 'CanvasTypeDeclaration' },
+  { name: 'CanvasSourcePresentation' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1228,6 +1248,41 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+const CANVAS_SOURCE_UNION: UnionConfig = {
+  name: 'CanvasSource',
+  discriminantField: 'kind',
+  doc: 'Identifies the explicitly installed extension or package that declares a canvas type.',
+  variants: [
+    { variantName: 'Extension', innerType: 'CanvasExtensionSource', wireValue: 'extension' },
+    { variantName: 'Package', innerType: 'CanvasPackageSource', wireValue: 'package' },
+  ],
+};
+
+const CANVAS_TRUST_STATE_UNION: UnionConfig = {
+  name: 'CanvasTrustState',
+  discriminantField: 'status',
+  doc: 'Current trust decision governing whether a canvas\'s declared actions may execute.',
+  variants: [
+    { variantName: 'Trusted', innerType: 'CanvasTrustedState', wireValue: 'trusted' },
+    { variantName: 'Pending', innerType: 'CanvasPendingTrustState', wireValue: 'pending' },
+    { variantName: 'Blocked', innerType: 'CanvasBlockedTrustState', wireValue: 'blocked' },
+  ],
+};
+
+const CANVAS_AVAILABILITY_STATE_UNION: UnionConfig = {
+  name: 'CanvasAvailabilityState',
+  discriminantField: 'status',
+  doc: 'Current live resolution state of a canvas.',
+  variants: [
+    { variantName: 'Unsupported', innerType: 'CanvasUnsupportedAvailabilityState', wireValue: 'unsupported' },
+    { variantName: 'NotLoaded', innerType: 'CanvasNotLoadedAvailabilityState', wireValue: 'notLoaded' },
+    { variantName: 'Loading', innerType: 'CanvasLoadingAvailabilityState', wireValue: 'loading' },
+    { variantName: 'Empty', innerType: 'CanvasEmptyAvailabilityState', wireValue: 'empty' },
+    { variantName: 'Ready', innerType: 'CanvasReadyAvailabilityState', wireValue: 'ready' },
+    { variantName: 'Failed', innerType: 'CanvasFailedAvailabilityState', wireValue: 'failed' },
+  ],
+};
+
 function generateChatOrigin(project: Project): string {
   const originKind = findEnum(project, 'ChatOriginKind');
   if (!originKind) throw new Error('ChatOriginKind enum not found');
@@ -1290,6 +1345,7 @@ function generateSnapshotState(): string {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SnapshotState {
+    Canvas(Box<CanvasState>),
     Session(Box<SessionState>),
     Chat(Box<ChatState>),
     Terminal(Box<TerminalState>),
@@ -1401,6 +1457,12 @@ function generateStateFile(project: Project): string {
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_ORIGIN_UNION));
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, AUTOMATION_RUN_LIFECYCLE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_SOURCE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_TRUST_STATE_UNION));
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CANVAS_AVAILABILITY_STATE_UNION));
   lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
@@ -1516,6 +1578,12 @@ const ACTION_VARIANTS: {
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', variantName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', variantName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'session/canvasSet', variantName: 'SessionCanvasSet', tsInterface: 'SessionCanvasSetAction' },
+  { type: 'session/canvasRemoved', variantName: 'SessionCanvasRemoved', tsInterface: 'SessionCanvasRemovedAction' },
+  { type: 'canvas/availabilityChanged', variantName: 'CanvasAvailabilityChanged', tsInterface: 'CanvasAvailabilityChangedAction', boxed: true },
+  { type: 'canvas/trustChanged', variantName: 'CanvasTrustChanged', tsInterface: 'CanvasTrustChangedAction' },
+  { type: 'canvas/incarnationChanged', variantName: 'CanvasIncarnationChanged', tsInterface: 'CanvasIncarnationChangedAction' },
+  { type: 'canvas/titleChanged', variantName: 'CanvasTitleChanged', tsInterface: 'CanvasTitleChangedAction' },
 ];
 
 function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Session'): string {
@@ -1593,7 +1661,7 @@ impl Serialize for ChatErrorAction {
 function generateActionsFile(project: Project): string {
   const lines: string[] = [GENERATED_HEADER];
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
+  lines.push('use crate::state::{AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition, AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary, CanvasAvailabilityState, CanvasEntry, CanvasTrustState, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo, ErrorResponsePart, McpAuthRequirement, McpServerState, ModelSelection, ResponsePart, SessionActiveClient, SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment, ToolCallConfirmationReason, ToolCallCancellationReason, ToolDefinition, ToolInput, ToolResultContent, UsageInfo, Message, PendingMessageKind, Turn, ChangesetStatus, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, Changeset, ChatSummary};');
   lines.push('');
 
   // ActionType enum
@@ -1701,7 +1769,7 @@ const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: string }[] = [
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
-  { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' },
+  { name: 'ClientCapabilities' }, { name: 'AutomationCapabilities' }, { name: 'CanvasCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
@@ -1739,6 +1807,11 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
+  { name: 'ListCanvasTypesParams' }, { name: 'ListCanvasTypesResult' },
+  { name: 'OpenCanvasParams' }, { name: 'OpenCanvasResult' },
+  { name: 'ResolveCanvasSourceParams' }, { name: 'ResolveCanvasSourceResult' },
+  { name: 'InvokeCanvasActionParams' }, { name: 'InvokeCanvasActionResult' },
+  { name: 'RestartCanvasProviderParams' }, { name: 'CloseCanvasParams' },
 ];
 
 const RECONNECT_RESULT_UNION: UnionConfig = {
@@ -1766,7 +1839,7 @@ function generateCommandsFile(project: Project): string {
   lines.push('#[allow(unused_imports)]');
   lines.push('use crate::actions::{ActionEnvelope, StateAction};');
   lines.push('#[allow(unused_imports)]');
-  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
+  lines.push('use crate::state::{AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, CanvasAvailabilityStatus, CanvasEntry, CanvasIdentityKey, CanvasSourcePresentation, CanvasTypeDeclaration, ContentRef, Icon, Message, MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn};');
   lines.push('');
 
   lines.push('// ─── Enums ────────────────────────────────────────────────────────────\n');
@@ -2233,6 +2306,9 @@ function checkExhaustiveness(project: Project): void {
     'AutomationTrigger',
     'AutomationRunOrigin',
     'AutomationRunLifecycle',
+    'CanvasSource',
+    'CanvasTrustState',
+    'CanvasAvailabilityState',
     'AuthRequiredErrorData',
     'PermissionDeniedErrorData',
     'UnsupportedProtocolVersionErrorData',

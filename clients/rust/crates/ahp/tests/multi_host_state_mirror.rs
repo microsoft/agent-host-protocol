@@ -11,14 +11,61 @@
 use ahp::hosts::{HostId, HostSubscriptionEvent};
 use ahp::{HostedResourceKey, MultiHostStateMirror, SubscriptionEvent};
 use ahp_types::actions::{
-    ActionEnvelope, RootActiveSessionsChangedAction, RootAgentsChangedAction,
-    SessionTitleChangedAction, StateAction,
+    ActionEnvelope, CanvasIncarnationChangedAction, RootActiveSessionsChangedAction,
+    RootAgentsChangedAction, SessionTitleChangedAction, StateAction,
 };
 use ahp_types::common::ROOT_RESOURCE_URI;
 use ahp_types::state::{
     AgentInfo, RootState, SessionLifecycle, SessionState, SessionStatus, SessionSummary, Snapshot,
     SnapshotState,
 };
+
+#[test]
+fn canvas_snapshots_and_revisions_are_isolated_per_host_and_reset() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../../types/test-cases/round-trips/050-canvas-snapshot.json"
+    ))
+    .unwrap();
+    let snapshot: Snapshot = serde_json::from_value(fixture["input"].clone()).unwrap();
+    let alpha = HostId::from("alpha");
+    let beta = HostId::from("beta");
+    let mut mirror = MultiHostStateMirror::new();
+    mirror.apply_snapshot(&alpha, &snapshot);
+    mirror.apply_snapshot(&beta, &snapshot);
+    for (revision, incarnation) in [(5, "generation-two"), (4, "stale")] {
+        mirror.apply_envelope(
+            &alpha,
+            &ActionEnvelope {
+                channel: snapshot.resource.clone(),
+                action: StateAction::CanvasIncarnationChanged(CanvasIncarnationChangedAction {
+                    revision,
+                    incarnation: incarnation.into(),
+                }),
+                server_seq: 9,
+                origin: None,
+                rejection_reason: None,
+            },
+        );
+    }
+    let alpha_key = HostedResourceKey::new(alpha.clone(), snapshot.resource.clone());
+    let beta_key = HostedResourceKey::new(beta.clone(), snapshot.resource.clone());
+    assert_eq!(
+        (
+            mirror.canvases()[&alpha_key].revision,
+            mirror.canvases()[&alpha_key].identity.incarnation.as_str(),
+            mirror.canvases()[&beta_key].revision,
+            mirror.canvases()[&beta_key].identity.incarnation.as_str()
+        ),
+        (5, "generation-two", 4, "generation-one"),
+    );
+    mirror.reset_host(&alpha);
+    assert_eq!(
+        mirror.canvases().keys().collect::<Vec<_>>(),
+        vec![&beta_key]
+    );
+    mirror.reset();
+    assert!(mirror.canvases().is_empty());
+}
 
 fn agent(provider: &str) -> AgentInfo {
     AgentInfo {
@@ -65,6 +112,7 @@ fn session_state(title: &str, _resource: &str) -> SessionState {
         config: None,
         customizations: None,
         changesets: None,
+        canvases: None,
         input_needed: None,
         meta: None,
     }

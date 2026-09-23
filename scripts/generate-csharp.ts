@@ -646,6 +646,7 @@ const STATE_ENUMS = [
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'AutomationOperation', 'AutomationMisfirePolicy', 'AutomationTriggerKind',
   'AutomationRunStatus', 'AutomationRunOriginKind',
+  'CanvasSourceKind', 'CanvasTrustStatus', 'CanvasAvailabilityStatus',
 ];
 
 // `mutable: true` marks the STATE types the reducers mutate in place — these
@@ -804,6 +805,24 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AutomationCancelledRunLifecycle' },
   { name: 'AutomationRunSummary' },
   { name: 'AutomationRunState', mutable: true },
+  { name: 'CanvasExtensionSource' },
+  { name: 'CanvasPackageSource' },
+  { name: 'CanvasIdentityKey' },
+  { name: 'CanvasIdentity' },
+  { name: 'CanvasTrustedState' },
+  { name: 'CanvasPendingTrustState' },
+  { name: 'CanvasBlockedTrustState' },
+  { name: 'CanvasActionDeclaration' },
+  { name: 'CanvasUnsupportedAvailabilityState' },
+  { name: 'CanvasNotLoadedAvailabilityState' },
+  { name: 'CanvasLoadingAvailabilityState' },
+  { name: 'CanvasEmptyAvailabilityState' },
+  { name: 'CanvasReadyAvailabilityState' },
+  { name: 'CanvasFailedAvailabilityState' },
+  { name: 'CanvasEntry', mutable: true },
+  { name: 'CanvasState', mutable: true },
+  { name: 'CanvasTypeDeclaration' },
+  { name: 'CanvasSourcePresentation' },
 ];
 
 const RESPONSE_PART_UNION: UnionConfig = {
@@ -1203,6 +1222,41 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
+const CANVAS_SOURCE_UNION: UnionConfig = {
+  name: 'CanvasSource',
+  discriminantField: 'kind',
+  doc: 'CanvasSource identifies the explicitly installed extension or package that declares a canvas type.',
+  variants: [
+    { variantName: 'Extension', innerType: 'CanvasExtensionSource', wireValue: 'extension' },
+    { variantName: 'Package', innerType: 'CanvasPackageSource', wireValue: 'package' },
+  ],
+};
+
+const CANVAS_TRUST_STATE_UNION: UnionConfig = {
+  name: 'CanvasTrustState',
+  discriminantField: 'status',
+  doc: 'CanvasTrustState is the current trust decision governing whether a canvas\'s declared actions may execute.',
+  variants: [
+    { variantName: 'Trusted', innerType: 'CanvasTrustedState', wireValue: 'trusted' },
+    { variantName: 'Pending', innerType: 'CanvasPendingTrustState', wireValue: 'pending' },
+    { variantName: 'Blocked', innerType: 'CanvasBlockedTrustState', wireValue: 'blocked' },
+  ],
+};
+
+const CANVAS_AVAILABILITY_STATE_UNION: UnionConfig = {
+  name: 'CanvasAvailabilityState',
+  discriminantField: 'status',
+  doc: 'CanvasAvailabilityState is the current live resolution state of a canvas.',
+  variants: [
+    { variantName: 'Unsupported', innerType: 'CanvasUnsupportedAvailabilityState', wireValue: 'unsupported' },
+    { variantName: 'NotLoaded', innerType: 'CanvasNotLoadedAvailabilityState', wireValue: 'notLoaded' },
+    { variantName: 'Loading', innerType: 'CanvasLoadingAvailabilityState', wireValue: 'loading' },
+    { variantName: 'Empty', innerType: 'CanvasEmptyAvailabilityState', wireValue: 'empty' },
+    { variantName: 'Ready', innerType: 'CanvasReadyAvailabilityState', wireValue: 'ready' },
+    { variantName: 'Failed', innerType: 'CanvasFailedAvailabilityState', wireValue: 'failed' },
+  ],
+};
+
 const CUSTOMIZATION_ENABLEMENT_UNION_CS = `/// <summary>A single explicit customization enablement decision.</summary>
 [JsonConverter(typeof(CustomizationEnablementConverter))]
 public sealed class CustomizationEnablement : AhpUnion
@@ -1283,6 +1337,9 @@ public sealed class SnapshotState
 
     /// <summary>Automation run state variant, when populated.</summary>
     public AutomationRunState? AutomationRun { get; set; }
+
+    /// <summary>Canvas state variant, when populated.</summary>
+    public CanvasState? Canvas { get; set; }
 }
 
 /// <summary>System.Text.Json converter for the SnapshotState shape-probed union.</summary>
@@ -1293,7 +1350,13 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var result = new SnapshotState();
-        if (root.TryGetProperty("automation", out _) &&
+        if (root.TryGetProperty("identity", out _) &&
+            root.TryGetProperty("availability", out _) &&
+            root.TryGetProperty("revision", out _))
+        {
+            result.Canvas = root.Deserialize(AhpJsonTypeInfo.Get<CanvasState>(options));
+        }
+        else if (root.TryGetProperty("automation", out _) &&
             root.TryGetProperty("origin", out _) &&
             root.TryGetProperty("sessions", out _))
         {
@@ -1339,6 +1402,7 @@ internal sealed class SnapshotStateConverter : JsonConverter<SnapshotState>
 
     public override void Write(Utf8JsonWriter writer, SnapshotState value, JsonSerializerOptions options)
     {
+        if (value.Canvas is not null) { JsonSerializer.Serialize(writer, value.Canvas, AhpJsonTypeInfo.Get<CanvasState>(options)); return; }
         if (value.AutomationRun is not null) { JsonSerializer.Serialize(writer, value.AutomationRun, AhpJsonTypeInfo.Get<AutomationRunState>(options)); return; }
         if (value.Automations is not null) { JsonSerializer.Serialize(writer, value.Automations, AhpJsonTypeInfo.Get<AutomationState>(options)); return; }
         if (value.Chat is not null) { JsonSerializer.Serialize(writer, value.Chat, AhpJsonTypeInfo.Get<ChatState>(options)); return; }
@@ -1394,6 +1458,7 @@ function generateStateFile(project: Project): string {
     MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION,
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
+    CANVAS_SOURCE_UNION, CANVAS_TRUST_STATE_UNION, CANVAS_AVAILABILITY_STATE_UNION,
   ]) {
     lines.push(generateDiscriminatedUnion(u));
     lines.push('');
@@ -1532,6 +1597,12 @@ const ACTION_VARIANTS: { type: string; variantName: string; tsInterface: string 
   { type: 'automationRun/sessionRemoved', variantName: 'AutomationRunSessionRemoved', tsInterface: 'AutomationRunSessionRemovedAction' },
   { type: 'automationRun/primarySessionChanged', variantName: 'AutomationRunPrimarySessionChanged', tsInterface: 'AutomationRunPrimarySessionChangedAction' },
   { type: 'automationRun/cancelRequested', variantName: 'AutomationRunCancelRequested', tsInterface: 'AutomationRunCancelRequestedAction' },
+  { type: 'session/canvasSet', variantName: 'SessionCanvasSet', tsInterface: 'SessionCanvasSetAction' },
+  { type: 'session/canvasRemoved', variantName: 'SessionCanvasRemoved', tsInterface: 'SessionCanvasRemovedAction' },
+  { type: 'canvas/availabilityChanged', variantName: 'CanvasAvailabilityChanged', tsInterface: 'CanvasAvailabilityChangedAction' },
+  { type: 'canvas/trustChanged', variantName: 'CanvasTrustChanged', tsInterface: 'CanvasTrustChangedAction' },
+  { type: 'canvas/incarnationChanged', variantName: 'CanvasIncarnationChanged', tsInterface: 'CanvasIncarnationChangedAction' },
+  { type: 'canvas/titleChanged', variantName: 'CanvasTitleChanged', tsInterface: 'CanvasTitleChangedAction' },
 ];
 
 function generateMergedToolCallConfirmedClass(): string {
@@ -2084,6 +2155,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'Implementation' },
   { name: 'ClientCapabilities' },
   { name: 'AutomationCapabilities' },
+  { name: 'CanvasCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
@@ -2128,6 +2200,11 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'ListAutomationTriggerDefinitionsParams' }, { name: 'ListAutomationTriggerDefinitionsResult' },
   { name: 'RunAutomationParams' }, { name: 'RunAutomationResult' },
   { name: 'FetchAutomationRunsParams' }, { name: 'FetchAutomationRunsResult' },
+  { name: 'ListCanvasTypesParams' }, { name: 'ListCanvasTypesResult' },
+  { name: 'OpenCanvasParams' }, { name: 'OpenCanvasResult' },
+  { name: 'ResolveCanvasSourceParams' }, { name: 'ResolveCanvasSourceResult' },
+  { name: 'InvokeCanvasActionParams' }, { name: 'InvokeCanvasActionResult' },
+  { name: 'RestartCanvasProviderParams' }, { name: 'CloseCanvasParams' },
 ];
 
 const CHAT_SOURCE_UNION: UnionConfig = {
@@ -2563,6 +2640,7 @@ function checkExhaustiveness(project: Project): void {
     'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
     'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
+    'CanvasSource', 'CanvasTrustState', 'CanvasAvailabilityState',
     'SessionInputRequest', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',
     'PermissionDeniedErrorData', 'UnsupportedProtocolVersionErrorData',

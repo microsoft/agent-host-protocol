@@ -110,6 +110,18 @@ public struct AHPRootReducer: Reducer {
 }
 
 
+/// Protocol-based canvas reducer.
+public struct AHPCanvasReducer: Reducer {
+    public typealias State = CanvasState
+    public typealias Action = StateAction
+
+    public init() {}
+
+    public func reduce(into state: inout CanvasState, action: StateAction) {
+        state = canvasReducer(state: state, action: action)
+    }
+}
+
 // MARK: - Chat Reducer (Protocol-based)
 
 /// Protocol-based chat reducer for AHP chat state.

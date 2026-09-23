@@ -1,0 +1,40 @@
+{
+  "description": "canvas/availabilityChanged replaces availability and applies the action's asserted revision",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "notLoaded" },
+    "revision": 1
+  },
+  "actions": [
+    {
+      "type": "canvas/availabilityChanged",
+      "availability": { "status": "ready", "actions": [{ "id": "refresh", "title": "Refresh" }] },
+      "revision": 2
+    }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "ready", "actions": [{ "id": "refresh", "title": "Refresh" }] },
+    "revision": 2
+  }
+}
+

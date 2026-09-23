@@ -1,0 +1,36 @@
+{
+  "description": "canvas/titleChanged replaces title and applies the action's asserted revision",
+  "reducer": "canvas",
+  "initial": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "empty" },
+    "revision": 1
+  },
+  "actions": [
+    { "type": "canvas/titleChanged", "title": "Renamed Widget", "revision": 2 }
+  ],
+  "expected": {
+    "resource": "ahp-canvas:/c1",
+    "identity": {
+      "chat": "ahp-chat:/s1/c1",
+      "source": { "kind": "extension", "extensionId": "contoso.widgets" },
+      "canvasType": "contoso.widget",
+      "instanceId": "w1",
+      "incarnation": "gen-1"
+    },
+    "title": "Renamed Widget",
+    "trust": { "status": "trusted" },
+    "availability": { "status": "empty" },
+    "revision": 2
+  }
+}
+

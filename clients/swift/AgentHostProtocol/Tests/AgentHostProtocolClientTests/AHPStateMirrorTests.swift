@@ -4,7 +4,37 @@ import XCTest
 import AgentHostProtocol
 @testable import AgentHostProtocolClient
 
+func canvasFixtureSnapshot() throws -> Snapshot {
+    struct Fixture: Decodable {
+        let input: Snapshot
+    }
+    let root = (0..<6).reduce(URL(fileURLWithPath: #filePath)) { url, _ in url.deletingLastPathComponent() }
+    let data = try Data(contentsOf: root.appendingPathComponent("types/test-cases/round-trips/050-canvas-snapshot.json"))
+    return try JSONDecoder().decode(Fixture.self, from: data).input
+}
+
 final class AHPStateMirrorTests: XCTestCase {
+
+    func testCanvasSnapshotRetainsOnlyNewerIncarnationsAndResets() async throws {
+        let mirror = AHPStateMirror()
+        let snapshot = try canvasFixtureSnapshot()
+        await mirror.applySnapshot(snapshot)
+        for (revision, incarnation) in [(5, "generation-two"), (4, "stale")] {
+            await mirror.apply(ActionEnvelope(
+                channel: snapshot.resource,
+                action: .canvasIncarnationChanged(CanvasIncarnationChangedAction(
+                    type: .canvasIncarnationChanged, incarnation: incarnation, revision: revision
+                )),
+                serverSeq: 9
+            ))
+        }
+        let canvases = await mirror.canvases
+        XCTAssertEqual(canvases[snapshot.resource]?.identity.incarnation, "generation-two")
+        XCTAssertEqual(canvases[snapshot.resource]?.revision, 5)
+        await mirror.reset()
+        let empty = await mirror.canvases
+        XCTAssertTrue(empty.isEmpty)
+    }
 
     func testApplySnapshotSeedsRootState() async {
         let mirror = AHPStateMirror()

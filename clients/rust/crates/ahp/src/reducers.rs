@@ -57,14 +57,14 @@ use ahp_types::actions::{
     ChatTurnStartedAction, StateAction,
 };
 use ahp_types::state::{
-    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, ChangesetOperationStatus,
-    ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization,
-    ConfirmationOption, Customization, CustomizationEnablement, ErrorResponsePart,
-    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState,
-    TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
+    ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, CanvasState,
+    ChangesetOperationStatus, ChangesetState, ChangesetStatus, ChatInputRequest, ChatState,
+    ChildCustomization, ConfirmationOption, Customization, CustomizationEnablement,
+    ErrorResponsePart, InputRequestResponsePart, McpServerStartingState, McpServerState,
+    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
+    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
+    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
     ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
     ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
@@ -110,6 +110,42 @@ pub enum ReduceError {
         /// Arithmetic diagnostic.
         reason: String,
     },
+}
+
+/// Applies newer canvas revisions without allowing stale state or incarnation changes.
+pub fn apply_action_to_canvas(state: &mut CanvasState, action: &StateAction) -> ReduceOutcome {
+    match action {
+        StateAction::CanvasAvailabilityChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.availability = a.availability.clone();
+            state.revision = a.revision;
+        }
+        StateAction::CanvasTrustChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.trust = a.trust.clone();
+            state.revision = a.revision;
+        }
+        StateAction::CanvasIncarnationChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.identity.incarnation = a.incarnation.clone();
+            state.revision = a.revision;
+        }
+        StateAction::CanvasTitleChanged(a) => {
+            if a.revision <= state.revision {
+                return ReduceOutcome::NoOp;
+            }
+            state.title = a.title.clone();
+            state.revision = a.revision;
+        }
+        _ => return ReduceOutcome::OutOfScope,
+    }
+    ReduceOutcome::Applied
 }
 
 fn add_milliseconds_to_timestamp(timestamp: &str, duration: i64) -> Result<String, ReduceError> {
@@ -771,6 +807,31 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
         }
         StateAction::SessionChangesetsChanged(a) => {
             state.changesets = a.changesets.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasSet(a) => {
+            let list = state.canvases.get_or_insert_with(Vec::new);
+            if let Some(idx) = list
+                .iter()
+                .position(|canvas| canvas.resource == a.canvas.resource)
+            {
+                if a.canvas.revision <= list[idx].revision {
+                    return ReduceOutcome::NoOp;
+                }
+                list[idx] = a.canvas.clone();
+            } else {
+                list.push(a.canvas.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::SessionCanvasRemoved(a) => {
+            let Some(list) = state.canvases.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = list.iter().position(|canvas| canvas.resource == a.resource) else {
+                return ReduceOutcome::NoOp;
+            };
+            list.remove(idx);
             ReduceOutcome::Applied
         }
         StateAction::SessionConfigChanged(a) => {
@@ -2192,6 +2253,7 @@ mod tests {
             config: None,
             customizations: None,
             changesets: None,
+            canvases: None,
             input_needed: None,
             meta: None,
         }
@@ -2669,6 +2731,14 @@ mod tests {
                     expected,
                     &parsed_actions,
                     apply_action_to_automation_run,
+                    &file_name,
+                    description,
+                ),
+                "canvas" => run_fixture::<CanvasState>(
+                    initial,
+                    expected,
+                    &parsed_actions,
+                    apply_action_to_canvas,
                     &file_name,
                     description,
                 ),

@@ -21,6 +21,7 @@ public actor AHPStateMirror {
     public private(set) var automationCatalog = AutomationState(entries: [])
     public private(set) var automations: [String: AutomationEntry] = [:]
     public private(set) var automationRuns: [String: AutomationRunState] = [:]
+    public private(set) var canvases: [String: CanvasState] = [:]
 
     public init() {}
 
@@ -78,6 +79,9 @@ public actor AHPStateMirror {
             automationRuns[channel] = run
             return
         }
+        if let canvas = canvases[channel] {
+            canvases[channel] = canvasReducer(state: canvas, action: action)
+        }
     }
 
     /// Seed the mirror from a `Snapshot`, routing by its `state` discriminator.
@@ -102,6 +106,8 @@ public actor AHPStateMirror {
             rebuildAutomationIndex()
         case .automationRun(let state):
             automationRuns[snapshot.resource] = state
+        case .canvas(let state):
+            canvases[snapshot.resource] = state
         }
     }
 
@@ -125,5 +131,6 @@ public actor AHPStateMirror {
         automationCatalog = AutomationState(entries: [])
         automations.removeAll()
         automationRuns.removeAll()
+        canvases.removeAll()
     }
 }
