@@ -1569,6 +1569,11 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
 function generateMergedToolCallConfirmedDataClass(scope: 'Session' | 'Chat' = 'Session'): string {
   const className = `${scope}ToolCallConfirmedAction`;
   const actionType = scope === 'Chat' ? 'ActionType.CHAT_TOOL_CALL_CONFIRMED' : 'ActionType.SESSION_TOOL_CALL_CONFIRMED';
+  const startedAt = scope === 'Chat'
+    ? `    /** ISO 8601 timestamp when tool execution first started */
+    val startedAt: String? = null,
+`
+    : '';
   return `/**
  * Client approves or denies a pending tool call (merged approved + denied variants).
  */
@@ -1584,7 +1589,7 @@ data class ${className}(
     val approved: Boolean,
     /** How the tool was confirmed (present when approved) */
     val confirmed: ToolCallConfirmationReason? = null,
-    /** Edited tool input parameters, if the client modified them before confirming */
+${startedAt}    /** Edited tool input parameters, if the client modified them before confirming */
     val editedToolInput: String? = null,
     /** Why the tool was cancelled (present when denied) */
     val reason: ToolCallCancellationReason? = null,

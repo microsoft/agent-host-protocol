@@ -1625,6 +1625,7 @@ type ChatToolCallConfirmedAction struct {
 \tMeta            map[string]json.RawMessage     \`json:"_meta,omitempty"\`
 \tApproved        bool                           \`json:"approved"\`
 \tConfirmed       *ToolCallConfirmationReason    \`json:"confirmed,omitempty"\`
+\tStartedAt       *string                        \`json:"startedAt,omitempty"\`
 \tReason          *ToolCallCancellationReason    \`json:"reason,omitempty"\`
 \tEditedToolInput *string                        \`json:"editedToolInput,omitempty"\`
 \tUserSuggestion  *Message                       \`json:"userSuggestion,omitempty"\`

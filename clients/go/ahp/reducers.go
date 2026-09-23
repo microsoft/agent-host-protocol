@@ -1161,11 +1161,15 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 		if value, ok := tc.Value.(*ahptypes.ToolCallPendingConfirmationState); ok {
 			pending = value
 		}
-		switch tc.Value.(type) {
+		switch current := tc.Value.(type) {
 		case *ahptypes.ToolCallStreamingState,
 			*ahptypes.ToolCallRunningState,
 			*ahptypes.ToolCallPendingConfirmationState:
 			if a.Confirmed != nil {
+				startedAt := a.StartedAt
+				if running, ok := current.(*ahptypes.ToolCallRunningState); ok && running.StartedAt != nil {
+					startedAt = running.StartedAt
+				}
 				return ahptypes.ToolCallState{Value: &ahptypes.ToolCallRunningState{
 					Status:            ahptypes.ToolCallStatusRunning,
 					ToolCallId:        common.id,
@@ -1177,6 +1181,7 @@ func applyToolCallReady(state *ahptypes.ChatState, a *ahptypes.ChatToolCallReady
 					Meta:              common.meta,
 					InvocationMessage: a.InvocationMessage,
 					Confirmed:         *a.Confirmed,
+					StartedAt:         startedAt,
 				}}
 			}
 			next := &ahptypes.ToolCallPendingConfirmationState{
@@ -1264,6 +1269,7 @@ func applyToolCallConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToolCallC
 				InvocationMessage: s.InvocationMessage,
 				Confirmed:         confirmed,
 				SelectedOption:    selected,
+				StartedAt:         a.StartedAt,
 			}}
 		}
 		reason := ahptypes.ToolCallCancellationReasonDenied
@@ -1303,6 +1309,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			toolInput        *ahptypes.ToolInput
 			confirmed        = ahptypes.ToolCallConfirmationReasonNotNeeded
 			selectedOption   *ahptypes.ConfirmationOption
+			startedAt        *string
 			preAuthContent   []ahptypes.ToolResultContent
 			fromAuthRequired bool
 		)
@@ -1312,6 +1319,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			toolInput = v.ToolInput
 			confirmed = v.Confirmed
 			selectedOption = v.SelectedOption
+			startedAt = v.StartedAt
 		case *ahptypes.ToolCallPendingConfirmationState:
 			invocation = v.InvocationMessage
 			toolInput = v.ToolInput
@@ -1329,6 +1337,7 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			toolInput = v.ToolInput
 			confirmed = v.Confirmed
 			selectedOption = v.SelectedOption
+			startedAt = v.StartedAt
 			preAuthContent = v.Content
 			fromAuthRequired = true
 		default:
@@ -1337,6 +1346,11 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 		content := a.Result.Content
 		if content == nil {
 			content = preAuthContent
+		}
+		duration := a.Duration
+		if duration != nil && *duration < 0 {
+			clamped := int64(0)
+			duration = &clamped
 		}
 		// Cancelling from auth-required always completes terminally: the
 		// pending auth challenge isn't a "pending result" the client can
@@ -1361,6 +1375,8 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 				Error:             a.Result.Error,
 				Confirmed:         confirmed,
 				SelectedOption:    selectedOption,
+				StartedAt:         startedAt,
+				Duration:          duration,
 			}}
 		}
 		return ahptypes.ToolCallState{Value: &ahptypes.ToolCallCompletedState{
@@ -1380,6 +1396,8 @@ func applyToolCallComplete(state *ahptypes.ChatState, a *ahptypes.ChatToolCallCo
 			Error:             a.Result.Error,
 			Confirmed:         confirmed,
 			SelectedOption:    selectedOption,
+			StartedAt:         startedAt,
+			Duration:          duration,
 		}}
 	})
 }
@@ -1412,6 +1430,8 @@ func applyToolCallResultConfirmed(state *ahptypes.ChatState, a *ahptypes.ChatToo
 				Error:             s.Error,
 				Confirmed:         s.Confirmed,
 				SelectedOption:    s.SelectedOption,
+				StartedAt:         s.StartedAt,
+				Duration:          s.Duration,
 			}}
 		}
 		meta := s.Meta
@@ -1462,6 +1482,8 @@ func applyToolCallAuthRequired(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 			InvocationMessage: s.InvocationMessage,
 			Confirmed:         s.Confirmed,
 			SelectedOption:    s.SelectedOption,
+			StartedAt:         s.StartedAt,
+			Duration:          s.Duration,
 			Auth:              a.Auth,
 			Content:           append([]ahptypes.ToolResultContent(nil), s.Content...),
 		}}
@@ -1490,6 +1512,8 @@ func applyToolCallAuthResolved(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 			InvocationMessage: s.InvocationMessage,
 			Confirmed:         s.Confirmed,
 			SelectedOption:    s.SelectedOption,
+			StartedAt:         s.StartedAt,
+			Duration:          s.Duration,
 			Content:           append([]ahptypes.ToolResultContent(nil), s.Content...),
 		}}
 	})

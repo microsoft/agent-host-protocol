@@ -546,6 +546,9 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
             invocationMessage: action.invocationMessage,
             toolInput,
             confirmed: action.confirmed,
+            ...(tc.status === ToolCallStatus.Running && tc.startedAt !== undefined
+              ? { startedAt: tc.startedAt }
+              : action.startedAt !== undefined ? { startedAt: action.startedAt } : {}),
           };
         }
         const pending = tc.status === ToolCallStatus.PendingConfirmation ? tc : undefined;
@@ -581,6 +584,7 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
             toolInput,
             confirmed: action.confirmed,
             ...(selectedOption ? { selectedOption } : {}),
+            ...(action.startedAt !== undefined ? { startedAt: action.startedAt } : {}),
           };
         }
         return {
@@ -616,6 +620,9 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
         const confirmed = tc.status === ToolCallStatus.Running || tc.status === ToolCallStatus.AuthRequired
           ? tc.confirmed
           : ToolCallConfirmationReason.NotNeeded;
+        const startedAt = tc.status === ToolCallStatus.Running || tc.status === ToolCallStatus.AuthRequired
+          ? tc.startedAt
+          : undefined;
         const selectedOption = tc.status === ToolCallStatus.Running || tc.status === ToolCallStatus.AuthRequired
           ? tc.selectedOption
           : undefined;
@@ -635,9 +642,11 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
             invocationMessage: tc.invocationMessage,
             toolInput: tc.toolInput,
             confirmed,
+            ...(startedAt !== undefined ? { startedAt } : {}),
             ...(selectedOption ? { selectedOption } : {}),
             ...(preAuthContent ? { content: preAuthContent } : {}),
             ...action.result,
+            ...(action.duration !== undefined ? { duration: Math.max(0, action.duration) } : {}),
           };
         }
         return {
@@ -646,9 +655,11 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           invocationMessage: tc.invocationMessage,
           toolInput: tc.toolInput,
           confirmed,
+          ...(startedAt !== undefined ? { startedAt } : {}),
           ...(selectedOption ? { selectedOption } : {}),
           ...(preAuthContent ? { content: preAuthContent } : {}),
           ...action.result,
+          ...(action.duration !== undefined ? { duration: Math.max(0, action.duration) } : {}),
         };
       }));
 
@@ -666,6 +677,8 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
             toolInput: tc.toolInput,
             confirmed: tc.confirmed,
             ...(tc.selectedOption ? { selectedOption: tc.selectedOption } : {}),
+            ...(tc.startedAt !== undefined ? { startedAt: tc.startedAt } : {}),
+            ...(tc.duration !== undefined ? { duration: tc.duration } : {}),
             success: tc.success,
             pastTenseMessage: tc.pastTenseMessage,
             content: tc.content,
@@ -713,6 +726,8 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           toolInput: tc.toolInput,
           confirmed: tc.confirmed,
           ...(tc.selectedOption ? { selectedOption: tc.selectedOption } : {}),
+          ...(tc.startedAt !== undefined ? { startedAt: tc.startedAt } : {}),
+          ...(tc.duration !== undefined ? { duration: tc.duration } : {}),
           ...(tc.content ? { content: tc.content } : {}),
           auth: action.auth,
         };
@@ -731,6 +746,8 @@ export function chatReducer(state: ChatState, action: ChatAction, log?: (msg: st
           toolInput: tc.toolInput,
           confirmed: tc.confirmed,
           ...(tc.selectedOption ? { selectedOption: tc.selectedOption } : {}),
+          ...(tc.startedAt !== undefined ? { startedAt: tc.startedAt } : {}),
+          ...(tc.duration !== undefined ? { duration: tc.duration } : {}),
           ...(tc.content ? { content: tc.content } : {}),
         };
       }));

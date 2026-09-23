@@ -1598,6 +1598,9 @@ public sealed record ChatToolCallConfirmedAction
     public ToolCallConfirmationReason? Confirmed { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ToolCallCancellationReason? Reason { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

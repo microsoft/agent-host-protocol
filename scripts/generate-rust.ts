@@ -1519,6 +1519,12 @@ const ACTION_VARIANTS: {
 ];
 
 function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Session'): string {
+  const startedAt = scope === 'Chat'
+    ? `    /// ISO 8601 timestamp when tool execution first started.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+`
+    : '';
   return `/// Client approves or denies a pending tool call (merged approved + denied variants).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1533,7 +1539,7 @@ pub struct ${scope}ToolCallConfirmedAction {
     /// How the tool was confirmed (present when approved).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirmed: Option<ToolCallConfirmationReason>,
-    /// Why the tool was cancelled (present when denied).
+${startedAt}    /// Why the tool was cancelled (present when denied).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<ToolCallCancellationReason>,
     /// Edited tool input parameters, if the client modified them before confirming.

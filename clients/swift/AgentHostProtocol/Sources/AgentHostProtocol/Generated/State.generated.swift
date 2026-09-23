@@ -3544,6 +3544,19 @@ public struct ToolCallRunningState: Codable, Sendable {
     public var confirmed: ToolCallConfirmationReason
     /// The confirmation option the user selected, if confirmation options were provided
     public var selectedOption: ConfirmationOption?
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.
+    public var startedAt: String?
+    /// Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock.
+    ///
+    /// Available after execution finishes when reported by the producer. Clients
+    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
+    /// differ — and MUST treat it as opaque, producer-supplied data. When both
+    /// timing fields are available, the execution completion timestamp is
+    /// `startedAt + duration`.
+    public var duration: Int?
     public var status: ToolCallStatus
     /// Partial content produced while the tool is still executing.
     ///
@@ -3562,6 +3575,8 @@ public struct ToolCallRunningState: Codable, Sendable {
         case toolInput
         case confirmed
         case selectedOption
+        case startedAt
+        case duration
         case status
         case content
     }
@@ -3577,6 +3592,8 @@ public struct ToolCallRunningState: Codable, Sendable {
         toolInput: ToolInput? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
+        startedAt: String? = nil,
+        duration: Int? = nil,
         status: ToolCallStatus,
         content: [ToolResultContent]? = nil
     ) {
@@ -3590,6 +3607,8 @@ public struct ToolCallRunningState: Codable, Sendable {
         self.toolInput = toolInput
         self.confirmed = confirmed
         self.selectedOption = selectedOption
+        self.startedAt = startedAt
+        self.duration = duration
         self.status = status
         self.content = content
     }
@@ -3625,6 +3644,19 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
     public var confirmed: ToolCallConfirmationReason
     /// The confirmation option the user selected, if confirmation options were provided
     public var selectedOption: ConfirmationOption?
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.
+    public var startedAt: String?
+    /// Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock.
+    ///
+    /// Available after execution finishes when reported by the producer. Clients
+    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
+    /// differ — and MUST treat it as opaque, producer-supplied data. When both
+    /// timing fields are available, the execution completion timestamp is
+    /// `startedAt + duration`.
+    public var duration: Int?
     public var status: ToolCallStatus
     /// The authentication challenge blocking this invocation.
     public var auth: McpAuthRequirement
@@ -3642,6 +3674,8 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         case toolInput
         case confirmed
         case selectedOption
+        case startedAt
+        case duration
         case status
         case auth
         case content
@@ -3658,6 +3692,8 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         toolInput: ToolInput? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
+        startedAt: String? = nil,
+        duration: Int? = nil,
         status: ToolCallStatus,
         auth: McpAuthRequirement,
         content: [ToolResultContent]? = nil
@@ -3672,6 +3708,8 @@ public struct ToolCallAuthRequiredState: Codable, Sendable {
         self.toolInput = toolInput
         self.confirmed = confirmed
         self.selectedOption = selectedOption
+        self.startedAt = startedAt
+        self.duration = duration
         self.status = status
         self.auth = auth
         self.content = content
@@ -3722,6 +3760,19 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
     public var confirmed: ToolCallConfirmationReason
     /// The confirmation option the user selected, if confirmation options were provided
     public var selectedOption: ConfirmationOption?
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.
+    public var startedAt: String?
+    /// Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock.
+    ///
+    /// Available after execution finishes when reported by the producer. Clients
+    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
+    /// differ — and MUST treat it as opaque, producer-supplied data. When both
+    /// timing fields are available, the execution completion timestamp is
+    /// `startedAt + duration`.
+    public var duration: Int?
     public var status: ToolCallStatus
 
     enum CodingKeys: String, CodingKey {
@@ -3740,6 +3791,8 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         case error
         case confirmed
         case selectedOption
+        case startedAt
+        case duration
         case status
     }
 
@@ -3759,6 +3812,8 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         error: AnyCodable? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
+        startedAt: String? = nil,
+        duration: Int? = nil,
         status: ToolCallStatus
     ) {
         self.toolCallId = toolCallId
@@ -3776,6 +3831,8 @@ public struct ToolCallPendingResultConfirmationState: Codable, Sendable {
         self.error = error
         self.confirmed = confirmed
         self.selectedOption = selectedOption
+        self.startedAt = startedAt
+        self.duration = duration
         self.status = status
     }
 }
@@ -3824,6 +3881,19 @@ public struct ToolCallCompletedState: Codable, Sendable {
     public var confirmed: ToolCallConfirmationReason
     /// The confirmation option the user selected, if confirmation options were provided
     public var selectedOption: ConfirmationOption?
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.
+    public var startedAt: String?
+    /// Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock.
+    ///
+    /// Available after execution finishes when reported by the producer. Clients
+    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
+    /// differ — and MUST treat it as opaque, producer-supplied data. When both
+    /// timing fields are available, the execution completion timestamp is
+    /// `startedAt + duration`.
+    public var duration: Int?
     public var status: ToolCallStatus
 
     enum CodingKeys: String, CodingKey {
@@ -3842,6 +3912,8 @@ public struct ToolCallCompletedState: Codable, Sendable {
         case error
         case confirmed
         case selectedOption
+        case startedAt
+        case duration
         case status
     }
 
@@ -3861,6 +3933,8 @@ public struct ToolCallCompletedState: Codable, Sendable {
         error: AnyCodable? = nil,
         confirmed: ToolCallConfirmationReason,
         selectedOption: ConfirmationOption? = nil,
+        startedAt: String? = nil,
+        duration: Int? = nil,
         status: ToolCallStatus
     ) {
         self.toolCallId = toolCallId
@@ -3878,6 +3952,8 @@ public struct ToolCallCompletedState: Codable, Sendable {
         self.error = error
         self.confirmed = confirmed
         self.selectedOption = selectedOption
+        self.startedAt = startedAt
+        self.duration = duration
         self.status = status
     }
 }

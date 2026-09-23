@@ -7,9 +7,9 @@
  * @module channels-chat/state
  */
 
+import type { Changeset } from '../channels-changeset/state.js';
 import type { ModelSelection } from '../channels-root/state.js';
 import type { AgentSelection, McpAuthRequirement, SessionStatus } from '../channels-session/state.js';
-import type { Changeset } from '../channels-changeset/state.js';
 import type {
   ContentRef,
   ErrorInfo,
@@ -1345,6 +1345,23 @@ interface ToolCallPostConfirmationFields {
   confirmed: ToolCallConfirmationReason;
   /** The confirmation option the user selected, if confirmation options were provided */
   selectedOption?: ConfirmationOption;
+  /**
+   * ISO 8601 timestamp when tool execution first started.
+   *
+   * Absent when timing was not reported by the producer.
+   */
+  startedAt?: string;
+  /**
+   * Elapsed tool execution duration in milliseconds, measured by the
+   * producer's own clock.
+   *
+   * Available after execution finishes when reported by the producer. Clients
+   * MUST NOT derive this by subtracting timestamps — cross-client clocks may
+   * differ — and MUST treat it as opaque, producer-supplied data. When both
+   * timing fields are available, the execution completion timestamp is
+   * `startedAt + duration`.
+   */
+  duration?: number;
 }
 
 /**

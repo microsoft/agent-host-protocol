@@ -273,6 +273,12 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 pending = nil
             }
             if let confirmed = a.confirmed {
+                let startedAt: String?
+                if case .running(let running) = tc, running.startedAt != nil {
+                    startedAt = running.startedAt
+                } else {
+                    startedAt = a.startedAt
+                }
                 return .running(ToolCallRunningState(
                     toolCallId: base.toolCallId,
                     toolName: base.toolName,
@@ -283,6 +289,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     invocationMessage: a.invocationMessage,
                     toolInput: toolInput,
                     confirmed: confirmed,
+                    startedAt: startedAt,
                     status: .running
                 ))
             }
@@ -328,6 +335,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     toolInput: toolInput,
                     confirmed: a.confirmed ?? .notNeeded,
                     selectedOption: selectedOption,
+                    startedAt: a.startedAt,
                     status: .running
                 ))
             }
@@ -356,6 +364,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
             let invocationMessage: StringOrMarkdown
             let toolInput: ToolInput?
             let selectedOption: ConfirmationOption?
+            let startedAt: String?
             let preAuthContent: [ToolResultContent]?
             let fromAuthRequired: Bool
             switch tc {
@@ -364,6 +373,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 invocationMessage = r.invocationMessage
                 toolInput = r.toolInput
                 selectedOption = r.selectedOption
+                startedAt = r.startedAt
                 preAuthContent = nil
                 fromAuthRequired = false
             case .pendingConfirmation(let p):
@@ -371,6 +381,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 invocationMessage = p.invocationMessage
                 toolInput = p.toolInput
                 selectedOption = nil
+                startedAt = nil
                 preAuthContent = nil
                 fromAuthRequired = false
             // A client MAY cancel an auth-required MCP tool call by dispatching a
@@ -387,6 +398,7 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 invocationMessage = ar.invocationMessage
                 toolInput = ar.toolInput
                 selectedOption = ar.selectedOption
+                startedAt = ar.startedAt
                 preAuthContent = ar.content
                 fromAuthRequired = true
             default:
@@ -415,6 +427,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     error: a.result.error,
                     confirmed: confirmed,
                     selectedOption: selectedOption,
+                    startedAt: startedAt,
+                    duration: a.duration.map { max(0, $0) },
                     status: .pendingResultConfirmation
                 ))
             }
@@ -434,6 +448,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 error: a.result.error,
                 confirmed: confirmed,
                 selectedOption: selectedOption,
+                startedAt: startedAt,
+                duration: a.duration.map { max(0, $0) },
                 status: .completed
             ))
         })
@@ -460,6 +476,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                     error: prc.error,
                     confirmed: prc.confirmed,
                     selectedOption: prc.selectedOption,
+                    startedAt: prc.startedAt,
+                    duration: prc.duration,
                     status: .completed
                 ))
             }
@@ -504,6 +522,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolInput: running.toolInput,
                 confirmed: running.confirmed,
                 selectedOption: running.selectedOption,
+                startedAt: running.startedAt,
+                duration: running.duration,
                 status: .authRequired,
                 auth: a.auth,
                 content: running.content
@@ -527,6 +547,8 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
                 toolInput: authRequired.toolInput,
                 confirmed: authRequired.confirmed,
                 selectedOption: authRequired.selectedOption,
+                startedAt: authRequired.startedAt,
+                duration: authRequired.duration,
                 status: .running,
                 content: authRequired.content
             ))
