@@ -10,16 +10,57 @@ namespace Microsoft.AgentHostProtocol;
 // ─── Enums ────────────────────────────────────────────────────────────
 
 /// <summary>Reason why authentication is required.</summary>
-[JsonConverter(typeof(WireEnumConverter<AuthRequiredReason>))]
-public enum AuthRequiredReason
+[JsonConverter(typeof(AuthRequiredReasonConverter))]
+public readonly struct AuthRequiredReason : IEquatable<AuthRequiredReason>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public AuthRequiredReason(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>The client has not yet authenticated for the resource</summary>
-    [WireValue("required")]
-    Required,
+    public static readonly AuthRequiredReason Required = new AuthRequiredReason("required");
+
     /// <summary>A previously valid token has expired or been revoked. The client must
     /// acquire or renew the credential rather than replaying the challenged token.</summary>
-    [WireValue("expired")]
-    Expired,
+    public static readonly AuthRequiredReason Expired = new AuthRequiredReason("expired");
+
+    /// <inheritdoc />
+    public bool Equals(AuthRequiredReason other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is AuthRequiredReason other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(AuthRequiredReason left, AuthRequiredReason right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(AuthRequiredReason left, AuthRequiredReason right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="AuthRequiredReason"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class AuthRequiredReasonConverter : JsonConverter<AuthRequiredReason>
+{
+    /// <inheritdoc />
+    public override AuthRequiredReason Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new AuthRequiredReason(reader.GetString() ?? throw new JsonException("AuthRequiredReason expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, AuthRequiredReason value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 // ─── Notification Payloads ────────────────────────────────────────────

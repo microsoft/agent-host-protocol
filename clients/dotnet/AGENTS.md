@@ -33,9 +33,17 @@ commit; CI fails on any diff between the committed sources and a fresh run.
   Condition = JsonIgnoreCondition.WhenWritingNull)]`. Required fields serialize
   their value (a required reference left null serializes as `null`, mirroring
   Go's `nil`-slice semantics).
-- String enums → C# `enum` with `[WireValue("…")]` per member, (de)serialized
-  by `WireEnumConverter<T>`. Bitset enums → `[Flags] enum : uint`, serialized
-  as their numeric value so unknown future bits round-trip.
+- Closed (`@exhaustive`) string enums → C# `enum` with `[WireValue("…")]` per
+  member, (de)serialized by `WireEnumConverter<T>`, which rejects an
+  unrecognized wire value because the contract says it is invalid. Open
+  (`@nonexhaustive`) string enums → a `readonly struct` wrapping the raw wire
+  string, with the known values exposed as static members and a generated
+  per-type converter. A value added by a newer protocol version therefore
+  round-trips verbatim instead of failing the whole message, as
+  [`versioning.md`](../../docs/specification/versioning.md) requires (this
+  mirrors Kotlin's `value class` and Rust's `Unknown(String)`). Bitset enums →
+  `[Flags] enum : uint`, serialized as their numeric value so unknown future
+  bits round-trip.
 - Discriminated unions → a sealed wrapper deriving from `AhpUnion` (carrying
   `object? Value`) plus a generated `UnionConverter<T>`. Unknown discriminator
   values are preserved verbatim as a raw `JsonElement`.

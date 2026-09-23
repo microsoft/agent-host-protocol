@@ -246,6 +246,14 @@
           "$ref": "#/$defs/ConfigPropertySchema",
           "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
         },
+        "minItems": {
+          "type": "number",
+          "description": "JSON Schema: minimum number of array items (used when `type` is `'array'`)"
+        },
+        "maxItems": {
+          "type": "number",
+          "description": "JSON Schema: maximum number of array items (used when `type` is `'array'`)"
+        },
         "properties": {
           "type": "object",
           "additionalProperties": {
@@ -1312,6 +1320,14 @@
         "items": {
           "$ref": "#/$defs/ConfigPropertySchema",
           "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
+        },
+        "minItems": {
+          "type": "number",
+          "description": "JSON Schema: minimum number of array items (used when `type` is `'array'`)"
+        },
+        "maxItems": {
+          "type": "number",
+          "description": "JSON Schema: maximum number of array items (used when `type` is `'array'`)"
         },
         "properties": {
           "type": "object",
@@ -10016,7 +10032,7 @@
     },
     "ChangesetStatusChangedAction": {
       "type": "object",
-      "description": "The {@link ChangesetState.status} for this changeset transitioned (e.g.\n`computing → ready` or `ready → recomputing`). The error payload is set\ntogether with `status` whenever it transitions to\n{@link ChangesetStatus.Error | Error}.",
+      "description": "The {@link ChangesetState.status} for this changeset transitioned (e.g.\n`computing → ready` or `recomputing → ready`). The error payload is set\ntogether with `status` whenever it transitions to\n{@link ChangesetStatus.Error | Error}.",
       "properties": {
         "type": {
           "const": "changeset/statusChanged"

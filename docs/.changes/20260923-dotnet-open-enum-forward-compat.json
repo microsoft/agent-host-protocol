@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "Open (`@nonexhaustive`) protocol enums no longer fail decoding when a newer peer sends a wire value this build does not recognize. They are now generated as readonly structs wrapping the raw wire string (with the known values as static members) instead of closed C# enums, so an added enum value round-trips verbatim as `versioning.md` requires. Each open enum gets a generated converter, so the path no longer relies on reflection.",
+  "targets": ["dotnet"],
+  "issues": [366]
+}

@@ -1373,6 +1373,14 @@ data class SessionConfigPropertySchema(
      */
     val items: ConfigPropertySchema? = null,
     /**
+     * JSON Schema: minimum number of array items (used when `type` is `'array'`)
+     */
+    val minItems: Long? = null,
+    /**
+     * JSON Schema: maximum number of array items (used when `type` is `'array'`)
+     */
+    val maxItems: Long? = null,
+    /**
      * JSON Schema: property descriptors for object properties (used when `type` is `'object'`)
      */
     val properties: Map<String, ConfigPropertySchema>? = null,

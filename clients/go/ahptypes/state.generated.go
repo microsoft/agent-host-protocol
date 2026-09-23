@@ -829,6 +829,10 @@ type ConfigPropertySchema struct {
 	ReadOnly *bool `json:"readOnly,omitempty"`
 	// JSON Schema: schema for array items (used when `type` is `'array'`)
 	Items *ConfigPropertySchema `json:"items,omitempty"`
+	// JSON Schema: minimum number of array items (used when `type` is `'array'`)
+	MinItems *int64 `json:"minItems,omitempty"`
+	// JSON Schema: maximum number of array items (used when `type` is `'array'`)
+	MaxItems *int64 `json:"maxItems,omitempty"`
 	// JSON Schema: property descriptors for object properties (used when `type` is `'object'`)
 	Properties map[string]ConfigPropertySchema `json:"properties,omitempty"`
 	// JSON Schema: list of required property ids (used when `type` is `'object'`)
@@ -1387,6 +1391,10 @@ type SessionConfigPropertySchema struct {
 	ReadOnly *bool `json:"readOnly,omitempty"`
 	// JSON Schema: schema for array items (used when `type` is `'array'`)
 	Items *ConfigPropertySchema `json:"items,omitempty"`
+	// JSON Schema: minimum number of array items (used when `type` is `'array'`)
+	MinItems *int64 `json:"minItems,omitempty"`
+	// JSON Schema: maximum number of array items (used when `type` is `'array'`)
+	MaxItems *int64 `json:"maxItems,omitempty"`
 	// JSON Schema: property descriptors for object properties (used when `type` is `'object'`)
 	Properties map[string]ConfigPropertySchema `json:"properties,omitempty"`
 	// JSON Schema: list of required property ids (used when `type` is `'object'`)

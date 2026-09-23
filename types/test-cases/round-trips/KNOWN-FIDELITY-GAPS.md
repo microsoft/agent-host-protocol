@@ -46,3 +46,10 @@ passthrough. And `SessionStatus` is now a uniform 32-bit-unsigned bitset across
 Rust/Go/Kotlin/Swift (`u32`/`uint32`/`UInt`/`UInt32`), so every client holds the
 same value range — within TS's `number` 53-bit-safe limit, with no width
 divergence.
+
+Unknown-value forward compatibility is covered at all three levels an additive
+protocol change can touch: an unknown **union variant** (fixture 003), an unknown
+value of an **open string field** (fixture 024), and an unknown value of an open
+(`@nonexhaustive`) **enum on a directly-typed field** (fixture 045). The last one
+is the case a closed language enum cannot represent, so it is the one that most
+easily regresses into a whole-message decode failure.

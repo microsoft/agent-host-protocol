@@ -424,6 +424,14 @@
           "$ref": "#/$defs/ConfigPropertySchema",
           "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
         },
+        "minItems": {
+          "type": "number",
+          "description": "JSON Schema: minimum number of array items (used when `type` is `'array'`)"
+        },
+        "maxItems": {
+          "type": "number",
+          "description": "JSON Schema: maximum number of array items (used when `type` is `'array'`)"
+        },
         "properties": {
           "type": "object",
           "additionalProperties": {
@@ -1490,6 +1498,14 @@
         "items": {
           "$ref": "#/$defs/ConfigPropertySchema",
           "description": "JSON Schema: schema for array items (used when `type` is `'array'`)"
+        },
+        "minItems": {
+          "type": "number",
+          "description": "JSON Schema: minimum number of array items (used when `type` is `'array'`)"
+        },
+        "maxItems": {
+          "type": "number",
+          "description": "JSON Schema: maximum number of array items (used when `type` is `'array'`)"
         },
         "properties": {
           "type": "object",

@@ -10,205 +10,246 @@ namespace Microsoft.AgentHostProtocol;
 // ─── ActionType ──────────────────────────────────────────────────────
 
 /// <summary>Discriminant values for all state actions.</summary>
-[JsonConverter(typeof(WireEnumConverter<ActionType>))]
-public enum ActionType
+[JsonConverter(typeof(ActionTypeConverter))]
+public readonly struct ActionType : IEquatable<ActionType>
 {
-    [WireValue("root/agentsChanged")]
-    RootAgentsChanged,
-    [WireValue("root/activeSessionsChanged")]
-    RootActiveSessionsChanged,
-    [WireValue("session/ready")]
-    SessionReady,
-    [WireValue("session/creationFailed")]
-    SessionCreationFailed,
-    [WireValue("session/chatAdded")]
-    SessionChatAdded,
-    [WireValue("session/chatRemoved")]
-    SessionChatRemoved,
-    [WireValue("session/chatUpdated")]
-    SessionChatUpdated,
-    [WireValue("session/defaultChatChanged")]
-    SessionDefaultChatChanged,
-    [WireValue("chat/turnStarted")]
-    ChatTurnStarted,
-    [WireValue("chat/delta")]
-    ChatDelta,
-    [WireValue("chat/responsePart")]
-    ChatResponsePart,
-    [WireValue("chat/toolCallStart")]
-    ChatToolCallStart,
-    [WireValue("chat/toolCallDelta")]
-    ChatToolCallDelta,
-    [WireValue("chat/toolCallReady")]
-    ChatToolCallReady,
-    [WireValue("chat/toolCallConfirmed")]
-    ChatToolCallConfirmed,
-    [WireValue("chat/toolCallComplete")]
-    ChatToolCallComplete,
-    [WireValue("chat/toolCallResultConfirmed")]
-    ChatToolCallResultConfirmed,
-    [WireValue("chat/toolCallContentChanged")]
-    ChatToolCallContentChanged,
-    [WireValue("chat/toolCallAuthRequired")]
-    ChatToolCallAuthRequired,
-    [WireValue("chat/toolCallAuthResolved")]
-    ChatToolCallAuthResolved,
-    [WireValue("chat/turnComplete")]
-    ChatTurnComplete,
-    [WireValue("chat/turnCancelled")]
-    ChatTurnCancelled,
-    [WireValue("chat/error")]
-    ChatError,
-    [WireValue("chat/turnResume")]
-    ChatTurnResume,
-    [WireValue("chat/activityChanged")]
-    ChatActivityChanged,
-    [WireValue("chat/changesetsChanged")]
-    ChatChangesetsChanged,
-    [WireValue("chat/workingDirectorySet")]
-    ChatWorkingDirectorySet,
-    [WireValue("chat/workingDirectoryRemoved")]
-    ChatWorkingDirectoryRemoved,
-    [WireValue("session/titleChanged")]
-    SessionTitleChanged,
-    [WireValue("chat/usage")]
-    ChatUsage,
-    [WireValue("chat/reasoning")]
-    ChatReasoning,
-    [WireValue("session/serverToolsChanged")]
-    SessionServerToolsChanged,
-    [WireValue("session/activeClientSet")]
-    SessionActiveClientSet,
-    [WireValue("session/activeClientRemoved")]
-    SessionActiveClientRemoved,
-    [WireValue("session/workingDirectorySet")]
-    SessionWorkingDirectorySet,
-    [WireValue("session/workingDirectoryRemoved")]
-    SessionWorkingDirectoryRemoved,
-    [WireValue("session/workingDirectoryReplaced")]
-    SessionWorkingDirectoryReplaced,
-    [WireValue("session/inputNeededSet")]
-    SessionInputNeededSet,
-    [WireValue("session/inputNeededRemoved")]
-    SessionInputNeededRemoved,
-    [WireValue("chat/pendingMessageSet")]
-    ChatPendingMessageSet,
-    [WireValue("chat/pendingMessageRemoved")]
-    ChatPendingMessageRemoved,
-    [WireValue("chat/queuedMessagesReordered")]
-    ChatQueuedMessagesReordered,
-    [WireValue("chat/draftChanged")]
-    ChatDraftChanged,
-    [WireValue("chat/isArchivedChanged")]
-    ChatIsArchivedChanged,
-    [WireValue("chat/inputRequested")]
-    ChatInputRequested,
-    [WireValue("chat/inputAnswerChanged")]
-    ChatInputAnswerChanged,
-    [WireValue("chat/inputCompleted")]
-    ChatInputCompleted,
-    [WireValue("session/customizationsChanged")]
-    SessionCustomizationsChanged,
-    [WireValue("session/customizationToggled")]
-    SessionCustomizationToggled,
-    [WireValue("session/customizationUpdated")]
-    SessionCustomizationUpdated,
-    [WireValue("session/customizationRemoved")]
-    SessionCustomizationRemoved,
-    [WireValue("session/mcpServerStateChanged")]
-    SessionMcpServerStateChanged,
-    [WireValue("session/mcpServerStartRequested")]
-    SessionMcpServerStartRequested,
-    [WireValue("session/mcpServerStopRequested")]
-    SessionMcpServerStopRequested,
-    [WireValue("chat/truncated")]
-    ChatTruncated,
-    [WireValue("chat/turnsLoaded")]
-    ChatTurnsLoaded,
-    [WireValue("session/isReadChanged")]
-    SessionIsReadChanged,
-    [WireValue("session/isArchivedChanged")]
-    SessionIsArchivedChanged,
-    [WireValue("session/activityChanged")]
-    SessionActivityChanged,
-    [WireValue("session/changesetsChanged")]
-    SessionChangesetsChanged,
-    [WireValue("session/configChanged")]
-    SessionConfigChanged,
-    [WireValue("session/metaChanged")]
-    SessionMetaChanged,
-    [WireValue("changeset/statusChanged")]
-    ChangesetStatusChanged,
-    [WireValue("changeset/fileSet")]
-    ChangesetFileSet,
-    [WireValue("changeset/fileRemoved")]
-    ChangesetFileRemoved,
-    [WireValue("changeset/filesReviewChanged")]
-    ChangesetFilesReviewChanged,
-    [WireValue("changeset/contentChanged")]
-    ChangesetContentChanged,
-    [WireValue("changeset/operationsChanged")]
-    ChangesetOperationsChanged,
-    [WireValue("changeset/operationStatusChanged")]
-    ChangesetOperationStatusChanged,
-    [WireValue("changeset/cleared")]
-    ChangesetCleared,
-    [WireValue("annotations/set")]
-    AnnotationsSet,
-    [WireValue("annotations/updated")]
-    AnnotationsUpdated,
-    [WireValue("annotations/removed")]
-    AnnotationsRemoved,
-    [WireValue("annotations/entrySet")]
-    AnnotationsEntrySet,
-    [WireValue("annotations/entryRemoved")]
-    AnnotationsEntryRemoved,
-    [WireValue("root/terminalsChanged")]
-    RootTerminalsChanged,
-    [WireValue("root/configChanged")]
-    RootConfigChanged,
-    [WireValue("terminal/data")]
-    TerminalData,
-    [WireValue("terminal/input")]
-    TerminalInput,
-    [WireValue("terminal/resized")]
-    TerminalResized,
-    [WireValue("terminal/claimed")]
-    TerminalClaimed,
-    [WireValue("terminal/titleChanged")]
-    TerminalTitleChanged,
-    [WireValue("terminal/cwdChanged")]
-    TerminalCwdChanged,
-    [WireValue("terminal/exited")]
-    TerminalExited,
-    [WireValue("terminal/cleared")]
-    TerminalCleared,
-    [WireValue("terminal/commandDetectionAvailable")]
-    TerminalCommandDetectionAvailable,
-    [WireValue("terminal/commandExecuted")]
-    TerminalCommandExecuted,
-    [WireValue("terminal/commandFinished")]
-    TerminalCommandFinished,
-    [WireValue("resourceWatch/changed")]
-    ResourceWatchChanged,
-    [WireValue("automation/createRequested")]
-    AutomationCreateRequested,
-    [WireValue("automation/updateRequested")]
-    AutomationUpdateRequested,
-    [WireValue("automation/set")]
-    AutomationSet,
-    [WireValue("automation/removed")]
-    AutomationRemoved,
-    [WireValue("automationRun/lifecycleChanged")]
-    AutomationRunLifecycleChanged,
-    [WireValue("automationRun/sessionSet")]
-    AutomationRunSessionSet,
-    [WireValue("automationRun/sessionRemoved")]
-    AutomationRunSessionRemoved,
-    [WireValue("automationRun/primarySessionChanged")]
-    AutomationRunPrimarySessionChanged,
-    [WireValue("automationRun/cancelRequested")]
-    AutomationRunCancelRequested,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ActionType(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ActionType RootAgentsChanged = new ActionType("root/agentsChanged");
+
+    public static readonly ActionType RootActiveSessionsChanged = new ActionType("root/activeSessionsChanged");
+
+    public static readonly ActionType SessionReady = new ActionType("session/ready");
+
+    public static readonly ActionType SessionCreationFailed = new ActionType("session/creationFailed");
+
+    public static readonly ActionType SessionChatAdded = new ActionType("session/chatAdded");
+
+    public static readonly ActionType SessionChatRemoved = new ActionType("session/chatRemoved");
+
+    public static readonly ActionType SessionChatUpdated = new ActionType("session/chatUpdated");
+
+    public static readonly ActionType SessionDefaultChatChanged = new ActionType("session/defaultChatChanged");
+
+    public static readonly ActionType ChatTurnStarted = new ActionType("chat/turnStarted");
+
+    public static readonly ActionType ChatDelta = new ActionType("chat/delta");
+
+    public static readonly ActionType ChatResponsePart = new ActionType("chat/responsePart");
+
+    public static readonly ActionType ChatToolCallStart = new ActionType("chat/toolCallStart");
+
+    public static readonly ActionType ChatToolCallDelta = new ActionType("chat/toolCallDelta");
+
+    public static readonly ActionType ChatToolCallReady = new ActionType("chat/toolCallReady");
+
+    public static readonly ActionType ChatToolCallConfirmed = new ActionType("chat/toolCallConfirmed");
+
+    public static readonly ActionType ChatToolCallComplete = new ActionType("chat/toolCallComplete");
+
+    public static readonly ActionType ChatToolCallResultConfirmed = new ActionType("chat/toolCallResultConfirmed");
+
+    public static readonly ActionType ChatToolCallContentChanged = new ActionType("chat/toolCallContentChanged");
+
+    public static readonly ActionType ChatToolCallAuthRequired = new ActionType("chat/toolCallAuthRequired");
+
+    public static readonly ActionType ChatToolCallAuthResolved = new ActionType("chat/toolCallAuthResolved");
+
+    public static readonly ActionType ChatTurnComplete = new ActionType("chat/turnComplete");
+
+    public static readonly ActionType ChatTurnCancelled = new ActionType("chat/turnCancelled");
+
+    public static readonly ActionType ChatError = new ActionType("chat/error");
+
+    public static readonly ActionType ChatTurnResume = new ActionType("chat/turnResume");
+
+    public static readonly ActionType ChatActivityChanged = new ActionType("chat/activityChanged");
+
+    public static readonly ActionType ChatChangesetsChanged = new ActionType("chat/changesetsChanged");
+
+    public static readonly ActionType ChatWorkingDirectorySet = new ActionType("chat/workingDirectorySet");
+
+    public static readonly ActionType ChatWorkingDirectoryRemoved = new ActionType("chat/workingDirectoryRemoved");
+
+    public static readonly ActionType SessionTitleChanged = new ActionType("session/titleChanged");
+
+    public static readonly ActionType ChatUsage = new ActionType("chat/usage");
+
+    public static readonly ActionType ChatReasoning = new ActionType("chat/reasoning");
+
+    public static readonly ActionType SessionServerToolsChanged = new ActionType("session/serverToolsChanged");
+
+    public static readonly ActionType SessionActiveClientSet = new ActionType("session/activeClientSet");
+
+    public static readonly ActionType SessionActiveClientRemoved = new ActionType("session/activeClientRemoved");
+
+    public static readonly ActionType SessionWorkingDirectorySet = new ActionType("session/workingDirectorySet");
+
+    public static readonly ActionType SessionWorkingDirectoryRemoved = new ActionType("session/workingDirectoryRemoved");
+
+    public static readonly ActionType SessionWorkingDirectoryReplaced = new ActionType("session/workingDirectoryReplaced");
+
+    public static readonly ActionType SessionInputNeededSet = new ActionType("session/inputNeededSet");
+
+    public static readonly ActionType SessionInputNeededRemoved = new ActionType("session/inputNeededRemoved");
+
+    public static readonly ActionType ChatPendingMessageSet = new ActionType("chat/pendingMessageSet");
+
+    public static readonly ActionType ChatPendingMessageRemoved = new ActionType("chat/pendingMessageRemoved");
+
+    public static readonly ActionType ChatQueuedMessagesReordered = new ActionType("chat/queuedMessagesReordered");
+
+    public static readonly ActionType ChatDraftChanged = new ActionType("chat/draftChanged");
+
+    public static readonly ActionType ChatIsArchivedChanged = new ActionType("chat/isArchivedChanged");
+
+    public static readonly ActionType ChatInputRequested = new ActionType("chat/inputRequested");
+
+    public static readonly ActionType ChatInputAnswerChanged = new ActionType("chat/inputAnswerChanged");
+
+    public static readonly ActionType ChatInputCompleted = new ActionType("chat/inputCompleted");
+
+    public static readonly ActionType SessionCustomizationsChanged = new ActionType("session/customizationsChanged");
+
+    public static readonly ActionType SessionCustomizationToggled = new ActionType("session/customizationToggled");
+
+    public static readonly ActionType SessionCustomizationUpdated = new ActionType("session/customizationUpdated");
+
+    public static readonly ActionType SessionCustomizationRemoved = new ActionType("session/customizationRemoved");
+
+    public static readonly ActionType SessionMcpServerStateChanged = new ActionType("session/mcpServerStateChanged");
+
+    public static readonly ActionType SessionMcpServerStartRequested = new ActionType("session/mcpServerStartRequested");
+
+    public static readonly ActionType SessionMcpServerStopRequested = new ActionType("session/mcpServerStopRequested");
+
+    public static readonly ActionType ChatTruncated = new ActionType("chat/truncated");
+
+    public static readonly ActionType ChatTurnsLoaded = new ActionType("chat/turnsLoaded");
+
+    public static readonly ActionType SessionIsReadChanged = new ActionType("session/isReadChanged");
+
+    public static readonly ActionType SessionIsArchivedChanged = new ActionType("session/isArchivedChanged");
+
+    public static readonly ActionType SessionActivityChanged = new ActionType("session/activityChanged");
+
+    public static readonly ActionType SessionChangesetsChanged = new ActionType("session/changesetsChanged");
+
+    public static readonly ActionType SessionConfigChanged = new ActionType("session/configChanged");
+
+    public static readonly ActionType SessionMetaChanged = new ActionType("session/metaChanged");
+
+    public static readonly ActionType ChangesetStatusChanged = new ActionType("changeset/statusChanged");
+
+    public static readonly ActionType ChangesetFileSet = new ActionType("changeset/fileSet");
+
+    public static readonly ActionType ChangesetFileRemoved = new ActionType("changeset/fileRemoved");
+
+    public static readonly ActionType ChangesetFilesReviewChanged = new ActionType("changeset/filesReviewChanged");
+
+    public static readonly ActionType ChangesetContentChanged = new ActionType("changeset/contentChanged");
+
+    public static readonly ActionType ChangesetOperationsChanged = new ActionType("changeset/operationsChanged");
+
+    public static readonly ActionType ChangesetOperationStatusChanged = new ActionType("changeset/operationStatusChanged");
+
+    public static readonly ActionType ChangesetCleared = new ActionType("changeset/cleared");
+
+    public static readonly ActionType AnnotationsSet = new ActionType("annotations/set");
+
+    public static readonly ActionType AnnotationsUpdated = new ActionType("annotations/updated");
+
+    public static readonly ActionType AnnotationsRemoved = new ActionType("annotations/removed");
+
+    public static readonly ActionType AnnotationsEntrySet = new ActionType("annotations/entrySet");
+
+    public static readonly ActionType AnnotationsEntryRemoved = new ActionType("annotations/entryRemoved");
+
+    public static readonly ActionType RootTerminalsChanged = new ActionType("root/terminalsChanged");
+
+    public static readonly ActionType RootConfigChanged = new ActionType("root/configChanged");
+
+    public static readonly ActionType TerminalData = new ActionType("terminal/data");
+
+    public static readonly ActionType TerminalInput = new ActionType("terminal/input");
+
+    public static readonly ActionType TerminalResized = new ActionType("terminal/resized");
+
+    public static readonly ActionType TerminalClaimed = new ActionType("terminal/claimed");
+
+    public static readonly ActionType TerminalTitleChanged = new ActionType("terminal/titleChanged");
+
+    public static readonly ActionType TerminalCwdChanged = new ActionType("terminal/cwdChanged");
+
+    public static readonly ActionType TerminalExited = new ActionType("terminal/exited");
+
+    public static readonly ActionType TerminalCleared = new ActionType("terminal/cleared");
+
+    public static readonly ActionType TerminalCommandDetectionAvailable = new ActionType("terminal/commandDetectionAvailable");
+
+    public static readonly ActionType TerminalCommandExecuted = new ActionType("terminal/commandExecuted");
+
+    public static readonly ActionType TerminalCommandFinished = new ActionType("terminal/commandFinished");
+
+    public static readonly ActionType ResourceWatchChanged = new ActionType("resourceWatch/changed");
+
+    public static readonly ActionType AutomationCreateRequested = new ActionType("automation/createRequested");
+
+    public static readonly ActionType AutomationUpdateRequested = new ActionType("automation/updateRequested");
+
+    public static readonly ActionType AutomationSet = new ActionType("automation/set");
+
+    public static readonly ActionType AutomationRemoved = new ActionType("automation/removed");
+
+    public static readonly ActionType AutomationRunLifecycleChanged = new ActionType("automationRun/lifecycleChanged");
+
+    public static readonly ActionType AutomationRunSessionSet = new ActionType("automationRun/sessionSet");
+
+    public static readonly ActionType AutomationRunSessionRemoved = new ActionType("automationRun/sessionRemoved");
+
+    public static readonly ActionType AutomationRunPrimarySessionChanged = new ActionType("automationRun/primarySessionChanged");
+
+    public static readonly ActionType AutomationRunCancelRequested = new ActionType("automationRun/cancelRequested");
+
+    /// <inheritdoc />
+    public bool Equals(ActionType other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ActionType other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ActionType left, ActionType right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ActionType left, ActionType right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ActionType"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ActionTypeConverter : JsonConverter<ActionType>
+{
+    /// <inheritdoc />
+    public override ActionType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ActionType(reader.GetString() ?? throw new JsonException("ActionType expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ActionType value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 // ─── Action Envelope ─────────────────────────────────────────────────

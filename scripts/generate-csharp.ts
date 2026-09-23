@@ -26,10 +26,15 @@
  *     a generated `UnionConverter<T>` subclass. Unknown discriminator
  *     values surface as a raw `JsonElement` stored in `Value`, preserved
  *     verbatim for loss-free round-trips.
- *   - String enums map wire values via `[WireValue("...")]` + the
- *     hand-written `WireEnumConverter<T>`. Bitset enums (numeric values)
- *     become `[Flags] enum : uint` and serialize as their numeric value
- *     (System.Text.Json default), so unknown future bits round-trip.
+ *   - Closed (`@exhaustive`) string enums map wire values via
+ *     `[WireValue("...")]` + the hand-written `WireEnumConverter<T>`, which
+ *     rejects an unrecognized value because the contract says it is invalid.
+ *     Open (`@nonexhaustive`) string enums instead become a readonly struct
+ *     wrapping the raw wire string, so a value added by a newer protocol
+ *     version is preserved rather than failing the whole message.
+ *     Bitset enums (numeric values) become `[Flags] enum : uint` and
+ *     serialize as their numeric value (System.Text.Json default), so
+ *     unknown future bits round-trip.
  */
 
 import {
@@ -41,6 +46,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
+import { isNonexhaustiveEnum } from './enum-compatibility.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
@@ -458,10 +464,91 @@ function generateBitsetEnum(enumDecl: EnumDeclaration): string {
   return lines.join('\n');
 }
 
+/**
+ * Open ("nonexhaustive") string enum. The protocol contract says later
+ * versions may add wire values, and `versioning.md` requires an older peer to
+ * preserve one it does not recognize instead of failing the whole message. A
+ * closed C# `enum` cannot hold an unrecognized value, so an open enum is
+ * emitted as a readonly struct wrapping the raw wire string, with the known
+ * values as static members:
+ *
+ *   [JsonConverter(typeof(ToolCallStatusConverter))]
+ *   public readonly struct ToolCallStatus : IEquatable<ToolCallStatus>
+ *   { public string Value { get; } public static readonly ToolCallStatus Running = new("running"); ... }
+ *
+ * This mirrors the Kotlin client's `@JvmInline value class … (val rawValue: String)`
+ * and Rust's `Unknown(String)` variant. The per-type converter is generated
+ * (rather than a shared reflective one) so the path stays trimming- and
+ * AOT-safe.
+ */
+function generateOpenStringEnum(enumDecl: EnumDeclaration): string {
+  const name = enumDecl.getName();
+  const lines: string[] = [];
+  emitDocComment('', enumDecl.getJsDocs()[0]?.getDescription().trim(), lines);
+  lines.push(`[JsonConverter(typeof(${name}Converter))]`);
+  lines.push(`public readonly struct ${name} : IEquatable<${name}>`);
+  lines.push('{');
+  lines.push('    private readonly string? _value;');
+  lines.push('');
+  lines.push(`    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>`);
+  lines.push(`    /// <param name="value">The raw wire string.</param>`);
+  lines.push(`    public ${name}(string value)`);
+  lines.push('    {');
+  lines.push('        _value = value;');
+  lines.push('    }');
+  lines.push('');
+  lines.push('    /// <summary>The raw wire value.</summary>');
+  lines.push('    public string Value => _value ?? string.Empty;');
+  for (const mem of enumDecl.getMembers()) {
+    const memberDoc = mem.getJsDocs()[0]?.getDescription().trim();
+    lines.push('');
+    emitDocComment('    ', memberDoc, lines);
+    const wire = String(mem.getValue());
+    lines.push(`    public static readonly ${name} ${mem.getName()} = new ${name}(${JSON.stringify(wire)});`);
+  }
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push(`    public bool Equals(${name} other) => string.Equals(Value, other.Value, StringComparison.Ordinal);`);
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push(`    public override bool Equals(object? obj) => obj is ${name} other && Equals(other);`);
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push('    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);');
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push('    public override string ToString() => Value;');
+  lines.push('');
+  lines.push(`    /// <summary>Ordinal equality over the raw wire value.</summary>`);
+  lines.push(`    public static bool operator ==(${name} left, ${name} right) => left.Equals(right);`);
+  lines.push('');
+  lines.push(`    /// <summary>Ordinal inequality over the raw wire value.</summary>`);
+  lines.push(`    public static bool operator !=(${name} left, ${name} right) => !left.Equals(right);`);
+  lines.push('}');
+  lines.push('');
+  lines.push(`/// <summary>Reads and writes <see cref="${name}"/> as its raw wire string, preserving unrecognized values.</summary>`);
+  lines.push(`internal sealed class ${name}Converter : JsonConverter<${name}>`);
+  lines.push('{');
+  lines.push('    /// <inheritdoc />');
+  lines.push(`    public override ${name} Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)`);
+  lines.push(`        => new ${name}(reader.GetString() ?? throw new JsonException("${name} expects a JSON string."));`);
+  lines.push('');
+  lines.push('    /// <inheritdoc />');
+  lines.push(`    public override void Write(Utf8JsonWriter writer, ${name} value, JsonSerializerOptions options)`);
+  lines.push('        => writer.WriteStringValue(value.Value);');
+  lines.push('}');
+  return lines.join('\n');
+}
+
 function generateEnum(enumDecl: EnumDeclaration): string {
   const values = enumDecl.getMembers().map((m) => m.getValue());
   const isNumeric = values.every((v) => typeof v === 'number');
-  return isNumeric ? generateBitsetEnum(enumDecl) : generateStringEnum(enumDecl);
+  if (isNumeric) {
+    return generateBitsetEnum(enumDecl);
+  }
+  return isNonexhaustiveEnum(enumDecl)
+    ? generateOpenStringEnum(enumDecl)
+    : generateStringEnum(enumDecl);
 }
 
 // ─── Struct Generation ───────────────────────────────────────────────────────
@@ -2716,11 +2803,23 @@ function generateReducerMetadata(project: Project): string {
   if (!actionTypeEnum) {
     throw new Error('ActionType enum not found');
   }
+  const actionTypeIsOpen = isNonexhaustiveEnum(actionTypeEnum);
   const wireCases = actionTypeEnum.getMembers()
     .map((member) => [member.getName(), String(member.getValue())] as const)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([name, wire]) => `            ActionType.${name} => ${JSON.stringify(wire)},`)
     .join('\n');
+
+  // An open ActionType already carries the wire string, so the lookup is the
+  // identity — and it stays correct for a value this build does not know.
+  const getWireName = actionTypeIsOpen
+    ? `    public static string GetWireName(ActionType actionType) => actionType.Value;`
+    : `    public static string GetWireName(ActionType actionType) =>
+        actionType switch
+        {
+${wireCases}
+            _ => throw new ArgumentOutOfRangeException(nameof(actionType)),
+        };`;
 
   return `${fileHeader()}
 internal static class GeneratedActionMetadata
@@ -2736,12 +2835,7 @@ ${cases}
         }
     }
 
-    public static string GetWireName(ActionType actionType) =>
-        actionType switch
-        {
-${wireCases}
-            _ => throw new ArgumentOutOfRangeException(nameof(actionType)),
-        };
+${getWireName}
 }
 `;
 }
