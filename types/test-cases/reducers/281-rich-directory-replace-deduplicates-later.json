@@ -1,0 +1,18 @@
+{
+  "description": "A rich replacement refreshes a later same-URI entry and moves it to the target position",
+  "reducer": "session",
+  "initial": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": ["file:///a", { "uri": "file:///b", "origin": { "kind": "local" } }, { "uri": "file:///c", "repo": "https://example.org/old.git" }]
+  },
+  "actions": [{
+    "type": "session/workingDirectoryReplaced", "directory": "file:///b",
+    "replacement": { "uri": "file:///c", "origin": { "kind": "local" } }
+  }],
+  "expected": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": ["file:///a", { "uri": "file:///c", "origin": { "kind": "local" } }]
+  }
+}

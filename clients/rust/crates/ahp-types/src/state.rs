@@ -1296,6 +1296,45 @@ impl<'de> serde::Deserialize<'de> for SessionOriginKind {
     }
 }
 
+/// How a working directory was prepared.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum WorkingDirectoryOriginKind {
+    Local,
+    Repo,
+    Worktree,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for WorkingDirectoryOriginKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Local => serializer.serialize_str("local"),
+            Self::Repo => serializer.serialize_str("repo"),
+            Self::Worktree => serializer.serialize_str("worktree"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for WorkingDirectoryOriginKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "local" => Self::Local,
+            "repo" => Self::Repo,
+            "worktree" => Self::Worktree,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Operations the host currently permits for an automation.
 ///
 /// The list on {@link AutomationEntry.operations} is authoritative and may
@@ -1707,6 +1746,35 @@ pub struct MultipleWorkingDirectoriesCapability {
     pub primary_replacement: Option<bool>,
 }
 
+/// An actual working directory, uniquely keyed by `uri` within the session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkingDirectory {
+    /// Actual selected directory, which may be a repository subdirectory.
+    pub uri: Uri,
+    /// Credential-free repository source association, not a checkout identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<Uri>,
+    /// Host-reported provenance; omission means unspecified.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<WorkingDirectoryOrigin>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalWorkingDirectoryOrigin {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepoWorkingDirectoryOrigin {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeWorkingDirectoryOrigin {
+    /// Main worktree associated with the host-prepared worktree.
+    pub main_worktree: Uri,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionModelInfo {
@@ -1889,13 +1957,14 @@ pub struct ChatState {
     pub interactivity: Option<ChatInteractivity>,
     /// The subset of the session's
     /// {@link SessionState.workingDirectories | `workingDirectories`} that this
-    /// chat's agent has tool access to. Every entry MUST be present in the owning
-    /// session's `workingDirectories`; servers MUST reject a
+    /// chat's agent has tool access to. Every URI MUST match a URI string or a
+    /// record's `uri` in the owning session's set; servers MUST reject a
     /// `chat/workingDirectorySet` action that violates this constraint.
     ///
     /// When absent, the chat inherits the full session set. When present but empty
     /// (not recommended), the chat has no working-directory tool access at all.
     ///
+    /// Directory metadata belongs to the session, not the chat.
     /// Dispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to
     /// update the subset on a running chat.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2035,8 +2104,10 @@ pub struct SessionState {
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub working_directories: Option<Vec<Uri>>,
+    pub working_directories: Option<Vec<WorkingDirectoryEntry>>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -2371,8 +2442,10 @@ pub struct SessionSummary {
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub working_directories: Option<Vec<Uri>>,
+    pub working_directories: Option<Vec<WorkingDirectoryEntry>>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -5722,6 +5795,35 @@ pub enum ToolInput {
     ContentRef(ContentRef),
 }
 
+/// A legacy URI or a complete working-directory record.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WorkingDirectoryEntry {
+    Uri(Uri),
+    Directory(WorkingDirectory),
+}
+
+impl WorkingDirectoryEntry {
+    pub fn uri(&self) -> &Uri {
+        match self {
+            Self::Uri(uri) => uri,
+            Self::Directory(directory) => &directory.uri,
+        }
+    }
+}
+
+impl From<Uri> for WorkingDirectoryEntry {
+    fn from(uri: Uri) -> Self {
+        Self::Uri(uri)
+    }
+}
+
+impl From<WorkingDirectory> for WorkingDirectoryEntry {
+    fn from(directory: WorkingDirectory) -> Self {
+        Self::Directory(directory)
+    }
+}
+
 // ─── Discriminated Unions ─────────────────────────────────────────────
 
 /// How a chat came into existence.
@@ -6083,6 +6185,22 @@ pub enum SessionInputRequest {
 pub enum SessionOrigin {
     #[serde(rename = "automation")]
     Automation(AutomationSessionOrigin),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+/// Host-reported working-directory provenance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum WorkingDirectoryOrigin {
+    #[serde(rename = "local")]
+    Local(LocalWorkingDirectoryOrigin),
+    #[serde(rename = "repo")]
+    Repo(RepoWorkingDirectoryOrigin),
+    #[serde(rename = "worktree")]
+    Worktree(WorktreeWorkingDirectoryOrigin),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

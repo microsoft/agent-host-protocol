@@ -1,0 +1,38 @@
+{
+  "name": "repository-session-multiple-ready",
+  "group": "A",
+  "description": "Ready state can associate different directories with the same source without deduplication.",
+  "type": "Snapshot",
+  "input": {
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "workingDirectories": [
+        { "uri": "file:///work/session-feature", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } },
+        { "uri": "file:///work/session-main", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } }
+      ]
+    },
+    "fromSeq": 2
+  },
+  "acceptableOutputs": [{
+    "resource": "ahp-session:/repository-session",
+    "state": {
+      "provider": "example",
+      "title": "Repository session",
+      "status": 1,
+      "lifecycle": "ready",
+      "activeClients": [],
+      "chats": [],
+      "workingDirectories": [
+        { "uri": "file:///work/session-feature", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } },
+        { "uri": "file:///work/session-main", "repo": "https://example.org/team/project.git", "origin": { "kind": "repo" } }
+      ]
+    },
+    "fromSeq": 2
+  }]
+}

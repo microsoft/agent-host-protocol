@@ -1386,11 +1386,11 @@ public struct SessionActiveClientRemovedAction: Codable, Sendable {
 public struct SessionWorkingDirectorySetAction: Codable, Sendable {
     public var type: ActionType
     /// The working directory to grant the session's agent tool access to.
-    public var directory: String
+    public var directory: WorkingDirectoryEntry
 
     public init(
         type: ActionType,
-        directory: String
+        directory: WorkingDirectoryEntry
     ) {
         self.type = type
         self.directory = directory
@@ -1415,13 +1415,13 @@ public struct SessionWorkingDirectoryReplacedAction: Codable, Sendable {
     public var type: ActionType
     /// URI of the existing entry to replace.
     public var directory: String
-    /// URI to place in the replaced entry's position.
-    public var replacement: String
+    /// Complete entry to place in the replaced entry's position.
+    public var replacement: WorkingDirectoryEntry
 
     public init(
         type: ActionType,
         directory: String,
-        replacement: String
+        replacement: WorkingDirectoryEntry
     ) {
         self.type = type
         self.directory = directory

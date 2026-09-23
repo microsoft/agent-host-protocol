@@ -89,6 +89,16 @@ const (
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+// Requested repository source, not a resolved working directory.
+type RepositorySource struct {
+	// Credential-free repository source URI.
+	Source URI `json:"source"`
+	// Requested branch, tag, or commit. Omit to use the host's default revision.
+	Revision *string `json:"revision,omitempty"`
+	// Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.
+	Subdirectory *string `json:"subdirectory,omitempty"`
+}
+
 // Establishes a new connection and negotiates the protocol version.
 // This MUST be the first message sent by the client.
 type InitializeParams struct {
@@ -160,6 +170,8 @@ type InitializeResult struct {
 	Snapshots []Snapshot `json:"snapshots"`
 	// Suggested default directory for remote filesystem browsing
 	DefaultDirectory *URI `json:"defaultDirectory,omitempty"`
+	// Host repository preparation support; absent when unsupported.
+	RepositoryPreparation *RepositoryPreparationCapabilities `json:"repositoryPreparation,omitempty"`
 	// Characters that, when typed in a {@link Message} input, SHOULD cause
 	// the client to issue a `completions` request with
 	// {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -182,12 +194,23 @@ type InitializeResult struct {
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
 }
 
+// An empty object supports one repository at its default revision.
+type RepositoryPreparationCapabilities struct {
+	// When true, clients may supply {@link RepositorySource.revision}.
+	Revision *bool `json:"revision,omitempty"`
+	// When true, clients may supply more than one repository.
+	MultipleRepositories *bool `json:"multipleRepositories,omitempty"`
+}
+
 // Optional capabilities a client declares during `initialize`.
 //
 // Each field is a presence flag: an empty object `{}` means "supported",
 // absence means "not supported". Sub-fields on individual capabilities
 // are reserved for future per-capability options.
 type ClientCapabilities struct {
+	// Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+	// Hosts project records to URIs when absent and retain this choice on reconnect.
+	WorkingDirectoryInfo *map[string]json.RawMessage `json:"workingDirectoryInfo,omitempty"`
 	// Client can render
 	// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
 	// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -199,7 +222,7 @@ type ClientCapabilities struct {
 	// {@link McpServerCustomization.channel | `mcp://` channel}) when this
 	// capability is declared. Clients that omit it MUST treat
 	// App-bearing tool calls as ordinary MCP tool calls.
-	McpApps map[string]json.RawMessage `json:"mcpApps,omitempty"`
+	McpApps *map[string]json.RawMessage `json:"mcpApps,omitempty"`
 }
 
 // Automation features supported by this host authority.
@@ -397,6 +420,8 @@ type CreateSessionParams struct {
 	// and ignores the rest. Dispatch working-directory actions to change the set
 	// after the session has started.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Repositories to prepare instead of an explicit `workingDirectories` list.
+	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Agent-specific configuration values collected via `resolveSessionConfig`.
 	// Keys and values correspond to the schema returned by the server.
 	Config map[string]json.RawMessage `json:"config,omitempty"`
@@ -493,9 +518,9 @@ type CreateChatParams struct {
 	// also snapshots and preserves that exact selected text in the created chat's
 	// origin; any `responsePartId` there is provenance only, not a live range.
 	Source *ChatSource `json:"source,omitempty"`
-	// Initial working-directory subset for this chat. Every entry MUST be
-	// present in the owning session's `workingDirectories`; the server MUST
-	// reject any entry that is not. When absent, the chat inherits the full
+	// Initial working-directory URI subset for this chat. Every URI MUST match
+	// a URI string or record's `uri` in the owning session's `workingDirectories`;
+	// the server MUST reject any entry that does not. When absent, the chat inherits the full
 	// session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
 	// the source chat's `workingDirectories`; this field is ignored for forks.
 	//
@@ -1080,6 +1105,8 @@ type ResolveSessionConfigParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+	// Repositories used as configuration context.
+	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Current user-filled configuration values
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 }
@@ -1107,6 +1134,8 @@ type SessionConfigCompletionsParams struct {
 	Provider *string `json:"provider,omitempty"`
 	// Working directory for the session
 	WorkingDirectory *URI `json:"workingDirectory,omitempty"`
+	// Repositories used as configuration context.
+	Repositories []RepositorySource `json:"repositories,omitempty"`
 	// Current user-filled configuration values (provides context for the query)
 	Config map[string]json.RawMessage `json:"config,omitempty"`
 	// Property id from the schema to query values for
@@ -1479,7 +1508,21 @@ func (u ReconnectResult) MarshalJSON() ([]byte, error) {
 	if u.Value == nil {
 		return []byte("null"), nil
 	}
-	return json.Marshal(u.Value)
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *ReconnectReplayResult:
+		object["type"] = json.RawMessage("\"replay\"")
+	case *ReconnectSnapshotResult:
+		object["type"] = json.RawMessage("\"snapshot\"")
+	}
+	return json.Marshal(object)
 }
 
 // ─── Changeset Operation Unions ───────────────────────────────────────

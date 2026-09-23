@@ -1,0 +1,22 @@
+{
+  "name": "session-added-legacy-directories",
+  "group": "A",
+  "description": "Legacy session-added notifications contain URI-only directories.",
+  "type": "SessionAddedParams",
+  "input": {
+    "channel": "ahp-root://",
+    "summary": {
+      "resource": "ahp-session:/directories", "provider": "example", "title": "Directories", "status": 1,
+      "createdAt": "2026-09-21T00:00:00.000Z", "modifiedAt": "2026-09-21T00:00:00.000Z",
+      "workingDirectories": ["file:///legacy", "file:///tree/packages/api"]
+    }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "summary": {
+      "resource": "ahp-session:/directories", "provider": "example", "title": "Directories", "status": 1,
+      "createdAt": "2026-09-21T00:00:00.000Z", "modifiedAt": "2026-09-21T00:00:00.000Z",
+      "workingDirectories": ["file:///legacy", "file:///tree/packages/api"]
+    }
+  }]
+}

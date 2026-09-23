@@ -1,0 +1,36 @@
+{
+  "name": "initialize-rich-directories",
+  "group": "A",
+  "description": "Initialize snapshots accept mixed URI-only and rich directory entries.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.9.0", "serverSeq": 2,
+    "snapshots": [{
+      "resource": "ahp-session:/directories", "fromSeq": 2,
+      "state": {
+        "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": [
+          "file:///legacy",
+          { "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+            "origin": { "kind": "worktree", "mainWorktree": "file:///main" } }
+        ]
+      }
+    }]
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "0.9.0", "serverSeq": 2,
+    "snapshots": [{
+      "resource": "ahp-session:/directories", "fromSeq": 2,
+      "state": {
+        "provider": "example", "title": "Directories", "status": 1,
+        "lifecycle": "ready", "activeClients": [], "chats": [],
+        "workingDirectories": [
+          "file:///legacy",
+          { "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+            "origin": { "kind": "worktree", "mainWorktree": "file:///main" } }
+        ]
+      }
+    }]
+  }]
+}

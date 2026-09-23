@@ -573,8 +573,9 @@ export interface ChatChangesetsChangedAction {
  * Membership semantics keyed by the directory URI: the reducer appends
  * `directory` when the chat's subset does not already contain it (creating the
  * subset if absent) and is a no-op when it is already present. `directory` MUST
- * be one of the owning session's {@link SessionState.workingDirectories}; a host
- * MUST reject a directory that is not. Only valid when the agent advertises
+ * match a URI string or record's `uri` in the owning session's
+ * {@link SessionState.workingDirectories}; a host MUST reject a directory that
+ * does not. Only valid when the agent advertises
  * {@link AgentCapabilities.multipleWorkingDirectories}.
  *
  * @category Chat Actions

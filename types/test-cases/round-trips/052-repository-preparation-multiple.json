@@ -1,0 +1,18 @@
+{
+  "name": "repository-preparation-multiple",
+  "group": "A",
+  "description": "Future hosts can advertise multiple repositories and explicit revisions independently of agent capabilities.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.9.0",
+    "serverSeq": 0,
+    "snapshots": [],
+    "repositoryPreparation": { "revision": true, "multipleRepositories": true }
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "0.9.0",
+    "serverSeq": 0,
+    "snapshots": [],
+    "repositoryPreparation": { "revision": true, "multipleRepositories": true }
+  }]
+}

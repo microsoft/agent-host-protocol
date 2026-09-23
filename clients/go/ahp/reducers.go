@@ -929,16 +929,20 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		}
 		return ReduceOutcomeNoOp
 	case *ahptypes.SessionWorkingDirectorySetAction:
-		for _, d := range state.WorkingDirectories {
-			if d == a.Directory {
-				return ReduceOutcomeNoOp
+		for i, d := range state.WorkingDirectories {
+			if d.GetURI() == a.Directory.GetURI() {
+				if a.Directory.Directory == nil {
+					return ReduceOutcomeNoOp
+				}
+				state.WorkingDirectories[i] = a.Directory
+				return ReduceOutcomeApplied
 			}
 		}
 		state.WorkingDirectories = append(state.WorkingDirectories, a.Directory)
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionWorkingDirectoryRemovedAction:
 		for i := range state.WorkingDirectories {
-			if state.WorkingDirectories[i] == a.Directory {
+			if state.WorkingDirectories[i].GetURI() == a.Directory {
 				state.WorkingDirectories = append(state.WorkingDirectories[:i], state.WorkingDirectories[i+1:]...)
 				return ReduceOutcomeApplied
 			}
@@ -947,7 +951,7 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 	case *ahptypes.SessionWorkingDirectoryReplacedAction:
 		idx := -1
 		for i, directory := range state.WorkingDirectories {
-			if directory == a.Directory {
+			if directory.GetURI() == a.Directory {
 				idx = i
 				break
 			}
@@ -955,21 +959,26 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		if idx < 0 {
 			return ReduceOutcomeNoOp
 		}
-		for i := 0; i < idx; i++ {
-			if state.WorkingDirectories[i] == a.Replacement {
-				state.WorkingDirectories = append(state.WorkingDirectories[:idx], state.WorkingDirectories[idx+1:]...)
-				return ReduceOutcomeApplied
-			}
-		}
-		updated := make([]ahptypes.URI, 0, len(state.WorkingDirectories))
+		replacementIdx := -1
 		for i, directory := range state.WorkingDirectories {
-			if i == idx {
-				updated = append(updated, a.Replacement)
-			} else if directory != a.Replacement {
-				updated = append(updated, directory)
+			if directory.GetURI() == a.Replacement.GetURI() {
+				replacementIdx = i
+				break
 			}
 		}
-		state.WorkingDirectories = updated
+		replacement := a.Replacement
+		if replacement.Directory == nil && replacementIdx >= 0 {
+			replacement = state.WorkingDirectories[replacementIdx]
+		}
+		if replacementIdx >= 0 && replacementIdx < idx {
+			state.WorkingDirectories[replacementIdx] = replacement
+			state.WorkingDirectories = append(state.WorkingDirectories[:idx], state.WorkingDirectories[idx+1:]...)
+		} else {
+			state.WorkingDirectories[idx] = replacement
+			if replacementIdx > idx {
+				state.WorkingDirectories = append(state.WorkingDirectories[:replacementIdx], state.WorkingDirectories[replacementIdx+1:]...)
+			}
+		}
 		return ReduceOutcomeApplied
 	case *ahptypes.SessionInputNeededSetAction:
 		id, ok := sessionInputRequestID(a.Request)

@@ -737,16 +737,20 @@ public static class Reducers
                 }
             case SessionWorkingDirectorySetAction a:
                 {
-                    // Membership keyed by the directory URI: append when the set does
-                    // not already contain it (creating the set if absent), no-op when
-                    // it is already present. Mirrors the TS reducer.
-                    if (state.WorkingDirectories is not null && state.WorkingDirectories.Contains(a.Directory))
+                    state.WorkingDirectories ??= new List<WorkingDirectoryEntry>();
+                    int index = state.WorkingDirectories.FindIndex(d => d.Uri == a.Directory.Uri);
+                    if (index < 0)
+                    {
+                        state.WorkingDirectories.Add(a.Directory);
+                    }
+                    else if (a.Directory.Directory is null)
                     {
                         return ReduceOutcome.NoOp;
                     }
-
-                    state.WorkingDirectories ??= new List<string>();
-                    state.WorkingDirectories.Add(a.Directory);
+                    else
+                    {
+                        state.WorkingDirectories[index] = a.Directory;
+                    }
                     return ReduceOutcome.Applied;
                 }
             case SessionWorkingDirectoryRemovedAction a:
@@ -759,7 +763,7 @@ public static class Reducers
                         return ReduceOutcome.NoOp;
                     }
 
-                    int wdIdx = state.WorkingDirectories.IndexOf(a.Directory);
+                    int wdIdx = state.WorkingDirectories.FindIndex(d => d.Uri == a.Directory);
                     if (wdIdx < 0)
                     {
                         return ReduceOutcome.NoOp;
@@ -775,26 +779,27 @@ public static class Reducers
                         return ReduceOutcome.NoOp;
                     }
 
-                    int index = state.WorkingDirectories.IndexOf(a.Directory);
+                    int index = state.WorkingDirectories.FindIndex(d => d.Uri == a.Directory);
                     if (index < 0)
                     {
                         return ReduceOutcome.NoOp;
                     }
 
-                    int replacementIndex = state.WorkingDirectories.IndexOf(a.Replacement);
+                    int replacementIndex = state.WorkingDirectories.FindIndex(d => d.Uri == a.Replacement.Uri);
+                    var replacement = a.Replacement.Directory is null && replacementIndex >= 0
+                        ? state.WorkingDirectories[replacementIndex]
+                        : a.Replacement;
                     if (replacementIndex >= 0 && replacementIndex < index)
                     {
+                        state.WorkingDirectories[replacementIndex] = replacement;
                         state.WorkingDirectories.RemoveAt(index);
                         return ReduceOutcome.Applied;
                     }
 
-                    state.WorkingDirectories[index] = a.Replacement;
-                    for (int i = state.WorkingDirectories.Count - 1; i >= 0; i--)
+                    state.WorkingDirectories[index] = replacement;
+                    if (replacementIndex > index)
                     {
-                        if (i != index && state.WorkingDirectories[i] == a.Replacement)
-                        {
-                            state.WorkingDirectories.RemoveAt(i);
-                        }
+                        state.WorkingDirectories.RemoveAt(replacementIndex);
                     }
 
                     return ReduceOutcome.Applied;

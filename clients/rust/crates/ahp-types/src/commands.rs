@@ -185,6 +185,20 @@ pub enum ResourceWriteMode {
 
 // ─── Command Payloads ─────────────────────────────────────────────────
 
+/// Requested repository source, not a resolved working directory.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositorySource {
+    /// Credential-free repository source URI.
+    pub source: Uri,
+    /// Requested branch, tag, or commit. Omit to use the host's default revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    /// Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subdirectory: Option<String>,
+}
+
 /// Establishes a new connection and negotiates the protocol version.
 /// This MUST be the first message sent by the client.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -268,6 +282,9 @@ pub struct InitializeResult {
     /// Suggested default directory for remote filesystem browsing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_directory: Option<Uri>,
+    /// Host repository preparation support; absent when unsupported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_preparation: Option<RepositoryPreparationCapabilities>,
     /// Characters that, when typed in a {@link Message} input, SHOULD cause
     /// the client to issue a `completions` request with
     /// {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -294,6 +311,18 @@ pub struct InitializeResult {
     pub automations: Option<AutomationCapabilities>,
 }
 
+/// An empty object supports one repository at its default revision.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositoryPreparationCapabilities {
+    /// When true, clients may supply {@link RepositorySource.revision}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<bool>,
+    /// When true, clients may supply more than one repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multiple_repositories: Option<bool>,
+}
+
 /// Optional capabilities a client declares during `initialize`.
 ///
 /// Each field is a presence flag: an empty object `{}` means "supported",
@@ -302,6 +331,10 @@ pub struct InitializeResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientCapabilities {
+    /// Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+    /// Hosts project records to URIs when absent and retain this choice on reconnect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_directory_info: Option<JsonObject>,
     /// Client can render
     /// [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
     /// it can host the View sandbox, run the `ui/*` protocol against it,
@@ -585,6 +618,9 @@ pub struct CreateSessionParams {
     /// after the session has started.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+    /// Repositories to prepare instead of an explicit `workingDirectories` list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repositories: Option<Vec<RepositorySource>>,
     /// Agent-specific configuration values collected via `resolveSessionConfig`.
     /// Keys and values correspond to the schema returned by the server.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -693,9 +729,9 @@ pub struct CreateChatParams {
     /// origin; any `responsePartId` there is provenance only, not a live range.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<ChatSource>,
-    /// Initial working-directory subset for this chat. Every entry MUST be
-    /// present in the owning session's `workingDirectories`; the server MUST
-    /// reject any entry that is not. When absent, the chat inherits the full
+    /// Initial working-directory URI subset for this chat. Every URI MUST match
+    /// a URI string or record's `uri` in the owning session's `workingDirectories`;
+    /// the server MUST reject any entry that does not. When absent, the chat inherits the full
     /// session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
     /// the source chat's `workingDirectories`; this field is ignored for forks.
     ///
@@ -1389,6 +1425,9 @@ pub struct ResolveSessionConfigParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
+    /// Repositories used as configuration context.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repositories: Option<Vec<RepositorySource>>,
     /// Current user-filled configuration values
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
@@ -1424,6 +1463,9 @@ pub struct SessionConfigCompletionsParams {
     /// Working directory for the session
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directory: Option<Uri>,
+    /// Repositories used as configuration context.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repositories: Option<Vec<RepositorySource>>,
     /// Current user-filled configuration values (provides context for the query)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,

@@ -1,0 +1,16 @@
+{
+  "name": "repository-session-request-default-revision",
+  "group": "A",
+  "description": "Creation uses a typed repository list and preserves omission of the requested revision.",
+  "type": "CreateSessionParams",
+  "input": {
+    "channel": "ahp-session:/repository-session",
+    "repositories": [{ "source": "https://example.org/team/project.git" }],
+    "config": { "mode": "review" }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-session:/repository-session",
+    "repositories": [{ "source": "https://example.org/team/project.git" }],
+    "config": { "mode": "review" }
+  }]
+}

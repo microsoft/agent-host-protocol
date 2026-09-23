@@ -1011,6 +1011,29 @@ internal object SessionOriginKindSerializer : KSerializer<SessionOriginKind> {
 }
 
 /**
+ * How a working directory was prepared.
+ */
+@Serializable(with = WorkingDirectoryOriginKindSerializer::class)
+@JvmInline
+value class WorkingDirectoryOriginKind(val rawValue: String) {
+    companion object {
+        val LOCAL: WorkingDirectoryOriginKind = WorkingDirectoryOriginKind("local")
+        val REPO: WorkingDirectoryOriginKind = WorkingDirectoryOriginKind("repo")
+        val WORKTREE: WorkingDirectoryOriginKind = WorkingDirectoryOriginKind("worktree")
+    }
+}
+
+internal object WorkingDirectoryOriginKindSerializer : KSerializer<WorkingDirectoryOriginKind> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("WorkingDirectoryOriginKind", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: WorkingDirectoryOriginKind) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): WorkingDirectoryOriginKind =
+        WorkingDirectoryOriginKind(decoder.decodeString())
+}
+
+/**
  * Operations the host currently permits for an automation.
  *
  * The list on {@link AutomationEntry.operations} is authoritative and may
@@ -1422,6 +1445,41 @@ data class MultipleWorkingDirectoriesCapability(
 )
 
 @Serializable
+data class WorkingDirectory(
+    /**
+     * Actual selected directory, which may be a repository subdirectory.
+     */
+    val uri: String,
+    /**
+     * Credential-free repository source association, not a checkout identity.
+     */
+    val repo: String? = null,
+    /**
+     * Host-reported provenance; omission means unspecified.
+     */
+    val origin: WorkingDirectoryOrigin? = null
+)
+
+@Serializable
+data class LocalWorkingDirectoryOrigin(
+    val kind: WorkingDirectoryOriginKind
+)
+
+@Serializable
+data class RepoWorkingDirectoryOrigin(
+    val kind: WorkingDirectoryOriginKind
+)
+
+@Serializable
+data class WorktreeWorkingDirectoryOrigin(
+    val kind: WorkingDirectoryOriginKind,
+    /**
+     * Main worktree associated with the host-prepared worktree.
+     */
+    val mainWorktree: String
+)
+
+@Serializable
 data class SessionModelInfo(
     /**
      * Model identifier
@@ -1610,13 +1668,14 @@ data class ChatState(
     /**
      * The subset of the session's
      * {@link SessionState.workingDirectories | `workingDirectories`} that this
-     * chat's agent has tool access to. Every entry MUST be present in the owning
-     * session's `workingDirectories`; servers MUST reject a
+     * chat's agent has tool access to. Every URI MUST match a URI string or a
+     * record's `uri` in the owning session's set; servers MUST reject a
      * `chat/workingDirectorySet` action that violates this constraint.
      *
      * When absent, the chat inherits the full session set. When present but empty
      * (not recommended), the chat has no working-directory tool access at all.
      *
+     * Directory metadata belongs to the session, not the chat.
      * Dispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to
      * update the subset on a running chat.
      */
@@ -1774,8 +1833,10 @@ data class SessionState(
      * MAY restrict to a subset via
      * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
      * chat that sets none operates against this full set.
+     * Entries are uniquely keyed by URI. Rich records require
+     * {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
      */
-    val workingDirectories: List<String>? = null,
+    val workingDirectories: List<WorkingDirectoryEntry>? = null,
     /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
@@ -2055,8 +2116,10 @@ data class SessionSummary(
      * MAY restrict to a subset via
      * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
      * chat that sets none operates against this full set.
+     * Entries are uniquely keyed by URI. Rich records require
+     * {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
      */
-    val workingDirectories: List<String>? = null,
+    val workingDirectories: List<WorkingDirectoryEntry>? = null,
     /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
@@ -5768,6 +5831,50 @@ internal object ToolInputSerializer : KSerializer<ToolInput> {
     }
 }
 
+/** A legacy URI or a complete working-directory record. */
+@Serializable(with = WorkingDirectoryEntrySerializer::class)
+sealed interface WorkingDirectoryEntry {
+    val uri: String
+
+    data class Uri(val value: String) : WorkingDirectoryEntry {
+        override val uri: String get() = value
+    }
+    data class Directory(val value: WorkingDirectory) : WorkingDirectoryEntry {
+        override val uri: String get() = value.uri
+    }
+}
+
+internal object WorkingDirectoryEntrySerializer : KSerializer<WorkingDirectoryEntry> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("WorkingDirectoryEntry")
+
+    override fun deserialize(decoder: Decoder): WorkingDirectoryEntry {
+        val input = decoder as? JsonDecoder
+            ?: error("WorkingDirectoryEntry requires JSON")
+        return when (val element = input.decodeJsonElement()) {
+            is JsonPrimitive -> {
+                require(element.isString) { "WorkingDirectoryEntry URI must be a string" }
+                WorkingDirectoryEntry.Uri(element.content)
+            }
+            is JsonObject -> WorkingDirectoryEntry.Directory(
+                input.json.decodeFromJsonElement(WorkingDirectory.serializer(), element),
+            )
+            else -> error("WorkingDirectoryEntry requires a URI or directory")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: WorkingDirectoryEntry) {
+        val output = encoder as? JsonEncoder
+            ?: error("WorkingDirectoryEntry requires JSON")
+        val element = when (value) {
+            is WorkingDirectoryEntry.Uri -> JsonPrimitive(value.value)
+            is WorkingDirectoryEntry.Directory ->
+                output.json.encodeToJsonElement(WorkingDirectory.serializer(), value.value)
+        }
+        output.encodeJsonElement(element)
+    }
+}
+
 // ─── Discriminated Unions ───────────────────────────────────────────────────
 
 @Serializable(with = ChatOriginSerializer::class)
@@ -6795,6 +6902,67 @@ internal object SessionOriginSerializer : KSerializer<SessionOrigin> {
         val discriminant = when (value) {
             is SessionOriginAutomation -> "automation"
             is SessionOriginUnknown -> null
+        }
+        if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
+        output.encodeJsonElement(JsonObject(encodedObject))
+    }
+}
+
+@Serializable(with = WorkingDirectoryOriginSerializer::class)
+sealed interface WorkingDirectoryOrigin
+
+@JvmInline
+value class WorkingDirectoryOriginLocal(val value: LocalWorkingDirectoryOrigin) : WorkingDirectoryOrigin
+@JvmInline
+value class WorkingDirectoryOriginRepo(val value: RepoWorkingDirectoryOrigin) : WorkingDirectoryOrigin
+@JvmInline
+value class WorkingDirectoryOriginWorktree(val value: WorktreeWorkingDirectoryOrigin) : WorkingDirectoryOrigin
+/**
+ * Forward-compat catch-all for unknown WorkingDirectoryOrigin discriminators.
+ *
+ * Older clients may receive newer wire variants they don't recognise; capturing
+ * the raw `JsonObject` lets such payloads round-trip through the client unchanged.
+ * Reducers handle this variant conservatively on a per-union basis (typically
+ * as a no-op, but see `Reducers.kt` for the exact treatment).
+ */
+@JvmInline
+value class WorkingDirectoryOriginUnknown(val raw: JsonObject) : WorkingDirectoryOrigin
+
+internal object WorkingDirectoryOriginSerializer : KSerializer<WorkingDirectoryOrigin> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("WorkingDirectoryOrigin")
+
+    override fun deserialize(decoder: Decoder): WorkingDirectoryOrigin {
+        val input = decoder as? JsonDecoder
+            ?: error("WorkingDirectoryOrigin can only be deserialized from JSON")
+        val element = input.decodeJsonElement()
+        val obj = element as? JsonObject
+            ?: error("Expected JsonObject for WorkingDirectoryOrigin")
+        val discriminant = (obj["kind"] as? JsonPrimitive)?.content
+            ?: return WorkingDirectoryOriginUnknown(obj)
+        return when (discriminant) {
+            "local" -> WorkingDirectoryOriginLocal(input.json.decodeFromJsonElement(LocalWorkingDirectoryOrigin.serializer(), element))
+            "repo" -> WorkingDirectoryOriginRepo(input.json.decodeFromJsonElement(RepoWorkingDirectoryOrigin.serializer(), element))
+            "worktree" -> WorkingDirectoryOriginWorktree(input.json.decodeFromJsonElement(WorktreeWorkingDirectoryOrigin.serializer(), element))
+            else -> WorkingDirectoryOriginUnknown(obj)
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: WorkingDirectoryOrigin) {
+        val output = encoder as? JsonEncoder
+            ?: error("WorkingDirectoryOrigin can only be serialized to JSON")
+        val element: JsonElement = when (value) {
+            is WorkingDirectoryOriginLocal -> output.json.encodeToJsonElement(LocalWorkingDirectoryOrigin.serializer(), value.value)
+            is WorkingDirectoryOriginRepo -> output.json.encodeToJsonElement(RepoWorkingDirectoryOrigin.serializer(), value.value)
+            is WorkingDirectoryOriginWorktree -> output.json.encodeToJsonElement(WorktreeWorkingDirectoryOrigin.serializer(), value.value)
+            is WorkingDirectoryOriginUnknown -> value.raw
+        }
+        val encodedObject = element.jsonObject.toMutableMap()
+        val discriminant = when (value) {
+            is WorkingDirectoryOriginLocal -> "local"
+            is WorkingDirectoryOriginRepo -> "repo"
+            is WorkingDirectoryOriginWorktree -> "worktree"
+            is WorkingDirectoryOriginUnknown -> null
         }
         if (discriminant != null) encodedObject["kind"] = JsonPrimitive(discriminant)
         output.encodeJsonElement(JsonObject(encodedObject))

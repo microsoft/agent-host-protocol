@@ -1,0 +1,15 @@
+{
+  "description": "URI-only replacement moves a later rich record without dropping metadata",
+  "reducer": "session",
+  "initial": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": ["file:///a", "file:///b", { "uri": "file:///c", "origin": { "kind": "worktree", "mainWorktree": "file:///main" } }]
+  },
+  "actions": [{ "type": "session/workingDirectoryReplaced", "directory": "file:///b", "replacement": "file:///c" }],
+  "expected": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": ["file:///a", { "uri": "file:///c", "origin": { "kind": "worktree", "mainWorktree": "file:///main" } }]
+  }
+}

@@ -105,9 +105,16 @@
             "workingDirectories": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/URI"
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/URI"
+                  },
+                  {
+                    "$ref": "#/$defs/WorkingDirectory"
+                  }
+                ]
               },
-              "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
+              "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set.\nEntries are uniquely keyed by URI. Rich records require\n{@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs."
             },
             "annotations": {
               "$ref": "#/$defs/AnnotationsSummary",
@@ -944,6 +951,65 @@
         "run"
       ]
     },
+    "LocalWorkingDirectoryOrigin": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "local"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "RepoWorkingDirectoryOrigin": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "repo"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "WorktreeWorkingDirectoryOrigin": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "worktree"
+        },
+        "mainWorktree": {
+          "$ref": "#/$defs/URI",
+          "description": "Main worktree associated with the host-prepared worktree."
+        }
+      },
+      "required": [
+        "kind",
+        "mainWorktree"
+      ]
+    },
+    "WorkingDirectory": {
+      "type": "object",
+      "description": "An actual working directory, uniquely keyed by `uri` within the session.",
+      "properties": {
+        "uri": {
+          "$ref": "#/$defs/URI",
+          "description": "Actual selected directory, which may be a repository subdirectory."
+        },
+        "repo": {
+          "$ref": "#/$defs/URI",
+          "description": "Credential-free repository source association, not a checkout identity."
+        },
+        "origin": {
+          "$ref": "#/$defs/WorkingDirectoryOrigin",
+          "description": "Host-reported provenance; omission means unspecified."
+        }
+      },
+      "required": [
+        "uri"
+      ]
+    },
     "SessionMetadata": {
       "type": "object",
       "description": "Metadata shared between the full {@link SessionState} (delivered when a\nclient subscribes to a session's URI) and the lightweight\n{@link SessionSummary} (carried in the root-channel session catalog).\n\nThese fields describe the session at a glance and appear in both places.\n`SessionState` owns the authoritative values for a subscribed session;\n`SessionSummary` mirrors them into the catalog so clients that only render a\nsession list don't have to subscribe to every session URI. The host keeps\nthe catalog in sync via `root/sessionSummaryChanged`.",
@@ -975,9 +1041,16 @@
         "workingDirectories": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/URI"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/URI"
+              },
+              {
+                "$ref": "#/$defs/WorkingDirectory"
+              }
+            ]
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set.\nEntries are uniquely keyed by URI. Rich records require\n{@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -1021,9 +1094,16 @@
         "workingDirectories": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/URI"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/URI"
+              },
+              {
+                "$ref": "#/$defs/WorkingDirectory"
+              }
+            ]
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set.\nEntries are uniquely keyed by URI. Rich records require\n{@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -1329,9 +1409,16 @@
         "workingDirectories": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/URI"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/URI"
+              },
+              {
+                "$ref": "#/$defs/WorkingDirectory"
+              }
+            ]
           },
-          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set."
+          "description": "The working directories the session's agent has tool access to, as\nmaintained by working-directory actions. Directories are equal peers except\nwhen the agent advertises\n{@link MultipleWorkingDirectoriesCapability.immutablePrimary} without\n{@link MultipleWorkingDirectoriesCapability.primaryReplacement} (the first\nentry is then a fixed process root), or advertises `primaryReplacement`\n(the first entry is a protected, replaceable primary slot). Individual chats\nMAY restrict to a subset via\n{@link ChatSummary.workingDirectories | their own `workingDirectories`}; a\nchat that sets none operates against this full set.\nEntries are uniquely keyed by URI. Rich records require\n{@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs."
         },
         "annotations": {
           "$ref": "#/$defs/AnnotationsSummary",
@@ -2683,7 +2770,7 @@
           "items": {
             "$ref": "#/$defs/URI"
           },
-          "description": "The subset of the session's\n{@link SessionState.workingDirectories | `workingDirectories`} that this\nchat's agent has tool access to. Every entry MUST be present in the owning\nsession's `workingDirectories`; servers MUST reject a\n`chat/workingDirectorySet` action that violates this constraint.\n\nWhen absent, the chat inherits the full session set. When present but empty\n(not recommended), the chat has no working-directory tool access at all.\n\nDispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to\nupdate the subset on a running chat."
+          "description": "The subset of the session's\n{@link SessionState.workingDirectories | `workingDirectories`} that this\nchat's agent has tool access to. Every URI MUST match a URI string or a\nrecord's `uri` in the owning session's set; servers MUST reject a\n`chat/workingDirectorySet` action that violates this constraint.\n\nWhen absent, the chat inherits the full session set. When present but empty\n(not recommended), the chat has no working-directory tool access at all.\n\nDirectory metadata belongs to the session, not the chat.\nDispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to\nupdate the subset on a running chat."
         },
         "changesets": {
           "type": "array",
@@ -5946,6 +6033,20 @@
       ],
       "type": "string",
       "description": "Policy configuration state for a model."
+    },
+    "WorkingDirectoryOrigin": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/LocalWorkingDirectoryOrigin"
+        },
+        {
+          "$ref": "#/$defs/RepoWorkingDirectoryOrigin"
+        },
+        {
+          "$ref": "#/$defs/WorktreeWorkingDirectoryOrigin"
+        }
+      ],
+      "description": "Host-reported preparation result, independent of the creation input."
     },
     "SessionLifecycle": {
       "enum": [

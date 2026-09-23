@@ -1,0 +1,15 @@
+{
+  "description": "URI-only replacement retains an earlier rich record and removes only the target",
+  "reducer": "session",
+  "initial": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": [{ "uri": "file:///a", "repo": "https://example.org/project.git" }, "file:///b", { "uri": "file:///c" }]
+  },
+  "actions": [{ "type": "session/workingDirectoryReplaced", "directory": "file:///c", "replacement": "file:///a" }],
+  "expected": {
+    "provider": "example", "title": "Directories", "status": 1,
+    "lifecycle": "ready", "activeClients": [], "chats": [],
+    "workingDirectories": [{ "uri": "file:///a", "repo": "https://example.org/project.git" }, "file:///b"]
+  }
+}

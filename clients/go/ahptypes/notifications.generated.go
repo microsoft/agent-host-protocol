@@ -231,7 +231,9 @@ type PartialSessionSummary struct {
 	// MAY restrict to a subset via
 	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
 	// chat that sets none operates against this full set.
-	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Entries are uniquely keyed by URI. Rich records require
+	// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
+	WorkingDirectories []WorkingDirectoryEntry `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session

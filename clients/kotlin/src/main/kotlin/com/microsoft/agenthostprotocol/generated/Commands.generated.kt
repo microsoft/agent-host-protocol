@@ -271,6 +271,22 @@ internal object SideChatSourceSerializer : KSerializer<SideChatSource> {
 }
 
 @Serializable
+data class RepositorySource(
+    /**
+     * Credential-free repository source URI.
+     */
+    val source: String,
+    /**
+     * Requested branch, tag, or commit. Omit to use the host's default revision.
+     */
+    val revision: String? = null,
+    /**
+     * Repository-relative selected folder; omit for the root. Hosts reject empty, absolute, or escaping paths.
+     */
+    val subdirectory: String? = null
+)
+
+@Serializable
 data class InitializeParams(
     /**
      * Channel URI this command targets.
@@ -364,6 +380,10 @@ data class InitializeResult(
      */
     val defaultDirectory: String? = null,
     /**
+     * Host repository preparation support; absent when unsupported.
+     */
+    val repositoryPreparation: RepositoryPreparationCapabilities? = null,
+    /**
      * Characters that, when typed in a {@link Message} input, SHOULD cause
      * the client to issue a `completions` request with
      * {@link CompletionItemKind.UserMessage}. Typically includes characters like
@@ -394,7 +414,24 @@ data class InitializeResult(
 )
 
 @Serializable
+data class RepositoryPreparationCapabilities(
+    /**
+     * When true, clients may supply {@link RepositorySource.revision}.
+     */
+    val revision: Boolean? = null,
+    /**
+     * When true, clients may supply more than one repository.
+     */
+    val multipleRepositories: Boolean? = null
+)
+
+@Serializable
 data class ClientCapabilities(
+    /**
+     * Client accepts rich {@link WorkingDirectory} records as well as URI strings.
+     * Hosts project records to URIs when absent and retain this choice on reconnect.
+     */
+    val workingDirectoryInfo: Map<String, JsonElement>? = null,
     /**
      * Client can render
      * [MCP Apps](https://github.com/modelcontextprotocol/ext-apps) — i.e.
@@ -620,6 +657,10 @@ data class CreateSessionParams(
      */
     val workingDirectories: List<String>? = null,
     /**
+     * Repositories to prepare instead of an explicit `workingDirectories` list.
+     */
+    val repositories: List<RepositorySource>? = null,
+    /**
      * Agent-specific configuration values collected via `resolveSessionConfig`.
      * Keys and values correspond to the schema returned by the server.
      */
@@ -700,9 +741,9 @@ data class CreateChatParams(
      */
     val source: ChatSource? = null,
     /**
-     * Initial working-directory subset for this chat. Every entry MUST be
-     * present in the owning session's `workingDirectories`; the server MUST
-     * reject any entry that is not. When absent, the chat inherits the full
+     * Initial working-directory URI subset for this chat. Every URI MUST match
+     * a URI string or record's `uri` in the owning session's `workingDirectories`;
+     * the server MUST reject any entry that does not. When absent, the chat inherits the full
      * session set. Forked chats (those whose `source.kind` is `"fork"`) inherit
      * the source chat's `workingDirectories`; this field is ignored for forks.
      *
@@ -1317,6 +1358,10 @@ data class ResolveSessionConfigParams(
      */
     val workingDirectory: String? = null,
     /**
+     * Repositories used as configuration context.
+     */
+    val repositories: List<RepositorySource>? = null,
+    /**
      * Current user-filled configuration values
      */
     val config: Map<String, JsonElement>? = null
@@ -1433,6 +1478,10 @@ data class SessionConfigCompletionsParams(
      * Working directory for the session
      */
     val workingDirectory: String? = null,
+    /**
+     * Repositories used as configuration context.
+     */
+    val repositories: List<RepositorySource>? = null,
     /**
      * Current user-filled configuration values (provides context for the query)
      */

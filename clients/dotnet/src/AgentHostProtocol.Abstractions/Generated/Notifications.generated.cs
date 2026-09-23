@@ -263,9 +263,11 @@ public sealed record PartialSessionSummary
     /// (the first entry is a protected, replaceable primary slot). Individual chats
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
-    /// chat that sets none operates against this full set.</summary>
+    /// chat that sets none operates against this full set.
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<string>? WorkingDirectories { get; init; }
+    public List<WorkingDirectoryEntry>? WorkingDirectories { get; init; }
 
     /// <summary>Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/&lt;uuid&gt;/annotations`). Surfaced so badge UI can render

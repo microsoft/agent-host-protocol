@@ -223,8 +223,10 @@ data class PartialSessionSummary(
      * MAY restrict to a subset via
      * {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
      * chat that sets none operates against this full set.
+     * Entries are uniquely keyed by URI. Rich records require
+     * {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
      */
-    val workingDirectories: List<String>? = null,
+    val workingDirectories: List<WorkingDirectoryEntry>? = null,
     /**
      * Lightweight summary of this session's inline annotations channel
      * (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render

@@ -651,16 +651,21 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
 
     is StateActionSessionWorkingDirectorySet -> {
         val list = state.workingDirectories ?: emptyList()
-        if (list.contains(action.value.directory)) {
+        val idx = list.indexOfFirst { it.uri == action.value.directory.uri }
+        if (idx < 0) {
+            state.copy(workingDirectories = list + action.value.directory)
+        } else if (action.value.directory is WorkingDirectoryEntry.Uri) {
             state
         } else {
-            state.copy(workingDirectories = list + action.value.directory)
+            val updated = list.toMutableList()
+            updated[idx] = action.value.directory
+            state.copy(workingDirectories = updated)
         }
     }
 
     is StateActionSessionWorkingDirectoryRemoved -> {
         val list = state.workingDirectories
-        val idx = list?.indexOf(action.value.directory) ?: -1
+        val idx = list?.indexOfFirst { it.uri == action.value.directory } ?: -1
         if (list == null || idx < 0) {
             state
         } else {
@@ -672,24 +677,27 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
 
     is StateActionSessionWorkingDirectoryReplaced -> {
         val list = state.workingDirectories
-        val idx = list?.indexOf(action.value.directory) ?: -1
+        val idx = list?.indexOfFirst { it.uri == action.value.directory } ?: -1
         if (list == null || idx < 0) {
             state
         } else {
-            val replacementIdx = list.indexOf(action.value.replacement)
-            if (replacementIdx in 0 until idx) {
-                state.copy(workingDirectories = list.filterIndexed { index, _ -> index != idx })
+            val replacementIdx = list.indexOfFirst { it.uri == action.value.replacement.uri }
+            val replacement = if (action.value.replacement is WorkingDirectoryEntry.Uri && replacementIdx >= 0) {
+                list[replacementIdx]
             } else {
-                state.copy(
-                    workingDirectories = list.mapIndexedNotNull { index, directory ->
-                        when {
-                            index == idx -> action.value.replacement
-                            directory == action.value.replacement -> null
-                            else -> directory
-                        }
-                    },
-                )
+                action.value.replacement
             }
+            val updated = list.toMutableList()
+            if (replacementIdx in 0 until idx) {
+                updated[replacementIdx] = replacement
+                updated.removeAt(idx)
+            } else {
+                updated[idx] = replacement
+                if (replacementIdx > idx) {
+                    updated.removeAt(replacementIdx)
+                }
+            }
+            state.copy(workingDirectories = updated)
         }
     }
 

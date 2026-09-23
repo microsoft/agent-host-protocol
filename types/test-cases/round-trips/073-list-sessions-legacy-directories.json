@@ -1,0 +1,16 @@
+{
+  "name": "list-sessions-legacy-directories",
+  "group": "A",
+  "description": "Legacy session-list summaries remain URI-only.",
+  "type": "ListSessionsResult",
+  "input": { "items": [{
+    "resource": "ahp-session:/directories", "provider": "example", "title": "Directories", "status": 1,
+    "createdAt": "2026-09-21T00:00:00.000Z", "modifiedAt": "2026-09-21T00:00:00.000Z",
+    "workingDirectories": ["file:///legacy", "file:///tree/packages/api"]
+  }] },
+  "acceptableOutputs": [{ "items": [{
+    "resource": "ahp-session:/directories", "provider": "example", "title": "Directories", "status": 1,
+    "createdAt": "2026-09-21T00:00:00.000Z", "modifiedAt": "2026-09-21T00:00:00.000Z",
+    "workingDirectories": ["file:///legacy", "file:///tree/packages/api"]
+  }] }]
+}

@@ -242,6 +242,38 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 		var v InitializeResult
 		dec(&v)
 		return enc(&v)
+	case "InitializeParams":
+		var v InitializeParams
+		dec(&v)
+		return enc(&v)
+	case "SubscribeResult":
+		var v SubscribeResult
+		dec(&v)
+		return enc(&v)
+	case "ReconnectResult":
+		var v ReconnectResult
+		dec(&v)
+		return enc(&v)
+	case "ListSessionsResult":
+		var v ListSessionsResult
+		dec(&v)
+		return enc(&v)
+	case "SessionSummaryChangedParams":
+		var v SessionSummaryChangedParams
+		dec(&v)
+		return enc(&v)
+	case "CreateSessionParams":
+		var v CreateSessionParams
+		dec(&v)
+		return enc(&v)
+	case "ResolveSessionConfigParams":
+		var v ResolveSessionConfigParams
+		dec(&v)
+		return enc(&v)
+	case "SessionConfigCompletionsParams":
+		var v SessionConfigCompletionsParams
+		dec(&v)
+		return enc(&v)
 	case "ChatSource":
 		var v ChatSource
 		dec(&v)

@@ -6,12 +6,8 @@ package ahptypes
 
 import (
 	"encoding/json"
+	"fmt"
 )
-
-// Reference the encoding/json import to keep gofmt -d from
-// stripping it when a generated file has no struct that mentions
-// json.RawMessage directly (rare but possible). Compiled out.
-var _ = json.RawMessage(nil)
 
 // ─── Enums ────────────────────────────────────────────────────────────
 
@@ -475,6 +471,15 @@ const (
 	SessionOriginKindAutomation SessionOriginKind = "automation"
 )
 
+// How a working directory was prepared.
+type WorkingDirectoryOriginKind string
+
+const (
+	WorkingDirectoryOriginKindLocal    WorkingDirectoryOriginKind = "local"
+	WorkingDirectoryOriginKindRepo     WorkingDirectoryOriginKind = "repo"
+	WorkingDirectoryOriginKindWorktree WorkingDirectoryOriginKind = "worktree"
+)
+
 // Operations the host currently permits for an automation.
 //
 // The list on {@link AutomationEntry.operations} is authoritative and may
@@ -748,6 +753,30 @@ type MultipleWorkingDirectoriesCapability struct {
 	PrimaryReplacement *bool `json:"primaryReplacement,omitempty"`
 }
 
+// An actual working directory, uniquely keyed by `uri` within the session.
+type WorkingDirectory struct {
+	// Actual selected directory, which may be a repository subdirectory.
+	Uri URI `json:"uri"`
+	// Credential-free repository source association, not a checkout identity.
+	Repo *URI `json:"repo,omitempty"`
+	// Host-reported provenance; omission means unspecified.
+	Origin *WorkingDirectoryOrigin `json:"origin,omitempty"`
+}
+
+type LocalWorkingDirectoryOrigin struct {
+	Kind WorkingDirectoryOriginKind `json:"kind"`
+}
+
+type RepoWorkingDirectoryOrigin struct {
+	Kind WorkingDirectoryOriginKind `json:"kind"`
+}
+
+type WorktreeWorkingDirectoryOrigin struct {
+	Kind WorkingDirectoryOriginKind `json:"kind"`
+	// Main worktree associated with the host-prepared worktree.
+	MainWorktree URI `json:"mainWorktree"`
+}
+
 type SessionModelInfo struct {
 	// Model identifier
 	Id string `json:"id"`
@@ -880,7 +909,9 @@ type SessionState struct {
 	// MAY restrict to a subset via
 	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
 	// chat that sets none operates against this full set.
-	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Entries are uniquely keyed by URI. Rich records require
+	// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
+	WorkingDirectories []WorkingDirectoryEntry `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
@@ -1156,7 +1187,9 @@ type SessionSummary struct {
 	// MAY restrict to a subset via
 	// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
 	// chat that sets none operates against this full set.
-	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+	// Entries are uniquely keyed by URI. Rich records require
+	// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
+	WorkingDirectories []WorkingDirectoryEntry `json:"workingDirectories,omitempty"`
 	// Lightweight summary of this session's inline annotations channel
 	// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
 	// annotation / entry counts without subscribing. Absent when the session
@@ -1250,13 +1283,14 @@ type ChatState struct {
 	Interactivity *ChatInteractivity `json:"interactivity,omitempty"`
 	// The subset of the session's
 	// {@link SessionState.workingDirectories | `workingDirectories`} that this
-	// chat's agent has tool access to. Every entry MUST be present in the owning
-	// session's `workingDirectories`; servers MUST reject a
+	// chat's agent has tool access to. Every URI MUST match a URI string or a
+	// record's `uri` in the owning session's set; servers MUST reject a
 	// `chat/workingDirectorySet` action that violates this constraint.
 	//
 	// When absent, the chat inherits the full session set. When present but empty
 	// (not recommended), the chat has no working-directory tool access at all.
 	//
+	// Directory metadata belongs to the session, not the chat.
 	// Dispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to
 	// update the subset on a running chat.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
@@ -3143,7 +3177,7 @@ type AhpMcpUiHostCapabilities struct {
 	// Producer proxies the MCP `resources/*` methods to the upstream server.
 	ServerResources *json.RawMessage `json:"serverResources,omitempty"`
 	// Producer accepts `notifications/message` log entries from the App via `mcpNotification`.
-	Logging map[string]json.RawMessage `json:"logging,omitempty"`
+	Logging *map[string]json.RawMessage `json:"logging,omitempty"`
 	// Producer serves `sampling/createMessage` via `mcpMethodCall`.
 	Sampling *json.RawMessage `json:"sampling,omitempty"`
 }
@@ -3527,7 +3561,7 @@ type ChangesetCapabilities struct {
 	// {@link ChangesetFilesReviewChangedAction | `changeset/filesReviewChanged`} to
 	// set each file's {@link ChangesetFile.reviewed} flag. Clients that omit
 	// handling MUST treat the changeset as non-reviewable.
-	Review map[string]json.RawMessage `json:"review,omitempty"`
+	Review *map[string]json.RawMessage `json:"review,omitempty"`
 }
 
 // Full state for a single changeset, returned when a client subscribes to
@@ -4237,6 +4271,50 @@ func (t *ToolInput) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	t.ContentRef = &ref
+	return nil
+}
+
+// WorkingDirectoryEntry is a legacy URI or a complete working-directory record.
+type WorkingDirectoryEntry struct {
+	URI       *URI
+	Directory *WorkingDirectory
+}
+
+func (d WorkingDirectoryEntry) GetURI() URI {
+	if d.Directory != nil {
+		return d.Directory.Uri
+	}
+	if d.URI != nil {
+		return *d.URI
+	}
+	return ""
+}
+
+func (d WorkingDirectoryEntry) MarshalJSON() ([]byte, error) {
+	if d.Directory != nil {
+		return json.Marshal(d.Directory)
+	}
+	if d.URI != nil {
+		return json.Marshal(*d.URI)
+	}
+	return nil, fmt.Errorf("WorkingDirectoryEntry requires a URI or directory")
+}
+
+func (d *WorkingDirectoryEntry) UnmarshalJSON(data []byte) error {
+	*d = WorkingDirectoryEntry{}
+	var uri *URI
+	if err := json.Unmarshal(data, &uri); err == nil && uri != nil {
+		d.URI = uri
+		return nil
+	}
+	var directory *WorkingDirectory
+	if err := json.Unmarshal(data, &directory); err != nil {
+		return err
+	}
+	if directory == nil {
+		return fmt.Errorf("WorkingDirectoryEntry requires a URI or directory")
+	}
+	d.Directory = directory
 	return nil
 }
 
@@ -5592,6 +5670,89 @@ func (u SessionOrigin) MarshalJSON() ([]byte, error) {
 	switch u.Value.(type) {
 	case *AutomationSessionOrigin:
 		object["kind"] = json.RawMessage("\"automation\"")
+	}
+	return json.Marshal(object)
+}
+
+// Host-reported working-directory provenance.
+type WorkingDirectoryOrigin struct {
+	Value isWorkingDirectoryOrigin
+}
+
+// isWorkingDirectoryOrigin is the marker interface implemented by every
+// concrete variant of WorkingDirectoryOrigin.
+type isWorkingDirectoryOrigin interface{ isWorkingDirectoryOrigin() }
+
+func (*LocalWorkingDirectoryOrigin) isWorkingDirectoryOrigin()    {}
+func (*RepoWorkingDirectoryOrigin) isWorkingDirectoryOrigin()     {}
+func (*WorktreeWorkingDirectoryOrigin) isWorkingDirectoryOrigin() {}
+
+// WorkingDirectoryOriginUnknown carries an unrecognized WorkingDirectoryOrigin variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type WorkingDirectoryOriginUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*WorkingDirectoryOriginUnknown) isWorkingDirectoryOrigin() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *WorkingDirectoryOrigin) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "local":
+		var value LocalWorkingDirectoryOrigin
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "repo":
+		var value RepoWorkingDirectoryOrigin
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "worktree":
+		var value WorktreeWorkingDirectoryOrigin
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &WorkingDirectoryOriginUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u WorkingDirectoryOrigin) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*WorkingDirectoryOriginUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	data, err := json.Marshal(u.Value)
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return nil, err
+	}
+	switch u.Value.(type) {
+	case *LocalWorkingDirectoryOrigin:
+		object["kind"] = json.RawMessage("\"local\"")
+	case *RepoWorkingDirectoryOrigin:
+		object["kind"] = json.RawMessage("\"repo\"")
+	case *WorktreeWorkingDirectoryOrigin:
+		object["kind"] = json.RawMessage("\"worktree\"")
 	}
 	return json.Marshal(object)
 }

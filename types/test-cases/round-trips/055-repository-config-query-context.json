@@ -1,0 +1,18 @@
+{
+  "name": "repository-config-query-context",
+  "group": "A",
+  "description": "Repository lists and directory context coexist in configuration queries, outside generic config.",
+  "type": "ResolveSessionConfigParams",
+  "input": {
+    "channel": "ahp-root://",
+    "workingDirectory": "file:///work/context",
+    "repositories": [{ "source": "https://example.org/team/project.git", "revision": "main", "subdirectory": "packages/api" }],
+    "config": { "mode": "review" }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "workingDirectory": "file:///work/context",
+    "repositories": [{ "source": "https://example.org/team/project.git", "revision": "main", "subdirectory": "packages/api" }],
+    "config": { "mode": "review" }
+  }]
+}

@@ -15,7 +15,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::state::{
     AgentSelection, AnnotationsSummary, ChangesSummary, Changeset, FileEdit, ModelSelection,
     ProjectInfo, ProtectedResourceMetadata, SessionChatSummary, SessionOrigin, SessionStatus,
-    SessionSummary,
+    SessionSummary, WorkingDirectoryEntry,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -291,8 +291,10 @@ pub struct PartialSessionSummary {
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub working_directories: Option<Vec<Uri>>,
+    pub working_directories: Option<Vec<WorkingDirectoryEntry>>,
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session

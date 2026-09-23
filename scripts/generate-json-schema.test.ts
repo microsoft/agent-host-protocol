@@ -142,7 +142,9 @@ function schemaAccepts(
     case 'null':
       return value === null;
     case 'array':
-      return Array.isArray(value);
+      return Array.isArray(value)
+        && (typeof schema.minItems !== 'number' || value.length >= schema.minItems)
+        && value.every(item => schemaAccepts(root, schema.items as JsonNode, item));
   }
 
   return true;
@@ -198,6 +200,178 @@ describe('generated JSON schemas', () => {
         assert.equal(required.includes('expiresIn'), false);
         assert.match(expiresIn.description as string, /remaining lifetime, in seconds/);
         assert.match(expiresIn.description as string, /MUST be a positive integer/);
+      });
+
+      it('keeps session config schema generic without repository metadata', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const configSchema = defs.SessionConfigSchema;
+        const properties = configSchema.properties as Record<string, Record<string, unknown>>;
+        assert.deepEqual({
+          fields: Object.keys(properties).sort(),
+          required: configSchema.required,
+          propertySchema: properties.properties.additionalProperties,
+          repositoryType: defs.RepositorySessionConfig,
+        }, {
+          fields: ['properties', 'required', 'type'],
+          required: ['type', 'properties'],
+          propertySchema: { $ref: '#/$defs/SessionConfigPropertySchema' },
+          repositoryType: undefined,
+        });
+
+        const legacy = {
+          type: 'object',
+          properties: { mode: { type: 'string', title: 'Mode' } },
+          required: ['mode'],
+        };
+        assert.equal(schemaAccepts(schema, configSchema, legacy), true);
+      });
+
+      it('declares optional non-empty repository lists beside generic config', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const [definition, channel] of [
+          ['ResolveSessionConfigParams', 'ahp-root://'],
+          ['SessionConfigCompletionsParams', 'ahp-root://'],
+          ['CreateSessionParams', 'ahp-session:/repository-test'],
+        ]) {
+          const properties = defs[definition].properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.config.type, 'object');
+          assert.deepEqual(
+            Object.keys(properties).filter(name => name.startsWith('repositor')),
+            ['repositories'],
+          );
+          assert.equal(properties.repositories.minItems, 1);
+          const base = { channel, ...(definition === 'SessionConfigCompletionsParams' ? { property: 'mode' } : {}) };
+          assert.equal(schemaAccepts(schema, defs[definition], base), true);
+          const source = 'https://example.org/team/project.git';
+          for (const repositories of [
+            [{ source }],
+            [{ source, revision: 'refs/tags/v1.2.3' }],
+            [{ source, subdirectory: 'packages/api' }],
+            [{ source, revision: 'main' }, { source, revision: 'feature' }],
+          ]) {
+            assert.equal(schemaAccepts(schema, defs[definition], { ...base, repositories, config: { mode: 'review' } }), true);
+          }
+          for (const repositories of [
+            [], null, {}, source, [null], [source], [{}],
+            [{ revision: 'main' }], [{ source: 42 }], [{ source: null }],
+            [{ source, revision: 42 }],
+            [{ source, subdirectory: 42 }],
+          ]) {
+            assert.equal(schemaAccepts(schema, defs[definition], { ...base, repositories }), false);
+          }
+        }
+      });
+
+      it('declares URI-keyed directory records instead of repository input metadata', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        for (const name of ['SessionMetadata', 'SessionState', 'SessionSummary']) {
+          const properties = defs[name].properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.repositories, undefined);
+          assert.equal(properties.workingDirectories.type, 'array');
+          const item = properties.workingDirectories.items as JsonNode;
+          const uri = 'file:///work/project/packages/api';
+          for (const directory of [
+            uri, { uri }, { uri, repo: 'https://example.org/team/project.git' },
+            { uri, origin: { kind: 'local' } },
+            { uri, origin: { kind: 'repo' } },
+            { uri, origin: { kind: 'worktree', mainWorktree: 'file:///work/project' } },
+          ]) {
+            assert.equal(schemaAccepts(schema, item, directory), true);
+          }
+          for (const directory of [
+            42, null, {}, { repo: 'https://example.org/team/project.git' },
+            { uri: 42 }, { uri, repo: 42 },
+            { uri, origin: { kind: 'worktree' } },
+            { uri, origin: { kind: 'worktree', mainWorktree: 42 } },
+          ]) {
+            assert.equal(schemaAccepts(schema, item, directory), false);
+          }
+        }
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const source = defs.RepositorySource;
+        const properties = source.properties as Record<string, Record<string, unknown>>;
+        assert.deepEqual({
+          fields: Object.keys(properties),
+          required: source.required,
+          sourceType: dereferenceSchema(schema, properties.source).type,
+          revisionType: properties.revision.type,
+          subdirectoryType: properties.subdirectory.type,
+        }, {
+          fields: ['source', 'revision', 'subdirectory'], required: ['source'],
+          sourceType: 'string', revisionType: 'string', subdirectoryType: 'string',
+        });
+      });
+
+      it('gates rich directories with a presence-only client capability', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const capabilities = defs.ClientCapabilities;
+        for (const value of [{}, { workingDirectoryInfo: {} }, { mcpApps: {}, workingDirectoryInfo: {} }]) {
+          assert.equal(schemaAccepts(schema, capabilities, value), true);
+        }
+        for (const value of [true, null, []]) {
+          assert.equal(schemaAccepts(schema, capabilities, { workingDirectoryInfo: value }), false);
+        }
+      });
+
+      it('carries complete keyed metadata in set and replace actions', () => {
+        if (file !== 'actions.schema.json') {
+          return;
+        }
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const directory = { uri: 'file:///work/tree', origin: { kind: 'worktree', mainWorktree: 'file:///work/main' } };
+        for (const [name, action] of [
+          ['SessionWorkingDirectorySetAction', { type: 'session/workingDirectorySet', directory }],
+          ['SessionWorkingDirectoryReplacedAction', { type: 'session/workingDirectoryReplaced', directory: 'file:///work/old', replacement: directory }],
+        ] as const) {
+          assert.equal(schemaAccepts(schema, defs[name], action), true);
+          const properties = defs[name].properties as Record<string, Record<string, unknown>>;
+          assert.equal(properties.origin, undefined);
+        }
+        assert.equal(schemaAccepts(schema, defs.SessionWorkingDirectoryRemovedAction, {
+          type: 'session/workingDirectoryRemoved', directory,
+        }), false);
+        assert.equal(schemaAccepts(schema, defs.SessionWorkingDirectoryReplacedAction, {
+          type: 'session/workingDirectoryReplaced', directory, replacement: 'file:///work/new',
+        }), false);
+      });
+
+      it('advertises repository preparation on the host, not the agent', () => {
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const capabilities = defs.AgentCapabilities.properties as Record<string, Record<string, unknown>>;
+        assert.deepEqual({
+          agentSource: capabilities.repositorySource,
+          agentPreparation: capabilities.repositoryPreparation,
+          oldCapability: defs.RepositorySourceCapability,
+        }, {
+          agentSource: undefined, agentPreparation: undefined, oldCapability: undefined,
+        });
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+        const properties = defs.InitializeResult.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.repositoryPreparation.$ref, '#/$defs/RepositoryPreparationCapabilities');
+        const hostCapabilities = defs.RepositoryPreparationCapabilities;
+        assert.equal(hostCapabilities.required, undefined);
+        const base = { protocolVersion: '0.9.0', serverSeq: 0, snapshots: [] };
+        assert.equal(schemaAccepts(schema, defs.InitializeResult, base), true);
+        for (const repositoryPreparation of [
+          {}, { revision: true }, { revision: false },
+          { multipleRepositories: false }, { multipleRepositories: true },
+          { revision: true, multipleRepositories: true },
+        ]) {
+          assert.equal(schemaAccepts(schema, defs.InitializeResult, { ...base, repositoryPreparation }), true);
+        }
+        for (const repositoryPreparation of [true, null, [], { revision: 'true' }, { multipleRepositories: 2 }]) {
+          assert.equal(schemaAccepts(schema, defs.InitializeResult, { ...base, repositoryPreparation }), false);
+        }
       });
 
       it('constrains every ChatOrigin branch to a distinct kind', () => {

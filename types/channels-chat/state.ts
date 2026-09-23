@@ -63,13 +63,14 @@ export interface ChatState {
   /**
    * The subset of the session's
    * {@link SessionState.workingDirectories | `workingDirectories`} that this
-   * chat's agent has tool access to. Every entry MUST be present in the owning
-   * session's `workingDirectories`; servers MUST reject a
+   * chat's agent has tool access to. Every URI MUST match a URI string or a
+   * record's `uri` in the owning session's set; servers MUST reject a
    * `chat/workingDirectorySet` action that violates this constraint.
    *
    * When absent, the chat inherits the full session set. When present but empty
    * (not recommended), the chat has no working-directory tool access at all.
    *
+   * Directory metadata belongs to the session, not the chat.
    * Dispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to
    * update the subset on a running chat.
    */

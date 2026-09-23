@@ -221,6 +221,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(ListAutomationTriggerDefinitionsResult))]
 [JsonSerializable(typeof(ListSessionsParams))]
 [JsonSerializable(typeof(ListSessionsResult))]
+[JsonSerializable(typeof(LocalWorkingDirectoryOrigin))]
 [JsonSerializable(typeof(MarkdownResponsePart))]
 [JsonSerializable(typeof(McpAuthRequiredReason))]
 [JsonSerializable(typeof(McpAuthRequirement))]
@@ -266,6 +267,9 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(ReconnectResult))]
 [JsonSerializable(typeof(ReconnectResultType))]
 [JsonSerializable(typeof(ReconnectSnapshotResult))]
+[JsonSerializable(typeof(RepositoryPreparationCapabilities))]
+[JsonSerializable(typeof(RepositorySource))]
+[JsonSerializable(typeof(RepoWorkingDirectoryOrigin))]
 [JsonSerializable(typeof(ResolveSessionConfigParams))]
 [JsonSerializable(typeof(ResolveSessionConfigResult))]
 [JsonSerializable(typeof(ResourceChange))]
@@ -456,6 +460,11 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(UnsubscribeParams))]
 [JsonSerializable(typeof(UnsupportedProtocolVersionErrorData))]
 [JsonSerializable(typeof(UsageInfo))]
+[JsonSerializable(typeof(WorkingDirectory))]
+[JsonSerializable(typeof(WorkingDirectoryEntry))]
+[JsonSerializable(typeof(WorkingDirectoryOrigin))]
+[JsonSerializable(typeof(WorkingDirectoryOriginKind))]
+[JsonSerializable(typeof(WorktreeWorkingDirectoryOrigin))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.Never,

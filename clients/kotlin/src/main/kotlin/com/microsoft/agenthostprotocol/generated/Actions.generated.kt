@@ -867,7 +867,7 @@ data class SessionWorkingDirectorySetAction(
     /**
      * The working directory to grant the session's agent tool access to.
      */
-    val directory: String
+    val directory: WorkingDirectoryEntry
 )
 
 @Serializable
@@ -887,9 +887,9 @@ data class SessionWorkingDirectoryReplacedAction(
      */
     val directory: String,
     /**
-     * URI to place in the replaced entry's position.
+     * Complete entry to place in the replaced entry's position.
      */
-    val replacement: String
+    val replacement: WorkingDirectoryEntry
 )
 
 @Serializable

@@ -376,6 +376,7 @@ async fn session_config_completions_send_wrapper_targets_root_channel() {
             meta: None,
             provider: None,
             working_directory: None,
+            repositories: None,
             config: None,
             property: "baseBranch".into(),
             query: Some("ma".into()),

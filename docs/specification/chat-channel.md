@@ -41,7 +41,7 @@ Clients MAY periodically sync their local input state into the draft by dispatch
 
 ### Per-chat working directory
 
-`ChatState.workingDirectories` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is **optional**. When absent, the chat inherits the session's full [`workingDirectories`](/reference/session#sessionsummary) set; when present it MUST be a subset of that set. Hosts MAY set a per-chat subset to give individual chats their own filesystem context — for example, allocating a separate git worktree per chat so multiple chats in the same session can make independent edits that the orchestrating chat later merges back.
+`ChatState.workingDirectories` (and its mirror on [`ChatSummary`](/reference/chat#chatsummary)) is an **optional URI array**. When absent, the chat inherits the session's full [`workingDirectories`](/reference/session#sessionsummary) set. When present, every URI MUST match a session URI string or a record's `uri`; directory metadata remains on the session. Hosts MAY set a per-chat subset to give individual chats their own filesystem context — for example, allocating a separate git worktree per chat so multiple chats in the same session can make independent edits that the orchestrating chat later merges back.
 
 ### Per-chat changesets
 

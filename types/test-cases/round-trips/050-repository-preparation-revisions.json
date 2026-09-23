@@ -1,0 +1,18 @@
+{
+  "name": "repository-preparation-revisions",
+  "group": "A",
+  "description": "Host revision support does not imply multiple-repository support.",
+  "type": "InitializeResult",
+  "input": {
+    "protocolVersion": "0.9.0",
+    "serverSeq": 0,
+    "snapshots": [],
+    "repositoryPreparation": { "revision": true }
+  },
+  "acceptableOutputs": [{
+    "protocolVersion": "0.9.0",
+    "serverSeq": 0,
+    "snapshots": [],
+    "repositoryPreparation": { "revision": true }
+  }]
+}

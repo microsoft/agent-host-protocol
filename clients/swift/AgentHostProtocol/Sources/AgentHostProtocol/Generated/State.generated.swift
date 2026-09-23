@@ -1004,6 +1004,36 @@ public enum SessionOriginKind: Codable, Sendable, Equatable {
     }
 }
 
+/// How a working directory was prepared.
+public enum WorkingDirectoryOriginKind: Codable, Sendable, Equatable {
+    case local
+    case repo
+    case worktree
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "local": self = .local
+        case "repo": self = .repo
+        case "worktree": self = .worktree
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .local: try container.encode("local")
+        case .repo: try container.encode("repo")
+        case .worktree: try container.encode("worktree")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Operations the host currently permits for an automation.
 ///
 /// The list on {@link AutomationEntry.operations} is authoritative and may
@@ -1417,6 +1447,59 @@ public struct MultipleWorkingDirectoriesCapability: Codable, Sendable {
     }
 }
 
+public struct WorkingDirectory: Codable, Sendable {
+    /// Actual selected directory, which may be a repository subdirectory.
+    public var uri: String
+    /// Credential-free repository source association, not a checkout identity.
+    public var repo: String?
+    /// Host-reported provenance; omission means unspecified.
+    public var origin: WorkingDirectoryOrigin?
+
+    public init(
+        uri: String,
+        repo: String? = nil,
+        origin: WorkingDirectoryOrigin? = nil
+    ) {
+        self.uri = uri
+        self.repo = repo
+        self.origin = origin
+    }
+}
+
+public struct LocalWorkingDirectoryOrigin: Codable, Sendable {
+    public var kind: WorkingDirectoryOriginKind
+
+    public init(
+        kind: WorkingDirectoryOriginKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct RepoWorkingDirectoryOrigin: Codable, Sendable {
+    public var kind: WorkingDirectoryOriginKind
+
+    public init(
+        kind: WorkingDirectoryOriginKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct WorktreeWorkingDirectoryOrigin: Codable, Sendable {
+    public var kind: WorkingDirectoryOriginKind
+    /// Main worktree associated with the host-prepared worktree.
+    public var mainWorktree: String
+
+    public init(
+        kind: WorkingDirectoryOriginKind,
+        mainWorktree: String
+    ) {
+        self.kind = kind
+        self.mainWorktree = mainWorktree
+    }
+}
+
 public struct SessionModelInfo: Codable, Sendable {
     /// Model identifier
     public var id: String
@@ -1635,13 +1718,14 @@ public struct ChatState: Codable, Sendable {
     public var interactivity: ChatInteractivity?
     /// The subset of the session's
     /// {@link SessionState.workingDirectories | `workingDirectories`} that this
-    /// chat's agent has tool access to. Every entry MUST be present in the owning
-    /// session's `workingDirectories`; servers MUST reject a
+    /// chat's agent has tool access to. Every URI MUST match a URI string or a
+    /// record's `uri` in the owning session's set; servers MUST reject a
     /// `chat/workingDirectorySet` action that violates this constraint.
     ///
     /// When absent, the chat inherits the full session set. When present but empty
     /// (not recommended), the chat has no working-directory tool access at all.
     ///
+    /// Directory metadata belongs to the session, not the chat.
     /// Dispatch `chat/workingDirectorySet` / `chat/workingDirectoryRemoved` to
     /// update the subset on a running chat.
     public var workingDirectories: [String]?
@@ -1828,7 +1912,9 @@ public struct SessionState: Codable, Sendable {
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
-    public var workingDirectories: [String]?
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
+    public var workingDirectories: [WorkingDirectoryEntry]?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -1939,7 +2025,7 @@ public struct SessionState: Codable, Sendable {
         activity: String? = nil,
         origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
-        workingDirectories: [String]? = nil,
+        workingDirectories: [WorkingDirectoryEntry]? = nil,
         annotations: AnnotationsSummary? = nil,
         lifecycle: SessionLifecycle,
         creationError: ErrorInfo? = nil,
@@ -2156,7 +2242,9 @@ public struct SessionSummary: Codable, Sendable {
     /// MAY restrict to a subset via
     /// {@link ChatSummary.workingDirectories | their own `workingDirectories`}; a
     /// chat that sets none operates against this full set.
-    public var workingDirectories: [String]?
+    /// Entries are uniquely keyed by URI. Rich records require
+    /// {@link ClientCapabilities.workingDirectoryInfo}; other clients receive URIs.
+    public var workingDirectories: [WorkingDirectoryEntry]?
     /// Lightweight summary of this session's inline annotations channel
     /// (`ahp-session:/<uuid>/annotations`). Surfaced so badge UI can render
     /// annotation / entry counts without subscribing. Absent when the session
@@ -2212,7 +2300,7 @@ public struct SessionSummary: Codable, Sendable {
         activity: String? = nil,
         origin: SessionOrigin? = nil,
         project: ProjectInfo? = nil,
-        workingDirectories: [String]? = nil,
+        workingDirectories: [WorkingDirectoryEntry]? = nil,
         annotations: AnnotationsSummary? = nil,
         resource: String,
         createdAt: String,
@@ -6775,6 +6863,36 @@ public enum ToolInput: Codable, Sendable {
     }
 }
 
+/// A legacy URI or a complete working-directory record.
+public enum WorkingDirectoryEntry: Codable, Sendable {
+    case uri(String)
+    case directory(WorkingDirectory)
+
+    public var uri: String {
+        switch self {
+        case .uri(let value): return value
+        case .directory(let value): return value.uri
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let uri = try? container.decode(String.self) {
+            self = .uri(uri)
+        } else {
+            self = .directory(try container.decode(WorkingDirectory.self))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .uri(let value): try container.encode(value)
+        case .directory(let value): try container.encode(value)
+        }
+    }
+}
+
 // MARK: - Discriminated Unions
 
 public struct ChatOriginUser: Codable, Sendable {
@@ -7598,6 +7716,52 @@ public enum SessionOrigin: Codable, Sendable {
         switch self {
         case .automation(var value):
             value.kind = .automation
+            try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum WorkingDirectoryOrigin: Codable, Sendable {
+    case local(LocalWorkingDirectoryOrigin)
+    case repo(RepoWorkingDirectoryOrigin)
+    case worktree(WorktreeWorkingDirectoryOrigin)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "local":
+            self = .local(try LocalWorkingDirectoryOrigin(from: decoder))
+        case "repo":
+            self = .repo(try RepoWorkingDirectoryOrigin(from: decoder))
+        case "worktree":
+            self = .worktree(try WorktreeWorkingDirectoryOrigin(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .local(var value):
+            value.kind = .local
+            try value.encode(to: encoder)
+        case .repo(var value):
+            value.kind = .repo
+            try value.encode(to: encoder)
+        case .worktree(var value):
+            value.kind = .worktree
             try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }

@@ -164,6 +164,7 @@ function mapType(tsType: string): string {
 
   if (tsType === 'URI') return 'string';
   if (tsType === 'StringOrMarkdown') return 'StringOrMarkdown';
+  if (tsType === 'URI | WorkingDirectory') return 'WorkingDirectoryEntry';
 
   // ChildCustomizationType is a TS-only subset alias of CustomizationType.
   if (tsType === 'ChildCustomizationType') return 'CustomizationType';
@@ -632,7 +633,7 @@ function generateDiscriminatedUnion(cfg: UnionConfig): string {
 
 const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
-  'SessionOriginKind',
+  'SessionOriginKind', 'WorkingDirectoryOriginKind',
   'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind',
   'ChatInputQuestionKind', 'ChatInputResponseKind', 'SessionInputRequestKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
@@ -659,6 +660,10 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: strin
   { name: 'AgentCapabilities' },
   { name: 'MultipleChatsCapability' },
   { name: 'MultipleWorkingDirectoriesCapability' },
+  { name: 'WorkingDirectory' },
+  { name: 'LocalWorkingDirectoryOrigin' },
+  { name: 'RepoWorkingDirectoryOrigin' },
+  { name: 'WorktreeWorkingDirectoryOrigin' },
   { name: 'SessionModelInfo' },
   { name: 'ModelSelection' },
   { name: 'AgentSelection' },
@@ -888,6 +893,37 @@ const TERMINAL_CONTENT_PART_UNION: UnionConfig = {
 // inline form, an object is the content reference. Mirrors rust's
 // `#[serde(untagged)] enum ToolInput { Inline(String), ContentRef(ContentRef) }`
 // (clients/rust/crates/ahp-types/src/state.rs) and swift's `.inline` / `.contentRef`.
+const WORKING_DIRECTORY_ENTRY_CS = `/// <summary>A legacy URI or a complete working-directory record.</summary>
+[JsonConverter(typeof(WorkingDirectoryEntryConverter))]
+public sealed class WorkingDirectoryEntry
+{
+    public WorkingDirectoryEntry(string uri) { Uri = uri; }
+    public WorkingDirectoryEntry(WorkingDirectory directory) { Uri = directory.Uri; Directory = directory; }
+
+    public string Uri { get; }
+    public WorkingDirectory? Directory { get; }
+}
+
+internal sealed class WorkingDirectoryEntryConverter : JsonConverter<WorkingDirectoryEntry>
+{
+    public override WorkingDirectoryEntry Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            return new WorkingDirectoryEntry(reader.GetString()!);
+        }
+        return new WorkingDirectoryEntry(
+            JsonSerializer.Deserialize(ref reader, AhpJsonTypeInfo.Get<WorkingDirectory>(options))
+                ?? throw new JsonException("WorkingDirectoryEntry requires a URI or directory"));
+    }
+
+    public override void Write(Utf8JsonWriter writer, WorkingDirectoryEntry value, JsonSerializerOptions options)
+    {
+        if (value.Directory is null) { writer.WriteStringValue(value.Uri); return; }
+        JsonSerializer.Serialize(writer, value.Directory, AhpJsonTypeInfo.Get<WorkingDirectory>(options));
+    }
+}`;
+
 const TOOL_INPUT_UNION_CS = `/// <summary>
 /// ToolInput is a tool call's raw input, carried either inline as a string or by
 /// content reference for inputs large enough to be fetched lazily.
@@ -1161,6 +1197,18 @@ const TERMINAL_LIFECYCLE_STATE_UNION: UnionConfig = {
   ],
 };
 
+const WORKING_DIRECTORY_ORIGIN_UNION: UnionConfig = {
+  name: 'WorkingDirectoryOrigin',
+  discriminantField: 'kind',
+  doc: 'Host-reported working-directory provenance.',
+  variants: [
+    { variantName: 'Local', innerType: 'LocalWorkingDirectoryOrigin', wireValue: 'local' },
+    { variantName: 'Repo', innerType: 'RepoWorkingDirectoryOrigin', wireValue: 'repo' },
+    { variantName: 'Worktree', innerType: 'WorktreeWorkingDirectoryOrigin', wireValue: 'worktree' },
+  ],
+  unknown: true,
+};
+
 const SESSION_ORIGIN_UNION: UnionConfig = {
   name: 'SessionOrigin',
   discriminantField: 'kind',
@@ -1392,7 +1440,7 @@ function generateStateFile(project: Project): string {
     TOOL_RESULT_CONTENT_UNION, MESSAGE_ATTACHMENT_UNION, CUSTOMIZATION_UNION,
     CHILD_CUSTOMIZATION_UNION, CUSTOMIZATION_LOAD_STATE_UNION,
     MCP_SERVER_STATUS_UNION, TOOL_CALL_CONTRIBUTOR_UNION, SESSION_INPUT_REQUEST_UNION,
-    TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
+    TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, WORKING_DIRECTORY_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
   ]) {
     lines.push(generateDiscriminatedUnion(u));
@@ -1401,6 +1449,8 @@ function generateStateFile(project: Project): string {
   lines.push(CHAT_ORIGIN_UNION_CS);
   lines.push('');
   lines.push(TOOL_INPUT_UNION_CS);
+  lines.push('');
+  lines.push(WORKING_DIRECTORY_ENTRY_CS);
   lines.push('');
   lines.push(generateSnapshotState());
   lines.push('');
@@ -2077,12 +2127,14 @@ function generateActionsFile(project: Project): string {
 const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string }[] = [
+  { name: 'RepositorySource' },
   { name: 'InitializeParams' }, { name: 'InitializeResult' },
   // Implementation identity carried by InitializeParams.clientInfo /
   // InitializeResult.serverInfo (upstream #309). Must be generated as its own
   // record or those fields reference a non-existent type (CS0246).
   { name: 'Implementation' },
   { name: 'ClientCapabilities' },
+  { name: 'RepositoryPreparationCapabilities' },
   { name: 'AutomationCapabilities' },
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
@@ -2561,7 +2613,7 @@ function checkExhaustiveness(project: Project): void {
     'TerminalContentPart', 'MessageAttachment', 'MessageAttachmentBase',
     'Customization', 'ChildCustomization', 'ChildCustomizationType',
     'CustomizationLoadState', 'McpServerState', 'ToolCallContributor',
-    'SessionOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
+    'SessionOrigin', 'WorkingDirectoryOrigin', 'TerminalLifecycleState', 'AutomationTrigger',
     'AutomationRunOrigin', 'AutomationRunLifecycle',
     'SessionInputRequest', 'ToolCallConfirmationState', 'ToolCallRiskAssessment',
     'ReconnectResult', 'AuthRequiredErrorData',

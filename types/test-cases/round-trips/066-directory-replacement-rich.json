@@ -1,0 +1,22 @@
+{
+  "name": "directory-replacement-rich",
+  "group": "A",
+  "description": "Live replacement actions target a URI and carry a complete new directory record.",
+  "type": "ActionEnvelope",
+  "input": {
+    "channel": "ahp-session:/directories", "serverSeq": 4,
+    "action": {
+      "type": "session/workingDirectoryReplaced", "directory": "file:///main/packages/api",
+      "replacement": { "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+        "origin": { "kind": "worktree", "mainWorktree": "file:///main" } }
+    }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-session:/directories", "serverSeq": 4,
+    "action": {
+      "type": "session/workingDirectoryReplaced", "directory": "file:///main/packages/api",
+      "replacement": { "uri": "file:///tree/packages/api", "repo": "https://example.org/project.git",
+        "origin": { "kind": "worktree", "mainWorktree": "file:///main" } }
+    }
+  }]
+}
