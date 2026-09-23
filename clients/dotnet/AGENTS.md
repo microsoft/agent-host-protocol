@@ -45,8 +45,11 @@ commit; CI fails on any diff between the committed sources and a fresh run.
   `[Flags] enum : uint`, serialized as their numeric value so unknown future
   bits round-trip.
 - Discriminated unions → a sealed wrapper deriving from `AhpUnion` (carrying
-  `object? Value`) plus a generated `UnionConverter<T>`. Unknown discriminator
-  values are preserved verbatim as a raw `JsonElement`.
+  `object? Value`) plus a generated `UnionConverter<T>`. Whether an unknown
+  discriminator is preserved verbatim as a raw `JsonElement` or rejected is
+  derived from the discriminator enum's `@exhaustive` / `@nonexhaustive`
+  annotation (via `discriminatedUnionAllowsUnknown`), so an open union stays
+  forward-compatible and a closed one keeps rejecting invalid values.
 
 ## Reducers
 

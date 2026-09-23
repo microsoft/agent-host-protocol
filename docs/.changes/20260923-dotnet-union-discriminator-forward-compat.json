@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "Discriminated unions now derive whether an unrecognized discriminator is preserved from the discriminator enum's `@exhaustive` / `@nonexhaustive` annotation, matching the other generators. `SessionOrigin` and `CustomizationEnablement` previously rejected a discriminator added by a newer peer even though their discriminants are open; `ChangesetOperationTarget` is likewise derived now.",
+  "targets": ["dotnet"],
+  "issues": [366]
+}

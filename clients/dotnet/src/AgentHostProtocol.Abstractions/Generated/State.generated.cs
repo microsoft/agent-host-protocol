@@ -6589,7 +6589,7 @@ internal sealed class CustomizationEnablementConverter : UnionConverter<Customiz
                 ["workspace"] = typeof(CustomizationEnablementWorkspace),
                 ["session"] = typeof(CustomizationEnablementSession),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }
@@ -6734,7 +6734,7 @@ internal sealed class TerminalClaimConverter : UnionConverter<TerminalClaim>
         ["client"] = typeof(TerminalClientClaim),
         ["session"] = typeof(TerminalSessionClaim),
             },
-            allowUnknown: true)
+            allowUnknown: false)
     {
     }
 }
@@ -6850,7 +6850,7 @@ internal sealed class ChatInputAnswerConverter : UnionConverter<ChatInputAnswer>
         ["submitted"] = typeof(ChatInputAnswered),
         ["skipped"] = typeof(ChatInputSkipped),
             },
-            allowUnknown: true)
+            allowUnknown: false)
     {
     }
 }
@@ -6999,7 +6999,7 @@ internal sealed class CustomizationLoadStateConverter : UnionConverter<Customiza
         ["degraded"] = typeof(CustomizationDegradedState),
         ["error"] = typeof(CustomizationErrorState),
             },
-            allowUnknown: true)
+            allowUnknown: false)
     {
     }
 }
@@ -7138,7 +7138,7 @@ internal sealed class SessionOriginConverter : UnionConverter<SessionOrigin>
             {
         ["automation"] = typeof(AutomationSessionOrigin),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }

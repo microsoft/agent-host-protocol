@@ -171,9 +171,19 @@ export interface ConfigPropertySchema {
   readOnly?: boolean;
   /** JSON Schema: schema for array items (used when `type` is `'array'`) */
   items?: ConfigPropertySchema;
-  /** JSON Schema: minimum number of array items (used when `type` is `'array'`) */
+  /**
+   * JSON Schema: minimum number of array items (used when `type` is `'array'`)
+   *
+   * @integer
+   * @minimum 0
+   */
   minItems?: number;
-  /** JSON Schema: maximum number of array items (used when `type` is `'array'`) */
+  /**
+   * JSON Schema: maximum number of array items (used when `type` is `'array'`)
+   *
+   * @integer
+   * @minimum 0
+   */
   maxItems?: number;
   /** JSON Schema: property descriptors for object properties (used when `type` is `'object'`) */
   properties?: Record<string, ConfigPropertySchema>;

@@ -1846,7 +1846,7 @@ internal sealed class ChatSourceConverter : UnionConverter<ChatSource>
         ["fork"] = typeof(ForkChatSource),
         ["sideChat"] = typeof(SideChatSource),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }
@@ -1899,7 +1899,7 @@ internal sealed class ChangesetOperationTargetConverter : UnionConverter<Changes
                 ["resource"] = typeof(ChangesetOperationResourceTarget),
                 ["range"] = typeof(ChangesetOperationRangeTarget),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }

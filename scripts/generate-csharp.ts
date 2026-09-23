@@ -46,7 +46,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import { findProtocolSourceFiles } from './find-protocol-sources.js';
-import { isNonexhaustiveEnum } from './enum-compatibility.js';
+import { isNonexhaustiveEnum, discriminatedUnionAllowsUnknown } from './enum-compatibility.js';
 import { readProtocolVersions } from './read-protocol-versions.js';
 import { readErrorCodes } from './read-error-codes.js';
 import { readTelemetry } from './read-telemetry.js';
@@ -676,9 +676,26 @@ interface UnionConfig {
   doc?: string;
   variants: UnionVariant[];
   unknown?: boolean;
+  /**
+   * Discriminator enum to read the compatibility annotation from, when it
+   * cannot be resolved from the variant interfaces (e.g. hand-written
+   * variants that don't carry a typed discriminator property).
+   */
+  discriminatorEnum?: string;
 }
 
-function generateDiscriminatedUnion(cfg: UnionConfig): string {
+function generateDiscriminatedUnion(project: Project, cfg: UnionConfig): string {
+  // Whether an unrecognized discriminator must be preserved is a property of
+  // the discriminator enum's `@exhaustive` / `@nonexhaustive` annotation, not
+  // of this config — deriving it (as every other generator does) keeps the
+  // union's forward compatibility in lockstep with the protocol declaration.
+  const allowUnknown = discriminatedUnionAllowsUnknown(
+    project,
+    cfg.discriminantField,
+    cfg.variants.map((variant) => variant.innerType),
+    cfg.unknown,
+    cfg.discriminatorEnum,
+  );
   const lines: string[] = [];
   emitDocComment('', cfg.doc, lines);
   lines.push(`[JsonConverter(typeof(${cfg.name}Converter))]`);
@@ -708,7 +725,7 @@ function generateDiscriminatedUnion(cfg: UnionConfig): string {
   lines.push('            {');
   lines.push(entries);
   lines.push('            },');
-  lines.push(`            allowUnknown: ${cfg.unknown ? 'true' : 'false'})`);
+  lines.push(`            allowUnknown: ${allowUnknown ? 'true' : 'false'})`);
   lines.push('    {');
   lines.push('    }');
   lines.push('}');
@@ -1290,7 +1307,17 @@ const AUTOMATION_RUN_LIFECYCLE_UNION: UnionConfig = {
   ],
 };
 
-const CUSTOMIZATION_ENABLEMENT_UNION_CS = `/// <summary>A single explicit customization enablement decision.</summary>
+function generateCustomizationEnablementUnionCs(project: Project): string {
+  // Variants are inline object types in `types/`, so there are no named
+  // interfaces to read the discriminator from — name the enum explicitly.
+  const allowUnknown = discriminatedUnionAllowsUnknown(
+    project,
+    'kind',
+    [],
+    false,
+    'CustomizationEnablementKind',
+  );
+  return `/// <summary>A single explicit customization enablement decision.</summary>
 [JsonConverter(typeof(CustomizationEnablementConverter))]
 public sealed class CustomizationEnablement : AhpUnion
 {
@@ -1328,10 +1355,11 @@ internal sealed class CustomizationEnablementConverter : UnionConverter<Customiz
                 ["workspace"] = typeof(CustomizationEnablementWorkspace),
                 ["session"] = typeof(CustomizationEnablementSession),
             },
-            allowUnknown: false)
+            allowUnknown: ${allowUnknown ? 'true' : 'false'})
     {
     }
 }`;
+}
 
 function generateSnapshotState(): string {
   return `/// <summary>
@@ -1469,7 +1497,7 @@ function generateStateFile(project: Project): string {
   }
 
   lines.push('// ─── Discriminated Unions ─────────────────────────────────────────────\n');
-  lines.push(CUSTOMIZATION_ENABLEMENT_UNION_CS);
+  lines.push(generateCustomizationEnablementUnionCs(project));
   lines.push('');
   for (const u of [
     RESPONSE_PART_UNION, TOOL_CALL_STATE_UNION, TOOL_CALL_CONFIRMATION_STATE_UNION,
@@ -1482,7 +1510,7 @@ function generateStateFile(project: Project): string {
     TERMINAL_LIFECYCLE_STATE_UNION, SESSION_ORIGIN_UNION, AUTOMATION_TRIGGER_UNION,
     AUTOMATION_RUN_ORIGIN_UNION, AUTOMATION_RUN_LIFECYCLE_UNION,
   ]) {
-    lines.push(generateDiscriminatedUnion(u));
+    lines.push(generateDiscriminatedUnion(project, u));
     lines.push('');
   }
   lines.push(CHAT_ORIGIN_UNION_CS);
@@ -2057,7 +2085,7 @@ public sealed record ActionEnvelope
 }`;
 }
 
-function generateActionsUnion(): string {
+function generateActionsUnion(project: Project): string {
   const cfg: UnionConfig = {
     name: 'StateAction',
     discriminantField: 'type',
@@ -2073,8 +2101,11 @@ function generateActionsUnion(): string {
       wireValue: v.type,
     })),
     unknown: true,
+    // Several variants are synthesized or hand-written, so they carry no
+    // resolvable `type` property — read the annotation from ActionType itself.
+    discriminatorEnum: 'ActionType',
   };
-  return generateDiscriminatedUnion(cfg);
+  return generateDiscriminatedUnion(project, cfg);
 }
 
 function generateActionsFile(project: Project): string {
@@ -2153,7 +2184,7 @@ function generateActionsFile(project: Project): string {
   }
 
   lines.push('// ─── StateAction Union ───────────────────────────────────────────────\n');
-  lines.push(generateActionsUnion());
+  lines.push(generateActionsUnion(project));
   lines.push('');
 
   return lines.join('\n');
@@ -2237,7 +2268,14 @@ const RECONNECT_RESULT_UNION: UnionConfig = {
   ],
 };
 
-function generateChangesetOperationTargetCs(): string {
+function generateChangesetOperationTargetCs(project: Project): string {
+  const allowUnknown = discriminatedUnionAllowsUnknown(
+    project,
+    'kind',
+    [],
+    false,
+    'ChangesetOperationTargetKind',
+  );
   return `/// <summary>
 /// ChangesetOperationTarget identifies the file or range a
 /// ChangesetOperation should act on.
@@ -2284,7 +2322,7 @@ internal sealed class ChangesetOperationTargetConverter : UnionConverter<Changes
                 ["resource"] = typeof(ChangesetOperationResourceTarget),
                 ["range"] = typeof(ChangesetOperationRangeTarget),
             },
-            allowUnknown: false)
+            allowUnknown: ${allowUnknown ? 'true' : 'false'})
     {
     }
 }`;
@@ -2321,12 +2359,12 @@ function generateCommandsFile(project: Project): string {
   }
 
   lines.push('// ─── ReconnectResult Union ────────────────────────────────────────────\n');
-  lines.push(generateDiscriminatedUnion(RECONNECT_RESULT_UNION));
-  lines.push(generateDiscriminatedUnion(CHAT_SOURCE_UNION));
+  lines.push(generateDiscriminatedUnion(project, RECONNECT_RESULT_UNION));
+  lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
   lines.push('');
 
   lines.push('// ─── Changeset Operation Unions ───────────────────────────────────────\n');
-  lines.push(generateChangesetOperationTargetCs());
+  lines.push(generateChangesetOperationTargetCs(project));
   lines.push('');
 
   return lines.join('\n');
