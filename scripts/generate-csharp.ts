@@ -243,6 +243,8 @@ interface CsProp {
   doc: string;
   isLiteralDiscriminant: boolean;
   literalValue?: string;
+  /** Enum member backing a literal discriminant (e.g. `SessionReady`), when there is one. */
+  literalMemberName?: string;
 }
 
 function getPropertyType(prop: PropertySignature): string {
@@ -330,6 +332,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
     const stringLiteral = tsType.match(/^'([^']+)'$/);
     let isLiteralDiscriminant = false;
     let literalValue: string | undefined;
+    let literalMemberName: string | undefined;
 
     const tsPropLower = tsName.toLowerCase();
     if (['type', 'kind', 'status', 'state'].includes(tsPropLower)) {
@@ -342,6 +345,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
           if (mem) {
             isLiteralDiscriminant = true;
             literalValue = String(mem.getValue());
+            literalMemberName = memberName;
           }
         }
       } else if (stringLiteral) {
@@ -372,6 +376,7 @@ function extractProps(iface: InterfaceDeclaration, project: Project): CsProp[] {
       doc: getPropertyDoc(p),
       isLiteralDiscriminant,
       literalValue,
+      literalMemberName,
     });
   }
   return result;
@@ -591,8 +596,17 @@ function csRequiredModifier(csType: string, optional: boolean): string {
   return csIsRequiredReference(csType, optional) ? 'required ' : '';
 }
 
-function csPropDefault(csType: string, optional: boolean): string {
+function csPropDefault(csType: string, optional: boolean, prop?: CsProp): string {
   if (optional) return '';
+  // A literal discriminant has exactly one valid value, so pin it as the
+  // initializer. Both closed enums and open-enum structs expose the member by
+  // name, so one form covers each. Without this the property falls back to the
+  // type's zero value — the *first* enum member for a closed enum (silently the
+  // wrong discriminator on every record but the first) and an empty wire string
+  // for an open-enum struct.
+  if (prop?.isLiteralDiscriminant && prop.literalMemberName && csIsValueType(csType)) {
+    return ` = ${csType}.${prop.literalMemberName};`;
+  }
   // Required value types get the C# default (matches Go's numeric/bool zero).
   if (csIsValueType(csType)) return '';
   // Required reference types (string, StringOrMarkdown, nested object,
@@ -630,7 +644,7 @@ function generateCsClass(csName: string, props: CsProp[], opts: StructOpts = {})
       lines.push('    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]');
       csType = `${csType}?`;
     }
-    const def = csPropDefault(p.csType, p.optional);
+    const def = csPropDefault(p.csType, p.optional, p);
     const req = csRequiredModifier(p.csType, p.optional);
     lines.push(`    public ${req}${csType} ${p.csName} { ${accessor} }${def}`);
   });
@@ -1035,7 +1049,17 @@ internal sealed class ToolInputConverter : JsonConverter<ToolInput>
     }
 }`;
 
-const CHAT_ORIGIN_UNION_CS = `/// <summary>
+function generateChatOriginUnionCs(project: Project): string {
+  // Variants are generated separately from this hand-written block, so name the
+  // discriminator enum explicitly rather than resolving it from them.
+  const allowUnknown = discriminatedUnionAllowsUnknown(
+    project,
+    'kind',
+    [],
+    false,
+    'ChatOriginKind',
+  );
+  return `/// <summary>
 /// ChatOrigin describes how a chat came into existence.
 /// </summary>
 [JsonConverter(typeof(ChatOriginConverter))]
@@ -1102,10 +1126,11 @@ internal sealed class ChatOriginConverter : UnionConverter<ChatOrigin>
                 ["sideChat"] = typeof(ChatOriginSideChat),
                 ["tool"] = typeof(ChatOriginTool),
             },
-            allowUnknown: true)
+            allowUnknown: ${allowUnknown ? 'true' : 'false'})
     {
     }
 }`;
+}
 
 const CHAT_INPUT_QUESTION_UNION: UnionConfig = {
   name: 'ChatInputQuestion',
@@ -1513,7 +1538,7 @@ function generateStateFile(project: Project): string {
     lines.push(generateDiscriminatedUnion(project, u));
     lines.push('');
   }
-  lines.push(CHAT_ORIGIN_UNION_CS);
+  lines.push(generateChatOriginUnionCs(project));
   lines.push('');
   lines.push(TOOL_INPUT_UNION_CS);
   lines.push('');
@@ -1656,7 +1681,7 @@ function generateMergedToolCallConfirmedClass(): string {
 /// </summary>
 public sealed record SessionToolCallConfirmedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallConfirmed");
 
     public required string TurnId { get; init; }
 
@@ -1696,7 +1721,7 @@ function generateMergedChatToolCallConfirmedClass(): string {
 /// </summary>
 public sealed record ChatToolCallConfirmedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = ActionType.ChatToolCallConfirmed;
 
     public required string TurnId { get; init; }
 
@@ -1741,7 +1766,7 @@ function generateSessionTruncatedActionClass(): string {
 /// \`session/turnStarted\` with an edited message.</summary>
 public sealed record SessionTruncatedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/truncated");
 
     /// <summary>Keep turns up to and including this turn. Omit to clear all turns.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1778,7 +1803,7 @@ public sealed record SessionToolCallContentChangedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallContentChanged");
 
     /// <summary>The current partial content for the running tool call</summary>
     public required List<ToolResultContent> Content { get; init; }
@@ -1791,7 +1816,7 @@ public sealed record SessionToolCallContentChangedAction
 // Keep in ACTION_VARIANTS order so the generated union matches.
 const SESSION_ACTION_TYPES_CS = `public sealed record SessionTurnStartedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnStarted");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1810,7 +1835,7 @@ const SESSION_ACTION_TYPES_CS = `public sealed record SessionTurnStartedAction
 /// part (markdown or reasoning), then use this action to append text to it.</summary>
 public sealed record SessionDeltaAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/delta");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1825,7 +1850,7 @@ public sealed record SessionDeltaAction
 /// <summary>Structured content appended to the response.</summary>
 public sealed record SessionResponsePartAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/responsePart");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1847,7 +1872,7 @@ public sealed record SessionToolCallStartAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallStart");
 
     /// <summary>Internal tool name (for debugging/logging)</summary>
     public required string ToolName { get; init; }
@@ -1873,7 +1898,7 @@ public sealed record SessionToolCallDeltaAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallDelta");
 
     /// <summary>Partial parameter content to append</summary>
     public required string Content { get; init; }
@@ -1896,7 +1921,7 @@ public sealed record SessionToolCallReadyAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallReady");
 
     /// <summary>Message describing what the tool will do or what confirmation is needed</summary>
     public required StringOrMarkdown InvocationMessage { get; init; }
@@ -1939,7 +1964,7 @@ public sealed record SessionToolCallCompleteAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallComplete");
 
     /// <summary>Execution result</summary>
     public required ToolCallResult Result { get; init; }
@@ -1962,7 +1987,7 @@ public sealed record SessionToolCallResultConfirmedAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/toolCallResultConfirmed");
 
     /// <summary>Whether the result was approved</summary>
     public bool Approved { get; init; }
@@ -1971,7 +1996,7 @@ public sealed record SessionToolCallResultConfirmedAction
 /// <summary>Turn finished — the assistant is idle.</summary>
 public sealed record SessionTurnCompleteAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnComplete");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1980,7 +2005,7 @@ public sealed record SessionTurnCompleteAction
 /// <summary>Turn was aborted; server stops processing.</summary>
 public sealed record SessionTurnCancelledAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/turnCancelled");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -1989,7 +2014,7 @@ public sealed record SessionTurnCancelledAction
 /// <summary>Error during turn processing.</summary>
 public sealed record SessionErrorAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/error");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -2001,7 +2026,7 @@ public sealed record SessionErrorAction
 /// <summary>Token usage report for a turn.</summary>
 public sealed record SessionUsageAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/usage");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -2013,7 +2038,7 @@ public sealed record SessionUsageAction
 /// <summary>Reasoning/thinking text from the model, appended to a specific reasoning response part.</summary>
 public sealed record SessionReasoningAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/reasoning");
 
     /// <summary>Turn identifier</summary>
     public required string TurnId { get; init; }
@@ -2028,7 +2053,7 @@ public sealed record SessionReasoningAction
 /// <summary>A pending message was set (upsert semantics: creates or replaces).</summary>
 public sealed record SessionPendingMessageSetAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/pendingMessageSet");
 
     /// <summary>Whether this is a steering or queued message</summary>
     public PendingMessageKind Kind { get; init; }
@@ -2043,7 +2068,7 @@ public sealed record SessionPendingMessageSetAction
 /// <summary>A pending message was removed (steering or queued).</summary>
 public sealed record SessionPendingMessageRemovedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/pendingMessageRemoved");
 
     /// <summary>Whether this is a steering or queued message</summary>
     public PendingMessageKind Kind { get; init; }
@@ -2055,7 +2080,7 @@ public sealed record SessionPendingMessageRemovedAction
 /// <summary>Reorder the queued messages.</summary>
 public sealed record SessionQueuedMessagesReorderedAction
 {
-    public ActionType Type { get; init; }
+    public ActionType Type { get; init; } = new ActionType("session/queuedMessagesReordered");
 
     /// <summary>Queued message IDs in the desired order</summary>
     public required List<string> Order { get; init; }
