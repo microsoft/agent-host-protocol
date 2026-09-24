@@ -33,6 +33,16 @@ const (
 	ChatSourceKindSideChat ChatSourceKind = "sideChat"
 )
 
+// Destination kind for an atomic chat move.
+type ChatMoveDestinationKind string
+
+const (
+	// Move the source chat under another chat.
+	ChatMoveDestinationKindChat ChatMoveDestinationKind = "chat"
+	// Promote the source chat into a newly allocated top-level session.
+	ChatMoveDestinationKindNewSession ChatMoveDestinationKind = "newSession"
+)
+
 // Encoding of fetched content data.
 type ContentEncoding string
 
@@ -511,6 +521,100 @@ type DisposeChatParams struct {
 	// Optional JSON-serializable metadata associated with this request.
 	// Receivers MUST ignore keys they do not understand.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// Moves a chat under another chat.
+type ChatMoveToChatDestination struct {
+	// Discriminant
+	Kind ChatMoveDestinationKind `json:"kind"`
+	// Destination parent chat URI.
+	Chat URI `json:"chat"`
+}
+
+// Promotes a chat into a newly allocated top-level session.
+type ChatMoveToNewSessionDestination struct {
+	// Discriminant
+	Kind ChatMoveDestinationKind `json:"kind"`
+}
+
+// Atomically changes a non-default chat's parent and, when necessary, owning
+// session.
+//
+// The source is the chat named by `channel`. A `chat` destination reparents it
+// under the destination chat and moves its descendant subtree into that chat's
+// session when the sessions differ. A `newSession` destination allocates a new
+// compatible session, promotes the source to its top level, and makes it that
+// session's default chat.
+//
+// The host MUST validate the complete operation before committing it. It MUST
+// reject a source subtree containing an owning session's default chat, any
+// active turn in the moved subtree, a destination equal to or below the
+// source, an unsupported capability, a destination on another host, or
+// incompatible source and destination provider/agent runtimes. Rejection MUST
+// leave every chat, session catalog, and root summary unchanged. Unknown
+// resources use `NotFound`, active turns use `TurnInProgress`, and validation,
+// capability, compatibility, cycle, and idempotency-key mismatches use
+// `InvalidParams`.
+//
+// On success the host commits the hierarchy, ownership, and every moved-chat
+// URI replacement as one transaction before publishing synchronization
+// messages. Every moved descendant's `parentChat` MUST name the authoritative
+// post-move URI of its moved parent. `ChatOrigin` remains unchanged, including
+// historical chat URIs that no longer resolve after replacement.
+// It then updates affected session catalogs with `session/chatRemoved`,
+// `session/chatAdded`, and `session/chatUpdated`, dispatches
+// `chat/parentChanged` on preserved chat channels, and emits `chat/moved` on
+// previous moved chat channels when subscribers must follow authoritative
+// result resources.
+type MoveChatParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Atomic move destination.
+	Destination ChatMoveDestination `json:"destination"`
+	// Durable client-generated idempotency key.
+	//
+	// Retrying the same logical request with the same `requestId`, source, and
+	// destination MUST return the original {@link MoveChatResult}, including
+	// after reconnect or an uncertain response. Reusing the key with a different
+	// source or destination MUST be rejected with `InvalidParams`.
+	RequestId string `json:"requestId"`
+}
+
+// Authoritative URI mapping for one chat in a moved subtree.
+type MovedChatResource struct {
+	// Chat URI before the move.
+	PreviousChat URI `json:"previousChat"`
+	// Authoritative chat URI after the move.
+	Chat URI `json:"chat"`
+}
+
+// Authoritative resources before and after an atomic chat move.
+//
+// `previousChat` and `chat` identify the requested root and equal the first
+// entry of `movedChats`. They are retained as a convenience for callers that
+// only need to follow the requested chat. `movedChats` is the exhaustive
+// authoritative mapping for the complete moved subtree.
+type MoveChatResult struct {
+	// Owning session URI before the move.
+	PreviousSession URI `json:"previousSession"`
+	// Source chat URI before the move.
+	PreviousChat URI `json:"previousChat"`
+	// Authoritative owning session URI after the move.
+	Session URI `json:"session"`
+	// Authoritative requested root chat URI after the move.
+	Chat URI `json:"chat"`
+	// Exhaustive URI mapping for every chat in the moved subtree, including
+	// entries whose URI was preserved.
+	//
+	// The first entry MUST map `previousChat` to `chat`. Remaining entries are
+	// ordered in deterministic depth-first pre-order: every parent precedes its
+	// descendants, and siblings retain their order from the source session's
+	// `chats` catalog. Clients MUST apply the complete mapping atomically and
+	// MUST NOT infer replacements for chats absent from this list.
+	MovedChats []MovedChatResource `json:"movedChats"`
 }
 
 // Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -1370,6 +1474,62 @@ func (v SideChatSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
+func (v *ChatMoveToChatDestination) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("ChatMoveToChatDestination", "kind")
+	}
+	if disc != "chat" {
+		return unknownDiscriminatorError("ChatMoveToChatDestination", "kind", disc)
+	}
+	type wire ChatMoveToChatDestination
+	var raw wire
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = ChatMoveToChatDestination(raw)
+	v.Kind = ChatMoveDestinationKindChat
+	return nil
+}
+
+func (v ChatMoveToChatDestination) MarshalJSON() ([]byte, error) {
+	type wire ChatMoveToChatDestination
+	raw := wire(v)
+	raw.Kind = ChatMoveDestinationKindChat
+	return json.Marshal(raw)
+}
+
+func (v *ChatMoveToNewSessionDestination) UnmarshalJSON(data []byte) error {
+	disc, ok, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return missingDiscriminatorError("ChatMoveToNewSessionDestination", "kind")
+	}
+	if disc != "newSession" {
+		return unknownDiscriminatorError("ChatMoveToNewSessionDestination", "kind", disc)
+	}
+	type wire ChatMoveToNewSessionDestination
+	var raw wire
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = ChatMoveToNewSessionDestination(raw)
+	v.Kind = ChatMoveDestinationKindNewSession
+	return nil
+}
+
+func (v ChatMoveToNewSessionDestination) MarshalJSON() ([]byte, error) {
+	type wire ChatMoveToNewSessionDestination
+	raw := wire(v)
+	raw.Kind = ChatMoveDestinationKindNewSession
+	return json.Marshal(raw)
+}
+
 // ─── ChatSource Union ─────────────────────────────────────────────────
 
 // ChatSource identifies how a new chat uses a source chat.
@@ -1421,6 +1581,68 @@ func (u *ChatSource) UnmarshalJSON(data []byte) error {
 // MarshalJSON encodes the active variant back to JSON.
 func (u ChatSource) MarshalJSON() ([]byte, error) {
 	if unk, ok := u.Value.(*ChatSourceUnknown); ok {
+		if len(unk.Raw) == 0 {
+			return []byte("null"), nil
+		}
+		return unk.Raw, nil
+	}
+	if u.Value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(u.Value)
+}
+
+// ─── ChatMoveDestination Union ────────────────────────────────────────
+
+// Destination of an atomic chat move.
+type ChatMoveDestination struct {
+	Value isChatMoveDestination
+}
+
+// isChatMoveDestination is the marker interface implemented by every
+// concrete variant of ChatMoveDestination.
+type isChatMoveDestination interface{ isChatMoveDestination() }
+
+func (*ChatMoveToChatDestination) isChatMoveDestination()       {}
+func (*ChatMoveToNewSessionDestination) isChatMoveDestination() {}
+
+// ChatMoveDestinationUnknown carries an unrecognized ChatMoveDestination variant — typically a discriminator value introduced by a newer protocol version. The original JSON object is preserved verbatim so that re-encoding round-trips faithfully.
+type ChatMoveDestinationUnknown struct {
+	Raw json.RawMessage
+}
+
+func (*ChatMoveDestinationUnknown) isChatMoveDestination() {}
+
+// UnmarshalJSON decodes the variant indicated by the "kind" discriminator.
+func (u *ChatMoveDestination) UnmarshalJSON(data []byte) error {
+	disc, _, err := readDiscriminator(data, "kind")
+	if err != nil {
+		return err
+	}
+	switch disc {
+	case "chat":
+		var value ChatMoveToChatDestination
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "newSession":
+		var value ChatMoveToNewSessionDestination
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	default:
+		raw := make(json.RawMessage, len(data))
+		copy(raw, data)
+		u.Value = &ChatMoveDestinationUnknown{Raw: raw}
+	}
+	return nil
+}
+
+// MarshalJSON encodes the active variant back to JSON.
+func (u ChatMoveDestination) MarshalJSON() ([]byte, error) {
+	if unk, ok := u.Value.(*ChatMoveDestinationUnknown); ok {
 		if len(unk.Raw) == 0 {
 			return []byte("null"), nil
 		}

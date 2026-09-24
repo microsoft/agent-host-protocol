@@ -55,6 +55,7 @@ pub enum ActionType {
     ChatError,
     ChatTurnResume,
     ChatActivityChanged,
+    ChatParentChanged,
     ChatChangesetsChanged,
     ChatWorkingDirectorySet,
     ChatWorkingDirectoryRemoved,
@@ -171,6 +172,7 @@ impl serde::Serialize for ActionType {
             Self::ChatError => serializer.serialize_str("chat/error"),
             Self::ChatTurnResume => serializer.serialize_str("chat/turnResume"),
             Self::ChatActivityChanged => serializer.serialize_str("chat/activityChanged"),
+            Self::ChatParentChanged => serializer.serialize_str("chat/parentChanged"),
             Self::ChatChangesetsChanged => serializer.serialize_str("chat/changesetsChanged"),
             Self::ChatWorkingDirectorySet => serializer.serialize_str("chat/workingDirectorySet"),
             Self::ChatWorkingDirectoryRemoved => {
@@ -333,6 +335,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/error" => Self::ChatError,
             "chat/turnResume" => Self::ChatTurnResume,
             "chat/activityChanged" => Self::ChatActivityChanged,
+            "chat/parentChanged" => Self::ChatParentChanged,
             "chat/changesetsChanged" => Self::ChatChangesetsChanged,
             "chat/workingDirectorySet" => Self::ChatWorkingDirectorySet,
             "chat/workingDirectoryRemoved" => Self::ChatWorkingDirectoryRemoved,
@@ -1050,6 +1053,19 @@ pub struct ChatActivityChangedAction {
     /// Human-readable description of current activity; omit or set `undefined` to clear
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
+}
+
+/// The chat's mutable hierarchy parent changed.
+///
+/// The host dispatches this action on a preserved chat channel after committing
+/// `moveChat`. It MUST also dispatch `session/chatUpdated` on the owning session
+/// so the denormalized {@link ChatSummary.parentChat} stays in sync.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatParentChangedAction {
+    /// New parent chat URI, or `undefined` to promote the chat to the session top level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_chat: Option<Uri>,
 }
 
 /// The {@link Changeset | catalogue of changesets} the agent host advertises
@@ -2206,6 +2222,11 @@ pub struct PartialChatSummary {
     /// How this chat came into existence
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<ChatOrigin>,
+    /// Current parent chat in the owning session's mutable chat hierarchy.
+    ///
+    /// See {@link ChatState.parentChat} for the full semantics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_chat: Option<Uri>,
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -2277,6 +2298,8 @@ pub enum StateAction {
     ChatTurnResume(ChatTurnResumeAction),
     #[serde(rename = "chat/activityChanged")]
     ChatActivityChanged(ChatActivityChangedAction),
+    #[serde(rename = "chat/parentChanged")]
+    ChatParentChanged(ChatParentChangedAction),
     #[serde(rename = "chat/changesetsChanged")]
     ChatChangesetsChanged(ChatChangesetsChangedAction),
     #[serde(rename = "session/titleChanged")]

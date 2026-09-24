@@ -1331,7 +1331,10 @@ public struct AgentCapabilities: Codable, Sendable {
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
     /// source-based creation; set {@link MultipleChatsCapability.fork} or
-    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.
+    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding
+    /// creation mode, and set {@link MultipleChatsCapability.reparent} or
+    /// {@link MultipleChatsCapability.promote} to allow the corresponding
+    /// `moveChat` destination.
     public var multipleChats: MultipleChatsCapability?
     /// The session's agent can be granted tool access to more than one working
     /// directory. The directories are treated as equal peers except where the
@@ -1369,13 +1372,29 @@ public struct MultipleChatsCapability: Codable, Sendable {
     /// the host snapshots the available partial assistant response at creation
     /// time. Side-chat support always implies multi-chat support.
     public var sideChat: Bool?
+    /// The agent can atomically move a non-default chat under another chat.
+    ///
+    /// The destination chat may belong to another session on the same host when
+    /// the source and destination sessions use the same compatible provider and
+    /// agent runtime. When absent or `false`, clients MUST NOT call `moveChat`
+    /// with `destination.kind: "chat"`.
+    public var reparent: Bool?
+    /// The agent can atomically promote a non-default chat into a new top-level
+    /// session on the same host. The new session preserves the source session's
+    /// compatible provider and agent runtime. When absent or `false`, clients
+    /// MUST NOT call `moveChat` with `destination.kind: "newSession"`.
+    public var promote: Bool?
 
     public init(
         fork: Bool? = nil,
-        sideChat: Bool? = nil
+        sideChat: Bool? = nil,
+        reparent: Bool? = nil,
+        promote: Bool? = nil
     ) {
         self.fork = fork
         self.sideChat = sideChat
+        self.reparent = reparent
+        self.promote = promote
     }
 }
 
@@ -1627,6 +1646,13 @@ public struct ChatState: Codable, Sendable {
     public var modifiedAt: String
     /// How this chat came into existence
     public var origin: ChatOrigin?
+    /// Current parent chat in the owning session's mutable chat hierarchy.
+    ///
+    /// Unlike {@link origin}, this relationship may change through `moveChat`.
+    /// Absence means the chat is top-level within its session. The referenced
+    /// chat MUST belong to the same session and MUST NOT be this chat or one of
+    /// its descendants.
+    public var parentChat: String?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1691,6 +1717,7 @@ public struct ChatState: Codable, Sendable {
         case activity
         case modifiedAt
         case origin
+        case parentChat
         case interactivity
         case workingDirectories
         case changesets
@@ -1710,6 +1737,7 @@ public struct ChatState: Codable, Sendable {
         activity: String? = nil,
         modifiedAt: String,
         origin: ChatOrigin? = nil,
+        parentChat: String? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil,
         changesets: [Changeset]? = nil,
@@ -1727,6 +1755,7 @@ public struct ChatState: Codable, Sendable {
         self.activity = activity
         self.modifiedAt = modifiedAt
         self.origin = origin
+        self.parentChat = parentChat
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories
         self.changesets = changesets
@@ -1753,6 +1782,10 @@ public struct ChatSummary: Codable, Sendable {
     public var modifiedAt: String
     /// How this chat came into existence
     public var origin: ChatOrigin?
+    /// Current parent chat in the owning session's mutable chat hierarchy.
+    ///
+    /// See {@link ChatState.parentChat} for the full semantics.
+    public var parentChat: String?
     /// How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1770,6 +1803,7 @@ public struct ChatSummary: Codable, Sendable {
         activity: String? = nil,
         modifiedAt: String,
         origin: ChatOrigin? = nil,
+        parentChat: String? = nil,
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil
     ) {
@@ -1779,6 +1813,7 @@ public struct ChatSummary: Codable, Sendable {
         self.activity = activity
         self.modifiedAt = modifiedAt
         self.origin = origin
+        self.parentChat = parentChat
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories
     }
@@ -1854,8 +1889,9 @@ public struct SessionState: Codable, Sendable {
     public var chats: [ChatSummary]
     /// The chat that receives input when the user addresses the session without
     /// selecting a specific chat. This is a UI routing hint, not a hierarchy
-    /// marker — chats remain equal peers at the protocol level. Hosts MAY change
-    /// this over the session's lifetime.
+    /// marker — {@link ChatSummary.parentChat} defines parentage, and every chat
+    /// remains directly addressable. Hosts MAY change this over the session's
+    /// lifetime.
     public var defaultChat: String?
     /// Session configuration schema and current values
     public var config: SessionConfigState?
@@ -2247,6 +2283,11 @@ public struct SessionChatSummary: Codable, Sendable {
     public var title: String
     /// How this chat was created, when known
     public var origin: ChatOrigin?
+    /// Current parent chat in the session's mutable hierarchy.
+    ///
+    /// Mirrors {@link ChatSummary.parentChat} for clients that consume only the
+    /// lightweight session summary.
+    public var parentChat: String?
     /// How the user can interact with this chat.
     ///
     /// Generic clients use this to omit hidden chats and disable input for
@@ -2258,11 +2299,13 @@ public struct SessionChatSummary: Codable, Sendable {
         resource: String,
         title: String,
         origin: ChatOrigin? = nil,
+        parentChat: String? = nil,
         interactivity: ChatInteractivity? = nil
     ) {
         self.resource = resource
         self.title = title
         self.origin = origin
+        self.parentChat = parentChat
         self.interactivity = interactivity
     }
 }

@@ -63,6 +63,8 @@ public enum ActionType
     ChatTurnResume,
     [WireValue("chat/activityChanged")]
     ChatActivityChanged,
+    [WireValue("chat/parentChanged")]
+    ChatParentChanged,
     [WireValue("chat/changesetsChanged")]
     ChatChangesetsChanged,
     [WireValue("chat/workingDirectorySet")]
@@ -1677,6 +1679,20 @@ public sealed record ChatActivityChangedAction
     public string? Activity { get; init; }
 }
 
+/// <summary>The chat's mutable hierarchy parent changed.
+///
+/// The host dispatches this action on a preserved chat channel after committing
+/// `moveChat`. It MUST also dispatch `session/chatUpdated` on the owning session
+/// so the denormalized {@link ChatSummary.parentChat} stays in sync.</summary>
+public sealed record ChatParentChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>New parent chat URI, or `undefined` to promote the chat to the session top level.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParentChat { get; init; }
+}
+
 /// <summary>The {@link Changeset | catalogue of changesets} the agent host advertises
 /// for this chat changed. Replaces
 /// {@link ChatState.changesets | `state.changesets`} entirely
@@ -2552,6 +2568,12 @@ public sealed record PartialChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; init; }
 
+    /// <summary>Current parent chat in the owning session's mutable chat hierarchy.
+    ///
+    /// See {@link ChatState.parentChat} for the full semantics.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParentChat { get; init; }
+
     /// <summary>How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -2654,6 +2676,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/error"] = typeof(ChatErrorAction),
         ["chat/turnResume"] = typeof(ChatTurnResumeAction),
         ["chat/activityChanged"] = typeof(ChatActivityChangedAction),
+        ["chat/parentChanged"] = typeof(ChatParentChangedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),

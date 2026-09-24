@@ -70,6 +70,44 @@ impl<'de> serde::Deserialize<'de> for ChatSourceKind {
     }
 }
 
+/// Destination kind for an atomic chat move.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ChatMoveDestinationKind {
+    /// Move the source chat under another chat.
+    Chat,
+    /// Promote the source chat into a newly allocated top-level session.
+    NewSession,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for ChatMoveDestinationKind {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Chat => serializer.serialize_str("chat"),
+            Self::NewSession => serializer.serialize_str("newSession"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ChatMoveDestinationKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "chat" => Self::Chat,
+            "newSession" => Self::NewSession,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Encoding of fetched content data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ContentEncoding {
@@ -715,6 +753,106 @@ pub struct DisposeChatParams {
     /// Receivers MUST ignore keys they do not understand.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+/// Moves a chat under another chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMoveToChatDestination {
+    /// Destination parent chat URI.
+    pub chat: Uri,
+}
+
+/// Promotes a chat into a newly allocated top-level session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMoveToNewSessionDestination {}
+
+/// Atomically changes a non-default chat's parent and, when necessary, owning
+/// session.
+///
+/// The source is the chat named by `channel`. A `chat` destination reparents it
+/// under the destination chat and moves its descendant subtree into that chat's
+/// session when the sessions differ. A `newSession` destination allocates a new
+/// compatible session, promotes the source to its top level, and makes it that
+/// session's default chat.
+///
+/// The host MUST validate the complete operation before committing it. It MUST
+/// reject a source subtree containing an owning session's default chat, any
+/// active turn in the moved subtree, a destination equal to or below the
+/// source, an unsupported capability, a destination on another host, or
+/// incompatible source and destination provider/agent runtimes. Rejection MUST
+/// leave every chat, session catalog, and root summary unchanged. Unknown
+/// resources use `NotFound`, active turns use `TurnInProgress`, and validation,
+/// capability, compatibility, cycle, and idempotency-key mismatches use
+/// `InvalidParams`.
+///
+/// On success the host commits the hierarchy, ownership, and every moved-chat
+/// URI replacement as one transaction before publishing synchronization
+/// messages. Every moved descendant's `parentChat` MUST name the authoritative
+/// post-move URI of its moved parent. `ChatOrigin` remains unchanged, including
+/// historical chat URIs that no longer resolve after replacement.
+/// It then updates affected session catalogs with `session/chatRemoved`,
+/// `session/chatAdded`, and `session/chatUpdated`, dispatches
+/// `chat/parentChanged` on preserved chat channels, and emits `chat/moved` on
+/// previous moved chat channels when subscribers must follow authoritative
+/// result resources.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveChatParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Atomic move destination.
+    pub destination: ChatMoveDestination,
+    /// Durable client-generated idempotency key.
+    ///
+    /// Retrying the same logical request with the same `requestId`, source, and
+    /// destination MUST return the original {@link MoveChatResult}, including
+    /// after reconnect or an uncertain response. Reusing the key with a different
+    /// source or destination MUST be rejected with `InvalidParams`.
+    pub request_id: String,
+}
+
+/// Authoritative URI mapping for one chat in a moved subtree.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MovedChatResource {
+    /// Chat URI before the move.
+    pub previous_chat: Uri,
+    /// Authoritative chat URI after the move.
+    pub chat: Uri,
+}
+
+/// Authoritative resources before and after an atomic chat move.
+///
+/// `previousChat` and `chat` identify the requested root and equal the first
+/// entry of `movedChats`. They are retained as a convenience for callers that
+/// only need to follow the requested chat. `movedChats` is the exhaustive
+/// authoritative mapping for the complete moved subtree.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveChatResult {
+    /// Owning session URI before the move.
+    pub previous_session: Uri,
+    /// Source chat URI before the move.
+    pub previous_chat: Uri,
+    /// Authoritative owning session URI after the move.
+    pub session: Uri,
+    /// Authoritative requested root chat URI after the move.
+    pub chat: Uri,
+    /// Exhaustive URI mapping for every chat in the moved subtree, including
+    /// entries whose URI was preserved.
+    ///
+    /// The first entry MUST map `previousChat` to `chat`. Remaining entries are
+    /// ordered in deterministic depth-first pre-order: every parent precedes its
+    /// descendants, and siblings retain their order from the source session's
+    /// `chats` catalog. Clients MUST apply the complete mapping atomically and
+    /// MUST NOT infer replacements for chats absent from this list.
+    pub moved_chats: Vec<MovedChatResource>,
 }
 
 /// Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -1686,6 +1824,22 @@ pub enum ChatSource {
     Fork(ForkChatSource),
     #[serde(rename = "sideChat")]
     SideChat(SideChatSource),
+    /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
+    /// Reducers treat this as a no-op.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+// ─── ChatMoveDestination Union ────────────────────────────────────────
+
+/// Destination of an atomic chat move.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum ChatMoveDestination {
+    #[serde(rename = "chat")]
+    Chat(ChatMoveToChatDestination),
+    #[serde(rename = "newSession")]
+    NewSession(ChatMoveToNewSessionDestination),
     /// Unknown or future variant — preserved as raw JSON for round-trip fidelity.
     /// Reducers treat this as a no-op.
     #[serde(untagged)]

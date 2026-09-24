@@ -1,0 +1,45 @@
+{
+  "description": "session/chatUpdated rewrites a moved descendant to its parent's authoritative destination URI",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Destination",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [
+      {
+        "resource": "ahp-chat:/after/child",
+        "title": "Child",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z",
+        "parentChat": "ahp-chat:/before/root"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/chatUpdated",
+      "chat": "ahp-chat:/after/child",
+      "changes": {
+        "parentChat": "ahp-chat:/after/root"
+      }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Destination",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [
+      {
+        "resource": "ahp-chat:/after/child",
+        "title": "Child",
+        "status": 1,
+        "modifiedAt": "1970-01-01T00:00:01.000Z",
+        "parentChat": "ahp-chat:/after/root"
+      }
+    ]
+  }
+}

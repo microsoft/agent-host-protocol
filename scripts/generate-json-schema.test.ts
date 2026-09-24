@@ -294,6 +294,83 @@ describe('generated JSON schemas', () => {
           false,
         );
       });
+
+      it('constrains chat move destinations and authoritative results', () => {
+        if (file !== 'commands.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const destination = defs.ChatMoveDestination;
+        assert.ok(destination, 'ChatMoveDestination must be emitted as a command definition');
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'chat',
+            chat: 'ahp-chat:/parent',
+          }),
+          true,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'newSession',
+          }),
+          true,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'chat',
+          }),
+          false,
+        );
+        assert.equal(
+          schemaAccepts(schema, destination, {
+            kind: 'unknown',
+          }),
+          false,
+        );
+
+        assert.deepEqual(
+          defs.MoveChatResult.required,
+          ['previousSession', 'previousChat', 'session', 'chat', 'movedChats'],
+        );
+        const resultProperties = defs.MoveChatResult.properties as Record<string, Record<string, unknown>>;
+        const movedChats = resultProperties.movedChats;
+        assert.equal(movedChats.type, 'array');
+        assert.deepEqual(movedChats.items, { $ref: '#/$defs/MovedChatResource' });
+        assert.deepEqual(
+          defs.MovedChatResource.required,
+          ['previousChat', 'chat'],
+        );
+      });
+
+      it('carries the exhaustive moved-chat mapping on routing notifications', () => {
+        if (file !== 'notifications.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const params = defs.ChatMovedParams;
+        assert.ok(params, 'ChatMovedParams must be emitted as a notification definition');
+        assert.deepEqual(
+          params.required,
+          ['channel', 'previousSession', 'previousChat', 'session', 'chat', 'movedChats'],
+        );
+        const properties = params.properties as Record<string, Record<string, unknown>>;
+        assert.equal(properties.movedChats.type, 'array');
+        assert.deepEqual(properties.movedChats.items, { $ref: '#/$defs/MovedChatResource' });
+      });
+
+      it('exposes mutable chat hierarchy separately from immutable origin', () => {
+        if (file !== 'state.schema.json') {
+          return;
+        }
+
+        const defs = schema.$defs as Record<string, Record<string, unknown>>;
+        const chatStateProperties = defs.ChatState.properties as Record<string, Record<string, unknown>>;
+        const chatSummaryProperties = defs.ChatSummary.properties as Record<string, Record<string, unknown>>;
+        assert.deepEqual(chatStateProperties.parentChat.$ref, '#/$defs/URI');
+        assert.deepEqual(chatSummaryProperties.parentChat.$ref, '#/$defs/URI');
+      });
     });
   }
 });

@@ -1,0 +1,35 @@
+{
+  "description": "chat/parentChanged sets the mutable parent independently of origin",
+  "reducer": "chat",
+  "initial": {
+    "turns": [],
+    "resource": "ahp-chat:/child",
+    "title": "Child",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "origin": {
+      "kind": "sideChat",
+      "chat": "ahp-chat:/creator",
+      "turnId": "turn-1"
+    }
+  },
+  "actions": [
+    {
+      "type": "chat/parentChanged",
+      "parentChat": "ahp-chat:/new-parent"
+    }
+  ],
+  "expected": {
+    "turns": [],
+    "resource": "ahp-chat:/child",
+    "title": "Child",
+    "status": 1,
+    "modifiedAt": "1970-01-01T00:00:01.000Z",
+    "origin": {
+      "kind": "sideChat",
+      "chat": "ahp-chat:/creator",
+      "turnId": "turn-1"
+    },
+    "parentChat": "ahp-chat:/new-parent"
+  }
+}

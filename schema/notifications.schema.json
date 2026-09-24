@@ -186,6 +186,47 @@
         "progress"
       ]
     },
+    "ChatMovedParams": {
+      "type": "object",
+      "description": "Sent on each previous moved chat channel after an atomic `moveChat` commit.\n\nEvery notification for one move carries the same authoritative resources and\nexhaustive ordered `movedChats` mapping as {@link MoveChatResult}. The host\nemits them in `movedChats` order on each old channel whose ownership or URI\nchanged. The move is already atomically committed before the first\nnotification; ordering is only a deterministic delivery aid, not the\ntransaction boundary.\n\nA client receiving any one notification MUST apply the complete mapping\natomically, stop dispatching to replaced old URIs, subscribe to the\nauthoritative session and chat channels as needed, and reconcile from their\nsnapshots. Duplicate notifications for the same mapping are idempotent.\nDurable hierarchy and catalog truth remain in `ChatState.parentChat` and the\naffected sessions' catalogs; this routing handoff is not replayed.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/URI",
+          "description": "Previous channel receiving this notification; names one `movedChats[].previousChat`."
+        },
+        "previousSession": {
+          "$ref": "#/$defs/URI",
+          "description": "Owning session URI before the move."
+        },
+        "previousChat": {
+          "$ref": "#/$defs/URI",
+          "description": "Requested root chat URI before the move."
+        },
+        "session": {
+          "$ref": "#/$defs/URI",
+          "description": "Authoritative owning session URI after the move."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "Authoritative requested root chat URI after the move."
+        },
+        "movedChats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MovedChatResource"
+          },
+          "description": "Exhaustive ordered mapping for the complete moved subtree.\n\nIdentical in every `chat/moved` notification for this move and in the\ncorresponding {@link MoveChatResult}."
+        }
+      },
+      "required": [
+        "channel",
+        "previousSession",
+        "previousChat",
+        "session",
+        "chat",
+        "movedChats"
+      ]
+    },
     "OtlpExportLogsParams": {
       "type": "object",
       "description": "Delivers a batch of OTLP log records to a client subscribed to the host's\nlogs channel (advertised on `TelemetryCapabilities.logs`).\n\nThe `payload` field is an OTLP/JSON `ExportLogsServiceRequest` value\nverbatim — i.e. an object of shape `{ resourceLogs: ResourceLogs[] }` as\ndefined by [opentelemetry-proto](https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto).\nAHP does not redeclare the OTLP type system; clients SHOULD use an\nOpenTelemetry SDK or schema to parse it.\n\nLike all stateless-channel notifications, this is ephemeral: it is not\nreplayed on reconnect. Subscribers receive only batches emitted after\ntheir `subscribe` succeeds.",
@@ -243,6 +284,24 @@
         "payload"
       ]
     },
+    "MovedChatResource": {
+      "type": "object",
+      "description": "Authoritative URI mapping for one chat in a moved subtree.",
+      "properties": {
+        "previousChat": {
+          "$ref": "#/$defs/URI",
+          "description": "Chat URI before the move."
+        },
+        "chat": {
+          "$ref": "#/$defs/URI",
+          "description": "Authoritative chat URI after the move."
+        }
+      },
+      "required": [
+        "previousChat",
+        "chat"
+      ]
+    },
     "ProtocolNotification": {
       "description": "Discriminated union of all protocol notifications.",
       "oneOf": [
@@ -260,6 +319,9 @@
         },
         {
           "$ref": "#/$defs/ProgressParams"
+        },
+        {
+          "$ref": "#/$defs/ChatMovedParams"
         },
         {
           "$ref": "#/$defs/OtlpExportLogsParams"
@@ -796,7 +858,7 @@
       "properties": {
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
-          "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding mode."
+          "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding\ncreation mode, and set {@link MultipleChatsCapability.reparent} or\n{@link MultipleChatsCapability.promote} to allow the corresponding\n`moveChat` destination."
         },
         "multipleWorkingDirectories": {
           "$ref": "#/$defs/MultipleWorkingDirectoriesCapability",
@@ -815,6 +877,14 @@
         "sideChat": {
           "type": "boolean",
           "description": "The agent can create a side chat from a specific turn. When absent or\n`false`, clients MUST NOT pass a {@link ChatSource} with\n`kind: \"sideChat\"` to `createChat`.\n\nA side chat receives the source turn as context without copying the source\ntranscript into its own visible history. The source is identified by a\nstable `turnId`, which the host resolves against the source chat's current\n`activeTurn` or retained history. When it names the current active turn,\nthe host snapshots the available partial assistant response at creation\ntime. Side-chat support always implies multi-chat support."
+        },
+        "reparent": {
+          "type": "boolean",
+          "description": "The agent can atomically move a non-default chat under another chat.\n\nThe destination chat may belong to another session on the same host when\nthe source and destination sessions use the same compatible provider and\nagent runtime. When absent or `false`, clients MUST NOT call `moveChat`\nwith `destination.kind: \"chat\"`."
+        },
+        "promote": {
+          "type": "boolean",
+          "description": "The agent can atomically promote a non-default chat into a new top-level\nsession on the same host. The new session preserves the source session's\ncompatible provider and agent runtime. When absent or `false`, clients\nMUST NOT call `moveChat` with `destination.kind: \"newSession\"`."
         }
       }
     },
@@ -1060,7 +1130,7 @@
         },
         "defaultChat": {
           "$ref": "#/$defs/URI",
-          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This is a UI routing hint, not a hierarchy\nmarker — chats remain equal peers at the protocol level. Hosts MAY change\nthis over the session's lifetime."
+          "description": "The chat that receives input when the user addresses the session without\nselecting a specific chat. This is a UI routing hint, not a hierarchy\nmarker — {@link ChatSummary.parentChat} defines parentage, and every chat\nremains directly addressable. Hosts MAY change this over the session's\nlifetime."
         },
         "config": {
           "$ref": "#/$defs/SessionConfigState",
@@ -1394,6 +1464,10 @@
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat was created, when known"
+        },
+        "parentChat": {
+          "$ref": "#/$defs/URI",
+          "description": "Current parent chat in the session's mutable hierarchy.\n\nMirrors {@link ChatSummary.parentChat} for clients that consume only the\nlightweight session summary."
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
@@ -2674,6 +2748,10 @@
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
         },
+        "parentChat": {
+          "$ref": "#/$defs/URI",
+          "description": "Current parent chat in the owning session's mutable chat hierarchy.\n\nUnlike {@link origin}, this relationship may change through `moveChat`.\nAbsence means the chat is top-level within its session. The referenced\nchat MUST belong to the same session and MUST NOT be this chat or one of\nits descendants."
+        },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
           "description": "How the user can interact with this chat. See {@link ChatInteractivity}.\n\nSupports agent-team patterns where worker chats are read-only or hidden.\nAbsence defaults to {@link ChatInteractivity.Full} for backward\ncompatibility."
@@ -2763,6 +2841,10 @@
         "origin": {
           "$ref": "#/$defs/ChatOrigin",
           "description": "How this chat came into existence"
+        },
+        "parentChat": {
+          "$ref": "#/$defs/URI",
+          "description": "Current parent chat in the owning session's mutable chat hierarchy.\n\nSee {@link ChatState.parentChat} for the full semantics."
         },
         "interactivity": {
           "$ref": "#/$defs/ChatInteractivity",
@@ -6058,7 +6140,7 @@
           ]
         }
       ],
-      "description": "How a chat came into existence. Clients MAY use it to render\ncontextual UI (parent indicators, fork markers, \"spawned by tool\" badges).\n\nFork and side-chat origins both carry a stable top-level `turnId` alongside\ntheir discriminated `kind` value instead of snapshotting whether that turn\nwas active or historical at creation time. Consumers resolve the identifier\nagainst the\nsource chat's current `activeTurn` or retained `turns` as needed.\n\nWhen a host accepts side-chat creation from the source chat's current active\nturn, it snapshots the retained history plus that turn's current user\nmessage and any partial assistant response already available. Later\nsource-turn deltas do not retroactively change the created side chat's\nstarting context, and once the source turn completes it is still referenced\nby the same `turnId`. Side-chat origins MAY also retain an immutable\n{@link SideChatSelection | selected-text snapshot} captured at acceptance\ntime; any `responsePartId` there is provenance only, not a range.\n\nThe `tool` variant records a tool-spawned worker from the worker's side: its\n`chat`/`toolCallId` identify the spawning tool call in the parent chat. This\nis the canonical record of the spawn relationship. The same edge is surfaced\nfrom the parent's side by {@link ToolResultSubagentContent}, whose `resource`\nis this chat's URI; hosts MUST keep the two consistent."
+      "description": "How a chat came into existence. Clients MAY use it to render creation\nprovenance (fork markers and \"spawned by tool\" badges). The current mutable\nhierarchy is represented separately by {@link ChatState.parentChat}.\n\nFork and side-chat origins both carry a stable top-level `turnId` alongside\ntheir discriminated `kind` value instead of snapshotting whether that turn\nwas active or historical at creation time. Consumers resolve the identifier\nagainst the\nsource chat's current `activeTurn` or retained `turns` as needed.\n\nWhen a host accepts side-chat creation from the source chat's current active\nturn, it snapshots the retained history plus that turn's current user\nmessage and any partial assistant response already available. Later\nsource-turn deltas do not retroactively change the created side chat's\nstarting context, and once the source turn completes it is still referenced\nby the same `turnId`. Side-chat origins MAY also retain an immutable\n{@link SideChatSelection | selected-text snapshot} captured at acceptance\ntime; any `responsePartId` there is provenance only, not a range.\n\nThe `tool` variant records a tool-spawned worker from the worker's side: its\n`chat`/`toolCallId` identify the spawning tool call in the parent chat. This\nis the canonical record of the spawn relationship. The same edge is surfaced\nfrom the parent's side by {@link ToolResultSubagentContent}, whose `resource`\nis this chat's URI; hosts MUST keep the two consistent."
     },
     "ChatInteractivity": {
       "enum": [

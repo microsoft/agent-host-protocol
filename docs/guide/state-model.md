@@ -150,6 +150,7 @@ ChatState {
   activity?: string
   modifiedAt: string
   origin?: ChatOrigin      // how the chat came to exist (user / fork / sideChat / tool)
+  parentChat?: URI         // current mutable parent; absent means session top level
   workingDirectories?: URI[]      // subset of session's workingDirectories
   changesets?: Changeset[]        // per-chat Branch, Uncommitted Changes, etc.
 
@@ -179,6 +180,11 @@ turn later moves into `turns` when it completes. When `selection` is present,
 the host also snapshots that exact selected text (which MUST be non-empty) into
 the created chat's `origin`; `responsePartId` there is advisory provenance, not
 a range.
+
+`origin` is immutable creation provenance. `parentChat` is the current mutable
+hierarchy and initially points to the source/spawning chat when one exists.
+`moveChat` may change `parentChat` and owning session without rewriting
+`origin`; see [Moving chats](/specification/chat-channel#moving-chats).
 
 The sections below — turns, response parts, tool calls, pending messages, and input requests — describe the contents of `ChatState`.
 

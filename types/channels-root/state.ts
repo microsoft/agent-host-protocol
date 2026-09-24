@@ -111,7 +111,10 @@ export interface AgentCapabilities {
    * clients MUST NOT call `createChat` to open chats beyond the default one the
    * session starts with. An empty object `{}` advertises multi-chat without
    * source-based creation; set {@link MultipleChatsCapability.fork} or
-   * {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.
+   * {@link MultipleChatsCapability.sideChat} to allow the corresponding
+   * creation mode, and set {@link MultipleChatsCapability.reparent} or
+   * {@link MultipleChatsCapability.promote} to allow the corresponding
+   * `moveChat` destination.
    */
   multipleChats?: MultipleChatsCapability;
   /**
@@ -153,6 +156,22 @@ export interface MultipleChatsCapability {
    * time. Side-chat support always implies multi-chat support.
    */
   sideChat?: boolean;
+  /**
+   * The agent can atomically move a non-default chat under another chat.
+   *
+   * The destination chat may belong to another session on the same host when
+   * the source and destination sessions use the same compatible provider and
+   * agent runtime. When absent or `false`, clients MUST NOT call `moveChat`
+   * with `destination.kind: "chat"`.
+   */
+  reparent?: boolean;
+  /**
+   * The agent can atomically promote a non-default chat into a new top-level
+   * session on the same host. The new session preserves the source session's
+   * compatible provider and agent runtime. When absent or `false`, clients
+   * MUST NOT call `moveChat` with `destination.kind: "newSession"`.
+   */
+  promote?: boolean;
 }
 
 /**
