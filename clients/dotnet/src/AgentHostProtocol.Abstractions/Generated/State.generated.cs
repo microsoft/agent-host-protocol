@@ -118,6 +118,18 @@ public enum ChatInteractivity
     Hidden,
 }
 
+/// <summary>Availability of a live canvas instance.</summary>
+[JsonConverter(typeof(WireEnumConverter<CanvasAvailability>))]
+public enum CanvasAvailability
+{
+    /// <summary>The provider currently has a source that can be resolved.</summary>
+    [WireValue("ready")]
+    Ready,
+    /// <summary>The provider is temporarily unavailable.</summary>
+    [WireValue("unavailable")]
+    Unavailable,
+}
+
 /// <summary>Answer lifecycle state.</summary>
 [JsonConverter(typeof(WireEnumConverter<ChatInputAnswerState>))]
 public enum ChatInputAnswerState
@@ -878,6 +890,10 @@ public sealed record AgentInfo
 /// per-capability options.</summary>
 public sealed record AgentCapabilities
 {
+    /// <summary>The agent can expose live canvases opened by its model tools.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CanvasCapability? Canvases { get; init; }
+
     /// <summary>The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -896,6 +912,11 @@ public sealed record AgentCapabilities
     /// {@link CreateSessionParams.workingDirectories}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MultipleWorkingDirectoriesCapability? MultipleWorkingDirectories { get; init; }
+}
+
+/// <summary>Presence-only capability for agent-owned canvases.</summary>
+public sealed record CanvasCapability
+{
 }
 
 /// <summary>Options for the {@link AgentCapabilities.multipleChats} capability.</summary>
@@ -1226,6 +1247,13 @@ public sealed class ChatState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<Changeset>? Changesets { get; set; }
 
+    /// <summary>Live canvases currently exposed by this chat.
+    ///
+    /// Canvas sources are resolved separately and are intentionally absent from
+    /// synchronized state.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<CanvasInstance>? Canvases { get; set; }
+
     /// <summary>Completed turns</summary>
     public required List<Turn> Turns { get; set; }
 
@@ -1268,6 +1296,37 @@ public sealed class ChatState
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
+}
+
+/// <summary>A canvas instance opened by the model for this chat.</summary>
+public sealed record CanvasInstance
+{
+    /// <summary>Stable caller-supplied instance identifier.</summary>
+    public required string InstanceId { get; init; }
+
+    /// <summary>Owning extension/provider identifier.</summary>
+    public required string ExtensionId { get; init; }
+
+    /// <summary>Owning extension display name, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExtensionName { get; init; }
+
+    /// <summary>Provider-local canvas type identifier.</summary>
+    public required string CanvasId { get; init; }
+
+    /// <summary>Provider-supplied title, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; init; }
+
+    /// <summary>Provider-supplied status text, when available.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Status { get; init; }
+
+    /// <summary>Monotonic instance revision used to fence source resolution.</summary>
+    public long Revision { get; init; }
+
+    /// <summary>Whether the live provider can currently resolve a source.</summary>
+    public CanvasAvailability Availability { get; init; }
 }
 
 /// <summary>A choice in a select-style question.</summary>

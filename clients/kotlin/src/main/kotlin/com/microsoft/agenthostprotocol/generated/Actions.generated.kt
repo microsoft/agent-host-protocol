@@ -55,6 +55,7 @@ value class ActionType(val rawValue: String) {
         val CHAT_TURN_RESUME: ActionType = ActionType("chat/turnResume")
         val CHAT_ACTIVITY_CHANGED: ActionType = ActionType("chat/activityChanged")
         val CHAT_CHANGESETS_CHANGED: ActionType = ActionType("chat/changesetsChanged")
+        val CHAT_CANVASES_CHANGED: ActionType = ActionType("chat/canvasesChanged")
         val CHAT_WORKING_DIRECTORY_SET: ActionType = ActionType("chat/workingDirectorySet")
         val CHAT_WORKING_DIRECTORY_REMOVED: ActionType = ActionType("chat/workingDirectoryRemoved")
         val SESSION_TITLE_CHANGED: ActionType = ActionType("session/titleChanged")
@@ -736,6 +737,15 @@ data class ChatChangesetsChangedAction(
      * New catalogue, or `undefined` to clear it.
      */
     val changesets: List<Changeset>? = null
+)
+
+@Serializable
+data class ChatCanvasesChangedAction(
+    val type: ActionType,
+    /**
+     * New canvas collection, or `undefined` to clear it.
+     */
+    val canvases: List<CanvasInstance>? = null
 )
 
 @Serializable
@@ -1635,6 +1645,7 @@ sealed interface StateAction
 @JvmInline value class StateActionChatTurnResume(val value: ChatTurnResumeAction) : StateAction
 @JvmInline value class StateActionChatActivityChanged(val value: ChatActivityChangedAction) : StateAction
 @JvmInline value class StateActionChatChangesetsChanged(val value: ChatChangesetsChangedAction) : StateAction
+@JvmInline value class StateActionChatCanvasesChanged(val value: ChatCanvasesChangedAction) : StateAction
 @JvmInline value class StateActionSessionTitleChanged(val value: SessionTitleChangedAction) : StateAction
 @JvmInline value class StateActionChatUsage(val value: ChatUsageAction) : StateAction
 @JvmInline value class StateActionChatReasoning(val value: ChatReasoningAction) : StateAction
@@ -1749,6 +1760,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/turnResume" -> StateActionChatTurnResume(input.json.decodeFromJsonElement(ChatTurnResumeAction.serializer(), element))
             "chat/activityChanged" -> StateActionChatActivityChanged(input.json.decodeFromJsonElement(ChatActivityChangedAction.serializer(), element))
             "chat/changesetsChanged" -> StateActionChatChangesetsChanged(input.json.decodeFromJsonElement(ChatChangesetsChangedAction.serializer(), element))
+            "chat/canvasesChanged" -> StateActionChatCanvasesChanged(input.json.decodeFromJsonElement(ChatCanvasesChangedAction.serializer(), element))
             "session/titleChanged" -> StateActionSessionTitleChanged(input.json.decodeFromJsonElement(SessionTitleChangedAction.serializer(), element))
             "chat/usage" -> StateActionChatUsage(input.json.decodeFromJsonElement(ChatUsageAction.serializer(), element))
             "chat/reasoning" -> StateActionChatReasoning(input.json.decodeFromJsonElement(ChatReasoningAction.serializer(), element))
@@ -1856,6 +1868,7 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatTurnResume -> output.json.encodeToJsonElement(ChatTurnResumeAction.serializer(), value.value)
             is StateActionChatActivityChanged -> output.json.encodeToJsonElement(ChatActivityChangedAction.serializer(), value.value)
             is StateActionChatChangesetsChanged -> output.json.encodeToJsonElement(ChatChangesetsChangedAction.serializer(), value.value)
+            is StateActionChatCanvasesChanged -> output.json.encodeToJsonElement(ChatCanvasesChangedAction.serializer(), value.value)
             is StateActionSessionTitleChanged -> output.json.encodeToJsonElement(SessionTitleChangedAction.serializer(), value.value)
             is StateActionChatUsage -> output.json.encodeToJsonElement(ChatUsageAction.serializer(), value.value)
             is StateActionChatReasoning -> output.json.encodeToJsonElement(ChatReasoningAction.serializer(), value.value)

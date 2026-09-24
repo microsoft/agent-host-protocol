@@ -1539,6 +1539,36 @@ data class CompletionsResult(
 )
 
 @Serializable
+data class ResolveCanvasSourceParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Canvas instance identifier from the subscribed chat state.
+     */
+    val instanceId: String,
+    /**
+     * Expected canvas revision.
+     */
+    val revision: Long
+)
+
+@Serializable
+data class ResolveCanvasSourceResult(
+    /**
+     * HTTP(S) URL supplied by the live canvas provider.
+     */
+    val url: String
+)
+
+@Serializable
 data class InvokeChangesetOperationParams(
     /**
      * Channel URI this command targets.

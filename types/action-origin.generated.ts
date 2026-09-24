@@ -54,6 +54,7 @@ import type {
   ChatTurnResumeAction,
   ChatActivityChangedAction,
   ChatChangesetsChangedAction,
+  ChatCanvasesChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
   ChatUsageAction,
@@ -218,6 +219,7 @@ export type ChatAction =
   | ChatTurnResumeAction
   | ChatActivityChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction
@@ -268,6 +270,7 @@ export type ServerChatAction =
   | ChatErrorAction
   | ChatActivityChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
   | ChatUsageAction
   | ChatReasoningAction
   | ChatInputRequestedAction
@@ -474,6 +477,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatTurnResume]: true,
   [ActionType.ChatActivityChanged]: false,
   [ActionType.ChatChangesetsChanged]: false,
+  [ActionType.ChatCanvasesChanged]: false,
   [ActionType.ChatWorkingDirectorySet]: true,
   [ActionType.ChatWorkingDirectoryRemoved]: true,
   [ActionType.ChatUsage]: false,

@@ -66,6 +66,7 @@ import type {
   ChatTurnResumeAction,
   ChatActivityChangedAction,
   ChatChangesetsChangedAction,
+  ChatCanvasesChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
   ChatUsageAction,
@@ -167,6 +168,7 @@ export const enum ActionType {
   ChatTurnResume = 'chat/turnResume',
   ChatActivityChanged = 'chat/activityChanged',
   ChatChangesetsChanged = 'chat/changesetsChanged',
+  ChatCanvasesChanged = 'chat/canvasesChanged',
   ChatWorkingDirectorySet = 'chat/workingDirectorySet',
   ChatWorkingDirectoryRemoved = 'chat/workingDirectoryRemoved',
   SessionTitleChanged = 'session/titleChanged',
@@ -327,6 +329,7 @@ export type StateAction =
   | ChatTurnResumeAction
   | ChatActivityChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction

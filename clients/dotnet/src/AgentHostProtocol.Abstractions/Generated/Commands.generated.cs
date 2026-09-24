@@ -1507,6 +1507,32 @@ public sealed record CompletionsResult
     public required List<CompletionItem> Items { get; init; }
 }
 
+/// <summary>Resolves the current source URL for a live canvas instance.</summary>
+public sealed record ResolveCanvasSourceParams
+{
+    /// <summary>Channel URI this command targets.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Canvas instance identifier from the subscribed chat state.</summary>
+    public required string InstanceId { get; init; }
+
+    /// <summary>Expected canvas revision.</summary>
+    public long Revision { get; init; }
+}
+
+/// <summary>Current source for a live canvas instance.</summary>
+public sealed record ResolveCanvasSourceResult
+{
+    /// <summary>HTTP(S) URL supplied by the live canvas provider.</summary>
+    public required string Url { get; init; }
+}
+
 /// <summary>Invokes a server-defined {@link ChangesetOperation} against a changeset,
 /// a single file, or a line range.
 ///

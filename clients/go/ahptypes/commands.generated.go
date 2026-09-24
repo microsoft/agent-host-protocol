@@ -1188,6 +1188,25 @@ type CompletionsResult struct {
 	Items []CompletionItem `json:"items"`
 }
 
+// Resolves the current source URL for a live canvas instance.
+type ResolveCanvasSourceParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Canvas instance identifier from the subscribed chat state.
+	InstanceId string `json:"instanceId"`
+	// Expected canvas revision.
+	Revision int64 `json:"revision"`
+}
+
+// Current source for a live canvas instance.
+type ResolveCanvasSourceResult struct {
+	// HTTP(S) URL supplied by the live canvas provider.
+	Url string `json:"url"`
+}
+
 // Invokes a server-defined {@link ChangesetOperation} against a changeset,
 // a single file, or a line range.
 //

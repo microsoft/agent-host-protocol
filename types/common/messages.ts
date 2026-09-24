@@ -57,6 +57,8 @@ import type {
 import type {
   CreateChatParams,
   DisposeChatParams,
+  ResolveCanvasSourceParams,
+  ResolveCanvasSourceResult,
 } from '../channels-chat/commands.js';
 import type {
   CreateTerminalParams,
@@ -163,6 +165,7 @@ export interface CommandMap {
   'disposeSession': { params: DisposeSessionParams; result: null };
   'createChat': { params: CreateChatParams; result: null };
   'disposeChat': { params: DisposeChatParams; result: null };
+  'resolveCanvasSource': { params: ResolveCanvasSourceParams; result: ResolveCanvasSourceResult };
   'createTerminal': { params: CreateTerminalParams; result: null };
   'disposeTerminal': { params: DisposeTerminalParams; result: null };
   'createResourceWatch': { params: CreateResourceWatchParams; result: CreateResourceWatchResult };

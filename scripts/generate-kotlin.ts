@@ -966,7 +966,7 @@ internal object ToolResultContentSerializer : KSerializer<ToolResultContent> {
 
 const STATE_ENUMS = [
   'PolicyState', 'PendingMessageKind', 'SessionLifecycle', 'SessionStatus',
-  'ChatOriginKind', 'ChatInteractivity', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
+  'ChatOriginKind', 'ChatInteractivity', 'CanvasAvailability', 'ChatInputAnswerState', 'ChatInputAnswerValueKind', 'ChatInputQuestionKind',
   'ChatInputResponseKind', 'SessionInputRequestKind',
   'TurnState', 'MessageKind', 'MessageAttachmentKind', 'ResponsePartKind', 'ToolCallStatus',
   'ToolCallConfirmationReason', 'ToolCallRiskAssessmentKind',
@@ -986,10 +986,11 @@ const STATE_ENUMS = [
 const STATE_STRUCTS = [
   'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
+  'CanvasCapability',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
   'SessionModelInfo', 'ModelSelection', 'AgentSelection', 'ConfigPropertySchema', 'ConfigSchema',
-  'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'SessionState', 'SessionActiveClient',
+  'PendingMessage', 'ChatState', 'ChatSummary', 'SideChatSelection', 'CanvasInstance', 'SessionState', 'SessionActiveClient',
   'SessionChatInputRequest', 'SessionToolConfirmationRequest', 'SessionToolClientExecutionRequest',
   'SessionToolAuthenticationRequest',
   'SessionSummary', 'SessionChatSummary', 'ChangesSummary', 'ProjectInfo', 'SessionConfigState', 'Turn', 'ActiveTurn', 'Message',
@@ -1506,6 +1507,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/turnResume', caseName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', caseName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
   { type: 'chat/changesetsChanged', caseName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
+  { type: 'chat/canvasesChanged', caseName: 'ChatCanvasesChanged', tsInterface: 'ChatCanvasesChangedAction' },
   { type: 'session/titleChanged', caseName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', caseName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
   { type: 'chat/reasoning', caseName: 'ChatReasoning', tsInterface: 'ChatReasoningAction' },
@@ -1768,6 +1770,7 @@ const COMMAND_STRUCTS = [
   'SessionConfigCompletionsParams', 'SessionConfigCompletionsResult',
   'SessionConfigValueItem',
   'CompletionsParams', 'CompletionItem', 'CompletionsResult',
+  'ResolveCanvasSourceParams', 'ResolveCanvasSourceResult',
   'InvokeChangesetOperationParams', 'InvokeChangesetOperationResult',
   'ChangesetOperationFollowUp',
   'ListAutomationTriggerDefinitionsParams', 'ListAutomationTriggerDefinitionsResult',

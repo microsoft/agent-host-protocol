@@ -16,6 +16,7 @@ import type {
   ChatInputAnswer,
   ChatInputRequest,
   ChatInputResponseKind,
+  CanvasInstance,
   ConfirmationOption,
   ErrorResponsePart,
   ToolCallContributor,
@@ -567,6 +568,21 @@ export interface ChatChangesetsChangedAction {
 }
 
 /**
+ * The live canvas instances exposed by this chat changed.
+ *
+ * Replaces {@link ChatState.canvases | `state.canvases`} entirely. Set to
+ * `undefined` to clear the collection.
+ *
+ * @category Chat Actions
+ * @version 1
+ */
+export interface ChatCanvasesChangedAction {
+  type: ActionType.ChatCanvasesChanged;
+  /** New canvas collection, or `undefined` to clear it. */
+  canvases: CanvasInstance[] | undefined;
+}
+
+/**
  * A working directory was added to this chat's
  * {@link ChatState.workingDirectories} subset.
  *
@@ -887,6 +903,7 @@ export type ChatAction =
   | ChatTurnResumeAction
   | ChatActivityChangedAction
   | ChatChangesetsChangedAction
+  | ChatCanvasesChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
   | ChatUsageAction
