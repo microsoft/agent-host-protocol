@@ -3979,6 +3979,7 @@ pub struct ClientPluginCustomization {
     /// nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<ChildCustomization>>,
+    pub r#type: CustomizationType,
     /// Explicit enablement decisions. See {@link McpServerCustomization.enablement}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enablement: Option<Vec<CustomizationEnablement>>,
@@ -5465,6 +5466,31 @@ pub struct AutomationSessionTemplate {
     /// {@link ResolveSessionConfigResult.values}.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config: Option<JsonObject>,
+    /// Client plugins to make available in every run session, in the same
+    /// published shape as
+    /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
+    /// Entries are keyed by `id`.
+    ///
+    /// Runs usually start when no client is connected, so the host does not
+    /// resolve these URIs at run time. Instead, when it accepts a
+    /// {@link AutomationCreateRequestedAction | `automation/createRequested`} or
+    /// {@link AutomationUpdateRequestedAction | `automation/updateRequested`}
+    /// that adds an entry or changes an entry's `uri` or `nonce`, the host
+    /// captures a host-owned copy of the plugin. For client-served URIs such as
+    /// `virtual://…`, it reads the contents from the dispatching client with
+    /// server→client `resource*` requests. If a capture fails, the host rejects
+    /// the whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep
+    /// their existing copy, so any client can re-submit a template it received
+    /// without being able to serve the plugin itself. The resulting copies are
+    /// reported in {@link AutomationEntry.customizations}.
+    ///
+    /// The host MAY share one stored copy between entries with equal `uri` and
+    /// `nonce`, including across automations; this is not observable to clients.
+    ///
+    /// Clients MUST NOT set this field unless the host advertises
+    /// {@link AutomationCapabilities.customizations}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customizations: Option<Vec<ClientPluginCustomization>>,
 }
 
 /// Durable, client-editable definition of an automation.
@@ -5508,7 +5534,9 @@ pub struct AutomationDefinitionPatch {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<Message>,
     /// Replacement {@link AutomationDefinition.session}. The host revalidates
-    /// affected event triggers when their discovery context changes.
+    /// affected event triggers when their discovery context changes, and
+    /// captures {@link AutomationSessionTemplate.customizations} entries that
+    /// are new or whose `uri` or `nonce` changed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<AutomationSessionTemplate>,
     /// Replacement {@link AutomationDefinition.enabled}.
@@ -5547,6 +5575,26 @@ pub struct AutomationEntry {
     pub runs_next_cursor: Option<String>,
     /// Operations currently permitted for this automation.
     pub operations: Vec<AutomationOperation>,
+    /// Host-owned copies of the plugins in
+    /// {@link AutomationSessionTemplate.customizations}, one per template entry
+    /// with the same `id`. Absent when the template has no customizations.
+    ///
+    /// Each copy's `uri` identifies the captured contents, which clients can
+    /// browse with `resourceRead`. `children` and `load` report what the host
+    /// found in that copy, independent of whether the originating client is
+    /// connected. `clientId` is absent because the copy no longer depends on a
+    /// client.
+    ///
+    /// Every run session receives these plugins in
+    /// {@link SessionState.customizations}, with the enablement from the
+    /// matching template entry.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_plugin_customizations",
+        deserialize_with = "deserialize_plugin_customizations"
+    )]
+    pub customizations: Option<Vec<PluginCustomization>>,
     /// Creation timestamp in ISO 8601 format.
     pub created_at: String,
     /// Last definition modification timestamp in ISO 8601 format.
@@ -5554,6 +5602,56 @@ pub struct AutomationEntry {
     /// Opaque host-defined state metadata.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+fn serialize_plugin_customizations<S>(
+    value: &Option<Vec<PluginCustomization>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let Some(items) = value else {
+        return serializer.serialize_none();
+    };
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
+        let serde_json::Value::Object(object) = &mut raw else {
+            return Err(serde::ser::Error::custom(
+                "plugin customization must serialize to an object",
+            ));
+        };
+        object.insert(
+            "type".to_owned(),
+            serde_json::Value::String("plugin".to_owned()),
+        );
+        out.push(raw);
+    }
+    serde::Serialize::serialize(&out, serializer)
+}
+
+fn deserialize_plugin_customizations<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<PluginCustomization>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(items) = Option::<Vec<serde_json::Value>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    items
+        .into_iter()
+        .map(|raw| {
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("plugin") {
+                return Err(serde::de::Error::custom(
+                    "expected plugin customization type",
+                ));
+            }
+            serde_json::from_value(raw).map_err(serde::de::Error::custom)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }
 
 /// Authoritative automation catalogue exposed on the `ahp-automations://`

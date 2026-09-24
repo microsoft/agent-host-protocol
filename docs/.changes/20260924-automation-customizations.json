@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`AutomationSessionTemplate.customizations` lets automations carry client plugins (skills, agents, prompts, rules) that the host captures when the definition is saved, with the host-owned copies reported in `AutomationEntry.customizations` and support advertised by `AutomationCapabilities.customizations`."
+}

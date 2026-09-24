@@ -5385,7 +5385,33 @@ data class AutomationSessionTemplate(
      * {@link CreateSessionParams.config}, normally obtained from
      * {@link ResolveSessionConfigResult.values}.
      */
-    val config: Map<String, JsonElement>? = null
+    val config: Map<String, JsonElement>? = null,
+    /**
+     * Client plugins to make available in every run session, in the same
+     * published shape as
+     * {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
+     * Entries are keyed by `id`.
+     *
+     * Runs usually start when no client is connected, so the host does not
+     * resolve these URIs at run time. Instead, when it accepts a
+     * {@link AutomationCreateRequestedAction | `automation/createRequested`} or
+     * {@link AutomationUpdateRequestedAction | `automation/updateRequested`}
+     * that adds an entry or changes an entry's `uri` or `nonce`, the host
+     * captures a host-owned copy of the plugin. For client-served URIs such as
+     * `virtual://…`, it reads the contents from the dispatching client with
+     * server→client `resource*` requests. If a capture fails, the host rejects
+     * the whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep
+     * their existing copy, so any client can re-submit a template it received
+     * without being able to serve the plugin itself. The resulting copies are
+     * reported in {@link AutomationEntry.customizations}.
+     *
+     * The host MAY share one stored copy between entries with equal `uri` and
+     * `nonce`, including across automations; this is not observable to clients.
+     *
+     * Clients MUST NOT set this field unless the host advertises
+     * {@link AutomationCapabilities.customizations}.
+     */
+    val customizations: List<ClientPluginCustomization>? = null
 )
 
 @Serializable
@@ -5432,7 +5458,9 @@ data class AutomationDefinitionPatch(
     val message: Message? = null,
     /**
      * Replacement {@link AutomationDefinition.session}. The host revalidates
-     * affected event triggers when their discovery context changes.
+     * affected event triggers when their discovery context changes, and
+     * captures {@link AutomationSessionTemplate.customizations} entries that
+     * are new or whose `uri` or `nonce` changed.
      */
     val session: AutomationSessionTemplate? = null,
     /**
@@ -5479,6 +5507,22 @@ data class AutomationEntry(
      * Operations currently permitted for this automation.
      */
     val operations: List<AutomationOperation>,
+    /**
+     * Host-owned copies of the plugins in
+     * {@link AutomationSessionTemplate.customizations}, one per template entry
+     * with the same `id`. Absent when the template has no customizations.
+     *
+     * Each copy's `uri` identifies the captured contents, which clients can
+     * browse with `resourceRead`. `children` and `load` report what the host
+     * found in that copy, independent of whether the originating client is
+     * connected. `clientId` is absent because the copy no longer depends on a
+     * client.
+     *
+     * Every run session receives these plugins in
+     * {@link SessionState.customizations}, with the enablement from the
+     * matching template entry.
+     */
+    val customizations: List<PluginCustomization>? = null,
     /**
      * Creation timestamp in ISO 8601 format.
      */

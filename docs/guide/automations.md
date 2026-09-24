@@ -35,6 +35,7 @@ AutomationCapabilities {
   }
   runCancellation?: {}
   runHistoryLimit?: number
+  customizations?: {}
 }
 ```
 
@@ -46,7 +47,7 @@ fields describe optional features and restrictions; clients use each
 automation's `operations` to determine which definition actions are currently
 allowed.
 
-`create` and `runCancellation` are presence capabilities: an empty object means
+`create`, `runCancellation`, and `customizations` are presence capabilities: an empty object means
 the feature is supported, and absence means it is not. The object shape leaves
 room for future feature-specific options without changing capability detection.
 
@@ -130,6 +131,7 @@ AutomationSessionTemplate {
   agent?: AgentSelection
   workingDirectories?: URI[]
   config?: Record<string, unknown>
+  customizations?: ClientPluginCustomization[]
 }
 ```
 
@@ -142,6 +144,53 @@ was saved.
 After a run creates a session, that session's `SessionState.workingDirectories`
 is authoritative for the directories it actually uses. This keeps per-run
 workspace preparation out of the durable automation definition and catalogue.
+
+### Customizations
+
+A client usually contributes plugins (skills, agents, prompts, rules, and so
+on) to a session as an [active client](./customizations.md#client-published-plugins).
+That doesn't work for automations: runs typically start when no client is
+connected, so there is no active client to read the plugins from. The session
+template instead lists the plugins each run should get, in the same
+`ClientPluginCustomization` shape clients publish with
+`session/activeClientSet`. Hosts that support this advertise
+`automations.customizations`.
+
+The host captures a copy of each plugin when the definition is saved, not
+when a run starts:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Host
+
+    Client->>Host: automation/createRequested (session.customizations)
+    Host->>Client: resourceList / resourceRead (virtual://…)
+    Client-->>Host: plugin contents
+    Note over Host: stores a host-owned copy
+    Host->>Client: automation/set (entry.customizations)
+    Note over Host: later, with no client connected
+    Host->>Host: run session gets the copied plugins
+```
+
+- On `automation/createRequested` or `automation/updateRequested`, the host
+  captures every entry that is new or whose `uri` or `nonce` changed, reading
+  client-served URIs from the dispatching client. If any capture fails, the
+  host rejects the whole action.
+- Entries whose `id`, `uri`, and `nonce` are unchanged keep their existing
+  copy. A client that can't serve a plugin can still edit the rest of the
+  definition by re-submitting the template it received.
+- `AutomationEntry.customizations` reports the host-owned copies, matched to
+  template entries by `id`. Each copy has a host `uri` that clients can browse,
+  plus `children` and `load` describing what the host found.
+- Every run session receives the copies in `SessionState.customizations`
+  without a `clientId`, using the template entry's enablement.
+- To pick up local changes, a client compares its current `nonce` with the
+  template entry and re-submits the entry with the new `nonce`. Hosts never
+  refresh copies on their own, so unattended runs use exactly what the user
+  saved.
+- Copies are per automation. Hosts may store identical copies (same `uri`
+  and `nonce`) once and share them between automations.
 
 ### Enabled state
 
@@ -471,6 +520,8 @@ applications.
 ## Security
 
 - Definitions contain no credentials or reusable confirmation decisions.
+  Captured customizations follow the same rule; they carry plugin content,
+  not secrets.
 - The host revalidates provider, model, agent, workspace, and session
   configuration when each run starts.
 - State-level operations are authoritative; clients do not infer permission

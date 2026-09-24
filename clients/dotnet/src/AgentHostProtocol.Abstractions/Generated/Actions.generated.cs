@@ -2396,7 +2396,9 @@ public sealed record AnnotationsUpdatedAction
 ///
 /// This side-effect request leaves optimistic catalogue state unchanged. The
 /// host validates trigger ids and configuration, normalizes event-trigger
-/// titles and descriptions, persists the definition, then publishes the
+/// titles and descriptions, captures any
+/// {@link AutomationSessionTemplate.customizations | session customizations}
+/// from the dispatching client, persists the definition, then publishes the
 /// authoritative result with {@link AutomationSetAction | `automation/set`}.
 /// Rejections leave the catalogue unchanged.</summary>
 public sealed record AutomationCreateRequestedAction

@@ -223,6 +223,9 @@ type AutomationCapabilities struct {
 	// runs are not counted toward the limit. Absence means the retention limit is
 	// implementation-defined.
 	RunHistoryLimit *int64 `json:"runHistoryLimit,omitempty"`
+	// Present when {@link AutomationSessionTemplate.customizations} may contain
+	// client plugins for the host to capture.
+	Customizations *AutomationCustomizationsCapability `json:"customizations,omitempty"`
 }
 
 // Presence capability for {@link AutomationCreateRequestedAction |
@@ -250,6 +253,14 @@ type AutomationScheduleCapabilities struct {
 // The empty object means "supported." Clients may dispatch the action for
 // `pending` or `running` runs; terminal runs cannot be cancelled.
 type AutomationRunCancellationCapability struct {
+}
+
+// Presence capability for
+// {@link AutomationSessionTemplate.customizations | automation customizations}.
+//
+// The empty object means "supported"; fields are reserved for future
+// capture options and limits.
+type AutomationCustomizationsCapability struct {
 }
 
 // Identifies a protocol implementation — the software (and build) on one end

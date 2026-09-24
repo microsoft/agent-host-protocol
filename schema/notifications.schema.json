@@ -5470,6 +5470,13 @@
           "type": "object",
           "additionalProperties": {},
           "description": "Session configuration values equivalent to\n{@link CreateSessionParams.config}, normally obtained from\n{@link ResolveSessionConfigResult.values}."
+        },
+        "customizations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ClientPluginCustomization"
+          },
+          "description": "Client plugins to make available in every run session, in the same\npublished shape as\n{@link SessionActiveClient.customizations | `activeClients[].customizations`}.\nEntries are keyed by `id`.\n\nRuns usually start when no client is connected, so the host does not\nresolve these URIs at run time. Instead, when it accepts a\n{@link AutomationCreateRequestedAction | `automation/createRequested`} or\n{@link AutomationUpdateRequestedAction | `automation/updateRequested`}\nthat adds an entry or changes an entry's `uri` or `nonce`, the host\ncaptures a host-owned copy of the plugin. For client-served URIs such as\n`virtual://…`, it reads the contents from the dispatching client with\nserver→client `resource*` requests. If a capture fails, the host rejects\nthe whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep\ntheir existing copy, so any client can re-submit a template it received\nwithout being able to serve the plugin itself. The resulting copies are\nreported in {@link AutomationEntry.customizations}.\n\nThe host MAY share one stored copy between entries with equal `uri` and\n`nonce`, including across automations; this is not observable to clients.\n\nClients MUST NOT set this field unless the host advertises\n{@link AutomationCapabilities.customizations}."
         }
       }
     },
@@ -5547,6 +5554,13 @@
             "$ref": "#/$defs/AutomationOperation"
           },
           "description": "Operations currently permitted for this automation."
+        },
+        "customizations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PluginCustomization"
+          },
+          "description": "Host-owned copies of the plugins in\n{@link AutomationSessionTemplate.customizations}, one per template entry\nwith the same `id`. Absent when the template has no customizations.\n\nEach copy's `uri` identifies the captured contents, which clients can\nbrowse with `resourceRead`. `children` and `load` report what the host\nfound in that copy, independent of whether the originating client is\nconnected. `clientId` is absent because the copy no longer depends on a\nclient.\n\nEvery run session receives these plugins in\n{@link SessionState.customizations}, with the enablement from the\nmatching template entry."
         },
         "createdAt": {
           "type": "string",

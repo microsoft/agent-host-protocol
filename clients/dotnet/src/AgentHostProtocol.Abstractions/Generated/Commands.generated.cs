@@ -300,6 +300,11 @@ public sealed record AutomationCapabilities
     /// implementation-defined.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? RunHistoryLimit { get; init; }
+
+    /// <summary>Present when {@link AutomationSessionTemplate.customizations} may contain
+    /// client plugins for the host to capture.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AutomationCustomizationsCapability? Customizations { get; init; }
 }
 
 /// <summary>Presence capability for {@link AutomationCreateRequestedAction |
@@ -330,6 +335,15 @@ public sealed record AutomationScheduleCapabilities
 /// The empty object means "supported." Clients may dispatch the action for
 /// `pending` or `running` runs; terminal runs cannot be cancelled.</summary>
 public sealed record AutomationRunCancellationCapability
+{
+}
+
+/// <summary>Presence capability for
+/// {@link AutomationSessionTemplate.customizations | automation customizations}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// capture options and limits.</summary>
+public sealed record AutomationCustomizationsCapability
 {
 }
 

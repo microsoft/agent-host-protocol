@@ -344,6 +344,10 @@ pub struct AutomationCapabilities {
     /// implementation-defined.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_history_limit: Option<i64>,
+    /// Present when {@link AutomationSessionTemplate.customizations} may contain
+    /// client plugins for the host to capture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub customizations: Option<AutomationCustomizationsCapability>,
 }
 
 /// Presence capability for {@link AutomationCreateRequestedAction |
@@ -377,6 +381,15 @@ pub struct AutomationScheduleCapabilities {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomationRunCancellationCapability {}
+
+/// Presence capability for
+/// {@link AutomationSessionTemplate.customizations | automation customizations}.
+///
+/// The empty object means "supported"; fields are reserved for future
+/// capture options and limits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutomationCustomizationsCapability {}
 
 /// Identifies a protocol implementation — the software (and build) on one end
 /// of the connection, as distinct from the {@link AgentInfo | agent persona} it

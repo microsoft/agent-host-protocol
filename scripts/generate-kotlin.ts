@@ -1728,6 +1728,7 @@ const COMMAND_STRUCTS = [
   'AutomationCreateCapability',
   'AutomationScheduleCapabilities',
   'AutomationRunCancellationCapability',
+  'AutomationCustomizationsCapability',
   'Implementation',
   'ReconnectParams', 'ReconnectReplayResult', 'ReconnectSnapshotResult',
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',

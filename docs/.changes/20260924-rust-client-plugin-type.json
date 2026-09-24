@@ -1,0 +1,5 @@
+{
+  "type": "fixed",
+  "message": "`ClientPluginCustomization` now serializes its `\"type\": \"plugin\"` discriminant, so plugins published in `SessionActiveClient.customizations` are no longer sent without `type`.",
+  "targets": ["rust"]
+}
