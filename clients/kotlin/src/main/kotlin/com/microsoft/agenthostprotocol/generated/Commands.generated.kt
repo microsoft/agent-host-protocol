@@ -431,7 +431,12 @@ data class AutomationCapabilities(
      * runs are not counted toward the limit. Absence means the retention limit is
      * implementation-defined.
      */
-    val runHistoryLimit: Long? = null
+    val runHistoryLimit: Long? = null,
+    /**
+     * Present when {@link AutomationSessionTemplate.customizations} may contain
+     * client plugins for the host to capture.
+     */
+    val customizations: AutomationCustomizationsCapability? = null
 )
 
 @Serializable
@@ -449,6 +454,9 @@ data class AutomationScheduleCapabilities(
 
 @Serializable
 class AutomationRunCancellationCapability
+
+@Serializable
+class AutomationCustomizationsCapability
 
 @Serializable
 data class Implementation(

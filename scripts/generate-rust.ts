@@ -609,6 +609,10 @@ function generateRustStruct(rustName: string, props: RustProp[], opts: StructOpt
       attrs.push('serialize_with = "serialize_running_tool_call"');
       attrs.push('deserialize_with = "deserialize_running_tool_call"');
     }
+    if (rustName === 'AutomationEntry' && p.rustName === 'customizations') {
+      attrs.push('serialize_with = "serialize_plugin_customizations"');
+      attrs.push('deserialize_with = "deserialize_plugin_customizations"');
+    }
     if (attrs.length > 0) {
       lines.push(`    #[serde(${attrs.join(', ')})]`);
     }
@@ -650,6 +654,56 @@ where
         return Err(serde::de::Error::custom("expected running tool-call status"));
     }
     serde_json::from_value(raw).map_err(serde::de::Error::custom)
+}`;
+}
+
+/**
+ * `PluginCustomization` omits its `type` discriminant because the
+ * `Customization` enum supplies it. Standalone plugin lists outside that enum
+ * (currently `AutomationEntry.customizations`) must restore it on the wire.
+ */
+function generatePluginCustomizationsSerdeHelpers(): string {
+  return `fn serialize_plugin_customizations<S>(
+    value: &Option<Vec<PluginCustomization>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let Some(items) = value else {
+        return serializer.serialize_none();
+    };
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let mut raw = serde_json::to_value(item).map_err(serde::ser::Error::custom)?;
+        let serde_json::Value::Object(object) = &mut raw else {
+            return Err(serde::ser::Error::custom("plugin customization must serialize to an object"));
+        };
+        object.insert("type".to_owned(), serde_json::Value::String("plugin".to_owned()));
+        out.push(raw);
+    }
+    serde::Serialize::serialize(&out, serializer)
+}
+
+fn deserialize_plugin_customizations<'de, D>(
+    deserializer: D,
+) -> Result<Option<Vec<PluginCustomization>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let Some(items) = Option::<Vec<serde_json::Value>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    items
+        .into_iter()
+        .map(|raw| {
+            if raw.get("type").and_then(serde_json::Value::as_str) != Some("plugin") {
+                return Err(serde::de::Error::custom("expected plugin customization type"));
+            }
+            serde_json::from_value(raw).map_err(serde::de::Error::custom)
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(Some)
 }`;
 }
 
@@ -880,7 +934,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: str
   { name: 'CustomizationDegradedState', omitDiscriminants: true },
   { name: 'CustomizationErrorState', omitDiscriminants: true },
   { name: 'PluginCustomization', omitDiscriminants: true },
-  { name: 'ClientPluginCustomization', omitDiscriminants: true },
+  { name: 'ClientPluginCustomization' },
   { name: 'DirectoryCustomization', omitDiscriminants: true },
   { name: 'AgentCustomization', omitDiscriminants: true },
   { name: 'SkillCustomization', omitDiscriminants: true },
@@ -1340,6 +1394,10 @@ function generateStateFile(project: Project): string {
         lines.push('');
         lines.push(generateRunningToolCallSerdeHelpers());
       }
+      if (entry.name === 'AutomationEntry') {
+        lines.push('');
+        lines.push(generatePluginCustomizationsSerdeHelpers());
+      }
       if (entry.name === 'SubscribeParams') {
         lines.push('');
         lines.push(generateSubscribeParamsImplRust());
@@ -1708,6 +1766,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; rustName?: s
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
+  { name: 'AutomationCustomizationsCapability' },
   { name: 'Implementation' },
   { name: 'ReconnectParams' },
   { name: 'ReconnectReplayResult', omitDiscriminants: true },

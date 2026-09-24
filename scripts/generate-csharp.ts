@@ -2090,6 +2090,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'AutomationCreateCapability' },
   { name: 'AutomationScheduleCapabilities' },
   { name: 'AutomationRunCancellationCapability' },
+  { name: 'AutomationCustomizationsCapability' },
   { name: 'ReconnectParams' },
   // Union variants MUST self-carry their `type` discriminator: UnionConverter<T>.Write
   // serializes the inner value by its runtime type and relies on that property to

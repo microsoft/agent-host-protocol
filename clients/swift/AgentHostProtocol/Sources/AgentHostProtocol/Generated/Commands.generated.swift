@@ -413,17 +413,22 @@ public struct AutomationCapabilities: Codable, Sendable {
     /// runs are not counted toward the limit. Absence means the retention limit is
     /// implementation-defined.
     public var runHistoryLimit: Int?
+    /// Present when {@link AutomationSessionTemplate.customizations} may contain
+    /// client plugins for the host to capture.
+    public var customizations: AutomationCustomizationsCapability?
 
     public init(
         create: AutomationCreateCapability? = nil,
         schedules: AutomationScheduleCapabilities? = nil,
         runCancellation: AutomationRunCancellationCapability? = nil,
-        runHistoryLimit: Int? = nil
+        runHistoryLimit: Int? = nil,
+        customizations: AutomationCustomizationsCapability? = nil
     ) {
         self.create = create
         self.schedules = schedules
         self.runCancellation = runCancellation
         self.runHistoryLimit = runHistoryLimit
+        self.customizations = customizations
     }
 }
 
@@ -449,6 +454,14 @@ public struct AutomationScheduleCapabilities: Codable, Sendable {
 }
 
 public struct AutomationRunCancellationCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
+    }
+}
+
+public struct AutomationCustomizationsCapability: Codable, Sendable {
 
     public init(
 

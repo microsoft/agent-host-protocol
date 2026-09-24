@@ -14,6 +14,7 @@ import type { AutomationCreateRequestedAction } from '../channels-automation/act
 import type {
   AutomationSchedule,
   AutomationScheduleTrigger,
+  AutomationSessionTemplate,
   AutomationEntry,
   AutomationState,
 } from '../channels-automation/state.js';
@@ -324,7 +325,23 @@ export interface AutomationCapabilities {
    * implementation-defined.
    */
   runHistoryLimit?: number;
+  /**
+   * Present when {@link AutomationSessionTemplate.customizations} may contain
+   * client plugins for the host to capture.
+   */
+  customizations?: AutomationCustomizationsCapability;
 }
+
+/**
+ * Presence capability for
+ * {@link AutomationSessionTemplate.customizations | automation customizations}.
+ *
+ * The empty object means "supported"; fields are reserved for future
+ * capture options and limits.
+ *
+ * @category Commands
+ */
+export interface AutomationCustomizationsCapability {}
 
 /**
  * Presence capability for {@link AutomationCreateRequestedAction |

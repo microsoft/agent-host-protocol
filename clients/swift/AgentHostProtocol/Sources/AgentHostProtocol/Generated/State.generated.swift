@@ -6310,19 +6310,45 @@ public struct AutomationSessionTemplate: Codable, Sendable {
     /// {@link CreateSessionParams.config}, normally obtained from
     /// {@link ResolveSessionConfigResult.values}.
     public var config: [String: AnyCodable]?
+    /// Client plugins to make available in every run session, in the same
+    /// published shape as
+    /// {@link SessionActiveClient.customizations | `activeClients[].customizations`}.
+    /// Entries are keyed by `id`.
+    ///
+    /// Runs usually start when no client is connected, so the host does not
+    /// resolve these URIs at run time. Instead, when it accepts a
+    /// {@link AutomationCreateRequestedAction | `automation/createRequested`} or
+    /// {@link AutomationUpdateRequestedAction | `automation/updateRequested`}
+    /// that adds an entry or changes an entry's `uri` or `nonce`, the host
+    /// captures a host-owned copy of the plugin. For client-served URIs such as
+    /// `virtual://…`, it reads the contents from the dispatching client with
+    /// server→client `resource*` requests. If a capture fails, the host rejects
+    /// the whole action. Entries whose `id`, `uri`, and `nonce` are unchanged keep
+    /// their existing copy, so any client can re-submit a template it received
+    /// without being able to serve the plugin itself. The resulting copies are
+    /// reported in {@link AutomationEntry.customizations}.
+    ///
+    /// The host MAY share one stored copy between entries with equal `uri` and
+    /// `nonce`, including across automations; this is not observable to clients.
+    ///
+    /// Clients MUST NOT set this field unless the host advertises
+    /// {@link AutomationCapabilities.customizations}.
+    public var customizations: [ClientPluginCustomization]?
 
     public init(
         provider: String? = nil,
         model: ModelSelection? = nil,
         agent: AgentSelection? = nil,
         workingDirectories: [String]? = nil,
-        config: [String: AnyCodable]? = nil
+        config: [String: AnyCodable]? = nil,
+        customizations: [ClientPluginCustomization]? = nil
     ) {
         self.provider = provider
         self.model = model
         self.agent = agent
         self.workingDirectories = workingDirectories
         self.config = config
+        self.customizations = customizations
     }
 }
 
@@ -6375,7 +6401,9 @@ public struct AutomationDefinitionPatch: Codable, Sendable {
     /// Replacement {@link AutomationDefinition.message}.
     public var message: Message?
     /// Replacement {@link AutomationDefinition.session}. The host revalidates
-    /// affected event triggers when their discovery context changes.
+    /// affected event triggers when their discovery context changes, and
+    /// captures {@link AutomationSessionTemplate.customizations} entries that
+    /// are new or whose `uri` or `nonce` changed.
     public var session: AutomationSessionTemplate?
     /// Replacement {@link AutomationDefinition.enabled}.
     public var enabled: Bool?
@@ -6426,6 +6454,20 @@ public struct AutomationEntry: Codable, Sendable {
     public var runsNextCursor: String?
     /// Operations currently permitted for this automation.
     public var operations: [AutomationOperation]
+    /// Host-owned copies of the plugins in
+    /// {@link AutomationSessionTemplate.customizations}, one per template entry
+    /// with the same `id`. Absent when the template has no customizations.
+    ///
+    /// Each copy's `uri` identifies the captured contents, which clients can
+    /// browse with `resourceRead`. `children` and `load` report what the host
+    /// found in that copy, independent of whether the originating client is
+    /// connected. `clientId` is absent because the copy no longer depends on a
+    /// client.
+    ///
+    /// Every run session receives these plugins in
+    /// {@link SessionState.customizations}, with the enablement from the
+    /// matching template entry.
+    public var customizations: [PluginCustomization]?
     /// Creation timestamp in ISO 8601 format.
     public var createdAt: String
     /// Last definition modification timestamp in ISO 8601 format.
@@ -6440,6 +6482,7 @@ public struct AutomationEntry: Codable, Sendable {
         case runs
         case runsNextCursor
         case operations
+        case customizations
         case createdAt
         case modifiedAt
         case meta = "_meta"
@@ -6452,6 +6495,7 @@ public struct AutomationEntry: Codable, Sendable {
         runs: [AutomationRunSummary],
         runsNextCursor: String? = nil,
         operations: [AutomationOperation],
+        customizations: [PluginCustomization]? = nil,
         createdAt: String,
         modifiedAt: String,
         meta: [String: AnyCodable]? = nil
@@ -6462,6 +6506,7 @@ public struct AutomationEntry: Codable, Sendable {
         self.runs = runs
         self.runsNextCursor = runsNextCursor
         self.operations = operations
+        self.customizations = customizations
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
         self.meta = meta
