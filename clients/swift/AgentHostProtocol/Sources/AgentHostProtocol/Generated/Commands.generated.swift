@@ -39,6 +39,35 @@ public enum ChatSourceKind: Codable, Sendable, Equatable {
     }
 }
 
+/// Destination kind for an atomic chat move.
+public enum ChatMoveDestinationKind: Codable, Sendable, Equatable {
+    /// Move the source chat under another chat.
+    case chat
+    /// Promote the source chat into a newly allocated top-level session.
+    case newSession
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "chat": self = .chat
+        case "newSession": self = .newSession
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .chat: try container.encode("chat")
+        case .newSession: try container.encode("newSession")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Encoding of fetched content data.
 public enum ContentEncoding: String, Codable, Sendable {
     case base64 = "base64"
@@ -803,6 +832,117 @@ public struct DisposeChatParams: Codable, Sendable {
     ) {
         self.channel = channel
         self.meta = meta
+    }
+}
+
+public struct ChatMoveToChatDestination: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChatMoveDestinationKind
+    /// Destination parent chat URI.
+    public var chat: String
+
+    public init(
+        kind: ChatMoveDestinationKind,
+        chat: String
+    ) {
+        self.kind = kind
+        self.chat = chat
+    }
+}
+
+public struct ChatMoveToNewSessionDestination: Codable, Sendable {
+    /// Discriminant
+    public var kind: ChatMoveDestinationKind
+
+    public init(
+        kind: ChatMoveDestinationKind
+    ) {
+        self.kind = kind
+    }
+}
+
+public struct MoveChatParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Atomic move destination.
+    public var destination: ChatMoveDestination
+    /// Durable client-generated idempotency key.
+    ///
+    /// Retrying the same logical request with the same `requestId`, source, and
+    /// destination MUST return the original {@link MoveChatResult}, including
+    /// after reconnect or an uncertain response. Reusing the key with a different
+    /// source or destination MUST be rejected with `InvalidParams`.
+    public var requestId: String
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case destination
+        case requestId
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        destination: ChatMoveDestination,
+        requestId: String
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.destination = destination
+        self.requestId = requestId
+    }
+}
+
+public struct MovedChatResource: Codable, Sendable {
+    /// Chat URI before the move.
+    public var previousChat: String
+    /// Authoritative chat URI after the move.
+    public var chat: String
+
+    public init(
+        previousChat: String,
+        chat: String
+    ) {
+        self.previousChat = previousChat
+        self.chat = chat
+    }
+}
+
+public struct MoveChatResult: Codable, Sendable {
+    /// Owning session URI before the move.
+    public var previousSession: String
+    /// Source chat URI before the move.
+    public var previousChat: String
+    /// Authoritative owning session URI after the move.
+    public var session: String
+    /// Authoritative requested root chat URI after the move.
+    public var chat: String
+    /// Exhaustive URI mapping for every chat in the moved subtree, including
+    /// entries whose URI was preserved.
+    ///
+    /// The first entry MUST map `previousChat` to `chat`. Remaining entries are
+    /// ordered in deterministic depth-first pre-order: every parent precedes its
+    /// descendants, and siblings retain their order from the source session's
+    /// `chats` catalog. Clients MUST apply the complete mapping atomically and
+    /// MUST NOT infer replacements for chats absent from this list.
+    public var movedChats: [MovedChatResource]
+
+    public init(
+        previousSession: String,
+        previousChat: String,
+        session: String,
+        chat: String,
+        movedChats: [MovedChatResource]
+    ) {
+        self.previousSession = previousSession
+        self.previousChat = previousChat
+        self.session = session
+        self.chat = chat
+        self.movedChats = movedChats
     }
 }
 
@@ -2123,6 +2263,42 @@ public enum ChatSource: Codable, Sendable {
         switch self {
         case .fork(let value): try value.encode(to: encoder)
         case .sideChat(let value): try value.encode(to: encoder)
+        case .unknown(let value): try value.encode(to: encoder)
+        }
+    }
+}
+
+public enum ChatMoveDestination: Codable, Sendable {
+    case chat(ChatMoveToChatDestination)
+    case newSession(ChatMoveToNewSessionDestination)
+    /// Unknown or future discriminant; the raw payload is preserved
+    /// and re-encoded verbatim for forward-compatibility.
+    case unknown(AnyCodable)
+
+    private enum DiscriminantKey: String, CodingKey {
+        case discriminant = "kind"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DiscriminantKey.self)
+        guard let discriminant = try container.decodeIfPresent(String.self, forKey: .discriminant) else {
+            self = .unknown(try AnyCodable(from: decoder))
+            return
+        }
+        switch discriminant {
+        case "chat":
+            self = .chat(try ChatMoveToChatDestination(from: decoder))
+        case "newSession":
+            self = .newSession(try ChatMoveToNewSessionDestination(from: decoder))
+        default:
+            self = .unknown(try AnyCodable(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .chat(let value): try value.encode(to: encoder)
+        case .newSession(let value): try value.encode(to: encoder)
         case .unknown(let value): try value.encode(to: encoder)
         }
     }

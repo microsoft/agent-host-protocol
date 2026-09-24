@@ -134,6 +134,39 @@ type ProgressParams struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// Sent on each previous moved chat channel after an atomic `moveChat` commit.
+//
+// Every notification for one move carries the same authoritative resources and
+// exhaustive ordered `movedChats` mapping as {@link MoveChatResult}. The host
+// emits them in `movedChats` order on each old channel whose ownership or URI
+// changed. The move is already atomically committed before the first
+// notification; ordering is only a deterministic delivery aid, not the
+// transaction boundary.
+//
+// A client receiving any one notification MUST apply the complete mapping
+// atomically, stop dispatching to replaced old URIs, subscribe to the
+// authoritative session and chat channels as needed, and reconcile from their
+// snapshots. Duplicate notifications for the same mapping are idempotent.
+// Durable hierarchy and catalog truth remain in `ChatState.parentChat` and the
+// affected sessions' catalogs; this routing handoff is not replayed.
+type ChatMovedParams struct {
+	// Previous channel receiving this notification; names one `movedChats[].previousChat`.
+	Channel URI `json:"channel"`
+	// Owning session URI before the move.
+	PreviousSession URI `json:"previousSession"`
+	// Requested root chat URI before the move.
+	PreviousChat URI `json:"previousChat"`
+	// Authoritative owning session URI after the move.
+	Session URI `json:"session"`
+	// Authoritative requested root chat URI after the move.
+	Chat URI `json:"chat"`
+	// Exhaustive ordered mapping for the complete moved subtree.
+	//
+	// Identical in every `chat/moved` notification for this move and in the
+	// corresponding {@link MoveChatResult}.
+	MovedChats []MovedChatResource `json:"movedChats"`
+}
+
 // Sent by the server when a protected resource requires (re-)authentication.
 //
 // This notification MAY be associated with any channel — for example, an
