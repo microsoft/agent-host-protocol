@@ -386,6 +386,11 @@ type ChatToolCallReadyAction struct {
 	Editable *bool `json:"editable,omitempty"`
 	// If set, the tool was auto-confirmed and transitions directly to `running`
 	Confirmed *ToolCallConfirmationReason `json:"confirmed,omitempty"`
+	// ISO 8601 timestamp when tool execution first started.
+	//
+	// Set when `confirmed` transitions a tool call into `running`. When resuming
+	// after re-confirmation, repeat the original execution start timestamp.
+	StartedAt *string `json:"startedAt,omitempty"`
 	// Options the server offers for this confirmation. When present, the client
 	// SHOULD render these instead of a plain approve/deny UI. Each option
 	// belongs to a {@link ConfirmationOptionGroup} so the client can still
@@ -402,6 +407,7 @@ type ChatToolCallConfirmedAction struct {
 	Meta             map[string]json.RawMessage  `json:"_meta,omitempty"`
 	Approved         bool                        `json:"approved"`
 	Confirmed        *ToolCallConfirmationReason `json:"confirmed,omitempty"`
+	StartedAt        *string                     `json:"startedAt,omitempty"`
 	Reason           *ToolCallCancellationReason `json:"reason,omitempty"`
 	EditedToolInput  *string                     `json:"editedToolInput,omitempty"`
 	UserSuggestion   *Message                    `json:"userSuggestion,omitempty"`
@@ -451,6 +457,14 @@ type ChatToolCallCompleteAction struct {
 	Type ActionType                 `json:"type"`
 	// Execution result
 	Result ToolCallResult `json:"result"`
+	// Elapsed tool execution duration in milliseconds, measured by the
+	// producer's own clock. Clients MUST NOT derive this by subtracting
+	// timestamps — cross-client clocks may differ — and MUST treat it as
+	// opaque, producer-supplied data.
+	//
+	// When both timing fields are available, the execution completion timestamp
+	// is the tool call state's `startedAt` plus `duration`.
+	Duration *int64 `json:"duration,omitempty"`
 	// If true, the result requires client approval before finalizing
 	RequiresResultConfirmation *bool `json:"requiresResultConfirmation,omitempty"`
 }

@@ -3965,11 +3965,25 @@
         "selectedOption": {
           "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
         }
       },
       "required": [
         "confirmed"
       ]
+    },
+    "ToolCallCompletedTimingFields": {
+      "type": "object",
+      "description": "Timing available after tool execution finishes.",
+      "properties": {
+        "duration": {
+          "type": "integer",
+          "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
+        }
+      }
     },
     "ToolCallRunningState": {
       "type": "object",
@@ -4015,6 +4029,10 @@
         "selectedOption": {
           "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
         },
         "status": {
           "const": "running"
@@ -4080,6 +4098,10 @@
         "selectedOption": {
           "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
         },
         "status": {
           "const": "auth-required"
@@ -4187,6 +4209,14 @@
           "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
         },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
+        },
+        "duration": {
+          "type": "integer",
+          "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
+        },
         "status": {
           "const": "pending-result-confirmation"
         }
@@ -4281,6 +4311,14 @@
         "selectedOption": {
           "$ref": "#/$defs/ConfirmationOption",
           "description": "The confirmation option the user selected, if confirmation options were provided"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when tool execution first started.\n\nAbsent when timing was not reported by the producer."
+        },
+        "duration": {
+          "type": "integer",
+          "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock.\n\nAvailable after execution finishes when reported by the producer. Clients\nMUST NOT derive this by subtracting timestamps — cross-client clocks may\ndiffer — and MUST treat it as opaque, producer-supplied data. When both\ntiming fields are available, the execution completion timestamp is\n`startedAt + duration`."
         },
         "status": {
           "const": "completed"
@@ -9339,6 +9377,10 @@
           "$ref": "#/$defs/ToolCallConfirmationReason",
           "description": "If set, the tool was auto-confirmed and transitions directly to `running`"
         },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when tool execution first started.\n\nSet when `confirmed` transitions a tool call into `running`. When resuming\nafter re-confirmation, repeat the original execution start timestamp."
+        },
         "options": {
           "type": "array",
           "items": {
@@ -9388,6 +9430,10 @@
         "result": {
           "$ref": "#/$defs/ToolCallResult",
           "description": "Execution result"
+        },
+        "duration": {
+          "type": "integer",
+          "description": "Elapsed tool execution duration in milliseconds, measured by the\nproducer's own clock. Clients MUST NOT derive this by subtracting\ntimestamps — cross-client clocks may differ — and MUST treat it as\nopaque, producer-supplied data.\n\nWhen both timing fields are available, the execution completion timestamp\nis the tool call state's `startedAt` plus `duration`."
         },
         "requiresResultConfirmation": {
           "type": "boolean",
@@ -9974,7 +10020,7 @@
     },
     "ChangesetStatusChangedAction": {
       "type": "object",
-      "description": "The {@link ChangesetState.status} for this changeset transitioned (e.g.\n`computing → ready` or `ready → recomputing`). The error payload is set\ntogether with `status` whenever it transitions to\n{@link ChangesetStatus.Error | Error}.",
+      "description": "The {@link ChangesetState.status} for this changeset transitioned (e.g.\n`computing → ready` or `recomputing → ready`). The error payload is set\ntogether with `status` whenever it transitions to\n{@link ChangesetStatus.Error | Error}.",
       "properties": {
         "type": {
           "const": "changeset/statusChanged"
@@ -10657,6 +10703,10 @@
         "confirmed": {
           "$ref": "#/$defs/ToolCallConfirmationReason",
           "description": "How the tool was confirmed"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when tool execution first started.\n\nSet when this approval transitions a tool call into `running`. When\nresuming after re-confirmation, repeat the original execution start\ntimestamp."
         },
         "editedToolInput": {
           "type": "string",

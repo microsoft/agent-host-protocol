@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Tool call execution states now expose producer-reported `startedAt` and `duration` timing."
+}

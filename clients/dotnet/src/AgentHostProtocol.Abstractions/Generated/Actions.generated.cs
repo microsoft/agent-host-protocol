@@ -1337,6 +1337,13 @@ public sealed record ChatToolCallReadyAction
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ToolCallConfirmationReason? Confirmed { get; init; }
 
+    /// <summary>ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Set when `confirmed` transitions a tool call into `running`. When resuming
+    /// after re-confirmation, repeat the original execution start timestamp.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
     /// <summary>Options the server offers for this confirmation. When present, the client
     /// SHOULD render these instead of a plain approve/deny UI. Each option
     /// belongs to a {@link ConfirmationOptionGroup} so the client can still
@@ -1366,6 +1373,9 @@ public sealed record ChatToolCallConfirmedAction
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ToolCallConfirmationReason? Confirmed { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ToolCallCancellationReason? Reason { get; init; }
@@ -1432,6 +1442,16 @@ public sealed record ChatToolCallCompleteAction
 
     /// <summary>Execution result</summary>
     public required ToolCallResult Result { get; init; }
+
+    /// <summary>Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock. Clients MUST NOT derive this by subtracting
+    /// timestamps — cross-client clocks may differ — and MUST treat it as
+    /// opaque, producer-supplied data.
+    ///
+    /// When both timing fields are available, the execution completion timestamp
+    /// is the tool call state's `startedAt` plus `duration`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; init; }
 
     /// <summary>If true, the result requires client approval before finalizing</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

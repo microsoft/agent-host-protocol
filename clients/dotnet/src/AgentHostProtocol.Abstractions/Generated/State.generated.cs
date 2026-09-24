@@ -2908,6 +2908,12 @@ public sealed class ToolCallRunningState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; set; }
 
+    /// <summary>ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; set; }
+
     public ToolCallStatus Status { get; set; }
 
     /// <summary>Partial content produced while the tool is still executing.
@@ -2991,6 +2997,12 @@ public sealed record ToolCallAuthRequiredState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
 
+    /// <summary>ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
     public ToolCallStatus Status { get; init; }
 
     /// <summary>The authentication challenge blocking this invocation.</summary>
@@ -3071,6 +3083,23 @@ public sealed record ToolCallPendingResultConfirmationState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
 
+    /// <summary>ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
+    /// <summary>Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock.
+    ///
+    /// Available after execution finishes when reported by the producer. Clients
+    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
+    /// differ — and MUST treat it as opaque, producer-supplied data. When both
+    /// timing fields are available, the execution completion timestamp is
+    /// `startedAt + duration`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; init; }
+
     public ToolCallStatus Status { get; init; }
 }
 
@@ -3143,6 +3172,23 @@ public sealed record ToolCallCompletedState
     /// <summary>The confirmation option the user selected, if confirmation options were provided</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
+
+    /// <summary>ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? StartedAt { get; init; }
+
+    /// <summary>Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock.
+    ///
+    /// Available after execution finishes when reported by the producer. Clients
+    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
+    /// differ — and MUST treat it as opaque, producer-supplied data. When both
+    /// timing fields are available, the execution completion timestamp is
+    /// `startedAt + duration`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Duration { get; init; }
 
     public ToolCallStatus Status { get; init; }
 }

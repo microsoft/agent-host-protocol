@@ -1467,6 +1467,14 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
 function generateMergedToolCallConfirmedStruct(scope: 'Session' | 'Chat' = 'Session'): string {
   const className = `${scope}ToolCallConfirmedAction`;
   const wireType = scope === 'Chat' ? 'chat/toolCallConfirmed' : 'session/toolCallConfirmed';
+  const startedAtProperty = scope === 'Chat'
+    ? `    /// ISO 8601 timestamp when tool execution first started
+    public var startedAt: String?
+`
+    : '';
+  const startedAtCodingKey = scope === 'Chat' ? ', startedAt' : '';
+  const startedAtParameter = scope === 'Chat' ? '        startedAt: String? = nil,\n' : '';
+  const startedAtAssignment = scope === 'Chat' ? '        self.startedAt = startedAt\n' : '';
   return `/// Client approves or denies a pending tool call (merged approved + denied variants).
 public struct ${className}: Codable, Sendable {
     /// Action type discriminant
@@ -1479,7 +1487,7 @@ public struct ${className}: Codable, Sendable {
     public var approved: Bool
     /// How the tool was confirmed (present when approved)
     public var confirmed: ToolCallConfirmationReason?
-    /// Edited tool input parameters, if the client modified them before confirming
+${startedAtProperty}    /// Edited tool input parameters, if the client modified them before confirming
     public var editedToolInput: String?
     /// Why the tool was cancelled (present when denied)
     public var reason: ToolCallCancellationReason?
@@ -1493,7 +1501,7 @@ public struct ${className}: Codable, Sendable {
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
-        case type, turnId, toolCallId, approved, confirmed, editedToolInput, reason, userSuggestion, reasonMessage, selectedOptionId
+        case type, turnId, toolCallId, approved, confirmed${startedAtCodingKey}, editedToolInput, reason, userSuggestion, reasonMessage, selectedOptionId
         case meta = "_meta"
     }
 
@@ -1503,7 +1511,7 @@ public struct ${className}: Codable, Sendable {
         toolCallId: String,
         approved: Bool,
         confirmed: ToolCallConfirmationReason? = nil,
-        editedToolInput: String? = nil,
+${startedAtParameter}        editedToolInput: String? = nil,
         reason: ToolCallCancellationReason? = nil,
         userSuggestion: Message? = nil,
         reasonMessage: StringOrMarkdown? = nil,
@@ -1515,7 +1523,7 @@ public struct ${className}: Codable, Sendable {
         self.toolCallId = toolCallId
         self.approved = approved
         self.confirmed = confirmed
-        self.editedToolInput = editedToolInput
+${startedAtAssignment}        self.editedToolInput = editedToolInput
         self.reason = reason
         self.userSuggestion = userSuggestion
         self.reasonMessage = reasonMessage

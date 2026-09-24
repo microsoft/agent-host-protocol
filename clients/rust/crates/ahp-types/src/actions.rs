@@ -724,6 +724,12 @@ pub struct ChatToolCallReadyAction {
     /// If set, the tool was auto-confirmed and transitions directly to `running`
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirmed: Option<ToolCallConfirmationReason>,
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Set when `confirmed` transitions a tool call into `running`. When resuming
+    /// after re-confirmation, repeat the original execution start timestamp.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
     /// Options the server offers for this confirmation. When present, the client
     /// SHOULD render these instead of a plain approve/deny UI. Each option
     /// belongs to a {@link ConfirmationOptionGroup} so the client can still
@@ -746,6 +752,9 @@ pub struct ChatToolCallConfirmedAction {
     /// How the tool was confirmed (present when approved).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confirmed: Option<ToolCallConfirmationReason>,
+    /// ISO 8601 timestamp when tool execution first started.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
     /// Why the tool was cancelled (present when denied).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<ToolCallCancellationReason>,
@@ -807,6 +816,15 @@ pub struct ChatToolCallCompleteAction {
     pub meta: Option<JsonObject>,
     /// Execution result
     pub result: ToolCallResult,
+    /// Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock. Clients MUST NOT derive this by subtracting
+    /// timestamps — cross-client clocks may differ — and MUST treat it as
+    /// opaque, producer-supplied data.
+    ///
+    /// When both timing fields are available, the execution completion timestamp
+    /// is the tool call state's `startedAt` plus `duration`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
     /// If true, the result requires client approval before finalizing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requires_result_confirmation: Option<bool>,

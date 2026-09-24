@@ -726,6 +726,11 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
     public var editable: Bool?
     /// If set, the tool was auto-confirmed and transitions directly to `running`
     public var confirmed: ToolCallConfirmationReason?
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Set when `confirmed` transitions a tool call into `running`. When resuming
+    /// after re-confirmation, repeat the original execution start timestamp.
+    public var startedAt: String?
     /// Options the server offers for this confirmation. When present, the client
     /// SHOULD render these instead of a plain approve/deny UI. Each option
     /// belongs to a {@link ConfirmationOptionGroup} so the client can still
@@ -746,6 +751,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         case edits
         case editable
         case confirmed
+        case startedAt
         case options
     }
 
@@ -763,6 +769,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         edits: FileEditCollection? = nil,
         editable: Bool? = nil,
         confirmed: ToolCallConfirmationReason? = nil,
+        startedAt: String? = nil,
         options: [ConfirmationOption]? = nil
     ) {
         self.turnId = turnId
@@ -778,6 +785,7 @@ public struct ChatToolCallReadyAction: Codable, Sendable {
         self.edits = edits
         self.editable = editable
         self.confirmed = confirmed
+        self.startedAt = startedAt
         self.options = options
     }
 }
@@ -794,6 +802,8 @@ public struct ChatToolCallConfirmedAction: Codable, Sendable {
     public var approved: Bool
     /// How the tool was confirmed (present when approved)
     public var confirmed: ToolCallConfirmationReason?
+    /// ISO 8601 timestamp when tool execution first started
+    public var startedAt: String?
     /// Edited tool input parameters, if the client modified them before confirming
     public var editedToolInput: String?
     /// Why the tool was cancelled (present when denied)
@@ -808,7 +818,7 @@ public struct ChatToolCallConfirmedAction: Codable, Sendable {
     public var meta: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
-        case type, turnId, toolCallId, approved, confirmed, editedToolInput, reason, userSuggestion, reasonMessage, selectedOptionId
+        case type, turnId, toolCallId, approved, confirmed, startedAt, editedToolInput, reason, userSuggestion, reasonMessage, selectedOptionId
         case meta = "_meta"
     }
 
@@ -818,6 +828,7 @@ public struct ChatToolCallConfirmedAction: Codable, Sendable {
         toolCallId: String,
         approved: Bool,
         confirmed: ToolCallConfirmationReason? = nil,
+        startedAt: String? = nil,
         editedToolInput: String? = nil,
         reason: ToolCallCancellationReason? = nil,
         userSuggestion: Message? = nil,
@@ -830,6 +841,7 @@ public struct ChatToolCallConfirmedAction: Codable, Sendable {
         self.toolCallId = toolCallId
         self.approved = approved
         self.confirmed = confirmed
+        self.startedAt = startedAt
         self.editedToolInput = editedToolInput
         self.reason = reason
         self.userSuggestion = userSuggestion
@@ -854,6 +866,14 @@ public struct ChatToolCallCompleteAction: Codable, Sendable {
     public var type: ActionType
     /// Execution result
     public var result: ToolCallResult
+    /// Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock. Clients MUST NOT derive this by subtracting
+    /// timestamps — cross-client clocks may differ — and MUST treat it as
+    /// opaque, producer-supplied data.
+    ///
+    /// When both timing fields are available, the execution completion timestamp
+    /// is the tool call state's `startedAt` plus `duration`.
+    public var duration: Int?
     /// If true, the result requires client approval before finalizing
     public var requiresResultConfirmation: Bool?
 
@@ -863,6 +883,7 @@ public struct ChatToolCallCompleteAction: Codable, Sendable {
         case meta = "_meta"
         case type
         case result
+        case duration
         case requiresResultConfirmation
     }
 
@@ -872,6 +893,7 @@ public struct ChatToolCallCompleteAction: Codable, Sendable {
         meta: [String: AnyCodable]? = nil,
         type: ActionType,
         result: ToolCallResult,
+        duration: Int? = nil,
         requiresResultConfirmation: Bool? = nil
     ) {
         self.turnId = turnId
@@ -879,6 +901,7 @@ public struct ChatToolCallCompleteAction: Codable, Sendable {
         self.meta = meta
         self.type = type
         self.result = result
+        self.duration = duration
         self.requiresResultConfirmation = requiresResultConfirmation
     }
 }

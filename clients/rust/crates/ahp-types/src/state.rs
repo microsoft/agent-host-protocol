@@ -3430,6 +3430,11 @@ pub struct ToolCallRunningState {
     /// The confirmation option the user selected, if confirmation options were provided
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_option: Option<ConfirmationOption>,
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
     /// Partial content produced while the tool is still executing.
     ///
     /// For example, a terminal content block lets clients subscribe to live
@@ -3502,6 +3507,11 @@ pub struct ToolCallAuthRequiredState {
     /// The confirmation option the user selected, if confirmation options were provided
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_option: Option<ConfirmationOption>,
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
     pub status: ToolCallStatus,
     /// The authentication challenge blocking this invocation.
     pub auth: McpAuthRequirement,
@@ -3565,6 +3575,21 @@ pub struct ToolCallPendingResultConfirmationState {
     /// The confirmation option the user selected, if confirmation options were provided
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_option: Option<ConfirmationOption>,
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock.
+    ///
+    /// Available after execution finishes when reported by the producer. Clients
+    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
+    /// differ — and MUST treat it as opaque, producer-supplied data. When both
+    /// timing fields are available, the execution completion timestamp is
+    /// `startedAt + duration`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
 }
 
 /// Tool completed successfully or with an error.
@@ -3622,6 +3647,21 @@ pub struct ToolCallCompletedState {
     /// The confirmation option the user selected, if confirmation options were provided
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_option: Option<ConfirmationOption>,
+    /// ISO 8601 timestamp when tool execution first started.
+    ///
+    /// Absent when timing was not reported by the producer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// Elapsed tool execution duration in milliseconds, measured by the
+    /// producer's own clock.
+    ///
+    /// Available after execution finishes when reported by the producer. Clients
+    /// MUST NOT derive this by subtracting timestamps — cross-client clocks may
+    /// differ — and MUST treat it as opaque, producer-supplied data. When both
+    /// timing fields are available, the execution completion timestamp is
+    /// `startedAt + duration`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
 }
 
 /// Tool call was cancelled before execution.
