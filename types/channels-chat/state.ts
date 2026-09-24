@@ -86,6 +86,13 @@ export interface ChatState {
    * obtain it by subscribing to the chat channel.
    */
   changesets?: Changeset[];
+  /**
+   * Live canvases currently exposed by this chat.
+   *
+   * Canvas sources are resolved separately and are intentionally absent from
+   * synchronized state.
+   */
+  canvases?: CanvasInstance[];
 
   // ── Conversation contents ──────────────────────────────────────────
   /** Completed turns */
@@ -123,6 +130,37 @@ export interface ChatState {
    * Additional provider-specific metadata for this chat.
    */
   _meta?: Record<string, unknown>;
+}
+
+/**
+ * Availability of a live canvas instance.
+ * @nonexhaustive
+ */
+export const enum CanvasAvailability {
+  /** The provider currently has a source that can be resolved. */
+  Ready = 'ready',
+  /** The provider is temporarily unavailable. */
+  Unavailable = 'unavailable',
+}
+
+/** A canvas instance opened by the model for this chat. */
+export interface CanvasInstance {
+  /** Stable caller-supplied instance identifier. */
+  instanceId: string;
+  /** Owning extension/provider identifier. */
+  extensionId: string;
+  /** Owning extension display name, when available. */
+  extensionName?: string;
+  /** Provider-local canvas type identifier. */
+  canvasId: string;
+  /** Provider-supplied title, when available. */
+  title?: string;
+  /** Provider-supplied status text, when available. */
+  status?: string;
+  /** Monotonic instance revision used to fence source resolution. */
+  revision: number;
+  /** Whether the live provider can currently resolve a source. */
+  availability: CanvasAvailability;
 }
 
 /**

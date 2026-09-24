@@ -15,14 +15,14 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::state::{
     AgentInfo, AgentSelection, Annotation, AnnotationEntry, AnnotationOrigin, AutomationDefinition,
     AutomationDefinitionPatch, AutomationEntry, AutomationRunLifecycle, AutomationRunSummary,
-    Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus, ChangesetStatus,
-    ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity, ChatOrigin,
-    ChatSummary, ConfirmationOption, ContentRef, Customization, CustomizationEnablement, ErrorInfo,
-    ErrorResponsePart, FileEditCollection, McpAuthRequirement, McpServerState, Message,
-    ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient, SessionInputRequest,
-    SideChatSelection, TerminalClaim, TerminalInfo, TextRange, ToolCallCancellationReason,
-    ToolCallConfirmationReason, ToolCallContributor, ToolCallResult, ToolCallRiskAssessment,
-    ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
+    CanvasInstance, Changeset, ChangesetFile, ChangesetOperation, ChangesetOperationStatus,
+    ChangesetStatus, ChatInputAnswer, ChatInputRequest, ChatInputResponseKind, ChatInteractivity,
+    ChatOrigin, ChatSummary, ConfirmationOption, ContentRef, Customization,
+    CustomizationEnablement, ErrorInfo, ErrorResponsePart, FileEditCollection, McpAuthRequirement,
+    McpServerState, Message, ModelSelection, PendingMessageKind, ResponsePart, SessionActiveClient,
+    SessionInputRequest, SideChatSelection, TerminalClaim, TerminalInfo, TextRange,
+    ToolCallCancellationReason, ToolCallConfirmationReason, ToolCallContributor, ToolCallResult,
+    ToolCallRiskAssessment, ToolDefinition, ToolInput, ToolResultContent, Turn, UsageInfo,
 };
 
 // ─── ActionType ──────────────────────────────────────────────────────
@@ -56,6 +56,7 @@ pub enum ActionType {
     ChatTurnResume,
     ChatActivityChanged,
     ChatChangesetsChanged,
+    ChatCanvasesChanged,
     ChatWorkingDirectorySet,
     ChatWorkingDirectoryRemoved,
     SessionTitleChanged,
@@ -173,6 +174,7 @@ impl serde::Serialize for ActionType {
             Self::ChatTurnResume => serializer.serialize_str("chat/turnResume"),
             Self::ChatActivityChanged => serializer.serialize_str("chat/activityChanged"),
             Self::ChatChangesetsChanged => serializer.serialize_str("chat/changesetsChanged"),
+            Self::ChatCanvasesChanged => serializer.serialize_str("chat/canvasesChanged"),
             Self::ChatWorkingDirectorySet => serializer.serialize_str("chat/workingDirectorySet"),
             Self::ChatWorkingDirectoryRemoved => {
                 serializer.serialize_str("chat/workingDirectoryRemoved")
@@ -338,6 +340,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "chat/turnResume" => Self::ChatTurnResume,
             "chat/activityChanged" => Self::ChatActivityChanged,
             "chat/changesetsChanged" => Self::ChatChangesetsChanged,
+            "chat/canvasesChanged" => Self::ChatCanvasesChanged,
             "chat/workingDirectorySet" => Self::ChatWorkingDirectorySet,
             "chat/workingDirectoryRemoved" => Self::ChatWorkingDirectoryRemoved,
             "session/titleChanged" => Self::SessionTitleChanged,
@@ -1072,6 +1075,18 @@ pub struct ChatChangesetsChangedAction {
     /// New catalogue, or `undefined` to clear it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changesets: Option<Vec<Changeset>>,
+}
+
+/// The live canvas instances exposed by this chat changed.
+///
+/// Replaces {@link ChatState.canvases | `state.canvases`} entirely. Set to
+/// `undefined` to clear the collection.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatCanvasesChangedAction {
+    /// New canvas collection, or `undefined` to clear it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<Vec<CanvasInstance>>,
 }
 
 /// Session title updated. Fired by the server when the title is auto-generated
@@ -2309,6 +2324,8 @@ pub enum StateAction {
     ChatActivityChanged(ChatActivityChangedAction),
     #[serde(rename = "chat/changesetsChanged")]
     ChatChangesetsChanged(ChatChangesetsChangedAction),
+    #[serde(rename = "chat/canvasesChanged")]
+    ChatCanvasesChanged(ChatCanvasesChangedAction),
     #[serde(rename = "session/titleChanged")]
     SessionTitleChanged(SessionTitleChangedAction),
     #[serde(rename = "chat/usage")]

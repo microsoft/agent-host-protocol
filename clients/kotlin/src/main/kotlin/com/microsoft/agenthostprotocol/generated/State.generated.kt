@@ -247,6 +247,34 @@ enum class ChatInteractivity {
 }
 
 /**
+ * Availability of a live canvas instance.
+ */
+@Serializable(with = CanvasAvailabilitySerializer::class)
+@JvmInline
+value class CanvasAvailability(val rawValue: String) {
+    companion object {
+        /**
+         * The provider currently has a source that can be resolved.
+         */
+        val READY: CanvasAvailability = CanvasAvailability("ready")
+        /**
+         * The provider is temporarily unavailable.
+         */
+        val UNAVAILABLE: CanvasAvailability = CanvasAvailability("unavailable")
+    }
+}
+
+internal object CanvasAvailabilitySerializer : KSerializer<CanvasAvailability> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("CanvasAvailability", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: CanvasAvailability) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): CanvasAvailability =
+        CanvasAvailability(decoder.decodeString())
+}
+
+/**
  * Answer lifecycle state.
  */
 @Serializable
@@ -1359,6 +1387,10 @@ data class AgentInfo(
 @Serializable
 data class AgentCapabilities(
     /**
+     * The agent can expose live canvases opened by its model tools.
+     */
+    val canvases: CanvasCapability? = null,
+    /**
      * The agent can host more than one concurrent chat per session. When absent,
      * clients MUST NOT call `createChat` to open chats beyond the default one the
      * session starts with. An empty object `{}` advertises multi-chat without
@@ -1378,6 +1410,9 @@ data class AgentCapabilities(
      */
     val multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = null
 )
+
+@Serializable
+class CanvasCapability
 
 @Serializable
 data class MultipleChatsCapability(
@@ -1650,6 +1685,13 @@ data class ChatState(
      */
     val changesets: List<Changeset>? = null,
     /**
+     * Live canvases currently exposed by this chat.
+     *
+     * Canvas sources are resolved separately and are intentionally absent from
+     * synchronized state.
+     */
+    val canvases: List<CanvasInstance>? = null,
+    /**
      * Completed turns
      */
     val turns: List<Turn>,
@@ -1752,6 +1794,42 @@ data class SideChatSelection(
      * recompute `text`.
      */
     val responsePartId: String? = null
+)
+
+@Serializable
+data class CanvasInstance(
+    /**
+     * Stable caller-supplied instance identifier.
+     */
+    val instanceId: String,
+    /**
+     * Owning extension/provider identifier.
+     */
+    val extensionId: String,
+    /**
+     * Owning extension display name, when available.
+     */
+    val extensionName: String? = null,
+    /**
+     * Provider-local canvas type identifier.
+     */
+    val canvasId: String,
+    /**
+     * Provider-supplied title, when available.
+     */
+    val title: String? = null,
+    /**
+     * Provider-supplied status text, when available.
+     */
+    val status: String? = null,
+    /**
+     * Monotonic instance revision used to fence source resolution.
+     */
+    val revision: Long,
+    /**
+     * Whether the live provider can currently resolve a source.
+     */
+    val availability: CanvasAvailability
 )
 
 @Serializable

@@ -1898,6 +1898,48 @@ public struct CompletionsResult: Codable, Sendable {
     }
 }
 
+public struct ResolveCanvasSourceParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Canvas instance identifier from the subscribed chat state.
+    public var instanceId: String
+    /// Expected canvas revision.
+    public var revision: Int
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case instanceId
+        case revision
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        instanceId: String,
+        revision: Int
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.instanceId = instanceId
+        self.revision = revision
+    }
+}
+
+public struct ResolveCanvasSourceResult: Codable, Sendable {
+    /// HTTP(S) URL supplied by the live canvas provider.
+    public var url: String
+
+    public init(
+        url: String
+    ) {
+        self.url = url
+    }
+}
+
 public struct InvokeChangesetOperationParams: Codable, Sendable {
     /// Channel URI this command targets.
     public var channel: String

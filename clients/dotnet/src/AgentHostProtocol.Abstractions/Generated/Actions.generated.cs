@@ -65,6 +65,8 @@ public enum ActionType
     ChatActivityChanged,
     [WireValue("chat/changesetsChanged")]
     ChatChangesetsChanged,
+    [WireValue("chat/canvasesChanged")]
+    ChatCanvasesChanged,
     [WireValue("chat/workingDirectorySet")]
     ChatWorkingDirectorySet,
     [WireValue("chat/workingDirectoryRemoved")]
@@ -1723,6 +1725,19 @@ public sealed record ChatChangesetsChangedAction
     public List<Changeset>? Changesets { get; init; }
 }
 
+/// <summary>The live canvas instances exposed by this chat changed.
+///
+/// Replaces {@link ChatState.canvases | `state.canvases`} entirely. Set to
+/// `undefined` to clear the collection.</summary>
+public sealed record ChatCanvasesChangedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>New canvas collection, or `undefined` to clear it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<CanvasInstance>? Canvases { get; init; }
+}
+
 /// <summary>A working directory was added to this chat's
 /// {@link ChatState.workingDirectories} subset.
 ///
@@ -2684,6 +2699,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/turnResume"] = typeof(ChatTurnResumeAction),
         ["chat/activityChanged"] = typeof(ChatActivityChangedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
+        ["chat/canvasesChanged"] = typeof(ChatCanvasesChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),
         ["chat/usage"] = typeof(ChatUsageAction),

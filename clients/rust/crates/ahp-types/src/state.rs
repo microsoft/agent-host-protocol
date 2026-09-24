@@ -234,6 +234,44 @@ pub enum ChatInteractivity {
     Hidden,
 }
 
+/// Availability of a live canvas instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CanvasAvailability {
+    /// The provider currently has a source that can be resolved.
+    Ready,
+    /// The provider is temporarily unavailable.
+    Unavailable,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for CanvasAvailability {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Ready => serializer.serialize_str("ready"),
+            Self::Unavailable => serializer.serialize_str("unavailable"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CanvasAvailability {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "ready" => Self::Ready,
+            "unavailable" => Self::Unavailable,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Answer lifecycle state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ChatInputAnswerState {
@@ -1640,6 +1678,9 @@ pub struct AgentInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentCapabilities {
+    /// The agent can expose live canvases opened by its model tools.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<CanvasCapability>,
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1658,6 +1699,11 @@ pub struct AgentCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multiple_working_directories: Option<MultipleWorkingDirectoriesCapability>,
 }
+
+/// Presence-only capability for agent-owned canvases.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasCapability {}
 
 /// Options for the {@link AgentCapabilities.multipleChats} capability.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -1921,6 +1967,12 @@ pub struct ChatState {
     /// obtain it by subscribing to the chat channel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changesets: Option<Vec<Changeset>>,
+    /// Live canvases currently exposed by this chat.
+    ///
+    /// Canvas sources are resolved separately and are intentionally absent from
+    /// synchronized state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canvases: Option<Vec<CanvasInstance>>,
     /// Completed turns
     pub turns: Vec<Turn>,
     /// Cursor for loading older completed turns into this chat state.
@@ -1956,6 +2008,31 @@ pub struct ChatState {
     /// Additional provider-specific metadata for this chat.
     #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<JsonObject>,
+}
+
+/// A canvas instance opened by the model for this chat.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasInstance {
+    /// Stable caller-supplied instance identifier.
+    pub instance_id: String,
+    /// Owning extension/provider identifier.
+    pub extension_id: String,
+    /// Owning extension display name, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extension_name: Option<String>,
+    /// Provider-local canvas type identifier.
+    pub canvas_id: String,
+    /// Provider-supplied title, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Provider-supplied status text, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// Monotonic instance revision used to fence source resolution.
+    pub revision: i64,
+    /// Whether the live provider can currently resolve a source.
+    pub availability: CanvasAvailability,
 }
 
 /// Lightweight catalog entry for a chat, carried in

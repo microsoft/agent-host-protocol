@@ -96,6 +96,16 @@ const (
 	ChatInteractivityHidden ChatInteractivity = "hidden"
 )
 
+// Availability of a live canvas instance.
+type CanvasAvailability string
+
+const (
+	// The provider currently has a source that can be resolved.
+	CanvasAvailabilityReady CanvasAvailability = "ready"
+	// The provider is temporarily unavailable.
+	CanvasAvailabilityUnavailable CanvasAvailability = "unavailable"
+)
+
 // Discriminant for pending message kinds.
 type PendingMessageKind string
 
@@ -690,6 +700,8 @@ type AgentInfo struct {
 // corresponding client commands MUST NOT be used. Sub-fields carry
 // per-capability options.
 type AgentCapabilities struct {
+	// The agent can expose live canvases opened by its model tools.
+	Canvases *CanvasCapability `json:"canvases,omitempty"`
 	// The agent can host more than one concurrent chat per session. When absent,
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
 	// session starts with. An empty object `{}` advertises multi-chat without
@@ -705,6 +717,10 @@ type AgentCapabilities struct {
 	// set and MUST NOT set more than one entry in
 	// {@link CreateSessionParams.workingDirectories}.
 	MultipleWorkingDirectories *MultipleWorkingDirectoriesCapability `json:"multipleWorkingDirectories,omitempty"`
+}
+
+// Presence-only capability for agent-owned canvases.
+type CanvasCapability struct {
 }
 
 // Options for the {@link AgentCapabilities.multipleChats} capability.
@@ -1279,6 +1295,11 @@ type ChatState struct {
 	// This catalogue is intentionally absent from {@link ChatSummary}; clients
 	// obtain it by subscribing to the chat channel.
 	Changesets []Changeset `json:"changesets,omitempty"`
+	// Live canvases currently exposed by this chat.
+	//
+	// Canvas sources are resolved separately and are intentionally absent from
+	// synchronized state.
+	Canvases []CanvasInstance `json:"canvases,omitempty"`
 	// Completed turns
 	Turns []Turn `json:"turns"`
 	// Cursor for loading older completed turns into this chat state.
@@ -1308,6 +1329,26 @@ type ChatState struct {
 	Draft *Message `json:"draft,omitempty"`
 	// Additional provider-specific metadata for this chat.
 	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+}
+
+// A canvas instance opened by the model for this chat.
+type CanvasInstance struct {
+	// Stable caller-supplied instance identifier.
+	InstanceId string `json:"instanceId"`
+	// Owning extension/provider identifier.
+	ExtensionId string `json:"extensionId"`
+	// Owning extension display name, when available.
+	ExtensionName *string `json:"extensionName,omitempty"`
+	// Provider-local canvas type identifier.
+	CanvasId string `json:"canvasId"`
+	// Provider-supplied title, when available.
+	Title *string `json:"title,omitempty"`
+	// Provider-supplied status text, when available.
+	Status *string `json:"status,omitempty"`
+	// Monotonic instance revision used to fence source resolution.
+	Revision int64 `json:"revision"`
+	// Whether the live provider can currently resolve a source.
+	Availability CanvasAvailability `json:"availability"`
 }
 
 // Lightweight catalog entry for a chat, carried in

@@ -1123,6 +1123,10 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
             state.changesets = a.changesets.clone();
             ReduceOutcome::Applied
         }
+        StateAction::ChatCanvasesChanged(a) => {
+            state.canvases = a.canvases.clone();
+            ReduceOutcome::Applied
+        }
         StateAction::ChatWorkingDirectorySet(a) => {
             let list = state.working_directories.get_or_insert_with(Vec::new);
             if list.contains(&a.directory) {
@@ -2226,6 +2230,7 @@ mod tests {
             interactivity: None,
             working_directories: None,
             changesets: None,
+            canvases: None,
             turns: Vec::new(),
             turns_next_cursor: None,
             active_turn: None,

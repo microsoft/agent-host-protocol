@@ -45,6 +45,7 @@ const (
 	ActionTypeChatTurnResume                      ActionType = "chat/turnResume"
 	ActionTypeChatActivityChanged                 ActionType = "chat/activityChanged"
 	ActionTypeChatChangesetsChanged               ActionType = "chat/changesetsChanged"
+	ActionTypeChatCanvasesChanged                 ActionType = "chat/canvasesChanged"
 	ActionTypeChatWorkingDirectorySet             ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved         ActionType = "chat/workingDirectoryRemoved"
 	ActionTypeSessionTitleChanged                 ActionType = "session/titleChanged"
@@ -657,6 +658,16 @@ type ChatChangesetsChangedAction struct {
 	Type ActionType `json:"type"`
 	// New catalogue, or `undefined` to clear it.
 	Changesets []Changeset `json:"changesets,omitempty"`
+}
+
+// The live canvas instances exposed by this chat changed.
+//
+// Replaces {@link ChatState.canvases | `state.canvases`} entirely. Set to
+// `undefined` to clear the collection.
+type ChatCanvasesChangedAction struct {
+	Type ActionType `json:"type"`
+	// New canvas collection, or `undefined` to clear it.
+	Canvases []CanvasInstance `json:"canvases,omitempty"`
 }
 
 // Session title updated. Fired by the server when the title is auto-generated
@@ -1743,6 +1754,7 @@ func (*ChatErrorAction) isStateAction()                           {}
 func (*ChatTurnResumeAction) isStateAction()                      {}
 func (*ChatActivityChangedAction) isStateAction()                 {}
 func (*ChatChangesetsChangedAction) isStateAction()               {}
+func (*ChatCanvasesChangedAction) isStateAction()                 {}
 func (*SessionTitleChangedAction) isStateAction()                 {}
 func (*ChatUsageAction) isStateAction()                           {}
 func (*ChatReasoningAction) isStateAction()                       {}
@@ -1988,6 +2000,12 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/changesetsChanged":
 		var value ChatChangesetsChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/canvasesChanged":
+		var value ChatCanvasesChangedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

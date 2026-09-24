@@ -164,6 +164,35 @@ public enum ChatInteractivity: String, Codable, Sendable {
     case hidden = "hidden"
 }
 
+/// Availability of a live canvas instance.
+public enum CanvasAvailability: Codable, Sendable, Equatable {
+    /// The provider currently has a source that can be resolved.
+    case ready
+    /// The provider is temporarily unavailable.
+    case unavailable
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "ready": self = .ready
+        case "unavailable": self = .unavailable
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .ready: try container.encode("ready")
+        case .unavailable: try container.encode("unavailable")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Answer lifecycle state.
 public enum ChatInputAnswerState: String, Codable, Sendable {
     case draft = "draft"
@@ -1335,6 +1364,8 @@ public struct AgentInfo: Codable, Sendable {
 }
 
 public struct AgentCapabilities: Codable, Sendable {
+    /// The agent can expose live canvases opened by its model tools.
+    public var canvases: CanvasCapability?
     /// The agent can host more than one concurrent chat per session. When absent,
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
@@ -1352,11 +1383,21 @@ public struct AgentCapabilities: Codable, Sendable {
     public var multipleWorkingDirectories: MultipleWorkingDirectoriesCapability?
 
     public init(
+        canvases: CanvasCapability? = nil,
         multipleChats: MultipleChatsCapability? = nil,
         multipleWorkingDirectories: MultipleWorkingDirectoriesCapability? = nil
     ) {
+        self.canvases = canvases
         self.multipleChats = multipleChats
         self.multipleWorkingDirectories = multipleWorkingDirectories
+    }
+}
+
+public struct CanvasCapability: Codable, Sendable {
+
+    public init(
+
+    ) {
     }
 }
 
@@ -1662,6 +1703,11 @@ public struct ChatState: Codable, Sendable {
     /// This catalogue is intentionally absent from {@link ChatSummary}; clients
     /// obtain it by subscribing to the chat channel.
     public var changesets: [Changeset]?
+    /// Live canvases currently exposed by this chat.
+    ///
+    /// Canvas sources are resolved separately and are intentionally absent from
+    /// synchronized state.
+    public var canvases: [CanvasInstance]?
     /// Completed turns
     public var turns: [Turn]
     /// Cursor for loading older completed turns into this chat state.
@@ -1702,6 +1748,7 @@ public struct ChatState: Codable, Sendable {
         case interactivity
         case workingDirectories
         case changesets
+        case canvases
         case turns
         case turnsNextCursor
         case activeTurn
@@ -1721,6 +1768,7 @@ public struct ChatState: Codable, Sendable {
         interactivity: ChatInteractivity? = nil,
         workingDirectories: [String]? = nil,
         changesets: [Changeset]? = nil,
+        canvases: [CanvasInstance]? = nil,
         turns: [Turn],
         turnsNextCursor: String? = nil,
         activeTurn: ActiveTurn? = nil,
@@ -1738,6 +1786,7 @@ public struct ChatState: Codable, Sendable {
         self.interactivity = interactivity
         self.workingDirectories = workingDirectories
         self.changesets = changesets
+        self.canvases = canvases
         self.turns = turns
         self.turnsNextCursor = turnsNextCursor
         self.activeTurn = activeTurn
@@ -5737,6 +5786,45 @@ public struct Snapshot: Codable, Sendable {
         self.resource = resource
         self.state = state
         self.fromSeq = fromSeq
+    }
+}
+
+public struct CanvasInstance: Codable, Sendable {
+    /// Stable caller-supplied instance identifier.
+    public var instanceId: String
+    /// Owning extension/provider identifier.
+    public var extensionId: String
+    /// Owning extension display name, when available.
+    public var extensionName: String?
+    /// Provider-local canvas type identifier.
+    public var canvasId: String
+    /// Provider-supplied title, when available.
+    public var title: String?
+    /// Provider-supplied status text, when available.
+    public var status: String?
+    /// Monotonic instance revision used to fence source resolution.
+    public var revision: Int
+    /// Whether the live provider can currently resolve a source.
+    public var availability: CanvasAvailability
+
+    public init(
+        instanceId: String,
+        extensionId: String,
+        extensionName: String? = nil,
+        canvasId: String,
+        title: String? = nil,
+        status: String? = nil,
+        revision: Int,
+        availability: CanvasAvailability
+    ) {
+        self.instanceId = instanceId
+        self.extensionId = extensionId
+        self.extensionName = extensionName
+        self.canvasId = canvasId
+        self.title = title
+        self.status = status
+        self.revision = revision
+        self.availability = availability
     }
 }
 

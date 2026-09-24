@@ -1358,6 +1358,25 @@
         "type"
       ]
     },
+    "ChatCanvasesChangedAction": {
+      "type": "object",
+      "description": "The live canvas instances exposed by this chat changed.\n\nReplaces {@link ChatState.canvases | `state.canvases`} entirely. Set to\n`undefined` to clear the collection.",
+      "properties": {
+        "type": {
+          "const": "chat/canvasesChanged"
+        },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasInstance"
+          },
+          "description": "New canvas collection, or `undefined` to clear it."
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
     "ChatWorkingDirectorySetAction": {
       "type": "object",
       "description": "A working directory was added to this chat's\n{@link ChatState.workingDirectories} subset.\n\nMembership semantics keyed by the directory URI: the reducer appends\n`directory` when the chat's subset does not already contain it (creating the\nsubset if absent) and is a no-op when it is already present. `directory` MUST\nbe one of the owning session's {@link SessionState.workingDirectories}; a host\nMUST reject a directory that is not. Only valid when the agent advertises\n{@link AgentCapabilities.multipleWorkingDirectories}.",
@@ -2465,6 +2484,9 @@
           "$ref": "#/$defs/ChatChangesetsChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatCanvasesChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatWorkingDirectorySetAction"
         },
         {
@@ -3042,6 +3064,10 @@
       "type": "object",
       "description": "Static capabilities an {@link AgentInfo} advertises. Modelled after MCP\ncapabilities: each field is opt-in and its presence (an empty object `{}`)\nsignals support, while absence means the feature is unsupported and the\ncorresponding client commands MUST NOT be used. Sub-fields carry\nper-capability options.",
       "properties": {
+        "canvases": {
+          "$ref": "#/$defs/CanvasCapability",
+          "description": "The agent can expose live canvases opened by its model tools."
+        },
         "multipleChats": {
           "$ref": "#/$defs/MultipleChatsCapability",
           "description": "The agent can host more than one concurrent chat per session. When absent,\nclients MUST NOT call `createChat` to open chats beyond the default one the\nsession starts with. An empty object `{}` advertises multi-chat without\nsource-based creation; set {@link MultipleChatsCapability.fork} or\n{@link MultipleChatsCapability.sideChat} to allow the corresponding mode."
@@ -3051,6 +3077,11 @@
           "description": "The session's agent can be granted tool access to more than one working\ndirectory. The directories are treated as equal peers except where the\nagent advertises a protected primary-slot option (some backends pin or\nreplace their first directory as a process root).\n\nWhen absent, clients MUST NOT mutate a session's or chat's working-directory\nset and MUST NOT set more than one entry in\n{@link CreateSessionParams.workingDirectories}."
         }
       }
+    },
+    "CanvasCapability": {
+      "type": "object",
+      "description": "Presence-only capability for agent-owned canvases.",
+      "properties": {}
     },
     "MultipleChatsCapability": {
       "type": "object",
@@ -4944,6 +4975,13 @@
           },
           "description": "Catalogue of changesets the server can produce for this chat. Each entry\nadvertises a subscribable view of file changes scoped to the chat's\neffective working directories and the URI template the client expands\nbefore subscribing. See {@link Changeset} for the full shape and\n{@link /guide/changesets | Changesets} for an overview of the model.\n\nThis catalogue is intentionally absent from {@link ChatSummary}; clients\nobtain it by subscribing to the chat channel."
         },
+        "canvases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CanvasInstance"
+          },
+          "description": "Live canvases currently exposed by this chat.\n\nCanvas sources are resolved separately and are intentionally absent from\nsynchronized state."
+        },
         "turns": {
           "type": "array",
           "items": {
@@ -4986,6 +5024,51 @@
         "status",
         "modifiedAt",
         "turns"
+      ]
+    },
+    "CanvasInstance": {
+      "type": "object",
+      "description": "A canvas instance opened by the model for this chat.",
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "description": "Stable caller-supplied instance identifier."
+        },
+        "extensionId": {
+          "type": "string",
+          "description": "Owning extension/provider identifier."
+        },
+        "extensionName": {
+          "type": "string",
+          "description": "Owning extension display name, when available."
+        },
+        "canvasId": {
+          "type": "string",
+          "description": "Provider-local canvas type identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "Provider-supplied title, when available."
+        },
+        "status": {
+          "type": "string",
+          "description": "Provider-supplied status text, when available."
+        },
+        "revision": {
+          "type": "number",
+          "description": "Monotonic instance revision used to fence source resolution."
+        },
+        "availability": {
+          "$ref": "#/$defs/CanvasAvailability",
+          "description": "Whether the live provider can currently resolve a source."
+        }
+      },
+      "required": [
+        "instanceId",
+        "extensionId",
+        "canvasId",
+        "revision",
+        "availability"
       ]
     },
     "ChatSummary": {
@@ -8882,6 +8965,9 @@
           "$ref": "#/$defs/ChatChangesetsChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatCanvasesChangedAction"
+        },
+        {
           "$ref": "#/$defs/ChatWorkingDirectorySetAction"
         },
         {
@@ -9124,6 +9210,14 @@
       ],
       "type": "string",
       "description": "Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}\nstate. Mirrors the three failure modes defined by the\n[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md)."
+    },
+    "CanvasAvailability": {
+      "enum": [
+        "ready",
+        "unavailable"
+      ],
+      "type": "string",
+      "description": "Availability of a live canvas instance."
     },
     "TurnState": {
       "enum": [

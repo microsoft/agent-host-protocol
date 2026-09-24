@@ -209,6 +209,11 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.changesets = a.changesets
         return next
 
+    case .chatCanvasesChanged(let a):
+        var next = state
+        next.canvases = a.canvases
+        return next
+
     case .chatWorkingDirectorySet(let a):
         if (state.workingDirectories ?? []).contains(a.directory) { return state }
         var next = state

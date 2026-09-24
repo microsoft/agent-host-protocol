@@ -58,6 +58,7 @@ type _ExpectedCommands =
   | 'disposeSession'
   | 'createChat'
   | 'disposeChat'
+  | 'resolveCanvasSource'
   | 'createTerminal'
   | 'disposeTerminal'
   | 'createResourceWatch'

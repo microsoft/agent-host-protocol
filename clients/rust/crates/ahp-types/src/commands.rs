@@ -1521,6 +1521,30 @@ pub struct CompletionsResult {
     pub items: Vec<CompletionItem>,
 }
 
+/// Resolves the current source URL for a live canvas instance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolveCanvasSourceParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Canvas instance identifier from the subscribed chat state.
+    pub instance_id: String,
+    /// Expected canvas revision.
+    pub revision: i64,
+}
+
+/// Current source for a live canvas instance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolveCanvasSourceResult {
+    /// HTTP(S) URL supplied by the live canvas provider.
+    pub url: String,
+}
+
 /// Invokes a server-defined {@link ChangesetOperation} against a changeset,
 /// a single file, or a line range.
 ///
