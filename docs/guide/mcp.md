@@ -49,6 +49,7 @@ Clients can also ask the host to manage the server process without changing the 
 
 - [`session/mcpServerStartRequested`](/reference/session#sessionmcpserverstartrequestedaction) asks the host to start or restart an existing MCP server customization. Reducers optimistically move the server to `starting` and clear any stale `channel`; the host remains authoritative and follows with `session/mcpServerStateChanged`.
 - [`session/mcpServerStopRequested`](/reference/session#sessionmcpserverstoprequestedaction) asks the host to stop an existing MCP server customization. Reducers optimistically move the server to `stopped` and clear any stale `channel`. Stopping an `authRequired` server unblocks it from waiting on authentication; if the host raised session-level input solely for that server, it should remove that input-needed entry when accepting the stop.
+- [`session/mcpServerBackgroundRequested`](/reference/session#sessionmcpserverbackgroundrequestedaction) asks the host to stop holding message processing on a server whose `starting` state has `blocking: true` (see [Blocking message processing](#blocking-message-processing)). Reducers optimistically set `blocking` to `false` on a blocking `starting` server and are a no-op otherwise; the host remains authoritative and MAY restore `blocking: true` via `session/mcpServerStateChanged` to reject the request.
 
 ## Runtime status
 
@@ -79,13 +80,31 @@ stateDiagram-v2
 
 | Kind | Meaning |
 |---|---|
-| `starting` | Registered but not yet running. Tools/resources are not available. |
+| `starting` | Registered but not yet running. Tools/resources are not available. `blocking: true` means startup will hold back the processing of new messages. |
 | `ready` | Running and serving requests. Tools/resources surface through the usual channels. |
 | `authRequired` | Reachable but blocked on authentication. Carries `ProtectedResourceMetadata` for the client to act on. |
 | `error` | Unrecoverable failure. Carries an `ErrorInfo`. Use `authRequired` for auth-specific failures. |
 | `stopped` | Shut down. The host MAY remove the entry shortly after. |
 
-High-frequency lifecycle transitions go through the narrow [`session/mcpServerStateChanged`](/reference/session#sessionmcpserverstatuschangedaction) action, which upserts just `state` (and optionally `channel`) on an existing entry. Client start/stop intent goes through `session/mcpServerStartRequested` and `session/mcpServerStopRequested`; use `session/customizationUpdated` for anything else (name, icons, `mcpApp`).
+High-frequency lifecycle transitions go through the narrow [`session/mcpServerStateChanged`](/reference/session#sessionmcpserverstatuschangedaction) action, which upserts just `state` (and optionally `channel`) on an existing entry. Client start/stop/background intent goes through `session/mcpServerStartRequested`, `session/mcpServerStopRequested`, and `session/mcpServerBackgroundRequested`; use `session/customizationUpdated` for anything else (name, icons, `mcpApp`).
+
+### Blocking message processing
+
+A host may wait for an MCP server's contributions (tools, etc.) to be discovered before it processes a new message. Hosts SHOULD advertise `blocking: true` on the server's `starting` state when its startup will hold back the processing of new messages. Clients MAY dispatch `session/mcpServerBackgroundRequested` through an appropriate affordance to ask the host to background the startup:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Host as Agent Host
+
+    Host->>Client: session/mcpServerStateChanged (starting, blocking: true)
+    Client->>Host: session/mcpServerBackgroundRequested { id }
+    Note over Client,Host: Reducers set blocking: false
+    Note over Host: Stops waiting on the server; message processing continues
+    Host->>Client: session/mcpServerStateChanged (ready)
+```
+
+The reducer optimistically sets `blocking: false` for `session/mcpServerBackgroundRequested`; the server keeps starting in the background. The action is a no-op if the server isn't `starting` with `blocking: true`. The host remains authoritative and MAY reject the request by dispatching `session/mcpServerStateChanged` with `blocking: true` again.
 
 ## Authentication
 

@@ -340,6 +340,7 @@ namespace Microsoft.AgentHostProtocol;
 [JsonSerializable(typeof(SessionIsArchivedChangedAction))]
 [JsonSerializable(typeof(SessionIsReadChangedAction))]
 [JsonSerializable(typeof(SessionLifecycle))]
+[JsonSerializable(typeof(SessionMcpServerBackgroundRequestedAction))]
 [JsonSerializable(typeof(SessionMcpServerStartRequestedAction))]
 [JsonSerializable(typeof(SessionMcpServerStateChangedAction))]
 [JsonSerializable(typeof(SessionMcpServerStopRequestedAction))]

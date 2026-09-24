@@ -1,0 +1,50 @@
+{
+  "description": "session/mcpServerBackgroundRequested sets blocking to false on a blocking starting McpServer customization",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "state": {
+          "kind": "starting",
+          "blocking": true
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/mcpServerBackgroundRequested",
+      "id": "mcp-1"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "state": {
+          "kind": "starting",
+          "blocking": false
+        }
+      }
+    ]
+  }
+}

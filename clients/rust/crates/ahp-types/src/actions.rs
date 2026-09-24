@@ -84,6 +84,7 @@ pub enum ActionType {
     SessionMcpServerStateChanged,
     SessionMcpServerStartRequested,
     SessionMcpServerStopRequested,
+    SessionMcpServerBackgroundRequested,
     ChatTruncated,
     ChatTurnsLoaded,
     SessionIsReadChanged,
@@ -232,6 +233,9 @@ impl serde::Serialize for ActionType {
             Self::SessionMcpServerStopRequested => {
                 serializer.serialize_str("session/mcpServerStopRequested")
             }
+            Self::SessionMcpServerBackgroundRequested => {
+                serializer.serialize_str("session/mcpServerBackgroundRequested")
+            }
             Self::ChatTruncated => serializer.serialize_str("chat/truncated"),
             Self::ChatTurnsLoaded => serializer.serialize_str("chat/turnsLoaded"),
             Self::SessionIsReadChanged => serializer.serialize_str("session/isReadChanged"),
@@ -362,6 +366,7 @@ impl<'de> serde::Deserialize<'de> for ActionType {
             "session/mcpServerStateChanged" => Self::SessionMcpServerStateChanged,
             "session/mcpServerStartRequested" => Self::SessionMcpServerStartRequested,
             "session/mcpServerStopRequested" => Self::SessionMcpServerStopRequested,
+            "session/mcpServerBackgroundRequested" => Self::SessionMcpServerBackgroundRequested,
             "chat/truncated" => Self::ChatTruncated,
             "chat/turnsLoaded" => Self::ChatTurnsLoaded,
             "session/isReadChanged" => Self::SessionIsReadChanged,
@@ -1605,6 +1610,31 @@ pub struct SessionMcpServerStopRequestedAction {
     pub id: String,
 }
 
+/// Requests that the host background the startup of an existing
+/// {@link McpServerCustomization} that is currently blocking message
+/// processing (see {@link McpServerStartingState.blocking}), so that new
+/// messages can be processed without waiting for the server to finish
+/// starting.
+///
+/// The server keeps starting in the background; backgrounding only stops the
+/// host from holding message processing on it.
+///
+/// Locates the target entry by `id`, searching both the top-level
+/// customization list and the `children` array of every container. When the
+/// server is {@link McpServerStatus.Starting | `starting`} with
+/// `blocking: true`, the reducer optimistically sets `blocking` to `false`,
+/// preserving the rest of the entry. Is a no-op otherwise (no matching
+/// `McpServerCustomization`, a different lifecycle state, or not blocking).
+/// The host remains authoritative and MAY reject the request by following with
+/// {@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}
+/// restoring `blocking: true`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMcpServerBackgroundRequestedAction {
+    /// The id of the {@link McpServerCustomization} to background.
+    pub id: String,
+}
+
 /// Truncates a session's history. If `turnId` is provided, all turns after that
 /// turn are removed and the specified turn is kept. If `turnId` is omitted, all
 /// turns are removed.
@@ -2343,6 +2373,8 @@ pub enum StateAction {
     SessionMcpServerStartRequested(SessionMcpServerStartRequestedAction),
     #[serde(rename = "session/mcpServerStopRequested")]
     SessionMcpServerStopRequested(SessionMcpServerStopRequestedAction),
+    #[serde(rename = "session/mcpServerBackgroundRequested")]
+    SessionMcpServerBackgroundRequested(SessionMcpServerBackgroundRequestedAction),
     #[serde(rename = "chat/truncated")]
     ChatTruncated(ChatTruncatedAction),
     #[serde(rename = "chat/turnsLoaded")]

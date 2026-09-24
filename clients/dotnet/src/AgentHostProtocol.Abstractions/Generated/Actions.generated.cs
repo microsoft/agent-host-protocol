@@ -133,6 +133,8 @@ public readonly struct ActionType : IEquatable<ActionType>
 
     public static readonly ActionType SessionMcpServerStopRequested = new ActionType("session/mcpServerStopRequested");
 
+    public static readonly ActionType SessionMcpServerBackgroundRequested = new ActionType("session/mcpServerBackgroundRequested");
+
     public static readonly ActionType ChatTruncated = new ActionType("chat/truncated");
 
     public static readonly ActionType ChatTurnsLoaded = new ActionType("chat/turnsLoaded");
@@ -1007,6 +1009,32 @@ public sealed record SessionMcpServerStopRequestedAction
     public ActionType Type { get; init; } = ActionType.SessionMcpServerStopRequested;
 
     /// <summary>The id of the {@link McpServerCustomization} to stop.</summary>
+    public required string Id { get; init; }
+}
+
+/// <summary>Requests that the host background the startup of an existing
+/// {@link McpServerCustomization} that is currently blocking message
+/// processing (see {@link McpServerStartingState.blocking}), so that new
+/// messages can be processed without waiting for the server to finish
+/// starting.
+///
+/// The server keeps starting in the background; backgrounding only stops the
+/// host from holding message processing on it.
+///
+/// Locates the target entry by `id`, searching both the top-level
+/// customization list and the `children` array of every container. When the
+/// server is {@link McpServerStatus.Starting | `starting`} with
+/// `blocking: true`, the reducer optimistically sets `blocking` to `false`,
+/// preserving the rest of the entry. Is a no-op otherwise (no matching
+/// `McpServerCustomization`, a different lifecycle state, or not blocking).
+/// The host remains authoritative and MAY reject the request by following with
+/// {@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}
+/// restoring `blocking: true`.</summary>
+public sealed record SessionMcpServerBackgroundRequestedAction
+{
+    public ActionType Type { get; init; } = ActionType.SessionMcpServerBackgroundRequested;
+
+    /// <summary>The id of the {@link McpServerCustomization} to background.</summary>
     public required string Id { get; init; }
 }
 
@@ -2670,6 +2698,7 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["session/mcpServerStateChanged"] = typeof(SessionMcpServerStateChangedAction),
         ["session/mcpServerStartRequested"] = typeof(SessionMcpServerStartRequestedAction),
         ["session/mcpServerStopRequested"] = typeof(SessionMcpServerStopRequestedAction),
+        ["session/mcpServerBackgroundRequested"] = typeof(SessionMcpServerBackgroundRequestedAction),
         ["session/truncated"] = typeof(SessionTruncatedAction),
         ["session/configChanged"] = typeof(SessionConfigChangedAction),
         ["session/metaChanged"] = typeof(SessionMetaChangedAction),

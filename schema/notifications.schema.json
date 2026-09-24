@@ -2544,6 +2544,10 @@
       "properties": {
         "kind": {
           "const": "starting"
+        },
+        "blocking": {
+          "type": "boolean",
+          "description": "Hosts SHOULD set this to `true` when this server's startup will hold back\nthe processing of new messages (for example, the next turn) while the\nserver's contributions — such as its tools — are discovered.\n\nClients MAY dispatch\n{@link SessionMcpServerBackgroundRequestedAction | `session/mcpServerBackgroundRequested`}\nthrough an appropriate affordance to ask the host to background the\nstartup."
         }
       },
       "required": [

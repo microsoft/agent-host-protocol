@@ -868,6 +868,17 @@ public static class Reducers
                     mcp.State = new McpServerState(new McpServerStartingState { Kind = McpServerStatus.Starting });
                     mcp.Channel = null;
                 });
+            case SessionMcpServerBackgroundRequestedAction a:
+                return UpdateMcpServerCustomization(state, a.Id, mcp =>
+                {
+                    if (mcp.State.Value is not McpServerStartingState { Blocking: true } starting)
+                    {
+                        return false;
+                    }
+
+                    mcp.State = new McpServerState(starting with { Blocking = false });
+                    return true;
+                });
             case SessionMcpServerStopRequestedAction a:
                 return UpdateMcpServerCustomization(state, a.Id, mcp =>
                 {
@@ -1930,14 +1941,30 @@ public static class Reducers
     /// to it in place. Mirrors the canonical TypeScript
     /// <c>updateMcpServerCustomization</c> helper shared by
     /// <c>session/mcpServerStateChanged</c>, <c>session/mcpServerStartRequested</c>,
-    /// and <c>session/mcpServerStopRequested</c>. Returns
+    /// <c>session/mcpServerStopRequested</c>, and
+    /// <c>session/mcpServerBackgroundRequested</c>. Returns
     /// <see cref="ReduceOutcome.NoOp"/> when no matching MCP server is found (or the
     /// id targets a non-MCP customization).
     /// </summary>
     private static ReduceOutcome UpdateMcpServerCustomization(
         SessionState state,
         string id,
-        Action<McpServerCustomization> update)
+        Action<McpServerCustomization> update) =>
+        UpdateMcpServerCustomization(state, id, mcp =>
+        {
+            update(mcp);
+            return true;
+        });
+
+    /// <summary>
+    /// Variant of <see cref="UpdateMcpServerCustomization(SessionState, string, Action{McpServerCustomization})"/>
+    /// whose <paramref name="update"/> returns whether it changed the entry, so a
+    /// conditional update can report <see cref="ReduceOutcome.NoOp"/>.
+    /// </summary>
+    private static ReduceOutcome UpdateMcpServerCustomization(
+        SessionState state,
+        string id,
+        Func<McpServerCustomization, bool> update)
     {
         List<Customization>? list = state.Customizations;
         if (list is null)
@@ -1953,8 +1980,7 @@ public static class Reducers
         {
             if (c.Value is McpServerCustomization top && top.Id == id)
             {
-                update(top);
-                return ReduceOutcome.Applied;
+                return update(top) ? ReduceOutcome.Applied : ReduceOutcome.NoOp;
             }
 
             // A non-MCP top-level customization that carries the id is a no-op
@@ -1978,8 +2004,7 @@ public static class Reducers
             {
                 if (child.Value is McpServerCustomization mcp && mcp.Id == id)
                 {
-                    update(mcp);
-                    return ReduceOutcome.Applied;
+                    return update(mcp) ? ReduceOutcome.Applied : ReduceOutcome.NoOp;
                 }
 
                 if (TryChildCustomizationId(child, out string childGot) && childGot == id)
@@ -2470,6 +2495,7 @@ public static class Reducers
         "session/customizationToggled",
         "session/mcpServerStartRequested",
         "session/mcpServerStopRequested",
+        "session/mcpServerBackgroundRequested",
         "session/isReadChanged",
         "session/isArchivedChanged",
         "session/configChanged",

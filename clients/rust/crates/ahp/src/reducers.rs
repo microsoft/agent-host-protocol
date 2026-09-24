@@ -60,11 +60,11 @@ use ahp_types::state::{
     ActiveTurn, AnnotationsState, AutomationRunState, AutomationState, ChangesetOperationStatus,
     ChangesetState, ChangesetStatus, ChatInputRequest, ChatState, ChildCustomization,
     ConfirmationOption, Customization, CustomizationEnablement, ErrorResponsePart,
-    InputRequestResponsePart, McpServerStartingState, McpServerState, McpServerStoppedState,
-    PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart, RootState,
-    SessionInputRequest, SessionLifecycle, SessionState, SessionStatus, TerminalCommandPart,
-    TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState, TerminalState,
-    TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
+    InputRequestResponsePart, McpServerCustomization, McpServerStartingState, McpServerState,
+    McpServerStoppedState, PendingMessage, PendingMessageKind, ResourceWatchState, ResponsePart,
+    RootState, SessionInputRequest, SessionLifecycle, SessionState, SessionStatus,
+    TerminalCommandPart, TerminalContentPart, TerminalExitedLifecycleState, TerminalLifecycleState,
+    TerminalState, TerminalUnclassifiedPart, ToolCallAuthRequiredState, ToolCallCancellationReason,
     ToolCallCancelledState, ToolCallCompletedState, ToolCallConfirmationReason,
     ToolCallContributor, ToolCallPendingConfirmationState, ToolCallPendingResultConfirmationState,
     ToolCallResponsePart, ToolCallRunningState, ToolCallState, ToolCallStatus,
@@ -965,9 +965,21 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
         StateAction::SessionMcpServerStartRequested(a) => update_mcp_server_customization_state(
             state,
             &a.id,
-            McpServerState::Starting(McpServerStartingState {}),
+            McpServerState::Starting(McpServerStartingState { blocking: None }),
             None,
         ),
+        StateAction::SessionMcpServerBackgroundRequested(a) => {
+            let Some(m) = find_mcp_server_customization_mut(state, &a.id) else {
+                return ReduceOutcome::NoOp;
+            };
+            match &mut m.state {
+                McpServerState::Starting(s) if s.blocking == Some(true) => {
+                    s.blocking = Some(false);
+                    ReduceOutcome::Applied
+                }
+                _ => ReduceOutcome::NoOp,
+            }
+        }
         StateAction::SessionMcpServerStopRequested(a) => update_mcp_server_customization_state(
             state,
             &a.id,
@@ -984,34 +996,40 @@ fn update_mcp_server_customization_state(
     next_state: McpServerState,
     channel: Option<String>,
 ) -> ReduceOutcome {
-    let Some(list) = state.customizations.as_mut() else {
+    let Some(m) = find_mcp_server_customization_mut(state, id) else {
         return ReduceOutcome::NoOp;
     };
+    m.state = next_state;
+    m.channel = channel;
+    ReduceOutcome::Applied
+}
+
+/// Locate the [`McpServerCustomization`] with `id`, searching the top-level
+/// list first and then every container's children. Returns `None` when no
+/// entry matches or the id targets a non-MCP customization.
+fn find_mcp_server_customization_mut<'a>(
+    state: &'a mut SessionState,
+    id: &str,
+) -> Option<&'a mut McpServerCustomization> {
+    let list = state.customizations.as_mut()?;
     if let Some(idx) = list.iter().position(|c| customization_id(c) == Some(id)) {
-        match &mut list[idx] {
-            Customization::McpServer(m) => {
-                m.state = next_state;
-                m.channel = channel;
-                return ReduceOutcome::Applied;
-            }
-            // Top-level entry exists but isn't an MCP server: no-op.
-            _ => return ReduceOutcome::NoOp,
-        }
+        return match &mut list[idx] {
+            Customization::McpServer(m) => Some(&mut **m),
+            _ => None,
+        };
     }
     for container in list.iter_mut() {
         let Some(children) = container_children_mut(container) else {
             continue;
         };
         if let Some(idx) = children.iter().position(|c| child_id_of(c) == Some(id)) {
-            if let ChildCustomization::McpServer(m) = &mut children[idx] {
-                m.state = next_state;
-                m.channel = channel;
-                return ReduceOutcome::Applied;
-            }
-            return ReduceOutcome::NoOp;
+            return match &mut children[idx] {
+                ChildCustomization::McpServer(m) => Some(&mut **m),
+                _ => None,
+            };
         }
     }
-    ReduceOutcome::NoOp
+    None
 }
 
 // ─── Chat Reducer ─────────────────────────────────────────────────────

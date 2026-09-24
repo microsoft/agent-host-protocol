@@ -3159,6 +3159,15 @@ type AhpMcpUiHostCapabilities struct {
 // Server is registered with the host but has not yet started.
 type McpServerStartingState struct {
 	Kind McpServerStatus `json:"kind"`
+	// Hosts SHOULD set this to `true` when this server's startup will hold back
+	// the processing of new messages (for example, the next turn) while the
+	// server's contributions — such as its tools — are discovered.
+	//
+	// Clients MAY dispatch
+	// {@link SessionMcpServerBackgroundRequestedAction | `session/mcpServerBackgroundRequested`}
+	// through an appropriate affordance to ask the host to background the
+	// startup.
+	Blocking *bool `json:"blocking,omitempty"`
 }
 
 // Server is running and serving requests.

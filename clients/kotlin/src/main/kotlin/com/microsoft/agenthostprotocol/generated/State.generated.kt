@@ -4460,7 +4460,18 @@ data class AhpMcpUiHostCapabilities(
 
 @Serializable
 data class McpServerStartingState(
-    val kind: McpServerStatus
+    val kind: McpServerStatus,
+    /**
+     * Hosts SHOULD set this to `true` when this server's startup will hold back
+     * the processing of new messages (for example, the next turn) while the
+     * server's contributions — such as its tools — are discovered.
+     *
+     * Clients MAY dispatch
+     * {@link SessionMcpServerBackgroundRequestedAction | `session/mcpServerBackgroundRequested`}
+     * through an appropriate affordance to ask the host to background the
+     * startup.
+     */
+    val blocking: Boolean? = null
 )
 
 @Serializable

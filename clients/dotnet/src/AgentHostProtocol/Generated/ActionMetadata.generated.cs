@@ -250,6 +250,9 @@ internal static class GeneratedActionMetadata
             case SessionIsReadChangedAction value:
                 actionType = value.Type;
                 return true;
+            case SessionMcpServerBackgroundRequestedAction value:
+                actionType = value.Type;
+                return true;
             case SessionMcpServerStartRequestedAction value:
                 actionType = value.Type;
                 return true;

@@ -1059,6 +1059,20 @@ func ApplyActionToSession(state *ahptypes.SessionState, action ahptypes.StateAct
 		return updateMcpServerCustomizationState(state, a.Id, ahptypes.McpServerState{Value: &ahptypes.McpServerStartingState{
 			Kind: ahptypes.McpServerStatusStarting,
 		}}, nil)
+	case *ahptypes.SessionMcpServerBackgroundRequestedAction:
+		mcp := findMcpServerCustomization(state, a.Id)
+		if mcp == nil {
+			return ReduceOutcomeNoOp
+		}
+		starting, ok := mcp.State.Value.(*ahptypes.McpServerStartingState)
+		if !ok || starting.Blocking == nil || !*starting.Blocking {
+			return ReduceOutcomeNoOp
+		}
+		blocking := false
+		next := *starting
+		next.Blocking = &blocking
+		mcp.State = ahptypes.McpServerState{Value: &next}
+		return ReduceOutcomeApplied
 	case *ahptypes.SessionMcpServerStopRequestedAction:
 		return updateMcpServerCustomizationState(state, a.Id, ahptypes.McpServerState{Value: &ahptypes.McpServerStoppedState{
 			Kind: ahptypes.McpServerStatusStopped,
@@ -1496,22 +1510,27 @@ func applyToolCallAuthResolved(state *ahptypes.ChatState, a *ahptypes.ChatToolCa
 }
 
 func updateMcpServerCustomizationState(state *ahptypes.SessionState, id string, nextState ahptypes.McpServerState, channel *ahptypes.URI) ReduceOutcome {
-	list := state.Customizations
-	if list == nil {
+	mcp := findMcpServerCustomization(state, id)
+	if mcp == nil {
 		return ReduceOutcomeNoOp
 	}
+	mcp.State = nextState
+	mcp.Channel = channel
+	return ReduceOutcomeApplied
+}
+
+// findMcpServerCustomization locates the McpServerCustomization with the given
+// id, searching the top-level list first and then every container's children.
+// Returns nil when no entry matches or the id targets a non-MCP customization.
+func findMcpServerCustomization(state *ahptypes.SessionState, id string) *ahptypes.McpServerCustomization {
+	list := state.Customizations
 	for i := range list {
 		got, ok := customizationID(list[i])
 		if !ok || got != id {
 			continue
 		}
-		mcp, ok := list[i].Value.(*ahptypes.McpServerCustomization)
-		if !ok {
-			return ReduceOutcomeNoOp
-		}
-		mcp.State = nextState
-		mcp.Channel = channel
-		return ReduceOutcomeApplied
+		mcp, _ := list[i].Value.(*ahptypes.McpServerCustomization)
+		return mcp
 	}
 	for i := range list {
 		children := containerChildren(&list[i])
@@ -1523,16 +1542,11 @@ func updateMcpServerCustomizationState(state *ahptypes.SessionState, id string, 
 			if !ok || got != id {
 				continue
 			}
-			mcp, ok := (*children)[j].Value.(*ahptypes.McpServerCustomization)
-			if !ok {
-				return ReduceOutcomeNoOp
-			}
-			mcp.State = nextState
-			mcp.Channel = channel
-			return ReduceOutcomeApplied
+			mcp, _ := (*children)[j].Value.(*ahptypes.McpServerCustomization)
+			return mcp
 		}
 	}
-	return ReduceOutcomeNoOp
+	return nil
 }
 
 func applyTruncated(state *ahptypes.ChatState, turnID *string) ReduceOutcome {

@@ -4554,9 +4554,20 @@ pub struct AhpMcpUiHostCapabilities {
 }
 
 /// Server is registered with the host but has not yet started.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct McpServerStartingState {}
+pub struct McpServerStartingState {
+    /// Hosts SHOULD set this to `true` when this server's startup will hold back
+    /// the processing of new messages (for example, the next turn) while the
+    /// server's contributions — such as its tools — are discovered.
+    ///
+    /// Clients MAY dispatch
+    /// {@link SessionMcpServerBackgroundRequestedAction | `session/mcpServerBackgroundRequested`}
+    /// through an appropriate affordance to ask the host to background the
+    /// startup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocking: Option<bool>,
+}
 
 /// Server is running and serving requests.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

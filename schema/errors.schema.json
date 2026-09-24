@@ -2366,6 +2366,10 @@
       "properties": {
         "kind": {
           "const": "starting"
+        },
+        "blocking": {
+          "type": "boolean",
+          "description": "Hosts SHOULD set this to `true` when this server's startup will hold back\nthe processing of new messages (for example, the next turn) while the\nserver's contributions — such as its tools — are discovered.\n\nClients MAY dispatch\n{@link SessionMcpServerBackgroundRequestedAction | `session/mcpServerBackgroundRequested`}\nthrough an appropriate affordance to ask the host to background the\nstartup."
         }
       },
       "required": [
@@ -8172,6 +8176,9 @@
           "$ref": "#/$defs/SessionMcpServerStopRequestedAction"
         },
         {
+          "$ref": "#/$defs/SessionMcpServerBackgroundRequestedAction"
+        },
+        {
           "$ref": "#/$defs/SessionIsReadChangedAction"
         },
         {
@@ -9013,6 +9020,23 @@
         "id": {
           "type": "string",
           "description": "The id of the {@link McpServerCustomization} to stop."
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ]
+    },
+    "SessionMcpServerBackgroundRequestedAction": {
+      "type": "object",
+      "description": "Requests that the host background the startup of an existing\n{@link McpServerCustomization} that is currently blocking message\nprocessing (see {@link McpServerStartingState.blocking}), so that new\nmessages can be processed without waiting for the server to finish\nstarting.\n\nThe server keeps starting in the background; backgrounding only stops the\nhost from holding message processing on it.\n\nLocates the target entry by `id`, searching both the top-level\ncustomization list and the `children` array of every container. When the\nserver is {@link McpServerStatus.Starting | `starting`} with\n`blocking: true`, the reducer optimistically sets `blocking` to `false`,\npreserving the rest of the entry. Is a no-op otherwise (no matching\n`McpServerCustomization`, a different lifecycle state, or not blocking).\nThe host remains authoritative and MAY reject the request by following with\n{@link SessionMcpServerStateChangedAction | `session/mcpServerStateChanged`}\nrestoring `blocking: true`.",
+      "properties": {
+        "type": {
+          "const": "session/mcpServerBackgroundRequested"
+        },
+        "id": {
+          "type": "string",
+          "description": "The id of the {@link McpServerCustomization} to background."
         }
       },
       "required": [

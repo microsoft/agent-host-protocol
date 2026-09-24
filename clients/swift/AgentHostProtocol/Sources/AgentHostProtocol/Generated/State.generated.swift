@@ -5202,11 +5202,22 @@ public struct AhpMcpUiHostCapabilities: Codable, Sendable {
 
 public struct McpServerStartingState: Codable, Sendable {
     public var kind: McpServerStatus
+    /// Hosts SHOULD set this to `true` when this server's startup will hold back
+    /// the processing of new messages (for example, the next turn) while the
+    /// server's contributions — such as its tools — are discovered.
+    ///
+    /// Clients MAY dispatch
+    /// {@link SessionMcpServerBackgroundRequestedAction | `session/mcpServerBackgroundRequested`}
+    /// through an appropriate affordance to ask the host to background the
+    /// startup.
+    public var blocking: Bool?
 
     public init(
-        kind: McpServerStatus
+        kind: McpServerStatus,
+        blocking: Bool? = nil
     ) {
         self.kind = kind
+        self.blocking = blocking
     }
 }
 
