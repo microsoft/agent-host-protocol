@@ -96,6 +96,10 @@ function schemaAccepts(
   }
 
   const schema = dereferenceSchema(root, node as Record<string, unknown>);
+  if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+    return false;
+  }
+
   const oneOf = schema.oneOf;
   if (Array.isArray(oneOf)) {
     return oneOf.filter(branch => schemaAccepts(root, branch as JsonNode, value)).length === 1;
@@ -296,6 +300,46 @@ describe('generated JSON schemas', () => {
       });
     });
   }
+});
+
+describe('account-scoped authentication schema', () => {
+  const schema = loadSchema('commands.schema.json');
+  const defs = schema.$defs as Record<string, Record<string, unknown>>;
+  const account = { authority: 'https://login.example.test', id: 'account-a' };
+  const target = { channel: 'ahp-root://', resource: 'https://api.example.test' };
+
+  it('keeps the account optional on token delivery but requires a complete supplied identity', () => {
+    const baseline = { ...target, token: 'test-credential' };
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, baseline), true);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, { ...baseline, account }), true);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, {
+      ...baseline, account: { id: 'account-a' },
+    }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthenticateParams, {
+      ...baseline, account: { authority: account.authority, id: 42 },
+    }), false);
+  });
+
+  it('requires resource, authority, and account id on revocation', () => {
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, { ...target, account }), true);
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, target), false);
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, {
+      channel: 'ahp-root://', account,
+    }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, {
+      ...target, account: { authority: account.authority },
+    }), false);
+    assert.equal(schemaAccepts(schema, defs.AuthRevokedParams, {
+      ...target, channel: 'ahp-session:/one', account,
+    }), false);
+  });
+
+  it('accepts the presence capability and preserves baseline initialization', () => {
+    const initialized = { protocolVersion: '0.9.0', serverSeq: 1, snapshots: [] };
+    assert.equal(schemaAccepts(schema, defs.InitializeResult, initialized), true);
+    assert.equal(schemaAccepts(schema, defs.InitializeResult, { ...initialized, accountRevocation: {} }), true);
+    assert.equal(schemaAccepts(schema, defs.InitializeResult, { ...initialized, accountRevocation: true }), false);
+  });
 });
 
 describe('typeAdmitsUndefined', () => {

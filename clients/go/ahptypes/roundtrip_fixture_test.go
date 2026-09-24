@@ -190,6 +190,18 @@ func decodeAndReencode(t *testing.T, name, typ, inputJSON string) string {
 	}
 
 	switch typ {
+	case "AuthenticateParams":
+		var v AuthenticateParams
+		dec(&v)
+		return enc(&v)
+	case "AuthRevokedParams":
+		var v AuthRevokedParams
+		dec(&v)
+		return enc(&v)
+	case "AhpClientNotification":
+		var v JsonRpcNotification
+		dec(&v)
+		return enc(&v)
 	case "ActionEnvelope":
 		var v ActionEnvelope
 		dec(&v)

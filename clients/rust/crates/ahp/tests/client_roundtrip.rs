@@ -41,6 +41,137 @@ impl Transport for MemTransport {
 }
 
 #[tokio::test]
+async fn account_authentication_and_revocation_preserve_wire_payloads() {
+    use ahp_types::commands::{AuthRevokedParams, AuthenticateParams, AuthenticateResult};
+    use ahp_types::state::AuthenticationAccount;
+    use serde_json::json;
+
+    let (transport, mut server) = pair();
+    let client = Client::connect(transport, ClientConfig::default())
+        .await
+        .expect("connect");
+    let (initialize, ()) = tokio::join!(
+        client.initialize("demo".into(), vec!["0.9.0".into()], vec![]),
+        async {
+            let JsonRpcMessage::Request(request) =
+                server.recv().await.unwrap().unwrap().into_parsed().unwrap()
+            else {
+                panic!("expected initialize request");
+            };
+            assert_eq!(request.method, "initialize");
+            server.send(TransportMessage::encode(&JsonRpcMessage::SuccessResponse(JsonRpcSuccessResponse {
+                jsonrpc: JsonRpcVersion::V2, id: request.id,
+                result: json!({"protocolVersion":"0.9.0","serverSeq":0,"snapshots":[],"accountRevocation":{}}),
+            })).unwrap()).await.unwrap();
+        }
+    );
+    assert!(initialize
+        .expect("initialize")
+        .account_revocation
+        .expect("capability")
+        .is_empty());
+
+    let account = AuthenticationAccount {
+        authority: "https://login.example.test".into(),
+        id: "account-1".into(),
+    };
+    let account_json = json!({"authority":"https://login.example.test","id":"account-1"});
+    let resource = "https://api.example.test";
+    for identity in [Some(account.clone()), None] {
+        let mut expected = json!({
+            "channel":"ahp-root://","resource":resource,"token":"example-test-credential",
+            "expiresIn":120,"scopes":["read"]
+        });
+        if identity.is_some() {
+            expected["account"] = account_json.clone();
+        }
+        let params = AuthenticateParams {
+            channel: "ahp-root://".into(),
+            meta: None,
+            resource: resource.into(),
+            token: "example-test-credential".into(),
+            expires_in: Some(120),
+            scopes: Some(vec!["read".into()]),
+            account: identity,
+        };
+        let (result, ()) = tokio::join!(
+            client.request::<_, AuthenticateResult>("authenticate", params),
+            async {
+                let JsonRpcMessage::Request(request) =
+                    server.recv().await.unwrap().unwrap().into_parsed().unwrap()
+                else {
+                    panic!("expected authenticate request");
+                };
+                assert_eq!(request.method, "authenticate");
+                assert_eq!(request.params, Some(expected));
+                server
+                    .send(
+                        TransportMessage::encode(&JsonRpcMessage::SuccessResponse(
+                            JsonRpcSuccessResponse {
+                                jsonrpc: JsonRpcVersion::V2,
+                                id: request.id,
+                                result: json!({}),
+                            },
+                        ))
+                        .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+            }
+        );
+        assert_eq!(
+            serde_json::to_value(result.expect("empty success")).unwrap(),
+            json!({})
+        );
+    }
+
+    client
+        .notify(
+            "auth/revoked",
+            AuthRevokedParams {
+                channel: "ahp-root://".into(),
+                meta: None,
+                resource: resource.into(),
+                account,
+            },
+        )
+        .await
+        .expect("notify");
+    let message = server.recv().await.unwrap().unwrap().into_parsed().unwrap();
+    assert_eq!(
+        serde_json::to_value(message).unwrap(),
+        json!({
+            "jsonrpc":"2.0","method":"auth/revoked",
+            "params":{"channel":"ahp-root://","resource":resource,"account":account_json}
+        })
+    );
+
+    let (ping, ()) = tokio::join!(client.ping(), async {
+        let JsonRpcMessage::Request(request) =
+            server.recv().await.unwrap().unwrap().into_parsed().unwrap()
+        else {
+            panic!("expected ping, not a fallback request");
+        };
+        assert_eq!(request.method, "ping");
+        server
+            .send(
+                TransportMessage::encode(&JsonRpcMessage::SuccessResponse(
+                    JsonRpcSuccessResponse {
+                        jsonrpc: JsonRpcVersion::V2,
+                        id: request.id,
+                        result: serde_json::Value::Null,
+                    },
+                ))
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+    });
+    ping.expect("ping");
+    client.shutdown().await;
+}
+
+#[tokio::test]
 async fn request_response_and_action_fanout() {
     let (client_side, mut server_side) = pair();
     let client = Client::connect(client_side, ClientConfig::default())

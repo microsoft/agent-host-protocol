@@ -160,4 +160,8 @@ public enum AHPClientNotifications {
     public static func dispatchAction(params: DispatchActionParams) -> JsonRpcNotification<DispatchActionParams> {
         JsonRpcNotification(method: "dispatchAction", params: params)
     }
+
+    public static func authRevoked(params: AuthRevokedParams) -> JsonRpcNotification<AuthRevokedParams> {
+        JsonRpcNotification(method: "auth/revoked", params: params)
+    }
 }

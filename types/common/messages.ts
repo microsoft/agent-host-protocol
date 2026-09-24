@@ -37,6 +37,7 @@ import type {
   DispatchActionParams,
   AuthenticateParams,
   AuthenticateResult,
+  AuthRevokedParams,
 } from './commands.js';
 import type {
   ListSessionsParams,
@@ -228,6 +229,7 @@ export interface ServerCommandMap {
 export interface ClientNotificationMap {
   'unsubscribe': { params: UnsubscribeParams };
   'dispatchAction': { params: DispatchActionParams };
+  'auth/revoked': { params: AuthRevokedParams };
 }
 
 /**

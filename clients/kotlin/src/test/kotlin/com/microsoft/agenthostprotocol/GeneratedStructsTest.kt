@@ -2,7 +2,14 @@ package com.microsoft.agenthostprotocol
 
 import com.microsoft.agenthostprotocol.generated.AgentInfo
 import com.microsoft.agenthostprotocol.generated.AhpCommands
+import com.microsoft.agenthostprotocol.generated.AhpClientNotifications
+import com.microsoft.agenthostprotocol.generated.AuthenticateParams
+import com.microsoft.agenthostprotocol.generated.AuthenticateResult
+import com.microsoft.agenthostprotocol.generated.AuthenticationAccount
+import com.microsoft.agenthostprotocol.generated.AuthRevokedParams
 import com.microsoft.agenthostprotocol.generated.AuthRequiredParams
+import com.microsoft.agenthostprotocol.generated.InitializeResult
+import com.microsoft.agenthostprotocol.generated.JsonRpcNotification
 import com.microsoft.agenthostprotocol.generated.JsonRpcRequest
 import com.microsoft.agenthostprotocol.generated.PolicyState
 import com.microsoft.agenthostprotocol.generated.ProtectedResourceMetadata
@@ -31,6 +38,51 @@ import kotlin.test.assertTrue
  */
 class GeneratedStructsTest {
     private val json: Json = Ahp.json
+
+    @Test
+    fun `authentication account is optional and success remains empty`() {
+        val account = AuthenticationAccount(authority = "https://login.example.com", id = "account-a")
+        val params = AuthenticateParams(
+            channel = "ahp-root://", resource = "https://api.example.com", token = "opaque", account = account,
+        )
+        val encoded = json.encodeToJsonElement(AuthenticateParams.serializer(), params)
+        assertEquals(json.encodeToJsonElement(AuthenticationAccount.serializer(), account), encoded.jsonObject["account"])
+        assertEquals(params, json.decodeFromJsonElement(AuthenticateParams.serializer(), encoded))
+        val legacy = json.encodeToJsonElement(AuthenticateParams.serializer(), params.copy(account = null))
+        assertFalse(legacy.jsonObject.containsKey("account"))
+        val result = json.decodeFromString(AuthenticateResult.serializer(), "{}")
+        assertEquals(JsonObject(emptyMap()), json.encodeToJsonElement(AuthenticateResult.serializer(), result))
+    }
+
+    @Test
+    fun `auth revoked builder emits a typed notification without id or token`() {
+        val notification = AhpClientNotifications.authRevoked(AuthRevokedParams(
+            channel = "ahp-root://",
+            resource = "https://api.example.com",
+            account = AuthenticationAccount(authority = "https://login.example.com", id = "account-a"),
+        ))
+        val serializer = JsonRpcNotification.serializer(AuthRevokedParams.serializer())
+        val encoded = json.encodeToJsonElement(serializer, notification)
+        assertEquals(json.parseToJsonElement("""
+            {"jsonrpc":"2.0","method":"auth/revoked","params":{"channel":"ahp-root://",
+             "resource":"https://api.example.com","account":{"authority":"https://login.example.com","id":"account-a"}}}
+        """), encoded)
+        assertEquals(notification, json.decodeFromJsonElement(serializer, encoded))
+    }
+
+    @Test
+    fun `account revocation capability preserves empty object presence`() {
+        val supported = json.decodeFromString(InitializeResult.serializer(), """
+            {"protocolVersion":"0.9.0","serverSeq":0,"snapshots":[],"accountRevocation":{}}
+        """)
+        assertTrue(assertNotNull(supported.accountRevocation).isEmpty())
+        val encoded = json.encodeToJsonElement(InitializeResult.serializer(), supported).jsonObject
+        assertEquals(JsonObject(emptyMap()), encoded["accountRevocation"])
+        val legacy = json.encodeToJsonElement(
+            InitializeResult.serializer(), supported.copy(accountRevocation = null),
+        ).jsonObject
+        assertFalse(legacy.containsKey("accountRevocation"))
+    }
 
     @Test
     fun `plain enum encodes wire string and decodes back`() {

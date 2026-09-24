@@ -180,6 +180,11 @@ type InitializeResult struct {
 	// `ahp-automations://` for {@link AutomationState}; absence means the
 	// host does not expose an automation catalogue or automation commands.
 	Automations *AutomationCapabilities `json:"automations,omitempty"`
+	// Supports `AuthenticateParams.account` and the client-to-host
+	// `auth/revoked` notification together. Presence (`{}`) means supported.
+	// Clients MUST check this capability before relying on account-scoped
+	// revocation, and MUST NOT fall back to an empty-token resource-wide clear.
+	AccountRevocation *map[string]json.RawMessage `json:"accountRevocation,omitempty"`
 }
 
 // Optional capabilities a client declares during `initialize`.
@@ -1006,8 +1011,9 @@ type AuthenticateParams struct {
 	// authorization server did not supply an expiry or the expiry is otherwise
 	// unknown. When supplied, the value MUST be a positive integer.
 	//
-	// This field is irrelevant when `token` is empty to revoke authentication
-	// and SHOULD be omitted in that case.
+	// This field is irrelevant when `token` is empty for baseline resource-wide
+	// revocation and SHOULD be omitted in that case. Identified credentials use
+	// `auth/revoked`, not empty-token delivery.
 	ExpiresIn *int64 `json:"expiresIn,omitempty"`
 	// OAuth scopes the token grants, when known. Lets the server determine
 	// whether a specific challenge — e.g. the `requiredScopes` on a live
@@ -1016,6 +1022,14 @@ type AuthenticateParams struct {
 	// Omit when the client doesn't track granted scopes separately from the
 	// token.
 	Scopes []string `json:"scopes,omitempty"`
+	// Account owning this credential, supplied by the client's authentication
+	// provider and stable across rotation. Required for account-scoped revocation.
+	//
+	// The host validates the association using its trusted provider context;
+	// this descriptor is not proof of identity or permission. It must accompany
+	// every refresh, not just the first token. An identified token must be
+	// nonempty; withdrawal uses `auth/revoked` instead.
+	Account *AuthenticationAccount `json:"account,omitempty"`
 }
 
 // Result of the `authenticate` command.
@@ -1024,6 +1038,34 @@ type AuthenticateParams struct {
 // unrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`
 // `-32007` or `InvalidParams` `-32602`).
 type AuthenticateResult struct {
+}
+
+// The client withdraws credentials for an account at a protected resource.
+//
+// Requires `InitializeResult.accountRevocation`. This client-to-host
+// notification has no response and is not an acknowledgement that host
+// cleanup succeeded. It does not revoke the upstream OAuth grant.
+//
+// The host orders it with authentication and provider replay, removes all
+// matching scope/token variants and pending deliveries, and promptly stops
+// work using those credentials. The current credential is cleared only if
+// both resource and account match; another account's credentials and work
+// remain untouched. Known dependent credentials are also invalidated.
+//
+// A later `authenticate` can authorize the account again. This notification
+// does not establish a permanent revocation barrier or a new account lifetime.
+// Clients must cancel stale forwarding and re-check their authentication
+// provider before replaying credentials after reconnect.
+type AuthRevokedParams struct {
+	// Channel URI this command targets.
+	Channel URI `json:"channel"`
+	// Optional JSON-serializable metadata associated with this request.
+	// Receivers MUST ignore keys they do not understand.
+	Meta map[string]json.RawMessage `json:"_meta,omitempty"`
+	// Exact protected-resource identifier used in `authenticate`.
+	Resource string `json:"resource"`
+	// The same authority-qualified account identity supplied with its tokens.
+	Account AuthenticationAccount `json:"account"`
 }
 
 // Creates a new terminal on the server.

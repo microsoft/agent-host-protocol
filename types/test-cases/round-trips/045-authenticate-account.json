@@ -1,0 +1,22 @@
+{
+  "name": "authenticate-account",
+  "group": "A",
+  "description": "Token delivery preserves the client-provided authority-qualified account identity.",
+  "type": "AuthenticateParams",
+  "input": {
+    "channel": "ahp-root://",
+    "resource": "https://api.example.test",
+    "token": "test-credential",
+    "scopes": ["read"],
+    "expiresIn": 3600,
+    "account": { "authority": "https://login.example.test", "id": "account-a" }
+  },
+  "acceptableOutputs": [{
+    "channel": "ahp-root://",
+    "resource": "https://api.example.test",
+    "token": "test-credential",
+    "scopes": ["read"],
+    "expiresIn": 3600,
+    "account": { "authority": "https://login.example.test", "id": "account-a" }
+  }]
+}

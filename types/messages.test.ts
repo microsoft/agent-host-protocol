@@ -61,7 +61,7 @@ function parseCommandMethods(source: string): MethodInfo[] {
   const jsdocRe = /\/\*\*[\s\S]*?\*\//g;
   for (const match of source.matchAll(jsdocRe)) {
     const block = match[0];
-    const methodMatch = block.match(/@method\s+(\w+)/);
+    const methodMatch = block.match(/@method\s+([\w/]+)/);
     const typeMatch = block.match(/@messageType\s+(Request|Notification)/);
     if (methodMatch && typeMatch) {
       results.push({

@@ -28,9 +28,12 @@
 
 use ahp_types::{
     actions::{ActionEnvelope, StateAction},
-    commands::{ChangesetOperationTarget, ChatSource, Implementation, InitializeResult},
+    commands::{
+        AuthRevokedParams, AuthenticateParams, ChangesetOperationTarget, ChatSource,
+        Implementation, InitializeResult,
+    },
     common::StringOrMarkdown,
-    messages::JsonRpcMessage,
+    messages::{JsonRpcMessage, JsonRpcNotification},
     notifications::{PartialSessionSummary, SessionAddedParams},
     state::{ChatInputQuestion, Customization, SessionStatus, SessionSummary, Snapshot},
     version::{PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS},
@@ -223,6 +226,9 @@ fn decode_and_reencode(file: &str, type_name: &str, input_json: &str) -> Result<
         "PartialSessionSummary" => round_trip!(PartialSessionSummary),
         "Implementation" => round_trip!(Implementation),
         "InitializeResult" => round_trip!(InitializeResult),
+        "AuthenticateParams" => round_trip!(AuthenticateParams),
+        "AuthRevokedParams" => round_trip!(AuthRevokedParams),
+        "AhpClientNotification" => round_trip!(JsonRpcNotification),
         "ChatSource" => round_trip!(ChatSource),
         "Snapshot" => round_trip!(Snapshot),
         other => Err(format!(

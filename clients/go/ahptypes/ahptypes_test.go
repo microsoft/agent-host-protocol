@@ -5,6 +5,30 @@ import (
 	"testing"
 )
 
+func TestAuthenticationWireRoundTrips(t *testing.T) {
+	for _, tc := range []struct{ name, typ, wire string }{
+		{"legacy authenticate", "AuthenticateParams", `{"channel":"ahp-root://","resource":"https://api.example.test","token":"test-token"}`},
+		{"identified authenticate", "AuthenticateParams", `{"channel":"ahp-root://","resource":"https://api.example.test","token":"test-token","account":{"authority":"https://issuer.example.test/","id":"user-123"}}`},
+		{"revoked account", "AuthRevokedParams", `{"channel":"ahp-root://","resource":"https://api.example.test","account":{"authority":"https://issuer.example.test/","id":"user-123"}}`},
+		{"capability present", "InitializeResult", `{"protocolVersion":"0.9.0","serverSeq":0,"snapshots":[],"accountRevocation":{}}`},
+		{"capability absent", "InitializeResult", `{"protocolVersion":"0.9.0","serverSeq":0,"snapshots":[]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			encoded := decodeAndReencode(t, tc.name, tc.typ, tc.wire)
+			if !canonicalJSONEqualRaw(t, tc.name, encoded, tc.wire) {
+				t.Fatalf("wire changed: got %s, want %s", encoded, tc.wire)
+			}
+		})
+	}
+	result, err := json.Marshal(AuthenticateResult{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(result) != "{}" {
+		t.Fatalf("authenticate result = %s, want empty object", result)
+	}
+}
+
 // TestProtocolVersion sanity-checks the constants emitted into
 // version.generated.go.
 func TestProtocolVersion(t *testing.T) {

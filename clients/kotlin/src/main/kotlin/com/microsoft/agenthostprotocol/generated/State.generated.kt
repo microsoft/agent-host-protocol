@@ -1251,6 +1251,22 @@ data class ProtectedResourceMetadata(
 )
 
 @Serializable
+data class AuthenticationAccount(
+    /**
+     * Nonempty canonical authorization-server identifier for this account,
+     * consistent with the protected resource's advertised authorization servers.
+     * This namespaces `id`; it is not an agent provider id or a client implementation.
+     */
+    val authority: String,
+    /**
+     * Nonempty stable account identifier within the authority. Pairwise
+     * identifiers from different OAuth clients require a trusted provider
+     * mapping before they can identify the same account.
+     */
+    val id: String
+)
+
+@Serializable
 data class RootState(
     /**
      * Available agent backends and their models

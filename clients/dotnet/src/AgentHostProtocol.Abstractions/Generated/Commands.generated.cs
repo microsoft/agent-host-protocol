@@ -218,6 +218,13 @@ public sealed record InitializeResult
     /// host does not expose an automation catalogue or automation commands.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AutomationCapabilities? Automations { get; init; }
+
+    /// <summary>Supports `AuthenticateParams.account` and the client-to-host
+    /// `auth/revoked` notification together. Presence (`{}`) means supported.
+    /// Clients MUST check this capability before relying on account-scoped
+    /// revocation, and MUST NOT fall back to an empty-token resource-wide clear.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? AccountRevocation { get; init; }
 }
 
 /// <summary>Identifies a protocol implementation — the software (and build) on one end
@@ -1262,8 +1269,9 @@ public sealed record AuthenticateParams
     /// authorization server did not supply an expiry or the expiry is otherwise
     /// unknown. When supplied, the value MUST be a positive integer.
     ///
-    /// This field is irrelevant when `token` is empty to revoke authentication
-    /// and SHOULD be omitted in that case.</summary>
+    /// This field is irrelevant when `token` is empty for baseline resource-wide
+    /// revocation and SHOULD be omitted in that case. Identified credentials use
+    /// `auth/revoked`, not empty-token delivery.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? ExpiresIn { get; init; }
 
@@ -1275,6 +1283,16 @@ public sealed record AuthenticateParams
     /// token.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Scopes { get; init; }
+
+    /// <summary>Account owning this credential, supplied by the client's authentication
+    /// provider and stable across rotation. Required for account-scoped revocation.
+    ///
+    /// The host validates the association using its trusted provider context;
+    /// this descriptor is not proof of identity or permission. It must accompany
+    /// every refresh, not just the first token. An identified token must be
+    /// nonempty; withdrawal uses `auth/revoked` instead.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AuthenticationAccount? Account { get; init; }
 }
 
 /// <summary>Result of the `authenticate` command.
@@ -1284,6 +1302,39 @@ public sealed record AuthenticateParams
 /// `-32007` or `InvalidParams` `-32602`).</summary>
 public sealed record AuthenticateResult
 {
+}
+
+/// <summary>The client withdraws credentials for an account at a protected resource.
+///
+/// Requires `InitializeResult.accountRevocation`. This client-to-host
+/// notification has no response and is not an acknowledgement that host
+/// cleanup succeeded. It does not revoke the upstream OAuth grant.
+///
+/// The host orders it with authentication and provider replay, removes all
+/// matching scope/token variants and pending deliveries, and promptly stops
+/// work using those credentials. The current credential is cleared only if
+/// both resource and account match; another account's credentials and work
+/// remain untouched. Known dependent credentials are also invalidated.
+///
+/// A later `authenticate` can authorize the account again. This notification
+/// does not establish a permanent revocation barrier or a new account lifetime.
+/// Clients must cancel stale forwarding and re-check their authentication
+/// provider before replaying credentials after reconnect.</summary>
+public sealed record AuthRevokedParams
+{
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Exact protected-resource identifier used in `authenticate`.</summary>
+    public required string Resource { get; init; }
+
+    /// <summary>The same authority-qualified account identity supplied with its tokens.</summary>
+    public required AuthenticationAccount Account { get; init; }
 }
 
 /// <summary>Creates a new terminal on the server.

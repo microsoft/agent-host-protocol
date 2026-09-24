@@ -652,6 +652,7 @@ const STATE_ENUMS = [
 // stay `class` with `{ get; set; }`. Everything else is a write-once `record`.
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: string; mutable?: boolean }[] = [
   { name: 'Icon' },
+  { name: 'AuthenticationAccount' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState', mutable: true },
   { name: 'RootConfigState', mutable: true },
@@ -2121,6 +2122,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; csName?: str
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
+  { name: 'AuthRevokedParams' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
   { name: 'SessionConfigCompletionsParams' }, { name: 'SessionConfigCompletionsResult' },

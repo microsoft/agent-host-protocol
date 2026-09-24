@@ -390,7 +390,14 @@ data class InitializeResult(
      * `ahp-automations://` for {@link AutomationState}; absence means the
      * host does not expose an automation catalogue or automation commands.
      */
-    val automations: AutomationCapabilities? = null
+    val automations: AutomationCapabilities? = null,
+    /**
+     * Supports `AuthenticateParams.account` and the client-to-host
+     * `auth/revoked` notification together. Presence (`{}`) means supported.
+     * Clients MUST check this capability before relying on account-scoped
+     * revocation, and MUST NOT fall back to an empty-token resource-wide clear.
+     */
+    val accountRevocation: Map<String, JsonElement>? = null
 )
 
 @Serializable
@@ -1230,8 +1237,9 @@ data class AuthenticateParams(
      * authorization server did not supply an expiry or the expiry is otherwise
      * unknown. When supplied, the value MUST be a positive integer.
      *
-     * This field is irrelevant when `token` is empty to revoke authentication
-     * and SHOULD be omitted in that case.
+     * This field is irrelevant when `token` is empty for baseline resource-wide
+     * revocation and SHOULD be omitted in that case. Identified credentials use
+     * `auth/revoked`, not empty-token delivery.
      */
     val expiresIn: Long? = null,
     /**
@@ -1242,11 +1250,43 @@ data class AuthenticateParams(
      * Omit when the client doesn't track granted scopes separately from the
      * token.
      */
-    val scopes: List<String>? = null
+    val scopes: List<String>? = null,
+    /**
+     * Account owning this credential, supplied by the client's authentication
+     * provider and stable across rotation. Required for account-scoped revocation.
+     *
+     * The host validates the association using its trusted provider context;
+     * this descriptor is not proof of identity or permission. It must accompany
+     * every refresh, not just the first token. An identified token must be
+     * nonempty; withdrawal uses `auth/revoked` instead.
+     */
+    val account: AuthenticationAccount? = null
 )
 
 @Serializable
 class AuthenticateResult
+
+@Serializable
+data class AuthRevokedParams(
+    /**
+     * Channel URI this command targets.
+     */
+    val channel: String,
+    /**
+     * Optional JSON-serializable metadata associated with this request.
+     * Receivers MUST ignore keys they do not understand.
+     */
+    @SerialName("_meta")
+    val meta: Map<String, JsonElement>? = null,
+    /**
+     * Exact protected-resource identifier used in `authenticate`.
+     */
+    val resource: String,
+    /**
+     * The same authority-qualified account identity supplied with its tokens.
+     */
+    val account: AuthenticationAccount
+)
 
 @Serializable
 data class CreateTerminalParams(

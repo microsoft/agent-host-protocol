@@ -341,6 +341,11 @@ public struct InitializeResult: Codable, Sendable {
     /// `ahp-automations://` for {@link AutomationState}; absence means the
     /// host does not expose an automation catalogue or automation commands.
     public var automations: AutomationCapabilities?
+    /// Supports `AuthenticateParams.account` and the client-to-host
+    /// `auth/revoked` notification together. Presence (`{}`) means supported.
+    /// Clients MUST check this capability before relying on account-scoped
+    /// revocation, and MUST NOT fall back to an empty-token resource-wide clear.
+    public var accountRevocation: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
         case protocolVersion
@@ -353,6 +358,7 @@ public struct InitializeResult: Codable, Sendable {
         case terminalCommandPrefix
         case telemetry
         case automations
+        case accountRevocation
     }
 
     public init(
@@ -365,7 +371,8 @@ public struct InitializeResult: Codable, Sendable {
         completionTriggerCharacters: [String]? = nil,
         terminalCommandPrefix: String? = nil,
         telemetry: TelemetryCapabilities? = nil,
-        automations: AutomationCapabilities? = nil
+        automations: AutomationCapabilities? = nil,
+        accountRevocation: [String: AnyCodable]? = nil
     ) {
         self.protocolVersion = protocolVersion
         self.serverSeq = serverSeq
@@ -377,6 +384,7 @@ public struct InitializeResult: Codable, Sendable {
         self.terminalCommandPrefix = terminalCommandPrefix
         self.telemetry = telemetry
         self.automations = automations
+        self.accountRevocation = accountRevocation
     }
 }
 
@@ -1474,8 +1482,9 @@ public struct AuthenticateParams: Codable, Sendable {
     /// authorization server did not supply an expiry or the expiry is otherwise
     /// unknown. When supplied, the value MUST be a positive integer.
     ///
-    /// This field is irrelevant when `token` is empty to revoke authentication
-    /// and SHOULD be omitted in that case.
+    /// This field is irrelevant when `token` is empty for baseline resource-wide
+    /// revocation and SHOULD be omitted in that case. Identified credentials use
+    /// `auth/revoked`, not empty-token delivery.
     public var expiresIn: Int?
     /// OAuth scopes the token grants, when known. Lets the server determine
     /// whether a specific challenge — e.g. the `requiredScopes` on a live
@@ -1484,6 +1493,14 @@ public struct AuthenticateParams: Codable, Sendable {
     /// Omit when the client doesn't track granted scopes separately from the
     /// token.
     public var scopes: [String]?
+    /// Account owning this credential, supplied by the client's authentication
+    /// provider and stable across rotation. Required for account-scoped revocation.
+    ///
+    /// The host validates the association using its trusted provider context;
+    /// this descriptor is not proof of identity or permission. It must accompany
+    /// every refresh, not just the first token. An identified token must be
+    /// nonempty; withdrawal uses `auth/revoked` instead.
+    public var account: AuthenticationAccount?
 
     enum CodingKeys: String, CodingKey {
         case channel
@@ -1492,6 +1509,7 @@ public struct AuthenticateParams: Codable, Sendable {
         case token
         case expiresIn
         case scopes
+        case account
     }
 
     public init(
@@ -1500,7 +1518,8 @@ public struct AuthenticateParams: Codable, Sendable {
         resource: String,
         token: String,
         expiresIn: Int? = nil,
-        scopes: [String]? = nil
+        scopes: [String]? = nil,
+        account: AuthenticationAccount? = nil
     ) {
         self.channel = channel
         self.meta = meta
@@ -1508,6 +1527,7 @@ public struct AuthenticateParams: Codable, Sendable {
         self.token = token
         self.expiresIn = expiresIn
         self.scopes = scopes
+        self.account = account
     }
 }
 
@@ -1516,6 +1536,37 @@ public struct AuthenticateResult: Codable, Sendable {
     public init(
 
     ) {
+    }
+}
+
+public struct AuthRevokedParams: Codable, Sendable {
+    /// Channel URI this command targets.
+    public var channel: String
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    public var meta: [String: AnyCodable]?
+    /// Exact protected-resource identifier used in `authenticate`.
+    public var resource: String
+    /// The same authority-qualified account identity supplied with its tokens.
+    public var account: AuthenticationAccount
+
+    enum CodingKeys: String, CodingKey {
+        case channel
+        case meta = "_meta"
+        case resource
+        case account
+    }
+
+    public init(
+        channel: String,
+        meta: [String: AnyCodable]? = nil,
+        resource: String,
+        account: AuthenticationAccount
+    ) {
+        self.channel = channel
+        self.meta = meta
+        self.resource = resource
+        self.account = account
     }
 }
 

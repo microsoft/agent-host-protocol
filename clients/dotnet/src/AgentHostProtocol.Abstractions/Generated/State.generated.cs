@@ -706,6 +706,25 @@ public sealed record Icon
     public string? Theme { get; init; }
 }
 
+/// <summary>Account identity attached to a client-supplied credential.
+///
+/// This is not a host-assigned account handle or a credential lifetime. Both
+/// fields are compared exactly; the same identity MUST survive token rotation
+/// and be comparable across clients using the same authority. Display names,
+/// client-local session ids, and token hashes are not account identifiers.</summary>
+public sealed record AuthenticationAccount
+{
+    /// <summary>Nonempty canonical authorization-server identifier for this account,
+    /// consistent with the protected resource's advertised authorization servers.
+    /// This namespaces `id`; it is not an agent provider id or a client implementation.</summary>
+    public required string Authority { get; init; }
+
+    /// <summary>Nonempty stable account identifier within the authority. Pairwise
+    /// identifiers from different OAuth clients require a trusted provider
+    /// mapping before they can identify the same account.</summary>
+    public required string Id { get; init; }
+}
+
 /// <summary>Describes a protected resource's authentication requirements using
 /// [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0
 /// Protected Resource Metadata) semantics.

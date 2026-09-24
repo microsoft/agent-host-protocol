@@ -358,8 +358,9 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
     // token: optional null-able stays a single pointer (avoid `**T`).
     const alreadyPointer = goType.startsWith('*');
     const optional = hasQuestionToken || hasUnionUndefined || alreadyPointer;
-    const presenceSensitiveCollection = iface.getName() === 'AutomationDefinitionPatch'
-      && (tsName === 'triggers' || tsName === '_meta');
+    const presenceSensitiveCollection = (iface.getName() === 'AutomationDefinitionPatch'
+      && (tsName === 'triggers' || tsName === '_meta'))
+      || (iface.getName() === 'InitializeResult' && tsName === 'accountRevocation');
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }
@@ -732,6 +733,7 @@ const STATE_ENUMS = [
 
 const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: string }[] = [
   { name: 'Icon' },
+  { name: 'AuthenticationAccount' },
   { name: 'ProtectedResourceMetadata' },
   { name: 'RootState' },
   { name: 'RootConfigState' },
@@ -1748,6 +1750,7 @@ const COMMAND_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: str
   { name: 'FetchTurnsParams' }, { name: 'FetchTurnsResult' },
   { name: 'UnsubscribeParams' }, { name: 'DispatchActionParams' },
   { name: 'AuthenticateParams' }, { name: 'AuthenticateResult' },
+  { name: 'AuthRevokedParams' },
   { name: 'CreateTerminalParams' }, { name: 'DisposeTerminalParams' },
   { name: 'ResolveSessionConfigParams' }, { name: 'ResolveSessionConfigResult' },
   { name: 'SessionConfigCompletionsParams' }, { name: 'SessionConfigCompletionsResult' },

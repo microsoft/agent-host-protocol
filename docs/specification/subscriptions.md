@@ -13,6 +13,7 @@ The channel concept is woven into every wire message. **Every command and every 
 | Server → Client commands (bidirectional `resource*` family) | The same nine `resource*` request methods plus `createResourceWatch` may also be initiated by the server. Used for host-driven per-session filesystem providers and for fetching client-published URIs (e.g. `virtual://my-client/...` plugins). | Literal `'ahp-root://'`. |
 | Client → Server | `dispatchAction` | The channel the action targets. |
 | Client → Server | `unsubscribe` | The channel being unsubscribed. |
+| Client → Server | `auth/revoked` | Literal `'ahp-root://'`; `resource` and `account` identify the withdrawn credentials. |
 | Server → Client | `action` | The channel that owns the action envelope. |
 | Server → Client protocol notifications | `root/sessionAdded`, `root/sessionRemoved`, `root/sessionSummaryChanged`, `auth/required`, `otlp/exportLogs`, `otlp/exportTraces`, `otlp/exportMetrics` | The channel the notification scopes to (the root channel for `root/*`; the channel the auth requirement targets for `auth/required`; the host-defined `ahp-otlp:` channel URI for `otlp/*`). |
 

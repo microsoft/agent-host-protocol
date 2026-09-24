@@ -1,0 +1,5 @@
+{
+  "type": "security",
+  "message": "Add authority-qualified account identity to client-supplied authentication and a capability-gated `auth/revoked` notification for account-scoped credential withdrawal.",
+  "issues": [153]
+}

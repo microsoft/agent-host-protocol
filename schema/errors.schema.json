@@ -126,6 +126,24 @@
         "src"
       ]
     },
+    "AuthenticationAccount": {
+      "type": "object",
+      "description": "Account identity attached to a client-supplied credential.\n\nThis is not a host-assigned account handle or a credential lifetime. Both\nfields are compared exactly; the same identity MUST survive token rotation\nand be comparable across clients using the same authority. Display names,\nclient-local session ids, and token hashes are not account identifiers.",
+      "properties": {
+        "authority": {
+          "type": "string",
+          "description": "Nonempty canonical authorization-server identifier for this account,\nconsistent with the protected resource's advertised authorization servers.\nThis namespaces `id`; it is not an agent provider id or a client implementation."
+        },
+        "id": {
+          "type": "string",
+          "description": "Nonempty stable account identifier within the authority. Pairwise\nidentifiers from different OAuth clients require a trusted provider\nmapping before they can identify the same account."
+        }
+      },
+      "required": [
+        "authority",
+        "id"
+      ]
+    },
     "ProtectedResourceMetadata": {
       "type": "object",
       "description": "Describes a protected resource's authentication requirements using\n[RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0\nProtected Resource Metadata) semantics.\n\nField names use snake_case to match the RFC 9728 JSON format.",
@@ -5846,6 +5864,11 @@
         "automations": {
           "$ref": "#/$defs/AutomationCapabilities",
           "description": "Host-owned automation support. Presence means clients may subscribe to\n`ahp-automations://` for {@link AutomationState}; absence means the\nhost does not expose an automation catalogue or automation commands."
+        },
+        "accountRevocation": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Supports `AuthenticateParams.account` and the client-to-host\n`auth/revoked` notification together. Presence (`{}`) means supported.\nClients MUST check this capability before relying on account-scoped\nrevocation, and MUST NOT fall back to an empty-token resource-wide clear."
         }
       },
       "required": [
@@ -6542,7 +6565,7 @@
         },
         "expiresIn": {
           "type": "integer",
-          "description": "The access token's remaining lifetime, in seconds, when this\n`authenticate` request is sent. This corresponds to `expires_in` in an\nOAuth 2.0 token response (RFC 6749 section 5.1).\n\nIf the client retained the original token response, it MUST subtract the\nelapsed time before forwarding this value. Omit this field when the\nauthorization server did not supply an expiry or the expiry is otherwise\nunknown. When supplied, the value MUST be a positive integer.\n\nThis field is irrelevant when `token` is empty to revoke authentication\nand SHOULD be omitted in that case.",
+          "description": "The access token's remaining lifetime, in seconds, when this\n`authenticate` request is sent. This corresponds to `expires_in` in an\nOAuth 2.0 token response (RFC 6749 section 5.1).\n\nIf the client retained the original token response, it MUST subtract the\nelapsed time before forwarding this value. Omit this field when the\nauthorization server did not supply an expiry or the expiry is otherwise\nunknown. When supplied, the value MUST be a positive integer.\n\nThis field is irrelevant when `token` is empty for baseline resource-wide\nrevocation and SHOULD be omitted in that case. Identified credentials use\n`auth/revoked`, not empty-token delivery.",
           "minimum": 1
         },
         "scopes": {
@@ -6551,6 +6574,10 @@
             "type": "string"
           },
           "description": "OAuth scopes the token grants, when known. Lets the server determine\nwhether a specific challenge — e.g. the `requiredScopes` on a live\n`McpServerAuthRequiredState` or `ToolCallAuthRequiredState.auth` — is\nsatisfied without decoding the (opaque, server-specific) token itself.\nOmit when the client doesn't track granted scopes separately from the\ntoken."
+        },
+        "account": {
+          "$ref": "#/$defs/AuthenticationAccount",
+          "description": "Account owning this credential, supplied by the client's authentication\nprovider and stable across rotation. Required for account-scoped revocation.\n\nThe host validates the association using its trusted provider context;\nthis descriptor is not proof of identity or permission. It must accompany\nevery refresh, not just the first token. An identified token must be\nnonempty; withdrawal uses `auth/revoked` instead."
         }
       },
       "required": [
@@ -6563,6 +6590,36 @@
       "type": "object",
       "description": "Result of the `authenticate` command.\n\nAn empty object on success. If the token is invalid or the resource is\nunrecognized, the server MUST return a JSON-RPC error (e.g. `AuthRequired`\n`-32007` or `InvalidParams` `-32602`).",
       "properties": {}
+    },
+    "AuthRevokedParams": {
+      "type": "object",
+      "description": "The client withdraws credentials for an account at a protected resource.\n\nRequires `InitializeResult.accountRevocation`. This client-to-host\nnotification has no response and is not an acknowledgement that host\ncleanup succeeded. It does not revoke the upstream OAuth grant.\n\nThe host orders it with authentication and provider replay, removes all\nmatching scope/token variants and pending deliveries, and promptly stops\nwork using those credentials. The current credential is cleared only if\nboth resource and account match; another account's credentials and work\nremain untouched. Known dependent credentials are also invalidated.\n\nA later `authenticate` can authorize the account again. This notification\ndoes not establish a permanent revocation barrier or a new account lifetime.\nClients must cancel stale forwarding and re-check their authentication\nprovider before replaying credentials after reconnect.",
+      "properties": {
+        "channel": {
+          "type": "string",
+          "enum": [
+            "ahp-root://"
+          ]
+        },
+        "_meta": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Optional JSON-serializable metadata associated with this request.\nReceivers MUST ignore keys they do not understand."
+        },
+        "resource": {
+          "type": "string",
+          "description": "Exact protected-resource identifier used in `authenticate`."
+        },
+        "account": {
+          "$ref": "#/$defs/AuthenticationAccount",
+          "description": "The same authority-qualified account identity supplied with its tokens."
+        }
+      },
+      "required": [
+        "channel",
+        "resource",
+        "account"
+      ]
     },
     "ListSessionsParams": {
       "type": "object",

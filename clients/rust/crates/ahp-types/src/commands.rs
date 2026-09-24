@@ -15,10 +15,11 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use crate::actions::{ActionEnvelope, StateAction};
 #[allow(unused_imports)]
 use crate::state::{
-    AgentSelection, AutomationDefinition, AutomationSchedule, AutomationSessionTemplate,
-    AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message, MessageAttachment,
-    ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary, SideChatSelection,
-    Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange, Turn,
+    AgentSelection, AuthenticationAccount, AutomationDefinition, AutomationSchedule,
+    AutomationSessionTemplate, AutomationTrigger, AutomationTriggerDefinition, ContentRef, Message,
+    MessageAttachment, ModelSelection, SessionActiveClient, SessionConfigSchema, SessionSummary,
+    SideChatSelection, Snapshot, SnapshotState, TelemetryCapabilities, TerminalClaim, TextRange,
+    Turn,
 };
 
 // ─── Enums ────────────────────────────────────────────────────────────
@@ -292,6 +293,12 @@ pub struct InitializeResult {
     /// host does not expose an automation catalogue or automation commands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub automations: Option<AutomationCapabilities>,
+    /// Supports `AuthenticateParams.account` and the client-to-host
+    /// `auth/revoked` notification together. Presence (`{}`) means supported.
+    /// Clients MUST check this capability before relying on account-scoped
+    /// revocation, and MUST NOT fall back to an empty-token resource-wide clear.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_revocation: Option<JsonObject>,
 }
 
 /// Optional capabilities a client declares during `initialize`.
@@ -1297,8 +1304,9 @@ pub struct AuthenticateParams {
     /// authorization server did not supply an expiry or the expiry is otherwise
     /// unknown. When supplied, the value MUST be a positive integer.
     ///
-    /// This field is irrelevant when `token` is empty to revoke authentication
-    /// and SHOULD be omitted in that case.
+    /// This field is irrelevant when `token` is empty for baseline resource-wide
+    /// revocation and SHOULD be omitted in that case. Identified credentials use
+    /// `auth/revoked`, not empty-token delivery.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_in: Option<i64>,
     /// OAuth scopes the token grants, when known. Lets the server determine
@@ -1309,6 +1317,15 @@ pub struct AuthenticateParams {
     /// token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
+    /// Account owning this credential, supplied by the client's authentication
+    /// provider and stable across rotation. Required for account-scoped revocation.
+    ///
+    /// The host validates the association using its trusted provider context;
+    /// this descriptor is not proof of identity or permission. It must accompany
+    /// every refresh, not just the first token. An identified token must be
+    /// nonempty; withdrawal uses `auth/revoked` instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<AuthenticationAccount>,
 }
 
 /// Result of the `authenticate` command.
@@ -1319,6 +1336,37 @@ pub struct AuthenticateParams {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticateResult {}
+
+/// The client withdraws credentials for an account at a protected resource.
+///
+/// Requires `InitializeResult.accountRevocation`. This client-to-host
+/// notification has no response and is not an acknowledgement that host
+/// cleanup succeeded. It does not revoke the upstream OAuth grant.
+///
+/// The host orders it with authentication and provider replay, removes all
+/// matching scope/token variants and pending deliveries, and promptly stops
+/// work using those credentials. The current credential is cleared only if
+/// both resource and account match; another account's credentials and work
+/// remain untouched. Known dependent credentials are also invalidated.
+///
+/// A later `authenticate` can authorize the account again. This notification
+/// does not establish a permanent revocation barrier or a new account lifetime.
+/// Clients must cancel stale forwarding and re-check their authentication
+/// provider before replaying credentials after reconnect.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthRevokedParams {
+    /// Channel URI this command targets.
+    pub channel: Uri,
+    /// Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.
+    #[serde(rename = "_meta", default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<JsonObject>,
+    /// Exact protected-resource identifier used in `authenticate`.
+    pub resource: String,
+    /// The same authority-qualified account identity supplied with its tokens.
+    pub account: AuthenticationAccount,
+}
 
 /// Creates a new terminal on the server.
 ///

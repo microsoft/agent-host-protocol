@@ -688,7 +688,7 @@ const STATE_ENUMS = [
 ];
 
 const STATE_STRUCTS = [
-  'Icon', 'ProtectedResourceMetadata', 'RootState', 'RootConfigState', 'AgentInfo',
+  'Icon', 'ProtectedResourceMetadata', 'AuthenticationAccount', 'RootState', 'RootConfigState', 'AgentInfo',
   'AgentCapabilities',
   'MultipleChatsCapability',
   'MultipleWorkingDirectoriesCapability',
@@ -1652,7 +1652,7 @@ const COMMAND_STRUCTS = [
   'CreateResourceWatchParams', 'CreateResourceWatchResult',
   'FetchTurnsParams', 'FetchTurnsResult',
   'UnsubscribeParams', 'DispatchActionParams',
-  'AuthenticateParams', 'AuthenticateResult',
+  'AuthenticateParams', 'AuthenticateResult', 'AuthRevokedParams',
   'CreateTerminalParams', 'DisposeTerminalParams',
   'ResolveSessionConfigParams', 'ResolveSessionConfigResult',
   'SessionConfigPropertySchema', 'SessionConfigSchema',
@@ -2162,6 +2162,10 @@ public enum AHPClientNotifications {
 
     public static func dispatchAction(params: DispatchActionParams) -> JsonRpcNotification<DispatchActionParams> {
         JsonRpcNotification(method: "dispatchAction", params: params)
+    }
+
+    public static func authRevoked(params: AuthRevokedParams) -> JsonRpcNotification<AuthRevokedParams> {
+        JsonRpcNotification(method: "auth/revoked", params: params)
     }
 }
 `;

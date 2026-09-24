@@ -7,6 +7,58 @@ import AgentHostProtocol
 
 final class AHPClientTests: XCTestCase {
 
+    func testAuthenticatePreservesOptionalAccountAndAcceptsEmptySuccess() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+        let account = AuthenticationAccount(authority: "https://login.example.com", id: "account-a")
+        let accounts: [AuthenticationAccount?] = [nil, account]
+        let serverTask = Task {
+            for account in accounts {
+                let request = try await readRequest(from: serverSide, expectedMethod: "authenticate")
+                let params = try JSONDecoder().decode(
+                    AuthenticateParams.self, from: JSONEncoder().encode(try XCTUnwrap(request.params))
+                )
+                XCTAssertEqual(params.account?.authority, account?.authority)
+                XCTAssertEqual(params.account?.id, account?.id)
+                XCTAssertEqual(params.token, "opaque")
+                try await respond(to: request.id, with: AuthenticateResult(), on: serverSide)
+            }
+        }
+        for account in accounts {
+            let command = AHPCommands.authenticate(id: 1, params: AuthenticateParams(
+                channel: RootResourceURI, resource: "https://api.example.com", token: "opaque", account: account
+            ))
+            let result: AuthenticateResult = try await client.request(method: command.method, params: command.params)
+            let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? NSDictionary
+            XCTAssertEqual(object?.count, 0)
+        }
+        try await serverTask.value
+        await client.shutdown()
+    }
+
+    func testAuthRevokedUsesExistingNotificationSender() async throws {
+        let (clientSide, serverSide) = InMemoryTransport.pair()
+        let client = AHPClient(transport: clientSide)
+        try await client.connect()
+        let notification = AHPClientNotifications.authRevoked(params: AuthRevokedParams(
+            channel: RootResourceURI,
+            resource: "https://api.example.com",
+            account: AuthenticationAccount(authority: "https://login.example.com", id: "account-a")
+        ))
+        try await client.notify(method: notification.method, params: notification.params)
+        let raw = try await readNotification(from: serverSide, expectedMethod: "auth/revoked")
+        let data = try JSONEncoder().encode(try XCTUnwrap(raw))
+        let decoded = try JSONDecoder().decode(AuthRevokedParams.self, from: data)
+        XCTAssertEqual(decoded.channel, RootResourceURI)
+        XCTAssertEqual(decoded.resource, "https://api.example.com")
+        XCTAssertEqual(decoded.account.authority, "https://login.example.com")
+        XCTAssertEqual(decoded.account.id, "account-a")
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertNil(object["token"])
+        await client.shutdown()
+    }
+
     // MARK: - request_response_round_trip
 
     func testInitializeHandshakeRoundTrip() async throws {

@@ -136,6 +136,12 @@ public sealed class TypesRoundTripFixtures
     {
         switch (type)
         {
+            case "AuthenticateParams":
+                return Wrap(Ser.Deserialize<AuthenticateParams>(inputJson));
+            case "AuthRevokedParams":
+                return Wrap(Ser.Deserialize<AuthRevokedParams>(inputJson));
+            case "AhpClientNotification":
+                return Wrap(Ser.Deserialize<JsonRpcNotification>(inputJson));
             case "ActionEnvelope":
                 return Wrap(Ser.Deserialize<ActionEnvelope>(inputJson));
             case "StateAction":

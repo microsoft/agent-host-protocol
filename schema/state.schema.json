@@ -37,6 +37,24 @@
         "src"
       ]
     },
+    "AuthenticationAccount": {
+      "type": "object",
+      "description": "Account identity attached to a client-supplied credential.\n\nThis is not a host-assigned account handle or a credential lifetime. Both\nfields are compared exactly; the same identity MUST survive token rotation\nand be comparable across clients using the same authority. Display names,\nclient-local session ids, and token hashes are not account identifiers.",
+      "properties": {
+        "authority": {
+          "type": "string",
+          "description": "Nonempty canonical authorization-server identifier for this account,\nconsistent with the protected resource's advertised authorization servers.\nThis namespaces `id`; it is not an agent provider id or a client implementation."
+        },
+        "id": {
+          "type": "string",
+          "description": "Nonempty stable account identifier within the authority. Pairwise\nidentifiers from different OAuth clients require a trusted provider\nmapping before they can identify the same account."
+        }
+      },
+      "required": [
+        "authority",
+        "id"
+      ]
+    },
     "ProtectedResourceMetadata": {
       "type": "object",
       "description": "Describes a protected resource's authentication requirements using\n[RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) (OAuth 2.0\nProtected Resource Metadata) semantics.\n\nField names use snake_case to match the RFC 9728 JSON format.",

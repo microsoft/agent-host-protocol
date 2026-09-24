@@ -1,0 +1,24 @@
+{
+  "name": "auth-revoked-notification",
+  "group": "A",
+  "description": "Account revocation is a client-to-host JSON-RPC notification with no request id.",
+  "type": "AhpClientNotification",
+  "input": {
+    "jsonrpc": "2.0",
+    "method": "auth/revoked",
+    "params": {
+      "channel": "ahp-root://",
+      "resource": "https://api.example.test",
+      "account": { "authority": "https://login.example.test", "id": "account-a" }
+    }
+  },
+  "acceptableOutputs": [{
+    "jsonrpc": "2.0",
+    "method": "auth/revoked",
+    "params": {
+      "channel": "ahp-root://",
+      "resource": "https://api.example.test",
+      "account": { "authority": "https://login.example.test", "id": "account-a" }
+    }
+  }]
+}

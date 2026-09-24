@@ -162,4 +162,7 @@ object AhpClientNotifications {
 
     fun dispatchAction(params: DispatchActionParams): JsonRpcNotification<DispatchActionParams> =
         JsonRpcNotification(method = "dispatchAction", params = params)
+
+    fun authRevoked(params: AuthRevokedParams): JsonRpcNotification<AuthRevokedParams> =
+        JsonRpcNotification(method = "auth/revoked", params = params)
 }
