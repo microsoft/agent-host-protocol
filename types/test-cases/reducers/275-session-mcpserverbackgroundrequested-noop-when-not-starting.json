@@ -1,0 +1,48 @@
+{
+  "description": "session/mcpServerBackgroundRequested is a no-op when the McpServer customization is not starting",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "state": {
+          "kind": "ready"
+        }
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/mcpServerBackgroundRequested",
+      "id": "mcp-1"
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Test Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [],
+    "customizations": [
+      {
+        "type": "mcpServer",
+        "id": "mcp-1",
+        "uri": "file:///workspace/.mcp/servers.json",
+        "name": "Filesystem",
+        "state": {
+          "kind": "ready"
+        }
+      }
+    ]
+  }
+}

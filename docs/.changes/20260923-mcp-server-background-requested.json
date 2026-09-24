@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "`McpServerStartingState.blocking` flag indicating that message processing may be held on the server, and the client-dispatchable `session/mcpServerBackgroundRequested` action asking the host to background such a startup."
+}

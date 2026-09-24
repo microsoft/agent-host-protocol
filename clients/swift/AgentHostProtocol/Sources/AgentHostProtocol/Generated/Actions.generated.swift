@@ -61,6 +61,7 @@ public enum ActionType: Codable, Sendable, Equatable {
     case sessionMcpServerStateChanged
     case sessionMcpServerStartRequested
     case sessionMcpServerStopRequested
+    case sessionMcpServerBackgroundRequested
     case chatTruncated
     case chatTurnsLoaded
     case sessionIsReadChanged
@@ -167,6 +168,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "session/mcpServerStateChanged": self = .sessionMcpServerStateChanged
         case "session/mcpServerStartRequested": self = .sessionMcpServerStartRequested
         case "session/mcpServerStopRequested": self = .sessionMcpServerStopRequested
+        case "session/mcpServerBackgroundRequested": self = .sessionMcpServerBackgroundRequested
         case "chat/truncated": self = .chatTruncated
         case "chat/turnsLoaded": self = .chatTurnsLoaded
         case "session/isReadChanged": self = .sessionIsReadChanged
@@ -273,6 +275,7 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .sessionMcpServerStateChanged: try container.encode("session/mcpServerStateChanged")
         case .sessionMcpServerStartRequested: try container.encode("session/mcpServerStartRequested")
         case .sessionMcpServerStopRequested: try container.encode("session/mcpServerStopRequested")
+        case .sessionMcpServerBackgroundRequested: try container.encode("session/mcpServerBackgroundRequested")
         case .chatTruncated: try container.encode("chat/truncated")
         case .chatTurnsLoaded: try container.encode("chat/turnsLoaded")
         case .sessionIsReadChanged: try container.encode("session/isReadChanged")
@@ -1754,6 +1757,20 @@ public struct SessionMcpServerStopRequestedAction: Codable, Sendable {
     }
 }
 
+public struct SessionMcpServerBackgroundRequestedAction: Codable, Sendable {
+    public var type: ActionType
+    /// The id of the {@link McpServerCustomization} to background.
+    public var id: String
+
+    public init(
+        type: ActionType,
+        id: String
+    ) {
+        self.type = type
+        self.id = id
+    }
+}
+
 public struct ChatTruncatedAction: Codable, Sendable {
     public var type: ActionType
     /// Keep turns up to and including this turn. Omit to clear all turns.
@@ -2511,6 +2528,7 @@ public enum StateAction: Codable, Sendable {
     case sessionMcpServerStateChanged(SessionMcpServerStateChangedAction)
     case sessionMcpServerStartRequested(SessionMcpServerStartRequestedAction)
     case sessionMcpServerStopRequested(SessionMcpServerStopRequestedAction)
+    case sessionMcpServerBackgroundRequested(SessionMcpServerBackgroundRequestedAction)
     case chatTruncated(ChatTruncatedAction)
     case chatTurnsLoaded(ChatTurnsLoadedAction)
     case sessionConfigChanged(SessionConfigChangedAction)
@@ -2681,6 +2699,8 @@ public enum StateAction: Codable, Sendable {
             self = .sessionMcpServerStartRequested(try SessionMcpServerStartRequestedAction(from: decoder))
         case "session/mcpServerStopRequested":
             self = .sessionMcpServerStopRequested(try SessionMcpServerStopRequestedAction(from: decoder))
+        case "session/mcpServerBackgroundRequested":
+            self = .sessionMcpServerBackgroundRequested(try SessionMcpServerBackgroundRequestedAction(from: decoder))
         case "chat/truncated":
             self = .chatTruncated(try ChatTruncatedAction(from: decoder))
         case "chat/turnsLoaded":
@@ -2827,6 +2847,7 @@ public enum StateAction: Codable, Sendable {
         case .sessionMcpServerStateChanged(let v): try v.encode(to: encoder)
         case .sessionMcpServerStartRequested(let v): try v.encode(to: encoder)
         case .sessionMcpServerStopRequested(let v): try v.encode(to: encoder)
+        case .sessionMcpServerBackgroundRequested(let v): try v.encode(to: encoder)
         case .chatTruncated(let v): try v.encode(to: encoder)
         case .chatTurnsLoaded(let v): try v.encode(to: encoder)
         case .sessionConfigChanged(let v): try v.encode(to: encoder)

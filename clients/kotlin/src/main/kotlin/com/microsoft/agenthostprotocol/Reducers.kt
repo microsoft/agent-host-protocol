@@ -807,6 +807,19 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
         )
     }
 
+    is StateActionSessionMcpServerBackgroundRequested -> {
+        val a = action.value
+        val entry = findMcpServerCustomization(state, a.id)
+        val current = entry?.state
+        if (entry == null || current !is McpServerStateStarting || current.value.blocking != true) state
+        else updateMcpServerCustomizationState(
+            state,
+            a.id,
+            McpServerStateStarting(current.value.copy(blocking = false)),
+            entry.channel
+        )
+    }
+
     is StateActionSessionMcpServerStopRequested -> {
         val a = action.value
         updateMcpServerCustomizationState(
@@ -818,6 +831,23 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
     }
 
     else -> state
+}
+
+/**
+ * Locates the [McpServerCustomization] with [id], searching the top-level list
+ * first and then every container's children, using the same lookup rules as
+ * [updateMcpServerCustomizationState].
+ */
+private fun findMcpServerCustomization(state: SessionState, id: String): McpServerCustomization? {
+    val list = state.customizations ?: return null
+    val top = list.firstOrNull { customizationId(it) == id }
+    if (top != null) return (top as? CustomizationMcpServer)?.value
+    for (container in list) {
+        val children = customizationChildren(container) ?: continue
+        val child = children.firstOrNull { childCustomizationId(it) == id } ?: continue
+        if (child is ChildCustomizationMcpServer) return child.value
+    }
+    return null
 }
 
 private fun updateMcpServerCustomizationState(

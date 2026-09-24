@@ -915,6 +915,18 @@ public func sessionReducer(state: SessionState, action: StateAction) -> SessionS
             channel: nil
         )
 
+    case .sessionMcpServerBackgroundRequested(let a):
+        guard let entry = findMcpServerCustomization(state, id: a.id),
+              case .starting(var starting) = entry.state,
+              starting.blocking == true else { return state }
+        starting.blocking = false
+        return updateMcpServerCustomizationState(
+            state,
+            id: a.id,
+            state: .starting(starting),
+            channel: entry.channel
+        )
+
     case .sessionMcpServerStopRequested(let a):
         return updateMcpServerCustomizationState(
             state,
@@ -949,6 +961,7 @@ public let clientDispatchableActions: Set<String> = [
     "session/customizationToggled",
     "session/mcpServerStartRequested",
     "session/mcpServerStopRequested",
+    "session/mcpServerBackgroundRequested",
     "session/isReadChanged",
     "session/isArchivedChanged",
     "automationRun/cancelRequested",
@@ -968,6 +981,7 @@ public func isClientDispatchable(_ action: StateAction) -> Bool {
          .chatInputAnswerChanged, .chatInputCompleted,
          .sessionCustomizationToggled,
          .sessionMcpServerStartRequested, .sessionMcpServerStopRequested,
+         .sessionMcpServerBackgroundRequested,
          .sessionIsReadChanged,
          .sessionIsArchivedChanged,
          .automationRunCancelRequested:
@@ -987,6 +1001,24 @@ private func addMillisecondsToTimestamp(_ timestamp: String, _ duration: Int) ->
     return iso8601TimestampFormatter.string(
         from: start.addingTimeInterval(Double(duration) / 1_000)
     )
+}
+
+/// Locates the `McpServerCustomization` with `id`, searching the top-level
+/// list first and then every container's children, using the same lookup
+/// rules as `updateMcpServerCustomizationState`.
+private func findMcpServerCustomization(_ state: SessionState, id: String) -> McpServerCustomization? {
+    guard let list = state.customizations else { return nil }
+    if let top = list.first(where: { customizationId($0) == id }) {
+        guard case .mcpServer(let entry) = top else { return nil }
+        return entry
+    }
+    for container in list {
+        guard let children = customizationChildren(container),
+              let child = children.first(where: { childId($0) == id }),
+              case .mcpServer(let entry) = child else { continue }
+        return entry
+    }
+    return nil
 }
 
 private func updateMcpServerCustomizationState(

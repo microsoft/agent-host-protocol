@@ -1421,6 +1421,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'session/mcpServerStateChanged', caseName: 'sessionMcpServerStateChanged', tsInterface: 'SessionMcpServerStateChangedAction' },
   { type: 'session/mcpServerStartRequested', caseName: 'sessionMcpServerStartRequested', tsInterface: 'SessionMcpServerStartRequestedAction' },
   { type: 'session/mcpServerStopRequested', caseName: 'sessionMcpServerStopRequested', tsInterface: 'SessionMcpServerStopRequestedAction' },
+  { type: 'session/mcpServerBackgroundRequested', caseName: 'sessionMcpServerBackgroundRequested', tsInterface: 'SessionMcpServerBackgroundRequestedAction' },
   { type: 'chat/truncated', caseName: 'chatTruncated', tsInterface: 'ChatTruncatedAction' },
   { type: 'chat/turnsLoaded', caseName: 'chatTurnsLoaded', tsInterface: 'ChatTurnsLoadedAction' },
   { type: 'session/configChanged', caseName: 'sessionConfigChanged', tsInterface: 'SessionConfigChangedAction' },

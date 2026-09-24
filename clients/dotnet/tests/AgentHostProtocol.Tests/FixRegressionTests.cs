@@ -642,6 +642,55 @@ public sealed class FixRegressionTests
         })));
     }
 
+    // ── session/mcpServerBackgroundRequested optimistically clears `blocking` on a
+    //    blocking `starting` server and is a no-op otherwise. The corpus fixtures
+    //    (274-276) compare STATE only; this pins Applied-vs-NoOp. ──
+    [Fact]
+    public void SessionMcpServerBackgroundRequested_ClearsBlocking_NoOpOtherwise()
+    {
+        var state = new SessionState
+        {
+            Provider = "copilot",
+            Title = "s",
+            Lifecycle = SessionLifecycle.Ready,
+            ActiveClients = new(),
+            Chats = new(),
+            Customizations = new()
+            {
+                new Customization(new McpServerCustomization
+                {
+                    Type = CustomizationType.McpServer,
+                    Id = "mcp-1",
+                    Uri = "file:///workspace/.mcp/servers.json",
+                    Name = "Filesystem",
+                    State = new McpServerState(new McpServerStartingState { Kind = McpServerStatus.Starting, Blocking = true }),
+                }),
+            },
+        };
+
+        McpServerCustomization Current() => (McpServerCustomization)state.Customizations!.Single().Value!;
+        ReduceOutcome Background(string id) => Reducers.ApplyToSession(state, new StateAction(new SessionMcpServerBackgroundRequestedAction
+        {
+            Type = ActionType.SessionMcpServerBackgroundRequested,
+            Id = id,
+        }));
+
+        Assert.Equal(ReduceOutcome.Applied, Background("mcp-1"));
+        Assert.False(Assert.IsType<McpServerStartingState>(Current().State.Value).Blocking);
+
+        // Already unblocked → NoOp.
+        Assert.Equal(ReduceOutcome.NoOp, Background("mcp-1"));
+
+        // Unknown id → NoOp.
+        Assert.Equal(ReduceOutcome.NoOp, Background("missing"));
+
+        Assert.True(Reducers.IsClientDispatchable(new StateAction(new SessionMcpServerBackgroundRequestedAction
+        {
+            Type = ActionType.SessionMcpServerBackgroundRequested,
+            Id = "mcp-1",
+        })));
+    }
+
     // ── MCP tool call authentication (microsoft/agent-host-protocol#336): a running
     //    MCP-contributed tool call pauses in `auth-required` and resumes on
     //    `chat/toolCallAuthResolved`. The canonical corpus covers the state transitions
