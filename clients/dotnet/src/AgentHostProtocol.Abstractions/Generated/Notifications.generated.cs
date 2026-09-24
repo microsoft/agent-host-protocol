@@ -144,6 +144,45 @@ public sealed record ProgressParams
     public string? Message { get; init; }
 }
 
+/// <summary>Sent on each previous moved chat channel after an atomic `moveChat` commit.
+///
+/// Every notification for one move carries the same authoritative resources and
+/// exhaustive ordered `movedChats` mapping as {@link MoveChatResult}. The host
+/// emits them in `movedChats` order on each old channel whose ownership or URI
+/// changed. The move is already atomically committed before the first
+/// notification; ordering is only a deterministic delivery aid, not the
+/// transaction boundary.
+///
+/// A client receiving any one notification MUST apply the complete mapping
+/// atomically, stop dispatching to replaced old URIs, subscribe to the
+/// authoritative session and chat channels as needed, and reconcile from their
+/// snapshots. Duplicate notifications for the same mapping are idempotent.
+/// Durable hierarchy and catalog truth remain in `ChatState.parentChat` and the
+/// affected sessions' catalogs; this routing handoff is not replayed.</summary>
+public sealed record ChatMovedParams
+{
+    /// <summary>Previous channel receiving this notification; names one `movedChats[].previousChat`.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Owning session URI before the move.</summary>
+    public required string PreviousSession { get; init; }
+
+    /// <summary>Requested root chat URI before the move.</summary>
+    public required string PreviousChat { get; init; }
+
+    /// <summary>Authoritative owning session URI after the move.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>Authoritative requested root chat URI after the move.</summary>
+    public required string Chat { get; init; }
+
+    /// <summary>Exhaustive ordered mapping for the complete moved subtree.
+    ///
+    /// Identical in every `chat/moved` notification for this move and in the
+    /// corresponding {@link MoveChatResult}.</summary>
+    public required List<MovedChatResource> MovedChats { get; init; }
+}
+
 /// <summary>Sent by the server when a protected resource requires (re-)authentication.
 ///
 /// This notification MAY be associated with any channel — for example, an

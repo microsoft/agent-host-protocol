@@ -684,7 +684,10 @@ type AgentCapabilities struct {
 	// clients MUST NOT call `createChat` to open chats beyond the default one the
 	// session starts with. An empty object `{}` advertises multi-chat without
 	// source-based creation; set {@link MultipleChatsCapability.fork} or
-	// {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.
+	// {@link MultipleChatsCapability.sideChat} to allow the corresponding
+	// creation mode, and set {@link MultipleChatsCapability.reparent} or
+	// {@link MultipleChatsCapability.promote} to allow the corresponding
+	// `moveChat` destination.
 	MultipleChats *MultipleChatsCapability `json:"multipleChats,omitempty"`
 	// The session's agent can be granted tool access to more than one working
 	// directory. The directories are treated as equal peers except where the
@@ -715,6 +718,18 @@ type MultipleChatsCapability struct {
 	// the host snapshots the available partial assistant response at creation
 	// time. Side-chat support always implies multi-chat support.
 	SideChat *bool `json:"sideChat,omitempty"`
+	// The agent can atomically move a non-default chat under another chat.
+	//
+	// The destination chat may belong to another session on the same host when
+	// the source and destination sessions use the same compatible provider and
+	// agent runtime. When absent or `false`, clients MUST NOT call `moveChat`
+	// with `destination.kind: "chat"`.
+	Reparent *bool `json:"reparent,omitempty"`
+	// The agent can atomically promote a non-default chat into a new top-level
+	// session on the same host. The new session preserves the source session's
+	// compatible provider and agent runtime. When absent or `false`, clients
+	// MUST NOT call `moveChat` with `destination.kind: "newSession"`.
+	Promote *bool `json:"promote,omitempty"`
 }
 
 // Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.
@@ -906,8 +921,9 @@ type SessionState struct {
 	Chats []ChatSummary `json:"chats"`
 	// The chat that receives input when the user addresses the session without
 	// selecting a specific chat. This is a UI routing hint, not a hierarchy
-	// marker — chats remain equal peers at the protocol level. Hosts MAY change
-	// this over the session's lifetime.
+	// marker — {@link ChatSummary.parentChat} defines parentage, and every chat
+	// remains directly addressable. Hosts MAY change this over the session's
+	// lifetime.
 	DefaultChat *URI `json:"defaultChat,omitempty"`
 	// Session configuration schema and current values
 	Config *SessionConfigState `json:"config,omitempty"`
@@ -1197,6 +1213,11 @@ type SessionChatSummary struct {
 	Title string `json:"title"`
 	// How this chat was created, when known
 	Origin *ChatOrigin `json:"origin,omitempty"`
+	// Current parent chat in the session's mutable hierarchy.
+	//
+	// Mirrors {@link ChatSummary.parentChat} for clients that consume only the
+	// lightweight session summary.
+	ParentChat *URI `json:"parentChat,omitempty"`
 	// How the user can interact with this chat.
 	//
 	// Generic clients use this to omit hidden chats and disable input for
@@ -1242,6 +1263,13 @@ type ChatState struct {
 	ModifiedAt string `json:"modifiedAt"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
+	// Current parent chat in the owning session's mutable chat hierarchy.
+	//
+	// Unlike {@link origin}, this relationship may change through `moveChat`.
+	// Absence means the chat is top-level within its session. The referenced
+	// chat MUST belong to the same session and MUST NOT be this chat or one of
+	// its descendants.
+	ParentChat *URI `json:"parentChat,omitempty"`
 	// How the user can interact with this chat. See {@link ChatInteractivity}.
 	//
 	// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1316,6 +1344,10 @@ type ChatSummary struct {
 	ModifiedAt string `json:"modifiedAt"`
 	// How this chat came into existence
 	Origin *ChatOrigin `json:"origin,omitempty"`
+	// Current parent chat in the owning session's mutable chat hierarchy.
+	//
+	// See {@link ChatState.parentChat} for the full semantics.
+	ParentChat *URI `json:"parentChat,omitempty"`
 	// How the user can interact with this chat. See {@link ChatInteractivity}.
 	//
 	// Supports agent-team patterns where worker chats are read-only or hidden.

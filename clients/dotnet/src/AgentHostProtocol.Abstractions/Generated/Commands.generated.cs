@@ -31,6 +31,18 @@ public enum ChatSourceKind
     SideChat,
 }
 
+/// <summary>Destination kind for an atomic chat move.</summary>
+[JsonConverter(typeof(WireEnumConverter<ChatMoveDestinationKind>))]
+public enum ChatMoveDestinationKind
+{
+    /// <summary>Move the source chat under another chat.</summary>
+    [WireValue("chat")]
+    Chat,
+    /// <summary>Promote the source chat into a newly allocated top-level session.</summary>
+    [WireValue("newSession")]
+    NewSession,
+}
+
 /// <summary>Encoding of fetched content data.</summary>
 [JsonConverter(typeof(WireEnumConverter<ContentEncoding>))]
 public enum ContentEncoding
@@ -640,6 +652,116 @@ public sealed record DisposeChatParams
     [JsonPropertyName("_meta")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; init; }
+}
+
+/// <summary>Moves a chat under another chat.</summary>
+public sealed record ChatMoveToChatDestination
+{
+    /// <summary>Discriminant</summary>
+    public ChatMoveDestinationKind Kind { get; init; }
+
+    /// <summary>Destination parent chat URI.</summary>
+    public required string Chat { get; init; }
+}
+
+/// <summary>Promotes a chat into a newly allocated top-level session.</summary>
+public sealed record ChatMoveToNewSessionDestination
+{
+    /// <summary>Discriminant</summary>
+    public ChatMoveDestinationKind Kind { get; init; }
+}
+
+/// <summary>Atomically changes a non-default chat's parent and, when necessary, owning
+/// session.
+///
+/// The source is the chat named by `channel`. A `chat` destination reparents it
+/// under the destination chat and moves its descendant subtree into that chat's
+/// session when the sessions differ. A `newSession` destination allocates a new
+/// compatible session, promotes the source to its top level, and makes it that
+/// session's default chat.
+///
+/// The host MUST validate the complete operation before committing it. It MUST
+/// reject a source subtree containing an owning session's default chat, any
+/// active turn in the moved subtree, a destination equal to or below the
+/// source, an unsupported capability, a destination on another host, or
+/// incompatible source and destination provider/agent runtimes. Rejection MUST
+/// leave every chat, session catalog, and root summary unchanged. Unknown
+/// resources use `NotFound`, active turns use `TurnInProgress`, and validation,
+/// capability, compatibility, cycle, and idempotency-key mismatches use
+/// `InvalidParams`.
+///
+/// On success the host commits the hierarchy, ownership, and every moved-chat
+/// URI replacement as one transaction before publishing synchronization
+/// messages. Every moved descendant's `parentChat` MUST name the authoritative
+/// post-move URI of its moved parent. `ChatOrigin` remains unchanged, including
+/// historical chat URIs that no longer resolve after replacement.
+/// It then updates affected session catalogs with `session/chatRemoved`,
+/// `session/chatAdded`, and `session/chatUpdated`, dispatches
+/// `chat/parentChanged` on preserved chat channels, and emits `chat/moved` on
+/// previous moved chat channels when subscribers must follow authoritative
+/// result resources.</summary>
+public sealed record MoveChatParams
+{
+    /// <summary>Source chat URI.</summary>
+    public required string Channel { get; init; }
+
+    /// <summary>Optional JSON-serializable metadata associated with this request.
+    /// Receivers MUST ignore keys they do not understand.</summary>
+    [JsonPropertyName("_meta")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonElement>? Meta { get; init; }
+
+    /// <summary>Atomic move destination.</summary>
+    public required ChatMoveDestination Destination { get; init; }
+
+    /// <summary>Durable client-generated idempotency key.
+    ///
+    /// Retrying the same logical request with the same `requestId`, source, and
+    /// destination MUST return the original {@link MoveChatResult}, including
+    /// after reconnect or an uncertain response. Reusing the key with a different
+    /// source or destination MUST be rejected with `InvalidParams`.</summary>
+    public required string RequestId { get; init; }
+}
+
+/// <summary>Authoritative URI mapping for one chat in a moved subtree.</summary>
+public sealed record MovedChatResource
+{
+    /// <summary>Chat URI before the move.</summary>
+    public required string PreviousChat { get; init; }
+
+    /// <summary>Authoritative chat URI after the move.</summary>
+    public required string Chat { get; init; }
+}
+
+/// <summary>Authoritative resources before and after an atomic chat move.
+///
+/// `previousChat` and `chat` identify the requested root and equal the first
+/// entry of `movedChats`. They are retained as a convenience for callers that
+/// only need to follow the requested chat. `movedChats` is the exhaustive
+/// authoritative mapping for the complete moved subtree.</summary>
+public sealed record MoveChatResult
+{
+    /// <summary>Owning session URI before the move.</summary>
+    public required string PreviousSession { get; init; }
+
+    /// <summary>Source chat URI before the move.</summary>
+    public required string PreviousChat { get; init; }
+
+    /// <summary>Authoritative owning session URI after the move.</summary>
+    public required string Session { get; init; }
+
+    /// <summary>Authoritative requested root chat URI after the move.</summary>
+    public required string Chat { get; init; }
+
+    /// <summary>Exhaustive URI mapping for every chat in the moved subtree, including
+    /// entries whose URI was preserved.
+    ///
+    /// The first entry MUST map `previousChat` to `chat`. Remaining entries are
+    /// ordered in deterministic depth-first pre-order: every parent precedes its
+    /// descendants, and siblings retain their order from the source session's
+    /// `chats` catalog. Clients MUST apply the complete mapping atomically and
+    /// MUST NOT infer replacements for chats absent from this list.</summary>
+    public required List<MovedChatResource> MovedChats { get; init; }
 }
 
 /// <summary>Returns a list of session summaries. Used to populate session lists and sidebars.
@@ -1722,6 +1844,31 @@ internal sealed class ChatSourceConverter : UnionConverter<ChatSource>
             {
         ["fork"] = typeof(ForkChatSource),
         ["sideChat"] = typeof(SideChatSource),
+            },
+            allowUnknown: false)
+    {
+    }
+}
+[JsonConverter(typeof(ChatMoveDestinationConverter))]
+public sealed class ChatMoveDestination : AhpUnion
+{
+    /// <summary>Creates an empty ChatMoveDestination (no active variant).</summary>
+    public ChatMoveDestination() { }
+
+    /// <summary>Creates a ChatMoveDestination wrapping the given variant value.</summary>
+    public ChatMoveDestination(object? value) : base(value) { }
+}
+
+/// <summary>System.Text.Json converter for the ChatMoveDestination discriminated union.</summary>
+internal sealed class ChatMoveDestinationConverter : UnionConverter<ChatMoveDestination>
+{
+    public ChatMoveDestinationConverter()
+        : base(
+            discriminator: "kind",
+            variants: new Dictionary<string, Type>
+            {
+        ["chat"] = typeof(ChatMoveToChatDestination),
+        ["newSession"] = typeof(ChatMoveToNewSessionDestination),
             },
             allowUnknown: false)
     {

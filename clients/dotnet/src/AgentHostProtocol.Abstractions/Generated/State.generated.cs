@@ -870,7 +870,10 @@ public sealed record AgentCapabilities
     /// clients MUST NOT call `createChat` to open chats beyond the default one the
     /// session starts with. An empty object `{}` advertises multi-chat without
     /// source-based creation; set {@link MultipleChatsCapability.fork} or
-    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding mode.</summary>
+    /// {@link MultipleChatsCapability.sideChat} to allow the corresponding
+    /// creation mode, and set {@link MultipleChatsCapability.reparent} or
+    /// {@link MultipleChatsCapability.promote} to allow the corresponding
+    /// `moveChat` destination.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MultipleChatsCapability? MultipleChats { get; init; }
 
@@ -908,6 +911,22 @@ public sealed record MultipleChatsCapability
     /// time. Side-chat support always implies multi-chat support.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? SideChat { get; init; }
+
+    /// <summary>The agent can atomically move a non-default chat under another chat.
+    ///
+    /// The destination chat may belong to another session on the same host when
+    /// the source and destination sessions use the same compatible provider and
+    /// agent runtime. When absent or `false`, clients MUST NOT call `moveChat`
+    /// with `destination.kind: "chat"`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Reparent { get; init; }
+
+    /// <summary>The agent can atomically promote a non-default chat into a new top-level
+    /// session on the same host. The new session preserves the source session's
+    /// compatible provider and agent runtime. When absent or `false`, clients
+    /// MUST NOT call `moveChat` with `destination.kind: "newSession"`.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Promote { get; init; }
 }
 
 /// <summary>Options for the {@link AgentCapabilities.multipleWorkingDirectories} capability.</summary>
@@ -1134,6 +1153,12 @@ public sealed class ChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
 
+    /// <summary>Current parent chat in the owning session's mutable chat hierarchy.
+    ///
+    /// See {@link ChatState.parentChat} for the full semantics.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParentChat { get; set; }
+
     /// <summary>How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
     /// Supports agent-team patterns where worker chats are read-only or hidden.
@@ -1180,6 +1205,15 @@ public sealed class ChatState
     /// <summary>How this chat came into existence</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; set; }
+
+    /// <summary>Current parent chat in the owning session's mutable chat hierarchy.
+    ///
+    /// Unlike {@link origin}, this relationship may change through `moveChat`.
+    /// Absence means the chat is top-level within its session. The referenced
+    /// chat MUST belong to the same session and MUST NOT be this chat or one of
+    /// its descendants.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParentChat { get; set; }
 
     /// <summary>How the user can interact with this chat. See {@link ChatInteractivity}.
     ///
@@ -1597,8 +1631,9 @@ public sealed class SessionState
 
     /// <summary>The chat that receives input when the user addresses the session without
     /// selecting a specific chat. This is a UI routing hint, not a hierarchy
-    /// marker — chats remain equal peers at the protocol level. Hosts MAY change
-    /// this over the session's lifetime.</summary>
+    /// marker — {@link ChatSummary.parentChat} defines parentage, and every chat
+    /// remains directly addressable. Hosts MAY change this over the session's
+    /// lifetime.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DefaultChat { get; set; }
 
@@ -1955,6 +1990,13 @@ public sealed record SessionChatSummary
     /// <summary>How this chat was created, when known</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ChatOrigin? Origin { get; init; }
+
+    /// <summary>Current parent chat in the session's mutable hierarchy.
+    ///
+    /// Mirrors {@link ChatSummary.parentChat} for clients that consume only the
+    /// lightweight session summary.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ParentChat { get; init; }
 
     /// <summary>How the user can interact with this chat.
     ///

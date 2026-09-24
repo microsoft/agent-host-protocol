@@ -52,6 +52,7 @@ import type {
   ChatErrorAction,
   ChatTurnResumeAction,
   ChatActivityChangedAction,
+  ChatParentChangedAction,
   ChatChangesetsChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
@@ -214,6 +215,7 @@ export type ChatAction =
   | ChatErrorAction
   | ChatTurnResumeAction
   | ChatActivityChangedAction
+  | ChatParentChangedAction
   | ChatChangesetsChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction
@@ -264,6 +266,7 @@ export type ServerChatAction =
   | ChatTurnCompleteAction
   | ChatErrorAction
   | ChatActivityChangedAction
+  | ChatParentChangedAction
   | ChatChangesetsChangedAction
   | ChatUsageAction
   | ChatReasoningAction
@@ -469,6 +472,7 @@ export const IS_CLIENT_DISPATCHABLE: { readonly [K in StateAction['type']]: bool
   [ActionType.ChatError]: false,
   [ActionType.ChatTurnResume]: true,
   [ActionType.ChatActivityChanged]: false,
+  [ActionType.ChatParentChanged]: false,
   [ActionType.ChatChangesetsChanged]: false,
   [ActionType.ChatWorkingDirectorySet]: true,
   [ActionType.ChatWorkingDirectoryRemoved]: true,

@@ -1490,6 +1490,7 @@ const ACTION_VARIANTS: { type: string; caseName: string; tsInterface: string }[]
   { type: 'chat/error', caseName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', caseName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', caseName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/parentChanged', caseName: 'ChatParentChanged', tsInterface: 'ChatParentChangedAction' },
   { type: 'chat/changesetsChanged', caseName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', caseName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', caseName: 'ChatUsage', tsInterface: 'ChatUsageAction' },
@@ -1719,7 +1720,7 @@ function generateActionsFile(project: Project): string {
 
 // ─── Commands File Generator ─────────────────────────────────────────────────
 
-const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
+const COMMAND_ENUMS = ['ReconnectResultType', 'ChatSourceKind', 'ChatMoveDestinationKind', 'ContentEncoding', 'CompletionItemKind', 'ResourceType', 'ResourceWriteMode'];
 
 const COMMAND_STRUCTS = [
   'InitializeParams', 'InitializeResult',
@@ -1732,6 +1733,7 @@ const COMMAND_STRUCTS = [
   'SubscribeParams', 'SubscribeView', 'SubscriptionDeliveryOptions', 'SubscribeResult',
   'CreateSessionParams', 'DisposeSessionParams',
   'CreateChatParams', 'DisposeChatParams',
+  'ChatMoveToChatDestination', 'ChatMoveToNewSessionDestination', 'MoveChatParams', 'MovedChatResource', 'MoveChatResult',
   'ListSessionsParams', 'ListSessionsResult',
   'ResourceReadParams', 'ResourceReadResult',
   'ResourceWriteParams', 'ResourceWriteResult',
@@ -1774,6 +1776,15 @@ const CHAT_SOURCE_UNION: UnionConfig = {
   variants: [
     { caseName: 'Fork', structName: 'ForkChatSource', discriminantValue: 'fork' },
     { caseName: 'SideChat', structName: 'SideChatSource', discriminantValue: 'sideChat' },
+  ],
+};
+
+const CHAT_MOVE_DESTINATION_UNION: UnionConfig = {
+  name: 'ChatMoveDestination',
+  discriminantField: 'kind',
+  variants: [
+    { caseName: 'Chat', structName: 'ChatMoveToChatDestination', discriminantValue: 'chat' },
+    { caseName: 'NewSession', structName: 'ChatMoveToNewSessionDestination', discriminantValue: 'newSession' },
   ],
 };
 
@@ -1967,6 +1978,10 @@ function generateCommandsFile(project: Project): string {
   lines.push('');
   lines.push(generateDiscriminatedUnion(project, CHAT_SOURCE_UNION));
   lines.push('');
+  lines.push('// ─── ChatMoveDestination Union ──────────────────────────────────────────────');
+  lines.push('');
+  lines.push(generateDiscriminatedUnion(project, CHAT_MOVE_DESTINATION_UNION));
+  lines.push('');
 
   lines.push('// ─── ReconnectResult Union ──────────────────────────────────────────────────');
   lines.push('');
@@ -1990,6 +2005,7 @@ const NOTIFICATION_STRUCTS = [
   'SessionRemovedParams',
   'SessionSummaryChangedParams',
   'ProgressParams',
+  'ChatMovedParams',
   'AuthRequiredParams',
   'OtlpExportLogsParams',
   'OtlpExportTracesParams',
@@ -2338,6 +2354,7 @@ function checkExhaustiveness(project: Project): void {
     'ChatInputAnswer',           // CHAT_INPUT_ANSWER_UNION discriminated union
     'ChatOrigin',                // hand-generated union for inline variants
     'ChatSource',                // CHAT_SOURCE_UNION discriminated union
+    'ChatMoveDestination',       // CHAT_MOVE_DESTINATION_UNION discriminated union
     'ChatToolCallApprovedAction', // merged into ChatToolCallConfirmedAction
     'ChatToolCallDeniedAction',   // merged into ChatToolCallConfirmedAction
     'ChatToolCallConfirmedAction', // emitted as merged variant

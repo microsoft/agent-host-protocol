@@ -547,6 +547,22 @@ export interface ChatActivityChangedAction {
 }
 
 /**
+ * The chat's mutable hierarchy parent changed.
+ *
+ * The host dispatches this action on a preserved chat channel after committing
+ * `moveChat`. It MUST also dispatch `session/chatUpdated` on the owning session
+ * so the denormalized {@link ChatSummary.parentChat} stays in sync.
+ *
+ * @category Chat Actions
+ * @version 1
+ */
+export interface ChatParentChangedAction {
+  type: ActionType.ChatParentChanged;
+  /** New parent chat URI, or `undefined` to promote the chat to the session top level. */
+  parentChat?: URI;
+}
+
+/**
  * The {@link Changeset | catalogue of changesets} the agent host advertises
  * for this chat changed. Replaces
  * {@link ChatState.changesets | `state.changesets`} entirely
@@ -886,6 +902,7 @@ export type ChatAction =
   | ChatErrorAction
   | ChatTurnResumeAction
   | ChatActivityChangedAction
+  | ChatParentChangedAction
   | ChatChangesetsChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction

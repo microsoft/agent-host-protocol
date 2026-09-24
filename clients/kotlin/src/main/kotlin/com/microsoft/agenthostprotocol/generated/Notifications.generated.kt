@@ -127,6 +127,37 @@ data class ProgressParams(
 )
 
 @Serializable
+data class ChatMovedParams(
+    /**
+     * Previous channel receiving this notification; names one `movedChats[].previousChat`.
+     */
+    val channel: String,
+    /**
+     * Owning session URI before the move.
+     */
+    val previousSession: String,
+    /**
+     * Requested root chat URI before the move.
+     */
+    val previousChat: String,
+    /**
+     * Authoritative owning session URI after the move.
+     */
+    val session: String,
+    /**
+     * Authoritative requested root chat URI after the move.
+     */
+    val chat: String,
+    /**
+     * Exhaustive ordered mapping for the complete moved subtree.
+     *
+     * Identical in every `chat/moved` notification for this move and in the
+     * corresponding {@link MoveChatResult}.
+     */
+    val movedChats: List<MovedChatResource>
+)
+
+@Serializable
 data class AuthRequiredParams(
     /**
      * Channel URI this notification belongs to
