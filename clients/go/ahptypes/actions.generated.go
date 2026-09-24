@@ -381,7 +381,7 @@ type ChatToolCallReadyAction struct {
 	// Risk assessment that informed the confirmation requirement.
 	RiskAssessment *ToolCallRiskAssessment `json:"riskAssessment,omitempty"`
 	// File edits that this tool call will perform, for preview before confirmation
-	Edits *json.RawMessage `json:"edits,omitempty"`
+	Edits *FileEditCollection `json:"edits,omitempty"`
 	// Whether the agent host allows the client to edit the tool's input parameters before confirming
 	Editable *bool `json:"editable,omitempty"`
 	// If set, the tool was auto-confirmed and transitions directly to `running`

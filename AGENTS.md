@@ -91,3 +91,21 @@ Do **not** edit `CHANGELOG.md` files for normal feature/fix PRs and do
 not invent a `## [X.Y.Z]` heading. Changelogs are updated by the release
 maintainer per [`RELEASING.md`](RELEASING.md). Run
 `npm run verify:change-fragments` to validate fragment JSON.
+
+## Preserve protocol object types
+
+For new or changed protocol objects with a fixed schema, prefer named, reusable
+types in `types/` and generated native models. Do not replace a known shape with
+raw JSON to work around a generator gap.
+
+Reserve raw JSON for intentionally open data, such as `_meta`, JSON Schema and
+tool payloads, provider extensions, and unknown variants.
+
+Update the canonical definitions and each affected generator. Do not hand-edit
+generated files. Preserve wire names, nesting, optionality, numeric mappings,
+and collection wrappers such as `{ items: ... }`.
+
+Check source and binary compatibility separately from JSON compatibility.
+Define an explicit migration for public API changes. Keep native decoding
+errors visible. Cover known shapes with shared round-trip fixtures, not
+per-language serialization tests.

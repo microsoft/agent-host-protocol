@@ -3128,7 +3128,7 @@ data class ToolCallPendingConfirmationState(
     /**
      * File edits that this tool call will perform, for preview before confirmation
      */
-    val edits: JsonElement? = null,
+    val edits: FileEditCollection? = null,
     /**
      * Whether the agent host allows the client to edit the tool's input parameters before confirming
      */
@@ -3641,15 +3641,15 @@ data class ToolResultFileEditContent(
     /**
      * The file state before the edit. Absent for file creations or for in-place file edits.
      */
-    val before: JsonElement? = null,
+    val before: FileEditSide? = null,
     /**
      * The file state after the edit. Absent for file deletions.
      */
-    val after: JsonElement? = null,
+    val after: FileEditSide? = null,
     /**
      * Optional diff display metadata
      */
-    val diff: JsonElement? = null,
+    val diff: FileEditDiffStats? = null,
     val type: ToolResultContentType
 )
 
@@ -3657,7 +3657,7 @@ data class ToolResultFileEditContent(
 data class ToolResultTerminalContent(
     val type: ToolResultContentType,
     /**
-     * Terminal URI (subscribable for full terminal state)
+     * Terminal URI (subscribable for live or retained terminal state)
      */
     val resource: String,
     /**
@@ -4583,19 +4583,48 @@ data class ToolCallMcpContributor(
 )
 
 @Serializable
+data class FileEditSide(
+    /**
+     * URI of the file on this side of the edit
+     */
+    val uri: String,
+    /**
+     * Reference to the file content on this side of the edit
+     */
+    val content: ContentRef
+)
+
+@Serializable
+data class FileEditDiffStats(
+    /**
+     * Number of items added (e.g., lines for text files, cells for notebooks)
+     */
+    val added: Long? = null,
+    /**
+     * Number of items removed (e.g., lines for text files, cells for notebooks)
+     */
+    val removed: Long? = null
+)
+
+@Serializable
 data class FileEdit(
     /**
      * The file state before the edit. Absent for file creations or for in-place file edits.
      */
-    val before: JsonElement? = null,
+    val before: FileEditSide? = null,
     /**
      * The file state after the edit. Absent for file deletions.
      */
-    val after: JsonElement? = null,
+    val after: FileEditSide? = null,
     /**
      * Optional diff display metadata
      */
-    val diff: JsonElement? = null
+    val diff: FileEditDiffStats? = null
+)
+
+@Serializable
+data class FileEditCollection(
+    val items: List<FileEdit>
 )
 
 @Serializable

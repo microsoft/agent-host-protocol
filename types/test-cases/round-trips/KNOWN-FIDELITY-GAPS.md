@@ -18,8 +18,7 @@ entries would cement observed-but-wrong divergence as "acceptable".
   which drops the unknown keys, and assert the dropped form in
   `acceptableOutputs[0]`. TypeScript has no runtime decoder, so `JSON.parse` /
   `JSON.stringify` preserve every key; it asserts the preserved form in
-  `preservedOutput`. TypeScript still asserts — it is never skipped. Fixtures
-  017 and 019 are the Group B cases.
+  `preservedOutput`. TypeScript still asserts. It never skips Group B fixtures.
 
 This is a real type-system capability difference, not a blessed divergence: a
 runtime client that wrongly *preserved* unknown keys would fail its
@@ -50,6 +49,8 @@ divergence.
 Unknown-value forward compatibility is covered at all three levels an additive
 protocol change can touch: an unknown **union variant** (fixture 003), an unknown
 value of an **open string field** (fixture 024), and an unknown value of an open
-(`@nonexhaustive`) **enum on a directly-typed field** (fixture 045). The last one
+(`@nonexhaustive`) **enum on a directly-typed field** (fixture 050). The last one
 is the case a closed language enum cannot represent, so it is the one that most
-easily regresses into a whole-message decode failure.
+easily regresses into a whole-message decode failure. Fixture 052 covers the
+related case where that open enum is also a **union discriminator**, which a
+decoder can fail even when it tolerates the enum on a plain field.

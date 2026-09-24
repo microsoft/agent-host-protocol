@@ -1,0 +1,4 @@
+{
+  "type": "changed",
+  "message": "`FileEdit` and preview `edits` now use named models in generated SDKs. This breaks affected SDK APIs but keeps JSON shapes unchanged."
+}

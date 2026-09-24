@@ -3887,7 +3887,7 @@ public sealed record ToolCallPendingConfirmationState
 
     /// <summary>File edits that this tool call will perform, for preview before confirmation</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Edits { get; init; }
+    public FileEditCollection? Edits { get; init; }
 
     /// <summary>Whether the agent host allows the client to edit the tool's input parameters before confirming</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -4366,15 +4366,15 @@ public sealed record ToolResultFileEditContent
 {
     /// <summary>The file state before the edit. Absent for file creations or for in-place file edits.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Before { get; init; }
+    public FileEditSide? Before { get; init; }
 
     /// <summary>The file state after the edit. Absent for file deletions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? After { get; init; }
+    public FileEditSide? After { get; init; }
 
     /// <summary>Optional diff display metadata</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Diff { get; init; }
+    public FileEditDiffStats? Diff { get; init; }
 
     public ToolResultContentType Type { get; init; } = ToolResultContentType.FileEdit;
 }
@@ -4382,7 +4382,11 @@ public sealed record ToolResultFileEditContent
 /// <summary>A reference to a terminal whose output is relevant to this tool result.
 ///
 /// Clients can subscribe to the terminal's URI to stream its output in real
-/// time, providing live feedback while a tool is executing.
+/// time, providing live feedback while a tool is executing. The same URI
+/// remains subscribable for historical results: when the referenced resource's
+/// lifecycle is `exited`, subscribing returns an exited {@link TerminalState}
+/// containing the retained terminal content. Servers may reconstruct that state
+/// lazily and do not need to retain a live terminal process.
 ///
 /// When the command exits, {@link result} is filled in on the completed
 /// result, retaining the outcome for clients that did not subscribe. This
@@ -4392,7 +4396,7 @@ public sealed record ToolResultTerminalContent
 {
     public ToolResultContentType Type { get; init; } = ToolResultContentType.Terminal;
 
-    /// <summary>Terminal URI (subscribable for full terminal state)</summary>
+    /// <summary>Terminal URI (subscribable for live or retained terminal state)</summary>
     public required string Resource { get; init; }
 
     /// <summary>Display title for the terminal content</summary>
@@ -5429,6 +5433,26 @@ public sealed record ToolCallMcpContributor
     public required string CustomizationId { get; init; }
 }
 
+public sealed record FileEditSide
+{
+    /// <summary>URI of the file on this side of the edit</summary>
+    public required string Uri { get; init; }
+
+    /// <summary>Reference to the file content on this side of the edit</summary>
+    public required ContentRef Content { get; init; }
+}
+
+public sealed record FileEditDiffStats
+{
+    /// <summary>Number of items added (e.g., lines for text files, cells for notebooks)</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Added { get; init; }
+
+    /// <summary>Number of items removed (e.g., lines for text files, cells for notebooks)</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? Removed { get; init; }
+}
+
 /// <summary>Describes a file modification with before/after state and diff metadata.
 ///
 /// Supports creates (only `after`), deletes (only `before`), renames/moves
@@ -5437,15 +5461,20 @@ public sealed record FileEdit
 {
     /// <summary>The file state before the edit. Absent for file creations or for in-place file edits.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Before { get; init; }
+    public FileEditSide? Before { get; init; }
 
     /// <summary>The file state after the edit. Absent for file deletions.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? After { get; init; }
+    public FileEditSide? After { get; init; }
 
     /// <summary>Optional diff display metadata</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public JsonElement? Diff { get; init; }
+    public FileEditDiffStats? Diff { get; init; }
+}
+
+public sealed record FileEditCollection
+{
+    public required List<FileEdit> Items { get; init; }
 }
 
 /// <summary>Lightweight terminal metadata exposed on the root state.</summary>

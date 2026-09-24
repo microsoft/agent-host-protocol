@@ -14,6 +14,7 @@ import type {
   ContentRef,
   ErrorInfo,
   FileEdit,
+  FileEditCollection,
   StringOrMarkdown,
   TextRange,
   TextSelection,
@@ -1317,7 +1318,7 @@ export interface ToolCallPendingConfirmationState extends ToolCallBase, ToolCall
   /** Risk assessment that informed the confirmation requirement. */
   riskAssessment?: ToolCallRiskAssessment;
   /** File edits that this tool call will perform, for preview before confirmation */
-  edits?: { items: FileEdit[] };
+  edits?: FileEditCollection;
   /** Whether the agent host allows the client to edit the tool's input parameters before confirming */
   editable?: boolean;
   /**
@@ -1546,7 +1547,11 @@ export interface ToolResultFileEditContent extends FileEdit {
  * A reference to a terminal whose output is relevant to this tool result.
  *
  * Clients can subscribe to the terminal's URI to stream its output in real
- * time, providing live feedback while a tool is executing.
+ * time, providing live feedback while a tool is executing. The same URI
+ * remains subscribable for historical results: when the referenced resource's
+ * lifecycle is `exited`, subscribing returns an exited {@link TerminalState}
+ * containing the retained terminal content. Servers may reconstruct that state
+ * lazily and do not need to retain a live terminal process.
  *
  * When the command exits, {@link result} is filled in on the completed
  * result, retaining the outcome for clients that did not subscribe. This
@@ -1557,7 +1562,7 @@ export interface ToolResultFileEditContent extends FileEdit {
  */
 export interface ToolResultTerminalContent {
   type: ToolResultContentType.Terminal;
-  /** Terminal URI (subscribable for full terminal state) */
+  /** Terminal URI (subscribable for live or retained terminal state) */
   resource: URI;
   /** Display title for the terminal content */
   title: string;
