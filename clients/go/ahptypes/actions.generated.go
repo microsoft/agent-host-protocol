@@ -44,6 +44,8 @@ const (
 	ActionTypeChatError                           ActionType = "chat/error"
 	ActionTypeChatTurnResume                      ActionType = "chat/turnResume"
 	ActionTypeChatActivityChanged                 ActionType = "chat/activityChanged"
+	ActionTypeChatBackgroundShellSet              ActionType = "chat/backgroundShellSet"
+	ActionTypeChatBackgroundShellRemoved          ActionType = "chat/backgroundShellRemoved"
 	ActionTypeChatChangesetsChanged               ActionType = "chat/changesetsChanged"
 	ActionTypeChatWorkingDirectorySet             ActionType = "chat/workingDirectorySet"
 	ActionTypeChatWorkingDirectoryRemoved         ActionType = "chat/workingDirectoryRemoved"
@@ -642,6 +644,22 @@ type ChatActivityChangedAction struct {
 	Type ActionType `json:"type"`
 	// Human-readable description of current activity; omit or set `undefined` to clear
 	Activity *string `json:"activity,omitempty"`
+}
+
+// Adds or replaces an active background shell by ID, independently of turn state.
+// Hosts mirror the resulting inventory through `session/chatUpdated`.
+type ChatBackgroundShellSetAction struct {
+	Type ActionType `json:"type"`
+	// Complete shell metadata.
+	Shell BackgroundShellInfo `json:"shell"`
+}
+
+// Removes a finished or no-longer-tracked background shell; unknown IDs are a no-op.
+// Hosts mirror the resulting inventory through `session/chatUpdated`.
+type ChatBackgroundShellRemovedAction struct {
+	Type ActionType `json:"type"`
+	// Identifier scoped to the owning chat.
+	ShellId string `json:"shellId"`
 }
 
 // The {@link Changeset | catalogue of changesets} the agent host advertises
@@ -1742,6 +1760,8 @@ func (*ChatTurnCancelledAction) isStateAction()                   {}
 func (*ChatErrorAction) isStateAction()                           {}
 func (*ChatTurnResumeAction) isStateAction()                      {}
 func (*ChatActivityChangedAction) isStateAction()                 {}
+func (*ChatBackgroundShellSetAction) isStateAction()              {}
+func (*ChatBackgroundShellRemovedAction) isStateAction()          {}
 func (*ChatChangesetsChangedAction) isStateAction()               {}
 func (*SessionTitleChangedAction) isStateAction()                 {}
 func (*ChatUsageAction) isStateAction()                           {}
@@ -1982,6 +2002,18 @@ func (u *StateAction) UnmarshalJSON(data []byte) error {
 		u.Value = &value
 	case "chat/activityChanged":
 		var value ChatActivityChangedAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/backgroundShellSet":
+		var value ChatBackgroundShellSetAction
+		if err := json.Unmarshal(data, &value); err != nil {
+			return err
+		}
+		u.Value = &value
+	case "chat/backgroundShellRemoved":
+		var value ChatBackgroundShellRemovedAction
 		if err := json.Unmarshal(data, &value); err != nil {
 			return err
 		}

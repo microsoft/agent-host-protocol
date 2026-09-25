@@ -738,6 +738,9 @@ pub fn apply_action_to_session(state: &mut SessionState, action: &StateAction) -
             if let Some(activity) = &a.changes.activity {
                 chat.activity = Some(activity.clone());
             }
+            if let Some(shells) = &a.changes.background_shells {
+                chat.background_shells = Some(shells.clone());
+            }
             if let Some(modified_at) = &a.changes.modified_at {
                 chat.modified_at = modified_at.clone();
             }
@@ -1117,6 +1120,25 @@ pub fn apply_action_to_chat(state: &mut ChatState, action: &StateAction) -> Redu
         }
         StateAction::ChatActivityChanged(a) => {
             state.activity = a.activity.clone();
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatBackgroundShellSet(a) => {
+            let list = state.background_shells.get_or_insert_with(Vec::new);
+            if let Some(idx) = list.iter().position(|shell| shell.id == a.shell.id) {
+                list[idx] = a.shell.clone();
+            } else {
+                list.push(a.shell.clone());
+            }
+            ReduceOutcome::Applied
+        }
+        StateAction::ChatBackgroundShellRemoved(a) => {
+            let Some(list) = state.background_shells.as_mut() else {
+                return ReduceOutcome::NoOp;
+            };
+            let Some(idx) = list.iter().position(|shell| shell.id == a.shell_id) else {
+                return ReduceOutcome::NoOp;
+            };
+            list.remove(idx);
             ReduceOutcome::Applied
         }
         StateAction::ChatChangesetsChanged(a) => {
@@ -2221,6 +2243,7 @@ mod tests {
             title: String::new(),
             status: SessionStatus::Idle.bits(),
             activity: None,
+            background_shells: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             origin: None,
             interactivity: None,
@@ -2378,6 +2401,7 @@ mod tests {
             title: "c1".into(),
             status: SessionStatus::Idle.bits(),
             activity: None,
+            background_shells: None,
             modified_at: "1970-01-01T00:00:00.000Z".into(),
             origin: None,
             interactivity: None,

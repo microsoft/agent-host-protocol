@@ -969,6 +969,32 @@ public static class Reducers
             case ChatActivityChangedAction a:
                 state.Activity = a.Activity;
                 return ReduceOutcome.Applied;
+            case ChatBackgroundShellSetAction a:
+                {
+                    state.BackgroundShells ??= new List<BackgroundShellInfo>();
+                    int idx = state.BackgroundShells.FindIndex(shell => shell.Id == a.Shell.Id);
+                    if (idx < 0)
+                    {
+                        state.BackgroundShells.Add(a.Shell);
+                    }
+                    else
+                    {
+                        state.BackgroundShells[idx] = a.Shell;
+                    }
+
+                    return ReduceOutcome.Applied;
+                }
+            case ChatBackgroundShellRemovedAction a:
+                {
+                    int idx = state.BackgroundShells?.FindIndex(shell => shell.Id == a.ShellId) ?? -1;
+                    if (idx < 0)
+                    {
+                        return ReduceOutcome.NoOp;
+                    }
+
+                    state.BackgroundShells!.RemoveAt(idx);
+                    return ReduceOutcome.Applied;
+                }
             case ChatChangesetsChangedAction a:
                 state.Changesets = CopyList(a.Changesets);
                 return ReduceOutcome.Applied;
@@ -1833,6 +1859,7 @@ public static class Reducers
         if (ch.Title is not null) { s.Title = ch.Title; }
         if (ch.Status is not null) { s.Status = ch.Status.Value; }
         if (ch.Activity is not null) { s.Activity = ch.Activity; }
+        if (ch.BackgroundShells is not null) { s.BackgroundShells = ch.BackgroundShells; }
         if (ch.ModifiedAt is not null) { s.ModifiedAt = ch.ModifiedAt; }
         if (ch.Origin is not null) { s.Origin = ch.Origin; }
         if (ch.Interactivity is not null) { s.Interactivity = ch.Interactivity; }

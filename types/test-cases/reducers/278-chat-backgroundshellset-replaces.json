@@ -1,0 +1,51 @@
+{
+  "description": "setting a background shell replaces by ID without duplication",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": [],
+    "backgroundShells": [
+      {
+        "id": "shell-1",
+        "description": "Run tests",
+        "command": "npm test",
+        "status": "running",
+        "startedAt": "2026-09-25T00:00:00.000Z",
+        "attachmentMode": "attached"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "chat/backgroundShellSet",
+      "shell": {
+        "id": "shell-1",
+        "description": "Run tests",
+        "command": "npm test",
+        "status": "idle",
+        "startedAt": "2026-09-25T00:00:00.000Z",
+        "attachmentMode": "detached"
+      }
+    }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": [],
+    "backgroundShells": [
+      {
+        "id": "shell-1",
+        "description": "Run tests",
+        "command": "npm test",
+        "status": "idle",
+        "startedAt": "2026-09-25T00:00:00.000Z",
+        "attachmentMode": "detached"
+      }
+    ]
+  }
+}

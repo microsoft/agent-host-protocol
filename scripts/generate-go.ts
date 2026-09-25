@@ -361,7 +361,8 @@ function extractProps(iface: InterfaceDeclaration, project: Project): GoProp[] {
     const presenceSensitiveCollection = (iface.getName() === 'AutomationDefinitionPatch'
       && (tsName === 'triggers' || tsName === '_meta'))
       || ((iface.getName() === 'AutomationDefinition' || iface.getName() === 'AutomationDefinitionPatch')
-        && tsName === 'disableConditions');
+        && tsName === 'disableConditions')
+      || (tsName === 'backgroundShells' && (iface.getName() === 'ChatState' || iface.getName() === 'ChatSummary'));
     if (optional && !alreadyPointer && (presenceSensitiveCollection || (!goType.startsWith('[]') && !goType.startsWith('map[')))) {
       goType = `*${goType}`;
     }
@@ -725,6 +726,7 @@ const STATE_ENUMS = [
   'ConfirmationOptionKind', 'ToolCallContributorKind',
   'ToolResultContentType', 'CustomizationType', 'CustomizationEnablementKind', 'CustomizationLoadStatus',
   'TerminalClaimKind', 'TerminalLifecycleStatus',
+  'BackgroundShellStatus', 'BackgroundShellAttachmentMode',
   'McpServerStatus', 'McpAuthRequiredReason',
   'ChangesetStatus', 'ChangesetOperationStatus', 'ChangesetOperationScope', 'ResourceChangeType',
   'SessionOriginKind',
@@ -758,6 +760,7 @@ const STATE_STRUCTS: { name: string; omitDiscriminants?: boolean; goName?: strin
   { name: 'ChangesSummary' },
   { name: 'ChatState' },
   { name: 'ChatSummary' },
+  { name: 'BackgroundShellInfo' },
   { name: 'SideChatSelection' },
   { name: 'PendingMessage' },
   { name: 'ProjectInfo' },
@@ -1562,6 +1565,8 @@ const ACTION_VARIANTS: {
   { type: 'chat/error', variantName: 'ChatError', tsInterface: 'ChatErrorAction' },
   { type: 'chat/turnResume', variantName: 'ChatTurnResume', tsInterface: 'ChatTurnResumeAction' },
   { type: 'chat/activityChanged', variantName: 'ChatActivityChanged', tsInterface: 'ChatActivityChangedAction' },
+  { type: 'chat/backgroundShellSet', variantName: 'ChatBackgroundShellSet', tsInterface: 'ChatBackgroundShellSetAction' },
+  { type: 'chat/backgroundShellRemoved', variantName: 'ChatBackgroundShellRemoved', tsInterface: 'ChatBackgroundShellRemovedAction' },
   { type: 'chat/changesetsChanged', variantName: 'ChatChangesetsChanged', tsInterface: 'ChatChangesetsChangedAction' },
   { type: 'session/titleChanged', variantName: 'SessionTitleChanged', tsInterface: 'SessionTitleChangedAction' },
   { type: 'chat/usage', variantName: 'ChatUsage', tsInterface: 'ChatUsageAction' },

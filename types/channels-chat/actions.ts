@@ -9,6 +9,7 @@ import type { StringOrMarkdown, FileEditCollection, UsageInfo, URI } from '../co
 import type { Changeset } from '../channels-changeset/state.js';
 import type { McpAuthRequirement } from '../channels-session/state.js';
 import type {
+  BackgroundShellInfo,
   Message,
   ResponsePart,
   ToolCallResult,
@@ -547,6 +548,32 @@ export interface ChatActivityChangedAction {
 }
 
 /**
+ * Adds or replaces an active background shell by ID, independently of turn state.
+ * Hosts mirror the resulting inventory through `session/chatUpdated`.
+ *
+ * @category Chat Actions
+ * @version 1
+ */
+export interface ChatBackgroundShellSetAction {
+  type: ActionType.ChatBackgroundShellSet;
+  /** Complete shell metadata. */
+  shell: BackgroundShellInfo;
+}
+
+/**
+ * Removes a finished or no-longer-tracked background shell; unknown IDs are a no-op.
+ * Hosts mirror the resulting inventory through `session/chatUpdated`.
+ *
+ * @category Chat Actions
+ * @version 1
+ */
+export interface ChatBackgroundShellRemovedAction {
+  type: ActionType.ChatBackgroundShellRemoved;
+  /** Identifier scoped to the owning chat. */
+  shellId: string;
+}
+
+/**
  * The {@link Changeset | catalogue of changesets} the agent host advertises
  * for this chat changed. Replaces
  * {@link ChatState.changesets | `state.changesets`} entirely
@@ -886,6 +913,8 @@ export type ChatAction =
   | ChatErrorAction
   | ChatTurnResumeAction
   | ChatActivityChangedAction
+  | ChatBackgroundShellSetAction
+  | ChatBackgroundShellRemovedAction
   | ChatChangesetsChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction

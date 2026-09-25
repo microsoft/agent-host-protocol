@@ -82,6 +82,12 @@ internal static class GeneratedActionMetadata
             case ChatActivityChangedAction value:
                 actionType = value.Type;
                 return true;
+            case ChatBackgroundShellRemovedAction value:
+                actionType = value.Type;
+                return true;
+            case ChatBackgroundShellSetAction value:
+                actionType = value.Type;
+                return true;
             case ChatChangesetsChangedAction value:
                 actionType = value.Type;
                 return true;
@@ -399,6 +405,8 @@ internal static class GeneratedActionMetadata
             ActionType.ChangesetOperationStatusChanged => "changeset/operationStatusChanged",
             ActionType.ChangesetStatusChanged => "changeset/statusChanged",
             ActionType.ChatActivityChanged => "chat/activityChanged",
+            ActionType.ChatBackgroundShellRemoved => "chat/backgroundShellRemoved",
+            ActionType.ChatBackgroundShellSet => "chat/backgroundShellSet",
             ActionType.ChatChangesetsChanged => "chat/changesetsChanged",
             ActionType.ChatDelta => "chat/delta",
             ActionType.ChatDraftChanged => "chat/draftChanged",

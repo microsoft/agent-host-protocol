@@ -760,6 +760,60 @@ public enum TerminalLifecycleStatus: String, Codable, Sendable {
     case exited = "exited"
 }
 
+/// Activity of a background shell that has not finished.
+public enum BackgroundShellStatus: Codable, Sendable, Equatable {
+    case running
+    case idle
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "running": self = .running
+        case "idle": self = .idle
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .running: try container.encode("running")
+        case .idle: try container.encode("idle")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
+/// Whether a background shell is retained by its agent or runs independently.
+public enum BackgroundShellAttachmentMode: Codable, Sendable, Equatable {
+    case attached
+    case detached
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "attached": self = .attached
+        case "detached": self = .detached
+        default: self = .unknown(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .attached: try container.encode("attached")
+        case .detached: try container.encode("detached")
+        case .unknown(let raw): try container.encode(raw)
+        }
+    }
+}
+
 /// Discriminant for the {@link McpServerState} union.
 public enum McpServerStatus: Codable, Sendable, Equatable {
     /// Server has been registered but is not yet running.
@@ -1631,6 +1685,8 @@ public struct ChatState: Codable, Sendable {
     public var status: SessionStatus
     /// Human-readable description of what the chat is currently doing
     public var activity: String?
+    /// Active background shells owned by this chat, independent of its current turn.
+    public var backgroundShells: [BackgroundShellInfo]?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String
     /// How this chat came into existence
@@ -1697,6 +1753,7 @@ public struct ChatState: Codable, Sendable {
         case title
         case status
         case activity
+        case backgroundShells
         case modifiedAt
         case origin
         case interactivity
@@ -1716,6 +1773,7 @@ public struct ChatState: Codable, Sendable {
         title: String,
         status: SessionStatus,
         activity: String? = nil,
+        backgroundShells: [BackgroundShellInfo]? = nil,
         modifiedAt: String,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
@@ -1733,6 +1791,7 @@ public struct ChatState: Codable, Sendable {
         self.title = title
         self.status = status
         self.activity = activity
+        self.backgroundShells = backgroundShells
         self.modifiedAt = modifiedAt
         self.origin = origin
         self.interactivity = interactivity
@@ -1757,6 +1816,8 @@ public struct ChatSummary: Codable, Sendable {
     public var status: SessionStatus
     /// Human-readable description of what the chat is currently doing
     public var activity: String?
+    /// Active background shells, mirrored from {@link ChatState.backgroundShells}.
+    public var backgroundShells: [BackgroundShellInfo]?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String
     /// How this chat came into existence
@@ -1776,6 +1837,7 @@ public struct ChatSummary: Codable, Sendable {
         title: String,
         status: SessionStatus,
         activity: String? = nil,
+        backgroundShells: [BackgroundShellInfo]? = nil,
         modifiedAt: String,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
@@ -1785,6 +1847,7 @@ public struct ChatSummary: Codable, Sendable {
         self.title = title
         self.status = status
         self.activity = activity
+        self.backgroundShells = backgroundShells
         self.modifiedAt = modifiedAt
         self.origin = origin
         self.interactivity = interactivity
@@ -2008,6 +2071,37 @@ public struct SessionActiveClient: Codable, Sendable {
         self.displayName = displayName
         self.tools = tools
         self.customizations = customizations
+    }
+}
+
+public struct BackgroundShellInfo: Codable, Sendable {
+    /// Stable identifier within the owning chat.
+    public var id: String
+    /// Human-readable description of the command's purpose.
+    public var description: String
+    /// Command line, displayed as plain text.
+    public var command: String
+    /// Current activity of the unfinished shell.
+    public var status: BackgroundShellStatus
+    /// ISO 8601 timestamp when the command started.
+    public var startedAt: String
+    /// Whether the shell remains attached to the agent's lifetime.
+    public var attachmentMode: BackgroundShellAttachmentMode
+
+    public init(
+        id: String,
+        description: String,
+        command: String,
+        status: BackgroundShellStatus,
+        startedAt: String,
+        attachmentMode: BackgroundShellAttachmentMode
+    ) {
+        self.id = id
+        self.description = description
+        self.command = command
+        self.status = status
+        self.startedAt = startedAt
+        self.attachmentMode = attachmentMode
     }
 }
 

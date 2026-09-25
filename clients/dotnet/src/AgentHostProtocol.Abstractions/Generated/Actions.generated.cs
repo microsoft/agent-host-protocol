@@ -63,6 +63,10 @@ public enum ActionType
     ChatTurnResume,
     [WireValue("chat/activityChanged")]
     ChatActivityChanged,
+    [WireValue("chat/backgroundShellSet")]
+    ChatBackgroundShellSet,
+    [WireValue("chat/backgroundShellRemoved")]
+    ChatBackgroundShellRemoved,
     [WireValue("chat/changesetsChanged")]
     ChatChangesetsChanged,
     [WireValue("chat/workingDirectorySet")]
@@ -1705,6 +1709,26 @@ public sealed record ChatActivityChangedAction
     public string? Activity { get; init; }
 }
 
+/// <summary>Adds or replaces an active background shell by ID, independently of turn state.
+/// Hosts mirror the resulting inventory through `session/chatUpdated`.</summary>
+public sealed record ChatBackgroundShellSetAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Complete shell metadata.</summary>
+    public required BackgroundShellInfo Shell { get; init; }
+}
+
+/// <summary>Removes a finished or no-longer-tracked background shell; unknown IDs are a no-op.
+/// Hosts mirror the resulting inventory through `session/chatUpdated`.</summary>
+public sealed record ChatBackgroundShellRemovedAction
+{
+    public ActionType Type { get; init; }
+
+    /// <summary>Identifier scoped to the owning chat.</summary>
+    public required string ShellId { get; init; }
+}
+
 /// <summary>The {@link Changeset | catalogue of changesets} the agent host advertises
 /// for this chat changed. Replaces
 /// {@link ChatState.changesets | `state.changesets`} entirely
@@ -2572,6 +2596,10 @@ public sealed record PartialChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Activity { get; init; }
 
+    /// <summary>Active background shells, mirrored from {@link ChatState.backgroundShells}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<BackgroundShellInfo>? BackgroundShells { get; init; }
+
     /// <summary>Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ModifiedAt { get; init; }
@@ -2683,6 +2711,8 @@ internal sealed class StateActionConverter : UnionConverter<StateAction>
         ["chat/error"] = typeof(ChatErrorAction),
         ["chat/turnResume"] = typeof(ChatTurnResumeAction),
         ["chat/activityChanged"] = typeof(ChatActivityChangedAction),
+        ["chat/backgroundShellSet"] = typeof(ChatBackgroundShellSetAction),
+        ["chat/backgroundShellRemoved"] = typeof(ChatBackgroundShellRemovedAction),
         ["chat/changesetsChanged"] = typeof(ChatChangesetsChangedAction),
         ["chat/workingDirectorySet"] = typeof(ChatWorkingDirectorySetAction),
         ["chat/workingDirectoryRemoved"] = typeof(ChatWorkingDirectoryRemovedAction),

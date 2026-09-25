@@ -79,6 +79,8 @@ type PartialChatSummary struct {
 	Status *SessionStatus `json:"status,omitempty"`
 	// Human-readable description of what the chat is currently doing
 	Activity *string `json:"activity,omitempty"`
+	// Preserve an explicitly empty shell inventory in a summary update.
+	BackgroundShells *[]BackgroundShellInfo `json:"backgroundShells,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt *string `json:"modifiedAt,omitempty"`
 	// How this chat came into existence

@@ -994,6 +994,78 @@ pub enum TerminalLifecycleStatus {
     Exited,
 }
 
+/// Activity of a background shell that has not finished.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BackgroundShellStatus {
+    Running,
+    Idle,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for BackgroundShellStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Running => serializer.serialize_str("running"),
+            Self::Idle => serializer.serialize_str("idle"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for BackgroundShellStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "running" => Self::Running,
+            "idle" => Self::Idle,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
+/// Whether a background shell is retained by its agent or runs independently.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BackgroundShellAttachmentMode {
+    Attached,
+    Detached,
+    /// Unknown raw value from a newer protocol version, preserved verbatim.
+    Unknown(String),
+}
+
+impl serde::Serialize for BackgroundShellAttachmentMode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::Attached => serializer.serialize_str("attached"),
+            Self::Detached => serializer.serialize_str("detached"),
+            Self::Unknown(value) => serializer.serialize_str(value),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for BackgroundShellAttachmentMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = <String as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(match raw.as_str() {
+            "attached" => Self::Attached,
+            "detached" => Self::Detached,
+            _ => Self::Unknown(raw),
+        })
+    }
+}
+
 /// Discriminant for the {@link McpServerState} union.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum McpServerStatus {
@@ -1886,6 +1958,9 @@ pub struct ChatState {
     /// Human-readable description of what the chat is currently doing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
+    /// Active background shells owned by this chat, independent of its current turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_shells: Option<Vec<BackgroundShellInfo>>,
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     pub modified_at: String,
     /// How this chat came into existence
@@ -1973,6 +2048,9 @@ pub struct ChatSummary {
     /// Human-readable description of what the chat is currently doing
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<String>,
+    /// Active background shells, mirrored from {@link ChatState.backgroundShells}.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_shells: Option<Vec<BackgroundShellInfo>>,
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     pub modified_at: String,
     /// How this chat came into existence
@@ -1989,6 +2067,25 @@ pub struct ChatSummary {
     /// See {@link ChatState.workingDirectories} for the full semantics.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_directories: Option<Vec<Uri>>,
+}
+
+/// Metadata for a shell command continuing outside its initiating tool call.
+/// Shell identity is scoped to the owning chat, not to a turn or terminal.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundShellInfo {
+    /// Stable identifier within the owning chat.
+    pub id: String,
+    /// Human-readable description of the command's purpose.
+    pub description: String,
+    /// Command line, displayed as plain text.
+    pub command: String,
+    /// Current activity of the unfinished shell.
+    pub status: BackgroundShellStatus,
+    /// ISO 8601 timestamp when the command started.
+    pub started_at: String,
+    /// Whether the shell remains attached to the agent's lifetime.
+    pub attachment_mode: BackgroundShellAttachmentMode,
 }
 
 /// Immutable selected-text snapshot captured when a side chat is created.

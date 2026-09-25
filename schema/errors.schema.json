@@ -2504,6 +2504,13 @@
           "type": "string",
           "description": "Human-readable description of what the chat is currently doing"
         },
+        "backgroundShells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BackgroundShellInfo"
+          },
+          "description": "Active background shells owned by this chat, independent of its current turn."
+        },
         "modifiedAt": {
           "type": "string",
           "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
@@ -2594,6 +2601,13 @@
           "type": "string",
           "description": "Human-readable description of what the chat is currently doing"
         },
+        "backgroundShells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/BackgroundShellInfo"
+          },
+          "description": "Active background shells, mirrored from {@link ChatState.backgroundShells}."
+        },
         "modifiedAt": {
           "type": "string",
           "description": "Last modification timestamp (ISO 8601, e.g. `\"2025-03-10T18:42:03.123Z\"`)"
@@ -2619,6 +2633,44 @@
         "title",
         "status",
         "modifiedAt"
+      ]
+    },
+    "BackgroundShellInfo": {
+      "type": "object",
+      "description": "Metadata for a shell command continuing outside its initiating tool call.\nShell identity is scoped to the owning chat, not to a turn or terminal.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable identifier within the owning chat."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the command's purpose."
+        },
+        "command": {
+          "type": "string",
+          "description": "Command line, displayed as plain text."
+        },
+        "status": {
+          "$ref": "#/$defs/BackgroundShellStatus",
+          "description": "Current activity of the unfinished shell."
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the command started."
+        },
+        "attachmentMode": {
+          "$ref": "#/$defs/BackgroundShellAttachmentMode",
+          "description": "Whether the shell remains attached to the agent's lifetime."
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "command",
+        "status",
+        "startedAt",
+        "attachmentMode"
       ]
     },
     "SideChatSelection": {
@@ -7740,6 +7792,22 @@
       "type": "string",
       "description": "Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}\nstate. Mirrors the three failure modes defined by the\n[MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md)."
     },
+    "BackgroundShellStatus": {
+      "enum": [
+        "running",
+        "idle"
+      ],
+      "type": "string",
+      "description": "Activity of a background shell that has not finished."
+    },
+    "BackgroundShellAttachmentMode": {
+      "enum": [
+        "attached",
+        "detached"
+      ],
+      "type": "string",
+      "description": "Whether a background shell is retained by its agent or runs independently."
+    },
     "ChatInputQuestion": {
       "oneOf": [
         {
@@ -8317,6 +8385,12 @@
           "$ref": "#/$defs/ChatActivityChangedAction"
         },
         {
+          "$ref": "#/$defs/ChatBackgroundShellSetAction"
+        },
+        {
+          "$ref": "#/$defs/ChatBackgroundShellRemovedAction"
+        },
+        {
           "$ref": "#/$defs/ChatChangesetsChangedAction"
         },
         {
@@ -8750,6 +8824,13 @@
             "activity": {
               "type": "string",
               "description": "Human-readable description of what the chat is currently doing"
+            },
+            "backgroundShells": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/BackgroundShellInfo"
+              },
+              "description": "Active background shells, mirrored from {@link ChatState.backgroundShells}."
             },
             "modifiedAt": {
               "type": "string",
@@ -9757,6 +9838,40 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "ChatBackgroundShellSetAction": {
+      "type": "object",
+      "description": "Adds or replaces an active background shell by ID, independently of turn state.\nHosts mirror the resulting inventory through `session/chatUpdated`.",
+      "properties": {
+        "type": {
+          "const": "chat/backgroundShellSet"
+        },
+        "shell": {
+          "$ref": "#/$defs/BackgroundShellInfo",
+          "description": "Complete shell metadata."
+        }
+      },
+      "required": [
+        "type",
+        "shell"
+      ]
+    },
+    "ChatBackgroundShellRemovedAction": {
+      "type": "object",
+      "description": "Removes a finished or no-longer-tracked background shell; unknown IDs are a no-op.\nHosts mirror the resulting inventory through `session/chatUpdated`.",
+      "properties": {
+        "type": {
+          "const": "chat/backgroundShellRemoved"
+        },
+        "shellId": {
+          "type": "string",
+          "description": "Identifier scoped to the owning chat."
+        }
+      },
+      "required": [
+        "type",
+        "shellId"
       ]
     },
     "ChatChangesetsChangedAction": {

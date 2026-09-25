@@ -141,6 +141,21 @@ For example, `(status & SessionStatus.InProgress) !== 0` is true for both `InPro
 
 Subscribable on a [Chat Channel](/specification/chat-channel) at `ahp-chat:/<cid>`. A session is a catalog of chats (`SessionState.chats`); each chat carries the per-conversation state — the turn history, the active turn and its streaming response parts (including live input requests), tool calls, steering/queued messages, and the user's in-progress draft. A session starts with a default chat (`SessionState.defaultChat`); hosts advertising the `multipleChats` capability let clients open more via `createChat`.
 
+`backgroundShells` lists active shell commands that continue after their initiating
+tool call returns. Hosts publish complete entries with `chat/backgroundShellSet`
+and remove them with `chat/backgroundShellRemoved` when they finish or are no longer
+tracked. IDs are scoped to a chat; the same ID in another chat is a different shell.
+Hosts mirror the list into `SessionState.chats` through `session/chatUpdated`, so a
+session subscriber can discover its chats' background work without reading transcripts.
+
+The collection survives turn completion, cancellation, steering, and history
+truncation; those actions do not establish whether a shell has stopped. Hosts must
+reconcile the runtime's current inventory after restoring a chat, rather than replaying
+historical commands as running. A missing collection means no inventory has been
+published; an empty collection contains no active shells. Commands are plain text,
+and attachment mode describes ownership, not whether the model is still thinking.
+This metadata does not provide terminal output, process controls, or a new turn-completion rule.
+
 ```typescript
 ChatState {
   // Chat summary fields, inlined directly (mirrored into SessionState.chats)

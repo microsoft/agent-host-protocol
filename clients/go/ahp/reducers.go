@@ -559,6 +559,32 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatBackgroundShellSetAction:
+		if state.BackgroundShells == nil {
+			shells := []ahptypes.BackgroundShellInfo{}
+			state.BackgroundShells = &shells
+		}
+		shells := *state.BackgroundShells
+		for i := range shells {
+			if shells[i].Id == a.Shell.Id {
+				shells[i] = a.Shell
+				return ReduceOutcomeApplied
+			}
+		}
+		*state.BackgroundShells = append(shells, a.Shell)
+		return ReduceOutcomeApplied
+	case *ahptypes.ChatBackgroundShellRemovedAction:
+		if state.BackgroundShells == nil {
+			return ReduceOutcomeNoOp
+		}
+		shells := *state.BackgroundShells
+		for i := range shells {
+			if shells[i].Id == a.ShellId {
+				*state.BackgroundShells = append(shells[:i], shells[i+1:]...)
+				return ReduceOutcomeApplied
+			}
+		}
+		return ReduceOutcomeNoOp
 	case *ahptypes.ChatChangesetsChangedAction:
 		if a.Changesets == nil {
 			state.Changesets = nil
@@ -814,6 +840,9 @@ func mergeChatSummaryPartial(summary *ahptypes.ChatSummary, changes ahptypes.Par
 	}
 	if changes.Activity != nil {
 		summary.Activity = changes.Activity
+	}
+	if changes.BackgroundShells != nil {
+		summary.BackgroundShells = changes.BackgroundShells
 	}
 	if changes.ModifiedAt != nil {
 		summary.ModifiedAt = *changes.ModifiedAt
