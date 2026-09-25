@@ -34,15 +34,56 @@ public enum PendingMessageKind
 }
 
 /// <summary>Session initialization state.</summary>
-[JsonConverter(typeof(WireEnumConverter<SessionLifecycle>))]
-public enum SessionLifecycle
+[JsonConverter(typeof(SessionLifecycleConverter))]
+public readonly struct SessionLifecycle : IEquatable<SessionLifecycle>
 {
-    [WireValue("creating")]
-    Creating,
-    [WireValue("ready")]
-    Ready,
-    [WireValue("failed")]
-    Failed,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public SessionLifecycle(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly SessionLifecycle Creating = new SessionLifecycle("creating");
+
+    public static readonly SessionLifecycle Ready = new SessionLifecycle("ready");
+
+    public static readonly SessionLifecycle Failed = new SessionLifecycle("failed");
+
+    /// <inheritdoc />
+    public bool Equals(SessionLifecycle other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is SessionLifecycle other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(SessionLifecycle left, SessionLifecycle right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(SessionLifecycle left, SessionLifecycle right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="SessionLifecycle"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class SessionLifecycleConverter : JsonConverter<SessionLifecycle>
+{
+    /// <inheritdoc />
+    public override SessionLifecycle Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new SessionLifecycle(reader.GetString() ?? throw new JsonException("SessionLifecycle expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, SessionLifecycle value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Bitset of summary-level session status flags.
@@ -68,30 +109,112 @@ public enum SessionStatus : uint
 }
 
 /// <summary>Discriminant describing the durable provenance of a session.</summary>
-[JsonConverter(typeof(WireEnumConverter<SessionOriginKind>))]
-public enum SessionOriginKind
+[JsonConverter(typeof(SessionOriginKindConverter))]
+public readonly struct SessionOriginKind : IEquatable<SessionOriginKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public SessionOriginKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>The session was created as part of an automation run.</summary>
-    [WireValue("automation")]
-    Automation,
+    public static readonly SessionOriginKind Automation = new SessionOriginKind("automation");
+
+    /// <inheritdoc />
+    public bool Equals(SessionOriginKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is SessionOriginKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(SessionOriginKind left, SessionOriginKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(SessionOriginKind left, SessionOriginKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="SessionOriginKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class SessionOriginKindConverter : JsonConverter<SessionOriginKind>
+{
+    /// <inheritdoc />
+    public override SessionOriginKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new SessionOriginKind(reader.GetString() ?? throw new JsonException("SessionOriginKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, SessionOriginKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for {@link ChatOrigin} — how a chat came into existence.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChatOriginKind>))]
-public enum ChatOriginKind
+[JsonConverter(typeof(ChatOriginKindConverter))]
+public readonly struct ChatOriginKind : IEquatable<ChatOriginKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChatOriginKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>User created the chat explicitly (e.g. via the host UI).</summary>
-    [WireValue("user")]
-    User,
+    public static readonly ChatOriginKind User = new ChatOriginKind("user");
+
     /// <summary>Forked from an existing chat at a specific turn.</summary>
-    [WireValue("fork")]
-    Fork,
+    public static readonly ChatOriginKind Fork = new ChatOriginKind("fork");
+
     /// <summary>Created as an independent side conversation from a specific turn.</summary>
-    [WireValue("sideChat")]
-    SideChat,
+    public static readonly ChatOriginKind SideChat = new ChatOriginKind("sideChat");
+
     /// <summary>Spawned by a tool call running in another chat (e.g. a sub-agent delegation).</summary>
-    [WireValue("tool")]
-    Tool,
+    public static readonly ChatOriginKind Tool = new ChatOriginKind("tool");
+
+    /// <inheritdoc />
+    public bool Equals(ChatOriginKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChatOriginKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChatOriginKind left, ChatOriginKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChatOriginKind left, ChatOriginKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChatOriginKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChatOriginKindConverter : JsonConverter<ChatOriginKind>
+{
+    /// <inheritdoc />
+    public override ChatOriginKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChatOriginKind(reader.GetString() ?? throw new JsonException("ChatOriginKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChatOriginKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>How a user can interact with a chat.
@@ -131,37 +254,119 @@ public enum ChatInputAnswerState
 }
 
 /// <summary>Answer value kind.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChatInputAnswerValueKind>))]
-public enum ChatInputAnswerValueKind
+[JsonConverter(typeof(ChatInputAnswerValueKindConverter))]
+public readonly struct ChatInputAnswerValueKind : IEquatable<ChatInputAnswerValueKind>
 {
-    [WireValue("text")]
-    Text,
-    [WireValue("number")]
-    Number,
-    [WireValue("boolean")]
-    Boolean,
-    [WireValue("selected")]
-    Selected,
-    [WireValue("selected-many")]
-    SelectedMany,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChatInputAnswerValueKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ChatInputAnswerValueKind Text = new ChatInputAnswerValueKind("text");
+
+    public static readonly ChatInputAnswerValueKind Number = new ChatInputAnswerValueKind("number");
+
+    public static readonly ChatInputAnswerValueKind Boolean = new ChatInputAnswerValueKind("boolean");
+
+    public static readonly ChatInputAnswerValueKind Selected = new ChatInputAnswerValueKind("selected");
+
+    public static readonly ChatInputAnswerValueKind SelectedMany = new ChatInputAnswerValueKind("selected-many");
+
+    /// <inheritdoc />
+    public bool Equals(ChatInputAnswerValueKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChatInputAnswerValueKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChatInputAnswerValueKind left, ChatInputAnswerValueKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChatInputAnswerValueKind left, ChatInputAnswerValueKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChatInputAnswerValueKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChatInputAnswerValueKindConverter : JsonConverter<ChatInputAnswerValueKind>
+{
+    /// <inheritdoc />
+    public override ChatInputAnswerValueKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChatInputAnswerValueKind(reader.GetString() ?? throw new JsonException("ChatInputAnswerValueKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChatInputAnswerValueKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Question/input control kind.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChatInputQuestionKind>))]
-public enum ChatInputQuestionKind
+[JsonConverter(typeof(ChatInputQuestionKindConverter))]
+public readonly struct ChatInputQuestionKind : IEquatable<ChatInputQuestionKind>
 {
-    [WireValue("text")]
-    Text,
-    [WireValue("number")]
-    Number,
-    [WireValue("integer")]
-    Integer,
-    [WireValue("boolean")]
-    Boolean,
-    [WireValue("single-select")]
-    SingleSelect,
-    [WireValue("multi-select")]
-    MultiSelect,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChatInputQuestionKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ChatInputQuestionKind Text = new ChatInputQuestionKind("text");
+
+    public static readonly ChatInputQuestionKind Number = new ChatInputQuestionKind("number");
+
+    public static readonly ChatInputQuestionKind Integer = new ChatInputQuestionKind("integer");
+
+    public static readonly ChatInputQuestionKind Boolean = new ChatInputQuestionKind("boolean");
+
+    public static readonly ChatInputQuestionKind SingleSelect = new ChatInputQuestionKind("single-select");
+
+    public static readonly ChatInputQuestionKind MultiSelect = new ChatInputQuestionKind("multi-select");
+
+    /// <inheritdoc />
+    public bool Equals(ChatInputQuestionKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChatInputQuestionKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChatInputQuestionKind left, ChatInputQuestionKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChatInputQuestionKind left, ChatInputQuestionKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChatInputQuestionKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChatInputQuestionKindConverter : JsonConverter<ChatInputQuestionKind>
+{
+    /// <inheritdoc />
+    public override ChatInputQuestionKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChatInputQuestionKind(reader.GetString() ?? throw new JsonException("ChatInputQuestionKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChatInputQuestionKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>How a client completed an input request.</summary>
@@ -181,21 +386,62 @@ public enum ChatInputResponseKind
 ///
 /// This is a general/typological union (not a lifecycle), so the discriminant is
 /// a `*Kind`.</summary>
-[JsonConverter(typeof(WireEnumConverter<SessionInputRequestKind>))]
-public enum SessionInputRequestKind
+[JsonConverter(typeof(SessionInputRequestKindConverter))]
+public readonly struct SessionInputRequestKind : IEquatable<SessionInputRequestKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public SessionInputRequestKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>A user-facing elicitation mirrored from an unresolved chat response part.</summary>
-    [WireValue("chatInput")]
-    ChatInput,
+    public static readonly SessionInputRequestKind ChatInput = new SessionInputRequestKind("chatInput");
+
     /// <summary>A tool call awaiting parameter- or result-confirmation.</summary>
-    [WireValue("toolConfirmation")]
-    ToolConfirmation,
+    public static readonly SessionInputRequestKind ToolConfirmation = new SessionInputRequestKind("toolConfirmation");
+
     /// <summary>A running tool the session wants an active client to execute.</summary>
-    [WireValue("toolClientExecution")]
-    ToolClientExecution,
+    public static readonly SessionInputRequestKind ToolClientExecution = new SessionInputRequestKind("toolClientExecution");
+
     /// <summary>A tool call blocked on MCP authentication mid-execution.</summary>
-    [WireValue("toolAuthentication")]
-    ToolAuthentication,
+    public static readonly SessionInputRequestKind ToolAuthentication = new SessionInputRequestKind("toolAuthentication");
+
+    /// <inheritdoc />
+    public bool Equals(SessionInputRequestKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is SessionInputRequestKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(SessionInputRequestKind left, SessionInputRequestKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(SessionInputRequestKind left, SessionInputRequestKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="SessionInputRequestKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class SessionInputRequestKindConverter : JsonConverter<SessionInputRequestKind>
+{
+    /// <inheritdoc />
+    public override SessionInputRequestKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new SessionInputRequestKind(reader.GetString() ?? throw new JsonException("SessionInputRequestKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, SessionInputRequestKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>How a turn ended.</summary>
@@ -211,90 +457,254 @@ public enum TurnState
 }
 
 /// <summary>Discriminant for {@link MessageOrigin} — identifies who produced a message.</summary>
-[JsonConverter(typeof(WireEnumConverter<MessageKind>))]
-public enum MessageKind
+[JsonConverter(typeof(MessageKindConverter))]
+public readonly struct MessageKind : IEquatable<MessageKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public MessageKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Sent directly by the user.</summary>
-    [WireValue("user")]
-    User,
+    public static readonly MessageKind User = new MessageKind("user");
+
     /// <summary>Produced by the agent itself rather than the user — for example, an agent
     /// that seeds the first message of a chat it spawned.</summary>
-    [WireValue("agent")]
-    Agent,
+    public static readonly MessageKind Agent = new MessageKind("agent");
+
     /// <summary>Produced by a tool rather than the user — for example, a tool that spawns a
     /// worker chat whose first message carries a seed prompt.</summary>
-    [WireValue("tool")]
-    Tool,
+    public static readonly MessageKind Tool = new MessageKind("tool");
+
     /// <summary>Emitted automatically when an automation run starts a session.</summary>
-    [WireValue("automation")]
-    Automation,
+    public static readonly MessageKind Automation = new MessageKind("automation");
+
     /// <summary>A system-generated notification rather than a direct user message.</summary>
-    [WireValue("systemNotification")]
-    SystemNotification,
+    public static readonly MessageKind SystemNotification = new MessageKind("systemNotification");
+
+    /// <inheritdoc />
+    public bool Equals(MessageKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is MessageKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(MessageKind left, MessageKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(MessageKind left, MessageKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="MessageKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class MessageKindConverter : JsonConverter<MessageKind>
+{
+    /// <inheritdoc />
+    public override MessageKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new MessageKind(reader.GetString() ?? throw new JsonException("MessageKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, MessageKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for {@link MessageAttachment} variants.</summary>
-[JsonConverter(typeof(WireEnumConverter<MessageAttachmentKind>))]
-public enum MessageAttachmentKind
+[JsonConverter(typeof(MessageAttachmentKindConverter))]
+public readonly struct MessageAttachmentKind : IEquatable<MessageAttachmentKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public MessageAttachmentKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>A simple, opaque attachment whose representation is described by the producer.</summary>
-    [WireValue("simple")]
-    Simple,
+    public static readonly MessageAttachmentKind Simple = new MessageAttachmentKind("simple");
+
     /// <summary>An attachment whose data is embedded inline as a base64 string.</summary>
-    [WireValue("embeddedResource")]
-    EmbeddedResource,
+    public static readonly MessageAttachmentKind EmbeddedResource = new MessageAttachmentKind("embeddedResource");
+
     /// <summary>An attachment that references a resource by URI.</summary>
-    [WireValue("resource")]
-    Resource,
+    public static readonly MessageAttachmentKind Resource = new MessageAttachmentKind("resource");
+
     /// <summary>An attachment that references annotations on an annotations channel.</summary>
-    [WireValue("annotations")]
-    Annotations,
+    public static readonly MessageAttachmentKind Annotations = new MessageAttachmentKind("annotations");
+
     /// <summary>An attachment that references a bounded transcript from another chat.</summary>
-    [WireValue("chat")]
-    Chat,
+    public static readonly MessageAttachmentKind Chat = new MessageAttachmentKind("chat");
+
+    /// <inheritdoc />
+    public bool Equals(MessageAttachmentKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is MessageAttachmentKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(MessageAttachmentKind left, MessageAttachmentKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(MessageAttachmentKind left, MessageAttachmentKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="MessageAttachmentKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class MessageAttachmentKindConverter : JsonConverter<MessageAttachmentKind>
+{
+    /// <inheritdoc />
+    public override MessageAttachmentKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new MessageAttachmentKind(reader.GetString() ?? throw new JsonException("MessageAttachmentKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, MessageAttachmentKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for response part types.</summary>
-[JsonConverter(typeof(WireEnumConverter<ResponsePartKind>))]
-public enum ResponsePartKind
+[JsonConverter(typeof(ResponsePartKindConverter))]
+public readonly struct ResponsePartKind : IEquatable<ResponsePartKind>
 {
-    [WireValue("markdown")]
-    Markdown,
-    [WireValue("contentRef")]
-    ContentRef,
-    [WireValue("toolCall")]
-    ToolCall,
-    [WireValue("reasoning")]
-    Reasoning,
-    [WireValue("systemNotification")]
-    SystemNotification,
-    [WireValue("inputRequest")]
-    InputRequest,
-    [WireValue("error")]
-    Error,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ResponsePartKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ResponsePartKind Markdown = new ResponsePartKind("markdown");
+
+    public static readonly ResponsePartKind ContentRef = new ResponsePartKind("contentRef");
+
+    public static readonly ResponsePartKind ToolCall = new ResponsePartKind("toolCall");
+
+    public static readonly ResponsePartKind Reasoning = new ResponsePartKind("reasoning");
+
+    public static readonly ResponsePartKind SystemNotification = new ResponsePartKind("systemNotification");
+
+    public static readonly ResponsePartKind InputRequest = new ResponsePartKind("inputRequest");
+
+    public static readonly ResponsePartKind Error = new ResponsePartKind("error");
+
+    /// <inheritdoc />
+    public bool Equals(ResponsePartKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ResponsePartKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ResponsePartKind left, ResponsePartKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ResponsePartKind left, ResponsePartKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ResponsePartKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ResponsePartKindConverter : JsonConverter<ResponsePartKind>
+{
+    /// <inheritdoc />
+    public override ResponsePartKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ResponsePartKind(reader.GetString() ?? throw new JsonException("ResponsePartKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ResponsePartKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Status of a tool call in the lifecycle state machine.</summary>
-[JsonConverter(typeof(WireEnumConverter<ToolCallStatus>))]
-public enum ToolCallStatus
+[JsonConverter(typeof(ToolCallStatusConverter))]
+public readonly struct ToolCallStatus : IEquatable<ToolCallStatus>
 {
-    [WireValue("streaming")]
-    Streaming,
-    [WireValue("pending-confirmation")]
-    PendingConfirmation,
-    [WireValue("running")]
-    Running,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ToolCallStatus(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ToolCallStatus Streaming = new ToolCallStatus("streaming");
+
+    public static readonly ToolCallStatus PendingConfirmation = new ToolCallStatus("pending-confirmation");
+
+    public static readonly ToolCallStatus Running = new ToolCallStatus("running");
+
     /// <summary>Running paused because the MCP server backing this call needs
     /// authentication (typically step-up auth for insufficient scope,
     /// surfacing mid-execution). See {@link ToolCallAuthRequiredState}.</summary>
-    [WireValue("auth-required")]
-    AuthRequired,
-    [WireValue("pending-result-confirmation")]
-    PendingResultConfirmation,
-    [WireValue("completed")]
-    Completed,
-    [WireValue("cancelled")]
-    Cancelled,
+    public static readonly ToolCallStatus AuthRequired = new ToolCallStatus("auth-required");
+
+    public static readonly ToolCallStatus PendingResultConfirmation = new ToolCallStatus("pending-result-confirmation");
+
+    public static readonly ToolCallStatus Completed = new ToolCallStatus("completed");
+
+    public static readonly ToolCallStatus Cancelled = new ToolCallStatus("cancelled");
+
+    /// <inheritdoc />
+    public bool Equals(ToolCallStatus other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ToolCallStatus other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ToolCallStatus left, ToolCallStatus right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ToolCallStatus left, ToolCallStatus right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ToolCallStatus"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ToolCallStatusConverter : JsonConverter<ToolCallStatus>
+{
+    /// <inheritdoc />
+    public override ToolCallStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ToolCallStatus(reader.GetString() ?? throw new JsonException("ToolCallStatus expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ToolCallStatus value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>How a tool call was confirmed for execution.
@@ -302,15 +712,56 @@ public enum ToolCallStatus
 /// - `NotNeeded` — No confirmation required (auto-approved)
 /// - `UserAction` — User explicitly approved
 /// - `Setting` — Approved by a persistent user setting</summary>
-[JsonConverter(typeof(WireEnumConverter<ToolCallConfirmationReason>))]
-public enum ToolCallConfirmationReason
+[JsonConverter(typeof(ToolCallConfirmationReasonConverter))]
+public readonly struct ToolCallConfirmationReason : IEquatable<ToolCallConfirmationReason>
 {
-    [WireValue("not-needed")]
-    NotNeeded,
-    [WireValue("user-action")]
-    UserAction,
-    [WireValue("setting")]
-    Setting,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ToolCallConfirmationReason(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ToolCallConfirmationReason NotNeeded = new ToolCallConfirmationReason("not-needed");
+
+    public static readonly ToolCallConfirmationReason UserAction = new ToolCallConfirmationReason("user-action");
+
+    public static readonly ToolCallConfirmationReason Setting = new ToolCallConfirmationReason("setting");
+
+    /// <inheritdoc />
+    public bool Equals(ToolCallConfirmationReason other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ToolCallConfirmationReason other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ToolCallConfirmationReason left, ToolCallConfirmationReason right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ToolCallConfirmationReason left, ToolCallConfirmationReason right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ToolCallConfirmationReason"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ToolCallConfirmationReasonConverter : JsonConverter<ToolCallConfirmationReason>
+{
+    /// <inheritdoc />
+    public override ToolCallConfirmationReason Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ToolCallConfirmationReason(reader.GetString() ?? throw new JsonException("ToolCallConfirmationReason expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ToolCallConfirmationReason value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Why a tool call was cancelled.</summary>
@@ -326,59 +777,264 @@ public enum ToolCallCancellationReason
 }
 
 /// <summary>Identifies a model judge as the source of a confirmation requirement.</summary>
-[JsonConverter(typeof(WireEnumConverter<ToolCallRiskAssessmentKind>))]
-public enum ToolCallRiskAssessmentKind
+[JsonConverter(typeof(ToolCallRiskAssessmentKindConverter))]
+public readonly struct ToolCallRiskAssessmentKind : IEquatable<ToolCallRiskAssessmentKind>
 {
-    [WireValue("judge")]
-    Judge,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ToolCallRiskAssessmentKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ToolCallRiskAssessmentKind Judge = new ToolCallRiskAssessmentKind("judge");
+
+    /// <inheritdoc />
+    public bool Equals(ToolCallRiskAssessmentKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ToolCallRiskAssessmentKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ToolCallRiskAssessmentKind left, ToolCallRiskAssessmentKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ToolCallRiskAssessmentKind left, ToolCallRiskAssessmentKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ToolCallRiskAssessmentKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ToolCallRiskAssessmentKindConverter : JsonConverter<ToolCallRiskAssessmentKind>
+{
+    /// <inheritdoc />
+    public override ToolCallRiskAssessmentKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ToolCallRiskAssessmentKind(reader.GetString() ?? throw new JsonException("ToolCallRiskAssessmentKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ToolCallRiskAssessmentKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Lifecycle status of an asynchronous model-judge confirmation decision.</summary>
-[JsonConverter(typeof(WireEnumConverter<ToolCallRiskAssessmentStatus>))]
-public enum ToolCallRiskAssessmentStatus
+[JsonConverter(typeof(ToolCallRiskAssessmentStatusConverter))]
+public readonly struct ToolCallRiskAssessmentStatus : IEquatable<ToolCallRiskAssessmentStatus>
 {
-    [WireValue("loading")]
-    Loading,
-    [WireValue("complete")]
-    Complete,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ToolCallRiskAssessmentStatus(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ToolCallRiskAssessmentStatus Loading = new ToolCallRiskAssessmentStatus("loading");
+
+    public static readonly ToolCallRiskAssessmentStatus Complete = new ToolCallRiskAssessmentStatus("complete");
+
+    /// <inheritdoc />
+    public bool Equals(ToolCallRiskAssessmentStatus other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ToolCallRiskAssessmentStatus other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ToolCallRiskAssessmentStatus left, ToolCallRiskAssessmentStatus right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ToolCallRiskAssessmentStatus left, ToolCallRiskAssessmentStatus right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ToolCallRiskAssessmentStatus"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ToolCallRiskAssessmentStatusConverter : JsonConverter<ToolCallRiskAssessmentStatus>
+{
+    /// <inheritdoc />
+    public override ToolCallRiskAssessmentStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ToolCallRiskAssessmentStatus(reader.GetString() ?? throw new JsonException("ToolCallRiskAssessmentStatus expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ToolCallRiskAssessmentStatus value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Whether a confirmation option represents an approval or denial action.</summary>
-[JsonConverter(typeof(WireEnumConverter<ConfirmationOptionKind>))]
-public enum ConfirmationOptionKind
+[JsonConverter(typeof(ConfirmationOptionKindConverter))]
+public readonly struct ConfirmationOptionKind : IEquatable<ConfirmationOptionKind>
 {
-    [WireValue("approve")]
-    Approve,
-    [WireValue("deny")]
-    Deny,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ConfirmationOptionKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ConfirmationOptionKind Approve = new ConfirmationOptionKind("approve");
+
+    public static readonly ConfirmationOptionKind Deny = new ConfirmationOptionKind("deny");
+
+    /// <inheritdoc />
+    public bool Equals(ConfirmationOptionKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ConfirmationOptionKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ConfirmationOptionKind left, ConfirmationOptionKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ConfirmationOptionKind left, ConfirmationOptionKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ConfirmationOptionKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ConfirmationOptionKindConverter : JsonConverter<ConfirmationOptionKind>
+{
+    /// <inheritdoc />
+    public override ConfirmationOptionKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ConfirmationOptionKind(reader.GetString() ?? throw new JsonException("ConfirmationOptionKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ConfirmationOptionKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Identifies the source of a tool call's implementation.</summary>
-[JsonConverter(typeof(WireEnumConverter<ToolCallContributorKind>))]
-public enum ToolCallContributorKind
+[JsonConverter(typeof(ToolCallContributorKindConverter))]
+public readonly struct ToolCallContributorKind : IEquatable<ToolCallContributorKind>
 {
-    [WireValue("client")]
-    Client,
-    [WireValue("mcp")]
-    MCP,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ToolCallContributorKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ToolCallContributorKind Client = new ToolCallContributorKind("client");
+
+    public static readonly ToolCallContributorKind MCP = new ToolCallContributorKind("mcp");
+
+    /// <inheritdoc />
+    public bool Equals(ToolCallContributorKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ToolCallContributorKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ToolCallContributorKind left, ToolCallContributorKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ToolCallContributorKind left, ToolCallContributorKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ToolCallContributorKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ToolCallContributorKindConverter : JsonConverter<ToolCallContributorKind>
+{
+    /// <inheritdoc />
+    public override ToolCallContributorKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ToolCallContributorKind(reader.GetString() ?? throw new JsonException("ToolCallContributorKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ToolCallContributorKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for tool result content types.</summary>
-[JsonConverter(typeof(WireEnumConverter<ToolResultContentType>))]
-public enum ToolResultContentType
+[JsonConverter(typeof(ToolResultContentTypeConverter))]
+public readonly struct ToolResultContentType : IEquatable<ToolResultContentType>
 {
-    [WireValue("text")]
-    Text,
-    [WireValue("embeddedResource")]
-    EmbeddedResource,
-    [WireValue("resource")]
-    Resource,
-    [WireValue("fileEdit")]
-    FileEdit,
-    [WireValue("terminal")]
-    Terminal,
-    [WireValue("subagent")]
-    Subagent,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ToolResultContentType(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ToolResultContentType Text = new ToolResultContentType("text");
+
+    public static readonly ToolResultContentType EmbeddedResource = new ToolResultContentType("embeddedResource");
+
+    public static readonly ToolResultContentType Resource = new ToolResultContentType("resource");
+
+    public static readonly ToolResultContentType FileEdit = new ToolResultContentType("fileEdit");
+
+    public static readonly ToolResultContentType Terminal = new ToolResultContentType("terminal");
+
+    public static readonly ToolResultContentType Subagent = new ToolResultContentType("subagent");
+
+    /// <inheritdoc />
+    public bool Equals(ToolResultContentType other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ToolResultContentType other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ToolResultContentType left, ToolResultContentType right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ToolResultContentType left, ToolResultContentType right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ToolResultContentType"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ToolResultContentTypeConverter : JsonConverter<ToolResultContentType>
+{
+    /// <inheritdoc />
+    public override ToolResultContentType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ToolResultContentType(reader.GetString() ?? throw new JsonException("ToolResultContentType expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ToolResultContentType value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for the kind of customization.
@@ -390,37 +1046,119 @@ public enum ToolResultContentType
 /// {@link CustomizationType.McpServer | `McpServer`} entries surfaced
 /// directly by the host. The remaining types appear only as children of
 /// a container.</summary>
-[JsonConverter(typeof(WireEnumConverter<CustomizationType>))]
-public enum CustomizationType
+[JsonConverter(typeof(CustomizationTypeConverter))]
+public readonly struct CustomizationType : IEquatable<CustomizationType>
 {
-    [WireValue("plugin")]
-    Plugin,
-    [WireValue("directory")]
-    Directory,
-    [WireValue("agent")]
-    Agent,
-    [WireValue("skill")]
-    Skill,
-    [WireValue("prompt")]
-    Prompt,
-    [WireValue("rule")]
-    Rule,
-    [WireValue("hook")]
-    Hook,
-    [WireValue("mcpServer")]
-    McpServer,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public CustomizationType(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly CustomizationType Plugin = new CustomizationType("plugin");
+
+    public static readonly CustomizationType Directory = new CustomizationType("directory");
+
+    public static readonly CustomizationType Agent = new CustomizationType("agent");
+
+    public static readonly CustomizationType Skill = new CustomizationType("skill");
+
+    public static readonly CustomizationType Prompt = new CustomizationType("prompt");
+
+    public static readonly CustomizationType Rule = new CustomizationType("rule");
+
+    public static readonly CustomizationType Hook = new CustomizationType("hook");
+
+    public static readonly CustomizationType McpServer = new CustomizationType("mcpServer");
+
+    /// <inheritdoc />
+    public bool Equals(CustomizationType other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is CustomizationType other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(CustomizationType left, CustomizationType right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(CustomizationType left, CustomizationType right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="CustomizationType"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class CustomizationTypeConverter : JsonConverter<CustomizationType>
+{
+    /// <inheritdoc />
+    public override CustomizationType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new CustomizationType(reader.GetString() ?? throw new JsonException("CustomizationType expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, CustomizationType value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Scope at which customization enablement is decided.</summary>
-[JsonConverter(typeof(WireEnumConverter<CustomizationEnablementKind>))]
-public enum CustomizationEnablementKind
+[JsonConverter(typeof(CustomizationEnablementKindConverter))]
+public readonly struct CustomizationEnablementKind : IEquatable<CustomizationEnablementKind>
 {
-    [WireValue("global")]
-    Global,
-    [WireValue("workspace")]
-    Workspace,
-    [WireValue("session")]
-    Session,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public CustomizationEnablementKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly CustomizationEnablementKind Global = new CustomizationEnablementKind("global");
+
+    public static readonly CustomizationEnablementKind Workspace = new CustomizationEnablementKind("workspace");
+
+    public static readonly CustomizationEnablementKind Session = new CustomizationEnablementKind("session");
+
+    /// <inheritdoc />
+    public bool Equals(CustomizationEnablementKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is CustomizationEnablementKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(CustomizationEnablementKind left, CustomizationEnablementKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(CustomizationEnablementKind left, CustomizationEnablementKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="CustomizationEnablementKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class CustomizationEnablementKindConverter : JsonConverter<CustomizationEnablementKind>
+{
+    /// <inheritdoc />
+    public override CustomizationEnablementKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new CustomizationEnablementKind(reader.GetString() ?? throw new JsonException("CustomizationEnablementKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, CustomizationEnablementKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant values for {@link CustomizationLoadState}.</summary>
@@ -458,42 +1196,95 @@ public enum TerminalLifecycleStatus
 }
 
 /// <summary>Discriminant for the {@link McpServerState} union.</summary>
-[JsonConverter(typeof(WireEnumConverter<McpServerStatus>))]
-public enum McpServerStatus
+[JsonConverter(typeof(McpServerStatusConverter))]
+public readonly struct McpServerStatus : IEquatable<McpServerStatus>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public McpServerStatus(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Server has been registered but is not yet running.</summary>
-    [WireValue("starting")]
-    Starting,
+    public static readonly McpServerStatus Starting = new McpServerStatus("starting");
+
     /// <summary>Server is running and serving requests.</summary>
-    [WireValue("ready")]
-    Ready,
+    public static readonly McpServerStatus Ready = new McpServerStatus("ready");
+
     /// <summary>Server is reachable but requires additional authentication before it
     /// can start, or before it can serve a particular request. Carries the
     /// RFC 9728 Protected Resource Metadata the client needs to obtain a
     /// token; the client then pushes the token via the existing
     /// `authenticate` command.</summary>
-    [WireValue("authRequired")]
-    AuthRequired,
+    public static readonly McpServerStatus AuthRequired = new McpServerStatus("authRequired");
+
     /// <summary>Server failed to start, crashed, or otherwise transitioned to a fatal error.</summary>
-    [WireValue("error")]
-    Error,
+    public static readonly McpServerStatus Error = new McpServerStatus("error");
+
     /// <summary>Server has been shut down.</summary>
-    [WireValue("stopped")]
-    Stopped,
+    public static readonly McpServerStatus Stopped = new McpServerStatus("stopped");
+
+    /// <inheritdoc />
+    public bool Equals(McpServerStatus other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is McpServerStatus other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(McpServerStatus left, McpServerStatus right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(McpServerStatus left, McpServerStatus right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="McpServerStatus"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class McpServerStatusConverter : JsonConverter<McpServerStatus>
+{
+    /// <inheritdoc />
+    public override McpServerStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new McpServerStatus(reader.GetString() ?? throw new JsonException("McpServerStatus expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, McpServerStatus value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Why an MCP server is currently in the {@link McpServerStatus.AuthRequired}
 /// state. Mirrors the three failure modes defined by the
 /// [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization.md).</summary>
-[JsonConverter(typeof(WireEnumConverter<McpAuthRequiredReason>))]
-public enum McpAuthRequiredReason
+[JsonConverter(typeof(McpAuthRequiredReasonConverter))]
+public readonly struct McpAuthRequiredReason : IEquatable<McpAuthRequiredReason>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public McpAuthRequiredReason(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>No token has been provided yet (HTTP 401, no prior token).</summary>
-    [WireValue("required")]
-    Required,
+    public static readonly McpAuthRequiredReason Required = new McpAuthRequiredReason("required");
+
     /// <summary>A previously valid token expired or was revoked (HTTP 401).</summary>
-    [WireValue("expired")]
-    Expired,
+    public static readonly McpAuthRequiredReason Expired = new McpAuthRequiredReason("expired");
+
     /// <summary>Step-up auth: a token is present but its scopes are insufficient for
     /// the requested operation (HTTP 403 with
     /// `WWW-Authenticate: Bearer error="insufficient_scope"`).
@@ -510,29 +1301,99 @@ public enum McpAuthRequiredReason
     /// {@link McpServerCustomization | MCP server} backing a running tool
     /// call so they can present an explicit "grant more access" affordance
     /// tied to the blocked tool call.</summary>
-    [WireValue("insufficientScope")]
-    InsufficientScope,
+    public static readonly McpAuthRequiredReason InsufficientScope = new McpAuthRequiredReason("insufficientScope");
+
+    /// <inheritdoc />
+    public bool Equals(McpAuthRequiredReason other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is McpAuthRequiredReason other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(McpAuthRequiredReason left, McpAuthRequiredReason right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(McpAuthRequiredReason left, McpAuthRequiredReason right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="McpAuthRequiredReason"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class McpAuthRequiredReasonConverter : JsonConverter<McpAuthRequiredReason>
+{
+    /// <inheritdoc />
+    public override McpAuthRequiredReason Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new McpAuthRequiredReason(reader.GetString() ?? throw new JsonException("McpAuthRequiredReason expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, McpAuthRequiredReason value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Computation lifecycle of a {@link ChangesetState}.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChangesetStatus>))]
-public enum ChangesetStatus
+[JsonConverter(typeof(ChangesetStatusConverter))]
+public readonly struct ChangesetStatus : IEquatable<ChangesetStatus>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChangesetStatus(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>The server is computing this changeset for the first time.</summary>
-    [WireValue("computing")]
-    Computing,
+    public static readonly ChangesetStatus Computing = new ChangesetStatus("computing");
+
     /// <summary>The server is recomputing this changeset. {@link ChangesetState.files}
     /// remains the previous completed result while recomputation is in progress,
     /// including when that result is an empty array.</summary>
-    [WireValue("recomputing")]
-    Recomputing,
+    public static readonly ChangesetStatus Recomputing = new ChangesetStatus("recomputing");
+
     /// <summary>The changeset has been fully computed and is up-to-date.</summary>
-    [WireValue("ready")]
-    Ready,
+    public static readonly ChangesetStatus Ready = new ChangesetStatus("ready");
+
     /// <summary>Computation failed. The cause is described by
     /// {@link ChangesetState.error}.</summary>
-    [WireValue("error")]
-    Error,
+    public static readonly ChangesetStatus Error = new ChangesetStatus("error");
+
+    /// <inheritdoc />
+    public bool Equals(ChangesetStatus other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChangesetStatus other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChangesetStatus left, ChangesetStatus right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChangesetStatus left, ChangesetStatus right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChangesetStatus"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChangesetStatusConverter : JsonConverter<ChangesetStatus>
+{
+    /// <inheritdoc />
+    public override ChangesetStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChangesetStatus(reader.GetString() ?? throw new JsonException("ChangesetStatus expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChangesetStatus value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Execution lifecycle of a {@link ChangesetOperation}.
@@ -541,38 +1402,120 @@ public enum ChangesetStatus
 /// its progress and outcome are reflected back into changeset state so that
 /// every subscriber observes a consistent view (e.g. a spinner on a "Create
 /// Pull Request" button, or an inline error after a failed "revert").</summary>
-[JsonConverter(typeof(WireEnumConverter<ChangesetOperationStatus>))]
-public enum ChangesetOperationStatus
+[JsonConverter(typeof(ChangesetOperationStatusConverter))]
+public readonly struct ChangesetOperationStatus : IEquatable<ChangesetOperationStatus>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChangesetOperationStatus(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>The operation is ready to be invoked. This is the default when
     /// {@link ChangesetOperation.status} is omitted.</summary>
-    [WireValue("idle")]
-    Idle,
+    public static readonly ChangesetOperationStatus Idle = new ChangesetOperationStatus("idle");
+
     /// <summary>An invocation of this operation is currently in flight.</summary>
-    [WireValue("running")]
-    Running,
+    public static readonly ChangesetOperationStatus Running = new ChangesetOperationStatus("running");
+
     /// <summary>The most recent invocation failed. The cause is described by
     /// {@link ChangesetOperation.error}.</summary>
-    [WireValue("error")]
-    Error,
+    public static readonly ChangesetOperationStatus Error = new ChangesetOperationStatus("error");
+
     /// <summary>The operation is currently disabled and cannot be invoked.</summary>
-    [WireValue("disabled")]
-    Disabled,
+    public static readonly ChangesetOperationStatus Disabled = new ChangesetOperationStatus("disabled");
+
+    /// <inheritdoc />
+    public bool Equals(ChangesetOperationStatus other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChangesetOperationStatus other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChangesetOperationStatus left, ChangesetOperationStatus right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChangesetOperationStatus left, ChangesetOperationStatus right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChangesetOperationStatus"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChangesetOperationStatusConverter : JsonConverter<ChangesetOperationStatus>
+{
+    /// <inheritdoc />
+    public override ChangesetOperationStatus Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChangesetOperationStatus(reader.GetString() ?? throw new JsonException("ChangesetOperationStatus expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChangesetOperationStatus value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Where a {@link ChangesetOperation} can be invoked.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChangesetOperationScope>))]
-public enum ChangesetOperationScope
+[JsonConverter(typeof(ChangesetOperationScopeConverter))]
+public readonly struct ChangesetOperationScope : IEquatable<ChangesetOperationScope>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChangesetOperationScope(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Applies to the whole changeset.</summary>
-    [WireValue("changeset")]
-    Changeset,
+    public static readonly ChangesetOperationScope Changeset = new ChangesetOperationScope("changeset");
+
     /// <summary>Applies to a single file within the changeset.</summary>
-    [WireValue("resource")]
-    Resource,
+    public static readonly ChangesetOperationScope Resource = new ChangesetOperationScope("resource");
+
     /// <summary>Applies to a line range within a single file.</summary>
-    [WireValue("range")]
-    Range,
+    public static readonly ChangesetOperationScope Range = new ChangesetOperationScope("range");
+
+    /// <inheritdoc />
+    public bool Equals(ChangesetOperationScope other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChangesetOperationScope other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChangesetOperationScope left, ChangesetOperationScope right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChangesetOperationScope left, ChangesetOperationScope right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChangesetOperationScope"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChangesetOperationScopeConverter : JsonConverter<ChangesetOperationScope>
+{
+    /// <inheritdoc />
+    public override ChangesetOperationScope Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChangesetOperationScope(reader.GetString() ?? throw new JsonException("ChangesetOperationScope expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChangesetOperationScope value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for {@link ResourceChange.type}.</summary>
@@ -593,32 +1536,114 @@ public enum ResourceChangeType
 /// change over time. Clients MUST NOT infer permission from capabilities alone:
 /// capabilities describe what the host implementation can support, while
 /// operations describe what is allowed for this particular automation now.</summary>
-[JsonConverter(typeof(WireEnumConverter<AutomationOperation>))]
-public enum AutomationOperation
+[JsonConverter(typeof(AutomationOperationConverter))]
+public readonly struct AutomationOperation : IEquatable<AutomationOperation>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public AutomationOperation(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Replace editable fields using {@link AutomationUpdateRequestedAction | `automation/updateRequested`}.</summary>
-    [WireValue("update")]
-    Update,
+    public static readonly AutomationOperation Update = new AutomationOperation("update");
+
     /// <summary>Permanently remove the automation using {@link AutomationRemovedAction | `automation/removed`}.</summary>
-    [WireValue("remove")]
-    Remove,
+    public static readonly AutomationOperation Remove = new AutomationOperation("remove");
+
     /// <summary>Start a manual run using {@link RunAutomationParams | runAutomation}.</summary>
-    [WireValue("run")]
-    Run,
+    public static readonly AutomationOperation Run = new AutomationOperation("run");
+
+    /// <inheritdoc />
+    public bool Equals(AutomationOperation other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is AutomationOperation other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(AutomationOperation left, AutomationOperation right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(AutomationOperation left, AutomationOperation right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="AutomationOperation"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class AutomationOperationConverter : JsonConverter<AutomationOperation>
+{
+    /// <inheritdoc />
+    public override AutomationOperation Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new AutomationOperation(reader.GetString() ?? throw new JsonException("AutomationOperation expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, AutomationOperation value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>How a host handles schedule occurrences missed while automatic execution was
 /// unavailable.</summary>
-[JsonConverter(typeof(WireEnumConverter<AutomationMisfirePolicy>))]
-public enum AutomationMisfirePolicy
+[JsonConverter(typeof(AutomationMisfirePolicyConverter))]
+public readonly struct AutomationMisfirePolicy : IEquatable<AutomationMisfirePolicy>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public AutomationMisfirePolicy(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Discard missed occurrences and wait for the next future occurrence.</summary>
-    [WireValue("skip")]
-    Skip,
+    public static readonly AutomationMisfirePolicy Skip = new AutomationMisfirePolicy("skip");
+
     /// <summary>Start at most one catch-up run when execution becomes available, regardless
     /// of how many occurrences were missed.</summary>
-    [WireValue("runOnce")]
-    RunOnce,
+    public static readonly AutomationMisfirePolicy RunOnce = new AutomationMisfirePolicy("runOnce");
+
+    /// <inheritdoc />
+    public bool Equals(AutomationMisfirePolicy other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is AutomationMisfirePolicy other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(AutomationMisfirePolicy left, AutomationMisfirePolicy right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(AutomationMisfirePolicy left, AutomationMisfirePolicy right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="AutomationMisfirePolicy"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class AutomationMisfirePolicyConverter : JsonConverter<AutomationMisfirePolicy>
+{
+    /// <inheritdoc />
+    public override AutomationMisfirePolicy Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new AutomationMisfirePolicy(reader.GetString() ?? throw new JsonException("AutomationMisfirePolicy expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, AutomationMisfirePolicy value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for automatic trigger definitions.</summary>
@@ -1077,6 +2102,14 @@ public sealed record ConfigPropertySchema
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfigPropertySchema? Items { get; init; }
 
+    /// <summary>JSON Schema: minimum number of array items (used when `type` is `'array'`)</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? MinItems { get; init; }
+
+    /// <summary>JSON Schema: maximum number of array items (used when `type` is `'array'`)</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? MaxItems { get; init; }
+
     /// <summary>JSON Schema: property descriptors for object properties (used when `type` is `'object'`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, ConfigPropertySchema>? Properties { get; init; }
@@ -1305,7 +2338,7 @@ public sealed record ChatInputTextQuestion
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
 
-    public ChatInputQuestionKind Kind { get; init; }
+    public ChatInputQuestionKind Kind { get; init; } = ChatInputQuestionKind.Text;
 
     /// <summary>Format hint for text questions, such as `email`, `uri`, `date`, or `date-time`</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1373,7 +2406,7 @@ public sealed record ChatInputBooleanQuestion
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
 
-    public ChatInputQuestionKind Kind { get; init; }
+    public ChatInputQuestionKind Kind { get; init; } = ChatInputQuestionKind.Boolean;
 
     /// <summary>Default boolean value</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1397,7 +2430,7 @@ public sealed record ChatInputSingleSelectQuestion
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
 
-    public ChatInputQuestionKind Kind { get; init; }
+    public ChatInputQuestionKind Kind { get; init; } = ChatInputQuestionKind.SingleSelect;
 
     /// <summary>Options the user may select from</summary>
     public required List<ChatInputOption> Options { get; init; }
@@ -1424,7 +2457,7 @@ public sealed record ChatInputMultiSelectQuestion
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Required { get; init; }
 
-    public ChatInputQuestionKind Kind { get; init; }
+    public ChatInputQuestionKind Kind { get; init; } = ChatInputQuestionKind.MultiSelect;
 
     /// <summary>Options the user may select from</summary>
     public required List<ChatInputOption> Options { get; init; }
@@ -1472,28 +2505,28 @@ public sealed class ChatInputRequest
 /// <summary>Value captured for one answer.</summary>
 public sealed record ChatInputTextAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.Text;
 
     public required string Value { get; init; }
 }
 
 public sealed record ChatInputNumberAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.Number;
 
     public double Value { get; init; }
 }
 
 public sealed record ChatInputBooleanAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.Boolean;
 
     public bool Value { get; init; }
 }
 
 public sealed record ChatInputSelectedAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.Selected;
 
     public required string Value { get; init; }
 
@@ -1504,7 +2537,7 @@ public sealed record ChatInputSelectedAnswerValue
 
 public sealed record ChatInputSelectedManyAnswerValue
 {
-    public ChatInputAnswerValueKind Kind { get; init; }
+    public ChatInputAnswerValueKind Kind { get; init; } = ChatInputAnswerValueKind.SelectedMany;
 
     public required List<string> Value { get; init; }
 
@@ -1525,7 +2558,7 @@ public sealed record ChatInputAnswered
 public sealed record ChatInputSkipped
 {
     /// <summary>Answer state</summary>
-    public ChatInputAnswerState State { get; init; }
+    public ChatInputAnswerState State { get; init; } = ChatInputAnswerState.Skipped;
 
     /// <summary>Free-form reason or value captured while skipping, if any</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -1725,7 +2758,7 @@ public sealed record SessionChatInputRequest
     /// chat first.</summary>
     public required string Chat { get; init; }
 
-    public SessionInputRequestKind Kind { get; init; }
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ChatInput;
 
     /// <summary>The mirrored chat input request.</summary>
     public required ChatInputRequest Request { get; init; }
@@ -1753,7 +2786,7 @@ public sealed record SessionToolConfirmationRequest
     /// chat first.</summary>
     public required string Chat { get; init; }
 
-    public SessionInputRequestKind Kind { get; init; }
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ToolConfirmation;
 
     /// <summary>The turn the tool call belongs to.</summary>
     public required string TurnId { get; init; }
@@ -1793,7 +2826,7 @@ public sealed record SessionToolClientExecutionRequest
     /// chat first.</summary>
     public required string Chat { get; init; }
 
-    public SessionInputRequestKind Kind { get; init; }
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ToolClientExecution;
 
     /// <summary>The turn the tool call belongs to.</summary>
     public required string TurnId { get; init; }
@@ -1834,7 +2867,7 @@ public sealed record SessionToolAuthenticationRequest
     /// chat first.</summary>
     public required string Chat { get; init; }
 
-    public SessionInputRequestKind Kind { get; init; }
+    public SessionInputRequestKind Kind { get; init; } = SessionInputRequestKind.ToolAuthentication;
 
     /// <summary>The turn the tool call belongs to.</summary>
     public required string TurnId { get; init; }
@@ -2045,6 +3078,14 @@ public sealed record SessionConfigPropertySchema
     /// <summary>JSON Schema: schema for array items (used when `type` is `'array'`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfigPropertySchema? Items { get; init; }
+
+    /// <summary>JSON Schema: minimum number of array items (used when `type` is `'array'`)</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? MinItems { get; init; }
+
+    /// <summary>JSON Schema: maximum number of array items (used when `type` is `'array'`)</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? MaxItems { get; init; }
 
     /// <summary>JSON Schema: property descriptors for object properties (used when `type` is `'object'`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2295,7 +3336,7 @@ public sealed record SimpleMessageAttachment
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Simple;
 
     /// <summary>Representation of the attachment as it should be shown to the model.
     ///
@@ -2346,7 +3387,7 @@ public sealed record MessageEmbeddedResourceAttachment
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.EmbeddedResource;
 
     /// <summary>Base64-encoded binary data</summary>
     public required string Data { get; init; }
@@ -2413,7 +3454,7 @@ public sealed record MessageResourceAttachment
     public string? Nonce { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Resource;
 
     /// <summary>Optional selection within the referenced textual resource.
     ///
@@ -2463,7 +3504,7 @@ public sealed record MessageAnnotationsAttachment
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Annotations;
 
     /// <summary>The annotations channel URI (typically `ahp-session:/&lt;uuid&gt;/annotations`).
     /// Matches {@link AnnotationsSummary.resource}.</summary>
@@ -2530,7 +3571,7 @@ public sealed record MessageChatAttachment
     public Dictionary<string, JsonElement>? Meta { get; init; }
 
     /// <summary>Discriminant</summary>
-    public MessageAttachmentKind Type { get; init; }
+    public MessageAttachmentKind Type { get; init; } = MessageAttachmentKind.Chat;
 
     /// <summary>URI of the referenced chat.</summary>
     public required string Resource { get; init; }
@@ -2544,7 +3585,7 @@ public sealed record MessageChatAttachment
 public sealed class MarkdownResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; set; }
+    public ResponsePartKind Kind { get; set; } = ResponsePartKind.Markdown;
 
     /// <summary>Part identifier, used by `chat/delta` to target this part for content appends</summary>
     public required string Id { get; set; }
@@ -2591,7 +3632,7 @@ public sealed record ResourceResponsePart
     public string? Nonce { get; init; }
 
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; init; }
+    public ResponsePartKind Kind { get; init; } = ResponsePartKind.ContentRef;
 }
 
 /// <summary>A tool call represented as a response part.
@@ -2602,7 +3643,7 @@ public sealed record ResourceResponsePart
 public sealed class ToolCallResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; set; }
+    public ResponsePartKind Kind { get; set; } = ResponsePartKind.ToolCall;
 
     /// <summary>Full tool call lifecycle state</summary>
     public required ToolCallState ToolCall { get; set; }
@@ -2612,7 +3653,7 @@ public sealed class ToolCallResponsePart
 public sealed class ReasoningResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; set; }
+    public ResponsePartKind Kind { get; set; } = ResponsePartKind.Reasoning;
 
     /// <summary>Part identifier, used by `chat/reasoning` to target this part for content appends</summary>
     public required string Id { get; set; }
@@ -2630,7 +3671,7 @@ public sealed class ReasoningResponsePart
 public sealed record SystemNotificationResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; init; }
+    public ResponsePartKind Kind { get; init; } = ResponsePartKind.SystemNotification;
 
     /// <summary>The text of the system notification</summary>
     public required StringOrMarkdown Content { get; init; }
@@ -2660,7 +3701,7 @@ public sealed record SystemNotificationResponsePart
 public sealed record InputRequestResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; init; }
+    public ResponsePartKind Kind { get; init; } = ResponsePartKind.InputRequest;
 
     /// <summary>The request, carrying its `id`, `message`, `url`, `questions`, and current
     /// draft or submitted `answers`.</summary>
@@ -2684,7 +3725,7 @@ public sealed record InputRequestResponsePart
 public sealed record ErrorResponsePart
 {
     /// <summary>Discriminant</summary>
-    public ResponsePartKind Kind { get; init; }
+    public ResponsePartKind Kind { get; init; } = ResponsePartKind.Error;
 
     /// <summary>Error details.</summary>
     public required ErrorInfo Error { get; init; }
@@ -2748,7 +3789,7 @@ public sealed record ToolCallRiskAssessmentLoadingState
 {
     public ToolCallRiskAssessmentKind Kind { get; init; }
 
-    public ToolCallRiskAssessmentStatus Status { get; init; }
+    public ToolCallRiskAssessmentStatus Status { get; init; } = ToolCallRiskAssessmentStatus.Loading;
 }
 
 /// <summary>The model judge has completed its evaluation.</summary>
@@ -2756,7 +3797,7 @@ public sealed record ToolCallRiskAssessmentCompleteState
 {
     public ToolCallRiskAssessmentKind Kind { get; init; }
 
-    public ToolCallRiskAssessmentStatus Status { get; init; }
+    public ToolCallRiskAssessmentStatus Status { get; init; } = ToolCallRiskAssessmentStatus.Complete;
 
     public required StringOrMarkdown Reason { get; init; }
 
@@ -2793,7 +3834,7 @@ public sealed class ToolCallStreamingState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
 
-    public ToolCallStatus Status { get; set; }
+    public ToolCallStatus Status { get; set; } = ToolCallStatus.Streaming;
 
     /// <summary>Partial parameters accumulated from tool-call deltas.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2846,7 +3887,7 @@ public sealed record ToolCallPendingConfirmationState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ToolInput? ToolInput { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.PendingConfirmation;
 
     /// <summary>Short title for the confirmation prompt (e.g. `"Run in terminal"`, `"Write file"`)</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -2920,7 +3961,7 @@ public sealed class ToolCallRunningState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; set; }
 
-    public ToolCallStatus Status { get; set; }
+    public ToolCallStatus Status { get; set; } = ToolCallStatus.Running;
 
     /// <summary>Partial content produced while the tool is still executing.
     ///
@@ -3003,7 +4044,7 @@ public sealed record ToolCallAuthRequiredState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.AuthRequired;
 
     /// <summary>The authentication challenge blocking this invocation.</summary>
     public required McpAuthRequirement Auth { get; init; }
@@ -3083,7 +4124,7 @@ public sealed record ToolCallPendingResultConfirmationState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.PendingResultConfirmation;
 }
 
 /// <summary>Tool completed successfully or with an error.</summary>
@@ -3156,7 +4197,7 @@ public sealed record ToolCallCompletedState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ConfirmationOption? SelectedOption { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.Completed;
 }
 
 /// <summary>Tool call was cancelled before execution.</summary>
@@ -3200,7 +4241,7 @@ public sealed record ToolCallCancelledState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ToolInput? ToolInput { get; init; }
 
-    public ToolCallStatus Status { get; init; }
+    public ToolCallStatus Status { get; init; } = ToolCallStatus.Cancelled;
 
     /// <summary>Why the tool was cancelled</summary>
     public ToolCallCancellationReason Reason { get; init; }
@@ -3289,7 +4330,7 @@ public sealed record ToolAnnotations
 /// Mirrors MCP `TextContent`.</summary>
 public sealed record ToolResultTextContent
 {
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.Text;
 
     /// <summary>The text content</summary>
     public required string Text { get; init; }
@@ -3300,7 +4341,7 @@ public sealed record ToolResultTextContent
 /// Mirrors MCP `EmbeddedResource` for inline binary data.</summary>
 public sealed record ToolResultEmbeddedResourceContent
 {
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.EmbeddedResource;
 
     /// <summary>Base64-encoded data</summary>
     public required string Data { get; init; }
@@ -3329,7 +4370,7 @@ public sealed record ToolResultResourceContent
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Nonce { get; init; }
 
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.Resource;
 }
 
 /// <summary>Describes a file modification performed by a tool.</summary>
@@ -3347,7 +4388,7 @@ public sealed record ToolResultFileEditContent
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public FileEditDiffStats? Diff { get; init; }
 
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.FileEdit;
 }
 
 /// <summary>A reference to a terminal whose output is relevant to this tool result.
@@ -3365,7 +4406,7 @@ public sealed record ToolResultFileEditContent
 /// running afterwards.</summary>
 public sealed record ToolResultTerminalContent
 {
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.Terminal;
 
     /// <summary>Terminal URI (subscribable for live or retained terminal state)</summary>
     public required string Resource { get; init; }
@@ -3412,7 +4453,7 @@ public sealed record TerminalCommandResult
 /// whose `toolCallId` identifies the tool call that emitted this content.</summary>
 public sealed record ToolResultSubagentContent
 {
-    public ToolResultContentType Type { get; init; }
+    public ToolResultContentType Type { get; init; } = ToolResultContentType.Subagent;
 
     /// <summary>Worker chat URI (subscribable for full chat state)</summary>
     public required string Resource { get; init; }
@@ -3432,19 +4473,19 @@ public sealed record ToolResultSubagentContent
 /// <summary>Container is being loaded by the host.</summary>
 public sealed record CustomizationLoadingState
 {
-    public CustomizationLoadStatus Kind { get; init; }
+    public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Loading;
 }
 
 /// <summary>Container loaded successfully.</summary>
 public sealed record CustomizationLoadedState
 {
-    public CustomizationLoadStatus Kind { get; init; }
+    public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Loaded;
 }
 
 /// <summary>Container partially loaded but has warnings.</summary>
 public sealed record CustomizationDegradedState
 {
-    public CustomizationLoadStatus Kind { get; init; }
+    public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Degraded;
 
     /// <summary>Human-readable description of the warning.</summary>
     public required string Message { get; init; }
@@ -3453,7 +4494,7 @@ public sealed record CustomizationDegradedState
 /// <summary>Container failed to load.</summary>
 public sealed record CustomizationErrorState
 {
-    public CustomizationLoadStatus Kind { get; init; }
+    public CustomizationLoadStatus Kind { get; init; } = CustomizationLoadStatus.Error;
 
     /// <summary>Human-readable error message.</summary>
     public required string Message { get; init; }
@@ -3517,7 +4558,7 @@ public sealed class PluginCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ChildCustomization>? Children { get; set; }
 
-    public CustomizationType Type { get; set; }
+    public CustomizationType Type { get; set; } = CustomizationType.Plugin;
 
     /// <summary>Explicit enablement decisions. See {@link McpServerCustomization.enablement}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3599,7 +4640,7 @@ public sealed record ClientPluginCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ChildCustomization>? Children { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Plugin;
 
     /// <summary>Explicit enablement decisions. See {@link McpServerCustomization.enablement}.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -3696,7 +4737,7 @@ public sealed class DirectoryCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ChildCustomization>? Children { get; set; }
 
-    public CustomizationType Type { get; set; }
+    public CustomizationType Type { get; set; } = CustomizationType.Directory;
 
     /// <summary>Whether this container is currently enabled.</summary>
     public bool Enabled { get; set; }
@@ -3767,7 +4808,7 @@ public sealed record AgentCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Agent;
 
     /// <summary>Short description of what the agent specializes in and when to
     /// invoke it. Sourced from the agent file's frontmatter `description`.</summary>
@@ -3863,7 +4904,7 @@ public sealed record SkillCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Skill;
 
     /// <summary>Short description used for help text and auto-invocation matching.
     /// Sourced from the skill's frontmatter `description`.</summary>
@@ -3938,7 +4979,7 @@ public sealed record PromptCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Prompt;
 
     /// <summary>Short description of what the prompt does.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -4008,7 +5049,7 @@ public sealed record RuleCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Rule;
 
     /// <summary>Description of what the rule enforces.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -4081,7 +5122,7 @@ public sealed record HookCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Enabled { get; init; }
 
-    public CustomizationType Type { get; init; }
+    public CustomizationType Type { get; init; } = CustomizationType.Hook;
 }
 
 /// <summary>An MCP server contributed by a plugin or directory.
@@ -4131,7 +5172,7 @@ public sealed class McpServerCustomization
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, JsonElement>? Meta { get; set; }
 
-    public CustomizationType Type { get; set; }
+    public CustomizationType Type { get; set; } = CustomizationType.McpServer;
 
     /// <summary>Explicit enablement decisions for this customization, one entry per scope
     /// that has one. This is a wire contract: producers MUST publish entries
@@ -4246,7 +5287,7 @@ public sealed record AhpMcpUiHostCapabilities
 /// <summary>Server is registered with the host but has not yet started.</summary>
 public sealed record McpServerStartingState
 {
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.Starting;
 
     /// <summary>Hosts SHOULD set this to `true` when this server's startup will hold back
     /// the processing of new messages (for example, the next turn) while the
@@ -4263,7 +5304,7 @@ public sealed record McpServerStartingState
 /// <summary>Server is running and serving requests.</summary>
 public sealed record McpServerReadyState
 {
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.Ready;
 }
 
 /// <summary>A pre-registered OAuth client that clients use instead of dynamic client
@@ -4374,7 +5415,7 @@ public sealed record McpServerAuthRequiredState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Description { get; init; }
 
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.AuthRequired;
 }
 
 /// <summary>Server failed to start, crashed, or otherwise transitioned to a
@@ -4382,7 +5423,7 @@ public sealed record McpServerAuthRequiredState
 /// for authentication failures.</summary>
 public sealed record McpServerErrorState
 {
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.Error;
 
     /// <summary>Error details.</summary>
     public required ErrorInfo Error { get; init; }
@@ -4392,12 +5433,12 @@ public sealed record McpServerErrorState
 /// session entirely shortly after this state.</summary>
 public sealed record McpServerStoppedState
 {
-    public McpServerStatus Kind { get; init; }
+    public McpServerStatus Kind { get; init; } = McpServerStatus.Stopped;
 }
 
 public sealed record ToolCallClientContributor
 {
-    public ToolCallContributorKind Kind { get; init; }
+    public ToolCallContributorKind Kind { get; init; } = ToolCallContributorKind.Client;
 
     /// <summary>If this tool is provided by a client, the `clientId` of the owning client.
     /// Absent for server-side tools.
@@ -4409,7 +5450,7 @@ public sealed record ToolCallClientContributor
 
 public sealed record ToolCallMcpContributor
 {
-    public ToolCallContributorKind Kind { get; init; }
+    public ToolCallContributorKind Kind { get; init; } = ToolCallContributorKind.MCP;
 
     /// <summary>Customization ID of the corresponding MCP server in {@link SessionState.customizations}.</summary>
     public required string CustomizationId { get; init; }
@@ -4479,7 +5520,7 @@ public sealed record TerminalInfo
 public sealed record TerminalClientClaim
 {
     /// <summary>Discriminant</summary>
-    public TerminalClaimKind Kind { get; init; }
+    public TerminalClaimKind Kind { get; init; } = TerminalClaimKind.Client;
 
     /// <summary>The `clientId` of the claiming client</summary>
     public required string ClientId { get; init; }
@@ -4489,7 +5530,7 @@ public sealed record TerminalClientClaim
 public sealed record TerminalSessionClaim
 {
     /// <summary>Discriminant</summary>
-    public TerminalClaimKind Kind { get; init; }
+    public TerminalClaimKind Kind { get; init; } = TerminalClaimKind.Session;
 
     /// <summary>Session URI that claimed the terminal</summary>
     public required string Session { get; init; }
@@ -5065,7 +6106,7 @@ public sealed record AnnotationEntry
 /// for this session's transcript, tools, confirmations, and changes.</summary>
 public sealed record AutomationSessionOrigin
 {
-    public SessionOriginKind Kind { get; init; }
+    public SessionOriginKind Kind { get; init; } = SessionOriginKind.Automation;
 
     /// <summary>Owning {@link AutomationEntry.resource}.</summary>
     public required string Automation { get; init; }
@@ -5077,13 +6118,13 @@ public sealed record AutomationSessionOrigin
 /// <summary>A terminal process that is still running.</summary>
 public sealed record TerminalRunningLifecycleState
 {
-    public TerminalLifecycleStatus Status { get; init; }
+    public TerminalLifecycleStatus Status { get; init; } = TerminalLifecycleStatus.Running;
 }
 
 /// <summary>A terminal process that has exited.</summary>
 public sealed record TerminalExitedLifecycleState
 {
-    public TerminalLifecycleStatus Status { get; init; }
+    public TerminalLifecycleStatus Status { get; init; } = TerminalLifecycleStatus.Exited;
 
     /// <summary>Process exit code, if the runtime reported one.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -5131,7 +6172,7 @@ public sealed record AutomationScheduleTrigger
     /// run.</summary>
     public required string Id { get; init; }
 
-    public AutomationTriggerKind Kind { get; init; }
+    public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.Schedule;
 
     /// <summary>Recurrence and time zone evaluated by the host.</summary>
     public required AutomationSchedule Schedule { get; init; }
@@ -5156,7 +6197,7 @@ public sealed record AutomationEventTrigger
     /// run.</summary>
     public required string Id { get; init; }
 
-    public AutomationTriggerKind Kind { get; init; }
+    public AutomationTriggerKind Kind { get; init; } = AutomationTriggerKind.Event;
 
     /// <summary>Matches {@link AutomationTriggerDefinition.type}.</summary>
     public required string Type { get; init; }
@@ -5345,7 +6386,7 @@ public sealed record AutomationDefinitionPatch
 /// <summary>Stops scheduling after a fixed number of scheduled runs.</summary>
 public sealed record AutomationAfterRunsCondition
 {
-    public AutomationDisableConditionKind Kind { get; init; }
+    public AutomationDisableConditionKind Kind { get; init; } = AutomationDisableConditionKind.AfterRuns;
 
     /// <summary>Positive-integer cap on scheduled runs.</summary>
     public long Max { get; init; }
@@ -5354,7 +6395,7 @@ public sealed record AutomationAfterRunsCondition
 /// <summary>Stops scheduling once a wall-clock date passes.</summary>
 public sealed record AutomationAfterDateCondition
 {
-    public AutomationDisableConditionKind Kind { get; init; }
+    public AutomationDisableConditionKind Kind { get; init; } = AutomationDisableConditionKind.AfterDate;
 
     /// <summary>ISO 8601 timestamp after which scheduling stops.</summary>
     public required string Date { get; init; }
@@ -5436,13 +6477,13 @@ public sealed class AutomationState
 /// <summary>Origin recorded for a client-requested manual run.</summary>
 public sealed record AutomationManualRunOrigin
 {
-    public AutomationRunOriginKind Kind { get; init; }
+    public AutomationRunOriginKind Kind { get; init; } = AutomationRunOriginKind.Manual;
 }
 
 /// <summary>Origin recorded for a run created by one of the automation's triggers.</summary>
 public sealed record AutomationTriggeredRunOrigin
 {
-    public AutomationRunOriginKind Kind { get; init; }
+    public AutomationRunOriginKind Kind { get; init; } = AutomationRunOriginKind.Trigger;
 
     /// <summary>Matches the stable {@link AutomationScheduleTrigger.id} or
     /// {@link AutomationEventTrigger.id} in the definition.</summary>
@@ -5467,7 +6508,7 @@ public sealed record AutomationTriggeredRunOrigin
 /// <summary>A durable run exists but has not begun external execution.</summary>
 public sealed record AutomationPendingRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Pending;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5480,7 +6521,7 @@ public sealed record AutomationPendingRunLifecycle
 /// required.</summary>
 public sealed record AutomationRunningRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Running;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5492,7 +6533,7 @@ public sealed record AutomationRunningRunLifecycle
 /// <summary>Terminal lifecycle for a successfully completed run.</summary>
 public sealed record AutomationCompletedRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Completed;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5514,7 +6555,7 @@ public sealed record AutomationCompletedRunLifecycle
 /// session-template validation or workspace preparation.</summary>
 public sealed record AutomationFailedRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Failed;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5536,7 +6577,7 @@ public sealed record AutomationFailedRunLifecycle
 /// pending.</summary>
 public sealed record AutomationCancelledRunLifecycle
 {
-    public AutomationRunStatus Status { get; init; }
+    public AutomationRunStatus Status { get; init; } = AutomationRunStatus.Cancelled;
 
     /// <summary>Run creation timestamp in ISO 8601 format.</summary>
     public required string CreatedAt { get; init; }
@@ -5655,7 +6696,7 @@ internal sealed class CustomizationEnablementConverter : UnionConverter<Customiz
                 ["workspace"] = typeof(CustomizationEnablementWorkspace),
                 ["session"] = typeof(CustomizationEnablementSession),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }
@@ -5800,7 +6841,7 @@ internal sealed class TerminalClaimConverter : UnionConverter<TerminalClaim>
         ["client"] = typeof(TerminalClientClaim),
         ["session"] = typeof(TerminalSessionClaim),
             },
-            allowUnknown: true)
+            allowUnknown: false)
     {
     }
 }
@@ -5916,7 +6957,7 @@ internal sealed class ChatInputAnswerConverter : UnionConverter<ChatInputAnswer>
         ["submitted"] = typeof(ChatInputAnswered),
         ["skipped"] = typeof(ChatInputSkipped),
             },
-            allowUnknown: true)
+            allowUnknown: false)
     {
     }
 }
@@ -6065,7 +7106,7 @@ internal sealed class CustomizationLoadStateConverter : UnionConverter<Customiza
         ["degraded"] = typeof(CustomizationDegradedState),
         ["error"] = typeof(CustomizationErrorState),
             },
-            allowUnknown: true)
+            allowUnknown: false)
     {
     }
 }
@@ -6204,7 +7245,7 @@ internal sealed class SessionOriginConverter : UnionConverter<SessionOrigin>
             {
         ["automation"] = typeof(AutomationSessionOrigin),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }

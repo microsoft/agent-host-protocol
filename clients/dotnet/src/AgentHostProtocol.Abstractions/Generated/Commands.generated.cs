@@ -20,15 +20,56 @@ public enum ReconnectResultType
 }
 
 /// <summary>How a new chat uses its source chat and turn.</summary>
-[JsonConverter(typeof(WireEnumConverter<ChatSourceKind>))]
-public enum ChatSourceKind
+[JsonConverter(typeof(ChatSourceKindConverter))]
+public readonly struct ChatSourceKind : IEquatable<ChatSourceKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ChatSourceKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Copy source history through the referenced turn into the new chat.</summary>
-    [WireValue("fork")]
-    Fork,
+    public static readonly ChatSourceKind Fork = new ChatSourceKind("fork");
+
     /// <summary>Supply source context without copying it into the new chat's visible history.</summary>
-    [WireValue("sideChat")]
-    SideChat,
+    public static readonly ChatSourceKind SideChat = new ChatSourceKind("sideChat");
+
+    /// <inheritdoc />
+    public bool Equals(ChatSourceKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ChatSourceKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ChatSourceKind left, ChatSourceKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ChatSourceKind left, ChatSourceKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ChatSourceKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ChatSourceKindConverter : JsonConverter<ChatSourceKind>
+{
+    /// <inheritdoc />
+    public override ChatSourceKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ChatSourceKind(reader.GetString() ?? throw new JsonException("ChatSourceKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ChatSourceKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Encoding of fetched content data.</summary>
@@ -42,26 +83,108 @@ public enum ContentEncoding
 }
 
 /// <summary>The kind of completion items being requested.</summary>
-[JsonConverter(typeof(WireEnumConverter<CompletionItemKind>))]
-public enum CompletionItemKind
+[JsonConverter(typeof(CompletionItemKindConverter))]
+public readonly struct CompletionItemKind : IEquatable<CompletionItemKind>
 {
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public CompletionItemKind(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
     /// <summary>Completions for the text of a {@link Message} the user is composing.
     /// Each returned item carries an attachment that gets associated with the
     /// message when accepted.</summary>
-    [WireValue("userMessage")]
-    UserMessage,
+    public static readonly CompletionItemKind UserMessage = new CompletionItemKind("userMessage");
+
+    /// <inheritdoc />
+    public bool Equals(CompletionItemKind other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is CompletionItemKind other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(CompletionItemKind left, CompletionItemKind right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(CompletionItemKind left, CompletionItemKind right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="CompletionItemKind"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class CompletionItemKindConverter : JsonConverter<CompletionItemKind>
+{
+    /// <inheritdoc />
+    public override CompletionItemKind Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new CompletionItemKind(reader.GetString() ?? throw new JsonException("CompletionItemKind expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, CompletionItemKind value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>Discriminant for {@link ResourceResolveResult.type}.</summary>
-[JsonConverter(typeof(WireEnumConverter<ResourceType>))]
-public enum ResourceType
+[JsonConverter(typeof(ResourceTypeConverter))]
+public readonly struct ResourceType : IEquatable<ResourceType>
 {
-    [WireValue("file")]
-    File,
-    [WireValue("directory")]
-    Directory,
-    [WireValue("symlink")]
-    Symlink,
+    private readonly string? _value;
+
+    /// <summary>Wraps a raw wire value — including one this build does not recognize.</summary>
+    /// <param name="value">The raw wire string.</param>
+    public ResourceType(string value)
+    {
+        _value = value;
+    }
+
+    /// <summary>The raw wire value.</summary>
+    public string Value => _value ?? string.Empty;
+
+    public static readonly ResourceType File = new ResourceType("file");
+
+    public static readonly ResourceType Directory = new ResourceType("directory");
+
+    public static readonly ResourceType Symlink = new ResourceType("symlink");
+
+    /// <inheritdoc />
+    public bool Equals(ResourceType other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj) => obj is ResourceType other && Equals(other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+
+    /// <inheritdoc />
+    public override string ToString() => Value;
+
+    /// <summary>Ordinal equality over the raw wire value.</summary>
+    public static bool operator ==(ResourceType left, ResourceType right) => left.Equals(right);
+
+    /// <summary>Ordinal inequality over the raw wire value.</summary>
+    public static bool operator !=(ResourceType left, ResourceType right) => !left.Equals(right);
+}
+
+/// <summary>Reads and writes <see cref="ResourceType"/> as its raw wire string, preserving unrecognized values.</summary>
+internal sealed class ResourceTypeConverter : JsonConverter<ResourceType>
+{
+    /// <inheritdoc />
+    public override ResourceType Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new ResourceType(reader.GetString() ?? throw new JsonException("ResourceType expects a JSON string."));
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, ResourceType value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Value);
 }
 
 /// <summary>How {@link ResourceWriteParams.data} is placed within the target file.
@@ -361,7 +484,7 @@ public sealed record ReconnectParams
 public sealed record ReconnectReplayResult
 {
     /// <summary>Discriminant</summary>
-    public ReconnectResultType Type { get; init; }
+    public ReconnectResultType Type { get; init; } = ReconnectResultType.Replay;
 
     /// <summary>Missed action envelopes since `lastSeenServerSeq`</summary>
     public required List<ActionEnvelope> Actions { get; init; }
@@ -377,7 +500,7 @@ public sealed record ReconnectReplayResult
 public sealed record ReconnectSnapshotResult
 {
     /// <summary>Discriminant</summary>
-    public ReconnectResultType Type { get; init; }
+    public ReconnectResultType Type { get; init; } = ReconnectResultType.Snapshot;
 
     /// <summary>Fresh snapshots for each subscription</summary>
     public required List<Snapshot> Snapshots { get; init; }
@@ -541,7 +664,7 @@ public sealed record DisposeSessionParams
 public sealed record ForkChatSource
 {
     /// <summary>Discriminant</summary>
-    public ChatSourceKind Kind { get; init; }
+    public ChatSourceKind Kind { get; init; } = ChatSourceKind.Fork;
 
     /// <summary>URI of the existing source chat.</summary>
     public required string Chat { get; init; }
@@ -557,7 +680,7 @@ public sealed record ForkChatSource
 public sealed record SideChatSource
 {
     /// <summary>Discriminant</summary>
-    public ChatSourceKind Kind { get; init; }
+    public ChatSourceKind Kind { get; init; } = ChatSourceKind.SideChat;
 
     /// <summary>URI of the existing source chat.</summary>
     public required string Chat { get; init; }
@@ -1723,7 +1846,7 @@ internal sealed class ChatSourceConverter : UnionConverter<ChatSource>
         ["fork"] = typeof(ForkChatSource),
         ["sideChat"] = typeof(SideChatSource),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }
@@ -1776,7 +1899,7 @@ internal sealed class ChangesetOperationTargetConverter : UnionConverter<Changes
                 ["resource"] = typeof(ChangesetOperationResourceTarget),
                 ["range"] = typeof(ChangesetOperationRangeTarget),
             },
-            allowUnknown: false)
+            allowUnknown: true)
     {
     }
 }

@@ -1,0 +1,6 @@
+{
+  "type": "fixed",
+  "message": "Generated action and union-variant records now pin their own literal discriminator as the property initializer, so constructing one without setting the discriminator serializes the correct wire value. Previously the property fell back to the type's zero value — the *first* enum member, which silently emitted the wrong discriminator on every record but the first.",
+  "targets": ["dotnet"],
+  "issues": [366]
+}

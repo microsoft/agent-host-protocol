@@ -52,6 +52,8 @@ ConfigPropertySchema {
   enumLabels?: string[]          // display labels (parallel array)
   enumDescriptions?: string[]    // descriptions (parallel array)
   readOnly?: boolean
+  minItems?: number              // array cardinality (when type is 'array')
+  maxItems?: number
 }
 ```
 

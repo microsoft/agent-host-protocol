@@ -1,0 +1,5 @@
+{
+  "type": "added",
+  "message": "`ConfigPropertySchema.minItems` and `ConfigPropertySchema.maxItems` express array cardinality for `type: \"array\"` config properties.",
+  "issues": [432]
+}
