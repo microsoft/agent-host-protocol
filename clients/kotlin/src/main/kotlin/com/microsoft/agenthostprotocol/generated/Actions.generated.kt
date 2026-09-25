@@ -54,6 +54,8 @@ value class ActionType(val rawValue: String) {
         val CHAT_ERROR: ActionType = ActionType("chat/error")
         val CHAT_TURN_RESUME: ActionType = ActionType("chat/turnResume")
         val CHAT_ACTIVITY_CHANGED: ActionType = ActionType("chat/activityChanged")
+        val CHAT_BACKGROUND_SHELL_SET: ActionType = ActionType("chat/backgroundShellSet")
+        val CHAT_BACKGROUND_SHELL_REMOVED: ActionType = ActionType("chat/backgroundShellRemoved")
         val CHAT_CHANGESETS_CHANGED: ActionType = ActionType("chat/changesetsChanged")
         val CHAT_WORKING_DIRECTORY_SET: ActionType = ActionType("chat/workingDirectorySet")
         val CHAT_WORKING_DIRECTORY_REMOVED: ActionType = ActionType("chat/workingDirectoryRemoved")
@@ -727,6 +729,24 @@ data class ChatActivityChangedAction(
      * Human-readable description of current activity; omit or set `undefined` to clear
      */
     val activity: String? = null
+)
+
+@Serializable
+data class ChatBackgroundShellSetAction(
+    val type: ActionType,
+    /**
+     * Complete shell metadata.
+     */
+    val shell: BackgroundShellInfo
+)
+
+@Serializable
+data class ChatBackgroundShellRemovedAction(
+    val type: ActionType,
+    /**
+     * Identifier scoped to the owning chat.
+     */
+    val shellId: String
 )
 
 @Serializable
@@ -1573,6 +1593,10 @@ data class PartialChatSummary(
      */
     val activity: String? = null,
     /**
+     * Active background shells, mirrored from {@link ChatState.backgroundShells}.
+     */
+    val backgroundShells: List<BackgroundShellInfo>? = null,
+    /**
      * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
      */
     val modifiedAt: String? = null,
@@ -1634,6 +1658,8 @@ sealed interface StateAction
 @JvmInline value class StateActionChatError(val value: ChatErrorAction) : StateAction
 @JvmInline value class StateActionChatTurnResume(val value: ChatTurnResumeAction) : StateAction
 @JvmInline value class StateActionChatActivityChanged(val value: ChatActivityChangedAction) : StateAction
+@JvmInline value class StateActionChatBackgroundShellSet(val value: ChatBackgroundShellSetAction) : StateAction
+@JvmInline value class StateActionChatBackgroundShellRemoved(val value: ChatBackgroundShellRemovedAction) : StateAction
 @JvmInline value class StateActionChatChangesetsChanged(val value: ChatChangesetsChangedAction) : StateAction
 @JvmInline value class StateActionSessionTitleChanged(val value: SessionTitleChangedAction) : StateAction
 @JvmInline value class StateActionChatUsage(val value: ChatUsageAction) : StateAction
@@ -1748,6 +1774,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             "chat/error" -> StateActionChatError(input.json.decodeFromJsonElement(ChatErrorAction.serializer(), element))
             "chat/turnResume" -> StateActionChatTurnResume(input.json.decodeFromJsonElement(ChatTurnResumeAction.serializer(), element))
             "chat/activityChanged" -> StateActionChatActivityChanged(input.json.decodeFromJsonElement(ChatActivityChangedAction.serializer(), element))
+            "chat/backgroundShellSet" -> StateActionChatBackgroundShellSet(input.json.decodeFromJsonElement(ChatBackgroundShellSetAction.serializer(), element))
+            "chat/backgroundShellRemoved" -> StateActionChatBackgroundShellRemoved(input.json.decodeFromJsonElement(ChatBackgroundShellRemovedAction.serializer(), element))
             "chat/changesetsChanged" -> StateActionChatChangesetsChanged(input.json.decodeFromJsonElement(ChatChangesetsChangedAction.serializer(), element))
             "session/titleChanged" -> StateActionSessionTitleChanged(input.json.decodeFromJsonElement(SessionTitleChangedAction.serializer(), element))
             "chat/usage" -> StateActionChatUsage(input.json.decodeFromJsonElement(ChatUsageAction.serializer(), element))
@@ -1855,6 +1883,8 @@ internal object StateActionSerializer : KSerializer<StateAction> {
             is StateActionChatError -> output.json.encodeToJsonElement(ChatErrorAction.serializer(), value.value)
             is StateActionChatTurnResume -> output.json.encodeToJsonElement(ChatTurnResumeAction.serializer(), value.value)
             is StateActionChatActivityChanged -> output.json.encodeToJsonElement(ChatActivityChangedAction.serializer(), value.value)
+            is StateActionChatBackgroundShellSet -> output.json.encodeToJsonElement(ChatBackgroundShellSetAction.serializer(), value.value)
+            is StateActionChatBackgroundShellRemoved -> output.json.encodeToJsonElement(ChatBackgroundShellRemovedAction.serializer(), value.value)
             is StateActionChatChangesetsChanged -> output.json.encodeToJsonElement(ChatChangesetsChangedAction.serializer(), value.value)
             is StateActionSessionTitleChanged -> output.json.encodeToJsonElement(SessionTitleChangedAction.serializer(), value.value)
             is StateActionChatUsage -> output.json.encodeToJsonElement(ChatUsageAction.serializer(), value.value)

@@ -204,6 +204,23 @@ public func chatReducer(state: ChatState, action: StateAction) -> ChatState {
         next.activity = a.activity
         return next
 
+    case .chatBackgroundShellSet(let a):
+        var next = state
+        var shells = state.backgroundShells ?? []
+        if let idx = shells.firstIndex(where: { $0.id == a.shell.id }) {
+            shells[idx] = a.shell
+        } else {
+            shells.append(a.shell)
+        }
+        next.backgroundShells = shells
+        return next
+
+    case .chatBackgroundShellRemoved(let a):
+        guard let idx = state.backgroundShells?.firstIndex(where: { $0.id == a.shellId }) else { return state }
+        var next = state
+        next.backgroundShells?.remove(at: idx)
+        return next
+
     case .chatChangesetsChanged(let a):
         var next = state
         next.changesets = a.changesets
@@ -1053,6 +1070,7 @@ private func mergeChatSummaryChanges(_ summary: inout ChatSummary, changes: Part
     if let title = changes.title { summary.title = title }
     if let status = changes.status { summary.status = status }
     if let activity = changes.activity { summary.activity = activity }
+    if let shells = changes.backgroundShells { summary.backgroundShells = shells }
     if let modifiedAt = changes.modifiedAt { summary.modifiedAt = modifiedAt }
     if let origin = changes.origin { summary.origin = origin }
     if let workingDirectories = changes.workingDirectories { summary.workingDirectories = workingDirectories }

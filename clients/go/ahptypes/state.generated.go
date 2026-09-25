@@ -359,6 +359,22 @@ const (
 	TerminalLifecycleStatusExited  TerminalLifecycleStatus = "exited"
 )
 
+// Activity of a background shell that has not finished.
+type BackgroundShellStatus string
+
+const (
+	BackgroundShellStatusRunning BackgroundShellStatus = "running"
+	BackgroundShellStatusIdle    BackgroundShellStatus = "idle"
+)
+
+// Whether a background shell is retained by its agent or runs independently.
+type BackgroundShellAttachmentMode string
+
+const (
+	BackgroundShellAttachmentModeAttached BackgroundShellAttachmentMode = "attached"
+	BackgroundShellAttachmentModeDetached BackgroundShellAttachmentMode = "detached"
+)
+
 // Discriminant for the {@link McpServerState} union.
 type McpServerStatus string
 
@@ -1248,6 +1264,8 @@ type ChatState struct {
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the chat is currently doing
 	Activity *string `json:"activity,omitempty"`
+	// Active background shells owned by this chat, independent of its current turn.
+	BackgroundShells *[]BackgroundShellInfo `json:"backgroundShells,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt string `json:"modifiedAt"`
 	// How this chat came into existence
@@ -1322,6 +1340,8 @@ type ChatSummary struct {
 	Status SessionStatus `json:"status"`
 	// Human-readable description of what the chat is currently doing
 	Activity *string `json:"activity,omitempty"`
+	// Active background shells, mirrored from {@link ChatState.backgroundShells}.
+	BackgroundShells *[]BackgroundShellInfo `json:"backgroundShells,omitempty"`
 	// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
 	ModifiedAt string `json:"modifiedAt"`
 	// How this chat came into existence
@@ -1335,6 +1355,23 @@ type ChatSummary struct {
 	// The subset of the session's working directories this chat uses.
 	// See {@link ChatState.workingDirectories} for the full semantics.
 	WorkingDirectories []URI `json:"workingDirectories,omitempty"`
+}
+
+// Metadata for a shell command continuing outside its initiating tool call.
+// Shell identity is scoped to the owning chat, not to a turn or terminal.
+type BackgroundShellInfo struct {
+	// Stable identifier within the owning chat.
+	Id string `json:"id"`
+	// Human-readable description of the command's purpose.
+	Description string `json:"description"`
+	// Command line, displayed as plain text.
+	Command string `json:"command"`
+	// Current activity of the unfinished shell.
+	Status BackgroundShellStatus `json:"status"`
+	// ISO 8601 timestamp when the command started.
+	StartedAt string `json:"startedAt"`
+	// Whether the shell remains attached to the agent's lifetime.
+	AttachmentMode BackgroundShellAttachmentMode `json:"attachmentMode"`
 }
 
 // Immutable selected-text snapshot captured when a side chat is created.

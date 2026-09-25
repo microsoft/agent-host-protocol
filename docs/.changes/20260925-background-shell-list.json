@@ -1,0 +1,4 @@
+{
+  "type": "added",
+  "message": "Expose chat-owned active background shells in chat state and session chat summaries, with `chat/backgroundShellSet` and `chat/backgroundShellRemoved` actions independent of turn lifetime."
+}

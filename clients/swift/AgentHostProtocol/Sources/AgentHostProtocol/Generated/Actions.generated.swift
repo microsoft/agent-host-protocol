@@ -31,6 +31,8 @@ public enum ActionType: Codable, Sendable, Equatable {
     case chatError
     case chatTurnResume
     case chatActivityChanged
+    case chatBackgroundShellSet
+    case chatBackgroundShellRemoved
     case chatChangesetsChanged
     case chatWorkingDirectorySet
     case chatWorkingDirectoryRemoved
@@ -137,6 +139,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case "chat/error": self = .chatError
         case "chat/turnResume": self = .chatTurnResume
         case "chat/activityChanged": self = .chatActivityChanged
+        case "chat/backgroundShellSet": self = .chatBackgroundShellSet
+        case "chat/backgroundShellRemoved": self = .chatBackgroundShellRemoved
         case "chat/changesetsChanged": self = .chatChangesetsChanged
         case "chat/workingDirectorySet": self = .chatWorkingDirectorySet
         case "chat/workingDirectoryRemoved": self = .chatWorkingDirectoryRemoved
@@ -243,6 +247,8 @@ public enum ActionType: Codable, Sendable, Equatable {
         case .chatError: try container.encode("chat/error")
         case .chatTurnResume: try container.encode("chat/turnResume")
         case .chatActivityChanged: try container.encode("chat/activityChanged")
+        case .chatBackgroundShellSet: try container.encode("chat/backgroundShellSet")
+        case .chatBackgroundShellRemoved: try container.encode("chat/backgroundShellRemoved")
         case .chatChangesetsChanged: try container.encode("chat/changesetsChanged")
         case .chatWorkingDirectorySet: try container.encode("chat/workingDirectorySet")
         case .chatWorkingDirectoryRemoved: try container.encode("chat/workingDirectoryRemoved")
@@ -1182,6 +1188,34 @@ public struct ChatActivityChangedAction: Codable, Sendable {
     ) {
         self.type = type
         self.activity = activity
+    }
+}
+
+public struct ChatBackgroundShellSetAction: Codable, Sendable {
+    public var type: ActionType
+    /// Complete shell metadata.
+    public var shell: BackgroundShellInfo
+
+    public init(
+        type: ActionType,
+        shell: BackgroundShellInfo
+    ) {
+        self.type = type
+        self.shell = shell
+    }
+}
+
+public struct ChatBackgroundShellRemovedAction: Codable, Sendable {
+    public var type: ActionType
+    /// Identifier scoped to the owning chat.
+    public var shellId: String
+
+    public init(
+        type: ActionType,
+        shellId: String
+    ) {
+        self.type = type
+        self.shellId = shellId
     }
 }
 
@@ -2406,6 +2440,8 @@ public struct PartialChatSummary: Codable, Sendable {
     public var status: SessionStatus?
     /// Human-readable description of what the chat is currently doing
     public var activity: String?
+    /// Active background shells, mirrored from {@link ChatState.backgroundShells}.
+    public var backgroundShells: [BackgroundShellInfo]?
     /// Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
     public var modifiedAt: String?
     /// How this chat came into existence
@@ -2425,6 +2461,7 @@ public struct PartialChatSummary: Codable, Sendable {
         title: String? = nil,
         status: SessionStatus? = nil,
         activity: String? = nil,
+        backgroundShells: [BackgroundShellInfo]? = nil,
         modifiedAt: String? = nil,
         origin: ChatOrigin? = nil,
         interactivity: ChatInteractivity? = nil,
@@ -2434,6 +2471,7 @@ public struct PartialChatSummary: Codable, Sendable {
         self.title = title
         self.status = status
         self.activity = activity
+        self.backgroundShells = backgroundShells
         self.modifiedAt = modifiedAt
         self.origin = origin
         self.interactivity = interactivity
@@ -2470,6 +2508,8 @@ public enum StateAction: Codable, Sendable {
     case chatError(ChatErrorAction)
     case chatTurnResume(ChatTurnResumeAction)
     case chatActivityChanged(ChatActivityChangedAction)
+    case chatBackgroundShellSet(ChatBackgroundShellSetAction)
+    case chatBackgroundShellRemoved(ChatBackgroundShellRemovedAction)
     case chatChangesetsChanged(ChatChangesetsChangedAction)
     case sessionTitleChanged(SessionTitleChangedAction)
     case chatUsage(ChatUsageAction)
@@ -2606,6 +2646,10 @@ public enum StateAction: Codable, Sendable {
             self = .chatTurnResume(try ChatTurnResumeAction(from: decoder))
         case "chat/activityChanged":
             self = .chatActivityChanged(try ChatActivityChangedAction(from: decoder))
+        case "chat/backgroundShellSet":
+            self = .chatBackgroundShellSet(try ChatBackgroundShellSetAction(from: decoder))
+        case "chat/backgroundShellRemoved":
+            self = .chatBackgroundShellRemoved(try ChatBackgroundShellRemovedAction(from: decoder))
         case "chat/changesetsChanged":
             self = .chatChangesetsChanged(try ChatChangesetsChangedAction(from: decoder))
         case "session/titleChanged":
@@ -2786,6 +2830,8 @@ public enum StateAction: Codable, Sendable {
         case .chatError(let v): try v.encode(to: encoder)
         case .chatTurnResume(let v): try v.encode(to: encoder)
         case .chatActivityChanged(let v): try v.encode(to: encoder)
+        case .chatBackgroundShellSet(let v): try v.encode(to: encoder)
+        case .chatBackgroundShellRemoved(let v): try v.encode(to: encoder)
         case .chatChangesetsChanged(let v): try v.encode(to: encoder)
         case .sessionTitleChanged(let v): try v.encode(to: encoder)
         case .chatUsage(let v): try v.encode(to: encoder)

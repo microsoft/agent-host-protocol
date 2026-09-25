@@ -767,6 +767,50 @@ enum class TerminalLifecycleStatus {
 }
 
 /**
+ * Activity of a background shell that has not finished.
+ */
+@Serializable(with = BackgroundShellStatusSerializer::class)
+@JvmInline
+value class BackgroundShellStatus(val rawValue: String) {
+    companion object {
+        val RUNNING: BackgroundShellStatus = BackgroundShellStatus("running")
+        val IDLE: BackgroundShellStatus = BackgroundShellStatus("idle")
+    }
+}
+
+internal object BackgroundShellStatusSerializer : KSerializer<BackgroundShellStatus> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("BackgroundShellStatus", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: BackgroundShellStatus) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): BackgroundShellStatus =
+        BackgroundShellStatus(decoder.decodeString())
+}
+
+/**
+ * Whether a background shell is retained by its agent or runs independently.
+ */
+@Serializable(with = BackgroundShellAttachmentModeSerializer::class)
+@JvmInline
+value class BackgroundShellAttachmentMode(val rawValue: String) {
+    companion object {
+        val ATTACHED: BackgroundShellAttachmentMode = BackgroundShellAttachmentMode("attached")
+        val DETACHED: BackgroundShellAttachmentMode = BackgroundShellAttachmentMode("detached")
+    }
+}
+
+internal object BackgroundShellAttachmentModeSerializer : KSerializer<BackgroundShellAttachmentMode> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("BackgroundShellAttachmentMode", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: BackgroundShellAttachmentMode) {
+        encoder.encodeString(value.rawValue)
+    }
+    override fun deserialize(decoder: Decoder): BackgroundShellAttachmentMode =
+        BackgroundShellAttachmentMode(decoder.decodeString())
+}
+
+/**
  * Discriminant for the {@link McpServerState} union.
  */
 @Serializable(with = McpServerStatusSerializer::class)
@@ -1609,6 +1653,10 @@ data class ChatState(
      */
     val activity: String? = null,
     /**
+     * Active background shells owned by this chat, independent of its current turn.
+     */
+    val backgroundShells: List<BackgroundShellInfo>? = null,
+    /**
      * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
      */
     val modifiedAt: String,
@@ -1713,6 +1761,10 @@ data class ChatSummary(
      * Human-readable description of what the chat is currently doing
      */
     val activity: String? = null,
+    /**
+     * Active background shells, mirrored from {@link ChatState.backgroundShells}.
+     */
+    val backgroundShells: List<BackgroundShellInfo>? = null,
     /**
      * Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)
      */
@@ -1923,6 +1975,34 @@ data class SessionActiveClient(
      * children inside {@link SessionState.customizations}.
      */
     val customizations: List<ClientPluginCustomization>? = null
+)
+
+@Serializable
+data class BackgroundShellInfo(
+    /**
+     * Stable identifier within the owning chat.
+     */
+    val id: String,
+    /**
+     * Human-readable description of the command's purpose.
+     */
+    val description: String,
+    /**
+     * Command line, displayed as plain text.
+     */
+    val command: String,
+    /**
+     * Current activity of the unfinished shell.
+     */
+    val status: BackgroundShellStatus,
+    /**
+     * ISO 8601 timestamp when the command started.
+     */
+    val startedAt: String,
+    /**
+     * Whether the shell remains attached to the agent's lifetime.
+     */
+    val attachmentMode: BackgroundShellAttachmentMode
 )
 
 @Serializable

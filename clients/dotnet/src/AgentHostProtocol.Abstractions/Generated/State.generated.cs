@@ -457,6 +457,26 @@ public enum TerminalLifecycleStatus
     Exited,
 }
 
+/// <summary>Activity of a background shell that has not finished.</summary>
+[JsonConverter(typeof(WireEnumConverter<BackgroundShellStatus>))]
+public enum BackgroundShellStatus
+{
+    [WireValue("running")]
+    Running,
+    [WireValue("idle")]
+    Idle,
+}
+
+/// <summary>Whether a background shell is retained by its agent or runs independently.</summary>
+[JsonConverter(typeof(WireEnumConverter<BackgroundShellAttachmentMode>))]
+public enum BackgroundShellAttachmentMode
+{
+    [WireValue("attached")]
+    Attached,
+    [WireValue("detached")]
+    Detached,
+}
+
 /// <summary>Discriminant for the {@link McpServerState} union.</summary>
 [JsonConverter(typeof(WireEnumConverter<McpServerStatus>))]
 public enum McpServerStatus
@@ -1139,6 +1159,10 @@ public sealed class ChatSummary
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Activity { get; set; }
 
+    /// <summary>Active background shells, mirrored from {@link ChatState.backgroundShells}.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<BackgroundShellInfo>? BackgroundShells { get; set; }
+
     /// <summary>Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)</summary>
     public required string ModifiedAt { get; set; }
 
@@ -1158,6 +1182,29 @@ public sealed class ChatSummary
     /// See {@link ChatState.workingDirectories} for the full semantics.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? WorkingDirectories { get; set; }
+}
+
+/// <summary>Metadata for a shell command continuing outside its initiating tool call.
+/// Shell identity is scoped to the owning chat, not to a turn or terminal.</summary>
+public sealed record BackgroundShellInfo
+{
+    /// <summary>Stable identifier within the owning chat.</summary>
+    public required string Id { get; init; }
+
+    /// <summary>Human-readable description of the command's purpose.</summary>
+    public required string Description { get; init; }
+
+    /// <summary>Command line, displayed as plain text.</summary>
+    public required string Command { get; init; }
+
+    /// <summary>Current activity of the unfinished shell.</summary>
+    public BackgroundShellStatus Status { get; init; }
+
+    /// <summary>ISO 8601 timestamp when the command started.</summary>
+    public required string StartedAt { get; init; }
+
+    /// <summary>Whether the shell remains attached to the agent's lifetime.</summary>
+    public BackgroundShellAttachmentMode AttachmentMode { get; init; }
 }
 
 /// <summary>Full state for a single chat, loaded when a client subscribes to the chat's
@@ -1185,6 +1232,10 @@ public sealed class ChatState
     /// <summary>Human-readable description of what the chat is currently doing</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Activity { get; set; }
+
+    /// <summary>Active background shells owned by this chat, independent of its current turn.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<BackgroundShellInfo>? BackgroundShells { get; set; }
 
     /// <summary>Last modification timestamp (ISO 8601, e.g. `"2025-03-10T18:42:03.123Z"`)</summary>
     public required string ModifiedAt { get; set; }

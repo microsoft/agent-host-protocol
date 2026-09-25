@@ -65,6 +65,8 @@ import type {
   ChatErrorAction,
   ChatTurnResumeAction,
   ChatActivityChangedAction,
+  ChatBackgroundShellSetAction,
+  ChatBackgroundShellRemovedAction,
   ChatChangesetsChangedAction,
   ChatWorkingDirectorySetAction,
   ChatWorkingDirectoryRemovedAction,
@@ -166,6 +168,8 @@ export const enum ActionType {
   ChatError = 'chat/error',
   ChatTurnResume = 'chat/turnResume',
   ChatActivityChanged = 'chat/activityChanged',
+  ChatBackgroundShellSet = 'chat/backgroundShellSet',
+  ChatBackgroundShellRemoved = 'chat/backgroundShellRemoved',
   ChatChangesetsChanged = 'chat/changesetsChanged',
   ChatWorkingDirectorySet = 'chat/workingDirectorySet',
   ChatWorkingDirectoryRemoved = 'chat/workingDirectoryRemoved',
@@ -326,6 +330,8 @@ export type StateAction =
   | ChatErrorAction
   | ChatTurnResumeAction
   | ChatActivityChangedAction
+  | ChatBackgroundShellSetAction
+  | ChatBackgroundShellRemovedAction
   | ChatChangesetsChangedAction
   | ChatWorkingDirectorySetAction
   | ChatWorkingDirectoryRemovedAction

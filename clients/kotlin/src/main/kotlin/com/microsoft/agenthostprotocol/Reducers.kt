@@ -587,6 +587,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 title = c.title ?: prior.title,
                 status = c.status ?: prior.status,
                 activity = c.activity ?: prior.activity,
+                backgroundShells = c.backgroundShells ?: prior.backgroundShells,
                 modifiedAt = c.modifiedAt ?: prior.modifiedAt,
                 origin = c.origin ?: prior.origin,
                 workingDirectories = c.workingDirectories ?: prior.workingDirectories,
@@ -992,6 +993,29 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)
+
+    is StateActionChatBackgroundShellSet -> {
+        val shells = (state.backgroundShells ?: emptyList()).toMutableList()
+        val idx = shells.indexOfFirst { it.id == action.value.shell.id }
+        if (idx < 0) {
+            shells.add(action.value.shell)
+        } else {
+            shells[idx] = action.value.shell
+        }
+        state.copy(backgroundShells = shells)
+    }
+
+    is StateActionChatBackgroundShellRemoved -> {
+        val shells = state.backgroundShells
+        val idx = shells?.indexOfFirst { it.id == action.value.shellId } ?: -1
+        if (shells == null || idx < 0) {
+            state
+        } else {
+            val next = shells.toMutableList()
+            next.removeAt(idx)
+            state.copy(backgroundShells = next)
+        }
+    }
 
     is StateActionChatChangesetsChanged ->
         state.copy(changesets = action.value.changesets)

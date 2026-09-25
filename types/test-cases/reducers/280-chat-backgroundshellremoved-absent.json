@@ -1,0 +1,21 @@
+{
+  "description": "removing a background shell without an inventory is a no-op",
+  "reducer": "chat",
+  "initial": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": []
+  },
+  "actions": [
+    { "type": "chat/backgroundShellRemoved", "shellId": "missing" }
+  ],
+  "expected": {
+    "resource": "ahp-chat:/session/main",
+    "title": "Test Chat",
+    "status": 1,
+    "modifiedAt": "2026-09-25T00:00:00.000Z",
+    "turns": []
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "description": "an explicitly empty shell list clears a chat's previous inventory",
+  "reducer": "session",
+  "initial": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [
+      {
+        "resource": "ahp-chat:/session/main",
+        "title": "Main",
+        "status": 1,
+        "modifiedAt": "2026-09-25T00:00:00.000Z",
+        "backgroundShells": [
+          {
+            "id": "shell-1",
+            "description": "Run tests",
+            "command": "npm test",
+            "status": "running",
+            "startedAt": "2026-09-25T00:00:00.000Z",
+            "attachmentMode": "attached"
+          }
+        ]
+      }
+    ]
+  },
+  "actions": [
+    {
+      "type": "session/chatUpdated",
+      "chat": "ahp-chat:/session/main",
+      "changes": { "backgroundShells": [] }
+    }
+  ],
+  "expected": {
+    "provider": "copilot",
+    "title": "Session",
+    "status": 1,
+    "lifecycle": "ready",
+    "activeClients": [],
+    "chats": [
+      {
+        "resource": "ahp-chat:/session/main",
+        "title": "Main",
+        "status": 1,
+        "modifiedAt": "2026-09-25T00:00:00.000Z",
+        "backgroundShells": []
+      }
+    ]
+  }
+}
