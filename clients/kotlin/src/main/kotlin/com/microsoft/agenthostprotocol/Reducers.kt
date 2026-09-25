@@ -589,6 +589,7 @@ public fun sessionReducer(state: SessionState, action: StateAction): SessionStat
                 activity = c.activity ?: prior.activity,
                 modifiedAt = c.modifiedAt ?: prior.modifiedAt,
                 origin = c.origin ?: prior.origin,
+                parentChat = c.parentChat ?: prior.parentChat,
                 workingDirectories = c.workingDirectories ?: prior.workingDirectories,
             )
             val updated = state.chats.toMutableList()
@@ -962,6 +963,9 @@ public fun chatReducer(state: ChatState, action: StateAction): ChatState = when 
 
     is StateActionChatActivityChanged ->
         state.copy(activity = action.value.activity)
+
+    is StateActionChatParentChanged ->
+        state.copy(parentChat = action.value.parentChat)
 
     is StateActionChatChangesetsChanged ->
         state.copy(changesets = action.value.changesets)

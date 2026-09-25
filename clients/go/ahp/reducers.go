@@ -559,6 +559,9 @@ func ApplyActionToChat(state *ahptypes.ChatState, action ahptypes.StateAction) R
 	case *ahptypes.ChatActivityChangedAction:
 		state.Activity = a.Activity
 		return ReduceOutcomeApplied
+	case *ahptypes.ChatParentChangedAction:
+		state.ParentChat = a.ParentChat
+		return ReduceOutcomeApplied
 	case *ahptypes.ChatChangesetsChangedAction:
 		if a.Changesets == nil {
 			state.Changesets = nil
@@ -820,6 +823,9 @@ func mergeChatSummaryPartial(summary *ahptypes.ChatSummary, changes ahptypes.Par
 	}
 	if changes.Origin != nil {
 		summary.Origin = changes.Origin
+	}
+	if changes.ParentChat != nil {
+		summary.ParentChat = changes.ParentChat
 	}
 	if changes.WorkingDirectories != nil {
 		summary.WorkingDirectories = changes.WorkingDirectories
