@@ -246,9 +246,11 @@ by `(hostId, uri)` so URIs that legitimately collide across hosts
 ## Wire types
 
 The wire types under `src/types/` are generated from `types/*.ts` at the
-repository root and are **not committed** to the repo — avoiding a
-byte-for-byte duplication of the canonical TypeScript sources. Regenerate
-them whenever you pull or change the protocol:
+repository root and are **not committed** to the repo. The generator emits
+ordinary enums in the SDK so its declarations support consumers using
+`isolatedModules` or `verbatimModuleSyntax`, while preserving the canonical
+enum members and their wire values. Regenerate whenever you pull or change
+the protocol:
 
 ```bash
 npm run generate:typescript    # from the repo root
@@ -305,7 +307,9 @@ npm run build
 
 CI runs the generate step automatically before the install/typecheck/test/build
 sequence, so contributors only need to remember step 1 locally after pulling
-protocol changes.
+protocol changes. `npm test` builds the package and includes a packed-package
+consumer check that compiles with `isolatedModules` and `verbatimModuleSyntax`
+and runs the emitted JavaScript.
 
 ## License
 
